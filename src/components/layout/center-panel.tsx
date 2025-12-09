@@ -1,14 +1,20 @@
 import {
   ArrowRight,
+  AtSign,
   ChevronDown,
+  Circle,
   Code,
   Eye,
   FileCode,
   FileText,
+  Forward,
   Globe,
+  Image,
+  Lightbulb,
   ListChecks,
   PanelRight,
   Plus,
+  Send,
   SquareTerminal,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -97,7 +103,7 @@ export const CenterPanel: FC = () => {
 
           {/* Chat Input */}
           <div className="p-4 pt-0 shrink-0">
-            <div className="p-1 rounded-lg bg-gray-500/10 border border-gray-500/20">
+            <div className="max-w-[820px] mx-auto p-1 rounded-lg bg-gray-500/10 border border-gray-500/20">
               {/* Input Area */}
               <div
                 className="p-2 min-h-[60px] text-sm outline-none"

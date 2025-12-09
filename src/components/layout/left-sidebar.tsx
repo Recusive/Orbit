@@ -32,7 +32,7 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
       style={{ width }}
     >
       {/* Header */}
-      <div className="flex items-center h-[35px] border-b border-gray-500/10 shrink-0">
+      <div className="flex items-center h-[35px] shrink-0">
         {/* Fixed icon column */}
         <div
           className="flex items-center justify-center shrink-0"
@@ -43,7 +43,17 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
             className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors opacity-70 hover:opacity-100"
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <PanelLeft className="h-4 w-4" />
+            <div className="relative h-4 w-4">
+              <PanelLeft className="h-4 w-4" />
+              {/* Fill indicator when sidebar is expanded */}
+              <div
+                className={cn(
+                  'absolute left-[2px] top-[2px] w-[4px] h-[12px] bg-current transition-opacity duration-150',
+                  isCollapsed ? 'opacity-0' : 'opacity-100'
+                )}
+                style={{ borderRadius: '1px 0 0 1px' }}
+              />
+            </div>
           </button>
         </div>
         {/* Text that slides in */}
@@ -122,9 +132,7 @@ const SidebarItem: FC<SidebarItemProps> = ({
     <button
       className={cn(
         'flex items-center h-8 rounded-md mx-1.5 transition-colors overflow-hidden',
-        active && !collapsed
-          ? 'bg-accent text-accent-foreground'
-          : 'text-foreground/70 hover:text-foreground hover:bg-accent/50'
+        'text-foreground/70 hover:text-foreground hover:bg-accent/50'
       )}
       title={collapsed ? label : undefined}
     >
@@ -159,15 +167,10 @@ interface WorkspaceItemProps {
   readonly collapsed?: boolean;
 }
 
-const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, active, collapsed }) => {
+const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, collapsed }) => {
   return (
     <button
-      className={cn(
-        'flex items-center h-8 rounded-md mx-1.5 transition-colors overflow-hidden',
-        active && !collapsed
-          ? 'bg-accent text-accent-foreground'
-          : 'text-foreground/70 hover:text-foreground hover:bg-accent/50'
-      )}
+      className="flex items-center h-8 rounded-md mx-1.5 transition-colors overflow-hidden text-foreground/70 hover:text-foreground hover:bg-accent/50"
     >
       {/* Fixed-width icon column */}
       <div
