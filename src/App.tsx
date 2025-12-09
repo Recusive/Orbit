@@ -1,7 +1,13 @@
-import { RootLayout } from '@/layout/RootLayout'
+import type { FC } from 'react';
 
-function App(): React.JSX.Element {
-  return <RootLayout />
-}
+import { RootLayout } from '@/components/layout';
 
-export default App
+const App: FC = () => {
+  return (
+    <div className="dark">
+      <RootLayout />
+    </div>
+  );
+};
+
+export default App;

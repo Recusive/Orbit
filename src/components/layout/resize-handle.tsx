@@ -1,70 +1,47 @@
-import React, { useCallback, useRef, useState, useEffect } from 'react';
+import type { FC } from 'react';
+
+import { cn } from '@/lib/utils';
+import { useUIStore } from '@/stores/ui-store';
 
 interface ResizeHandleProps {
-  direction: 'horizontal' | 'vertical';
-  onResize: (delta: number) => void;
-  className?: string;
+  readonly direction: 'horizontal' | 'vertical';
+  readonly target: 'right' | 'bottom';
 }
 
-export const ResizeHandle: React.FC<ResizeHandleProps> = ({
-  direction,
-  onResize,
-  className = '',
-}) => {
-  const [isResizing, setIsResizing] = useState(false);
-  const startPosRef = useRef(0);
+export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
+  const { setRightPanelWidth, setBottomPanelHeight } = useUIStore();
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent): void => {
-      e.preventDefault();
-      setIsResizing(true);
-      startPosRef.current = direction === 'horizontal' ? e.clientX : e.clientY;
-    },
-    [direction]
-  );
+  const handleMouseDown = (e: React.MouseEvent): void => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
 
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseMove = (e: MouseEvent): void => {
-      const currentPos = direction === 'horizontal' ? e.clientX : e.clientY;
-      const delta = currentPos - startPosRef.current;
-      onResize(delta);
-      startPosRef.current = currentPos;
+    const handleMouseMove = (moveEvent: MouseEvent): void => {
+      if (target === 'right') {
+        const delta = startX - moveEvent.clientX;
+        setRightPanelWidth(400 + delta);
+      } else {
+        const delta = startY - moveEvent.clientY;
+        setBottomPanelHeight(200 + delta);
+      }
     };
 
     const handleMouseUp = (): void => {
-      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-
-    // Change cursor while resizing
-    document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize';
-    document.body.style.userSelect = 'none';
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [isResizing, direction, onResize]);
-
-  const baseClasses =
-    direction === 'horizontal'
-      ? 'w-1 cursor-col-resize hover:bg-blue-500/50'
-      : 'h-1 cursor-row-resize hover:bg-blue-500/50';
-
-  const activeClasses = isResizing ? 'bg-blue-500' : 'bg-border';
+  };
 
   return (
     <div
-      className={`${baseClasses} ${activeClasses} transition-colors ${className}`}
+      className={cn(
+        'shrink-0 bg-border/50 hover:bg-primary/50 transition-colors',
+        direction === 'vertical' ? 'w-1 cursor-col-resize' : 'h-1 cursor-row-resize'
+      )}
       onMouseDown={handleMouseDown}
-      role="separator"
-      aria-orientation={direction}
     />
   );
 };

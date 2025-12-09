@@ -23,10 +23,4 @@ export type {
   TerminalOutput,
 } from './terminal-store';
 
-export { useUiStore } from './ui-store';
-export type {
-  UiState,
-  PanelState,
-  PanelPosition,
-  ThemeMode,
-} from './ui-store';
+export { useUIStore, useIsLeftSidebarCollapsed } from './ui-store';
