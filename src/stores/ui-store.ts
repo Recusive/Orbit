@@ -2,40 +2,44 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
 interface UIState {
+  // Left Sidebar
   leftSidebarOpen: boolean;
   leftSidebarWidth: number;
-  rightPanelOpen: boolean;
-  rightPanelWidth: number;
+  // Review Panel (inside center area as split)
+  reviewPanelOpen: boolean;
+  reviewPanelWidth: number;
+  // Right Sidebar (Sessions)
+  rightSidebarOpen: boolean;
+  // Bottom Panel (Terminal)
   bottomPanelOpen: boolean;
   bottomPanelHeight: number;
-  farRightPanelOpen: boolean;
 }
 
 interface UIActions {
   toggleLeftSidebar: () => void;
   expandLeftSidebar: () => void;
   collapseLeftSidebar: () => void;
-  toggleRightPanel: () => void;
+  toggleReviewPanel: () => void;
+  toggleRightSidebar: () => void;
   toggleBottomPanel: () => void;
-  toggleFarRightPanel: () => void;
-  setRightPanelWidth: (width: number) => void;
+  setReviewPanelWidth: (width: number) => void;
   setBottomPanelHeight: (height: number) => void;
 }
 
 type UIStore = UIState & UIActions;
 
-const SIDEBAR_COLLAPSED = 52;
+const SIDEBAR_COLLAPSED = 40;
 const SIDEBAR_EXPANDED = 256;
 
 export const useUIStore = create<UIStore>()(
   immer((set) => ({
     leftSidebarOpen: true,
     leftSidebarWidth: SIDEBAR_EXPANDED,
-    rightPanelOpen: false,
-    rightPanelWidth: 400,
-    bottomPanelOpen: true,
+    reviewPanelOpen: false,
+    reviewPanelWidth: 400,
+    rightSidebarOpen: false,
+    bottomPanelOpen: false,
     bottomPanelHeight: 200,
-    farRightPanelOpen: false,
 
     toggleLeftSidebar: (): void => {
       set((state) => {
@@ -59,9 +63,15 @@ export const useUIStore = create<UIStore>()(
       });
     },
 
-    toggleRightPanel: (): void => {
+    toggleReviewPanel: (): void => {
       set((state) => {
-        state.rightPanelOpen = !state.rightPanelOpen;
+        state.reviewPanelOpen = !state.reviewPanelOpen;
+      });
+    },
+
+    toggleRightSidebar: (): void => {
+      set((state) => {
+        state.rightSidebarOpen = !state.rightSidebarOpen;
       });
     },
 
@@ -71,15 +81,9 @@ export const useUIStore = create<UIStore>()(
       });
     },
 
-    toggleFarRightPanel: (): void => {
+    setReviewPanelWidth: (width: number): void => {
       set((state) => {
-        state.farRightPanelOpen = !state.farRightPanelOpen;
-      });
-    },
-
-    setRightPanelWidth: (width: number): void => {
-      set((state) => {
-        state.rightPanelWidth = Math.max(300, Math.min(800, width));
+        state.reviewPanelWidth = Math.max(300, Math.min(800, width));
       });
     },
 

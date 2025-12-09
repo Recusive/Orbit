@@ -1,12 +1,9 @@
-
-
 import { BottomPanel } from './bottom-panel';
 import { CenterPanel } from './center-panel';
-import { FarRightPanel } from './far-right-panel';
 import { HeaderBar } from './header-bar';
 import { LeftSidebar } from './left-sidebar';
 import { ResizeHandle } from './resize-handle';
-import { RightPanel } from './right-panel';
+import { RightSidebar } from './right-sidebar';
 
 import type { FC } from 'react';
 
@@ -15,11 +12,9 @@ import { useUIStore } from '@/stores/ui-store';
 export const RootLayout: FC = () => {
   const {
     leftSidebarWidth,
-    rightPanelOpen,
-    rightPanelWidth,
+    rightSidebarOpen,
     bottomPanelOpen,
     bottomPanelHeight,
-    farRightPanelOpen,
   } = useUIStore();
 
   return (
@@ -31,14 +26,11 @@ export const RootLayout: FC = () => {
 
         <div className="flex-1 flex flex-col min-w-0">
           <div className="flex-1 flex min-h-0">
+            {/* CenterPanel contains Chat + Review split internally */}
             <CenterPanel />
 
-            {rightPanelOpen ? <>
-                <ResizeHandle direction="vertical" target="right" />
-                <RightPanel width={rightPanelWidth} />
-              </> : null}
-
-            {farRightPanelOpen ? <FarRightPanel /> : null}
+            {/* Right Sidebar (Sessions) - separate from Review */}
+            {rightSidebarOpen ? <RightSidebar /> : null}
           </div>
 
           {bottomPanelOpen ? <>
