@@ -12,13 +12,13 @@ export interface ReviewTabsProps {
 export const ReviewTabs: React.FC<ReviewTabsProps> = ({ className = '' }) => {
   return (
     <Tabs defaultValue="files-changed" className={className}>
-      <TabsList className="w-full justify-start border-b border-gray-200 rounded-none bg-transparent p-0">
+      <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0">
         <TabsTrigger
           value="files-changed"
           className="
             px-4 py-2 rounded-none border-b-2 border-transparent
-            data-[state=active]:border-blue-600 data-[state=active]:text-blue-600
-            hover:bg-gray-50 transition-colors
+            data-[state=active]:border-primary data-[state=active]:text-primary
+            hover:bg-muted transition-colors
           "
         >
           Files Changed
@@ -27,8 +27,8 @@ export const ReviewTabs: React.FC<ReviewTabsProps> = ({ className = '' }) => {
           value="source-control"
           className="
             px-4 py-2 rounded-none border-b-2 border-transparent
-            data-[state=active]:border-blue-600 data-[state=active]:text-blue-600
-            hover:bg-gray-50 transition-colors
+            data-[state=active]:border-primary data-[state=active]:text-primary
+            hover:bg-muted transition-colors
           "
         >
           Source Control

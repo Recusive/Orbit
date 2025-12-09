@@ -25,9 +25,7 @@ export const ToolCallBlock: FC<ToolCallBlockProps> = ({
 
   const getExitCodeColor = (code?: number): string => {
     if (code === undefined) return 'text-muted-foreground';
-    return code === 0
-      ? 'text-green-600 dark:text-green-400'
-      : 'text-red-600 dark:text-red-400';
+    return code === 0 ? 'text-success' : 'text-destructive';
   };
 
   return (

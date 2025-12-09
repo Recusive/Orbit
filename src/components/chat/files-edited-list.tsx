@@ -34,11 +34,11 @@ export const FilesEditedList: FC<FilesEditedListProps> = ({
   const getStatusColor = (status: FileEdit['status']): string => {
     switch (status) {
       case 'added':
-        return 'text-green-600 bg-green-50 dark:bg-green-950/30 dark:text-green-400';
+        return 'text-success bg-success-muted';
       case 'modified':
-        return 'text-blue-600 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400';
+        return 'text-info bg-info-muted';
       case 'deleted':
-        return 'text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400';
+        return 'text-destructive bg-destructive/10';
       default:
         return 'text-muted-foreground bg-muted';
     }

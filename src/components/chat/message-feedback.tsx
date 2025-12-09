@@ -26,7 +26,7 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
         disabled={selected !== null}
         className={`p-1.5 rounded transition-colors ${
           selected === 'good'
-            ? 'bg-green-100 dark:bg-green-950/30 text-green-600 dark:text-green-400'
+            ? 'bg-success-muted text-success'
             : selected === null
             ? 'hover:bg-accent text-muted-foreground hover:text-foreground'
             : 'text-muted-foreground/50 cursor-not-allowed'
@@ -42,7 +42,7 @@ export const MessageFeedback: FC<MessageFeedbackProps> = ({
         disabled={selected !== null}
         className={`p-1.5 rounded transition-colors ${
           selected === 'bad'
-            ? 'bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400'
+            ? 'bg-destructive/10 text-destructive'
             : selected === null
             ? 'hover:bg-accent text-muted-foreground hover:text-foreground'
             : 'text-muted-foreground/50 cursor-not-allowed'

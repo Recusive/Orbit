@@ -60,13 +60,13 @@ const getFileIcon = (fileName: string): typeof File => {
 const getFileColor = (fileName: string): string => {
   const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
 
-  if (['ts', 'tsx'].includes(ext)) return 'text-blue-500';
-  if (['js', 'jsx'].includes(ext)) return 'text-yellow-500';
-  if (['py'].includes(ext)) return 'text-blue-400';
-  if (['json'].includes(ext)) return 'text-green-500';
-  if (['html', 'xml'].includes(ext)) return 'text-orange-500';
-  if (['css', 'scss'].includes(ext)) return 'text-purple-500';
-  if (['md'].includes(ext)) return 'text-gray-500';
+  if (['ts', 'tsx'].includes(ext)) return 'text-file-typescript';
+  if (['js', 'jsx'].includes(ext)) return 'text-file-javascript';
+  if (['py'].includes(ext)) return 'text-file-python';
+  if (['json'].includes(ext)) return 'text-file-json';
+  if (['html', 'xml'].includes(ext)) return 'text-file-html';
+  if (['css', 'scss'].includes(ext)) return 'text-file-css';
+  if (['md'].includes(ext)) return 'text-muted-foreground';
 
   return 'text-muted-foreground';
 };

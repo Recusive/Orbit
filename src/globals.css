@@ -58,12 +58,40 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
-  /* Custom app colors */
+  /* Status colors */
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
   --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-muted: var(--info-muted);
+
+  /* Diff colors */
   --color-diff-added: var(--diff-added);
+  --color-diff-added-border: var(--diff-added-border);
+  --color-diff-added-text: var(--diff-added-text);
   --color-diff-removed: var(--diff-removed);
+  --color-diff-removed-border: var(--diff-removed-border);
+  --color-diff-removed-text: var(--diff-removed-text);
+  --color-diff-hunk: var(--diff-hunk);
+  --color-diff-hunk-border: var(--diff-hunk-border);
+  --color-diff-hunk-text: var(--diff-hunk-text);
+
+  /* File type colors */
+  --color-file-typescript: var(--file-typescript);
+  --color-file-javascript: var(--file-javascript);
+  --color-file-python: var(--file-python);
+  --color-file-json: var(--file-json);
+  --color-file-html: var(--file-html);
+  --color-file-css: var(--file-css);
+
+  /* Terminal theme */
+  --color-terminal-bg: var(--terminal-bg);
+  --color-terminal-fg: var(--terminal-fg);
+  --color-terminal-cursor: var(--terminal-cursor);
 }
 
 :root {
@@ -118,12 +146,40 @@
   --sidebar-border: oklch(0.88 0.02 70);
   --sidebar-ring: oklch(0.62 0.18 35);
 
-  /* Custom app colors */
-  --success: #10b981;
-  --warning: #f59e0b;
-  --info: #4facfe;
-  --diff-added: rgba(155, 185, 85, 0.2);
-  --diff-removed: rgba(255, 0, 0, 0.2);
+  /* Status colors */
+  --success: oklch(0.65 0.18 155);
+  --success-foreground: oklch(0.25 0.08 155);
+  --success-muted: oklch(0.95 0.04 155);
+  --warning: oklch(0.75 0.18 85);
+  --warning-foreground: oklch(0.30 0.08 85);
+  --warning-muted: oklch(0.95 0.04 85);
+  --info: oklch(0.65 0.15 240);
+  --info-foreground: oklch(0.25 0.08 240);
+  --info-muted: oklch(0.95 0.04 240);
+
+  /* Diff colors */
+  --diff-added: oklch(0.92 0.06 145);
+  --diff-added-border: oklch(0.65 0.18 145);
+  --diff-added-text: oklch(0.35 0.10 145);
+  --diff-removed: oklch(0.92 0.06 25);
+  --diff-removed-border: oklch(0.55 0.22 25);
+  --diff-removed-text: oklch(0.35 0.12 25);
+  --diff-hunk: oklch(0.95 0.04 240);
+  --diff-hunk-border: oklch(0.65 0.12 240);
+  --diff-hunk-text: oklch(0.35 0.10 240);
+
+  /* File type colors */
+  --file-typescript: oklch(0.60 0.15 240);
+  --file-javascript: oklch(0.75 0.18 90);
+  --file-python: oklch(0.55 0.12 240);
+  --file-json: oklch(0.60 0.18 145);
+  --file-html: oklch(0.65 0.18 45);
+  --file-css: oklch(0.55 0.18 300);
+
+  /* Terminal theme */
+  --terminal-bg: oklch(0.15 0.01 60);
+  --terminal-fg: oklch(0.85 0.01 75);
+  --terminal-cursor: oklch(0.85 0.01 75);
 }
 
 .dark {
@@ -174,12 +230,40 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.55 0.15 38);
 
-  /* Custom app colors */
-  --success: #10b981;
-  --warning: #f59e0b;
-  --info: #4facfe;
-  --diff-added: rgba(155, 185, 85, 0.25);
-  --diff-removed: rgba(255, 100, 100, 0.2);
+  /* Status colors */
+  --success: oklch(0.70 0.18 155);
+  --success-foreground: oklch(0.90 0.04 155);
+  --success-muted: oklch(0.25 0.06 155);
+  --warning: oklch(0.80 0.18 85);
+  --warning-foreground: oklch(0.95 0.04 85);
+  --warning-muted: oklch(0.28 0.06 85);
+  --info: oklch(0.70 0.15 240);
+  --info-foreground: oklch(0.95 0.04 240);
+  --info-muted: oklch(0.25 0.06 240);
+
+  /* Diff colors */
+  --diff-added: oklch(0.28 0.06 145);
+  --diff-added-border: oklch(0.60 0.15 145);
+  --diff-added-text: oklch(0.80 0.10 145);
+  --diff-removed: oklch(0.28 0.08 25);
+  --diff-removed-border: oklch(0.55 0.18 25);
+  --diff-removed-text: oklch(0.80 0.10 25);
+  --diff-hunk: oklch(0.25 0.04 240);
+  --diff-hunk-border: oklch(0.55 0.12 240);
+  --diff-hunk-text: oklch(0.80 0.08 240);
+
+  /* File type colors */
+  --file-typescript: oklch(0.65 0.15 240);
+  --file-javascript: oklch(0.80 0.18 90);
+  --file-python: oklch(0.60 0.12 240);
+  --file-json: oklch(0.65 0.18 145);
+  --file-html: oklch(0.70 0.18 45);
+  --file-css: oklch(0.60 0.18 300);
+
+  /* Terminal theme */
+  --terminal-bg: oklch(0.15 0.01 60);
+  --terminal-fg: oklch(0.85 0.01 75);
+  --terminal-cursor: oklch(0.85 0.01 75);
 }
 
 @layer base {

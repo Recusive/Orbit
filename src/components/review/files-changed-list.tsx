@@ -20,14 +20,14 @@ export const FilesChangedList: React.FC<FilesChangedListProps> = ({
 
   if (filteredFiles.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-gray-500 text-sm">
+      <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
         No files changed
       </div>
     );
   }
 
   return (
-    <div className={`divide-y divide-gray-200 ${className}`}>
+    <div className={`divide-y divide-border ${className}`}>
       {filteredFiles.map((file) => (
         <FileChangeItem key={file.id} file={file} />
       ))}

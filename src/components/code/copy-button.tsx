@@ -33,7 +33,7 @@ export const CopyButton: FC<CopyButtonProps> = ({ text, className = '' }) => {
       title={isCopied ? 'Copied!' : 'Copy to clipboard'}
     >
       {isCopied ? (
-        <Check className="h-4 w-4 text-green-500" />
+        <Check className="h-4 w-4 text-success" />
       ) : (
         <Copy className="h-4 w-4" />
       )}

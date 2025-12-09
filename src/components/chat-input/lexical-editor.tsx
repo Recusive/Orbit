@@ -82,14 +82,14 @@ export const LexicalEditor: React.FC<LexicalEditorProps> = ({
               <ContentEditable
                 className={`
                   min-h-[80px] max-h-[200px] overflow-y-auto
-                  px-4 py-3 rounded-lg border border-gray-300
-                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                  ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}
+                  px-4 py-3 rounded-lg border border-border
+                  focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent
+                  ${disabled ? 'bg-muted cursor-not-allowed' : 'bg-background'}
                 `}
               />
             }
             placeholder={
-              <div className="absolute top-3 left-4 text-gray-400 pointer-events-none">
+              <div className="absolute top-3 left-4 text-muted-foreground pointer-events-none">
                 {placeholder}
               </div>
             }

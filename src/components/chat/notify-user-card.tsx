@@ -39,28 +39,28 @@ export const NotifyUserCard: FC<NotifyUserCardProps> = ({
     switch (type) {
       case 'success':
         return {
-          container: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900',
-          icon: 'text-green-600 dark:text-green-400',
-          text: 'text-green-900 dark:text-green-100',
+          container: 'bg-success-muted border-success/30',
+          icon: 'text-success',
+          text: 'text-success-foreground',
         };
       case 'warning':
         return {
-          container: 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-900',
-          icon: 'text-yellow-600 dark:text-yellow-400',
-          text: 'text-yellow-900 dark:text-yellow-100',
+          container: 'bg-warning-muted border-warning/30',
+          icon: 'text-warning',
+          text: 'text-warning-foreground',
         };
       case 'error':
         return {
-          container: 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900',
-          icon: 'text-red-600 dark:text-red-400',
-          text: 'text-red-900 dark:text-red-100',
+          container: 'bg-destructive/10 border-destructive/30',
+          icon: 'text-destructive',
+          text: 'text-foreground',
         };
       case 'info':
       default:
         return {
-          container: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900',
-          icon: 'text-blue-600 dark:text-blue-400',
-          text: 'text-blue-900 dark:text-blue-100',
+          container: 'bg-info-muted border-info/30',
+          icon: 'text-info',
+          text: 'text-info-foreground',
         };
     }
   };

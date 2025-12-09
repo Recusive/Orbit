@@ -54,18 +54,18 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         className={`
           inline-flex items-center gap-2
           px-3 py-1.5 rounded-md
-          border border-gray-300 bg-white
-          hover:bg-gray-50 hover:border-gray-400
-          focus:outline-none focus:ring-2 focus:ring-blue-500
+          border border-border bg-background
+          hover:bg-muted hover:border-border
+          focus:outline-none focus:ring-2 focus:ring-ring
           transition-colors
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}
       >
-        <Sparkles className="h-4 w-4 text-gray-700" />
-        <span className="text-sm font-medium text-gray-700">
+        <Sparkles className="h-4 w-4 text-foreground" />
+        <span className="text-sm font-medium text-foreground">
           {selectedModel?.name ?? 'Select Model'}
         </span>
-        <ChevronDown className="h-3 w-3 text-gray-500" />
+        <ChevronDown className="h-3 w-3 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
         {models.map((model) => (
@@ -74,13 +74,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             onClick={() => { onChange(model.id); }}
             className={`
               flex items-start gap-3 cursor-pointer p-3
-              ${value === model.id ? 'bg-blue-50' : ''}
+              ${value === model.id ? 'bg-primary/10' : ''}
             `}
           >
-            <Sparkles className="h-4 w-4 mt-0.5 text-gray-700" />
+            <Sparkles className="h-4 w-4 mt-0.5 text-foreground" />
             <div className="flex flex-col">
               <span className="text-sm font-medium">{model.name}</span>
-              <span className="text-xs text-gray-500">{model.description}</span>
+              <span className="text-xs text-muted-foreground">{model.description}</span>
             </div>
           </DropdownMenuItem>
         ))}

@@ -36,7 +36,7 @@ export const ChatInputContainer: React.FC<ChatInputContainerProps> = ({
   };
 
   return (
-    <div className={`border-t border-gray-200 bg-white ${className}`}>
+    <div className={`border-t border-border bg-background ${className}`}>
       <div className="max-w-4xl mx-auto p-4">
         {/* Editor */}
         <div className="mb-3">

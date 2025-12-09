@@ -14,10 +14,10 @@ export const BadgePill: FC<BadgePillProps> = ({
   className = '',
 }) => {
   const variantStyles = {
-    success: 'bg-green-500/10 text-green-600 border-green-500/20',
-    warning: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
+    success: 'bg-success-muted text-success border-success/20',
+    warning: 'bg-warning-muted text-warning border-warning/20',
     error: 'bg-destructive/10 text-destructive border-destructive/20',
-    info: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+    info: 'bg-info-muted text-info border-info/20',
     default: 'bg-muted text-muted-foreground border-border',
   };
 

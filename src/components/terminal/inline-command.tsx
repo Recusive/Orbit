@@ -29,7 +29,7 @@ export const InlineCommand: FC<InlineCommandProps> = ({
         {exitCode !== undefined && (
           <span
             className={`text-xs ml-auto ${
-              hasError ? 'text-destructive' : 'text-green-600'
+              hasError ? 'text-destructive' : 'text-success'
             }`}
           >
             exit {exitCode}

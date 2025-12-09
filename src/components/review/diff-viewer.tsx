@@ -15,7 +15,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 }) => {
   if (hunks.length === 0) {
     return (
-      <div className="py-8 text-center text-sm text-gray-500">
+      <div className="py-8 text-center text-sm text-muted-foreground">
         No changes to display
       </div>
     );
@@ -26,7 +26,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
       {hunks.map((hunk, hunkIndex) => (
         <div key={hunkIndex}>
           {/* Hunk header */}
-          <div className="bg-blue-50 border-l-2 border-blue-400 px-3 py-1 text-blue-800">
+          <div className="bg-diff-hunk border-l-2 border-diff-hunk-border px-3 py-1 text-diff-hunk-text">
             @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
           </div>
           {/* Hunk lines */}

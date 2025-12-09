@@ -26,15 +26,15 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         className={`
           inline-flex items-center justify-center
           h-8 w-8 rounded-md
-          border border-gray-300 bg-white
-          hover:bg-gray-50 hover:border-gray-400
-          focus:outline-none focus:ring-2 focus:ring-blue-500
+          border border-border bg-background
+          hover:bg-muted hover:border-border
+          focus:outline-none focus:ring-2 focus:ring-ring
           transition-colors
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}
         aria-label="Add context"
       >
-        <Plus className="h-4 w-4 text-gray-700" />
+        <Plus className="h-4 w-4 text-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
         <DropdownMenuItem

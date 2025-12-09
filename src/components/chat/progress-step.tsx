@@ -19,20 +19,20 @@ export const ProgressStep: FC<ProgressStepProps> = ({
     switch (status) {
       case 'completed':
         return (
-          <div className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-950/30 flex items-center justify-center">
-            <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
+          <div className="w-5 h-5 rounded-full bg-success-muted flex items-center justify-center">
+            <Check className="w-3 h-3 text-success" />
           </div>
         );
       case 'in_progress':
         return (
-          <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950/30 flex items-center justify-center">
-            <Loader2 className="w-3 h-3 text-blue-600 dark:text-blue-400 animate-spin" />
+          <div className="w-5 h-5 rounded-full bg-info-muted flex items-center justify-center">
+            <Loader2 className="w-3 h-3 text-info animate-spin" />
           </div>
         );
       case 'failed':
         return (
-          <div className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-950/30 flex items-center justify-center">
-            <X className="w-3 h-3 text-red-600 dark:text-red-400" />
+          <div className="w-5 h-5 rounded-full bg-destructive/10 flex items-center justify-center">
+            <X className="w-3 h-3 text-destructive" />
           </div>
         );
       case 'pending':
@@ -52,7 +52,7 @@ export const ProgressStep: FC<ProgressStepProps> = ({
       case 'in_progress':
         return 'text-foreground font-medium';
       case 'failed':
-        return 'text-red-600 dark:text-red-400';
+        return 'text-destructive';
       case 'pending':
       default:
         return 'text-muted-foreground';

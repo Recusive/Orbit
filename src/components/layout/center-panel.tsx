@@ -1,24 +1,22 @@
 import {
   ArrowRight,
   AtSign,
-  ChevronDown,
   Circle,
   Code,
   Eye,
   FileCode,
   FileText,
-  Forward,
   Globe,
   Image,
   Lightbulb,
   ListChecks,
   PanelRight,
   Plus,
-  Send,
   SquareTerminal,
 } from 'lucide-react';
 import { useState } from 'react';
 
+import { ModelSelector } from '@/components/chat/model-selector';
 
 import { ResizeHandle } from './resize-handle';
 
@@ -34,7 +32,7 @@ export const CenterPanel: FC = () => {
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background">
       {/* Shared Header - 40px (spans both Chat and Review) */}
-      <header className="h-[40px] flex items-center justify-between px-4 border-b border-gray-500/20 shrink-0">
+      <header className="h-[40px] flex items-center justify-between px-4 border-b border-border shrink-0">
         {/* Breadcrumb */}
         <div className="flex items-center text-sm">
           <span className="opacity-70 cursor-pointer hover:opacity-100 transition-opacity">
@@ -58,8 +56,8 @@ export const CenterPanel: FC = () => {
             className={cn(
               'flex items-center gap-1.5 px-2 py-1 rounded text-sm transition-colors',
               reviewPanelOpen
-                ? 'bg-gray-500/20 text-foreground'
-                : 'opacity-70 hover:opacity-100 hover:bg-gray-500/20'
+                ? 'bg-accent text-foreground'
+                : 'opacity-70 hover:opacity-100 hover:bg-accent'
             )}
           >
             <ListChecks className="h-4 w-4" />
@@ -78,12 +76,12 @@ export const CenterPanel: FC = () => {
           <div className="flex-1 overflow-y-auto p-4">
             <div className="max-w-3xl mx-auto flex flex-col gap-y-3">
               {/* Example User Message */}
-              <div className="bg-gray-500/15 p-2 rounded-lg">
+              <div className="bg-muted p-2 rounded-lg">
                 <p className="text-sm">Hello! Can you help me create a todo list application?</p>
               </div>
 
               {/* Example Agent Message */}
-              <div className="rounded-lg border border-gray-500/20">
+              <div className="rounded-lg border border-border">
                 <div className="px-2 py-2">
                   <p className="text-sm">
                     I'd be happy to help you create a todo list application! Let me plan out the implementation...
@@ -103,7 +101,7 @@ export const CenterPanel: FC = () => {
 
           {/* Chat Input */}
           <div className="p-4 pt-0 shrink-0">
-            <div className="max-w-[820px] mx-auto p-1 rounded-lg bg-gray-500/10 border border-gray-500/20">
+            <div className="max-w-[820px] mx-auto p-1 rounded-lg bg-muted border border-border">
               {/* Input Area */}
               <div
                 className="p-2 min-h-[60px] text-sm outline-none"
@@ -114,25 +112,36 @@ export const CenterPanel: FC = () => {
 
               {/* Controls Row */}
               <div className="flex w-full items-center justify-between gap-1 px-1 pb-1">
-                {/* Left Controls */}
-                <div className="flex items-center gap-1">
-                  <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-gray-500/20 opacity-70 hover:opacity-100 transition-colors">
-                    <Plus className="h-4 w-4" />
+                {/* Left Controls - Mode & Model Pickers */}
+                <div className="flex items-center gap-0.5">
+                  {/* Mode Picker */}
+                  <button className="h-7 px-2 flex items-center gap-1.5 rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors">
+                    <Circle className="h-3 w-3" />
+                    <span className="text-xs">Default</span>
                   </button>
-                  <button className="py-1 pl-1 pr-2 flex items-center gap-0.5 rounded text-sm hover:bg-gray-500/20 opacity-70 hover:opacity-100 transition-colors">
-                    <ChevronDown className="h-4 w-4" />
-                    <span>Planning</span>
-                  </button>
-                  <button className="py-1 px-2 flex items-center gap-0.5 rounded text-sm hover:bg-gray-500/20 opacity-70 hover:opacity-100 transition-colors">
-                    <ChevronDown className="h-4 w-4" />
-                    <span>Claude Sonnet 4.5</span>
-                  </button>
+                  {/* Model Picker */}
+                  <ModelSelector />
                 </div>
 
-                {/* Send Button */}
-                <button className="h-7 w-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                  <ArrowRight className="h-4 w-4" />
-                </button>
+                {/* Right Controls - Action Buttons */}
+                <div className="flex items-center gap-0.5">
+                  <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Add Context">
+                    <AtSign className="h-4 w-4" />
+                  </button>
+                  <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Toggle Thinking">
+                    <Lightbulb className="h-4 w-4" />
+                  </button>
+                  <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Web Browser">
+                    <Globe className="h-4 w-4" />
+                  </button>
+                  <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Attach Image">
+                    <Image className="h-4 w-4" />
+                  </button>
+                  {/* Send Button */}
+                  <button className="h-7 w-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -160,7 +169,7 @@ const HeaderButton: FC<HeaderButtonProps> = ({ icon: Icon, title, onClick }) => 
   return (
     <button
       onClick={onClick}
-      className="h-7 w-7 flex items-center justify-center rounded opacity-70 hover:opacity-100 hover:bg-gray-500/20 transition-colors"
+      className="h-7 w-7 flex items-center justify-center rounded opacity-70 hover:opacity-100 hover:bg-accent transition-colors"
       title={title}
     >
       <Icon className="h-4 w-4" />
@@ -223,8 +232,8 @@ const TabButton: FC<TabButtonProps> = ({ active, onClick, children }) => {
       className={cn(
         'px-2 py-1 text-xs font-medium transition-colors rounded select-none',
         active
-          ? 'bg-gray-500/20 text-foreground cursor-default'
-          : 'text-muted-foreground hover:text-foreground hover:bg-gray-500/10'
+          ? 'bg-accent text-foreground cursor-default'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
       )}
     >
       {children}
@@ -266,36 +275,38 @@ interface FileChangeItemProps {
 }
 
 const FileChangeItem: FC<FileChangeItemProps> = ({ name, folder, lines, status }) => {
-  const statusColors = {
-    added: '#81b88b',
-    modified: '#e2c08d',
-    deleted: '#c74e39',
+  const getStatusClass = (): string => {
+    switch (status) {
+      case 'added':
+        return 'text-success';
+      case 'modified':
+        return 'text-warning';
+      case 'deleted':
+        return 'text-destructive';
+    }
   };
 
   const getFileIcon = (fileName: string): React.ReactNode => {
     if (fileName.endsWith('.css')) {
-      return <FileText className="h-4 w-4 text-sky-400" />;
+      return <FileText className="h-4 w-4 text-file-css" />;
     }
     if (fileName.endsWith('.html')) {
-      return <FileCode className="h-4 w-4 text-orange-400" />;
+      return <FileCode className="h-4 w-4 text-file-html" />;
     }
     if (fileName.endsWith('.js') || fileName.endsWith('.ts')) {
-      return <FileCode className="h-4 w-4 text-yellow-400" />;
+      return <FileCode className="h-4 w-4 text-file-javascript" />;
     }
     return <FileText className="h-4 w-4" />;
   };
 
   return (
-    <button className="w-full flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-500/20 transition-colors text-left border border-gray-500/20">
+    <button className="w-full flex items-center gap-3 px-3 py-2 rounded hover:bg-accent transition-colors text-left border border-border">
       {getFileIcon(name)}
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{name}</div>
         <div className="text-xs text-muted-foreground truncate">{folder}</div>
       </div>
-      <span
-        className="text-xs font-medium"
-        style={{ color: statusColors[status] }}
-      >
+      <span className={`text-xs font-medium ${getStatusClass()}`}>
         {lines}
       </span>
     </button>
@@ -310,7 +321,7 @@ const SourceControlTab: FC = () => {
           Commit Message
         </label>
         <textarea
-          className="w-full min-h-[80px] px-3 py-2 bg-gray-500/10 border border-gray-500/20 rounded text-xs resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+          className="w-full min-h-[80px] px-3 py-2 bg-muted border border-border rounded text-xs resize-none focus:outline-none focus:ring-1 focus:ring-primary"
           placeholder="Enter commit message..."
         />
       </div>
@@ -318,7 +329,7 @@ const SourceControlTab: FC = () => {
         <button className="flex-1 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors">
           Commit
         </button>
-        <button className="px-3 py-1.5 text-xs font-medium hover:bg-gray-500/20 rounded transition-colors">
+        <button className="px-3 py-1.5 text-xs font-medium hover:bg-accent rounded transition-colors">
           Stash
         </button>
       </div>

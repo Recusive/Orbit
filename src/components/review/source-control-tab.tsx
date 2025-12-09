@@ -47,7 +47,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
   return (
     <div className={`p-4 space-y-4 ${className}`}>
       {/* Branch Info */}
-      <div className="flex items-center gap-2 text-sm text-gray-600">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <GitBranch className="h-4 w-4" />
         <span className="font-medium">main</span>
       </div>
@@ -56,7 +56,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
       <div>
         <label
           htmlFor="commit-message"
-          className="block text-sm font-medium text-gray-700 mb-2"
+          className="block text-sm font-medium text-foreground mb-2"
         >
           Commit Message
         </label>
@@ -68,8 +68,8 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
           rows={4}
           className="
             w-full px-3 py-2 rounded-md
-            border border-gray-300
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+            border border-border
+            focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent
             text-sm
           "
         />
@@ -78,7 +78,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
       {/* Staging Area */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">
+          <h3 className="text-sm font-semibold text-foreground">
             Changes ({changedFiles.length})
           </h3>
           <div className="flex gap-2">
@@ -87,7 +87,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
               disabled={stagedFiles.length === changedFiles.length}
               className="
                 text-xs px-2 py-1 rounded
-                text-blue-600 hover:bg-blue-50
+                text-primary hover:bg-primary/10
                 disabled:opacity-50 disabled:cursor-not-allowed
                 transition-colors
               "
@@ -99,7 +99,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
               disabled={stagedFiles.length === 0}
               className="
                 text-xs px-2 py-1 rounded
-                text-blue-600 hover:bg-blue-50
+                text-primary hover:bg-primary/10
                 disabled:opacity-50 disabled:cursor-not-allowed
                 transition-colors
               "
@@ -119,20 +119,20 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
             return (
               <div
                 key={file.id}
-                className="flex items-center justify-between py-2 px-3 rounded hover:bg-gray-50"
+                className="flex items-center justify-between py-2 px-3 rounded hover:bg-muted"
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <input
                     type="checkbox"
                     checked={isStaged}
                     onChange={() => { handleToggleStage(file.path); }}
-                    className="rounded text-blue-600 focus:ring-blue-500"
+                    className="rounded text-primary focus:ring-ring"
                   />
-                  <span className="text-sm text-gray-700 truncate">
+                  <span className="text-sm text-foreground truncate">
                     {file.path}
                   </span>
                 </div>
-                <span className="text-xs text-gray-500 ml-2">
+                <span className="text-xs text-muted-foreground ml-2">
                   +{additions} -{deletions}
                 </span>
               </div>
@@ -142,15 +142,15 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2 pt-2 border-t border-gray-200">
+      <div className="flex gap-2 pt-2 border-t border-border">
         <button
           onClick={handleCommit}
           disabled={!commitMessage.trim() || stagedFiles.length === 0}
           className="
             flex-1 flex items-center justify-center gap-2
             px-4 py-2 rounded-md
-            bg-blue-600 hover:bg-blue-700
-            text-white text-sm font-medium
+            bg-primary hover:bg-primary/90
+            text-primary-foreground text-sm font-medium
             disabled:opacity-50 disabled:cursor-not-allowed
             transition-colors
           "
@@ -162,8 +162,8 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
           onClick={handlePush}
           className="
             px-4 py-2 rounded-md
-            border border-gray-300 hover:bg-gray-50
-            text-gray-700 text-sm font-medium
+            border border-border hover:bg-muted
+            text-foreground text-sm font-medium
             transition-colors
           "
         >

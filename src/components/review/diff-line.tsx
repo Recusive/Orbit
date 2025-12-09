@@ -11,11 +11,11 @@ export const DiffLine: React.FC<DiffLineProps> = ({ line, className = '' }) => {
   const getBackgroundColor = (): string => {
     switch (line.type) {
       case 'add':
-        return 'bg-green-50 border-l-2 border-green-500';
+        return 'bg-diff-added border-l-2 border-diff-added-border';
       case 'delete':
-        return 'bg-red-50 border-l-2 border-red-500';
+        return 'bg-diff-removed border-l-2 border-diff-removed-border';
       case 'context':
-        return 'bg-white';
+        return 'bg-background';
     }
   };
 
@@ -33,11 +33,11 @@ export const DiffLine: React.FC<DiffLineProps> = ({ line, className = '' }) => {
   const getTextColor = (): string => {
     switch (line.type) {
       case 'add':
-        return 'text-green-800';
+        return 'text-diff-added-text';
       case 'delete':
-        return 'text-red-800';
+        return 'text-diff-removed-text';
       case 'context':
-        return 'text-gray-700';
+        return 'text-foreground';
     }
   };
 
@@ -51,10 +51,10 @@ export const DiffLine: React.FC<DiffLineProps> = ({ line, className = '' }) => {
     >
       {/* Line Numbers */}
       <div className="flex gap-2 px-3 py-1 select-none">
-        <span className="w-10 text-right text-gray-400 tabular-nums">
+        <span className="w-10 text-right text-muted-foreground tabular-nums">
           {line.oldLineNumber ?? ''}
         </span>
-        <span className="w-10 text-right text-gray-400 tabular-nums">
+        <span className="w-10 text-right text-muted-foreground tabular-nums">
           {line.newLineNumber ?? ''}
         </span>
       </div>

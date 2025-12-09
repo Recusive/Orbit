@@ -69,14 +69,14 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
           }}
         >
           <span className="text-sm font-semibold whitespace-nowrap">Agent Manager</span>
-          <span className="bg-gray-500/10 rounded px-1 py-0.5 text-[10px] text-muted-foreground whitespace-nowrap">
+          <span className="bg-muted rounded px-1 py-0.5 text-[10px] text-muted-foreground whitespace-nowrap">
             Preview
           </span>
         </div>
       </div>
 
       {/* Main Actions */}
-      <div className="flex flex-col gap-1 py-1.5 border-b border-gray-500/10 shrink-0">
+      <div className="flex flex-col gap-1 py-1.5 border-b border-border shrink-0">
         <SidebarItem icon={Inbox} label="Inbox" collapsed={isCollapsed} />
         <SidebarItem icon={Plus} label="Start conversation" collapsed={isCollapsed} active />
       </div>
@@ -99,7 +99,7 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
         </div>
       </div>
 
-      <hr className="border-gray-500/20 my-2 shrink-0" />
+      <hr className="border-border my-2 shrink-0" />
 
       {/* Utilities */}
       <div className="flex flex-col gap-1 py-1.5 shrink-0">

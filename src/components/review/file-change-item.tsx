@@ -25,28 +25,28 @@ export const FileChangeItem: React.FC<FileChangeItemProps> = ({
   const deletions = (file.diff?.deletions ?? 0) !== 0 ? (file.diff?.deletions ?? 0) : 0;
 
   return (
-    <div className="bg-white">
+    <div className="bg-background">
       {/* File Header */}
       <button
         onClick={toggleExpanded}
         className="
           w-full flex items-center gap-3 px-4 py-3
-          hover:bg-gray-50 transition-colors
+          hover:bg-muted transition-colors
           text-left
         "
       >
         {/* Expand Icon */}
         {isExpanded ? (
-          <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         ) : (
-          <ChevronRight className="h-4 w-4 text-gray-500 flex-shrink-0" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         )}
 
         {/* File Icon */}
-        <File className="h-4 w-4 text-gray-400 flex-shrink-0" />
+        <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
 
         {/* File Path */}
-        <span className="text-sm font-medium text-gray-900 flex-1 truncate">
+        <span className="text-sm font-medium text-foreground flex-1 truncate">
           {file.path}
         </span>
 
@@ -55,7 +55,7 @@ export const FileChangeItem: React.FC<FileChangeItemProps> = ({
       </button>
 
       {/* Diff Content */}
-      {isExpanded && file.diff ? <div className="border-t border-gray-200 bg-gray-50">
+      {isExpanded && file.diff ? <div className="border-t border-border bg-muted">
           <DiffViewer hunks={file.diff.hunks} />
         </div> : null}
     </div>
