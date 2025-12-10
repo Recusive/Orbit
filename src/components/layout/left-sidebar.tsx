@@ -9,12 +9,15 @@ import {
   Plus,
   Settings,
 } from 'lucide-react';
+import { useCallback } from 'react';
 
+import type {ConversationSummary} from '@/stores/ui-store';
 import type { FC } from 'react';
 
+import { useVSCode } from '@/hooks/use-vscode';
 import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { useUIStore, useIsLeftSidebarCollapsed } from '@/stores/ui-store';
+import { useUIStore, useIsLeftSidebarCollapsed, useWorkspaceName, useConversations, useActiveConversationId  } from '@/stores/ui-store';
 
 interface LeftSidebarProps {
   readonly width: number;
@@ -29,6 +32,26 @@ const getCollapseTransition = (collapsed: boolean): string =>
 export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
   const { toggleLeftSidebar } = useUIStore();
   const isCollapsed = useIsLeftSidebarCollapsed();
+  const workspaceName = useWorkspaceName();
+  const conversations = useConversations();
+  const activeConversationId = useActiveConversationId();
+  const { postMessage } = useVSCode();
+
+  const handleStartConversation = useCallback((): void => {
+    postMessage({
+      type: 'conversation:create',
+      uuid: crypto.randomUUID(),
+      title: 'Untitled',
+    });
+  }, [postMessage]);
+
+  const handleLoadConversation = useCallback((sessionId: string): void => {
+    postMessage({
+      type: 'conversation:load',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+    });
+  }, [postMessage]);
 
   return (
     <aside
@@ -78,7 +101,7 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
       {/* Main Actions */}
       <div className="flex flex-col gap-1 py-1.5 border-b border-border shrink-0">
         <SidebarItem icon={Inbox} label="Inbox" collapsed={isCollapsed} />
-        <SidebarItem icon={Plus} label="Start conversation" collapsed={isCollapsed} active />
+        <SidebarItem icon={Plus} label="Start conversation" collapsed={isCollapsed} active onClick={handleStartConversation} />
       </div>
 
       {/* Workspaces */}
@@ -94,7 +117,17 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
             </button>
           </div>
           <div className="flex flex-col gap-0.5 mt-1">
-            <WorkspaceItem name="Docs" active collapsed={isCollapsed} />
+            {workspaceName ? <WorkspaceItem name={workspaceName} active collapsed={isCollapsed} /> : null}
+            {/* Conversation list under workspace */}
+            {conversations.map((conv) => (
+              <ConversationItem
+                key={conv.sessionId}
+                conversation={conv}
+                active={conv.sessionId === activeConversationId}
+                collapsed={isCollapsed}
+                onClick={() => { handleLoadConversation(conv.sessionId); }}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -119,6 +152,7 @@ interface SidebarItemProps {
   readonly collapsed: boolean;
   readonly active?: boolean;
   readonly small?: boolean;
+  readonly onClick?: () => void;
 }
 
 const SidebarItem: FC<SidebarItemProps> = ({
@@ -127,6 +161,7 @@ const SidebarItem: FC<SidebarItemProps> = ({
   collapsed,
   active,
   small,
+  onClick,
 }) => {
   return (
     <button
@@ -135,6 +170,7 @@ const SidebarItem: FC<SidebarItemProps> = ({
         active ? 'text-foreground' : 'text-foreground/70 hover:text-foreground'
       )}
       title={collapsed ? label : undefined}
+      onClick={onClick}
     >
       {/* Fixed-width icon column - never moves */}
       <div
@@ -184,6 +220,42 @@ const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, collapsed = false }) => {
         style={{ transition: getCollapseTransition(collapsed) }}
       >
         {name}
+      </span>
+    </button>
+  );
+};
+
+interface ConversationItemProps {
+  readonly conversation: ConversationSummary;
+  readonly active?: boolean;
+  readonly collapsed?: boolean;
+  readonly onClick?: () => void;
+}
+
+const ConversationItem: FC<ConversationItemProps> = ({
+  conversation,
+  active = false,
+  collapsed = false,
+  onClick,
+}) => {
+  return (
+    <button
+      className={cn(
+        'flex items-center h-7 rounded-md mx-1.5 ml-5 px-2 transition-colors overflow-hidden hover:bg-accent/50',
+        active ? 'bg-accent/50 text-foreground' : 'text-foreground/70 hover:text-foreground'
+      )}
+      title={collapsed ? conversation.title : undefined}
+      onClick={onClick}
+    >
+      {/* Text */}
+      <span
+        className={cn(
+          'text-sm whitespace-nowrap overflow-hidden text-ellipsis',
+          collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+        )}
+        style={{ transition: getCollapseTransition(collapsed) }}
+      >
+        {conversation.title}
       </span>
     </button>
   );

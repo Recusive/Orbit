@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button';
 import { useVSCode } from '@/hooks/use-vscode';
 import { CONTENT_WIDTH, HEIGHTS, INPUT_SIZES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { useUIStore } from '@/stores/ui-store';
+import { useUIStore, useWorkspaceName, useActiveConversationTitle } from '@/stores/ui-store';
 
 
 
@@ -59,7 +59,9 @@ const getInitialTheme = (): Theme => {
 };
 
 export const CenterPanel: FC = () => {
-  const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, reviewPanelWidth } = useUIStore();
+  const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, reviewPanelWidth, setWorkspace, setActiveConversation, setConversations, addConversation } = useUIStore();
+  const workspaceName = useWorkspaceName();
+  const activeConversationTitle = useActiveConversationTitle();
   const [inputMode, setInputMode] = useState<InputMode>('default');
   const [inputText, setInputText] = useState('');
   const [thinkingEnabled, setThinkingEnabled] = useState(false);
@@ -115,6 +117,12 @@ export const CenterPanel: FC = () => {
     switch (message.type) {
       case 'system:init':
         setSessionId(message.session_id);
+        if (message.cwd) {
+          setWorkspace(message.cwd);
+        }
+        // Request conversation list after init
+        // Note: We can't call postMessage here since it's not defined yet
+        // The conversation list request will be made in a useEffect
         break;
 
       case 'agent:chunk': {
@@ -162,6 +170,37 @@ export const CenterPanel: FC = () => {
 
       case 'conversation:created':
         setSessionId(message.session_id);
+        setActiveConversation(message.session_id, message.title);
+        // Add to conversation list
+        addConversation({
+          sessionId: message.session_id,
+          title: message.title,
+          updatedAt: Date.now(),
+          messageCount: 0,
+        });
+        // Clear messages for new conversation
+        setMessages([]);
+        break;
+
+      case 'conversation:list':
+        setConversations(message.conversations.map(c => ({
+          sessionId: c.session_id,
+          title: c.title,
+          updatedAt: c.updated_at,
+          messageCount: c.message_count,
+        })));
+        break;
+
+      case 'conversation:loaded':
+        setSessionId(message.session_id);
+        setActiveConversation(message.session_id, message.title);
+        // Load full message history
+        setMessages(message.messages.map(m => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          displayedContent: m.content, // Already displayed, no animation
+        })));
         break;
 
       // Handle other message types (no-op for now)
@@ -176,20 +215,18 @@ export const CenterPanel: FC = () => {
       case 'file:changed':
       case 'file:written':
       case 'conversation:deleted':
-      case 'conversation:list':
         break;
     }
-  }, []);
+  }, [setWorkspace, setActiveConversation, setConversations, addConversation]);
 
   const { postMessage, isMockMode } = useVSCode({ onMessage: handleMessage, debug: true });
 
-  // Request a new conversation on mount
+  // Request conversation list when session is ready
   useEffect(() => {
-    if (!sessionId) {
+    if (sessionId) {
       postMessage({
-        type: 'conversation:create',
+        type: 'conversation:list',
         uuid: crypto.randomUUID(),
-        title: 'New Chat',
       });
     }
   }, [sessionId, postMessage]);
@@ -273,10 +310,14 @@ export const CenterPanel: FC = () => {
         {/* Breadcrumb */}
         <div className="flex items-center text-sm">
           <span className="opacity-70 cursor-pointer hover:opacity-100 transition-opacity">
-            Docs
+            {workspaceName ?? 'No workspace'}
           </span>
-          <span className="font-light opacity-30 mx-1">/</span>
-          <span>Creating a Todo List</span>
+          {activeConversationTitle ? <>
+              <span className="mx-2 opacity-30">/</span>
+              <span className="opacity-70">
+                {activeConversationTitle}
+              </span>
+            </> : null}
         </div>
 
         {/* Actions */}

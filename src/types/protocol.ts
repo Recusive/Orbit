@@ -66,6 +66,12 @@ export const GetConversationsSchema = z.object({
   uuid: UUIDSchema,
 });
 
+export const LoadConversationSchema = z.object({
+  type: z.literal('conversation:load'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+});
+
 // Agent control
 export const AgentStartSchema = z.object({
   type: z.literal('agent:start'),
@@ -172,8 +178,16 @@ export const DiffOpenSchema = z.object({
   title: z.string().optional(),
 });
 
+// System
+export const WebviewReadySchema = z.object({
+  type: z.literal('webview:ready'),
+  uuid: UUIDSchema,
+});
+
 // Combined webview → extension
 export const WebviewMessageSchema = z.discriminatedUnion('type', [
+  // System
+  WebviewReadySchema,
   // Chat
   SendMessageSchema,
   EditMessageSchema,
@@ -182,6 +196,7 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   CreateConversationSchema,
   DeleteConversationSchema,
   GetConversationsSchema,
+  LoadConversationSchema,
   // Agent
   AgentStartSchema,
   AgentStopSchema,
@@ -353,6 +368,21 @@ export const ConversationListSchema = z.object({
   ),
 });
 
+export const ConversationLoadedSchema = z.object({
+  type: z.literal('conversation:loaded'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  title: z.string(),
+  messages: z.array(
+    z.object({
+      id: z.string(),
+      role: z.enum(['user', 'assistant']),
+      content: z.string(),
+      timestamp: z.number(),
+    })
+  ),
+});
+
 // General error
 export const ErrorSchema = z.object({
   type: z.literal('error'),
@@ -386,6 +416,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   ConversationCreatedSchema,
   ConversationDeletedSchema,
   ConversationListSchema,
+  ConversationLoadedSchema,
   // Error
   ErrorSchema,
 ]);
@@ -404,6 +435,7 @@ export type DeleteMessage = z.infer<typeof DeleteMessageSchema>;
 export type CreateConversation = z.infer<typeof CreateConversationSchema>;
 export type DeleteConversation = z.infer<typeof DeleteConversationSchema>;
 export type GetConversations = z.infer<typeof GetConversationsSchema>;
+export type LoadConversation = z.infer<typeof LoadConversationSchema>;
 export type AgentStart = z.infer<typeof AgentStartSchema>;
 export type AgentStop = z.infer<typeof AgentStopSchema>;
 export type AgentPause = z.infer<typeof AgentPauseSchema>;
@@ -420,6 +452,7 @@ export type FileReject = z.infer<typeof FileRejectSchema>;
 export type FileAcceptAll = z.infer<typeof FileAcceptAllSchema>;
 export type FileRejectAll = z.infer<typeof FileRejectAllSchema>;
 export type DiffOpen = z.infer<typeof DiffOpenSchema>;
+export type WebviewReady = z.infer<typeof WebviewReadySchema>;
 
 // Extension → Webview
 export type SystemInit = z.infer<typeof SystemInitSchema>;
@@ -438,6 +471,7 @@ export type FileWritten = z.infer<typeof FileWrittenSchema>;
 export type ConversationCreated = z.infer<typeof ConversationCreatedSchema>;
 export type ConversationDeleted = z.infer<typeof ConversationDeletedSchema>;
 export type ConversationList = z.infer<typeof ConversationListSchema>;
+export type ConversationLoaded = z.infer<typeof ConversationLoadedSchema>;
 export type ProtocolError = z.infer<typeof ErrorSchema>;
 
 // ═══════════════════════════════════════════════════════════════

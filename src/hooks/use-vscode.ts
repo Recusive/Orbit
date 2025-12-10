@@ -107,6 +107,19 @@ export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
     };
   }, [debug]);
 
+  // Send webview:ready when connected to VS Code
+  useEffect(() => {
+    if (isConnected && apiRef.current && !isMockMode) {
+      if (debug) {
+        console.warn('[Orbit] Sending webview:ready');
+      }
+      apiRef.current.postMessage({
+        type: 'webview:ready',
+        uuid: crypto.randomUUID(),
+      });
+    }
+  }, [isConnected, isMockMode, debug]);
+
   // Send message with validation
   const postMessage = useCallback(
     (message: WebviewMessage): void => {
@@ -224,11 +237,43 @@ function handleMockMessage(message: WebviewMessage): void {
       break;
     }
 
+    case 'conversation:list': {
+      // Return empty list in mock mode
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'conversation:list',
+            uuid: crypto.randomUUID(),
+            conversations: [],
+          },
+          '*'
+        );
+      }, delay);
+      break;
+    }
+
+    case 'conversation:load': {
+      // Return empty conversation in mock mode
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'conversation:loaded',
+            uuid: crypto.randomUUID(),
+            session_id: message.session_id,
+            title: 'Mock Conversation',
+            messages: [],
+          },
+          '*'
+        );
+      }, delay);
+      break;
+    }
+
     // No mock responses needed for these message types
+    case 'webview:ready':
     case 'message:edit':
     case 'message:delete':
     case 'conversation:delete':
-    case 'conversation:list':
     case 'agent:start':
     case 'agent:stop':
     case 'agent:pause':
@@ -291,13 +336,14 @@ export function useAgentStream(
         case 'tool:end':
           onToolEnd?.(message.tool_name, message.success, message.message_id);
           break;
-        // Not relevant for agent stream handling (these types have session_id)
+        // Not relevant for agent stream handling (these types have session_id but aren't agent events)
         case 'system:init':
         case 'terminal:output':
         case 'terminal:created':
         case 'terminal:exited':
         case 'conversation:created':
         case 'conversation:deleted':
+        case 'conversation:loaded':
           break;
       }
     },
