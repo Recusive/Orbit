@@ -1,6 +1,5 @@
 import { Bot } from 'lucide-react';
 
-import { AgentNarrative } from './agent-narrative';
 import { MessageFeedback } from './message-feedback';
 import { NotifyUserCard } from './notify-user-card';
 import { ProceedIndicator } from './proceed-indicator';
@@ -98,7 +97,7 @@ export const AgentMessage: FC<AgentMessageProps> = ({
         </div>
 
         {/* Narrative */}
-        {content.narrative ? <AgentNarrative content={content.narrative} /> : null}
+        {content.narrative ? <p className="text-sm text-foreground">{content.narrative}</p> : null}
 
         {/* Task Phase Cards */}
         {content.taskPhases && content.taskPhases.length > 0 ? <div className="space-y-3">

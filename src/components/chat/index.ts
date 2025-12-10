@@ -3,7 +3,6 @@ export { MessageFeed } from './message-feed';
 export { MessageSection } from './message-section';
 export { UserMessage } from './user-message';
 export { AgentMessage } from './agent-message';
-export { AgentNarrative } from './agent-narrative';
 export { TaskPhaseCard } from './task-phase-card';
 export { FilesEditedList } from './files-edited-list';
 export { ProgressUpdates } from './progress-updates';

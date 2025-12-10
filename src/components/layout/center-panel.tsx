@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Streamdown } from 'streamdown';
 
 import { ResizeHandle } from './resize-handle';
 
@@ -45,7 +46,8 @@ const INPUT_MODE_LABELS: Record<InputMode, string> = {
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
-  content: string;
+  content: string;           // Full content received from SDK
+  displayedContent: string;  // Content currently displayed (for streaming animation)
   isStreaming?: boolean;
 }
 
@@ -83,6 +85,31 @@ export const CenterPanel: FC = () => {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
   };
 
+  // Streaming animation - use interval to reveal content progressively
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setMessages(prev => {
+        // Find any message where displayedContent hasn't caught up to content
+        const pendingIdx = prev.findIndex(m => m.displayedContent.length < m.content.length);
+        if (pendingIdx === -1) {
+          // All messages fully displayed - nothing to animate
+          return prev;
+        }
+
+        // Reveal 3 characters at a time (slower, more visible)
+        const msg = prev[pendingIdx];
+        if (!msg) return prev;
+        const nextLength = Math.min(msg.displayedContent.length + 3, msg.content.length);
+        const newMsg: ChatMessage = { ...msg, displayedContent: msg.content.slice(0, nextLength) };
+        const updated = [...prev];
+        updated[pendingIdx] = newMsg;
+        return updated;
+      });
+    }, 16); // ~60fps but only 3 chars = ~180 chars/sec
+
+    return () => { clearInterval(intervalId); };
+  }, []); // Empty deps - runs continuously
+
   // VS Code communication
   const handleMessage = useCallback((message: ExtensionMessage): void => {
     switch (message.type) {
@@ -90,41 +117,48 @@ export const CenterPanel: FC = () => {
         setSessionId(message.session_id);
         break;
 
-      case 'agent:chunk':
+      case 'agent:chunk': {
+        // Store full content, animation effect will reveal it progressively
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
+          // If last message is streaming assistant, append to full content
           if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
             return [
               ...prev.slice(0, -1),
               { ...lastMsg, content: lastMsg.content + message.content },
             ];
           }
-          // Create new assistant message
+          // Otherwise create new streaming message (displayedContent starts empty)
           return [
             ...prev,
-            { id: message.message_id, role: 'assistant', content: message.content, isStreaming: true },
+            { id: message.message_id, role: 'assistant', content: message.content, displayedContent: '', isStreaming: true },
           ];
         });
         break;
+      }
 
       case 'agent:complete':
-        setIsAgentRunning(false);
+        // Mark streaming as complete - let animation continue to reveal remaining content
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+            // Don't force displayedContent - let animation finish naturally
             return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false }];
           }
           return prev;
         });
+        setIsAgentRunning(false);
         break;
 
-      case 'agent:error':
+      case 'agent:error': {
         setIsAgentRunning(false);
+        const errorContent = `Error: ${message.error}`;
         setMessages((prev) => [
           ...prev,
-          { id: message.message_id, role: 'assistant', content: `Error: ${message.error}` },
+          { id: message.message_id, role: 'assistant', content: errorContent, displayedContent: errorContent },
         ]);
         break;
+      }
 
       case 'conversation:created':
         setSessionId(message.session_id);
@@ -178,6 +212,7 @@ export const CenterPanel: FC = () => {
       id: crypto.randomUUID(),
       role: 'user',
       content: text,
+      displayedContent: text, // User messages show immediately
     };
     setMessages((prev) => [...prev, userMessage]);
     setIsAgentRunning(true);
@@ -303,10 +338,14 @@ export const CenterPanel: FC = () => {
                       msg.role === 'user' ? 'bg-muted' : 'border border-border'
                     )}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                    {msg.isStreaming ? (
-                      <span className="typing-cursor mt-1" />
-                    ) : null}
+                    {msg.role === 'user' ? (
+                      <p className="text-sm whitespace-pre-wrap">{msg.displayedContent}</p>
+                    ) : (
+                      <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
+                        <Streamdown remarkPlugins={[]} rehypePlugins={[]}>{msg.displayedContent}</Streamdown>
+                        {msg.isStreaming ? <span className="inline-block w-2 h-4 bg-foreground/70 animate-pulse ml-0.5" /> : null}
+                      </div>
+                    )}
                   </div>
                 ))
               )}

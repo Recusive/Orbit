@@ -4,13 +4,31 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
+import type { Plugin } from 'vite'
+
+// Plugin to exclude KaTeX CSS (causes CSP font-src issues in VS Code webviews)
+function excludeKatexCss(): Plugin {
+  return {
+    name: 'exclude-katex-css',
+    transform(code, id) {
+      // Replace katex CSS imports with empty string
+      if (id.includes('katex') && id.endsWith('.css')) {
+        return { code: '', map: null }
+      }
+      return null
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [excludeKatexCss(), react(), tailwindcss()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Exclude KaTeX entirely - causes CSP font-src issues in VS Code webviews
+      'katex/dist/katex.min.css': path.resolve(__dirname, './src/empty.css'),
+      'katex': path.resolve(__dirname, './src/empty-katex.ts'),
     },
   },
   build: {
@@ -26,7 +44,13 @@ export default defineConfig({
           return '[name].[ext]';
         },
         manualChunks: undefined, // Single bundle
+        inlineDynamicImports: true, // Inline all dynamic imports
+        format: 'iife', // Use IIFE format to avoid ES module exports
       },
     },
+  },
+  // Optimize dependencies to ensure proper bundling
+  optimizeDeps: {
+    include: ['streamdown', 'shiki', 'mermaid'],
   },
 })
