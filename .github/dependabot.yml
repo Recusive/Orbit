@@ -6,28 +6,27 @@ updates:
     schedule:
       interval: 'weekly'
       day: 'monday'
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     commit-message:
       prefix: 'deps'
     groups:
-      # Group all minor/patch updates into a single PR
-      dependencies:
+      # Group minor/patch updates - safer to batch
+      minor-and-patch:
         patterns:
           - '*'
         update-types:
           - 'minor'
           - 'patch'
-      # Keep major updates separate for review
-      major:
-        patterns:
-          - '*'
-        update-types:
-          - 'major'
+    # Auto-merge minor/patch if CI passes
+    labels:
+      - 'dependencies'
 
-  # GitHub Actions
+  # GitHub Actions - keep up to date for security
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
       interval: 'weekly'
     commit-message:
       prefix: 'ci'
+    labels:
+      - 'ci'
