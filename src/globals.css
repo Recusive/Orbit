@@ -192,7 +192,7 @@
   --terminal-cursor: oklch(0.85 0.01 75);
 }
 
-.dark {
+html.dark {
   /* Brand palette - adjusted for dark */
   --brand-oat: oklch(0.35 0.015 60);       /* Darkened */
   --brand-clay: oklch(0.55 0.08 55);       /* Lighter for contrast */
@@ -287,7 +287,8 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--background);
+    color: var(--foreground);
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
