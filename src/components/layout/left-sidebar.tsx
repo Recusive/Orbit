@@ -36,7 +36,7 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
       style={{ width }}
     >
       {/* Header */}
-      <div className="flex items-center shrink-0" style={{ height: HEIGHTS.header }}>
+      <div className="flex items-center shrink-0" style={{ height: HEIGHTS.headerBar }}>
         {/* Fixed icon column */}
         <div
           className="flex items-center justify-center shrink-0"

@@ -9,23 +9,29 @@ import {
   Image,
   Lightbulb,
   ListChecks,
+  Loader2,
   Maximize2,
+  Moon,
   PanelRight,
   Plus,
   SquareTerminal,
+  Sun,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ResizeHandle } from './resize-handle';
 
+import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { ModelSelector } from '@/components/chat/model-selector';
 import { Button } from '@/components/ui/button';
+import { useVSCode } from '@/hooks/use-vscode';
 import { CONTENT_WIDTH, HEIGHTS, INPUT_SIZES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui-store';
+
 
 
 type InputMode = 'default' | 'plan' | 'accept';
@@ -36,14 +42,166 @@ const INPUT_MODE_LABELS: Record<InputMode, string> = {
   accept: 'Accept',
 };
 
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  isStreaming?: boolean;
+}
+
+type Theme = 'light' | 'dark';
+
+const getInitialTheme = (): Theme => {
+  if (typeof document === 'undefined') return 'dark';
+  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+};
+
 export const CenterPanel: FC = () => {
   const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, reviewPanelWidth } = useUIStore();
   const [inputMode, setInputMode] = useState<InputMode>('default');
-  const [isInputEmpty, setIsInputEmpty] = useState(true);
+  const [inputText, setInputText] = useState('');
   const [thinkingEnabled, setThinkingEnabled] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isAgentRunning, setIsAgentRunning] = useState(false);
+  const [sessionId, setSessionId] = useState<string>('');
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const inputRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Theme toggle effect
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = (): void => {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
+  };
+
+  // VS Code communication
+  const handleMessage = useCallback((message: ExtensionMessage): void => {
+    switch (message.type) {
+      case 'system:init':
+        setSessionId(message.session_id);
+        break;
+
+      case 'agent:chunk':
+        setMessages((prev) => {
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+            return [
+              ...prev.slice(0, -1),
+              { ...lastMsg, content: lastMsg.content + message.content },
+            ];
+          }
+          // Create new assistant message
+          return [
+            ...prev,
+            { id: message.message_id, role: 'assistant', content: message.content, isStreaming: true },
+          ];
+        });
+        break;
+
+      case 'agent:complete':
+        setIsAgentRunning(false);
+        setMessages((prev) => {
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+            return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false }];
+          }
+          return prev;
+        });
+        break;
+
+      case 'agent:error':
+        setIsAgentRunning(false);
+        setMessages((prev) => [
+          ...prev,
+          { id: message.message_id, role: 'assistant', content: `Error: ${message.error}` },
+        ]);
+        break;
+
+      case 'conversation:created':
+        setSessionId(message.session_id);
+        break;
+
+      // Handle other message types (no-op for now)
+      case 'layout':
+      case 'error':
+      case 'tool:start':
+      case 'tool:end':
+      case 'terminal:output':
+      case 'terminal:created':
+      case 'terminal:exited':
+      case 'file:content':
+      case 'file:changed':
+      case 'file:written':
+      case 'conversation:deleted':
+      case 'conversation:list':
+        break;
+    }
+  }, []);
+
+  const { postMessage, isMockMode } = useVSCode({ onMessage: handleMessage, debug: true });
+
+  // Request a new conversation on mount
+  useEffect(() => {
+    if (!sessionId) {
+      postMessage({
+        type: 'conversation:create',
+        uuid: crypto.randomUUID(),
+        title: 'New Chat',
+      });
+    }
+  }, [sessionId, postMessage]);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleInputChange = (e: React.FormEvent<HTMLDivElement>): void => {
-    setIsInputEmpty(e.currentTarget.textContent.length === 0);
+    setInputText(e.currentTarget.textContent || '');
+  };
+
+  const handleSend = (): void => {
+    const text = inputText.trim();
+    if (!text || isAgentRunning || !sessionId) return;
+
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text,
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setIsAgentRunning(true);
+
+    // Send to VS Code
+    postMessage({
+      type: 'message:send',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+      content: text,
+    });
+
+    // Clear input
+    setInputText('');
+    if (inputRef.current) {
+      inputRef.current.textContent = '';
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   const cycleInputMode = (): void => {
@@ -71,6 +229,8 @@ export const CenterPanel: FC = () => {
     }
   };
 
+  const isInputEmpty = inputText.length === 0;
+
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background">
       {/* Shared Header (spans both Chat and Review) */}
@@ -86,6 +246,14 @@ export const CenterPanel: FC = () => {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="h-7 w-7 flex items-center justify-center rounded opacity-70 hover:opacity-100 hover:bg-accent transition-colors"
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           <HeaderButton icon={Plus} title="New Chat" />
           <HeaderButton icon={Globe} title="Browser" />
           <HeaderButton icon={SquareTerminal} title="Terminal" onClick={toggleBottomPanel} />
@@ -117,27 +285,32 @@ export const CenterPanel: FC = () => {
           {/* Message Feed */}
           <div className="flex-1 overflow-y-auto p-4">
             <div className="max-w-3xl mx-auto flex flex-col gap-y-3">
-              {/* Example User Message */}
-              <div className="bg-muted p-2 rounded-lg">
-                <p className="text-sm">Hello! Can you help me create a todo list application?</p>
-              </div>
-
-              {/* Example Agent Message */}
-              <div className="rounded-lg border border-border">
-                <div className="px-2 py-2">
-                  <p className="text-sm">
-                    I'd be happy to help you create a todo list application! Let me plan out the implementation...
-                  </p>
+              {messages.length === 0 ? (
+                /* Empty state when no messages */
+                <div className="flex-1 flex items-center justify-center" style={{ minHeight: INPUT_SIZES.emptyStateMinHeight }}>
+                  <div className="text-center text-muted-foreground">
+                    <p className="text-lg mb-1">Start a conversation</p>
+                    <p className="text-sm">Ask Orbit to help you code</p>
+                    {isMockMode ? <p className="text-xs mt-2 opacity-50">(Mock mode - no VS Code connection)</p> : null}
+                  </div>
                 </div>
-              </div>
-
-              {/* Empty state when no messages */}
-              <div className="flex-1 flex items-center justify-center" style={{ minHeight: INPUT_SIZES.emptyStateMinHeight }}>
-                <div className="text-center text-muted-foreground">
-                  <p className="text-lg mb-1">Start a conversation</p>
-                  <p className="text-sm">Ask Orbit to help you code</p>
-                </div>
-              </div>
+              ) : (
+                messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={cn(
+                      'p-3 rounded-lg',
+                      msg.role === 'user' ? 'bg-muted' : 'border border-border'
+                    )}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    {msg.isStreaming ? (
+                      <span className="inline-block mt-1 animate-pulse">▋</span>
+                    ) : null}
+                  </div>
+                ))
+              )}
+              <div ref={messagesEndRef} />
             </div>
           </div>
 
@@ -146,13 +319,15 @@ export const CenterPanel: FC = () => {
             <div className={getInputBoxClasses()} style={{ maxWidth: CONTENT_WIDTH.inputBox }}>
               {/* Input Area */}
               <div
+                ref={inputRef}
                 className="p-2 text-sm outline-none"
                 style={{ minHeight: INPUT_SIZES.textareaMinHeight }}
-                contentEditable
+                contentEditable={!isAgentRunning}
                 suppressContentEditableWarning
                 data-placeholder="Plan, @ for context, / for commands"
                 data-empty={isInputEmpty}
                 onInput={handleInputChange}
+                onKeyDown={handleKeyDown}
               />
 
               {/* Controls Row */}
@@ -197,8 +372,21 @@ export const CenterPanel: FC = () => {
                     <Image className="h-4 w-4" />
                   </button>
                   {/* Send Button */}
-                  <button className="h-7 w-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                    <ArrowRight className="h-4 w-4" />
+                  <button
+                    onClick={handleSend}
+                    disabled={isInputEmpty || isAgentRunning}
+                    className={cn(
+                      'h-7 w-7 flex items-center justify-center rounded-full transition-colors',
+                      isInputEmpty || isAgentRunning
+                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    )}
+                  >
+                    {isAgentRunning ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ArrowRight className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </div>

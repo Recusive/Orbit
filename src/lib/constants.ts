@@ -16,7 +16,6 @@ export const SIDEBAR = {
  * Header and panel heights
  */
 export const HEIGHTS = {
-  header: 35,
   panelHeader: 32,
   headerBar: 40,
 } as const;

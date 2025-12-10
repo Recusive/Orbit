@@ -1,5 +1,4 @@
 import { CenterPanel } from './center-panel';
-import { HeaderBar } from './header-bar';
 import { LeftSidebar } from './left-sidebar';
 import { RightSidebar } from './right-sidebar';
 
@@ -15,8 +14,6 @@ export const RootLayout: FC = () => {
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden bg-background text-foreground">
-      <HeaderBar />
-
       <div className="flex-1 flex min-h-0">
         <LeftSidebar width={leftSidebarWidth} />
 
