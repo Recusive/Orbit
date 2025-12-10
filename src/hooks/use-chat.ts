@@ -1,10 +1,12 @@
 import { useCallback, useMemo } from 'react';
 
-import { useChatStore  } from '../stores/chat-store';
+import { useChatStore } from '../stores/chat-store';
+import { generateUUID } from '../types/protocol';
 
 import { useVSCode } from './use-vscode';
 
-import type {Message} from '../stores/chat-store';
+import type { Message } from '../stores/chat-store';
+import type { SendMessage, EditMessage, DeleteMessage } from '../types/protocol';
 
 export interface UseChatReturn {
   messages: Message[];
@@ -21,7 +23,7 @@ export interface UseChatReturn {
  * Handles message sending, editing, and deletion
  */
 export function useChat(): UseChatReturn {
-  const { sendMessage: sendVSCodeMessage } = useVSCode();
+  const { postMessage } = useVSCode();
 
   const activeConversationId = useChatStore((state) => state.activeConversationId);
   const messagesRecord = useChatStore((state) => state.messages);
@@ -47,6 +49,7 @@ export function useChat(): UseChatReturn {
       }
 
       const tempId = `temp-${String(Date.now())}`;
+      const timestamp = Date.now();
 
       // Optimistic update - add message immediately
       const userMessage: Message = {
@@ -54,19 +57,19 @@ export function useChat(): UseChatReturn {
         conversationId: activeConversationId,
         role: 'user',
         content,
-        timestamp: Date.now(),
+        timestamp,
       };
 
       addMessageAction(activeConversationId, userMessage);
 
       try {
         // Send to VS Code extension
-        sendVSCodeMessage({
-          type: 'chat.sendMessage',
-          messageId: tempId,
+        postMessage({
+          type: 'message:send',
+          uuid: generateUUID(),
+          session_id: activeConversationId,
           content,
-          timestamp: Date.now(),
-        });
+        } satisfies SendMessage);
         await Promise.resolve();
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
@@ -83,7 +86,7 @@ export function useChat(): UseChatReturn {
         throw err;
       }
     },
-    [sendVSCodeMessage, addMessageAction, activeConversationId]
+    [postMessage, addMessageAction, activeConversationId]
   );
 
   const editMessage = useCallback(
@@ -101,12 +104,13 @@ export function useChat(): UseChatReturn {
       updateMessageAction(activeConversationId, messageId, { content });
 
       try {
-        sendVSCodeMessage({
-          type: 'chat.editMessage',
-          messageId,
+        postMessage({
+          type: 'message:edit',
+          uuid: generateUUID(),
+          session_id: activeConversationId,
+          message_id: messageId,
           content,
-          timestamp: Date.now(),
-        });
+        } satisfies EditMessage);
         return Promise.resolve();
       } catch (err) {
         // Revert on error
@@ -116,7 +120,7 @@ export function useChat(): UseChatReturn {
         throw err;
       }
     },
-    [sendVSCodeMessage, updateMessageAction, messages, activeConversationId]
+    [postMessage, updateMessageAction, messages, activeConversationId]
   );
 
   const deleteMessage = useCallback(
@@ -131,14 +135,15 @@ export function useChat(): UseChatReturn {
         throw new Error('Message not found');
       }
 
-      sendVSCodeMessage({
-        type: 'chat.deleteMessage',
-        messageId,
-        timestamp: Date.now(),
-      });
+      postMessage({
+        type: 'message:delete',
+        uuid: generateUUID(),
+        session_id: activeConversationId,
+        message_id: messageId,
+      } satisfies DeleteMessage);
       return Promise.resolve();
     },
-    [sendVSCodeMessage, messages, activeConversationId]
+    [postMessage, messages, activeConversationId]
   );
 
   const clearMessages = useCallback(() => {

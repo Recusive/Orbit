@@ -3,7 +3,69 @@
  */
 
 // Protocol types - VS Code postMessage communication
-export * from './protocol';
+// Export selectively to avoid conflicts with domain types
+export {
+  // Schemas
+  WebviewMessageSchema,
+  ExtensionMessageSchema,
+  // Types
+  type WebviewMessage,
+  type ExtensionMessage,
+  // Specific message types (prefixed to avoid conflicts)
+  type SendMessage,
+  type EditMessage,
+  type DeleteMessage,
+  type CreateConversation,
+  type DeleteConversation,
+  type GetConversations,
+  type AgentStart,
+  type AgentStop,
+  type AgentPause,
+  type AgentResume,
+  type TerminalCreate,
+  type TerminalClose,
+  type TerminalClear,
+  type FileOpen,
+  type FileRead,
+  type FileWrite,
+  type FileAccept,
+  type FileReject,
+  type FileAcceptAll,
+  type FileRejectAll,
+  type DiffOpen,
+  // Extension -> Webview types
+  type SystemInit,
+  type AgentChunk,
+  type AgentComplete,
+  type AgentError,
+  type ToolStart,
+  type ToolEnd,
+  type TerminalCreated,
+  type TerminalExited,
+  type FileChanged,
+  type FileWritten,
+  type ConversationCreated,
+  type ConversationDeleted,
+  type ConversationList,
+  type ProtocolError,
+  // Type guards
+  isProtocolAgentMessage,
+  isProtocolToolMessage,
+  isProtocolTerminalMessage,
+  isProtocolFileMessage,
+  // Helpers
+  generateUUID,
+} from './protocol';
+
+// Re-export protocol terminal types with aliases to avoid conflicts
+export {
+  TerminalCommandSchema as ProtocolTerminalCommandSchema,
+  TerminalOutputSchema as ProtocolTerminalOutputSchema,
+  FileContentSchema as ProtocolFileContentSchema,
+  type TerminalCommand as ProtocolTerminalCommand,
+  type TerminalOutput as ProtocolTerminalOutput,
+  type FileContent as ProtocolFileContent,
+} from './protocol';
 
 // Message types - Chat messages and content
 // Note: message.ts exports FileContent and FileContentSchema which conflict with file.ts

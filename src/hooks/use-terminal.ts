@@ -1,10 +1,12 @@
 import { useCallback, useEffect } from 'react';
 
 import { useTerminalStore } from '../stores/terminal-store';
+import { generateUUID } from '../types/protocol';
 
 import { useVSCode } from './use-vscode';
 
 import type { TerminalSession, TerminalOutput } from '../stores/terminal-store';
+import type { TerminalCreate, TerminalClose, TerminalCommand, TerminalClear } from '../types/protocol';
 
 export interface UseTerminalReturn {
   sessions: TerminalSession[];
@@ -23,7 +25,7 @@ export interface UseTerminalReturn {
  * Manages terminal sessions and command execution
  */
 export function useTerminal(defaultSessionId?: string): UseTerminalReturn {
-  const { sendMessage } = useVSCode();
+  const { postMessage } = useVSCode();
 
   const sessions = useTerminalStore((state) => state.sessions);
   const activeSessionId = useTerminalStore((state) => state.activeSessionId);
@@ -50,31 +52,31 @@ export function useTerminal(defaultSessionId?: string): UseTerminalReturn {
       const sessionId = createSessionStore(name, cwd);
 
       // Notify VS Code
-      sendMessage({
-        type: 'terminal.createSession',
-        sessionId,
-        name: name ?? `Terminal`,
+      postMessage({
+        type: 'terminal:create',
+        uuid: generateUUID(),
+        session_id: sessionId,
+        name,
         cwd,
-        timestamp: Date.now(),
-      });
+      } satisfies TerminalCreate);
 
       return sessionId;
     },
-    [sendMessage, createSessionStore]
+    [postMessage, createSessionStore]
   );
 
   const closeSession = useCallback(
     (sessionId: string) => {
       // Notify VS Code
-      sendMessage({
-        type: 'terminal.closeSession',
-        sessionId,
-        timestamp: Date.now(),
-      });
+      postMessage({
+        type: 'terminal:close',
+        uuid: generateUUID(),
+        session_id: sessionId,
+      } satisfies TerminalClose);
 
       closeSessionStore(sessionId);
     },
-    [sendMessage, closeSessionStore]
+    [postMessage, closeSessionStore]
   );
 
   const setActiveSession = useCallback(
@@ -106,14 +108,14 @@ export function useTerminal(defaultSessionId?: string): UseTerminalReturn {
       });
 
       // Send to VS Code
-      sendMessage({
-        type: 'terminal.sendCommand',
-        sessionId: targetSessionId,
+      postMessage({
+        type: 'terminal:command',
+        uuid: generateUUID(),
+        session_id: targetSessionId,
         command,
-        timestamp: Date.now(),
-      });
+      } satisfies TerminalCommand);
     },
-    [sendMessage, activeSessionId, sessions, addOutput]
+    [postMessage, activeSessionId, sessions, addOutput]
   );
 
   const clearTerminal = useCallback(
@@ -128,13 +130,13 @@ export function useTerminal(defaultSessionId?: string): UseTerminalReturn {
       clearOutput(targetSessionId);
 
       // Notify VS Code
-      sendMessage({
-        type: 'terminal.clear',
-        sessionId: targetSessionId,
-        timestamp: Date.now(),
-      });
+      postMessage({
+        type: 'terminal:clear',
+        uuid: generateUUID(),
+        session_id: targetSessionId,
+      } satisfies TerminalClear);
     },
-    [clearOutput, activeSessionId, sendMessage]
+    [clearOutput, activeSessionId, postMessage]
   );
 
   const getSessionOutput = useCallback(

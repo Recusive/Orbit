@@ -1,19 +1,21 @@
 import { useCallback } from 'react';
 
-import { useAgentStore  } from '../stores/agent-store';
+import { useAgentStore } from '../stores/agent-store';
+import { generateUUID } from '../types/protocol';
 
 import { useVSCode } from './use-vscode';
 
-import type {AgentTask} from '../stores/agent-store';
+import type { AgentTask } from '../stores/agent-store';
+import type { AgentStart, AgentStop, AgentPause, AgentResume } from '../types/protocol';
 
 export interface UseAgentReturn {
   status: 'idle' | 'running' | 'paused' | 'error';
   currentTask: AgentTask | null;
   error: string | null;
-  startTask: (task: string, context?: Record<string, unknown>) => Promise<void>;
-  stopTask: () => Promise<void>;
-  pauseTask: () => Promise<void>;
-  resumeTask: () => Promise<void>;
+  startTask: (sessionId: string, task: string, context?: Record<string, unknown>) => Promise<void>;
+  stopTask: (sessionId: string) => Promise<void>;
+  pauseTask: (sessionId: string) => Promise<void>;
+  resumeTask: (sessionId: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -22,7 +24,7 @@ export interface UseAgentReturn {
  * Connects to agent store and VS Code messaging
  */
 export function useAgent(): UseAgentReturn {
-  const { sendMessage } = useVSCode();
+  const { postMessage } = useVSCode();
 
   const phase = useAgentStore((state) => state.phase);
   const isRunning = useAgentStore((state) => state.isRunning);
@@ -41,40 +43,42 @@ export function useAgent(): UseAgentReturn {
   const error = currentTask?.error ?? null;
 
   const startTask = useCallback(
-    (task: string, context?: Record<string, unknown>): Promise<void> => {
+    (sessionId: string, task: string, context?: Record<string, unknown>): Promise<void> => {
       try {
         startTaskAction({
           title: task,
           description: JSON.stringify(context ?? {}),
         });
 
-        sendMessage({
-          type: 'agent.start',
+        postMessage({
+          type: 'agent:start',
+          uuid: generateUUID(),
+          session_id: sessionId,
           task,
           context,
-          timestamp: Date.now(),
-        });
+        } satisfies AgentStart);
         return Promise.resolve();
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to start task';
         if (currentTask) {
           updateTask(currentTask.id, {
             status: 'failed',
-            error: errorMessage
+            error: errorMessage,
           });
         }
         throw err;
       }
     },
-    [sendMessage, startTaskAction, currentTask, updateTask]
+    [postMessage, startTaskAction, currentTask, updateTask]
   );
 
-  const stopTask = useCallback((): Promise<void> => {
+  const stopTask = useCallback((sessionId: string): Promise<void> => {
     try {
-      sendMessage({
-        type: 'agent.stop',
-        timestamp: Date.now(),
-      });
+      postMessage({
+        type: 'agent:stop',
+        uuid: generateUUID(),
+        session_id: sessionId,
+      } satisfies AgentStop);
 
       stopTaskAction();
       return Promise.resolve();
@@ -83,19 +87,20 @@ export function useAgent(): UseAgentReturn {
       if (currentTask) {
         updateTask(currentTask.id, {
           status: 'failed',
-          error: errorMessage
+          error: errorMessage,
         });
       }
       throw err;
     }
-  }, [sendMessage, stopTaskAction, currentTask, updateTask]);
+  }, [postMessage, stopTaskAction, currentTask, updateTask]);
 
-  const pauseTask = useCallback((): Promise<void> => {
+  const pauseTask = useCallback((sessionId: string): Promise<void> => {
     try {
-      sendMessage({
-        type: 'agent.pause',
-        timestamp: Date.now(),
-      });
+      postMessage({
+        type: 'agent:pause',
+        uuid: generateUUID(),
+        session_id: sessionId,
+      } satisfies AgentPause);
 
       if (currentTask) {
         updateTask(currentTask.id, { status: 'pending' });
@@ -106,19 +111,20 @@ export function useAgent(): UseAgentReturn {
       if (currentTask) {
         updateTask(currentTask.id, {
           status: 'failed',
-          error: errorMessage
+          error: errorMessage,
         });
       }
       throw err;
     }
-  }, [sendMessage, currentTask, updateTask]);
+  }, [postMessage, currentTask, updateTask]);
 
-  const resumeTask = useCallback((): Promise<void> => {
+  const resumeTask = useCallback((sessionId: string): Promise<void> => {
     try {
-      sendMessage({
-        type: 'agent.resume',
-        timestamp: Date.now(),
-      });
+      postMessage({
+        type: 'agent:resume',
+        uuid: generateUUID(),
+        session_id: sessionId,
+      } satisfies AgentResume);
 
       if (currentTask) {
         updateTask(currentTask.id, { status: 'in_progress' });
@@ -129,12 +135,12 @@ export function useAgent(): UseAgentReturn {
       if (currentTask) {
         updateTask(currentTask.id, {
           status: 'failed',
-          error: errorMessage
+          error: errorMessage,
         });
       }
       throw err;
     }
-  }, [sendMessage, currentTask, updateTask]);
+  }, [postMessage, currentTask, updateTask]);
 
   const clearError = useCallback(() => {
     if (currentTask?.error) {

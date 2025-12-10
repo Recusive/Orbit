@@ -1,10 +1,12 @@
 import { useCallback } from 'react';
 
 import { useFileStore } from '../stores/file-store';
+import { generateUUID } from '../types/protocol';
 
 import { useVSCode } from './use-vscode';
 
 import type { FileChange, FileChangeType } from '../stores/file-store';
+import type { FileAccept, FileReject, FileAcceptAll, FileRejectAll } from '../types/protocol';
 
 export interface UseFileOperationsReturn {
   changedFiles: FileChange[];
@@ -25,7 +27,7 @@ export interface UseFileOperationsReturn {
  * Handles file change management and VS Code communication
  */
 export function useFileOperations(): UseFileOperationsReturn {
-  const { sendMessage } = useVSCode();
+  const { postMessage } = useVSCode();
 
   const changedFiles = useFileStore((state) => state.changedFiles);
   const selectedFile = useFileStore((state) => state.selectedFile);
@@ -47,17 +49,9 @@ export function useFileOperations(): UseFileOperationsReturn {
         ...(content?.newContent && { newContent: content.newContent }),
       });
 
-      // Notify VS Code
-      sendMessage({
-        type: 'file.change',
-        path,
-        changeType: type,
-        timestamp: Date.now(),
-      });
-
       return id;
     },
-    [sendMessage, addFileChangeStore]
+    [addFileChangeStore]
   );
 
   const selectFile = useCallback(
@@ -72,13 +66,13 @@ export function useFileOperations(): UseFileOperationsReturn {
       acceptFileStore(path);
 
       // Notify VS Code
-      sendMessage({
-        type: 'file.accept',
+      postMessage({
+        type: 'file:accept',
+        uuid: generateUUID(),
         path,
-        timestamp: Date.now(),
-      });
+      } satisfies FileAccept);
     },
-    [sendMessage, acceptFileStore]
+    [postMessage, acceptFileStore]
   );
 
   const rejectFile = useCallback(
@@ -86,34 +80,34 @@ export function useFileOperations(): UseFileOperationsReturn {
       rejectFileStore(path);
 
       // Notify VS Code
-      sendMessage({
-        type: 'file.reject',
+      postMessage({
+        type: 'file:reject',
+        uuid: generateUUID(),
         path,
-        timestamp: Date.now(),
-      });
+      } satisfies FileReject);
     },
-    [sendMessage, rejectFileStore]
+    [postMessage, rejectFileStore]
   );
 
   const acceptAllFiles = useCallback(() => {
     acceptAllFilesStore();
 
     // Notify VS Code
-    sendMessage({
-      type: 'file.acceptAll',
-      timestamp: Date.now(),
-    });
-  }, [sendMessage, acceptAllFilesStore]);
+    postMessage({
+      type: 'file:accept_all',
+      uuid: generateUUID(),
+    } satisfies FileAcceptAll);
+  }, [postMessage, acceptAllFilesStore]);
 
   const rejectAllFiles = useCallback(() => {
     rejectAllFilesStore();
 
     // Notify VS Code
-    sendMessage({
-      type: 'file.rejectAll',
-      timestamp: Date.now(),
-    });
-  }, [sendMessage, rejectAllFilesStore]);
+    postMessage({
+      type: 'file:reject_all',
+      uuid: generateUUID(),
+    } satisfies FileRejectAll);
+  }, [postMessage, rejectAllFilesStore]);
 
   const removeFile = useCallback(
     (path: string) => {

@@ -24,17 +24,3 @@ export {
   type ModelId,
   type ModelTier,
 } from './constants';
-
-// VS Code API
-export {
-  getVSCodeAPI,
-  postMessage,
-  onMessage,
-  getState,
-  setState,
-  isVSCodeEnvironment,
-  createMessageSender,
-  createMessageListener,
-  type VSCodeMessage,
-  type MessageHandler,
-} from './vscode-api';

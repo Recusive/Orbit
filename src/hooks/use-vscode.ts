@@ -1,141 +1,298 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
+
+import { ExtensionMessageSchema, WebviewMessageSchema } from '@/types/protocol';
+
+// ═══════════════════════════════════════════════════════════════
+// Types
+// ═══════════════════════════════════════════════════════════════
 
 interface VSCodeAPI {
   postMessage(message: unknown): void;
+  getState(): unknown;
+  setState(state: unknown): void;
 }
 
 declare global {
-  interface Window {
-    acquireVsCodeApi?: () => VSCodeAPI;
-  }
+  function acquireVsCodeApi(): VSCodeAPI;
 }
 
-export interface VSCodeMessage {
-  type: string;
-  [key: string]: unknown;
+type MessageHandler = (message: ExtensionMessage) => void;
+
+export interface UseVSCodeOptions {
+  onMessage?: MessageHandler;
+  debug?: boolean;
 }
 
 export interface UseVSCodeReturn {
-  sendMessage: (message: VSCodeMessage) => void;
+  postMessage: (message: WebviewMessage) => void;
   isConnected: boolean;
   isMockMode: boolean;
 }
 
-/**
- * Hook for VS Code webview postMessage bridge
- * Handles message sending/receiving and mock mode for development
- */
-export function useVSCode(
-  onMessage?: (message: MessageEvent<VSCodeMessage>) => void
-): UseVSCodeReturn {
+// ═══════════════════════════════════════════════════════════════
+// VS Code API Singleton
+// ═══════════════════════════════════════════════════════════════
+
+let vscodeApi: VSCodeAPI | null = null;
+
+function getVSCodeAPI(): VSCodeAPI | null {
+  if (vscodeApi) return vscodeApi;
+
+  if (typeof acquireVsCodeApi !== 'undefined') {
+    try {
+      vscodeApi = acquireVsCodeApi();
+      return vscodeApi;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Hook
+// ═══════════════════════════════════════════════════════════════
+
+export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
+  const { onMessage, debug = false } = options;
+
   const [isConnected, setIsConnected] = useState(false);
   const [isMockMode, setIsMockMode] = useState(false);
-  const vscodeApiRef = useRef<VSCodeAPI | null>(null);
+  const apiRef = useRef<VSCodeAPI | null>(null);
+  const handlerRef = useRef(onMessage);
 
+  handlerRef.current = onMessage;
+
+  // Initialize API
   useEffect(() => {
-    // Try to acquire VS Code API
-    if (typeof window.acquireVsCodeApi !== 'undefined') {
-      try {
-        vscodeApiRef.current = window.acquireVsCodeApi();
-        setIsConnected(true);
-        setIsMockMode(false);
-      } catch (error) {
-        console.warn('Failed to acquire VS Code API:', error);
-        setIsConnected(false);
-        setIsMockMode(true);
-      }
+    const api = getVSCodeAPI();
+    if (api) {
+      apiRef.current = api;
+      setIsConnected(true);
+      setIsMockMode(false);
     } else {
-      // Development mode - no VS Code API available
-      console.warn('Running in mock mode (no VS Code API available)');
       setIsConnected(false);
       setIsMockMode(true);
+      if (debug) console.warn('[Orbit] Mock mode - no VS Code API');
     }
-  }, []);
+  }, [debug]);
 
+  // Listen for messages with Zod validation
   useEffect(() => {
-    if (!onMessage) return;
+    const handleMessage = (event: MessageEvent<unknown>): void => {
+      const result = ExtensionMessageSchema.safeParse(event.data);
 
-    const handleMessage = (event: MessageEvent<VSCodeMessage>): void => {
-      // In VS Code webview, messages come from the extension host
-      // In development, we might receive messages from our mock handler
-      onMessage(event);
+      if (!result.success) {
+        if (debug) {
+          console.warn('[Orbit] Invalid message:', event.data);
+          console.warn('[Orbit] Errors:', result.error.format());
+        }
+        return;
+      }
+
+      if (debug) {
+        console.warn('[Orbit] Received:', result.data.type);
+      }
+
+      handlerRef.current?.(result.data);
     };
 
     window.addEventListener('message', handleMessage);
-
-    return () => {
+    return (): void => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [onMessage]);
+  }, [debug]);
 
-  const sendMessage = useCallback(
-    (message: VSCodeMessage) => {
-      if (vscodeApiRef.current) {
-        // Send to VS Code extension
-        vscodeApiRef.current.postMessage(message);
+  // Send message with validation
+  const postMessage = useCallback(
+    (message: WebviewMessage): void => {
+      const result = WebviewMessageSchema.safeParse(message);
+      if (!result.success) {
+        console.error('[Orbit] Invalid outgoing message:', result.error.format());
+        return;
+      }
+
+      if (debug) {
+        console.warn('[Orbit] Sending:', message.type);
+      }
+
+      if (apiRef.current) {
+        apiRef.current.postMessage(message);
       } else if (isMockMode) {
-        // Mock mode - log the message
-        console.warn('[Mock VSCode] Sending message:', message);
-
-        // Optionally simulate a response for testing
-        if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) {
-          setTimeout(() => {
-            const mockResponse = createMockResponse(message);
-            if (mockResponse) {
-              window.postMessage(mockResponse, '*');
-            }
-          }, 100);
-        }
-      } else {
-        console.error('Cannot send message: VS Code API not available');
+        if (debug) console.warn('[Orbit Mock]', message);
+        handleMockMessage(message);
       }
     },
-    [isMockMode]
+    [isMockMode, debug]
   );
 
-  return {
-    sendMessage,
-    isConnected,
-    isMockMode,
-  };
+  return { postMessage, isConnected, isMockMode };
 }
 
-/**
- * Create mock responses for development/testing
- */
-function createMockResponse(message: VSCodeMessage): VSCodeMessage | null {
+// ═══════════════════════════════════════════════════════════════
+// Mock handler for browser development
+// ═══════════════════════════════════════════════════════════════
+
+function handleMockMessage(message: WebviewMessage): void {
+  const delay = 100;
+
   switch (message.type) {
-    case 'agent.start':
-      return {
-        type: 'agent.started',
-        taskId: 'mock-task-id',
-        timestamp: Date.now(),
-      };
+    case 'message:send': {
+      const messageId = crypto.randomUUID();
 
-    case 'chat.sendMessage':
-      return {
-        type: 'chat.messageReceived',
-        messageId: 'mock-message-id',
-        content: `Mock response to: ${String(message['content'])}`,
-        timestamp: Date.now(),
-      };
+      // Simulate streaming
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'agent:chunk',
+            uuid: crypto.randomUUID(),
+            session_id: message.session_id,
+            message_id: messageId,
+            content: 'I received: ',
+          },
+          '*'
+        );
+      }, delay);
 
-    case 'file.open':
-      return {
-        type: 'file.opened',
-        path: message['path'],
-        content: '// Mock file content',
-        timestamp: Date.now(),
-      };
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'agent:chunk',
+            uuid: crypto.randomUUID(),
+            session_id: message.session_id,
+            message_id: messageId,
+            content: `"${message.content}"`,
+          },
+          '*'
+        );
+      }, delay * 2);
 
-    case 'terminal.createSession':
-      return {
-        type: 'terminal.sessionCreated',
-        sessionId: 'mock-session-id',
-        timestamp: Date.now(),
-      };
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'agent:complete',
+            uuid: crypto.randomUUID(),
+            session_id: message.session_id,
+            message_id: messageId,
+            duration_ms: delay * 3,
+          },
+          '*'
+        );
+      }, delay * 3);
+      break;
+    }
 
-    default:
-      return null;
+    case 'conversation:create': {
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'conversation:created',
+            uuid: crypto.randomUUID(),
+            session_id: crypto.randomUUID(),
+            title: message.title ?? 'New Conversation',
+          },
+          '*'
+        );
+      }, delay);
+      break;
+    }
+
+    case 'terminal:create': {
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'terminal:created',
+            uuid: crypto.randomUUID(),
+            session_id: message.session_id,
+            name: message.name ?? 'zsh',
+          },
+          '*'
+        );
+      }, delay);
+      break;
+    }
+
+    // No mock responses needed for these message types
+    case 'message:edit':
+    case 'message:delete':
+    case 'conversation:delete':
+    case 'conversation:list':
+    case 'agent:start':
+    case 'agent:stop':
+    case 'agent:pause':
+    case 'agent:resume':
+    case 'terminal:close':
+    case 'terminal:command':
+    case 'terminal:clear':
+    case 'file:open':
+    case 'file:read':
+    case 'file:write':
+    case 'file:accept':
+    case 'file:reject':
+    case 'file:accept_all':
+    case 'file:reject_all':
+    case 'diff:open':
+      break;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Convenience hooks
+// ═══════════════════════════════════════════════════════════════
+
+export interface AgentStreamCallbacks {
+  onChunk: (content: string, messageId: string) => void;
+  onComplete: (
+    messageId: string,
+    usage?: { input_tokens: number; output_tokens: number }
+  ) => void;
+  onError: (error: string, messageId: string) => void;
+  onToolStart?: (toolName: string, messageId: string) => void;
+  onToolEnd?: (toolName: string, success: boolean, messageId: string) => void;
+}
+
+export function useAgentStream(
+  sessionId: string,
+  callbacks: AgentStreamCallbacks
+): void {
+  const { onChunk, onComplete, onError, onToolStart, onToolEnd } = callbacks;
+
+  const handleMessage = useCallback(
+    (message: ExtensionMessage) => {
+      if (!('session_id' in message) || message.session_id !== sessionId) {
+        return;
+      }
+
+      switch (message.type) {
+        case 'agent:chunk':
+          onChunk(message.content, message.message_id);
+          break;
+        case 'agent:complete':
+          onComplete(message.message_id, message.usage);
+          break;
+        case 'agent:error':
+          onError(message.error, message.message_id);
+          break;
+        case 'tool:start':
+          onToolStart?.(message.tool_name, message.message_id);
+          break;
+        case 'tool:end':
+          onToolEnd?.(message.tool_name, message.success, message.message_id);
+          break;
+        // Not relevant for agent stream handling (these types have session_id)
+        case 'system:init':
+        case 'terminal:output':
+        case 'terminal:created':
+        case 'terminal:exited':
+        case 'conversation:created':
+        case 'conversation:deleted':
+          break;
+      }
+    },
+    [sessionId, onChunk, onComplete, onError, onToolStart, onToolEnd]
+  );
+
+  useVSCode({ onMessage: handleMessage });
 }
