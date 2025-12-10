@@ -27,6 +27,8 @@ export interface UseVSCodeOptions {
 
 export interface UseVSCodeReturn {
   postMessage: (message: WebviewMessage) => void;
+  getState: () => unknown;
+  setState: (state: unknown) => void;
   isConnected: boolean;
   isMockMode: boolean;
 }
@@ -128,7 +130,15 @@ export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
     [isMockMode, debug]
   );
 
-  return { postMessage, isConnected, isMockMode };
+  const getState = (): unknown => {
+    return apiRef.current?.getState();
+  };
+
+  const setState = (state: unknown): void => {
+    apiRef.current?.setState(state);
+  };
+
+  return { postMessage, getState, setState, isConnected, isMockMode };
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -318,7 +318,7 @@ export const CenterPanel: FC = () => {
         {/* Chat Area */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Message Feed */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4" style={{ scrollbarGutter: 'stable both-edges' }}>
             <div className="max-w-3xl mx-auto flex flex-col gap-y-3">
               {messages.length === 0 ? (
                 /* Empty state when no messages */
@@ -335,7 +335,7 @@ export const CenterPanel: FC = () => {
                     key={msg.id}
                     className={cn(
                       'p-3 rounded-lg',
-                      msg.role === 'user' ? 'bg-muted' : 'border border-border'
+                      msg.role === 'user' && 'bg-muted'
                     )}
                   >
                     {msg.role === 'user' ? (
