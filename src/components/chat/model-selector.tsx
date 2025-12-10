@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { FC } from 'react';
 
+import { CONTENT_WIDTH } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 // Model icons
@@ -109,7 +110,7 @@ export const ModelSelector: FC = () => {
       {isOpen ? (
         <div
           ref={popoverRef}
-          className="absolute bottom-full left-0 mb-2 w-[200px] bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50"
+          className={`absolute bottom-full left-0 mb-2 w-[${String(CONTENT_WIDTH.dropdown)}px] bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50`}
         >
           <div className="p-1">
             {MODEL_GROUPS.map((group) => (

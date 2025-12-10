@@ -1,31 +1,188 @@
+// ============================================
+// LAYOUT DIMENSIONS
+// ============================================
+
+/**
+ * Sidebar width constants
+ */
+export const SIDEBAR = {
+  collapsed: 40,
+  expanded: 256,
+  iconColumnWidth: 40,
+  itemPadding: 12, // 6px mx-1.5 each side
+} as const;
+
+/**
+ * Header and panel heights
+ */
+export const HEIGHTS = {
+  header: 35,
+  panelHeader: 32,
+  headerBar: 40,
+} as const;
+
 /**
  * Default panel sizes for the UI layout
  */
 export const PANEL_SIZES = {
   sidebar: {
-    default: 280,
-    min: 200,
+    default: 256,
+    min: 40,
     max: 400,
   },
-  chat: {
+  review: {
     default: 400,
     min: 300,
-    max: 600,
+    max: 800,
   },
   terminal: {
-    default: 300,
-    min: 150,
+    default: 200,
+    min: 100,
     max: 500,
   },
+  rightSidebar: {
+    default: 150,
+    min: 100,
+    max: 300,
+  },
+} as const;
+
+/**
+ * Content width constraints
+ */
+export const CONTENT_WIDTH = {
+  inputBox: 820,
+  messageFeed: '48rem', // max-w-3xl
+  dropdown: 200,
+  fileName: 200,
+  expandedContent: 400,
+} as const;
+
+/**
+ * Input and textarea dimensions
+ */
+export const INPUT_SIZES = {
+  textareaMinHeight: 60,
+  editorMinHeight: 80,
+  editorMaxHeight: 200,
+  emptyStateMinHeight: 200,
+  commitMessageMinHeight: 80,
+} as const;
+
+/**
+ * Resize handle dimensions
+ */
+export const RESIZE_HANDLE = {
+  width: 1,
+  hoverWidth: 3,
+} as const;
+
+// ============================================
+// TIMING CONSTANTS
+// ============================================
+
+/**
+ * Time units in milliseconds
+ */
+export const TIME_MS = {
+  second: 1000,
+  minute: 60000,
+  hour: 3600000,
+  day: 86400000,
 } as const;
 
 /**
  * Animation durations in milliseconds
  */
 export const ANIMATION_DURATION = {
-  fast: 150,
-  normal: 300,
-  slow: 500,
+  instant: 0,
+  fast: 100,
+  normal: 150,
+  slow: 300,
+  verySlow: 500,
+} as const;
+
+/**
+ * Transition configurations
+ */
+export const TRANSITIONS = {
+  sidebar: `${String(ANIMATION_DURATION.normal)}ms ease-in-out`,
+  opacity: `${String(ANIMATION_DURATION.fast)}ms ease-in-out`,
+  opacityDelay: 50,
+} as const;
+
+/**
+ * Timeout and delay durations
+ */
+export const DELAYS = {
+  toastDuration: 2000,
+  mockResponse: 100,
+  debounce: 150,
+} as const;
+
+// ============================================
+// VIRTUALIZATION & SCROLLING
+// ============================================
+
+/**
+ * Virtualization settings for lists
+ */
+export const VIRTUALIZATION = {
+  estimatedItemHeight: 200,
+  overscan: 5,
+} as const;
+
+/**
+ * Auto-scroll thresholds
+ */
+export const SCROLL_THRESHOLD = {
+  nearBottom: 100,
+  atBottom: 50,
+} as const;
+
+// ============================================
+// TERMINAL SETTINGS
+// ============================================
+
+/**
+ * Terminal configuration
+ */
+export const TERMINAL = {
+  fontSize: 13,
+  fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+  maxOutputLines: 1000,
+  minOutputLines: 100,
+} as const;
+
+// ============================================
+// TYPOGRAPHY
+// ============================================
+
+/**
+ * Font sizes
+ */
+export const FONT_SIZE = {
+  tiny: 10,
+  small: 12,
+  base: 14,
+  large: 16,
+} as const;
+
+// ============================================
+// UI STATE DEFAULTS
+// ============================================
+
+/**
+ * Default UI state values
+ */
+export const DEFAULT_UI_STATE = {
+  leftSidebarOpen: true,
+  leftSidebarWidth: SIDEBAR.expanded,
+  reviewPanelOpen: false,
+  reviewPanelWidth: PANEL_SIZES.review.default,
+  rightSidebarOpen: false,
+  bottomPanelOpen: false,
+  bottomPanelHeight: PANEL_SIZES.terminal.default,
 } as const;
 
 /**

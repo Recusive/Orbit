@@ -12,6 +12,7 @@ import {
 
 import type { FC } from 'react';
 
+import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useUIStore, useIsLeftSidebarCollapsed } from '@/stores/ui-store';
 
@@ -19,8 +20,11 @@ interface LeftSidebarProps {
   readonly width: number;
 }
 
-// Fixed width for icon column - matches collapsed sidebar width minus padding
-const ICON_COLUMN_WIDTH = 40;
+// Transition string builders
+const getCollapseTransition = (collapsed: boolean): string =>
+  collapsed
+    ? `opacity 0ms, width ${TRANSITIONS.sidebar}`
+    : `width ${TRANSITIONS.sidebar}, opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
 
 export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
   const { toggleLeftSidebar } = useUIStore();
@@ -32,11 +36,11 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
       style={{ width }}
     >
       {/* Header */}
-      <div className="flex items-center h-[35px] shrink-0">
+      <div className="flex items-center shrink-0" style={{ height: HEIGHTS.header }}>
         {/* Fixed icon column */}
         <div
           className="flex items-center justify-center shrink-0"
-          style={{ width: ICON_COLUMN_WIDTH }}
+          style={{ width: SIDEBAR.iconColumnWidth }}
         >
           <button
             onClick={toggleLeftSidebar}
@@ -62,11 +66,7 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
             'flex items-center gap-1 overflow-hidden',
             isCollapsed ? 'w-0 opacity-0' : 'flex-1 opacity-100'
           )}
-          style={{
-            transition: isCollapsed
-              ? 'opacity 0ms, width 150ms ease-in-out'
-              : 'width 150ms ease-in-out, opacity 100ms ease-in-out 50ms'
-          }}
+          style={{ transition: getCollapseTransition(isCollapsed) }}
         >
           <span className="text-sm font-semibold whitespace-nowrap">Agent Manager</span>
           <span className="bg-muted rounded px-1 py-0.5 text-[10px] text-muted-foreground whitespace-nowrap">
@@ -141,7 +141,7 @@ const SidebarItem: FC<SidebarItemProps> = ({
       {/* Fixed-width icon column - never moves */}
       <div
         className="flex items-center justify-center shrink-0"
-        style={{ width: ICON_COLUMN_WIDTH - 12 }} // minus mx-1.5 (6px each side)
+        style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
       >
         <Icon className={cn('shrink-0', small ? 'h-3 w-3' : 'h-4 w-4')} />
       </div>
@@ -151,11 +151,7 @@ const SidebarItem: FC<SidebarItemProps> = ({
           'text-sm whitespace-nowrap overflow-hidden pr-2',
           collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
         )}
-        style={{
-          transition: collapsed
-            ? 'opacity 0ms, width 150ms ease-in-out'
-            : 'width 150ms ease-in-out, opacity 100ms ease-in-out 50ms'
-        }}
+        style={{ transition: getCollapseTransition(collapsed) }}
       >
         {label}
       </span>
@@ -169,7 +165,7 @@ interface WorkspaceItemProps {
   readonly collapsed?: boolean;
 }
 
-const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, collapsed }) => {
+const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, collapsed = false }) => {
   return (
     <button
       className="flex items-center h-8 rounded-md mx-1.5 transition-colors overflow-hidden text-foreground/70 hover:text-foreground hover:bg-accent/50"
@@ -177,7 +173,7 @@ const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, collapsed }) => {
       {/* Fixed-width icon column */}
       <div
         className="flex items-center justify-center shrink-0"
-        style={{ width: ICON_COLUMN_WIDTH - 12 }}
+        style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
       >
         <ChevronDown className="h-4 w-4 shrink-0" />
       </div>
@@ -187,11 +183,7 @@ const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, collapsed }) => {
           'text-sm whitespace-nowrap overflow-hidden pr-2',
           collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
         )}
-        style={{
-          transition: collapsed
-            ? 'opacity 0ms, width 150ms ease-in-out'
-            : 'width 150ms ease-in-out, opacity 100ms ease-in-out 50ms'
-        }}
+        style={{ transition: getCollapseTransition(collapsed) }}
       >
         {name}
       </span>

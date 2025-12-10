@@ -20,6 +20,7 @@ import { ResizeHandle } from './resize-handle';
 import type { FC } from 'react';
 
 import { ModelSelector } from '@/components/chat/model-selector';
+import { CONTENT_WIDTH, HEIGHTS, INPUT_SIZES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui-store';
 
@@ -50,7 +51,7 @@ export const CenterPanel: FC = () => {
   };
 
   const getInputBoxClasses = (): string => {
-    const base = 'max-w-[820px] mx-auto p-1 rounded-lg bg-muted';
+    const base = `max-w-[${String(CONTENT_WIDTH.inputBox)}px] mx-auto p-1 rounded-lg bg-muted`;
     switch (inputMode) {
       case 'plan':
         return `${base} border-2 border-dashed border-mode-plan`;
@@ -63,8 +64,8 @@ export const CenterPanel: FC = () => {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background">
-      {/* Shared Header - 40px (spans both Chat and Review) */}
-      <header className="h-[40px] flex items-center justify-between px-4 border-b border-border shrink-0">
+      {/* Shared Header (spans both Chat and Review) */}
+      <header className={`h-[${String(HEIGHTS.headerBar)}px] flex items-center justify-between px-4 border-b border-border shrink-0`}>
         {/* Breadcrumb */}
         <div className="flex items-center text-sm">
           <span className="opacity-70 cursor-pointer hover:opacity-100 transition-opacity">
@@ -122,7 +123,7 @@ export const CenterPanel: FC = () => {
               </div>
 
               {/* Empty state when no messages */}
-              <div className="flex-1 flex items-center justify-center min-h-[200px]">
+              <div className={`flex-1 flex items-center justify-center min-h-[${String(INPUT_SIZES.emptyStateMinHeight)}px]`}>
                 <div className="text-center text-muted-foreground">
                   <p className="text-lg mb-1">Start a conversation</p>
                   <p className="text-sm">Ask Orbit to help you code</p>
@@ -136,7 +137,7 @@ export const CenterPanel: FC = () => {
             <div className={getInputBoxClasses()}>
               {/* Input Area */}
               <div
-                className="p-2 min-h-[60px] text-sm outline-none"
+                className={`p-2 min-h-[${String(INPUT_SIZES.textareaMinHeight)}px] text-sm outline-none`}
                 contentEditable
                 suppressContentEditableWarning
                 data-placeholder="Type your message..."
@@ -360,7 +361,7 @@ const SourceControlTab: FC = () => {
           Commit Message
         </label>
         <textarea
-          className="w-full min-h-[80px] px-3 py-2 bg-muted border border-border rounded text-xs resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+          className={`w-full min-h-[${String(INPUT_SIZES.commitMessageMinHeight)}px] px-3 py-2 bg-muted border border-border rounded text-xs resize-none focus:outline-none focus:ring-1 focus:ring-primary`}
           placeholder="Enter commit message..."
         />
       </div>

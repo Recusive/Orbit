@@ -3,6 +3,8 @@ import { useState } from 'react';
 
 import type { FC } from 'react';
 
+import { DELAYS } from '@/lib/constants';
+
 export interface CopyButtonProps {
   text: string;
   className?: string;
@@ -15,7 +17,7 @@ export const CopyButton: FC<CopyButtonProps> = ({ text, className = '' }) => {
     try {
       await navigator.clipboard.writeText(text);
       setIsCopied(true);
-      setTimeout(() => { setIsCopied(false); }, 2000);
+      setTimeout(() => { setIsCopied(false); }, DELAYS.toastDuration);
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
     }

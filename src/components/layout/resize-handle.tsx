@@ -2,6 +2,7 @@ import { useRef } from 'react';
 
 import type { FC } from 'react';
 
+import { RESIZE_HANDLE } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui-store';
 
@@ -56,7 +57,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
       <div
         className={cn(
           'bg-border transition-all duration-100',
-          isVertical ? 'w-[1px] h-full' : 'h-[1px] w-full'
+          isVertical ? `w-[${String(RESIZE_HANDLE.width)}px] h-full` : `h-[${String(RESIZE_HANDLE.width)}px] w-full`
         )}
       />
       {/* Hover indicator line */}
@@ -64,8 +65,8 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
         className={cn(
           'absolute opacity-0 group-hover:opacity-100 bg-primary transition-all duration-100',
           isVertical
-            ? 'w-[1px] group-hover:w-[3px] h-full'
-            : 'h-[1px] group-hover:h-[3px] w-full'
+            ? `w-[${String(RESIZE_HANDLE.width)}px] group-hover:w-[${String(RESIZE_HANDLE.hoverWidth)}px] h-full`
+            : `h-[${String(RESIZE_HANDLE.width)}px] group-hover:h-[${String(RESIZE_HANDLE.hoverWidth)}px] w-full`
         )}
       />
     </div>

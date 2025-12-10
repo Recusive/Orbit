@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 
 import type { FC } from 'react';
 
+import { TIME_MS } from '@/lib/constants';
+
 export interface TimestampProps {
   date: Date | string;
   format?: 'relative' | 'absolute' | 'both';
@@ -47,7 +49,7 @@ export const Timestamp: FC<TimestampProps> = ({
 
     const interval = setInterval(() => {
       setRelativeTime(getRelativeTime(dateObj));
-    }, 60000); // Update every minute
+    }, TIME_MS.minute); // Update every minute
 
     return () => { clearInterval(interval); };
   }, [dateObj]);

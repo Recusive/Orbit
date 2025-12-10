@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
+import { TERMINAL } from '@/lib/constants';
+
 export interface TerminalOutput {
   id: string;
   type: 'stdout' | 'stderr' | 'stdin' | 'system';
@@ -37,7 +39,7 @@ export const useTerminalStore = create<TerminalState>()(
   immer((set) => ({
     sessions: [],
     activeSessionId: null,
-    maxOutputLines: 1000,
+    maxOutputLines: TERMINAL.maxOutputLines,
 
     createSession: (name?: string, cwd?: string) => {
       const random = Math.random().toString(36);
@@ -134,7 +136,7 @@ export const useTerminalStore = create<TerminalState>()(
 
     setMaxOutputLines: (lines: number) =>
       { set((state) => {
-        state.maxOutputLines = Math.max(100, lines); // Minimum 100 lines
+        state.maxOutputLines = Math.max(TERMINAL.minOutputLines, lines);
 
         // Trim all sessions to the new limit
         state.sessions.forEach(session => {

@@ -1,6 +1,8 @@
 import { clsx  } from "clsx"
 import { twMerge } from "tailwind-merge"
 
+import { TIME_MS } from './constants';
+
 import type {ClassValue} from "clsx";
 
 export function cn(...inputs: ClassValue[]): string {
@@ -16,19 +18,19 @@ export function formatTimestamp(timestamp: number): string {
   const diff = now.getTime() - date.getTime();
 
   // Less than 1 minute
-  if (diff < 60000) {
+  if (diff < TIME_MS.minute) {
     return 'Just now';
   }
 
   // Less than 1 hour
-  if (diff < 3600000) {
-    const minutes = Math.floor(diff / 60000);
+  if (diff < TIME_MS.hour) {
+    const minutes = Math.floor(diff / TIME_MS.minute);
     return `${String(minutes)}m ago`;
   }
 
   // Less than 24 hours
-  if (diff < 86400000) {
-    const hours = Math.floor(diff / 3600000);
+  if (diff < TIME_MS.day) {
+    const hours = Math.floor(diff / TIME_MS.hour);
     return `${String(hours)}h ago`;
   }
 

@@ -3,10 +3,11 @@ import { Settings } from 'lucide-react';
 import type { FC } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { HEIGHTS } from '@/lib/constants';
 
 export const HeaderBar: FC = () => {
   return (
-    <header className="h-[35px] flex items-center justify-between border-b border-border px-3 bg-card/50">
+    <header className={`h-[${String(HEIGHTS.header)}px] flex items-center justify-between border-b border-border px-3 bg-card/50`}>
       <div />
 
       <div className="flex items-center gap-1">
