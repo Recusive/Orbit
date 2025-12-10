@@ -132,7 +132,9 @@ const SidebarItem: FC<SidebarItemProps> = ({
     <button
       className={cn(
         'flex items-center h-8 rounded-md mx-1.5 transition-colors overflow-hidden',
-        'text-foreground/70 hover:text-foreground hover:bg-accent/50'
+        active
+          ? 'text-foreground bg-accent/50'
+          : 'text-foreground/70 hover:text-foreground hover:bg-accent/50'
       )}
       title={collapsed ? label : undefined}
     >

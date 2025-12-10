@@ -41,6 +41,10 @@
   --color-brand-olive: var(--brand-olive);
   --color-brand-fig: var(--brand-fig);
 
+  /* Input modes */
+  --color-mode-plan: var(--mode-plan);
+  --color-mode-accept: var(--mode-accept);
+
   /* Sidebar */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -108,6 +112,10 @@
   --brand-heather: #9B8AA6;
   --brand-olive: #8B9B7A;
   --brand-fig: #7A6B8A;
+
+  /* Input modes */
+  --mode-plan: oklch(0.65 0.12 140);         /* Olive green */
+  --mode-accept: oklch(0.60 0.12 300);       /* Heather purple */
 
   /* Shadcn semantic (light) */
   --background: oklch(0.98 0.005 75);      /* Warm white, hint of oat */
@@ -192,6 +200,10 @@
   --brand-heather: oklch(0.60 0.08 300);
   --brand-olive: oklch(0.58 0.06 130);
   --brand-fig: oklch(0.50 0.10 310);
+
+  /* Input modes */
+  --mode-plan: oklch(0.58 0.10 140);         /* Olive green - adjusted for dark */
+  --mode-accept: oklch(0.55 0.10 300);       /* Heather purple - adjusted for dark */
 
   /* Shadcn semantic (dark) - warm, not cold */
   --background: oklch(0.16 0.012 60);      /* Warm dark, not pure black */

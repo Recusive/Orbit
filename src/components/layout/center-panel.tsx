@@ -1,7 +1,6 @@
 import {
   ArrowRight,
   AtSign,
-  Circle,
   Code,
   Eye,
   FileCode,
@@ -16,18 +15,51 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
-import { ModelSelector } from '@/components/chat/model-selector';
-
 import { ResizeHandle } from './resize-handle';
 
 import type { FC } from 'react';
 
-
+import { ModelSelector } from '@/components/chat/model-selector';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui-store';
 
+
+type InputMode = 'default' | 'plan' | 'accept';
+
+const INPUT_MODE_LABELS: Record<InputMode, string> = {
+  default: 'Default',
+  plan: 'Plan',
+  accept: 'Accept',
+};
+
 export const CenterPanel: FC = () => {
   const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, reviewPanelWidth } = useUIStore();
+  const [inputMode, setInputMode] = useState<InputMode>('default');
+
+  const cycleInputMode = (): void => {
+    setInputMode((current): InputMode => {
+      switch (current) {
+        case 'default':
+          return 'plan';
+        case 'plan':
+          return 'accept';
+        case 'accept':
+          return 'default';
+      }
+    });
+  };
+
+  const getInputBoxClasses = (): string => {
+    const base = 'max-w-[820px] mx-auto p-1 rounded-lg bg-muted';
+    switch (inputMode) {
+      case 'plan':
+        return `${base} border-2 border-dashed border-mode-plan`;
+      case 'accept':
+        return `${base} border-2 border-dashed border-mode-accept`;
+      case 'default':
+        return `${base} border border-border`;
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background">
@@ -101,7 +133,7 @@ export const CenterPanel: FC = () => {
 
           {/* Chat Input */}
           <div className="p-4 pt-0 shrink-0">
-            <div className="max-w-[820px] mx-auto p-1 rounded-lg bg-muted border border-border">
+            <div className={getInputBoxClasses()}>
               {/* Input Area */}
               <div
                 className="p-2 min-h-[60px] text-sm outline-none"
@@ -115,9 +147,16 @@ export const CenterPanel: FC = () => {
                 {/* Left Controls - Mode & Model Pickers */}
                 <div className="flex items-center gap-0.5">
                   {/* Mode Picker */}
-                  <button className="h-7 px-2 flex items-center gap-1.5 rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors">
-                    <Circle className="h-3 w-3" />
-                    <span className="text-xs">Default</span>
+                  <button
+                    onClick={cycleInputMode}
+                    className={cn(
+                      'h-7 px-2 flex items-center gap-1.5 rounded hover:bg-accent transition-colors',
+                      inputMode === 'default' && 'opacity-70 hover:opacity-100',
+                      inputMode === 'plan' && 'text-mode-plan',
+                      inputMode === 'accept' && 'text-mode-accept'
+                    )}
+                  >
+                    <span className="text-xs font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
                   </button>
                   {/* Model Picker */}
                   <ModelSelector />
