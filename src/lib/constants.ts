@@ -62,7 +62,7 @@ export const CONTENT_WIDTH = {
  * Input and textarea dimensions
  */
 export const INPUT_SIZES = {
-  textareaMinHeight: 60,
+  textareaMinHeight: 44,
   editorMinHeight: 80,
   editorMaxHeight: 200,
   emptyStateMinHeight: 200,

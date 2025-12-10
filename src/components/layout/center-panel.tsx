@@ -36,6 +36,11 @@ const INPUT_MODE_LABELS: Record<InputMode, string> = {
 export const CenterPanel: FC = () => {
   const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, reviewPanelWidth } = useUIStore();
   const [inputMode, setInputMode] = useState<InputMode>('default');
+  const [isInputEmpty, setIsInputEmpty] = useState(true);
+
+  const handleInputChange = (e: React.FormEvent<HTMLDivElement>): void => {
+    setIsInputEmpty(e.currentTarget.textContent.length === 0);
+  };
 
   const cycleInputMode = (): void => {
     setInputMode((current): InputMode => {
@@ -51,7 +56,7 @@ export const CenterPanel: FC = () => {
   };
 
   const getInputBoxClasses = (): string => {
-    const base = 'mx-auto p-1 rounded-lg bg-muted';
+    const base = 'mx-auto p-1 rounded-lg bg-muted transition-colors focus-within:border-muted-foreground/50';
     switch (inputMode) {
       case 'plan':
         return `${base} border-2 border-dashed border-mode-plan`;
@@ -141,7 +146,9 @@ export const CenterPanel: FC = () => {
                 style={{ minHeight: INPUT_SIZES.textareaMinHeight }}
                 contentEditable
                 suppressContentEditableWarning
-                data-placeholder="Type your message..."
+                data-placeholder="Plan, @ for context, / for commands"
+                data-empty={isInputEmpty}
+                onInput={handleInputChange}
               />
 
               {/* Controls Row */}
@@ -153,7 +160,7 @@ export const CenterPanel: FC = () => {
                     onClick={cycleInputMode}
                     className={cn(
                       'h-7 px-2 flex items-center gap-1.5 rounded hover:bg-accent transition-colors',
-                      inputMode === 'default' && 'opacity-70 hover:opacity-100',
+                      inputMode === 'default' && 'border border-border opacity-70 hover:opacity-100',
                       inputMode === 'plan' && 'text-mode-plan',
                       inputMode === 'accept' && 'text-mode-accept'
                     )}

@@ -287,4 +287,16 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /* Contenteditable placeholder */
+  [contenteditable][data-placeholder] {
+    position: relative;
+  }
+
+  [contenteditable][data-placeholder][data-empty="true"]::before {
+    content: attr(data-placeholder);
+    color: var(--muted-foreground);
+    pointer-events: none;
+    position: absolute;
+  }
 }
