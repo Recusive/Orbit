@@ -32,7 +32,7 @@ export const BottomPanel: FC<BottomPanelProps> = ({ height }) => {
 
       <div className="flex-1 p-2 font-mono text-xs text-muted-foreground overflow-auto">
         <div>$ <span className="text-foreground">xterm.js will render here</span></div>
-        <div className="mt-1 animate-pulse">▋</div>
+        <span className="typing-cursor mt-1" />
       </div>
     </div>
   );

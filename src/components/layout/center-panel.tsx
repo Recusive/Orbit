@@ -305,7 +305,7 @@ export const CenterPanel: FC = () => {
                   >
                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                     {msg.isStreaming ? (
-                      <span className="inline-block mt-1 animate-pulse">▋</span>
+                      <span className="typing-cursor mt-1" />
                     ) : null}
                   </div>
                 ))
@@ -487,7 +487,7 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
           </header>
           <div className="flex-1 p-2 font-mono text-xs text-muted-foreground overflow-auto">
             <div>$ <span className="text-foreground">xterm.js will render here</span></div>
-            <div className="mt-1 animate-pulse">▋</div>
+            <span className="typing-cursor mt-1" />
           </div>
         </div>
         </>

@@ -310,4 +310,23 @@ html.dark {
     pointer-events: none;
     position: absolute;
   }
+
+  /* Typing cursor - CSS-based to avoid unicode hygiene issues */
+  .typing-cursor {
+    display: inline-block;
+    width: 0.5em;
+    height: 1em;
+    background-color: currentColor;
+    vertical-align: text-bottom;
+    animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
 }
