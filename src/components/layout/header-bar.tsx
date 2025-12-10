@@ -7,7 +7,7 @@ import { HEIGHTS } from '@/lib/constants';
 
 export const HeaderBar: FC = () => {
   return (
-    <header className={`h-[${String(HEIGHTS.header)}px] flex items-center justify-between border-b border-border px-3 bg-card/50`}>
+    <header className="flex items-center justify-between border-b border-border px-3 bg-card/50" style={{ height: HEIGHTS.header }}>
       <div />
 
       <div className="flex items-center gap-1">

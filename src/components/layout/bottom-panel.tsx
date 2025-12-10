@@ -18,7 +18,7 @@ export const BottomPanel: FC<BottomPanelProps> = ({ height }) => {
       className="w-full border-t border-border bg-card/30 flex flex-col"
       style={{ height }}
     >
-      <header className={`h-[${String(HEIGHTS.panelHeader)}px] flex items-center justify-between px-2 border-b border-border shrink-0`}>
+      <header className="flex items-center justify-between px-2 border-b border-border shrink-0" style={{ height: HEIGHTS.panelHeader }}>
         <span className="text-xs font-medium">Terminal</span>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-5 w-5">

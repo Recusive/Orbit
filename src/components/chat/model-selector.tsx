@@ -110,7 +110,8 @@ export const ModelSelector: FC = () => {
       {isOpen ? (
         <div
           ref={popoverRef}
-          className={`absolute bottom-full left-0 mb-2 w-[${String(CONTENT_WIDTH.dropdown)}px] bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50`}
+          className="absolute bottom-full left-0 mb-2 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50"
+          style={{ width: CONTENT_WIDTH.dropdown }}
         >
           <div className="p-1">
             {MODEL_GROUPS.map((group) => (
