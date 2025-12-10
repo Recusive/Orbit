@@ -44,6 +44,7 @@
   /* Input modes */
   --color-mode-plan: var(--mode-plan);
   --color-mode-accept: var(--mode-accept);
+  --color-mode-think: var(--mode-think);
 
   /* Sidebar */
   --color-sidebar: var(--sidebar);
@@ -116,6 +117,7 @@
   /* Input modes */
   --mode-plan: oklch(0.65 0.12 140);         /* Olive green */
   --mode-accept: oklch(0.60 0.12 300);       /* Heather purple */
+  --mode-think: oklch(0.70 0.14 65);         /* Warm amber/sand */
 
   /* Shadcn semantic (light) */
   --background: oklch(0.98 0.005 75);      /* Warm white, hint of oat */
@@ -204,6 +206,7 @@
   /* Input modes */
   --mode-plan: oklch(0.58 0.10 140);         /* Olive green - adjusted for dark */
   --mode-accept: oklch(0.55 0.10 300);       /* Heather purple - adjusted for dark */
+  --mode-think: oklch(0.65 0.12 65);         /* Warm amber/sand - adjusted for dark */
 
   /* Shadcn semantic (dark) - warm, not cold */
   --background: oklch(0.16 0.012 60);      /* Warm dark, not pure black */

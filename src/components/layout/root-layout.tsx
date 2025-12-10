@@ -1,8 +1,6 @@
-import { BottomPanel } from './bottom-panel';
 import { CenterPanel } from './center-panel';
 import { HeaderBar } from './header-bar';
 import { LeftSidebar } from './left-sidebar';
-import { ResizeHandle } from './resize-handle';
 import { RightSidebar } from './right-sidebar';
 
 import type { FC } from 'react';
@@ -13,8 +11,6 @@ export const RootLayout: FC = () => {
   const {
     leftSidebarWidth,
     rightSidebarOpen,
-    bottomPanelOpen,
-    bottomPanelHeight,
   } = useUIStore();
 
   return (
@@ -24,20 +20,11 @@ export const RootLayout: FC = () => {
       <div className="flex-1 flex min-h-0">
         <LeftSidebar width={leftSidebarWidth} />
 
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 flex min-h-0">
-            {/* CenterPanel contains Chat + Review split internally */}
-            <CenterPanel />
+        {/* CenterPanel contains Chat + Review split (with terminal inside review) */}
+        <CenterPanel />
 
-            {/* Right Sidebar (Sessions) - separate from Review */}
-            {rightSidebarOpen ? <RightSidebar /> : null}
-          </div>
-
-          {bottomPanelOpen ? <>
-              <ResizeHandle direction="horizontal" target="bottom" />
-              <BottomPanel height={bottomPanelHeight} />
-            </> : null}
-        </div>
+        {/* Right Sidebar (Sessions) - separate from Review */}
+        {rightSidebarOpen ? <RightSidebar /> : null}
       </div>
     </div>
   );

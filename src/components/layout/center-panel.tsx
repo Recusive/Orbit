@@ -9,9 +9,11 @@ import {
   Image,
   Lightbulb,
   ListChecks,
+  Maximize2,
   PanelRight,
   Plus,
   SquareTerminal,
+  X,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -20,6 +22,7 @@ import { ResizeHandle } from './resize-handle';
 import type { FC } from 'react';
 
 import { ModelSelector } from '@/components/chat/model-selector';
+import { Button } from '@/components/ui/button';
 import { CONTENT_WIDTH, HEIGHTS, INPUT_SIZES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui-store';
@@ -37,6 +40,7 @@ export const CenterPanel: FC = () => {
   const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, reviewPanelWidth } = useUIStore();
   const [inputMode, setInputMode] = useState<InputMode>('default');
   const [isInputEmpty, setIsInputEmpty] = useState(true);
+  const [thinkingEnabled, setThinkingEnabled] = useState(false);
 
   const handleInputChange = (e: React.FormEvent<HTMLDivElement>): void => {
     setIsInputEmpty(e.currentTarget.textContent.length === 0);
@@ -56,14 +60,14 @@ export const CenterPanel: FC = () => {
   };
 
   const getInputBoxClasses = (): string => {
-    const base = 'mx-auto p-1 rounded-lg bg-muted transition-colors focus-within:border-muted-foreground/50';
+    const base = 'mx-auto p-1 rounded-lg bg-muted transition-colors';
     switch (inputMode) {
       case 'plan':
         return `${base} border-2 border-dashed border-mode-plan`;
       case 'accept':
         return `${base} border-2 border-dashed border-mode-accept`;
       case 'default':
-        return `${base} border border-border`;
+        return `${base} border border-border focus-within:border-muted-foreground/50`;
     }
   };
 
@@ -176,8 +180,15 @@ export const CenterPanel: FC = () => {
                   <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Add Context">
                     <AtSign className="h-4 w-4" />
                   </button>
-                  <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Toggle Thinking">
-                    <Lightbulb className="h-4 w-4" />
+                  <button
+                    onClick={() => { setThinkingEnabled(!thinkingEnabled); }}
+                    className={cn(
+                      'h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors',
+                      thinkingEnabled ? 'opacity-100 text-mode-think' : 'opacity-70 hover:opacity-100'
+                    )}
+                    title="Toggle Thinking"
+                  >
+                    <Lightbulb className={cn('h-4 w-4', thinkingEnabled && 'fill-mode-think')} />
                   </button>
                   <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Web Browser">
                     <Globe className="h-4 w-4" />
@@ -234,6 +245,7 @@ type TabValue = 'files' | 'source';
 
 const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
   const [activeTab, setActiveTab] = useState<TabValue>('files');
+  const { bottomPanelOpen, bottomPanelHeight, toggleBottomPanel } = useUIStore();
 
   return (
     <div
@@ -262,6 +274,36 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'files' ? <FilesChangedTab /> : <SourceControlTab />}
       </div>
+
+      {/* Terminal Panel (bottom of review panel) */}
+      {bottomPanelOpen ? (
+        <>
+          <ResizeHandle direction="horizontal" target="bottom" />
+          <div
+            className="bg-card/30 flex flex-col shrink-0"
+            style={{ height: bottomPanelHeight }}
+          >
+          <header
+            className="flex items-center justify-between px-2 border-b border-border shrink-0"
+            style={{ height: HEIGHTS.panelHeader }}
+          >
+            <span className="text-xs font-medium">Terminal</span>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-5 w-5">
+                <Maximize2 className="h-3 w-3" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={toggleBottomPanel}>
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          </header>
+          <div className="flex-1 p-2 font-mono text-xs text-muted-foreground overflow-auto">
+            <div>$ <span className="text-foreground">xterm.js will render here</span></div>
+            <div className="mt-1 animate-pulse">▋</div>
+          </div>
+        </div>
+        </>
+      ) : null}
     </div>
   );
 };
