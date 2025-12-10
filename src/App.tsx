@@ -4,7 +4,7 @@ import { RootLayout } from '@/components/layout';
 
 const App: FC = () => {
   return (
-    <div className="dark">
+    <div className="dark h-full">
       <RootLayout />
     </div>
   );

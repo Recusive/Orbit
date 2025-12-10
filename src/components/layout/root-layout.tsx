@@ -14,7 +14,7 @@ export const RootLayout: FC = () => {
   } = useUIStore();
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground">
+    <div className="h-full w-full flex flex-col overflow-hidden bg-background text-foreground">
       <HeaderBar />
 
       <div className="flex-1 flex min-h-0">

@@ -4,6 +4,9 @@ import { immer } from 'zustand/middleware/immer';
 import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/constants';
 
 interface UIState {
+  // Container dimensions (from VS Code editor layout)
+  containerWidth: number | null;
+  containerHeight: number | null;
   // Left Sidebar
   leftSidebarOpen: boolean;
   leftSidebarWidth: number;
@@ -18,6 +21,7 @@ interface UIState {
 }
 
 interface UIActions {
+  setContainerDimensions: (width: number, height: number) => void;
   toggleLeftSidebar: () => void;
   expandLeftSidebar: () => void;
   collapseLeftSidebar: () => void;
@@ -32,6 +36,8 @@ type UIStore = UIState & UIActions;
 
 export const useUIStore = create<UIStore>()(
   immer((set) => ({
+    containerWidth: null,
+    containerHeight: null,
     leftSidebarOpen: DEFAULT_UI_STATE.leftSidebarOpen,
     leftSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
     reviewPanelOpen: DEFAULT_UI_STATE.reviewPanelOpen,
@@ -39,6 +45,13 @@ export const useUIStore = create<UIStore>()(
     rightSidebarOpen: DEFAULT_UI_STATE.rightSidebarOpen,
     bottomPanelOpen: DEFAULT_UI_STATE.bottomPanelOpen,
     bottomPanelHeight: DEFAULT_UI_STATE.bottomPanelHeight,
+
+    setContainerDimensions: (width: number, height: number): void => {
+      set((state) => {
+        state.containerWidth = width;
+        state.containerHeight = height;
+      });
+    },
 
     toggleLeftSidebar: (): void => {
       set((state) => {

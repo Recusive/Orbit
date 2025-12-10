@@ -218,6 +218,13 @@ export const SystemInitSchema = z.object({
   tools: z.array(z.string()),
 });
 
+// Layout (sent when editor container resizes)
+export const LayoutSchema = z.object({
+  type: z.literal('layout'),
+  width: z.number(),
+  height: z.number(),
+});
+
 // Agent streaming (matches SDK pattern)
 export const AgentChunkSchema = z.object({
   type: z.literal('agent:chunk'),
@@ -359,6 +366,7 @@ export const ErrorSchema = z.object({
 export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   // System
   SystemInitSchema,
+  LayoutSchema,
   // Agent
   AgentChunkSchema,
   AgentCompleteSchema,
@@ -415,6 +423,7 @@ export type DiffOpen = z.infer<typeof DiffOpenSchema>;
 
 // Extension → Webview
 export type SystemInit = z.infer<typeof SystemInitSchema>;
+export type Layout = z.infer<typeof LayoutSchema>;
 export type AgentChunk = z.infer<typeof AgentChunkSchema>;
 export type AgentComplete = z.infer<typeof AgentCompleteSchema>;
 export type AgentError = z.infer<typeof AgentErrorSchema>;
