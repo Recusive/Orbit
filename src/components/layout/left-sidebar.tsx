@@ -36,10 +36,10 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
       style={{ width }}
     >
       {/* Header */}
-      <div className="flex items-center shrink-0" style={{ height: HEIGHTS.headerBar }}>
+      <div className="flex shrink-0" style={{ height: HEIGHTS.headerBar }}>
         {/* Fixed icon column */}
         <div
-          className="flex items-center justify-center shrink-0"
+          className="flex items-center justify-center shrink-0 h-full"
           style={{ width: SIDEBAR.iconColumnWidth }}
         >
           <button
@@ -63,7 +63,7 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
         {/* Text that slides in */}
         <div
           className={cn(
-            'flex items-center gap-1 overflow-hidden',
+            'flex items-center gap-1 overflow-hidden h-full',
             isCollapsed ? 'w-0 opacity-0' : 'flex-1 opacity-100'
           )}
           style={{ transition: getCollapseTransition(isCollapsed) }}

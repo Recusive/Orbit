@@ -282,14 +282,15 @@ html.dark {
 }
 
 @layer base {
-  * {
+  *, *::before, *::after {
+    box-sizing: border-box;
     @apply border-border;
   }
 
   html, body, #root {
     height: 100%;
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 1px 0 0 0 !important; /* 1px top padding to fix VS Code webview clipping */
   }
 
   body {
