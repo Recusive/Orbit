@@ -7,6 +7,9 @@ import { z } from 'zod';
 const UUIDSchema = z.string().uuid();
 const SessionIdSchema = z.string().min(1);
 
+// Input mode: default (ask permission), accept (auto-approve), plan (read-only)
+export const InputModeSchema = z.enum(['default', 'accept', 'plan']);
+
 // ═══════════════════════════════════════════════════════════════
 // WEBVIEW → EXTENSION (requests)
 // ═══════════════════════════════════════════════════════════════
@@ -193,6 +196,24 @@ export const DiffOpenSchema = z.object({
   title: z.string().optional(),
 });
 
+// Permission response (webview → extension)
+export const PermissionResponseSchema = z.object({
+  type: z.literal('permission:response'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  request_id: z.string(),
+  decision: z.enum(['approve', 'deny']),
+  always: z.boolean().optional(),
+});
+
+// Set input mode (webview → extension)
+export const SetInputModeSchema = z.object({
+  type: z.literal('inputMode:set'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  mode: InputModeSchema,
+});
+
 // System
 export const WebviewReadySchema = z.object({
   type: z.literal('webview:ready'),
@@ -234,6 +255,9 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   FileRejectAllSchema,
   // Diff
   DiffOpenSchema,
+  // Permissions
+  PermissionResponseSchema,
+  SetInputModeSchema,
 ]);
 
 // ═══════════════════════════════════════════════════════════════
@@ -310,6 +334,24 @@ export const ToolEndSchema = z.object({
   tool_name: z.string(),
   tool_output: z.unknown(),
   success: z.boolean(),
+});
+
+// Permission request (from extension to webview)
+export const PermissionRequestSchema = z.object({
+  type: z.literal('permission:request'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  request_id: z.string(),
+  tool_name: z.string(),
+  tool_input: z.record(z.unknown()),
+});
+
+// Input mode changed (from extension to webview)
+export const InputModeChangedSchema = z.object({
+  type: z.literal('inputMode:changed'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  mode: InputModeSchema,
 });
 
 // Terminal
@@ -440,6 +482,9 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   // Tools
   ToolStartSchema,
   ToolEndSchema,
+  // Permissions
+  PermissionRequestSchema,
+  InputModeChangedSchema,
   // Terminal
   TerminalOutputSchema,
   TerminalCreatedSchema,
@@ -492,6 +537,8 @@ export type FileAcceptAll = z.infer<typeof FileAcceptAllSchema>;
 export type FileRejectAll = z.infer<typeof FileRejectAllSchema>;
 export type DiffOpen = z.infer<typeof DiffOpenSchema>;
 export type WebviewReady = z.infer<typeof WebviewReadySchema>;
+export type PermissionResponse = z.infer<typeof PermissionResponseSchema>;
+export type SetInputMode = z.infer<typeof SetInputModeSchema>;
 
 // Extension → Webview
 export type SystemInit = z.infer<typeof SystemInitSchema>;
@@ -501,6 +548,9 @@ export type AgentComplete = z.infer<typeof AgentCompleteSchema>;
 export type AgentError = z.infer<typeof AgentErrorSchema>;
 export type ToolStart = z.infer<typeof ToolStartSchema>;
 export type ToolEnd = z.infer<typeof ToolEndSchema>;
+export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
+export type InputModeChanged = z.infer<typeof InputModeChangedSchema>;
+export type InputMode = z.infer<typeof InputModeSchema>;
 export type TerminalOutput = z.infer<typeof TerminalOutputSchema>;
 export type TerminalCreated = z.infer<typeof TerminalCreatedSchema>;
 export type TerminalExited = z.infer<typeof TerminalExitedSchema>;

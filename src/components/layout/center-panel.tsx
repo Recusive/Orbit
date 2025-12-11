@@ -23,20 +23,23 @@ import { Streamdown } from 'streamdown';
 
 import { ResizeHandle } from './resize-handle';
 
-import type { ExtensionMessage } from '@/types/protocol';
+import type { ExtensionMessage, InputMode } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { MessageActions } from '@/components/chat/message-actions';
 import { ModelSelector } from '@/components/chat/model-selector';
+import { PermissionModal } from '@/components/chat/permission-modal';
+import { EditToolWidget } from '@/components/chat/tools/edit-tool-widget';
+import { ReadToolWidget } from '@/components/chat/tools/read-tool-widget';
+import { WriteToolWidget } from '@/components/chat/tools/write-tool-widget';
 import { Button } from '@/components/ui/button';
 import { useVSCode } from '@/hooks/use-vscode';
 import { CONTENT_WIDTH, HEIGHTS, INPUT_SIZES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { useToolStore, usePendingPermissions, useInputMode } from '@/stores/tool-store';
 import { useUIStore, useWorkspaceName, useActiveConversationTitle } from '@/stores/ui-store';
 
 
-
-type InputMode = 'default' | 'plan' | 'accept';
 
 const INPUT_MODE_LABELS: Record<InputMode, string> = {
   default: 'Default',
@@ -63,7 +66,11 @@ export const CenterPanel: FC = () => {
   const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, reviewPanelWidth, setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle } = useUIStore();
   const workspaceName = useWorkspaceName();
   const activeConversationTitle = useActiveConversationTitle();
-  const [inputMode, setInputMode] = useState<InputMode>('default');
+
+  // Tool store
+  const inputMode = useInputMode();
+  const pendingPermissions = usePendingPermissions();
+  const { setInputMode, startTool, completeTool, addPermissionRequest, removePermissionRequest, getToolsForMessage } = useToolStore();
   const [inputText, setInputText] = useState('');
   const [thinkingEnabled, setThinkingEnabled] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -219,11 +226,44 @@ export const CenterPanel: FC = () => {
         })));
         break;
 
+      case 'inputMode:changed':
+        setInputMode(message.mode);
+        break;
+
+      case 'tool:start': {
+        const toolId = `${message.message_id}-${message.tool_name}`;
+        startTool(
+          toolId,
+          message.message_id,
+          message.tool_name,
+          message.tool_input
+        );
+        break;
+      }
+
+      case 'tool:end': {
+        const toolId = `${message.message_id}-${message.tool_name}`;
+        completeTool(
+          toolId,
+          message.tool_output,
+          message.success
+        );
+        break;
+      }
+
+      case 'permission:request':
+        addPermissionRequest({
+          requestId: message.request_id,
+          sessionId: message.session_id,
+          toolName: message.tool_name,
+          toolInput: message.tool_input,
+          createdAt: Date.now(),
+        });
+        break;
+
       // Handle other message types (no-op for now)
       case 'layout':
       case 'error':
-      case 'tool:start':
-      case 'tool:end':
       case 'terminal:output':
       case 'terminal:created':
       case 'terminal:exited':
@@ -233,7 +273,7 @@ export const CenterPanel: FC = () => {
       case 'conversation:deleted':
         break;
     }
-  }, [setWorkspace, setActiveConversation, setConversations, addConversation]);
+  }, [setWorkspace, setActiveConversation, setConversations, addConversation, setInputMode, startTool, completeTool, addPermissionRequest]);
 
   const { postMessage, isMockMode } = useVSCode({ onMessage: handleMessage });
 
@@ -308,6 +348,41 @@ export const CenterPanel: FC = () => {
     });
   }, [sessionId, isAgentRunning, postMessage]);
 
+  const handlePermissionApprove = useCallback((requestId: string, always?: boolean): void => {
+    if (!sessionId) return;
+
+    postMessage({
+      type: 'permission:response',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+      request_id: requestId,
+      decision: 'approve',
+      always,
+    });
+    removePermissionRequest(requestId);
+  }, [sessionId, postMessage, removePermissionRequest]);
+
+  const handlePermissionDeny = useCallback((requestId: string): void => {
+    if (!sessionId) return;
+
+    postMessage({
+      type: 'permission:response',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+      request_id: requestId,
+      decision: 'deny',
+    });
+    removePermissionRequest(requestId);
+  }, [sessionId, postMessage, removePermissionRequest]);
+
+  const handleOpenFile = useCallback((path: string): void => {
+    postMessage({
+      type: 'file:open',
+      uuid: crypto.randomUUID(),
+      path,
+    });
+  }, [postMessage]);
+
   const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -316,16 +391,21 @@ export const CenterPanel: FC = () => {
   };
 
   const cycleInputMode = (): void => {
-    setInputMode((current): InputMode => {
-      switch (current) {
-        case 'default':
-          return 'plan';
-        case 'plan':
-          return 'accept';
-        case 'accept':
-          return 'default';
-      }
-    });
+    const nextMode: InputMode = inputMode === 'default' ? 'plan'
+      : inputMode === 'plan' ? 'accept'
+      : 'default';
+
+    setInputMode(nextMode);
+
+    // Sync with extension
+    if (sessionId) {
+      postMessage({
+        type: 'inputMode:set',
+        uuid: crypto.randomUUID(),
+        session_id: sessionId,
+        mode: nextMode,
+      });
+    }
   };
 
   const getInputBoxClasses = (): string => {
@@ -440,6 +520,50 @@ export const CenterPanel: FC = () => {
                             <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
                               <Streamdown remarkPlugins={[]} rehypePlugins={[]}>{msg.displayedContent}</Streamdown>
                             </div>
+                            {/* Tool widgets for this message */}
+                            {getToolsForMessage(msg.id).map((tool) => {
+                              const toolName = tool.toolName.toLowerCase();
+                              const getStringInput = (key: string, fallback: string): string => {
+                                const value = tool.toolInput[key];
+                                return typeof value === 'string' ? value : fallback;
+                              };
+                              if (toolName === 'write') {
+                                return (
+                                  <WriteToolWidget
+                                    key={tool.id}
+                                    filePath={getStringInput('file_path', 'unknown')}
+                                    content={getStringInput('content', '')}
+                                    isRunning={tool.status === 'running'}
+                                    onOpenFile={handleOpenFile}
+                                  />
+                                );
+                              }
+                              if (toolName === 'edit') {
+                                return (
+                                  <EditToolWidget
+                                    key={tool.id}
+                                    filePath={getStringInput('file_path', 'unknown')}
+                                    oldString={getStringInput('old_string', '')}
+                                    newString={getStringInput('new_string', '')}
+                                    isRunning={tool.status === 'running'}
+                                    onOpenFile={handleOpenFile}
+                                  />
+                                );
+                              }
+                              if (toolName === 'read') {
+                                return (
+                                  <ReadToolWidget
+                                    key={tool.id}
+                                    filePath={getStringInput('file_path', 'unknown')}
+                                    isRunning={tool.status === 'running'}
+                                    content={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+                                    onOpenFile={handleOpenFile}
+                                  />
+                                );
+                              }
+                              // Other tool types can be added here
+                              return null;
+                            })}
                             {isComplete ? (
                               <MessageActions
                                 showDisclaimer={isLastAssistantMessage}
@@ -454,6 +578,16 @@ export const CenterPanel: FC = () => {
                   })}
                 </>
               )}
+              {/* Permission modals */}
+              {pendingPermissions.map((request) => (
+                <PermissionModal
+                  key={request.requestId}
+                  request={request}
+                  onApprove={handlePermissionApprove}
+                  onDeny={handlePermissionDeny}
+                  onOpenFile={handleOpenFile}
+                />
+              ))}
               {/* Progress indicator - shows while agent is running OR text is still animating */}
               {(isAgentRunning || messages.some(m => m.displayedContent.length < m.content.length)) ? (
                 <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
