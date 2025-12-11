@@ -287,6 +287,15 @@ html.dark {
   --terminal-cursor: oklch(0.85 0.01 75);
 }
 
+/* Streamdown overrides */
+[data-streamdown="code-block-header"] {
+  padding: 0.5rem;
+}
+
+[data-streamdown="code-block-download-button"] {
+  display: none;
+}
+
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;

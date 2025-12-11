@@ -1,4 +1,5 @@
-import { Copy, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Check, Copy, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { useState } from 'react';
 
 import type { FC } from 'react';
 
@@ -19,15 +20,25 @@ export const MessageActions: FC<MessageActionsProps> = ({
   onDislike,
   onRewind,
 }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (): void => {
+    onCopy?.();
+    setCopied(true);
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  };
+
   return (
     <div className="mt-3 flex flex-col gap-2 items-end">
       <div className="flex items-center gap-1">
         <button
           className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-          title="Copy"
-          onClick={onCopy}
+          title={copied ? 'Copied!' : 'Copy'}
+          onClick={handleCopy}
         >
-          <Copy className="h-3.5 w-3.5" />
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
         <button
           className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"

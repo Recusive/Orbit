@@ -62,42 +62,47 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
     >
       {/* Header */}
       <div className="flex shrink-0" style={{ height: HEIGHTS.headerBar }}>
-        {/* Fixed icon column */}
-        <div
-          className="flex items-center justify-center shrink-0 h-full"
-          style={{ width: SIDEBAR.iconColumnWidth }}
-        >
-          <button
-            onClick={toggleLeftSidebar}
-            className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors opacity-70 hover:opacity-100"
-            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        {isCollapsed ? (
+          /* Collapsed: just the icon centered */
+          <div
+            className="flex items-center justify-center shrink-0 h-full"
+            style={{ width: SIDEBAR.iconColumnWidth }}
           >
-            <div className="relative h-4 w-4">
-              <PanelLeft className="h-4 w-4" />
-              {/* Fill indicator when sidebar is expanded */}
-              <div
-                className={cn(
-                  'absolute left-[2px] top-[2px] w-[4px] h-[12px] bg-current transition-opacity duration-150',
-                  isCollapsed ? 'opacity-0' : 'opacity-100'
-                )}
-                style={{ borderRadius: '1px 0 0 1px' }}
-              />
+            <button
+              onClick={toggleLeftSidebar}
+              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors opacity-70 hover:opacity-100"
+              title="Expand sidebar"
+            >
+              <div className="relative h-4 w-4">
+                <PanelLeft className="h-4 w-4" />
+              </div>
+            </button>
+          </div>
+        ) : (
+          /* Expanded: text on left, button on right */
+          <div className="flex items-center justify-between w-full px-3">
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-semibold whitespace-nowrap">Agent Manager</span>
+              <span className="bg-muted rounded px-1 py-0.5 text-[10px] text-muted-foreground whitespace-nowrap">
+                Preview
+              </span>
             </div>
-          </button>
-        </div>
-        {/* Text that slides in */}
-        <div
-          className={cn(
-            'flex items-center gap-1 overflow-hidden h-full',
-            isCollapsed ? 'w-0 opacity-0' : 'flex-1 opacity-100'
-          )}
-          style={{ transition: getCollapseTransition(isCollapsed) }}
-        >
-          <span className="text-sm font-semibold whitespace-nowrap">Agent Manager</span>
-          <span className="bg-muted rounded px-1 py-0.5 text-[10px] text-muted-foreground whitespace-nowrap">
-            Preview
-          </span>
-        </div>
+            <button
+              onClick={toggleLeftSidebar}
+              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors opacity-70 hover:opacity-100"
+              title="Collapse sidebar"
+            >
+              <div className="relative h-4 w-4">
+                <PanelLeft className="h-4 w-4" />
+                {/* Fill indicator when sidebar is expanded */}
+                <div
+                  className="absolute left-[2px] top-[2px] w-[4px] h-[12px] bg-current opacity-100"
+                  style={{ borderRadius: '1px 0 0 1px' }}
+                />
+              </div>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Actions */}
