@@ -196,6 +196,13 @@ export const DiffOpenSchema = z.object({
   title: z.string().optional(),
 });
 
+// URL (open external links)
+export const UrlOpenSchema = z.object({
+  type: z.literal('url:open'),
+  uuid: UUIDSchema,
+  url: z.string().url(),
+});
+
 // Permission response (webview → extension)
 export const PermissionResponseSchema = z.object({
   type: z.literal('permission:response'),
@@ -255,6 +262,8 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   FileRejectAllSchema,
   // Diff
   DiffOpenSchema,
+  // URL
+  UrlOpenSchema,
   // Permissions
   PermissionResponseSchema,
   SetInputModeSchema,
@@ -322,6 +331,7 @@ export const ToolStartSchema = z.object({
   uuid: UUIDSchema,
   session_id: SessionIdSchema,
   message_id: z.string(),
+  tool_id: z.string(),
   tool_name: z.string(),
   tool_input: z.record(z.unknown()),
 });
@@ -331,6 +341,7 @@ export const ToolEndSchema = z.object({
   uuid: UUIDSchema,
   session_id: SessionIdSchema,
   message_id: z.string(),
+  tool_id: z.string(),
   tool_name: z.string(),
   tool_output: z.unknown(),
   success: z.boolean(),
@@ -536,6 +547,7 @@ export type FileReject = z.infer<typeof FileRejectSchema>;
 export type FileAcceptAll = z.infer<typeof FileAcceptAllSchema>;
 export type FileRejectAll = z.infer<typeof FileRejectAllSchema>;
 export type DiffOpen = z.infer<typeof DiffOpenSchema>;
+export type UrlOpen = z.infer<typeof UrlOpenSchema>;
 export type WebviewReady = z.infer<typeof WebviewReadySchema>;
 export type PermissionResponse = z.infer<typeof PermissionResponseSchema>;
 export type SetInputMode = z.infer<typeof SetInputModeSchema>;

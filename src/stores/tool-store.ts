@@ -17,6 +17,8 @@ export interface ToolExecution {
   startedAt: number;
   completedAt?: number;
   success?: boolean;
+  // Content offset - where in the message content this tool was invoked
+  contentOffset?: number | undefined;
 }
 
 // Permission request
@@ -45,7 +47,7 @@ export interface ToolState {
   setInputMode: (mode: InputMode) => void;
 
   // Tool lifecycle
-  startTool: (id: string, messageId: string, toolName: string, toolInput: Record<string, unknown>) => void;
+  startTool: (id: string, messageId: string, toolName: string, toolInput: Record<string, unknown>, contentOffset?: number) => void;
   completeTool: (id: string, toolOutput: unknown, success: boolean) => void;
 
   // Permission management
@@ -73,7 +75,7 @@ export const useToolStore = create<ToolState>()(
       });
     },
 
-    startTool: (id: string, messageId: string, toolName: string, toolInput: Record<string, unknown>) => {
+    startTool: (id: string, messageId: string, toolName: string, toolInput: Record<string, unknown>, contentOffset?: number) => {
       set((state) => {
         const tool: ToolExecution = {
           id,
@@ -82,6 +84,7 @@ export const useToolStore = create<ToolState>()(
           toolInput,
           status: 'running',
           startedAt: Date.now(),
+          contentOffset,
         };
         state.activeTools[id] = tool;
       });
@@ -132,7 +135,18 @@ export const useToolStore = create<ToolState>()(
       const completed = state.completedTools.filter(
         (t) => t.messageId === messageId
       );
-      return [...active, ...completed].sort((a, b) => a.startedAt - b.startedAt);
+
+      // Deduplicate by tool ID (keep latest version of each)
+      const toolMap = new Map<string, ToolExecution>();
+      for (const tool of [...active, ...completed]) {
+        const existing = toolMap.get(tool.id);
+        // Keep the tool if it's newer or has more complete status
+        if (!existing || tool.startedAt > existing.startedAt || (tool.completedAt && !existing.completedAt)) {
+          toolMap.set(tool.id, tool);
+        }
+      }
+
+      return Array.from(toolMap.values()).sort((a, b) => a.startedAt - b.startedAt);
     },
 
     reset: () => {

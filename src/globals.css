@@ -296,6 +296,51 @@ html.dark {
   display: none;
 }
 
+/* Table styling - rounded like code blocks */
+.prose table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.prose thead {
+  background-color: var(--muted);
+}
+
+.prose th,
+.prose td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  text-align: left;
+}
+
+.prose th:last-child,
+.prose td:last-child {
+  border-right: none;
+}
+
+.prose tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.prose th {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.prose td {
+  font-size: 0.875rem;
+}
+
+.prose tbody tr:hover {
+  background-color: var(--accent);
+}
+
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;

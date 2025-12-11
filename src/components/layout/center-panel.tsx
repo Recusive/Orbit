@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
 import { ResizeHandle } from './resize-handle';
@@ -29,8 +30,15 @@ import type { FC } from 'react';
 import { MessageActions } from '@/components/chat/message-actions';
 import { ModelSelector } from '@/components/chat/model-selector';
 import { PermissionModal } from '@/components/chat/permission-modal';
+import { BashToolWidget } from '@/components/chat/tools/bash-tool-widget';
 import { EditToolWidget } from '@/components/chat/tools/edit-tool-widget';
+import { GlobToolWidget } from '@/components/chat/tools/glob-tool-widget';
+import { GrepToolWidget } from '@/components/chat/tools/grep-tool-widget';
 import { ReadToolWidget } from '@/components/chat/tools/read-tool-widget';
+import { TaskToolWidget } from '@/components/chat/tools/task-tool-widget';
+import { TodoToolWidget } from '@/components/chat/tools/todo-tool-widget';
+import { WebFetchToolWidget } from '@/components/chat/tools/web-fetch-tool-widget';
+import { WebSearchToolWidget } from '@/components/chat/tools/web-search-tool-widget';
 import { WriteToolWidget } from '@/components/chat/tools/write-tool-widget';
 import { Button } from '@/components/ui/button';
 import { useVSCode } from '@/hooks/use-vscode';
@@ -231,18 +239,35 @@ export const CenterPanel: FC = () => {
         break;
 
       case 'tool:start': {
-        const toolId = `${message.message_id}-${message.tool_name}`;
-        startTool(
-          toolId,
-          message.message_id,
-          message.tool_name,
-          message.tool_input
-        );
+        // Use tool_id from SDK (unique per tool execution)
+        const toolId = message.tool_id;
+        // Get current content length for interleaving, and ensure message exists
+        setMessages(prev => {
+          let msg = prev.find(m => m.id === message.message_id);
+          const contentOffset = msg?.content.length ?? 0;
+          startTool(
+            toolId,
+            message.message_id,
+            message.tool_name,
+            message.tool_input,
+            contentOffset
+          );
+          // If no message exists yet, create an empty streaming assistant message
+          // so tools have something to attach to and render
+          if (!msg) {
+            return [
+              ...prev,
+              { id: message.message_id, role: 'assistant' as const, content: '', displayedContent: '', isStreaming: true },
+            ];
+          }
+          return prev;
+        });
         break;
       }
 
       case 'tool:end': {
-        const toolId = `${message.message_id}-${message.tool_name}`;
+        // Use tool_id from SDK (unique per tool execution)
+        const toolId = message.tool_id;
         completeTool(
           toolId,
           message.tool_output,
@@ -383,6 +408,14 @@ export const CenterPanel: FC = () => {
     });
   }, [postMessage]);
 
+  const handleOpenUrl = useCallback((url: string): void => {
+    postMessage({
+      type: 'url:open',
+      uuid: crypto.randomUUID(),
+      url,
+    });
+  }, [postMessage]);
+
   const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -517,53 +550,200 @@ export const CenterPanel: FC = () => {
                           <p className="text-sm whitespace-pre-wrap">{msg.displayedContent}</p>
                         ) : (
                           <>
-                            <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
-                              <Streamdown remarkPlugins={[]} rehypePlugins={[]}>{msg.displayedContent}</Streamdown>
-                            </div>
-                            {/* Tool widgets for this message */}
-                            {getToolsForMessage(msg.id).map((tool) => {
-                              const toolName = tool.toolName.toLowerCase();
-                              const getStringInput = (key: string, fallback: string): string => {
+                            {/* Interleave content and tools based on contentOffset */}
+                            {(() => {
+                              const tools = getToolsForMessage(msg.id);
+                              const content = msg.displayedContent;
+
+                              // Sort tools by contentOffset
+                              const sortedTools = [...tools].sort((a, b) =>
+                                (a.contentOffset ?? 0) - (b.contentOffset ?? 0)
+                              );
+
+                              // Build interleaved segments
+                              type Segment = { type: 'content'; text: string; key: string } | { type: 'tool'; tool: typeof tools[0]; key: string };
+                              const segments: Segment[] = [];
+                              let lastOffset = 0;
+
+                              for (const tool of sortedTools) {
+                                const offset = tool.contentOffset ?? 0;
+                                // Add content before this tool
+                                if (offset > lastOffset) {
+                                  const text = content.slice(lastOffset, offset);
+                                  if (text.trim()) {
+                                    segments.push({ type: 'content', text, key: `content-${String(lastOffset)}` });
+                                  }
+                                }
+                                // Add the tool
+                                segments.push({ type: 'tool', tool, key: tool.id });
+                                lastOffset = offset;
+                              }
+
+                              // Add remaining content after last tool
+                              if (lastOffset < content.length) {
+                                const text = content.slice(lastOffset);
+                                if (text.trim()) {
+                                  segments.push({ type: 'content', text, key: `content-${String(lastOffset)}` });
+                                }
+                              }
+
+                              // If no tools, just render all content
+                              if (segments.length === 0 && content.trim()) {
+                                segments.push({ type: 'content', text: content, key: 'content-0' });
+                              }
+
+                              const getStringInput = (tool: typeof tools[0], key: string, fallback: string): string => {
                                 const value = tool.toolInput[key];
                                 return typeof value === 'string' ? value : fallback;
                               };
-                              if (toolName === 'write') {
-                                return (
-                                  <WriteToolWidget
-                                    key={tool.id}
-                                    filePath={getStringInput('file_path', 'unknown')}
-                                    content={getStringInput('content', '')}
-                                    isRunning={tool.status === 'running'}
-                                    onOpenFile={handleOpenFile}
-                                  />
-                                );
-                              }
-                              if (toolName === 'edit') {
-                                return (
-                                  <EditToolWidget
-                                    key={tool.id}
-                                    filePath={getStringInput('file_path', 'unknown')}
-                                    oldString={getStringInput('old_string', '')}
-                                    newString={getStringInput('new_string', '')}
-                                    isRunning={tool.status === 'running'}
-                                    onOpenFile={handleOpenFile}
-                                  />
-                                );
-                              }
-                              if (toolName === 'read') {
-                                return (
-                                  <ReadToolWidget
-                                    key={tool.id}
-                                    filePath={getStringInput('file_path', 'unknown')}
-                                    isRunning={tool.status === 'running'}
-                                    content={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
-                                    onOpenFile={handleOpenFile}
-                                  />
-                                );
-                              }
-                              // Other tool types can be added here
-                              return null;
-                            })}
+
+                              // Handle clicks on links in markdown content
+                              const handleContentClick = (e: React.MouseEvent<HTMLDivElement>): void => {
+                                const target = e.target as HTMLElement;
+                                const anchor = target.closest('a');
+                                if (anchor?.href) {
+                                  e.preventDefault();
+                                  handleOpenUrl(anchor.href);
+                                }
+                              };
+
+                              return segments.map((segment) => {
+                                if (segment.type === 'content') {
+                                  return (
+                                    <div
+                                      key={segment.key}
+                                      className="text-sm prose prose-sm dark:prose-invert max-w-none [&_a]:focus:outline-none"
+                                      onClick={handleContentClick}
+                                    >
+                                      <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>{segment.text}</Streamdown>
+                                    </div>
+                                  );
+                                }
+
+                                const tool = segment.tool;
+                                const toolName = tool.toolName.toLowerCase();
+
+                                if (toolName === 'write') {
+                                  return (
+                                    <WriteToolWidget
+                                      key={tool.id}
+                                      filePath={getStringInput(tool, 'file_path', 'unknown')}
+                                      content={getStringInput(tool, 'content', '')}
+                                      isRunning={tool.status === 'running'}
+                                      onOpenFile={handleOpenFile}
+                                    />
+                                  );
+                                }
+                                if (toolName === 'edit') {
+                                  return (
+                                    <EditToolWidget
+                                      key={tool.id}
+                                      filePath={getStringInput(tool, 'file_path', 'unknown')}
+                                      oldString={getStringInput(tool, 'old_string', '')}
+                                      newString={getStringInput(tool, 'new_string', '')}
+                                      isRunning={tool.status === 'running'}
+                                      onOpenFile={handleOpenFile}
+                                    />
+                                  );
+                                }
+                                if (toolName === 'read') {
+                                  return (
+                                    <ReadToolWidget
+                                      key={tool.id}
+                                      filePath={getStringInput(tool, 'file_path', 'unknown')}
+                                      isRunning={tool.status === 'running'}
+                                      content={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+                                      onOpenFile={handleOpenFile}
+                                    />
+                                  );
+                                }
+                                if (toolName === 'bash') {
+                                  return (
+                                    <BashToolWidget
+                                      key={tool.id}
+                                      command={getStringInput(tool, 'command', '')}
+                                      description={getStringInput(tool, 'description', '')}
+                                      output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+                                      isRunning={tool.status === 'running'}
+                                    />
+                                  );
+                                }
+                                if (toolName === 'glob') {
+                                  return (
+                                    <GlobToolWidget
+                                      key={tool.id}
+                                      pattern={getStringInput(tool, 'pattern', '*')}
+                                      path={getStringInput(tool, 'path', '') || undefined}
+                                      output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+                                      isRunning={tool.status === 'running'}
+                                      onOpenFile={handleOpenFile}
+                                    />
+                                  );
+                                }
+                                if (toolName === 'grep') {
+                                  return (
+                                    <GrepToolWidget
+                                      key={tool.id}
+                                      pattern={getStringInput(tool, 'pattern', '')}
+                                      path={getStringInput(tool, 'path', '') || undefined}
+                                      outputMode={getStringInput(tool, 'output_mode', '') || undefined}
+                                      glob={getStringInput(tool, 'glob', '') || undefined}
+                                      fileType={getStringInput(tool, 'type', '') || undefined}
+                                      output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+                                      isRunning={tool.status === 'running'}
+                                      onOpenFile={handleOpenFile}
+                                    />
+                                  );
+                                }
+                                if (toolName === 'todowrite') {
+                                  const todosInput = tool.toolInput['todos'];
+                                  return (
+                                    <TodoToolWidget
+                                      key={tool.id}
+                                      todos={Array.isArray(todosInput) ? todosInput : undefined}
+                                      isRunning={tool.status === 'running'}
+                                    />
+                                  );
+                                }
+                                if (toolName === 'websearch') {
+                                  return (
+                                    <WebSearchToolWidget
+                                      key={tool.id}
+                                      query={getStringInput(tool, 'query', '')}
+                                      output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+                                      isRunning={tool.status === 'running'}
+                                      onOpenUrl={handleOpenUrl}
+                                    />
+                                  );
+                                }
+                                if (toolName === 'webfetch') {
+                                  return (
+                                    <WebFetchToolWidget
+                                      key={tool.id}
+                                      url={getStringInput(tool, 'url', '')}
+                                      prompt={getStringInput(tool, 'prompt', '')}
+                                      output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+                                      isRunning={tool.status === 'running'}
+                                      onOpenUrl={handleOpenUrl}
+                                    />
+                                  );
+                                }
+                                if (toolName === 'task') {
+                                  return (
+                                    <TaskToolWidget
+                                      key={tool.id}
+                                      description={getStringInput(tool, 'description', '')}
+                                      prompt={getStringInput(tool, 'prompt', '')}
+                                      subagentType={getStringInput(tool, 'subagent_type', 'general-purpose')}
+                                      model={getStringInput(tool, 'model', '') || undefined}
+                                      output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+                                      isRunning={tool.status === 'running'}
+                                    />
+                                  );
+                                }
+                                return null;
+                              });
+                            })()}
                             {isComplete ? (
                               <MessageActions
                                 showDisclaimer={isLastAssistantMessage}

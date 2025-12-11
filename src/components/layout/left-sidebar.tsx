@@ -112,7 +112,10 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
       </div>
 
       {/* Workspaces */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className={cn(
+        'flex-1 overflow-x-hidden',
+        isCollapsed ? 'overflow-y-hidden' : 'overflow-y-auto'
+      )}>
         <div className={cn(
           'py-1.5 transition-opacity duration-150',
           isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
