@@ -5,11 +5,12 @@ import {
   Inbox,
   Info,
   Lightbulb,
+  MoreHorizontal,
   PanelLeft,
   Plus,
   Settings,
 } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 import type {ConversationSummary} from '@/stores/ui-store';
 import type { FC } from 'react';
@@ -36,6 +37,7 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
   const conversations = useConversations();
   const activeConversationId = useActiveConversationId();
   const { postMessage } = useVSCode();
+  const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
 
   const handleStartConversation = useCallback((): void => {
     postMessage({
@@ -117,17 +119,32 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
             </button>
           </div>
           <div className="flex flex-col gap-0.5 mt-1">
-            {workspaceName ? <WorkspaceItem name={workspaceName} active collapsed={isCollapsed} /> : null}
-            {/* Conversation list under workspace */}
-            {conversations.map((conv) => (
-              <ConversationItem
-                key={conv.sessionId}
-                conversation={conv}
-                active={conv.sessionId === activeConversationId}
+            {workspaceName ? (
+              <WorkspaceItem
+                name={workspaceName}
+                active
                 collapsed={isCollapsed}
-                onClick={() => { handleLoadConversation(conv.sessionId); }}
+                expanded={workspaceExpanded}
+                onToggle={() => { setWorkspaceExpanded(!workspaceExpanded); }}
               />
-            ))}
+            ) : null}
+            {/* Conversation list with timeline */}
+            {workspaceExpanded && conversations.length > 0 ? <div className="relative ml-[19px]">
+                {/* Vertical timeline line */}
+                <div className="absolute left-0 top-0 bottom-2 w-px bg-border" />
+                {/* Conversations */}
+                <div className="flex flex-col gap-0.5">
+                  {conversations.map((conv) => (
+                    <ConversationItem
+                      key={conv.sessionId}
+                      conversation={conv}
+                      active={conv.sessionId === activeConversationId}
+                      collapsed={isCollapsed}
+                      onClick={() => { handleLoadConversation(conv.sessionId); }}
+                    />
+                  ))}
+                </div>
+              </div> : null}
           </div>
         </div>
       </div>
@@ -197,19 +214,22 @@ interface WorkspaceItemProps {
   readonly name: string;
   readonly active?: boolean;
   readonly collapsed?: boolean;
+  readonly expanded?: boolean;
+  readonly onToggle?: () => void;
 }
 
-const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, collapsed = false }) => {
+const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, collapsed = false, expanded = true, onToggle }) => {
   return (
     <button
       className="flex items-center h-8 rounded-md mx-1.5 transition-colors overflow-hidden text-foreground/70 hover:text-foreground hover:bg-accent/50"
+      onClick={onToggle}
     >
       {/* Fixed-width icon column */}
       <div
         className="flex items-center justify-center shrink-0"
         style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
       >
-        <ChevronDown className="h-4 w-4 shrink-0" />
+        <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', !expanded && '-rotate-90')} />
       </div>
       {/* Text that slides in */}
       <span
@@ -238,25 +258,55 @@ const ConversationItem: FC<ConversationItemProps> = ({
   collapsed = false,
   onClick,
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
-    <button
-      className={cn(
-        'flex items-center h-7 rounded-md mx-1.5 ml-5 px-2 transition-colors overflow-hidden hover:bg-accent/50',
-        active ? 'bg-accent/50 text-foreground' : 'text-foreground/70 hover:text-foreground'
-      )}
-      title={collapsed ? conversation.title : undefined}
-      onClick={onClick}
+    <div
+      className="relative group mx-1.5 ml-2"
+      onMouseEnter={() => { setIsHovered(true); }}
+      onMouseLeave={() => { setIsHovered(false); }}
     >
-      {/* Text */}
-      <span
+      <button
         className={cn(
-          'text-sm whitespace-nowrap overflow-hidden text-ellipsis',
-          collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+          'flex items-center h-7 w-full rounded-md pl-[7px] pr-7 transition-colors overflow-hidden hover:bg-accent/50',
+          active ? 'bg-accent/50 text-foreground' : 'text-foreground/70 hover:text-foreground'
         )}
-        style={{ transition: getCollapseTransition(collapsed) }}
+        title={conversation.title}
+        onClick={onClick}
       >
-        {conversation.title}
-      </span>
-    </button>
+        {/* Text with gradient fade for overflow */}
+        <span
+          className={cn(
+            'text-sm whitespace-nowrap overflow-hidden flex-1 text-left',
+            collapsed ? 'w-0 opacity-0' : ''
+          )}
+          style={{
+            transition: getCollapseTransition(collapsed),
+            maskImage: 'linear-gradient(to right, black 85%, transparent 98%)',
+            WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 98%)',
+            maskSize: '100% 100%',
+            WebkitMaskSize: '100% 100%',
+          }}
+        >
+          {conversation.title}
+        </span>
+      </button>
+      {/* More options button - appears on hover */}
+      {!collapsed && (
+        <button
+          className={cn(
+            'absolute right-0.5 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded transition-opacity hover:bg-accent',
+            isHovered ? 'opacity-100' : 'opacity-0'
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            // TODO: Show dropdown menu
+          }}
+          title="More options"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      )}
+    </div>
   );
 };

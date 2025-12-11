@@ -82,6 +82,9 @@ export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
   }, [debug]);
 
   // Listen for messages with Zod validation
+  // Track processed message UUIDs to prevent duplicate processing
+  const processedUuids = useRef(new Set<string>());
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent<unknown>): void => {
       const result = ExtensionMessageSchema.safeParse(event.data);
@@ -92,6 +95,26 @@ export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
           console.warn('[Orbit] Errors:', result.error.format());
         }
         return;
+      }
+
+      // Deduplicate messages by UUID (if present)
+      const uuid = 'uuid' in result.data ? result.data.uuid : undefined;
+      if (uuid) {
+        if (processedUuids.current.has(uuid)) {
+          if (debug) {
+            console.warn('[Orbit] Ignoring duplicate message:', result.data.type, uuid);
+          }
+          return;
+        }
+        processedUuids.current.add(uuid);
+        // Limit set size to prevent memory leak
+        if (processedUuids.current.size > 1000) {
+          const iterator = processedUuids.current.values();
+          for (let i = 0; i < 500; i++) {
+            const value = iterator.next().value;
+            if (value) processedUuids.current.delete(value);
+          }
+        }
       }
 
       if (debug) {
@@ -159,51 +182,82 @@ export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
 // ═══════════════════════════════════════════════════════════════
 
 function handleMockMessage(message: WebviewMessage): void {
-  const delay = 100;
+  const delay = 100; // Short delay for non-streaming responses
 
   switch (message.type) {
     case 'message:send': {
       const messageId = crypto.randomUUID();
 
-      // Simulate streaming
+      // Simulate streaming with multiple chunks over 5 seconds
       setTimeout(() => {
+        console.warn('[Mock] Sending chunk 1 at 1000ms');
         window.postMessage(
           {
             type: 'agent:chunk',
             uuid: crypto.randomUUID(),
             session_id: message.session_id,
             message_id: messageId,
-            content: 'I received: ',
+            content: 'I received your message: ',
           },
           '*'
         );
-      }, delay);
+      }, 1000);
 
       setTimeout(() => {
+        console.warn('[Mock] Sending chunk 2 at 2000ms');
         window.postMessage(
           {
             type: 'agent:chunk',
             uuid: crypto.randomUUID(),
             session_id: message.session_id,
             message_id: messageId,
-            content: `"${message.content}"`,
+            content: `"${message.content}". `,
           },
           '*'
         );
-      }, delay * 2);
+      }, 2000);
 
       setTimeout(() => {
+        console.warn('[Mock] Sending chunk 3 at 3000ms');
+        window.postMessage(
+          {
+            type: 'agent:chunk',
+            uuid: crypto.randomUUID(),
+            session_id: message.session_id,
+            message_id: messageId,
+            content: 'Let me help you with that. ',
+          },
+          '*'
+        );
+      }, 3000);
+
+      setTimeout(() => {
+        console.warn('[Mock] Sending chunk 4 at 4000ms');
+        window.postMessage(
+          {
+            type: 'agent:chunk',
+            uuid: crypto.randomUUID(),
+            session_id: message.session_id,
+            message_id: messageId,
+            content: 'This is a longer response to test the indicator.',
+          },
+          '*'
+        );
+      }, 4000);
+
+      setTimeout(() => {
+        console.warn('[Mock] Sending complete at 5000ms');
         window.postMessage(
           {
             type: 'agent:complete',
             uuid: crypto.randomUUID(),
             session_id: message.session_id,
             message_id: messageId,
-            duration_ms: delay * 3,
+            duration_ms: 5000,
           },
           '*'
         );
-      }, delay * 3);
+      }, 5000);
       break;
     }
 
@@ -269,11 +323,30 @@ function handleMockMessage(message: WebviewMessage): void {
       break;
     }
 
+    case 'conversation:rewind': {
+      // Mock rewind - just echo back the request with empty messages up to rewind point
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'conversation:rewound',
+            uuid: crypto.randomUUID(),
+            session_id: message.session_id,
+            new_session_id: message.session_id, // Same session in mock
+            rewind_to_message_id: message.message_id,
+            messages: [], // In real implementation, this would be truncated messages
+          },
+          '*'
+        );
+      }, delay);
+      break;
+    }
+
     // No mock responses needed for these message types
     case 'webview:ready':
     case 'message:edit':
     case 'message:delete':
     case 'conversation:delete':
+    case 'conversation:updateTitle':
     case 'agent:start':
     case 'agent:stop':
     case 'agent:pause':
@@ -344,6 +417,7 @@ export function useAgentStream(
         case 'conversation:created':
         case 'conversation:deleted':
         case 'conversation:loaded':
+        case 'conversation:rewound':
           break;
       }
     },

@@ -72,6 +72,21 @@ export const LoadConversationSchema = z.object({
   session_id: SessionIdSchema,
 });
 
+export const RewindConversationSchema = z.object({
+  type: z.literal('conversation:rewind'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  /** The message ID to rewind to (keep this message, discard all after) */
+  message_id: z.string(),
+});
+
+export const UpdateConversationTitleSchema = z.object({
+  type: z.literal('conversation:updateTitle'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  title: z.string(),
+});
+
 // Agent control
 export const AgentStartSchema = z.object({
   type: z.literal('agent:start'),
@@ -197,6 +212,8 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   DeleteConversationSchema,
   GetConversationsSchema,
   LoadConversationSchema,
+  RewindConversationSchema,
+  UpdateConversationTitleSchema,
   // Agent
   AgentStartSchema,
   AgentStopSchema,
@@ -383,6 +400,25 @@ export const ConversationLoadedSchema = z.object({
   ),
 });
 
+export const ConversationRewoundSchema = z.object({
+  type: z.literal('conversation:rewound'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  /** New session ID after forking (for future messages) */
+  new_session_id: z.string(),
+  /** The message ID we rewound to */
+  rewind_to_message_id: z.string(),
+  /** Messages remaining after rewind */
+  messages: z.array(
+    z.object({
+      id: z.string(),
+      role: z.enum(['user', 'assistant']),
+      content: z.string(),
+      timestamp: z.number(),
+    })
+  ),
+});
+
 // General error
 export const ErrorSchema = z.object({
   type: z.literal('error'),
@@ -417,6 +453,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   ConversationDeletedSchema,
   ConversationListSchema,
   ConversationLoadedSchema,
+  ConversationRewoundSchema,
   // Error
   ErrorSchema,
 ]);
@@ -436,6 +473,8 @@ export type CreateConversation = z.infer<typeof CreateConversationSchema>;
 export type DeleteConversation = z.infer<typeof DeleteConversationSchema>;
 export type GetConversations = z.infer<typeof GetConversationsSchema>;
 export type LoadConversation = z.infer<typeof LoadConversationSchema>;
+export type RewindConversation = z.infer<typeof RewindConversationSchema>;
+export type UpdateConversationTitle = z.infer<typeof UpdateConversationTitleSchema>;
 export type AgentStart = z.infer<typeof AgentStartSchema>;
 export type AgentStop = z.infer<typeof AgentStopSchema>;
 export type AgentPause = z.infer<typeof AgentPauseSchema>;
@@ -472,6 +511,7 @@ export type ConversationCreated = z.infer<typeof ConversationCreatedSchema>;
 export type ConversationDeleted = z.infer<typeof ConversationDeletedSchema>;
 export type ConversationList = z.infer<typeof ConversationListSchema>;
 export type ConversationLoaded = z.infer<typeof ConversationLoadedSchema>;
+export type ConversationRewound = z.infer<typeof ConversationRewoundSchema>;
 export type ProtocolError = z.infer<typeof ErrorSchema>;
 
 // ═══════════════════════════════════════════════════════════════

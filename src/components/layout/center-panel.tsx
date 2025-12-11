@@ -26,6 +26,7 @@ import { ResizeHandle } from './resize-handle';
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
+import { MessageActions } from '@/components/chat/message-actions';
 import { ModelSelector } from '@/components/chat/model-selector';
 import { Button } from '@/components/ui/button';
 import { useVSCode } from '@/hooks/use-vscode';
@@ -59,7 +60,7 @@ const getInitialTheme = (): Theme => {
 };
 
 export const CenterPanel: FC = () => {
-  const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, reviewPanelWidth, setWorkspace, setActiveConversation, setConversations, addConversation } = useUIStore();
+  const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, reviewPanelWidth, setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle } = useUIStore();
   const workspaceName = useWorkspaceName();
   const activeConversationTitle = useActiveConversationTitle();
   const [inputMode, setInputMode] = useState<InputMode>('default');
@@ -131,9 +132,10 @@ export const CenterPanel: FC = () => {
           const lastMsg = prev[prev.length - 1];
           // If last message is streaming assistant, append to full content
           if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+            const newContent = lastMsg.content + message.content;
             return [
               ...prev.slice(0, -1),
-              { ...lastMsg, content: lastMsg.content + message.content },
+              { ...lastMsg, content: newContent },
             ];
           }
           // Otherwise create new streaming message (displayedContent starts empty)
@@ -203,6 +205,20 @@ export const CenterPanel: FC = () => {
         })));
         break;
 
+      case 'conversation:rewound':
+        // Update session ID if it changed (would be different with SDK fork)
+        if (message.new_session_id !== message.session_id) {
+          setSessionId(message.new_session_id);
+        }
+        // Update messages to the truncated list
+        setMessages(message.messages.map(m => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          displayedContent: m.content, // Already displayed, no animation
+        })));
+        break;
+
       // Handle other message types (no-op for now)
       case 'layout':
       case 'error':
@@ -219,7 +235,7 @@ export const CenterPanel: FC = () => {
     }
   }, [setWorkspace, setActiveConversation, setConversations, addConversation]);
 
-  const { postMessage, isMockMode } = useVSCode({ onMessage: handleMessage, debug: true });
+  const { postMessage, isMockMode } = useVSCode({ onMessage: handleMessage });
 
   // Request conversation list when session is ready
   useEffect(() => {
@@ -243,6 +259,18 @@ export const CenterPanel: FC = () => {
   const handleSend = (): void => {
     const text = inputText.trim();
     if (!text || isAgentRunning || !sessionId) return;
+
+    // Update title to first message if this is the first message
+    if (messages.length === 0) {
+      updateConversationTitle(sessionId, text);
+      // Persist title to Orbit
+      postMessage({
+        type: 'conversation:updateTitle',
+        uuid: crypto.randomUUID(),
+        session_id: sessionId,
+        title: text,
+      });
+    }
 
     // Add user message
     const userMessage: ChatMessage = {
@@ -268,6 +296,17 @@ export const CenterPanel: FC = () => {
       inputRef.current.textContent = '';
     }
   };
+
+  const handleRewind = useCallback((messageId: string): void => {
+    if (!sessionId || isAgentRunning) return;
+
+    postMessage({
+      type: 'conversation:rewind',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+      message_id: messageId,
+    });
+  }, [sessionId, isAgentRunning, postMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -308,13 +347,22 @@ export const CenterPanel: FC = () => {
       {/* Shared Header (spans both Chat and Review) */}
       <header className="flex items-center justify-between px-4 border-b border-border shrink-0" style={{ height: HEIGHTS.headerBar }}>
         {/* Breadcrumb */}
-        <div className="flex items-center text-sm">
-          <span className="opacity-70 cursor-pointer hover:opacity-100 transition-opacity">
+        <div className="flex items-center text-sm min-w-0 flex-1 max-w-[280px]">
+          <span className="opacity-70 cursor-pointer hover:opacity-100 transition-opacity shrink-0">
             {workspaceName ?? 'No workspace'}
           </span>
           {activeConversationTitle ? <>
-              <span className="mx-2 opacity-30">/</span>
-              <span className="opacity-70">
+              <span className="mx-2 opacity-30 shrink-0">/</span>
+              <span
+                className="opacity-70 whitespace-nowrap overflow-hidden flex-1 min-w-0"
+                title={activeConversationTitle}
+                style={{
+                  maskImage: 'linear-gradient(to right, black 78%, transparent 95%)',
+                  WebkitMaskImage: 'linear-gradient(to right, black 78%, transparent 95%)',
+                  maskSize: '100% 100%',
+                  WebkitMaskSize: '100% 100%',
+                }}
+              >
                 {activeConversationTitle}
               </span>
             </> : null}
@@ -371,25 +419,48 @@ export const CenterPanel: FC = () => {
                   </div>
                 </div>
               ) : (
-                messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={cn(
-                      'p-3 rounded-lg',
-                      msg.role === 'user' && 'bg-muted'
-                    )}
-                  >
-                    {msg.role === 'user' ? (
-                      <p className="text-sm whitespace-pre-wrap">{msg.displayedContent}</p>
-                    ) : (
-                      <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
-                        <Streamdown remarkPlugins={[]} rehypePlugins={[]}>{msg.displayedContent}</Streamdown>
-                        {msg.isStreaming ? <span className="inline-block w-2 h-4 bg-foreground/70 animate-pulse ml-0.5" /> : null}
+                <>
+                  {messages.map((msg, index) => {
+                    const isLastAssistantMessage = msg.role === 'assistant' &&
+                      messages.slice(index + 1).every(m => m.role === 'user');
+                    const isComplete = !msg.isStreaming && msg.displayedContent.length === msg.content.length;
+
+                    return (
+                      <div
+                        key={msg.id}
+                        className={cn(
+                          'p-3 rounded-lg',
+                          msg.role === 'user' && 'bg-muted'
+                        )}
+                      >
+                        {msg.role === 'user' ? (
+                          <p className="text-sm whitespace-pre-wrap">{msg.displayedContent}</p>
+                        ) : (
+                          <>
+                            <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
+                              <Streamdown remarkPlugins={[]} rehypePlugins={[]}>{msg.displayedContent}</Streamdown>
+                            </div>
+                            {isComplete ? (
+                              <MessageActions
+                                showDisclaimer={isLastAssistantMessage}
+                                rewindDisabled={isLastAssistantMessage}
+                                onRewind={() => { handleRewind(msg.id); }}
+                              />
+                            ) : null}
+                          </>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))
+                    );
+                  })}
+                </>
               )}
+              {/* Progress indicator - shows while agent is running OR text is still animating */}
+              {(isAgentRunning || messages.some(m => m.displayedContent.length < m.content.length)) ? (
+                <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Generating...</span>
+                </div>
+              ) : null}
               <div ref={messagesEndRef} />
             </div>
           </div>

@@ -44,6 +44,7 @@ interface UIActions {
   setConversations: (conversations: ConversationSummary[]) => void;
   addConversation: (conversation: ConversationSummary) => void;
   removeConversation: (sessionId: string) => void;
+  updateConversationTitle: (sessionId: string, title: string) => void;
   // Sidebar actions
   toggleLeftSidebar: () => void;
   expandLeftSidebar: () => void;
@@ -117,6 +118,19 @@ export const useUIStore = create<UIStore>()(
         if (state.activeConversationId === sessionId) {
           state.activeConversationId = null;
           state.activeConversationTitle = null;
+        }
+      });
+    },
+
+    updateConversationTitle: (sessionId: string, title: string): void => {
+      set((state) => {
+        const conversation = state.conversations.find(c => c.sessionId === sessionId);
+        if (conversation) {
+          conversation.title = title;
+        }
+        // Also update active title if this is the active conversation
+        if (state.activeConversationId === sessionId) {
+          state.activeConversationTitle = title;
         }
       });
     },
