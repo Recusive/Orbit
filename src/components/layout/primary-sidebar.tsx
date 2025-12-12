@@ -6,10 +6,11 @@ import {
   Inbox,
   Info,
   Lightbulb,
-  MessageSquare,
+  MessageCircle,
   MoreHorizontal,
   PanelLeft,
   Plus,
+  Search,
   Settings,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -25,7 +26,7 @@ import { useUIStore, useIsLeftSidebarCollapsed, useWorkspaceName, useConversatio
 
 type SidebarTab = 'conversations' | 'explorer';
 
-interface LeftSidebarProps {
+interface PrimarySidebarProps {
   readonly width: number;
 }
 
@@ -35,7 +36,7 @@ const getCollapseTransition = (collapsed: boolean): string =>
     ? `opacity 0ms, width ${TRANSITIONS.sidebar}`
     : `width ${TRANSITIONS.sidebar}, opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
 
-export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
+export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   const { toggleLeftSidebar } = useUIStore();
   const isCollapsed = useIsLeftSidebarCollapsed();
   const workspaceName = useWorkspaceName();
@@ -60,6 +61,10 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
       session_id: sessionId,
     });
   }, [postMessage]);
+
+  const handleOpenQuickSearch = useCallback((): void => {
+    window.dispatchEvent(new CustomEvent('openCommandPalette'));
+  }, []);
 
   return (
     <aside
@@ -111,25 +116,82 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
         )}
       </div>
 
+      {/* Search Bar */}
+      <div className="shrink-0 mx-1.5 py-1" style={{ height: 40 }}>
+        <button
+          onClick={handleOpenQuickSearch}
+          className={cn(
+            'flex items-center h-8 rounded-md text-muted-foreground hover:text-foreground transition-colors overflow-hidden border border-transparent',
+            isCollapsed
+              ? ''
+              : 'w-full border-border bg-muted/50 hover:bg-muted'
+          )}
+          title="Search files (⌘P)"
+        >
+          {/* Fixed-width icon column - never moves */}
+          <div
+            className="flex items-center justify-center shrink-0"
+            style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
+          >
+            <Search className="h-4 w-4 shrink-0" />
+          </div>
+          {/* Text that slides in */}
+          <span
+            className={cn(
+              'text-xs whitespace-nowrap overflow-hidden',
+              isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+            )}
+            style={{ transition: getCollapseTransition(isCollapsed) }}
+          >
+            Search files...
+          </span>
+          <kbd
+            className={cn(
+              'text-[10px] font-mono bg-background/50 px-1 py-0.5 rounded whitespace-nowrap overflow-hidden',
+              isCollapsed ? 'w-0 opacity-0 ml-0 pr-0' : 'w-auto opacity-100 ml-auto mr-2'
+            )}
+            style={{ transition: getCollapseTransition(isCollapsed) }}
+          >
+            ⌘P
+          </kbd>
+        </button>
+      </div>
+
       {/* Tab Navigation */}
-      <div className={cn(
-        'flex border-b border-border shrink-0',
-        isCollapsed ? 'flex-col py-1 gap-1' : 'px-1.5 py-1 gap-0.5'
-      )}>
-        <TabButton
-          icon={MessageSquare}
-          label="Conversations"
-          active={activeTab === 'conversations'}
-          collapsed={isCollapsed}
-          onClick={() => { setActiveTab('conversations'); }}
-        />
-        <TabButton
-          icon={FolderTree}
-          label="Explorer"
-          active={activeTab === 'explorer'}
-          collapsed={isCollapsed}
-          onClick={() => { setActiveTab('explorer'); }}
-        />
+      <div
+        className={cn(
+          'flex items-center border-b border-border shrink-0',
+          isCollapsed ? 'justify-center' : 'px-1.5 gap-0.5'
+        )}
+        style={{ height: 40 }}
+      >
+        {isCollapsed ? (
+          /* When collapsed, show single button that toggles between tabs */
+          <button
+            className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => { setActiveTab(activeTab === 'conversations' ? 'explorer' : 'conversations'); }}
+            title={activeTab === 'conversations' ? 'Sessions (click for Explorer)' : 'Explorer (click for Sessions)'}
+          >
+            {activeTab === 'conversations' ? (
+              <MessageCircle className="h-4 w-4" />
+            ) : (
+              <FolderTree className="h-4 w-4" />
+            )}
+          </button>
+        ) : (
+          <>
+            <TabButton
+              label="Sessions"
+              active={activeTab === 'conversations'}
+              onClick={() => { setActiveTab('conversations'); }}
+            />
+            <TabButton
+              label="Explorer"
+              active={activeTab === 'explorer'}
+              onClick={() => { setActiveTab('explorer'); }}
+            />
+          </>
+        )}
       </div>
 
       {/* Main Actions (only show for conversations tab) */}
@@ -364,19 +426,16 @@ const ConversationItem: FC<ConversationItemProps> = ({
 // ═══════════════════════════════════════════════════════════════
 
 interface TabButtonProps {
-  readonly icon: FC<{ className?: string }>;
   readonly label: string;
   readonly active: boolean;
-  readonly collapsed: boolean;
   readonly onClick: () => void;
 }
 
-const TabButton: FC<TabButtonProps> = ({ icon: Icon, label, active, collapsed, onClick }) => {
+const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
   return (
     <button
       className={cn(
-        'flex items-center rounded-md transition-colors',
-        collapsed ? 'h-8 w-8 justify-center mx-auto' : 'h-7 px-2 gap-1.5 flex-1',
+        'flex items-center justify-center rounded-md transition-colors h-7 px-2 flex-1',
         active
           ? 'bg-accent text-accent-foreground'
           : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
@@ -384,8 +443,7 @@ const TabButton: FC<TabButtonProps> = ({ icon: Icon, label, active, collapsed, o
       onClick={onClick}
       title={label}
     >
-      <Icon className="h-4 w-4 shrink-0" />
-      {!collapsed ? <span className="text-xs font-medium truncate">{label}</span> : null}
+      <span className="text-xs font-medium truncate">{label}</span>
     </button>
   );
 };

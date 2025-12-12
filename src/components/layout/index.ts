@@ -1,6 +1,6 @@
 export { RootLayout } from './root-layout';
-export { LeftSidebar } from './left-sidebar';
-export { CenterPanel } from './center-panel';
-export { RightSidebar } from './right-sidebar';
+export { PrimarySidebar } from './primary-sidebar';
+export { ChatArea } from './chat-area';
+export { SecondaryPanel } from './secondary-panel';
 export { BottomPanel } from './bottom-panel';
 export { ResizeHandle } from './resize-handle';

@@ -2,8 +2,6 @@ import {
   ArrowLeft,
   ArrowRight,
   AtSign,
-  Code,
-  Eye,
   FileCode,
   FileText,
   Globe,
@@ -29,6 +27,7 @@ import { ResizeHandle } from './resize-handle';
 import type { ExtensionMessage, InputMode } from '@/types/protocol';
 import type { FC } from 'react';
 
+import { FileViewer } from '@/components/activity/file-viewer';
 import { MessageActions } from '@/components/chat/message-actions';
 import { ModelSelector } from '@/components/chat/model-selector';
 import { PermissionModal } from '@/components/chat/permission-modal';
@@ -42,7 +41,6 @@ import { TodoToolWidget } from '@/components/chat/tools/todo-tool-widget';
 import { WebFetchToolWidget } from '@/components/chat/tools/web-fetch-tool-widget';
 import { WebSearchToolWidget } from '@/components/chat/tools/web-search-tool-widget';
 import { WriteToolWidget } from '@/components/chat/tools/write-tool-widget';
-import { FileViewer } from '@/components/review/file-viewer';
 import { Button } from '@/components/ui/button';
 import { useVSCode } from '@/hooks/use-vscode';
 import { CONTENT_WIDTH, HEIGHTS, INPUT_SIZES } from '@/lib/constants';
@@ -74,7 +72,7 @@ const getInitialTheme = (): Theme => {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 };
 
-export const CenterPanel: FC = () => {
+export const ChatArea: FC = () => {
   const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, reviewPanelWidth, setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle } = useUIStore();
   const workspaceName = useWorkspaceName();
   const activeConversationTitle = useActiveConversationTitle();
@@ -529,8 +527,6 @@ export const CenterPanel: FC = () => {
           <HeaderButton icon={Plus} title="New Chat" />
           <HeaderButton icon={Globe} title="Browser" />
           <HeaderButton icon={SquareTerminal} title="Terminal" onClick={toggleBottomPanel} />
-          <HeaderButton icon={Code} title="Code" />
-          <HeaderButton icon={Eye} title="Preview" />
 
           {/* Review Changes Button */}
           <button
@@ -543,7 +539,7 @@ export const CenterPanel: FC = () => {
             )}
           >
             <ListChecks className="h-4 w-4" />
-            <span>Review Changes</span>
+            <span>Activity</span>
           </button>
 
           <HeaderButton icon={PanelRight} title="Right Panel" onClick={toggleRightSidebar} />
@@ -878,7 +874,7 @@ export const CenterPanel: FC = () => {
                     className={cn(
                       'h-7 w-7 flex items-center justify-center rounded-full transition-colors',
                       isInputEmpty || isAgentRunning
-                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                        ? 'bg-primary/30 text-primary-foreground/50 cursor-not-allowed'
                         : 'bg-primary text-primary-foreground hover:bg-primary/90'
                     )}
                   >

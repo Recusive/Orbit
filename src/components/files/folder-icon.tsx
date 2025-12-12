@@ -2,11 +2,12 @@ import { useMemo } from 'react';
 
 import type { FC } from 'react';
 
-import { getFileIconName } from '@/lib/iconMap';
+import { getFolderIconName } from '@/lib/iconMap';
 import { cn } from '@/lib/utils';
 
-export interface FileIconProps {
-  readonly fileName: string;
+export interface FolderIconProps {
+  readonly folderName: string;
+  readonly isOpen?: boolean;
   readonly className?: string;
   readonly monochrome?: boolean;
 }
@@ -26,16 +27,22 @@ for (const [path, url] of Object.entries(iconModules)) {
   }
 }
 
-export const FileIcon: FC<FileIconProps> = ({
-  fileName,
+export const FolderIcon: FC<FolderIconProps> = ({
+  folderName,
+  isOpen = false,
   className = '',
   monochrome = true,
 }) => {
-  const iconName = useMemo(() => getFileIconName(fileName), [fileName]);
-  const iconUrl = iconMap[iconName] ?? iconMap['document'];
+  const iconName = useMemo(
+    () => getFolderIconName(folderName, isOpen),
+    [folderName, isOpen]
+  );
+
+  // Try to get the specific folder icon, fall back to default folder
+  const iconUrl = iconMap[iconName] ?? iconMap[isOpen ? 'folder-open' : 'folder'];
 
   if (!iconUrl) {
-    // Fallback to a simple file representation
+    // Fallback to a simple folder representation
     return (
       <svg
         className={cn('shrink-0', className)}
@@ -44,8 +51,14 @@ export const FileIcon: FC<FileIconProps> = ({
         stroke="currentColor"
         strokeWidth={2}
       >
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
+        {isOpen ? (
+          <>
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            <path d="M2 10h20" />
+          </>
+        ) : (
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+        )}
       </svg>
     );
   }

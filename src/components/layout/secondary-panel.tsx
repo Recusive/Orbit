@@ -4,7 +4,7 @@ import type { FC } from 'react';
 
 import { Button } from '@/components/ui/button';
 
-export const RightSidebar: FC = () => {
+export const SecondaryPanel: FC = () => {
   return (
     <aside className="w-[150px] h-full flex flex-col border-l border-border bg-card/20">
       <header className="h-[40px] flex items-center justify-between px-2 border-b border-border">

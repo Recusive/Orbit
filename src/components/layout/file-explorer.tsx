@@ -1,10 +1,10 @@
-import { ChevronDown, ChevronRight, Folder, FolderOpen, Loader2, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { FileNode, ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
-import { FileIcon } from '@/components/files/file-icon';
+import { FileIcon, FolderIcon } from '@/components/files';
 import { useVSCode } from '@/hooks/use-vscode';
 import { cn } from '@/lib/utils';
 import { useFileStore } from '@/stores/file-store';
@@ -138,8 +138,16 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Explorer</span>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground min-w-0">
+          <span className="shrink-0">Explorer</span>
+          {rootPath ? (
+            <>
+              <span className="shrink-0">/</span>
+              <span className="truncate">{rootPath.split('/').pop()}</span>
+            </>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
           <button
             className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100"
             onClick={handleOpenQuickSearch}
@@ -268,11 +276,7 @@ const FileTreeItem: FC<FileTreeItemProps> = ({ node, depth, requestChildren }) =
         {/* Icon */}
         <span className="w-4 h-4 flex items-center justify-center shrink-0 mr-1">
           {node.isDirectory ? (
-            isExpanded ? (
-              <FolderOpen className="h-4 w-4 text-file-folder" />
-            ) : (
-              <Folder className="h-4 w-4 text-file-folder" />
-            )
+            <FolderIcon folderName={node.name} isOpen={isExpanded} className="h-4 w-4" />
           ) : (
             <FileIcon fileName={node.name} className="h-4 w-4" />
           )}

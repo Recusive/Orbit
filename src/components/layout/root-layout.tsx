@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { CenterPanel } from './center-panel';
-import { LeftSidebar } from './left-sidebar';
-import { RightSidebar } from './right-sidebar';
+import { ChatArea } from './chat-area';
+import { PrimarySidebar } from './primary-sidebar';
+import { SecondaryPanel } from './secondary-panel';
 
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
@@ -60,13 +60,14 @@ export const RootLayout: FC = () => {
   return (
     <div className="h-full w-full flex flex-col overflow-hidden bg-background text-foreground">
       <div className="flex-1 flex min-h-0">
-        <LeftSidebar width={leftSidebarWidth} />
+        {/* Primary Sidebar - File explorer, conversations */}
+        <PrimarySidebar width={leftSidebarWidth} />
 
-        {/* CenterPanel contains Chat + Review split (with terminal inside review) */}
-        <CenterPanel />
+        {/* Chat Area - Main chat interface with Activity panel */}
+        <ChatArea />
 
-        {/* Right Sidebar (Sessions) - separate from Review */}
-        {rightSidebarOpen ? <RightSidebar /> : null}
+        {/* Secondary Panel - Sessions list */}
+        {rightSidebarOpen ? <SecondaryPanel /> : null}
       </div>
 
       {/* Quick Open Dialog */}

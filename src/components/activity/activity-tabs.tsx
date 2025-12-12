@@ -5,11 +5,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { FilesChangedList } from './files-changed-list';
 import { SourceControlTab } from './source-control-tab';
 
-export interface ReviewTabsProps {
+export interface ActivityTabsProps {
   className?: string;
 }
 
-export const ReviewTabs: React.FC<ReviewTabsProps> = ({ className = '' }) => {
+export const ActivityTabs: React.FC<ActivityTabsProps> = ({ className = '' }) => {
   return (
     <Tabs defaultValue="files-changed" className={className}>
       <TabsList className="w-full justify-start border-b border-border rounded-none bg-transparent p-0">

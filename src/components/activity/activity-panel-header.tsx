@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import React from 'react';
 
-export interface ReviewPanelHeaderProps {
+export interface ActivityPanelHeaderProps {
   onBack?: () => void;
   onForward?: () => void;
   onFind?: () => void;
@@ -11,7 +11,7 @@ export interface ReviewPanelHeaderProps {
   canGoForward?: boolean;
 }
 
-export const ReviewPanelHeader: React.FC<ReviewPanelHeaderProps> = ({
+export const ActivityPanelHeader: React.FC<ActivityPanelHeaderProps> = ({
   onBack,
   onForward,
   onFind,

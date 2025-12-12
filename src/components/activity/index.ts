@@ -1,5 +1,5 @@
-export { ReviewPanelHeader } from './review-panel-header';
-export { ReviewTabs } from './review-tabs';
+export { ActivityPanelHeader } from './activity-panel-header';
+export { ActivityTabs } from './activity-tabs';
 export { FilesChangedList } from './files-changed-list';
 export { FileChangeItem } from './file-change-item';
 export { DiffViewer } from './diff-viewer';
