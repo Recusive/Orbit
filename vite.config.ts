@@ -34,6 +34,7 @@ export default defineConfig({
   build: {
     outDir: 'dist/webview',
     cssCodeSplit: false,
+    assetsInlineLimit: 1000000, // Inline all assets including fonts as base64
     rollupOptions: {
       output: {
         entryFileNames: 'index.js',
@@ -51,6 +52,10 @@ export default defineConfig({
   },
   // Optimize dependencies to ensure proper bundling
   optimizeDeps: {
-    include: ['streamdown', 'shiki', 'mermaid'],
+    include: ['streamdown', 'shiki', 'mermaid', 'monaco-editor'],
+  },
+  // Define globals
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
   },
 })

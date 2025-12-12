@@ -6,3 +6,6 @@ export { DiffViewer } from './diff-viewer';
 export { DiffLine } from './diff-line';
 export { DiffStats } from './diff-stats';
 export { SourceControlTab } from './source-control-tab';
+export { FileViewer } from './file-viewer';
+export { FileViewerContent } from './file-viewer-content';
+export { FileViewerHeader } from './file-viewer-header';

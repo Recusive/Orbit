@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   ArrowRight,
   AtSign,
   Code,
@@ -14,6 +15,7 @@ import {
   Moon,
   PanelRight,
   Plus,
+  Search,
   SquareTerminal,
   Sun,
   X,
@@ -40,10 +42,12 @@ import { TodoToolWidget } from '@/components/chat/tools/todo-tool-widget';
 import { WebFetchToolWidget } from '@/components/chat/tools/web-fetch-tool-widget';
 import { WebSearchToolWidget } from '@/components/chat/tools/web-search-tool-widget';
 import { WriteToolWidget } from '@/components/chat/tools/write-tool-widget';
+import { FileViewer } from '@/components/review/file-viewer';
 import { Button } from '@/components/ui/button';
 import { useVSCode } from '@/hooks/use-vscode';
 import { CONTENT_WIDTH, HEIGHTS, INPUT_SIZES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { useFileViewerStore, useHasOpenFiles } from '@/stores/file-viewer-store';
 import { useToolStore, usePendingPermissions, useInputMode } from '@/stores/tool-store';
 import { useUIStore, useWorkspaceName, useActiveConversationTitle } from '@/stores/ui-store';
 
@@ -243,7 +247,7 @@ export const CenterPanel: FC = () => {
         const toolId = message.tool_id;
         // Get current content length for interleaving, and ensure message exists
         setMessages(prev => {
-          let msg = prev.find(m => m.id === message.message_id);
+          const msg = prev.find(m => m.id === message.message_id);
           const contentOffset = msg?.content.length ?? 0;
           startTool(
             toolId,
@@ -286,13 +290,29 @@ export const CenterPanel: FC = () => {
         });
         break;
 
+      case 'file:content': {
+        // File content received - add to file viewer
+        // Derive language from file extension
+        const ext = message.path.split('.').pop()?.toLowerCase() ?? '';
+        const langMap: Record<string, string> = {
+          ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx',
+          css: 'css', scss: 'scss', less: 'less', html: 'html',
+          json: 'json', md: 'markdown', py: 'python', rs: 'rust',
+          go: 'go', java: 'java', c: 'c', cpp: 'cpp', h: 'c',
+          sh: 'bash', yml: 'yaml', yaml: 'yaml', xml: 'xml',
+        };
+        const language = langMap[ext] ?? 'text';
+        const fileViewerStore = useFileViewerStore.getState();
+        fileViewerStore.setFileContent(message.path, message.content, language);
+        break;
+      }
+
       // Handle other message types (no-op for now)
       case 'layout':
       case 'error':
       case 'terminal:output':
       case 'terminal:created':
       case 'terminal:exited':
-      case 'file:content':
       case 'file:changed':
       case 'file:written':
       case 'conversation:deleted':
@@ -401,8 +421,19 @@ export const CenterPanel: FC = () => {
   }, [sessionId, postMessage, removePermissionRequest]);
 
   const handleOpenFile = useCallback((path: string): void => {
+    // Start loading in file viewer store
+    const fileViewerStore = useFileViewerStore.getState();
+    fileViewerStore.openFile(path);
+
+    // Open review panel if not already open
+    const uiState = useUIStore.getState();
+    if (!uiState.reviewPanelOpen) {
+      uiState.toggleReviewPanel();
+    }
+
+    // Request file content from Orbit
     postMessage({
-      type: 'file:open',
+      type: 'file:read',
       uuid: crypto.randomUUID(),
       path,
     });
@@ -894,11 +925,36 @@ interface ReviewPanelProps {
   readonly width: number;
 }
 
-type TabValue = 'files' | 'source';
+type TabValue = 'file' | 'files' | 'source';
 
 const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
+  const hasOpenFiles = useHasOpenFiles();
+  const closeAllTabs = useFileViewerStore((state) => state.closeAllTabs);
+  const historyIndex = useFileViewerStore((state) => state.historyIndex);
+  const historyLength = useFileViewerStore((state) => state.history.length);
+  const goBack = useFileViewerStore((state) => state.goBack);
+  const goForward = useFileViewerStore((state) => state.goForward);
+  const toggleSearch = useFileViewerStore((state) => state.toggleSearch);
   const [activeTab, setActiveTab] = useState<TabValue>('files');
   const { bottomPanelOpen, bottomPanelHeight, toggleBottomPanel } = useUIStore();
+  const prevHasOpenFiles = useRef(hasOpenFiles);
+
+  const canGoBack = historyIndex > 0;
+  const canGoForward = historyIndex < historyLength - 1;
+
+  // Auto-switch to File tab only when files are first opened (not continuously)
+  useEffect(() => {
+    // Only switch when transitioning from no files to having files
+    if (hasOpenFiles && !prevHasOpenFiles.current) {
+      setActiveTab('file');
+    }
+    prevHasOpenFiles.current = hasOpenFiles;
+  }, [hasOpenFiles]);
+
+  const handleCloseFileViewer = (): void => {
+    closeAllTabs();
+    setActiveTab('files');
+  };
 
   return (
     <div
@@ -908,6 +964,14 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
       {/* Tabs (directly at top - no separate header) */}
       <div className="flex items-center justify-between px-4 pt-4">
         <div className="flex gap-1">
+          {hasOpenFiles ? (
+            <TabButton
+              active={activeTab === 'file'}
+              onClick={() => { setActiveTab('file'); }}
+            >
+              File
+            </TabButton>
+          ) : null}
           <TabButton
             active={activeTab === 'files'}
             onClick={() => { setActiveTab('files'); }}
@@ -921,11 +985,67 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
             Source Control
           </TabButton>
         </div>
+
+        {/* File navigation buttons (only show when files are open) */}
+        {hasOpenFiles ? (
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={goBack}
+              disabled={!canGoBack}
+              className={cn(
+                'h-6 w-6 flex items-center justify-center rounded transition-colors',
+                canGoBack
+                  ? 'hover:bg-accent opacity-70 hover:opacity-100'
+                  : 'opacity-30 cursor-not-allowed'
+              )}
+              title="Go back"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={goForward}
+              disabled={!canGoForward}
+              className={cn(
+                'h-6 w-6 flex items-center justify-center rounded transition-colors',
+                canGoForward
+                  ? 'hover:bg-accent opacity-70 hover:opacity-100'
+                  : 'opacity-30 cursor-not-allowed'
+              )}
+              title="Go forward"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={toggleSearch}
+              className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
+              title="Search (Cmd+F)"
+            >
+              <Search className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={handleCloseFileViewer}
+              className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
+              title="Close file viewer"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === 'files' ? <FilesChangedTab /> : <SourceControlTab />}
+      <div className="flex-1 overflow-hidden">
+        {activeTab === 'file' && hasOpenFiles ? (
+          <FileViewer />
+        ) : activeTab === 'files' ? (
+          <div className="h-full overflow-y-auto">
+            <FilesChangedTab />
+          </div>
+        ) : (
+          <div className="h-full overflow-y-auto">
+            <SourceControlTab />
+          </div>
+        )}
       </div>
 
       {/* Terminal Panel (bottom of review panel) */}
