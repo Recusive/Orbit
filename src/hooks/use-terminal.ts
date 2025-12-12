@@ -67,16 +67,23 @@ export function useTerminal(defaultSessionId?: string): UseTerminalReturn {
 
   const closeSession = useCallback(
     (sessionId: string) => {
-      // Notify VS Code
-      postMessage({
-        type: 'terminal:close',
-        uuid: generateUUID(),
-        session_id: sessionId,
-      } satisfies TerminalClose);
+      // Find the session to get the terminalId
+      const session = sessions.find((s) => s.id === sessionId);
+      const terminalId = session?.terminalId;
+
+      // Notify VS Code (only if we have a terminal ID)
+      if (terminalId) {
+        postMessage({
+          type: 'terminal:close',
+          uuid: generateUUID(),
+          session_id: sessionId,
+          terminal_id: terminalId,
+        } satisfies TerminalClose);
+      }
 
       closeSessionStore(sessionId);
     },
-    [postMessage, closeSessionStore]
+    [postMessage, closeSessionStore, sessions]
   );
 
   const setActiveSession = useCallback(

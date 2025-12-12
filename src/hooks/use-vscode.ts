@@ -277,13 +277,23 @@ function handleMockMessage(message: WebviewMessage): void {
     }
 
     case 'terminal:create': {
+      const terminalId = `pty_${String(Date.now())}_${crypto.randomUUID().slice(0, 8)}`;
       setTimeout(() => {
         window.postMessage(
           {
             type: 'terminal:created',
             uuid: crypto.randomUUID(),
             session_id: message.session_id,
+            terminal_id: terminalId,
             name: message.name ?? 'zsh',
+            pid: 12345,
+            cwd: '/mock/workspace',
+            shell_type: 'zsh',
+            capabilities: {
+              cwd_detection: true,
+              command_detection: true,
+              shell_integration: true,
+            },
           },
           '*'
         );
@@ -404,6 +414,10 @@ function handleMockMessage(message: WebviewMessage): void {
     case 'terminal:close':
     case 'terminal:command':
     case 'terminal:clear':
+    case 'terminal:write':
+    case 'terminal:resize':
+    case 'terminal:signal':
+    case 'terminal:ack':
     case 'file:open':
     case 'file:read':
     case 'file:write':
@@ -466,7 +480,6 @@ export function useAgentStream(
         case 'system:init':
         case 'terminal:output':
         case 'terminal:created':
-        case 'terminal:exited':
         case 'conversation:created':
         case 'conversation:deleted':
         case 'conversation:loaded':
@@ -474,6 +487,9 @@ export function useAgentStream(
         case 'permission:request':
         case 'inputMode:changed':
           break;
+        // Note: terminal:data, terminal:exited, terminal:cwd, terminal:command:start,
+        // terminal:command:end, terminal:capabilities have terminal_id instead of session_id
+        // so they are filtered out by the session_id check above
       }
     },
     [sessionId, onChunk, onComplete, onError, onToolStart, onToolEnd]

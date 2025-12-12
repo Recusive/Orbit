@@ -1,6 +1,3 @@
-// Terminal components
-export * from './terminal';
-
 // File components
 export * from './files';
 

@@ -124,12 +124,16 @@ export const TerminalCreateSchema = z.object({
   session_id: z.string(),
   name: z.string().optional(),
   cwd: z.string().optional(),
+  cols: z.number().optional(),
+  rows: z.number().optional(),
+  shell_integration: z.boolean().optional(),
 });
 
 export const TerminalCloseSchema = z.object({
   type: z.literal('terminal:close'),
   uuid: UUIDSchema,
   session_id: z.string(),
+  terminal_id: z.string(),
 });
 
 export const TerminalCommandSchema = z.object({
@@ -143,6 +147,39 @@ export const TerminalClearSchema = z.object({
   type: z.literal('terminal:clear'),
   uuid: UUIDSchema,
   session_id: z.string(),
+});
+
+// PTY Terminal - Raw input write
+export const TerminalWriteSchema = z.object({
+  type: z.literal('terminal:write'),
+  uuid: UUIDSchema,
+  terminal_id: z.string(),
+  data: z.string(),
+});
+
+// PTY Terminal - Resize
+export const TerminalResizeSchema = z.object({
+  type: z.literal('terminal:resize'),
+  uuid: UUIDSchema,
+  terminal_id: z.string(),
+  cols: z.number(),
+  rows: z.number(),
+});
+
+// PTY Terminal - Send signal
+export const TerminalSignalSchema = z.object({
+  type: z.literal('terminal:signal'),
+  uuid: UUIDSchema,
+  terminal_id: z.string(),
+  signal: z.enum(['SIGINT', 'SIGTERM', 'SIGKILL']),
+});
+
+// PTY Terminal - Flow control acknowledgment
+export const TerminalAckSchema = z.object({
+  type: z.literal('terminal:ack'),
+  uuid: UUIDSchema,
+  terminal_id: z.string(),
+  byte_count: z.number(),
 });
 
 // Files
@@ -264,6 +301,10 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   TerminalCloseSchema,
   TerminalCommandSchema,
   TerminalClearSchema,
+  TerminalWriteSchema,
+  TerminalResizeSchema,
+  TerminalSignalSchema,
+  TerminalAckSchema,
   // Files
   FileOpenSchema,
   FileReadSchema,
@@ -388,7 +429,17 @@ export const PanelCommandSchema = z.object({
   command: PanelCommandTypeSchema,
 });
 
-// Terminal
+// Terminal - Shell type enum
+export const ShellTypeSchema = z.enum(['bash', 'zsh', 'fish', 'pwsh', 'cmd', 'unknown']);
+
+// Terminal - Capabilities state
+export const TerminalCapabilitiesStateSchema = z.object({
+  cwd_detection: z.boolean(),
+  command_detection: z.boolean(),
+  shell_integration: z.boolean(),
+});
+
+// Terminal - Legacy output (for backwards compat)
 export const TerminalOutputSchema = z.object({
   type: z.literal('terminal:output'),
   uuid: UUIDSchema,
@@ -396,18 +447,66 @@ export const TerminalOutputSchema = z.object({
   data: z.string(),
 });
 
+// PTY Terminal - Raw data stream
+export const TerminalDataSchema = z.object({
+  type: z.literal('terminal:data'),
+  uuid: UUIDSchema,
+  terminal_id: z.string(),
+  data: z.string(),
+});
+
+// PTY Terminal - Created with full PTY info
 export const TerminalCreatedSchema = z.object({
   type: z.literal('terminal:created'),
   uuid: UUIDSchema,
   session_id: z.string(),
+  terminal_id: z.string(),
   name: z.string(),
+  pid: z.number().optional(),
+  cwd: z.string().optional(),
+  shell_type: ShellTypeSchema.optional(),
+  capabilities: TerminalCapabilitiesStateSchema.optional(),
 });
 
+// PTY Terminal - Exited
 export const TerminalExitedSchema = z.object({
   type: z.literal('terminal:exited'),
   uuid: UUIDSchema,
-  session_id: z.string(),
+  terminal_id: z.string(),
   exit_code: z.number().optional(),
+});
+
+// PTY Terminal - CWD changed (from shell integration)
+export const TerminalCwdChangedSchema = z.object({
+  type: z.literal('terminal:cwd'),
+  uuid: UUIDSchema,
+  terminal_id: z.string(),
+  cwd: z.string(),
+});
+
+// PTY Terminal - Command started (from shell integration)
+export const TerminalCommandStartSchema = z.object({
+  type: z.literal('terminal:command:start'),
+  uuid: UUIDSchema,
+  terminal_id: z.string(),
+  command_line: z.string().optional(),
+});
+
+// PTY Terminal - Command ended (from shell integration)
+export const TerminalCommandEndSchema = z.object({
+  type: z.literal('terminal:command:end'),
+  uuid: UUIDSchema,
+  terminal_id: z.string(),
+  command_line: z.string().optional(),
+  exit_code: z.number().optional(),
+});
+
+// PTY Terminal - Capabilities changed
+export const TerminalCapabilitiesChangedSchema = z.object({
+  type: z.literal('terminal:capabilities'),
+  uuid: UUIDSchema,
+  terminal_id: z.string(),
+  capabilities: TerminalCapabilitiesStateSchema,
 });
 
 // Files
@@ -562,8 +661,13 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   PanelCommandSchema,
   // Terminal
   TerminalOutputSchema,
+  TerminalDataSchema,
   TerminalCreatedSchema,
   TerminalExitedSchema,
+  TerminalCwdChangedSchema,
+  TerminalCommandStartSchema,
+  TerminalCommandEndSchema,
+  TerminalCapabilitiesChangedSchema,
   // Files
   FileContentSchema,
   FileChangedSchema,
@@ -606,6 +710,10 @@ export type TerminalCreate = z.infer<typeof TerminalCreateSchema>;
 export type TerminalClose = z.infer<typeof TerminalCloseSchema>;
 export type TerminalCommand = z.infer<typeof TerminalCommandSchema>;
 export type TerminalClear = z.infer<typeof TerminalClearSchema>;
+export type TerminalWrite = z.infer<typeof TerminalWriteSchema>;
+export type TerminalResize = z.infer<typeof TerminalResizeSchema>;
+export type TerminalSignal = z.infer<typeof TerminalSignalSchema>;
+export type TerminalAck = z.infer<typeof TerminalAckSchema>;
 export type FileOpen = z.infer<typeof FileOpenSchema>;
 export type FileRead = z.infer<typeof FileReadSchema>;
 export type FileWrite = z.infer<typeof FileWriteSchema>;
@@ -634,9 +742,16 @@ export type InputModeChanged = z.infer<typeof InputModeChangedSchema>;
 export type InputMode = z.infer<typeof InputModeSchema>;
 export type PanelCommandType = z.infer<typeof PanelCommandTypeSchema>;
 export type PanelCommand = z.infer<typeof PanelCommandSchema>;
+export type ShellType = z.infer<typeof ShellTypeSchema>;
+export type TerminalCapabilitiesState = z.infer<typeof TerminalCapabilitiesStateSchema>;
 export type TerminalOutput = z.infer<typeof TerminalOutputSchema>;
+export type TerminalData = z.infer<typeof TerminalDataSchema>;
 export type TerminalCreated = z.infer<typeof TerminalCreatedSchema>;
 export type TerminalExited = z.infer<typeof TerminalExitedSchema>;
+export type TerminalCwdChanged = z.infer<typeof TerminalCwdChangedSchema>;
+export type TerminalCommandStart = z.infer<typeof TerminalCommandStartSchema>;
+export type TerminalCommandEnd = z.infer<typeof TerminalCommandEndSchema>;
+export type TerminalCapabilitiesChanged = z.infer<typeof TerminalCapabilitiesChangedSchema>;
 export type FileContent = z.infer<typeof FileContentSchema>;
 export type FileChanged = z.infer<typeof FileChangedSchema>;
 export type FileWritten = z.infer<typeof FileWrittenSchema>;
@@ -668,7 +783,15 @@ export function isProtocolToolMessage(msg: ExtensionMessage): msg is ToolStart |
 
 export function isProtocolTerminalMessage(
   msg: ExtensionMessage
-): msg is TerminalOutput | TerminalCreated | TerminalExited {
+): msg is
+  | TerminalOutput
+  | TerminalData
+  | TerminalCreated
+  | TerminalExited
+  | TerminalCwdChanged
+  | TerminalCommandStart
+  | TerminalCommandEnd
+  | TerminalCapabilitiesChanged {
   return msg.type.startsWith('terminal:');
 }
 

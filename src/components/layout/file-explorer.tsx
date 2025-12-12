@@ -93,8 +93,13 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
       case 'inputMode:changed':
       case 'panel:command':
       case 'terminal:output':
+      case 'terminal:data':
       case 'terminal:created':
       case 'terminal:exited':
+      case 'terminal:cwd':
+      case 'terminal:command:start':
+      case 'terminal:command:end':
+      case 'terminal:capabilities':
       case 'file:written':
       case 'file:list:response':
       case 'conversation:created':

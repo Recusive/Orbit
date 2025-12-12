@@ -1,5 +1,69 @@
 import { z } from 'zod';
 
+// ============================================================================
+// PTY Terminal Types (for real terminal backend)
+// ============================================================================
+
+/**
+ * Shell type detected by the backend
+ */
+export type ShellType = 'bash' | 'zsh' | 'fish' | 'pwsh' | 'cmd' | 'unknown';
+
+/**
+ * Terminal capabilities provided by shell integration
+ */
+export interface TerminalCapabilities {
+  cwdDetection: boolean;
+  commandDetection: boolean;
+  shellIntegration: boolean;
+}
+
+/**
+ * PTY terminal session (connected to real backend)
+ */
+export interface PtyTerminalSession {
+  /** Unique terminal ID from backend */
+  terminalId: string;
+  /** Process ID of the shell */
+  pid: number;
+  /** Current working directory */
+  cwd: string;
+  /** Detected shell type */
+  shellType: ShellType;
+  /** Terminal title (usually process name) */
+  title: string;
+  /** Current capabilities */
+  capabilities: TerminalCapabilities;
+  /** Linked chat session ID if any */
+  sessionId?: string;
+  /** Whether the terminal is still alive */
+  isAlive: boolean;
+  /** Creation timestamp */
+  createdAt: number;
+}
+
+/**
+ * Command detected by shell integration
+ */
+export interface DetectedCommand {
+  /** Command line that was executed */
+  commandLine?: string;
+  /** Exit code when command finished */
+  exitCode?: number;
+  /** Marker position (line number) */
+  marker?: number;
+  /** Whether command is still running */
+  isRunning: boolean;
+  /** Start timestamp */
+  startTime?: number;
+  /** End timestamp */
+  endTime?: number;
+}
+
+// ============================================================================
+// Legacy Command Types (for command history)
+// ============================================================================
+
 /**
  * Command status enum
  */

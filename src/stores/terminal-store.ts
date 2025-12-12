@@ -1,7 +1,15 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
+import type { ShellType, TerminalCapabilitiesState } from '@/types/protocol';
+
 import { TERMINAL } from '@/lib/constants';
+
+
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export interface TerminalOutput {
   id: string;
@@ -10,36 +18,128 @@ export interface TerminalOutput {
   timestamp: number;
 }
 
-export interface TerminalSession {
+/** Detected command from shell integration */
+export interface DetectedCommand {
   id: string;
-  name: string;
-  cwd: string;
-  createdAt: number;
-  output: TerminalOutput[];
-  isRunning: boolean;
+  commandLine?: string;
+  startTime: number;
+  endTime?: number;
   exitCode?: number;
-  pid?: number;
+  isRunning: boolean;
 }
+
+/** PTY Terminal Session */
+export interface TerminalSession {
+  /** Local session ID (for UI tracking) */
+  id: string;
+  /** Backend PTY terminal ID (from main process) */
+  terminalId?: string;
+  /** Display name */
+  name: string;
+  /** Current working directory */
+  cwd: string;
+  /** Shell type (bash, zsh, fish, etc.) */
+  shellType?: ShellType;
+  /** Process ID */
+  pid?: number;
+  /** Terminal capabilities */
+  capabilities: TerminalCapabilitiesState;
+  /** Creation timestamp */
+  createdAt: number;
+  /** Terminal output buffer */
+  output: TerminalOutput[];
+  /** Whether the terminal process is alive */
+  isAlive: boolean;
+  /** Whether the terminal is connected to backend */
+  isConnected: boolean;
+  /** Exit code when process terminates */
+  exitCode?: number;
+  /** Currently running command (if any) */
+  currentCommand?: DetectedCommand;
+  /** Command history from shell integration */
+  commandHistory: DetectedCommand[];
+  /** Flow control: unacknowledged bytes */
+  unacknowledgedBytes: number;
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const DEFAULT_CAPABILITIES: TerminalCapabilitiesState = {
+  cwd_detection: false,
+  command_detection: false,
+  shell_integration: false,
+};
+
+const FLOW_CONTROL = {
+  highWaterMark: 100000,
+  ackThreshold: 50000,
+} as const;
+
+// ============================================================================
+// Store Interface
+// ============================================================================
 
 export interface TerminalState {
   sessions: TerminalSession[];
   activeSessionId: string | null;
   maxOutputLines: number;
-  // Actions
+
+  // Session Management
   createSession: (name?: string, cwd?: string) => string;
   closeSession: (id: string) => void;
   setActiveSession: (id: string | null) => void;
+
+  // PTY Connection
+  connectSession: (
+    sessionId: string,
+    terminalId: string,
+    pid?: number,
+    shellType?: ShellType,
+    capabilities?: TerminalCapabilitiesState
+  ) => void;
+  disconnectSession: (sessionId: string, exitCode?: number) => void;
+
+  // Output
   addOutput: (sessionId: string, output: Omit<TerminalOutput, 'id' | 'timestamp'>) => void;
+  appendData: (terminalId: string, data: string) => number; // Returns bytes for ack
   clearOutput: (sessionId: string) => void;
+
+  // Capabilities & CWD
+  updateCapabilities: (terminalId: string, capabilities: TerminalCapabilitiesState) => void;
+  updateCwd: (terminalId: string, cwd: string) => void;
+
+  // Command Detection
+  startCommand: (terminalId: string, commandLine?: string) => void;
+  endCommand: (terminalId: string, exitCode?: number) => void;
+
+  // Flow Control
+  acknowledgeData: (terminalId: string, byteCount: number) => void;
+  shouldPause: (terminalId: string) => boolean;
+
+  // Session Updates
   updateSession: (sessionId: string, updates: Partial<TerminalSession>) => void;
   setMaxOutputLines: (lines: number) => void;
+
+  // Helpers
+  getSessionByTerminalId: (terminalId: string) => TerminalSession | undefined;
+  getActiveSession: () => TerminalSession | undefined;
 }
 
+// ============================================================================
+// Store Implementation
+// ============================================================================
+
 export const useTerminalStore = create<TerminalState>()(
-  immer((set) => ({
+  immer((set, get) => ({
     sessions: [],
     activeSessionId: null,
     maxOutputLines: TERMINAL.maxOutputLines,
+
+    // ========================================================================
+    // Session Management
+    // ========================================================================
 
     createSession: (name?: string, cwd?: string) => {
       const random = Math.random().toString(36);
@@ -52,14 +152,20 @@ export const useTerminalStore = create<TerminalState>()(
 
       set((state) => {
         const processExists = typeof process !== 'undefined';
-        const defaultCwd = processExists && typeof process.cwd === 'function' ? process.cwd() : '~';
+        const defaultCwd =
+          processExists && typeof process.cwd === 'function' ? process.cwd() : '~';
+
         const newSession: TerminalSession = {
           id,
           name: name ?? `Terminal ${String(sessionNumber)}`,
           cwd: cwd ?? defaultCwd,
+          capabilities: { ...DEFAULT_CAPABILITIES },
           createdAt: Date.now(),
           output: [],
-          isRunning: false,
+          isAlive: false,
+          isConnected: false,
+          commandHistory: [],
+          unacknowledgedBytes: 0,
         };
 
         state.sessions.push(newSession);
@@ -73,9 +179,9 @@ export const useTerminalStore = create<TerminalState>()(
       return id;
     },
 
-    closeSession: (id: string) =>
-      { set((state) => {
-        const sessionIndex = state.sessions.findIndex(s => s.id === id);
+    closeSession: (id: string) => {
+      set((state) => {
+        const sessionIndex = state.sessions.findIndex((s) => s.id === id);
         if (sessionIndex === -1) return;
 
         state.sessions.splice(sessionIndex, 1);
@@ -83,23 +189,73 @@ export const useTerminalStore = create<TerminalState>()(
         // Update active session if the closed one was active
         if (state.activeSessionId === id) {
           if (state.sessions.length > 0) {
-            // Select the previous session, or the first one if we closed the first
             const newIndex = sessionIndex > 0 ? sessionIndex - 1 : 0;
             state.activeSessionId = state.sessions[newIndex]?.id ?? null;
           } else {
             state.activeSessionId = null;
           }
         }
-      }); },
+      });
+    },
 
-    setActiveSession: (id: string | null) =>
-      { set((state) => {
+    setActiveSession: (id: string | null) => {
+      set((state) => {
         state.activeSessionId = id;
-      }); },
+      });
+    },
 
-    addOutput: (sessionId: string, output: Omit<TerminalOutput, 'id' | 'timestamp'>) =>
-      { set((state) => {
-        const session = state.sessions.find(s => s.id === sessionId);
+    // ========================================================================
+    // PTY Connection
+    // ========================================================================
+
+    connectSession: (
+      sessionId: string,
+      terminalId: string,
+      pid?: number,
+      shellType?: ShellType,
+      capabilities?: TerminalCapabilitiesState
+    ) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.id === sessionId);
+        if (session) {
+          session.terminalId = terminalId;
+          if (pid !== undefined) {
+            session.pid = pid;
+          }
+          if (shellType !== undefined) {
+            session.shellType = shellType;
+          }
+          session.isAlive = true;
+          session.isConnected = true;
+          delete session.exitCode;
+          if (capabilities) {
+            session.capabilities = capabilities;
+          }
+        }
+      });
+    },
+
+    disconnectSession: (sessionId: string, exitCode?: number) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.id === sessionId);
+        if (session) {
+          session.isAlive = false;
+          session.isConnected = false;
+          if (exitCode !== undefined) {
+            session.exitCode = exitCode;
+          }
+          delete session.currentCommand;
+        }
+      });
+    },
+
+    // ========================================================================
+    // Output
+    // ========================================================================
+
+    addOutput: (sessionId: string, output: Omit<TerminalOutput, 'id' | 'timestamp'>) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.id === sessionId);
         if (!session) return;
 
         const random = Math.random().toString(36);
@@ -116,35 +272,178 @@ export const useTerminalStore = create<TerminalState>()(
           const excess = session.output.length - state.maxOutputLines;
           session.output.splice(0, excess);
         }
-      }); },
+      });
+    },
 
-    clearOutput: (sessionId: string) =>
-      { set((state) => {
-        const session = state.sessions.find(s => s.id === sessionId);
+    appendData: (terminalId: string, data: string) => {
+      const byteCount = data.length;
+
+      set((state) => {
+        const session = state.sessions.find((s) => s.terminalId === terminalId);
+        if (!session) return;
+
+        // Add raw data as output
+        const random = Math.random().toString(36);
+        session.output.push({
+          id: `out_${String(Date.now())}_${random.slice(2, 11)}`,
+          type: 'stdout',
+          content: data,
+          timestamp: Date.now(),
+        });
+
+        // Track unacknowledged bytes for flow control
+        session.unacknowledgedBytes += byteCount;
+
+        // Trim output if needed
+        if (session.output.length > state.maxOutputLines) {
+          const excess = session.output.length - state.maxOutputLines;
+          session.output.splice(0, excess);
+        }
+      });
+
+      return byteCount;
+    },
+
+    clearOutput: (sessionId: string) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.id === sessionId);
         if (session) {
           session.output = [];
         }
-      }); },
+      });
+    },
 
-    updateSession: (sessionId: string, updates: Partial<TerminalSession>) =>
-      { set((state) => {
-        const session = state.sessions.find(s => s.id === sessionId);
+    // ========================================================================
+    // Capabilities & CWD
+    // ========================================================================
+
+    updateCapabilities: (terminalId: string, capabilities: TerminalCapabilitiesState) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.terminalId === terminalId);
+        if (session) {
+          session.capabilities = capabilities;
+        }
+      });
+    },
+
+    updateCwd: (terminalId: string, cwd: string) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.terminalId === terminalId);
+        if (session) {
+          session.cwd = cwd;
+        }
+      });
+    },
+
+    // ========================================================================
+    // Command Detection
+    // ========================================================================
+
+    startCommand: (terminalId: string, commandLine?: string) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.terminalId === terminalId);
+        if (!session) return;
+
+        const random = Math.random().toString(36);
+        const command: DetectedCommand = {
+          id: `cmd_${String(Date.now())}_${random.slice(2, 11)}`,
+          startTime: Date.now(),
+          isRunning: true,
+        };
+
+        if (commandLine !== undefined) {
+          command.commandLine = commandLine;
+        }
+
+        session.currentCommand = command;
+      });
+    },
+
+    endCommand: (terminalId: string, exitCode?: number) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.terminalId === terminalId);
+        if (!session?.currentCommand) return;
+
+        const finishedCommand: DetectedCommand = {
+          ...session.currentCommand,
+          endTime: Date.now(),
+          isRunning: false,
+        };
+
+        if (exitCode !== undefined) {
+          finishedCommand.exitCode = exitCode;
+        }
+
+        // Add to history
+        session.commandHistory.push(finishedCommand);
+
+        // Keep only last 100 commands
+        if (session.commandHistory.length > 100) {
+          session.commandHistory.splice(0, session.commandHistory.length - 100);
+        }
+
+        delete session.currentCommand;
+      });
+    },
+
+    // ========================================================================
+    // Flow Control
+    // ========================================================================
+
+    acknowledgeData: (terminalId: string, byteCount: number) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.terminalId === terminalId);
+        if (session) {
+          session.unacknowledgedBytes = Math.max(0, session.unacknowledgedBytes - byteCount);
+        }
+      });
+    },
+
+    shouldPause: (terminalId: string) => {
+      const session = get().sessions.find((s) => s.terminalId === terminalId);
+      if (!session) return false;
+      return session.unacknowledgedBytes > FLOW_CONTROL.highWaterMark;
+    },
+
+    // ========================================================================
+    // Session Updates
+    // ========================================================================
+
+    updateSession: (sessionId: string, updates: Partial<TerminalSession>) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.id === sessionId);
         if (session) {
           Object.assign(session, updates);
         }
-      }); },
+      });
+    },
 
-    setMaxOutputLines: (lines: number) =>
-      { set((state) => {
+    setMaxOutputLines: (lines: number) => {
+      set((state) => {
         state.maxOutputLines = Math.max(TERMINAL.minOutputLines, lines);
 
         // Trim all sessions to the new limit
-        state.sessions.forEach(session => {
+        state.sessions.forEach((session) => {
           if (session.output.length > lines) {
             const excess = session.output.length - lines;
             session.output.splice(0, excess);
           }
         });
-      }); },
+      });
+    },
+
+    // ========================================================================
+    // Helpers
+    // ========================================================================
+
+    getSessionByTerminalId: (terminalId: string) => {
+      return get().sessions.find((s) => s.terminalId === terminalId);
+    },
+
+    getActiveSession: () => {
+      const state = get();
+      if (!state.activeSessionId) return undefined;
+      return state.sessions.find((s) => s.id === state.activeSessionId);
+    },
   }))
 );

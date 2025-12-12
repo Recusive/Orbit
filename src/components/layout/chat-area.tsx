@@ -42,10 +42,12 @@ import { WebFetchToolWidget } from '@/components/chat/tools/web-fetch-tool-widge
 import { WebSearchToolWidget } from '@/components/chat/tools/web-search-tool-widget';
 import { WriteToolWidget } from '@/components/chat/tools/write-tool-widget';
 import { Button } from '@/components/ui/button';
+import { useTerminalInstanceManager } from '@/hooks/use-terminal-instance-manager';
 import { useVSCode } from '@/hooks/use-vscode';
 import { CONTENT_WIDTH, HEIGHTS, INPUT_SIZES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useFileViewerStore, useHasOpenFiles } from '@/stores/file-viewer-store';
+import { useTerminalStore } from '@/stores/terminal-store';
 import { useToolStore, usePendingPermissions, useInputMode } from '@/stores/tool-store';
 import { useUIStore, useWorkspaceName, useActiveConversationTitle } from '@/stores/ui-store';
 
@@ -309,8 +311,13 @@ export const ChatArea: FC = () => {
       case 'layout':
       case 'error':
       case 'terminal:output':
+      case 'terminal:data':
       case 'terminal:created':
       case 'terminal:exited':
+      case 'terminal:cwd':
+      case 'terminal:command:start':
+      case 'terminal:command:end':
+      case 'terminal:capabilities':
       case 'file:changed':
       case 'file:written':
       case 'conversation:deleted':
@@ -937,7 +944,118 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
   const toggleSearch = useFileViewerStore((state) => state.toggleSearch);
   const [activeTab, setActiveTab] = useState<TabValue>('files');
   const { bottomPanelOpen, bottomPanelHeight, toggleBottomPanel } = useUIStore();
+  // Use individual selectors to minimize re-renders (avoids re-render on every output update)
+  const sessions = useTerminalStore((state) => state.sessions);
+  const activeSessionId = useTerminalStore((state) => state.activeSessionId);
+  const createSession = useTerminalStore((state) => state.createSession);
+  const setActiveSession = useTerminalStore((state) => state.setActiveSession);
   const prevHasOpenFiles = useRef(hasOpenFiles);
+
+  // Terminal instance manager (service-based approach)
+  const terminalManager = useTerminalInstanceManager();
+  const terminalContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Create a default terminal session when panel opens
+  useEffect(() => {
+    if (bottomPanelOpen && sessions.length === 0) {
+      createSession('Terminal');
+    }
+  }, [bottomPanelOpen, sessions.length, createSession]);
+
+  // Create terminal instances for sessions (only when panel is open)
+  useEffect(() => {
+    if (!bottomPanelOpen) return;
+    if (!terminalManager.isInitialized()) return;
+
+    for (const session of sessions) {
+      if (!terminalManager.getInstance(session.id)) {
+        terminalManager.createInstance(session.id, session.name);
+      }
+    }
+  }, [bottomPanelOpen, sessions, terminalManager]);
+
+  // Attach instances to containers and manage visibility
+  useEffect(() => {
+    if (!bottomPanelOpen) return;
+    if (!terminalManager.isInitialized()) return;
+
+    // Small delay to ensure refs are set after render
+    const timeoutId = setTimeout(() => {
+      for (const session of sessions) {
+        const instance = terminalManager.getInstance(session.id);
+        const container = terminalContainerRefs.current.get(session.id);
+
+        if (instance && container) {
+          instance.attachToElement(container);
+          instance.setVisible(session.id === activeSessionId);
+        }
+      }
+    }, 0);
+
+    return () => { clearTimeout(timeoutId); };
+  }, [bottomPanelOpen, sessions, activeSessionId, terminalManager]);
+
+  // Callback to set container ref - triggers attachment on mount only
+  // NOTE: Do NOT include activeSessionId in deps - it causes ref callback to re-run on tab switch
+  const setTerminalContainerRef = useCallback((sessionId: string, el: HTMLDivElement | null): void => {
+    if (el) {
+      terminalContainerRefs.current.set(sessionId, el);
+      // Immediately attach if instance exists (visibility handled by separate effect)
+      const instance = terminalManager.getInstance(sessionId);
+      if (instance) {
+        instance.attachToElement(el);
+      }
+    } else {
+      terminalContainerRefs.current.delete(sessionId);
+    }
+  }, [terminalManager]);
+
+  // ResizeObserver for terminal containers - calls layout() on active terminal
+  // (VS Code pattern: explicit layout calls instead of ResizeObserver on xterm wrapper)
+  useEffect(() => {
+    if (!bottomPanelOpen) return;
+    if (!activeSessionId) return;
+
+    const container = terminalContainerRefs.current.get(activeSessionId);
+    if (!container) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        const instance = terminalManager.getInstance(activeSessionId);
+        if (instance) {
+          instance.layout(width, height);
+        }
+      }
+    });
+
+    observer.observe(container);
+    return () => { observer.disconnect(); };
+  }, [bottomPanelOpen, activeSessionId, terminalManager]);
+
+  // Switch terminal with disableLayout to prevent expensive resize during DOM changes
+  // (VS Code pattern: _withDisabledLayout)
+  const handleSwitchTerminal = useCallback((newSessionId: string): void => {
+    // Disable layout on all terminals during switch
+    for (const session of sessions) {
+      const instance = terminalManager.getInstance(session.id);
+      if (instance) {
+        instance.disableLayout = true;
+      }
+    }
+
+    setActiveSession(newSessionId);
+
+    // Re-enable after DOM settles
+    requestAnimationFrame(() => {
+      for (const session of sessions) {
+        const instance = terminalManager.getInstance(session.id);
+        if (instance) {
+          instance.disableLayout = false;
+        }
+      }
+    });
+  }, [sessions, terminalManager, setActiveSession]);
 
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < historyLength - 1;
@@ -1060,8 +1178,38 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
             className="flex items-center justify-between px-2 border-b border-border shrink-0"
             style={{ height: HEIGHTS.panelHeader }}
           >
-            <span className="text-xs font-medium">Terminal</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium">Terminal</span>
+              {/* Terminal tabs */}
+              <div className="flex items-center gap-1">
+                {sessions.map((session) => (
+                  <button
+                    key={session.id}
+                    onClick={() => { handleSwitchTerminal(session.id); }}
+                    className={`px-2 py-0.5 text-xs rounded ${
+                      session.id === activeSessionId
+                        ? 'bg-accent text-accent-foreground'
+                        : 'text-muted-foreground hover:bg-accent/50'
+                    }`}
+                  >
+                    {session.name}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5"
+                onClick={() => {
+                  const id = createSession(`Terminal ${String(sessions.length + 1)}`);
+                  setActiveSession(id);
+                }}
+                title="New Terminal"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
               <Button variant="ghost" size="icon" className="h-5 w-5">
                 <Maximize2 className="h-3 w-3" />
               </Button>
@@ -1070,9 +1218,26 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
               </Button>
             </div>
           </header>
-          <div className="flex-1 p-2 font-mono text-xs text-muted-foreground overflow-auto">
-            <div>$ <span className="text-foreground">xterm.js will render here</span></div>
-            <span className="typing-cursor mt-1" />
+          <div className="flex-1 overflow-hidden relative">
+            {/* Render ALL terminal containers - visibility controlled by manager */}
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                ref={(el) => { setTerminalContainerRef(session.id, el); }}
+                className="absolute inset-0"
+                style={{
+                  pointerEvents: session.id === activeSessionId ? 'auto' : 'none',
+                }}
+                onClick={() => {
+                  terminalManager.getInstance(session.id)?.focus();
+                }}
+              />
+            ))}
+            {sessions.length === 0 && (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                No terminal session
+              </div>
+            )}
           </div>
         </div>
         </>
