@@ -80,7 +80,7 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
       {/* Inject Monaco token CSS */}
       <style>{MONACO_TOKEN_CSS}</style>
 
-      <div className="code-block with-line-numbers" style={{ fontFamily: 'monospace', fontSize: '12px', minWidth: 'max-content' }}>
+      <div className="code-block with-line-numbers" style={{ fontFamily: 'monospace', fontSize: '12px', minWidth: 'max-content', paddingTop: '5px' }}>
         {tokenizedLines.map((line) => (
           <div
             key={line.lineNumber}

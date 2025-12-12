@@ -1,10 +1,12 @@
 import {
   BookOpen,
   ChevronDown,
+  FolderTree,
   Globe,
   Inbox,
   Info,
   Lightbulb,
+  MessageSquare,
   MoreHorizontal,
   PanelLeft,
   Plus,
@@ -15,10 +17,13 @@ import { useCallback, useState } from 'react';
 import type {ConversationSummary} from '@/stores/ui-store';
 import type { FC } from 'react';
 
+import { FileExplorer } from '@/components/layout/file-explorer';
 import { useVSCode } from '@/hooks/use-vscode';
 import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useUIStore, useIsLeftSidebarCollapsed, useWorkspaceName, useConversations, useActiveConversationId  } from '@/stores/ui-store';
+
+type SidebarTab = 'conversations' | 'explorer';
 
 interface LeftSidebarProps {
   readonly width: number;
@@ -38,6 +43,7 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
   const activeConversationId = useActiveConversationId();
   const { postMessage } = useVSCode();
   const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
+  const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
 
   const handleStartConversation = useCallback((): void => {
     postMessage({
@@ -105,56 +111,90 @@ export const LeftSidebar: FC<LeftSidebarProps> = ({ width }) => {
         )}
       </div>
 
-      {/* Main Actions */}
-      <div className="flex flex-col gap-1 py-1.5 border-b border-border shrink-0">
-        <SidebarItem icon={Inbox} label="Inbox" collapsed={isCollapsed} />
-        <SidebarItem icon={Plus} label="Start conversation" collapsed={isCollapsed} active onClick={handleStartConversation} />
+      {/* Tab Navigation */}
+      <div className={cn(
+        'flex border-b border-border shrink-0',
+        isCollapsed ? 'flex-col py-1 gap-1' : 'px-1.5 py-1 gap-0.5'
+      )}>
+        <TabButton
+          icon={MessageSquare}
+          label="Conversations"
+          active={activeTab === 'conversations'}
+          collapsed={isCollapsed}
+          onClick={() => { setActiveTab('conversations'); }}
+        />
+        <TabButton
+          icon={FolderTree}
+          label="Explorer"
+          active={activeTab === 'explorer'}
+          collapsed={isCollapsed}
+          onClick={() => { setActiveTab('explorer'); }}
+        />
       </div>
 
-      {/* Workspaces */}
+      {/* Main Actions (only show for conversations tab) */}
+      {activeTab === 'conversations' ? (
+        <div className="flex flex-col gap-1 py-1.5 border-b border-border shrink-0">
+          <SidebarItem icon={Inbox} label="Inbox" collapsed={isCollapsed} />
+          <SidebarItem icon={Plus} label="Start conversation" collapsed={isCollapsed} active onClick={handleStartConversation} />
+        </div>
+      ) : null}
+
+      {/* Tab Content */}
       <div className={cn(
         'flex-1 overflow-x-hidden',
         isCollapsed ? 'overflow-y-hidden' : 'overflow-y-auto'
       )}>
-        <div className={cn(
-          'py-1.5 transition-opacity duration-150',
-          isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-        )}>
-          <div className="flex items-center justify-between px-3 py-1">
-            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Workspaces</span>
-            <button className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 shrink-0">
-              <Plus className="h-3 w-3" />
-            </button>
+        {activeTab === 'conversations' ? (
+          /* Conversations Tab Content */
+          <div className={cn(
+            'py-1.5 transition-opacity duration-150',
+            isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          )}>
+            <div className="flex items-center justify-between px-3 py-1">
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Workspaces</span>
+              <button className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 shrink-0">
+                <Plus className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-0.5 mt-1">
+              {workspaceName ? (
+                <WorkspaceItem
+                  name={workspaceName}
+                  active
+                  collapsed={isCollapsed}
+                  expanded={workspaceExpanded}
+                  onToggle={() => { setWorkspaceExpanded(!workspaceExpanded); }}
+                />
+              ) : null}
+              {/* Conversation list with timeline */}
+              {workspaceExpanded && conversations.length > 0 ? <div className="relative ml-[19px]">
+                  {/* Vertical timeline line */}
+                  <div className="absolute left-0 top-0 bottom-2 w-px bg-border" />
+                  {/* Conversations */}
+                  <div className="flex flex-col gap-0.5">
+                    {conversations.map((conv) => (
+                      <ConversationItem
+                        key={conv.sessionId}
+                        conversation={conv}
+                        active={conv.sessionId === activeConversationId}
+                        collapsed={isCollapsed}
+                        onClick={() => { handleLoadConversation(conv.sessionId); }}
+                      />
+                    ))}
+                  </div>
+                </div> : null}
+            </div>
           </div>
-          <div className="flex flex-col gap-0.5 mt-1">
-            {workspaceName ? (
-              <WorkspaceItem
-                name={workspaceName}
-                active
-                collapsed={isCollapsed}
-                expanded={workspaceExpanded}
-                onToggle={() => { setWorkspaceExpanded(!workspaceExpanded); }}
-              />
-            ) : null}
-            {/* Conversation list with timeline */}
-            {workspaceExpanded && conversations.length > 0 ? <div className="relative ml-[19px]">
-                {/* Vertical timeline line */}
-                <div className="absolute left-0 top-0 bottom-2 w-px bg-border" />
-                {/* Conversations */}
-                <div className="flex flex-col gap-0.5">
-                  {conversations.map((conv) => (
-                    <ConversationItem
-                      key={conv.sessionId}
-                      conversation={conv}
-                      active={conv.sessionId === activeConversationId}
-                      collapsed={isCollapsed}
-                      onClick={() => { handleLoadConversation(conv.sessionId); }}
-                    />
-                  ))}
-                </div>
-              </div> : null}
+        ) : (
+          /* Explorer Tab Content */
+          <div className={cn(
+            'h-full transition-opacity duration-150',
+            isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          )}>
+            <FileExplorer collapsed={isCollapsed} />
           </div>
-        </div>
+        )}
       </div>
 
       <hr className="border-border my-2 shrink-0" />
@@ -316,5 +356,36 @@ const ConversationItem: FC<ConversationItemProps> = ({
         </button>
       )}
     </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// Tab Button Component
+// ═══════════════════════════════════════════════════════════════
+
+interface TabButtonProps {
+  readonly icon: FC<{ className?: string }>;
+  readonly label: string;
+  readonly active: boolean;
+  readonly collapsed: boolean;
+  readonly onClick: () => void;
+}
+
+const TabButton: FC<TabButtonProps> = ({ icon: Icon, label, active, collapsed, onClick }) => {
+  return (
+    <button
+      className={cn(
+        'flex items-center rounded-md transition-colors',
+        collapsed ? 'h-8 w-8 justify-center mx-auto' : 'h-7 px-2 gap-1.5 flex-1',
+        active
+          ? 'bg-accent text-accent-foreground'
+          : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+      )}
+      onClick={onClick}
+      title={label}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      {!collapsed ? <span className="text-xs font-medium truncate">{label}</span> : null}
+    </button>
   );
 };

@@ -141,7 +141,7 @@ export const useToolStore = create<ToolState>()(
       for (const tool of [...active, ...completed]) {
         const existing = toolMap.get(tool.id);
         // Keep the tool if it's newer or has more complete status
-        if (!existing || tool.startedAt > existing.startedAt || (tool.completedAt && !existing.completedAt)) {
+        if (!existing || tool.startedAt > existing.startedAt || (tool.completedAt !== undefined && existing.completedAt === undefined)) {
           toolMap.set(tool.id, tool);
         }
       }

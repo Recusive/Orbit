@@ -55,7 +55,7 @@ function formatSubagentType(type: string): string {
 }
 
 // Truncate long prompts
-function truncatePrompt(prompt: string, maxLength: number = 200): string {
+function truncatePrompt(prompt: string, maxLength = 200): string {
   if (prompt.length <= maxLength) return prompt;
   return prompt.slice(0, maxLength).trim() + '...';
 }

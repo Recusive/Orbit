@@ -316,6 +316,10 @@ export const CenterPanel: FC = () => {
       case 'file:changed':
       case 'file:written':
       case 'conversation:deleted':
+      case 'panel:command':
+      case 'file:tree:response':
+      case 'file:tree:error':
+      case 'file:list:response':
         break;
     }
   }, [setWorkspace, setActiveConversation, setConversations, addConversation, setInputMode, startTool, completeTool, addPermissionRequest]);

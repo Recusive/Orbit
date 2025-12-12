@@ -341,6 +341,56 @@ function handleMockMessage(message: WebviewMessage): void {
       break;
     }
 
+    case 'file:tree:request': {
+      // Mock file tree response for development
+      const mockPath = message.path ?? '/mock/workspace';
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'file:tree:response',
+            uuid: crypto.randomUUID(),
+            request_uuid: message.uuid,
+            path: mockPath,
+            children: [
+              { name: 'src', path: `${mockPath}/src`, isDirectory: true, isFile: false },
+              { name: 'tests', path: `${mockPath}/tests`, isDirectory: true, isFile: false },
+              { name: 'node_modules', path: `${mockPath}/node_modules`, isDirectory: true, isFile: false },
+              { name: 'package.json', path: `${mockPath}/package.json`, isDirectory: false, isFile: true },
+              { name: 'README.md', path: `${mockPath}/README.md`, isDirectory: false, isFile: true },
+              { name: 'tsconfig.json', path: `${mockPath}/tsconfig.json`, isDirectory: false, isFile: true },
+            ],
+          },
+          '*'
+        );
+      }, delay);
+      break;
+    }
+
+    case 'file:list:request': {
+      // Mock file list response for development
+      const mockPath = '/mock/workspace';
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'file:list:response',
+            uuid: crypto.randomUUID(),
+            request_uuid: message.uuid,
+            files: [
+              { name: 'index.ts', path: `${mockPath}/src/index.ts` },
+              { name: 'App.tsx', path: `${mockPath}/src/App.tsx` },
+              { name: 'main.tsx', path: `${mockPath}/src/main.tsx` },
+              { name: 'utils.ts', path: `${mockPath}/src/utils.ts` },
+              { name: 'package.json', path: `${mockPath}/package.json` },
+              { name: 'README.md', path: `${mockPath}/README.md` },
+              { name: 'tsconfig.json', path: `${mockPath}/tsconfig.json` },
+            ],
+          },
+          '*'
+        );
+      }, delay);
+      break;
+    }
+
     // No mock responses needed for these message types
     case 'webview:ready':
     case 'message:edit':
@@ -362,6 +412,9 @@ function handleMockMessage(message: WebviewMessage): void {
     case 'file:accept_all':
     case 'file:reject_all':
     case 'diff:open':
+    case 'url:open':
+    case 'inputMode:set':
+    case 'permission:response':
       break;
   }
 }
@@ -418,6 +471,8 @@ export function useAgentStream(
         case 'conversation:deleted':
         case 'conversation:loaded':
         case 'conversation:rewound':
+        case 'permission:request':
+        case 'inputMode:changed':
           break;
       }
     },

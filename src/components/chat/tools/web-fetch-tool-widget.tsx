@@ -22,15 +22,6 @@ function getHostname(url: string): string {
   }
 }
 
-// Truncate long content for preview
-function truncateContent(content: string, maxLines: number = 10): { text: string; truncated: boolean } {
-  const lines = content.split('\n');
-  if (lines.length <= maxLines) {
-    return { text: content, truncated: false };
-  }
-  return { text: lines.slice(0, maxLines).join('\n'), truncated: true };
-}
-
 export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
   url,
   prompt,
@@ -41,7 +32,6 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
 
   const hostname = getHostname(url);
-  const { text: previewText, truncated } = output ? truncateContent(output) : { text: '', truncated: false };
 
   return (
     <div className="my-2 rounded-md border border-border bg-card overflow-hidden">
@@ -109,13 +99,8 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
             ) : output ? (
               <div className="overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs">
                 <pre className="break-words whitespace-pre-wrap text-foreground">
-                  {isExpanded ? output : previewText}
+                  {output}
                 </pre>
-                {truncated && !isExpanded ? (
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Content truncated...
-                  </div>
-                ) : null}
               </div>
             ) : (
               <div className="text-xs text-muted-foreground italic">

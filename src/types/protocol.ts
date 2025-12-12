@@ -187,6 +187,18 @@ export const FileRejectAllSchema = z.object({
   uuid: UUIDSchema,
 });
 
+export const FileTreeRequestSchema = z.object({
+  type: z.literal('file:tree:request'),
+  uuid: UUIDSchema,
+  /** Path to get children for. If omitted, returns workspace root children */
+  path: z.string().optional(),
+});
+
+export const FileListRequestSchema = z.object({
+  type: z.literal('file:list:request'),
+  uuid: UUIDSchema,
+});
+
 // Diff
 export const DiffOpenSchema = z.object({
   type: z.literal('diff:open'),
@@ -260,6 +272,8 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   FileRejectSchema,
   FileAcceptAllSchema,
   FileRejectAllSchema,
+  FileTreeRequestSchema,
+  FileListRequestSchema,
   // Diff
   DiffOpenSchema,
   // URL
@@ -365,6 +379,15 @@ export const InputModeChangedSchema = z.object({
   mode: InputModeSchema,
 });
 
+// Panel command (from extension to webview)
+export const PanelCommandTypeSchema = z.enum(['quick-open']);
+
+export const PanelCommandSchema = z.object({
+  type: z.literal('panel:command'),
+  uuid: UUIDSchema,
+  command: PanelCommandTypeSchema,
+});
+
 // Terminal
 export const TerminalOutputSchema = z.object({
   type: z.literal('terminal:output'),
@@ -409,6 +432,45 @@ export const FileWrittenSchema = z.object({
   request_uuid: z.string().optional(),
   path: z.string(),
   success: z.boolean(),
+});
+
+/** Node in the file tree */
+export const FileNodeSchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  isDirectory: z.boolean(),
+  isFile: z.boolean(),
+});
+
+export const FileTreeResponseSchema = z.object({
+  type: z.literal('file:tree:response'),
+  uuid: UUIDSchema,
+  request_uuid: z.string(),
+  /** The path that was queried */
+  path: z.string(),
+  /** Children of the path */
+  children: z.array(FileNodeSchema),
+});
+
+export const FileTreeErrorSchema = z.object({
+  type: z.literal('file:tree:error'),
+  uuid: UUIDSchema,
+  request_uuid: z.string(),
+  error: z.string(),
+});
+
+/** Flat list entry for file:list:response */
+export const FileListEntrySchema = z.object({
+  name: z.string(),
+  path: z.string(),
+});
+
+export const FileListResponseSchema = z.object({
+  type: z.literal('file:list:response'),
+  uuid: UUIDSchema,
+  request_uuid: z.string(),
+  /** All files in the workspace (recursively) */
+  files: z.array(FileListEntrySchema),
 });
 
 // Conversation
@@ -496,6 +558,8 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   // Permissions
   PermissionRequestSchema,
   InputModeChangedSchema,
+  // Panel commands
+  PanelCommandSchema,
   // Terminal
   TerminalOutputSchema,
   TerminalCreatedSchema,
@@ -504,6 +568,9 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   FileContentSchema,
   FileChangedSchema,
   FileWrittenSchema,
+  FileTreeResponseSchema,
+  FileTreeErrorSchema,
+  FileListResponseSchema,
   // Conversation
   ConversationCreatedSchema,
   ConversationDeletedSchema,
@@ -546,6 +613,8 @@ export type FileAccept = z.infer<typeof FileAcceptSchema>;
 export type FileReject = z.infer<typeof FileRejectSchema>;
 export type FileAcceptAll = z.infer<typeof FileAcceptAllSchema>;
 export type FileRejectAll = z.infer<typeof FileRejectAllSchema>;
+export type FileTreeRequest = z.infer<typeof FileTreeRequestSchema>;
+export type FileListRequest = z.infer<typeof FileListRequestSchema>;
 export type DiffOpen = z.infer<typeof DiffOpenSchema>;
 export type UrlOpen = z.infer<typeof UrlOpenSchema>;
 export type WebviewReady = z.infer<typeof WebviewReadySchema>;
@@ -563,12 +632,19 @@ export type ToolEnd = z.infer<typeof ToolEndSchema>;
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
 export type InputModeChanged = z.infer<typeof InputModeChangedSchema>;
 export type InputMode = z.infer<typeof InputModeSchema>;
+export type PanelCommandType = z.infer<typeof PanelCommandTypeSchema>;
+export type PanelCommand = z.infer<typeof PanelCommandSchema>;
 export type TerminalOutput = z.infer<typeof TerminalOutputSchema>;
 export type TerminalCreated = z.infer<typeof TerminalCreatedSchema>;
 export type TerminalExited = z.infer<typeof TerminalExitedSchema>;
 export type FileContent = z.infer<typeof FileContentSchema>;
 export type FileChanged = z.infer<typeof FileChangedSchema>;
 export type FileWritten = z.infer<typeof FileWrittenSchema>;
+export type FileNode = z.infer<typeof FileNodeSchema>;
+export type FileTreeResponse = z.infer<typeof FileTreeResponseSchema>;
+export type FileTreeError = z.infer<typeof FileTreeErrorSchema>;
+export type FileListEntry = z.infer<typeof FileListEntrySchema>;
+export type FileListResponse = z.infer<typeof FileListResponseSchema>;
 export type ConversationCreated = z.infer<typeof ConversationCreatedSchema>;
 export type ConversationDeleted = z.infer<typeof ConversationDeletedSchema>;
 export type ConversationList = z.infer<typeof ConversationListSchema>;
@@ -598,7 +674,7 @@ export function isProtocolTerminalMessage(
 
 export function isProtocolFileMessage(
   msg: ExtensionMessage
-): msg is FileContent | FileChanged | FileWritten {
+): msg is FileContent | FileChanged | FileWritten | FileTreeResponse | FileTreeError | FileListResponse {
   return msg.type.startsWith('file:');
 }
 
