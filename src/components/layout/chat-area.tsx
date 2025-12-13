@@ -1218,7 +1218,7 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
               </Button>
             </div>
           </header>
-          <div className="flex-1 overflow-hidden relative">
+          <div className="flex-1 overflow-hidden relative bg-sidebar">
             {/* Render ALL terminal containers - visibility controlled by manager */}
             {sessions.map((session) => (
               <div

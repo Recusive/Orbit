@@ -113,13 +113,55 @@ export class TerminalInstance {
     this.onCommandEnd = options.onCommandEnd;
     this.onCapabilitiesChange = options.onCapabilitiesChange;
 
-    // Create wrapper element (VS Code pattern)
+    // Initialize xterm.js with theme
+    const baseTheme = getBestTheme();
+
+    // Create wrapper element with sidebar background class
     this.wrapperElement = document.createElement('div');
-    this.wrapperElement.className = 'terminal-instance-wrapper';
+    this.wrapperElement.className = 'terminal-instance-wrapper bg-sidebar';
     this.wrapperElement.style.cssText = 'height: 100%; width: 100%; padding: 4px 8px;';
 
-    // Initialize xterm.js with theme
-    const theme = getBestTheme();
+    // Inject CSS for viewport/screen background and text color
+    const styleId = 'terminal-sidebar-bg-override';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        .terminal-instance-wrapper .xterm-viewport {
+          background-color: inherit !important;
+        }
+        .terminal-instance-wrapper .xterm-screen {
+          background-color: transparent !important;
+        }
+        .terminal-instance-wrapper .xterm-rows {
+          color: var(--sidebar-foreground) !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Compute actual color values from CSS variables for xterm theme
+    // (xterm.js doesn't support CSS variables directly in theme)
+    const tempEl = document.createElement('div');
+    document.body.appendChild(tempEl);
+
+    tempEl.style.color = 'var(--sidebar-accent)';
+    const accentColor = getComputedStyle(tempEl).color;
+
+    tempEl.style.color = 'var(--sidebar-foreground)';
+    const fgColor = getComputedStyle(tempEl).color;
+
+    document.body.removeChild(tempEl);
+
+    // Convert rgb to rgba with opacity for selection
+    const selectionBg = accentColor.replace('rgb(', 'rgba(').replace(')', ', 0.5)');
+
+    const theme = {
+      ...baseTheme,
+      background: 'transparent',
+      foreground: fgColor,
+      selectionBackground: selectionBg,
+    };
     this.terminal = new Terminal({
       cursorBlink: true,
       cursorStyle: 'bar',
