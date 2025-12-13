@@ -1,12 +1,7 @@
 import {
-  BookOpen,
   ChevronDown,
-  FolderTree,
-  Globe,
   Inbox,
-  Info,
   Lightbulb,
-  MessageCircle,
   MoreHorizontal,
   PanelLeft,
   Plus,
@@ -81,7 +76,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           >
             <button
               onClick={toggleLeftSidebar}
-              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors opacity-70 hover:opacity-100"
+              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
               title="Expand sidebar"
             >
               <div className="relative h-4 w-4">
@@ -100,7 +95,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
             </div>
             <button
               onClick={toggleLeftSidebar}
-              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors opacity-70 hover:opacity-100"
+              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
               title="Collapse sidebar"
             >
               <div className="relative h-4 w-4">
@@ -116,16 +111,17 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         )}
       </div>
 
-      {/* Search Bar */}
-      <div className="shrink-0 mx-1.5 py-1" style={{ height: 40 }}>
+      {/* Search Bar - hidden when collapsed */}
+      <div
+        className={cn(
+          'shrink-0 mx-1.5 overflow-hidden transition-all duration-150 ease-in-out',
+          isCollapsed ? 'py-0' : 'py-1'
+        )}
+        style={{ height: isCollapsed ? 0 : 40, opacity: isCollapsed ? 0 : 1 }}
+      >
         <button
           onClick={handleOpenQuickSearch}
-          className={cn(
-            'flex items-center h-8 rounded-md text-muted-foreground hover:text-foreground transition-colors overflow-hidden border border-transparent',
-            isCollapsed
-              ? ''
-              : 'w-full border-border bg-muted/50 hover:bg-muted'
-          )}
+          className="flex items-center h-8 rounded-md text-muted-foreground hover:text-foreground transition-colors overflow-hidden border border-border dark:border-border/50 w-full bg-muted/50 hover:bg-muted"
           title="Search files (⌘P)"
         >
           {/* Fixed-width icon column - never moves */}
@@ -136,69 +132,48 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
             <Search className="h-4 w-4 shrink-0" />
           </div>
           {/* Text that slides in */}
-          <span
-            className={cn(
-              'text-xs whitespace-nowrap overflow-hidden',
-              isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
-            )}
-            style={{ transition: getCollapseTransition(isCollapsed) }}
-          >
+          <span className="text-xs whitespace-nowrap overflow-hidden w-auto opacity-100">
             Search files...
           </span>
-          <kbd
-            className={cn(
-              'text-[10px] font-mono bg-background/50 px-1 py-0.5 rounded whitespace-nowrap overflow-hidden',
-              isCollapsed ? 'w-0 opacity-0 ml-0 pr-0' : 'w-auto opacity-100 ml-auto mr-2'
-            )}
-            style={{ transition: getCollapseTransition(isCollapsed) }}
-          >
-            ⌘P
-          </kbd>
+          <div className="flex items-center gap-0.5 ml-auto mr-2">
+            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-[11px] font-mono bg-background/50 rounded">
+              ⌘
+            </kbd>
+            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-[11px] font-mono bg-background/50 rounded">
+              P
+            </kbd>
+          </div>
         </button>
       </div>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation - hidden when collapsed */}
       <div
         className={cn(
-          'flex items-center border-b border-border shrink-0',
-          isCollapsed ? 'justify-center' : 'px-1.5 gap-0.5'
+          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-all duration-150 ease-in-out',
+          isCollapsed ? '' : 'border-b border-border'
         )}
-        style={{ height: 40 }}
+        style={{ height: isCollapsed ? 0 : 40, opacity: isCollapsed ? 0 : 1 }}
       >
-        {isCollapsed ? (
-          /* When collapsed, show single button that toggles between tabs */
-          <button
-            className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
-            onClick={() => { setActiveTab(activeTab === 'conversations' ? 'explorer' : 'conversations'); }}
-            title={activeTab === 'conversations' ? 'Sessions (click for Explorer)' : 'Explorer (click for Sessions)'}
-          >
-            {activeTab === 'conversations' ? (
-              <MessageCircle className="h-4 w-4" />
-            ) : (
-              <FolderTree className="h-4 w-4" />
-            )}
-          </button>
-        ) : (
-          <>
-            <TabButton
-              label="Sessions"
-              active={activeTab === 'conversations'}
-              onClick={() => { setActiveTab('conversations'); }}
-            />
-            <TabButton
-              label="Explorer"
-              active={activeTab === 'explorer'}
-              onClick={() => { setActiveTab('explorer'); }}
-            />
-          </>
-        )}
+        <TabButton
+          label="Sessions"
+          active={activeTab === 'conversations'}
+          onClick={() => { setActiveTab('conversations'); }}
+        />
+        <TabButton
+          label="Explorer"
+          active={activeTab === 'explorer'}
+          onClick={() => { setActiveTab('explorer'); }}
+        />
       </div>
 
-      {/* Main Actions (only show for conversations tab) */}
+      {/* Main Actions (only show for conversations tab) - slides up when collapsed */}
       {activeTab === 'conversations' ? (
-        <div className="flex flex-col gap-1 py-1.5 border-b border-border shrink-0">
-          <SidebarItem icon={Inbox} label="Inbox" collapsed={isCollapsed} />
-          <SidebarItem icon={Plus} label="Start conversation" collapsed={isCollapsed} active onClick={handleStartConversation} />
+        <div className={cn(
+          'flex flex-col border-b border-border shrink-0 transition-all duration-150 ease-in-out',
+          isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
+        )}>
+          <SidebarItem icon={Inbox} label="Inbox" collapsed={isCollapsed} equalSpacing={isCollapsed} />
+          <SidebarItem icon={Plus} label="Start conversation" collapsed={isCollapsed} equalSpacing={isCollapsed} onClick={handleStartConversation} />
         </div>
       ) : null}
 
@@ -215,7 +190,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           )}>
             <div className="flex items-center justify-between px-3 py-1">
               <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Workspaces</span>
-              <button className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 shrink-0">
+              <button className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground shrink-0">
                 <Plus className="h-3 w-3" />
               </button>
             </div>
@@ -259,15 +234,15 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         )}
       </div>
 
-      <hr className="border-border my-2 shrink-0" />
+      <hr className={cn('border-border shrink-0', isCollapsed ? 'my-0' : 'my-2')} />
 
       {/* Utilities */}
-      <div className="flex flex-col gap-1 py-1.5 shrink-0">
-        <SidebarItem icon={Info} label="Playground" collapsed={isCollapsed} small />
-        <SidebarItem icon={BookOpen} label="Knowledge" collapsed={isCollapsed} />
-        <SidebarItem icon={Globe} label="Browser" collapsed={isCollapsed} />
-        <SidebarItem icon={Settings} label="Settings" collapsed={isCollapsed} />
-        <SidebarItem icon={Lightbulb} label="Provide Feedback" collapsed={isCollapsed} />
+      <div className={cn(
+        'flex flex-col shrink-0',
+        isCollapsed ? 'gap-0 py-0' : 'gap-1 py-1.5'
+      )}>
+        <SidebarItem icon={Settings} label="Settings" collapsed={isCollapsed} equalSpacing={isCollapsed} />
+        <SidebarItem icon={Lightbulb} label="Feedback" collapsed={isCollapsed} equalSpacing={isCollapsed} />
       </div>
     </aside>
   );
@@ -279,6 +254,7 @@ interface SidebarItemProps {
   readonly collapsed: boolean;
   readonly active?: boolean;
   readonly small?: boolean;
+  readonly equalSpacing?: boolean;
   readonly onClick?: () => void;
 }
 
@@ -288,13 +264,35 @@ const SidebarItem: FC<SidebarItemProps> = ({
   collapsed,
   active,
   small,
+  equalSpacing,
   onClick,
 }) => {
+  // When collapsed with equalSpacing, render a small square button like the panel toggler
+  if (equalSpacing) {
+    return (
+      <div
+        className="flex items-center justify-center shrink-0"
+        style={{ height: 32, width: SIDEBAR.iconColumnWidth }}
+      >
+        <button
+          className={cn(
+            'h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors',
+            active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+          )}
+          title={label}
+          onClick={onClick}
+        >
+          <Icon className={cn('shrink-0', small ? 'h-3 w-3' : 'h-4 w-4')} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <button
       className={cn(
-        'flex items-center h-8 rounded-md mx-1.5 transition-colors overflow-hidden hover:bg-accent/50',
-        active ? 'text-foreground' : 'text-foreground/70 hover:text-foreground'
+        'flex items-center h-8 rounded-md mx-1.5 transition-all overflow-hidden hover:bg-accent/50',
+        active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
       )}
       title={collapsed ? label : undefined}
       onClick={onClick}

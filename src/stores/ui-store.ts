@@ -11,6 +11,9 @@ export interface ConversationSummary {
   messageCount: number;
 }
 
+// Terminal position options
+export type TerminalPosition = 'activity' | 'both';
+
 interface UIState {
   // Container dimensions (from VS Code editor layout)
   containerWidth: number | null;
@@ -34,6 +37,7 @@ interface UIState {
   // Bottom Panel (Terminal)
   bottomPanelOpen: boolean;
   bottomPanelHeight: number;
+  terminalPosition: TerminalPosition;
 }
 
 interface UIActions {
@@ -54,6 +58,8 @@ interface UIActions {
   toggleBottomPanel: () => void;
   setReviewPanelWidth: (width: number) => void;
   setBottomPanelHeight: (height: number) => void;
+  setTerminalPosition: (position: TerminalPosition) => void;
+  cycleTerminalPosition: () => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -74,6 +80,7 @@ export const useUIStore = create<UIStore>()(
     rightSidebarOpen: DEFAULT_UI_STATE.rightSidebarOpen,
     bottomPanelOpen: DEFAULT_UI_STATE.bottomPanelOpen,
     bottomPanelHeight: DEFAULT_UI_STATE.bottomPanelHeight,
+    terminalPosition: 'activity' as TerminalPosition,
 
     setContainerDimensions: (width: number, height: number): void => {
       set((state) => {
@@ -192,6 +199,18 @@ export const useUIStore = create<UIStore>()(
         );
       });
     },
+
+    setTerminalPosition: (position: TerminalPosition): void => {
+      set((state) => {
+        state.terminalPosition = position;
+      });
+    },
+
+    cycleTerminalPosition: (): void => {
+      set((state) => {
+        state.terminalPosition = state.terminalPosition === 'activity' ? 'both' : 'activity';
+      });
+    },
   }))
 );
 
@@ -213,4 +232,8 @@ export const useActiveConversationTitle = (): string | null => {
 
 export const useConversations = (): ConversationSummary[] => {
   return useUIStore((state) => state.conversations);
+};
+
+export const useTerminalPosition = (): TerminalPosition => {
+  return useUIStore((state) => state.terminalPosition);
 };

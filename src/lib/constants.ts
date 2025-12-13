@@ -37,7 +37,7 @@ export const PANEL_SIZES = {
   terminal: {
     default: 200,
     min: 100,
-    max: 500,
+    max: 1990,
   },
   rightSidebar: {
     default: 150,
@@ -50,7 +50,7 @@ export const PANEL_SIZES = {
  * Content width constraints
  */
 export const CONTENT_WIDTH = {
-  inputBox: 820,
+  inputBox: 800,
   messageFeed: '48rem', // max-w-3xl
   dropdown: 200,
   fileName: 200,

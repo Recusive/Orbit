@@ -1,15 +1,17 @@
 import {
-  ArrowLeft,
   ArrowRight,
   AtSign,
+  ChevronsLeftRight,
+  ChevronsRightLeft,
   FileCode,
   FileText,
+  GitBranch,
+  GitCompareArrows,
   Globe,
   Image,
   Lightbulb,
   ListChecks,
   Loader2,
-  Maximize2,
   Moon,
   PanelRight,
   Plus,
@@ -41,7 +43,12 @@ import { TodoToolWidget } from '@/components/chat/tools/todo-tool-widget';
 import { WebFetchToolWidget } from '@/components/chat/tools/web-fetch-tool-widget';
 import { WebSearchToolWidget } from '@/components/chat/tools/web-search-tool-widget';
 import { WriteToolWidget } from '@/components/chat/tools/write-tool-widget';
-import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useTerminalInstanceManager } from '@/hooks/use-terminal-instance-manager';
 import { useVSCode } from '@/hooks/use-vscode';
 import { CONTENT_WIDTH, HEIGHTS, INPUT_SIZES } from '@/lib/constants';
@@ -49,7 +56,7 @@ import { cn } from '@/lib/utils';
 import { useFileViewerStore, useHasOpenFiles } from '@/stores/file-viewer-store';
 import { useTerminalStore } from '@/stores/terminal-store';
 import { useToolStore, usePendingPermissions, useInputMode } from '@/stores/tool-store';
-import { useUIStore, useWorkspaceName, useActiveConversationTitle } from '@/stores/ui-store';
+import { useUIStore, useWorkspaceName, useActiveConversationTitle, useTerminalPosition } from '@/stores/ui-store';
 
 
 
@@ -75,20 +82,22 @@ const getInitialTheme = (): Theme => {
 };
 
 export const ChatArea: FC = () => {
-  const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, reviewPanelWidth, setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle } = useUIStore();
+  const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, bottomPanelOpen, reviewPanelWidth, setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle } = useUIStore();
   const workspaceName = useWorkspaceName();
   const activeConversationTitle = useActiveConversationTitle();
+  const terminalPosition = useTerminalPosition();
 
   // Tool store
   const inputMode = useInputMode();
   const pendingPermissions = usePendingPermissions();
   const { setInputMode, startTool, completeTool, addPermissionRequest, removePermissionRequest, getToolsForMessage } = useToolStore();
   const [inputText, setInputText] = useState('');
-  const [thinkingEnabled, setThinkingEnabled] = useState(false);
+  const [thinkingMode, setThinkingMode] = useState<'off' | 'think' | 'hard' | 'ultra'>('off');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAgentRunning, setIsAgentRunning] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -346,13 +355,65 @@ export const ChatArea: FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Send pending message when session becomes available
+  useEffect(() => {
+    if (sessionId && pendingMessage) {
+      const text = pendingMessage;
+      setPendingMessage(null);
+
+      // Update title to first message
+      updateConversationTitle(sessionId, text);
+      postMessage({
+        type: 'conversation:updateTitle',
+        uuid: crypto.randomUUID(),
+        session_id: sessionId,
+        title: text,
+      });
+
+      // Add user message
+      const userMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: text,
+        displayedContent: text,
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      setIsAgentRunning(true);
+
+      // Send to VS Code
+      postMessage({
+        type: 'message:send',
+        uuid: crypto.randomUUID(),
+        session_id: sessionId,
+        content: text,
+      });
+    }
+  }, [sessionId, pendingMessage, postMessage, updateConversationTitle]);
+
   const handleInputChange = (e: React.FormEvent<HTMLDivElement>): void => {
     setInputText(e.currentTarget.textContent || '');
   };
 
   const handleSend = (): void => {
     const text = inputText.trim();
-    if (!text || isAgentRunning || !sessionId) return;
+    if (!text || isAgentRunning) return;
+
+    // Clear input immediately
+    setInputText('');
+    if (inputRef.current) {
+      inputRef.current.textContent = '';
+    }
+
+    // If no session exists, create one and store the message as pending
+    if (!sessionId) {
+      setPendingMessage(text);
+      postMessage({
+        type: 'conversation:create',
+        uuid: crypto.randomUUID(),
+        title: text, // Use the message as the initial title
+      });
+      return;
+    }
 
     // Update title to first message if this is the first message
     if (messages.length === 0) {
@@ -383,12 +444,6 @@ export const ChatArea: FC = () => {
       session_id: sessionId,
       content: text,
     });
-
-    // Clear input
-    setInputText('');
-    if (inputRef.current) {
-      inputRef.current.textContent = '';
-    }
   };
 
   const handleRewind = useCallback((messageId: string): void => {
@@ -481,6 +536,16 @@ export const ChatArea: FC = () => {
     }
   };
 
+  const handleTerminalToggle = (): void => {
+    // If activity panel is closed and terminal is closed, open activity panel first
+    if (!reviewPanelOpen && !bottomPanelOpen) {
+      toggleReviewPanel();
+      toggleBottomPanel();
+    } else {
+      toggleBottomPanel();
+    }
+  };
+
   const getInputBoxClasses = (): string => {
     const base = 'mx-auto p-1 rounded-lg bg-muted transition-colors';
     switch (inputMode) {
@@ -522,7 +587,7 @@ export const ChatArea: FC = () => {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
@@ -531,9 +596,8 @@ export const ChatArea: FC = () => {
           >
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-          <HeaderButton icon={Plus} title="New Chat" />
           <HeaderButton icon={Globe} title="Browser" />
-          <HeaderButton icon={SquareTerminal} title="Terminal" onClick={toggleBottomPanel} />
+          <HeaderButton icon={SquareTerminal} title="Terminal" onClick={handleTerminalToggle} />
 
           {/* Review Changes Button */}
           <button
@@ -553,10 +617,12 @@ export const ChatArea: FC = () => {
         </div>
       </header>
 
-      {/* Content Area (Chat + Review split) */}
-      <div className="flex-1 flex min-h-0">
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col min-w-0">
+      {/* Content Area (Chat + Review split + Terminal when 'both') */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Top area: Chat + Review side by side */}
+        <div className="flex-1 flex min-h-0 overflow-hidden">
+          {/* Chat Area */}
+          <div className="flex-1 flex flex-col min-w-0">
           {/* Message Feed */}
           <div className="flex-1 overflow-y-auto p-4" style={{ scrollbarGutter: 'stable both-edges' }}>
             <div className="max-w-3xl mx-auto flex flex-col gap-y-3">
@@ -858,16 +924,46 @@ export const ChatArea: FC = () => {
                   <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Add Context">
                     <AtSign className="h-4 w-4" />
                   </button>
-                  <button
-                    onClick={() => { setThinkingEnabled(!thinkingEnabled); }}
-                    className={cn(
-                      'h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors',
-                      thinkingEnabled ? 'opacity-100 text-mode-think' : 'opacity-70 hover:opacity-100'
-                    )}
-                    title="Toggle Thinking"
-                  >
-                    <Lightbulb className={cn('h-4 w-4', thinkingEnabled && 'fill-mode-think')} />
-                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className={cn(
+                          'h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors',
+                          thinkingMode === 'off' && 'opacity-70 hover:opacity-100',
+                          thinkingMode === 'think' && 'opacity-100 text-mode-think',
+                          thinkingMode === 'hard' && 'opacity-100 text-orange-500',
+                          thinkingMode === 'ultra' && 'opacity-100 text-red-500'
+                        )}
+                        title="Think Config"
+                      >
+                        <Lightbulb className={cn(
+                          'h-4 w-4',
+                          thinkingMode === 'think' && 'fill-mode-think',
+                          thinkingMode === 'hard' && 'fill-orange-500',
+                          thinkingMode === 'ultra' && 'fill-red-500'
+                        )} />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="center" side="top" className="p-2">
+                      <div className="text-xs text-muted-foreground mb-2">Think config</div>
+                      <div className="flex gap-1 bg-muted rounded-md p-1">
+                        {(['off', 'think', 'hard', 'ultra'] as const).map((mode) => (
+                          <button
+                            key={mode}
+                            onClick={() => { setThinkingMode(mode); }}
+                            className={cn(
+                              'px-2 py-1 text-xs font-medium rounded transition-colors capitalize',
+                              thinkingMode === mode
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                            )}
+                          >
+                            {mode}
+                          </button>
+                        ))}
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Web Browser">
                     <Globe className="h-4 w-4" />
                   </button>
@@ -895,14 +991,21 @@ export const ChatArea: FC = () => {
               </div>
             </div>
           </div>
+
         </div>
 
-        {/* Review Panel (split view inside center area - no separate header) */}
-        {reviewPanelOpen ? (
-          <>
-            <ResizeHandle direction="vertical" target="review" />
-            <ReviewPanel width={reviewPanelWidth} />
-          </>
+          {/* Review Panel (split view inside center area - no separate header) */}
+          {reviewPanelOpen ? (
+            <>
+              <ResizeHandle direction="vertical" target="review" />
+              <ReviewPanel width={reviewPanelWidth} />
+            </>
+          ) : null}
+        </div>
+
+        {/* Terminal Panel (spans full width when position is 'both') */}
+        {bottomPanelOpen && terminalPosition === 'both' ? (
+          <FullWidthTerminalPanel />
         ) : null}
       </div>
     </div>
@@ -937,18 +1040,16 @@ type TabValue = 'file' | 'files' | 'source';
 const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
   const hasOpenFiles = useHasOpenFiles();
   const closeAllTabs = useFileViewerStore((state) => state.closeAllTabs);
-  const historyIndex = useFileViewerStore((state) => state.historyIndex);
-  const historyLength = useFileViewerStore((state) => state.history.length);
-  const goBack = useFileViewerStore((state) => state.goBack);
-  const goForward = useFileViewerStore((state) => state.goForward);
   const toggleSearch = useFileViewerStore((state) => state.toggleSearch);
   const [activeTab, setActiveTab] = useState<TabValue>('files');
-  const { bottomPanelOpen, bottomPanelHeight, toggleBottomPanel } = useUIStore();
+  const { bottomPanelOpen, bottomPanelHeight, toggleBottomPanel, cycleTerminalPosition } = useUIStore();
+  const terminalPosition = useTerminalPosition();
   // Use individual selectors to minimize re-renders (avoids re-render on every output update)
   const sessions = useTerminalStore((state) => state.sessions);
   const activeSessionId = useTerminalStore((state) => state.activeSessionId);
   const createSession = useTerminalStore((state) => state.createSession);
   const setActiveSession = useTerminalStore((state) => state.setActiveSession);
+  const closeSession = useTerminalStore((state) => state.closeSession);
   const prevHasOpenFiles = useRef(hasOpenFiles);
 
   // Terminal instance manager (service-based approach)
@@ -1057,9 +1158,6 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
     });
   }, [sessions, terminalManager, setActiveSession]);
 
-  const canGoBack = historyIndex > 0;
-  const canGoForward = historyIndex < historyLength - 1;
-
   // Auto-switch to File tab only when files are first opened (not continuously)
   useEffect(() => {
     // Only switch when transitioning from no files to having files
@@ -1076,79 +1174,67 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
 
   return (
     <div
-      className="h-full flex flex-col bg-background shrink-0"
+      className="@container h-full flex flex-col bg-background shrink-0"
       style={{ width }}
     >
       {/* Tabs (directly at top - no separate header) */}
-      <div className="flex items-center justify-between px-4 pt-4">
-        <div className="flex gap-1">
+      <div className="flex items-center gap-2 px-4 pt-4 overflow-hidden">
+        <div className="flex gap-1 min-w-0">
           {hasOpenFiles ? (
             <TabButton
               active={activeTab === 'file'}
               onClick={() => { setActiveTab('file'); }}
-            >
-              File
-            </TabButton>
+              icon={FileCode}
+              label="File"
+              compact
+            />
           ) : null}
           <TabButton
             active={activeTab === 'files'}
             onClick={() => { setActiveTab('files'); }}
-          >
-            Files Changed
-          </TabButton>
+            icon={GitCompareArrows}
+            label="Changed"
+            compact={hasOpenFiles}
+          />
           <TabButton
             active={activeTab === 'source'}
             onClick={() => { setActiveTab('source'); }}
-          >
-            Source Control
-          </TabButton>
+            icon={GitBranch}
+            label="Source"
+            compact={hasOpenFiles}
+          />
         </div>
 
-        {/* File navigation buttons (only show when files are open) */}
-        {hasOpenFiles ? (
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={goBack}
-              disabled={!canGoBack}
-              className={cn(
-                'h-6 w-6 flex items-center justify-center rounded transition-colors',
-                canGoBack
-                  ? 'hover:bg-accent opacity-70 hover:opacity-100'
-                  : 'opacity-30 cursor-not-allowed'
-              )}
-              title="Go back"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={goForward}
-              disabled={!canGoForward}
-              className={cn(
-                'h-6 w-6 flex items-center justify-center rounded transition-colors',
-                canGoForward
-                  ? 'hover:bg-accent opacity-70 hover:opacity-100'
-                  : 'opacity-30 cursor-not-allowed'
-              )}
-              title="Go forward"
-            >
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={toggleSearch}
-              className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
-              title="Search (Cmd+F)"
-            >
-              <Search className="h-3.5 w-3.5" />
-            </button>
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Search bar - always visible */}
+        <ButtonGroup className="h-7 shrink-0">
+          <input
+            type="text"
+            placeholder="Search..."
+            className="h-7 w-28 min-w-0 rounded-md rounded-r-none border border-r-0 border-border bg-muted/50 px-2 text-xs outline-none placeholder:text-muted-foreground focus:border-border focus:bg-muted"
+          />
+          <button
+            onClick={toggleSearch}
+            className={cn(
+              'h-7 w-7 flex items-center justify-center border border-border bg-muted/50 hover:bg-accent transition-colors',
+              hasOpenFiles ? 'border-l-0 border-r-0' : 'rounded-md rounded-l-none border-l-0'
+            )}
+            title="Search"
+          >
+            <Search className="h-3.5 w-3.5" />
+          </button>
+          {hasOpenFiles ? (
             <button
               onClick={handleCloseFileViewer}
-              className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
-              title="Close file viewer"
+              className="h-7 w-7 flex items-center justify-center rounded-md rounded-l-none border border-l-0 border-border bg-muted/50 hover:bg-accent transition-colors"
+              title="Close"
             >
               <X className="h-3.5 w-3.5" />
             </button>
-          </div>
-        ) : null}
+          ) : null}
+        </ButtonGroup>
       </div>
 
       {/* Content */}
@@ -1166,8 +1252,8 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
         )}
       </div>
 
-      {/* Terminal Panel (bottom of review panel) */}
-      {bottomPanelOpen ? (
+      {/* Terminal Panel (bottom of review panel) - only show when position is 'activity' */}
+      {bottomPanelOpen && terminalPosition === 'activity' ? (
         <>
           <ResizeHandle direction="horizontal" target="bottom" />
           <div
@@ -1178,44 +1264,64 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
             className="flex items-center justify-between px-2 border-b border-border shrink-0"
             style={{ height: HEIGHTS.panelHeader }}
           >
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium">Terminal</span>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <SquareTerminal className="h-4 w-4 text-muted-foreground shrink-0" />
               {/* Terminal tabs */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden flex-1 min-w-0 scrollbar-none pr-4">
                 {sessions.map((session) => (
-                  <button
+                  <div
                     key={session.id}
-                    onClick={() => { handleSwitchTerminal(session.id); }}
-                    className={`px-2 py-0.5 text-xs rounded ${
+                    className={`group relative flex items-center px-2 py-0.5 text-xs rounded cursor-pointer shrink-0 ${
                       session.id === activeSessionId
                         ? 'bg-accent text-accent-foreground'
                         : 'text-muted-foreground hover:bg-accent/50'
                     }`}
+                    onClick={() => { handleSwitchTerminal(session.id); }}
                   >
-                    {session.name}
-                  </button>
+                    <span>{session.name}</span>
+                    <button
+                      className="ml-1 w-0 overflow-hidden opacity-0 group-hover:w-4 group-hover:opacity-100 transition-all duration-150 ease-out flex items-center justify-center hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        closeSession(session.id);
+                        // Close panel if this was the last session
+                        if (sessions.length === 1) {
+                          toggleBottomPanel();
+                        }
+                      }}
+                      title="Close terminal"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5"
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => {
                   const id = createSession(`Terminal ${String(sessions.length + 1)}`);
                   setActiveSession(id);
                 }}
                 title="New Terminal"
               >
-                <Plus className="h-3 w-3" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-5 w-5">
-                <Maximize2 className="h-3 w-3" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={toggleBottomPanel}>
-                <X className="h-3 w-3" />
-              </Button>
+                <Plus className="h-4 w-4" />
+              </button>
+              <button
+                className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                onClick={cycleTerminalPosition}
+                title="Expand to full width"
+              >
+                <ChevronsLeftRight className="h-4 w-4" />
+              </button>
+              <button
+                className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                onClick={toggleBottomPanel}
+                title="Close terminal"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           </header>
           <div className="flex-1 overflow-hidden relative bg-sidebar">
@@ -1246,25 +1352,227 @@ const ReviewPanel: FC<ReviewPanelProps> = ({ width }) => {
   );
 };
 
+// Full-width Terminal Panel (spans both chat and activity areas when position is 'both')
+const FullWidthTerminalPanel: FC = () => {
+  const { bottomPanelHeight, toggleBottomPanel, cycleTerminalPosition } = useUIStore();
+  const sessions = useTerminalStore((state) => state.sessions);
+  const activeSessionId = useTerminalStore((state) => state.activeSessionId);
+  const createSession = useTerminalStore((state) => state.createSession);
+  const setActiveSession = useTerminalStore((state) => state.setActiveSession);
+  const closeSession = useTerminalStore((state) => state.closeSession);
+  const terminalManager = useTerminalInstanceManager();
+  const terminalContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Create a default terminal session when panel opens
+  useEffect(() => {
+    if (sessions.length === 0) {
+      createSession('Terminal');
+    }
+  }, [sessions.length, createSession]);
+
+  // Create terminal instances for sessions
+  useEffect(() => {
+    if (!terminalManager.isInitialized()) return;
+
+    for (const session of sessions) {
+      if (!terminalManager.getInstance(session.id)) {
+        terminalManager.createInstance(session.id, session.name);
+      }
+    }
+  }, [sessions, terminalManager]);
+
+  // Attach instances to containers and manage visibility
+  useEffect(() => {
+    if (!terminalManager.isInitialized()) return;
+
+    const timeoutId = setTimeout(() => {
+      for (const session of sessions) {
+        const instance = terminalManager.getInstance(session.id);
+        const container = terminalContainerRefs.current.get(session.id);
+
+        if (instance && container) {
+          instance.attachToElement(container);
+          instance.setVisible(session.id === activeSessionId);
+        }
+      }
+    }, 0);
+
+    return () => { clearTimeout(timeoutId); };
+  }, [sessions, activeSessionId, terminalManager]);
+
+  // Callback to set container ref
+  const setTerminalContainerRef = useCallback((sessionId: string, el: HTMLDivElement | null): void => {
+    if (el) {
+      terminalContainerRefs.current.set(sessionId, el);
+      const instance = terminalManager.getInstance(sessionId);
+      if (instance) {
+        instance.attachToElement(el);
+      }
+    } else {
+      terminalContainerRefs.current.delete(sessionId);
+    }
+  }, [terminalManager]);
+
+  // ResizeObserver for terminal containers
+  useEffect(() => {
+    if (!activeSessionId) return;
+
+    const container = terminalContainerRefs.current.get(activeSessionId);
+    if (!container) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        const instance = terminalManager.getInstance(activeSessionId);
+        if (instance) {
+          instance.layout(width, height);
+        }
+      }
+    });
+
+    observer.observe(container);
+    return () => { observer.disconnect(); };
+  }, [activeSessionId, terminalManager]);
+
+  // Switch terminal with disableLayout
+  const handleSwitchTerminal = useCallback((newSessionId: string): void => {
+    for (const session of sessions) {
+      const instance = terminalManager.getInstance(session.id);
+      if (instance) {
+        instance.disableLayout = true;
+      }
+    }
+
+    setActiveSession(newSessionId);
+
+    requestAnimationFrame(() => {
+      for (const session of sessions) {
+        const instance = terminalManager.getInstance(session.id);
+        if (instance) {
+          instance.disableLayout = false;
+        }
+      }
+    });
+  }, [sessions, terminalManager, setActiveSession]);
+
+  return (
+    <>
+      <ResizeHandle direction="horizontal" target="bottom" />
+      <div
+        className="bg-background flex flex-col shrink-0"
+        style={{ height: bottomPanelHeight }}
+      >
+        <header
+          className="flex items-center justify-between px-2 border-b border-border shrink-0"
+          style={{ height: HEIGHTS.panelHeader }}
+        >
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <SquareTerminal className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden flex-1 min-w-0 scrollbar-none pr-4">
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className={`group relative flex items-center px-2 py-0.5 text-xs rounded cursor-pointer shrink-0 ${
+                    session.id === activeSessionId
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:bg-accent/50'
+                  }`}
+                  onClick={() => { handleSwitchTerminal(session.id); }}
+                >
+                  <span>{session.name}</span>
+                  <button
+                    className="ml-1 w-0 overflow-hidden opacity-0 group-hover:w-4 group-hover:opacity-100 transition-all duration-150 ease-out flex items-center justify-center hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeSession(session.id);
+                      // Close panel if this was the last session
+                      if (sessions.length === 1) {
+                        toggleBottomPanel();
+                      }
+                    }}
+                    title="Close terminal"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => {
+                const id = createSession(`Terminal ${String(sessions.length + 1)}`);
+                setActiveSession(id);
+              }}
+              title="New Terminal"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+            <button
+              className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              onClick={cycleTerminalPosition}
+              title="Collapse to activity panel"
+            >
+              <ChevronsRightLeft className="h-4 w-4" />
+            </button>
+            <button
+              className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              onClick={toggleBottomPanel}
+              title="Close terminal"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </header>
+        <div className="flex-1 overflow-hidden relative bg-sidebar">
+          {sessions.map((session) => (
+            <div
+              key={session.id}
+              ref={(el) => { setTerminalContainerRef(session.id, el); }}
+              className="absolute inset-0"
+              style={{
+                pointerEvents: session.id === activeSessionId ? 'auto' : 'none',
+              }}
+              onClick={() => {
+                terminalManager.getInstance(session.id)?.focus();
+              }}
+            />
+          ))}
+          {sessions.length === 0 && (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+              No terminal session
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
 interface TabButtonProps {
   readonly active: boolean;
   readonly onClick: () => void;
-  readonly children: React.ReactNode;
+  readonly icon: FC<{ className?: string }>;
+  readonly label: string;
+  readonly compact?: boolean;
 }
 
-const TabButton: FC<TabButtonProps> = ({ active, onClick, children }) => {
+const TabButton: FC<TabButtonProps> = ({ active, onClick, icon: Icon, label, compact = false }) => {
   return (
     <button
       onClick={active ? undefined : onClick}
       disabled={active}
       className={cn(
-        'px-2 py-1 text-xs font-medium transition-colors rounded select-none',
+        'flex items-center gap-1.5 px-2 py-1 text-xs font-medium transition-colors rounded select-none shrink-0',
         active
           ? 'bg-accent text-foreground cursor-default'
           : 'text-muted-foreground hover:text-foreground hover:bg-muted'
       )}
+      title={label}
     >
-      {children}
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <span className={cn('truncate', compact ? 'hidden @[435px]:inline' : 'hidden @[350px]:inline')}>{label}</span>
     </button>
   );
 };

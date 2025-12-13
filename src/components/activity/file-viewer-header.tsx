@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, X } from 'lucide-react';
 
 import type { ViewedFile } from '@/stores/file-viewer-store';
 import type { FC } from 'react';
@@ -11,6 +11,8 @@ export const FileViewerHeader: FC = () => {
   const activeTabPath = useFileViewerStore((state) => state.activeTabPath);
   const setActiveTab = useFileViewerStore((state) => state.setActiveTab);
   const closeTab = useFileViewerStore((state) => state.closeTab);
+  const goBack = useFileViewerStore((state) => state.goBack);
+  const goForward = useFileViewerStore((state) => state.goForward);
 
   // Only show tabs row if there are open tabs
   if (openTabs.length === 0) {
@@ -18,16 +20,39 @@ export const FileViewerHeader: FC = () => {
   }
 
   return (
-    <div className="flex items-center overflow-x-auto scrollbar-thin border-b border-border shrink-0 px-1 py-1">
-      {openTabs.map((tab) => (
-        <FileTab
-          key={tab.path}
-          file={tab}
-          isActive={tab.path === activeTabPath}
-          onSelect={() => { setActiveTab(tab.path); }}
-          onClose={() => { closeTab(tab.path); }}
-        />
-      ))}
+    <div className="flex items-center border-b border-border shrink-0 px-1 py-1">
+      {/* Navigation buttons - only show when there are multiple tabs */}
+      {openTabs.length > 1 ? (
+        <div className="flex items-center gap-0.5 shrink-0 mr-1">
+          <button
+            onClick={goBack}
+            className="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-accent opacity-70 hover:opacity-100"
+            title="Previous tab"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={goForward}
+            className="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-accent opacity-70 hover:opacity-100"
+            title="Next tab"
+          >
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : null}
+
+      {/* File tabs */}
+      <div className="flex items-center overflow-x-auto scrollbar-thin flex-1 min-w-0">
+        {openTabs.map((tab) => (
+          <FileTab
+            key={tab.path}
+            file={tab}
+            isActive={tab.path === activeTabPath}
+            onSelect={() => { setActiveTab(tab.path); }}
+            onClose={() => { closeTab(tab.path); }}
+          />
+        ))}
+      </div>
     </div>
   );
 };

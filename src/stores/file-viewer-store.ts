@@ -227,38 +227,48 @@ export const useFileViewerStore = create<FileViewerStore>()(
 
     goBack: (): void => {
       const state = get();
-      if (state.historyIndex > 0) {
+      if (state.openTabs.length < 2 || !state.activeTabPath) return;
+
+      const currentIndex = state.openTabs.findIndex((t) => t.path === state.activeTabPath);
+      if (currentIndex === -1) return;
+
+      // Cycle to previous tab (wrap around to end if at start)
+      const newIndex = currentIndex === 0 ? state.openTabs.length - 1 : currentIndex - 1;
+      const newPath = state.openTabs[newIndex]?.path;
+
+      if (newPath) {
         set((s) => {
-          s.historyIndex--;
-          const path = s.history[s.historyIndex];
-          if (path) {
-            s.activeTabPath = path;
-          }
+          s.activeTabPath = newPath;
         });
       }
     },
 
     goForward: (): void => {
       const state = get();
-      if (state.historyIndex < state.history.length - 1) {
+      if (state.openTabs.length < 2 || !state.activeTabPath) return;
+
+      const currentIndex = state.openTabs.findIndex((t) => t.path === state.activeTabPath);
+      if (currentIndex === -1) return;
+
+      // Cycle to next tab (wrap around to start if at end)
+      const newIndex = currentIndex === state.openTabs.length - 1 ? 0 : currentIndex + 1;
+      const newPath = state.openTabs[newIndex]?.path;
+
+      if (newPath) {
         set((s) => {
-          s.historyIndex++;
-          const path = s.history[s.historyIndex];
-          if (path) {
-            s.activeTabPath = path;
-          }
+          s.activeTabPath = newPath;
         });
       }
     },
 
     canGoBack: (): boolean => {
       const state = get();
-      return state.historyIndex > 0;
+      return state.openTabs.length > 1;
     },
 
     canGoForward: (): boolean => {
       const state = get();
-      return state.historyIndex < state.history.length - 1;
+      return state.openTabs.length > 1;
     },
 
     setLoading: (isLoading: boolean, path?: string): void => {
