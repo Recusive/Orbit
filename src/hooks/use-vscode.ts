@@ -429,6 +429,8 @@ function handleMockMessage(message: WebviewMessage): void {
     case 'url:open':
     case 'inputMode:set':
     case 'permission:response':
+    case 'thinking:set':
+    case 'model:set':
       break;
   }
 }
@@ -486,6 +488,9 @@ export function useAgentStream(
         case 'conversation:rewound':
         case 'permission:request':
         case 'inputMode:changed':
+        case 'agent:thinking':
+        case 'thinking:changed':
+        case 'model:changed':
           break;
         // Note: terminal:data, terminal:exited, terminal:cwd, terminal:command:start,
         // terminal:command:end, terminal:capabilities have terminal_id instead of session_id

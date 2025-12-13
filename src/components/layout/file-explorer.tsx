@@ -106,6 +106,9 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
       case 'conversation:deleted':
       case 'conversation:loaded':
       case 'conversation:rewound':
+      case 'agent:thinking':
+      case 'thinking:changed':
+      case 'model:changed':
         break;
     }
   }, [rootPath, setRootPath, setTreeChildren, handleFileChanged, treeNodes]);
