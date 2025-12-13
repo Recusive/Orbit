@@ -1,7 +1,23 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
-import type { InputMode } from '@/types/protocol';
+import type { InputMode, Model, ThinkingMode } from '@/types/protocol';
+
+// SDK Usage data (matches agent:complete schema)
+export interface UsageData {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens: number;
+  cacheCreationInputTokens: number;
+  totalCostUsd: number;
+}
+
+// Context window sizes by model (Claude 3.5 models all have 200k context)
+const MODEL_CONTEXT_WINDOWS: Record<Model, number> = {
+  haiku: 200000,
+  sonnet: 200000,
+  opus: 200000,
+};
 
 // Tool status
 export type ToolStatus = 'pending' | 'running' | 'success' | 'error';
@@ -34,6 +50,12 @@ export interface ToolState {
   // Input mode (synced with extension)
   inputMode: InputMode;
 
+  // Thinking mode (off, think, hard, ultra)
+  thinkingMode: ThinkingMode;
+
+  // Model (haiku, sonnet, opus)
+  model: Model;
+
   // Active tool executions (keyed by tool ID)
   activeTools: Record<string, ToolExecution>;
 
@@ -43,8 +65,16 @@ export interface ToolState {
   // Pending permission requests
   pendingPermissions: PermissionRequest[];
 
+  // Cumulative session usage (from SDK)
+  sessionUsage: UsageData;
+
+  // Track processed message IDs to avoid double-counting (SDK sends same usage for parallel tools)
+  processedMessageIds: Set<string>;
+
   // Actions
   setInputMode: (mode: InputMode) => void;
+  setThinkingMode: (mode: ThinkingMode) => void;
+  setModel: (model: Model) => void;
 
   // Tool lifecycle
   startTool: (id: string, messageId: string, toolName: string, toolInput: Record<string, unknown>, contentOffset?: number) => void;
@@ -55,6 +85,20 @@ export interface ToolState {
   removePermissionRequest: (requestId: string) => void;
   clearPermissions: () => void;
 
+  // Usage tracking
+  addUsage: (messageId: string, usage: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_input_tokens?: number | undefined;
+    cache_creation_input_tokens?: number | undefined;
+  }, totalCostUsd?: number  ) => void;
+  resetUsage: () => void;
+
+  // Computed values
+  getContextPercentage: () => number;
+  getMaxTokens: () => number;
+  getUsedTokens: () => number;
+
   // Get tools for a specific message
   getToolsForMessage: (messageId: string) => ToolExecution[];
 
@@ -62,16 +106,40 @@ export interface ToolState {
   reset: () => void;
 }
 
+const initialUsage: UsageData = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadInputTokens: 0,
+  cacheCreationInputTokens: 0,
+  totalCostUsd: 0,
+};
+
 export const useToolStore = create<ToolState>()(
   immer((set, get) => ({
     inputMode: 'default',
+    thinkingMode: 'off',
+    model: 'sonnet',
     activeTools: {},
     completedTools: [],
     pendingPermissions: [],
+    sessionUsage: { ...initialUsage },
+    processedMessageIds: new Set<string>(),
 
     setInputMode: (mode: InputMode) => {
       set((state) => {
         state.inputMode = mode;
+      });
+    },
+
+    setThinkingMode: (mode: ThinkingMode) => {
+      set((state) => {
+        state.thinkingMode = mode;
+      });
+    },
+
+    setModel: (model: Model) => {
+      set((state) => {
+        state.model = model;
       });
     },
 
@@ -127,6 +195,55 @@ export const useToolStore = create<ToolState>()(
       });
     },
 
+    addUsage: (messageId: string, usage: {
+      input_tokens: number;
+      output_tokens: number;
+      cache_read_input_tokens?: number | undefined;
+      cache_creation_input_tokens?: number | undefined;
+    }, totalCostUsd?: number  ) => {
+      set((state) => {
+        // SDK sends same usage for all messages with same ID (parallel tool uses)
+        // Only count each message ID once to avoid double-charging
+        if (state.processedMessageIds.has(messageId)) {
+          return;
+        }
+        state.processedMessageIds.add(messageId);
+
+        // Accumulate usage
+        state.sessionUsage.inputTokens += usage.input_tokens;
+        state.sessionUsage.outputTokens += usage.output_tokens;
+        state.sessionUsage.cacheReadInputTokens += usage.cache_read_input_tokens ?? 0;
+        state.sessionUsage.cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0;
+        if (totalCostUsd !== undefined) {
+          state.sessionUsage.totalCostUsd += totalCostUsd;
+        }
+      });
+    },
+
+    resetUsage: () => {
+      set((state) => {
+        state.sessionUsage = { ...initialUsage };
+        state.processedMessageIds = new Set<string>();
+      });
+    },
+
+    getContextPercentage: () => {
+      const state = get();
+      const maxTokens = MODEL_CONTEXT_WINDOWS[state.model];
+      const usedTokens = state.sessionUsage.inputTokens + state.sessionUsage.outputTokens;
+      return Math.min(100, Math.round((usedTokens / maxTokens) * 100));
+    },
+
+    getMaxTokens: () => {
+      const state = get();
+      return MODEL_CONTEXT_WINDOWS[state.model];
+    },
+
+    getUsedTokens: () => {
+      const state = get();
+      return state.sessionUsage.inputTokens + state.sessionUsage.outputTokens;
+    },
+
     getToolsForMessage: (messageId: string) => {
       const state = get();
       const active = Object.values(state.activeTools).filter(
@@ -152,9 +269,13 @@ export const useToolStore = create<ToolState>()(
     reset: () => {
       set((state) => {
         state.inputMode = 'default';
+        state.thinkingMode = 'off';
+        state.model = 'sonnet';
         state.activeTools = {};
         state.completedTools = [];
         state.pendingPermissions = [];
+        state.sessionUsage = { ...initialUsage };
+        state.processedMessageIds = new Set<string>();
       });
     },
   }))
@@ -162,5 +283,13 @@ export const useToolStore = create<ToolState>()(
 
 // Selector hooks for common patterns
 export const useInputMode = (): InputMode => useToolStore((state) => state.inputMode);
+export const useThinkingMode = (): ThinkingMode => useToolStore((state) => state.thinkingMode);
+export const useModel = (): Model => useToolStore((state) => state.model);
 export const useActiveTools = (): Record<string, ToolExecution> => useToolStore((state) => state.activeTools);
 export const usePendingPermissions = (): PermissionRequest[] => useToolStore((state) => state.pendingPermissions);
+
+// Usage selectors
+export const useSessionUsage = (): UsageData => useToolStore((state) => state.sessionUsage);
+export const useContextPercentage = (): number => useToolStore((state) => state.getContextPercentage());
+export const useMaxTokens = (): number => useToolStore((state) => state.getMaxTokens());
+export const useUsedTokens = (): number => useToolStore((state) => state.getUsedTokens());

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { ChatMessage } from '@/components/chat/message-item';
-import type { ExtensionMessage } from '@/types/protocol';
+import type { ExtensionMessage, Model, ThinkingMode } from '@/types/protocol';
 
 import { useVSCode } from '@/hooks/use-vscode';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/diff-utils';
@@ -20,13 +20,15 @@ interface UseChatMessagesReturn {
   sessionId: string;
   isMockMode: boolean;
   postMessage: ReturnType<typeof useVSCode>['postMessage'];
-  handleSend: (text: string) => void;
+  handleSend: (text: string, contextFiles?: string[]) => void;
   handleRewind: (messageId: string) => void;
   handlePermissionApprove: (requestId: string, always?: boolean) => void;
   handlePermissionDeny: (requestId: string) => void;
   handleOpenFile: (path: string) => void;
   handleOpenUrl: (url: string) => void;
   handleModeChange: (mode: 'default' | 'plan' | 'accept') => void;
+  handleThinkingModeChange: (mode: ThinkingMode) => void;
+  handleModelChange: (model: Model) => void;
 }
 
 export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMessagesReturn {
@@ -35,10 +37,10 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAgentRunning, setIsAgentRunning] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<{ text: string; contextFiles?: string[] | undefined } | null>(null);
 
   const { setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle, conversations } = useUIStore();
-  const { setInputMode, startTool, completeTool, addPermissionRequest, removePermissionRequest } = useToolStore();
+  const { setInputMode, setThinkingMode, setModel, startTool, completeTool, addPermissionRequest, removePermissionRequest, addUsage } = useToolStore();
 
   // Streaming animation - use interval to reveal content progressively
   useEffect(() => {
@@ -88,6 +90,37 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         break;
       }
 
+      case 'agent:thinking': {
+        // Update the current streaming message with thinking content
+        setMessages((prev) => {
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg?.role === 'assistant') {
+            return [
+              ...prev.slice(0, -1),
+              {
+                ...lastMsg,
+                thinking: message.thinking,
+                thinkingDurationMs: message.thinking_duration_ms,
+              },
+            ];
+          }
+          // If no assistant message exists yet, create one with just thinking
+          return [
+            ...prev,
+            {
+              id: message.message_id,
+              role: 'assistant',
+              content: '',
+              displayedContent: '',
+              isStreaming: true,
+              thinking: message.thinking,
+              thinkingDurationMs: message.thinking_duration_ms,
+            },
+          ];
+        });
+        break;
+      }
+
       case 'agent:complete':
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
@@ -96,6 +129,10 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           }
           return prev;
         });
+        // Track usage data from SDK (deduplicates by message_id)
+        if (message.usage) {
+          addUsage(message.message_id, message.usage, message.total_cost_usd);
+        }
         setIsAgentRunning(false);
         break;
 
@@ -156,6 +193,10 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
 
       case 'inputMode:changed':
         setInputMode(message.mode);
+        break;
+
+      case 'model:changed':
+        setModel(message.model);
         break;
 
       case 'tool:start': {
@@ -265,9 +306,10 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       case 'file:tree:response':
       case 'file:tree:error':
       case 'file:list:response':
+      case 'thinking:changed':
         break;
     }
-  }, [setWorkspace, setActiveConversation, setConversations, addConversation, setInputMode, startTool, completeTool, addPermissionRequest, onSessionCreated]);
+  }, [setWorkspace, setActiveConversation, setConversations, addConversation, setInputMode, setModel, startTool, completeTool, addPermissionRequest, addUsage, onSessionCreated]);
 
   const { postMessage, isMockMode } = useVSCode({ onMessage: handleMessage });
 
@@ -292,8 +334,24 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   // Send pending message when session becomes available
   useEffect(() => {
     if (sessionId && pendingMessage) {
-      const text = pendingMessage;
+      const { text, contextFiles } = pendingMessage;
       setPendingMessage(null);
+
+      // Send current thinking mode and model to backend BEFORE the message
+      // This ensures the session is created with the correct settings
+      const toolState = useToolStore.getState();
+      postMessage({
+        type: 'thinking:set',
+        uuid: crypto.randomUUID(),
+        session_id: sessionId,
+        mode: toolState.thinkingMode,
+      });
+      postMessage({
+        type: 'model:set',
+        uuid: crypto.randomUUID(),
+        session_id: sessionId,
+        model: toolState.model,
+      });
 
       updateConversationTitle(sessionId, text);
       postMessage({
@@ -308,6 +366,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         role: 'user',
         content: text,
         displayedContent: text,
+        attachedFiles: contextFiles,
       };
       setMessages((prev) => [...prev, userMessage]);
       setIsAgentRunning(true);
@@ -317,11 +376,12 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         uuid: crypto.randomUUID(),
         session_id: sessionId,
         content: text,
+        context: contextFiles ? { files: contextFiles } : undefined,
       });
     }
   }, [sessionId, pendingMessage, postMessage, updateConversationTitle]);
 
-  const handleSend = useCallback((text: string): void => {
+  const handleSend = useCallback((text: string, contextFiles?: string[]): void => {
     if (!text || isAgentRunning) return;
 
     // Check if conversation already exists in sidebar
@@ -330,7 +390,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     // If no sessionId OR (first message AND conversation doesn't exist in sidebar),
     // we need to create a conversation first via the backend
     if (!sessionId || (messages.length === 0 && !conversationExists)) {
-      setPendingMessage(text);
+      // Store both text and context files for pending message
+      setPendingMessage({ text, contextFiles });
       // Clear sessionId so the conversation:created handler will set the new one
       if (sessionId) {
         setSessionId('');
@@ -355,11 +416,28 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       });
     }
 
+    // Always send current thinking mode and model BEFORE message:send
+    // This ensures the session uses the correct settings
+    const toolState = useToolStore.getState();
+    postMessage({
+      type: 'thinking:set',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+      mode: toolState.thinkingMode,
+    });
+    postMessage({
+      type: 'model:set',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+      model: toolState.model,
+    });
+
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content: text,
       displayedContent: text,
+      attachedFiles: contextFiles,
     };
     setMessages((prev) => [...prev, userMessage]);
     setIsAgentRunning(true);
@@ -369,6 +447,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       uuid: crypto.randomUUID(),
       session_id: sessionId,
       content: text,
+      context: contextFiles ? { files: contextFiles } : undefined,
     });
   }, [sessionId, isAgentRunning, messages.length, conversations, postMessage, updateConversationTitle]);
 
@@ -446,6 +525,30 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     }
   }, [sessionId, setInputMode, postMessage]);
 
+  const handleThinkingModeChange = useCallback((mode: ThinkingMode): void => {
+    setThinkingMode(mode);
+    if (sessionId) {
+      postMessage({
+        type: 'thinking:set',
+        uuid: crypto.randomUUID(),
+        session_id: sessionId,
+        mode,
+      });
+    }
+  }, [sessionId, setThinkingMode, postMessage]);
+
+  const handleModelChange = useCallback((model: Model): void => {
+    setModel(model);
+    if (sessionId) {
+      postMessage({
+        type: 'model:set',
+        uuid: crypto.randomUUID(),
+        session_id: sessionId,
+        model,
+      });
+    }
+  }, [sessionId, setModel, postMessage]);
+
   return {
     messages,
     isAgentRunning,
@@ -459,5 +562,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     handleOpenFile,
     handleOpenUrl,
     handleModeChange,
+    handleThinkingModeChange,
+    handleModelChange,
   };
 }

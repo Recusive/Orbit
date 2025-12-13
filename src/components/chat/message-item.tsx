@@ -5,6 +5,7 @@ import type { ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
 import { MessageActions } from '@/components/chat/message-actions';
+import { ThinkingBox } from '@/components/chat/thinking-box';
 import { BashToolWidget } from '@/components/chat/tools/bash-tool-widget';
 import { EditToolWidget } from '@/components/chat/tools/edit-tool-widget';
 import { GlobToolWidget } from '@/components/chat/tools/glob-tool-widget';
@@ -15,6 +16,7 @@ import { TodoToolWidget } from '@/components/chat/tools/todo-tool-widget';
 import { WebFetchToolWidget } from '@/components/chat/tools/web-fetch-tool-widget';
 import { WebSearchToolWidget } from '@/components/chat/tools/web-search-tool-widget';
 import { WriteToolWidget } from '@/components/chat/tools/write-tool-widget';
+import { FileIcon } from '@/components/files/file-icon';
 import { cn } from '@/lib/utils';
 
 export interface ChatMessage {
@@ -22,7 +24,11 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   displayedContent: string;
-  isStreaming?: boolean;
+  isStreaming?: boolean | undefined;
+  thinking?: string | undefined;
+  thinkingDurationMs?: number | undefined;
+  /** Attached file paths for user messages */
+  attachedFiles?: string[] | undefined;
 }
 
 interface MessageItemProps {
@@ -238,9 +244,36 @@ export const MessageItem: FC<MessageItemProps> = ({
       )}
     >
       {message.role === 'user' ? (
-        <p className="text-sm whitespace-pre-wrap">{message.displayedContent}</p>
+        <div className="space-y-2">
+          <p className="text-sm whitespace-pre-wrap">{message.displayedContent}</p>
+          {/* Attached files display */}
+          {message.attachedFiles && message.attachedFiles.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {message.attachedFiles.map((filePath) => {
+                const fileName = filePath.split('/').pop() ?? filePath;
+                return (
+                  <div
+                    key={filePath}
+                    className="flex items-center gap-1.5 px-2 py-1 text-xs bg-background/50 rounded-md border border-border/50"
+                    title={filePath}
+                  >
+                    <FileIcon fileName={fileName} className="h-3.5 w-3.5" monochrome={false} />
+                    <span className="text-foreground/70">{fileName}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
       ) : (
         <>
+          {/* Thinking Box - show when thinking content exists */}
+          {message.thinking ? (
+            <ThinkingBox
+              thinking={message.thinking}
+              thinkingDurationMs={message.thinkingDurationMs}
+            />
+          ) : null}
           {buildSegments().map((segment) => {
             if (segment.type === 'content') {
               return (

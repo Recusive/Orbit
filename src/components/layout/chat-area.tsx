@@ -13,14 +13,17 @@ import { ResizeHandle } from '@/components/layout/resize-handle';
 import { TerminalPanel } from '@/components/terminal/terminal-panel';
 import { useChatMessages } from '@/hooks/use-chat-messages';
 import { useVSCode } from '@/hooks/use-vscode';
-import { useToolStore, usePendingPermissions, useInputMode } from '@/stores/tool-store';
+import { useToolStore, usePendingPermissions, useInputMode, useThinkingMode, useSessionUsage, useMaxTokens } from '@/stores/tool-store';
 import { useUIStore, useTerminalPosition } from '@/stores/ui-store';
 
 export const ChatArea: FC = () => {
   const { reviewPanelOpen, bottomPanelOpen, reviewPanelWidth } = useUIStore();
   const terminalPosition = useTerminalPosition();
   const inputMode = useInputMode();
+  const thinkingMode = useThinkingMode();
   const pendingPermissions = usePendingPermissions();
+  const sessionUsage = useSessionUsage();
+  const maxTokens = useMaxTokens();
   const { getToolsForMessage } = useToolStore();
   const [fileList, setFileList] = useState<FileEntry[]>([]);
 
@@ -35,6 +38,8 @@ export const ChatArea: FC = () => {
     handleOpenFile,
     handleOpenUrl,
     handleModeChange,
+    handleThinkingModeChange,
+    handleModelChange,
   } = useChatMessages();
 
   // Handle file list response for @ mentions
@@ -76,10 +81,15 @@ export const ChatArea: FC = () => {
                 <WelcomeGreeting />
                 <ChatInput
                   inputMode={inputMode}
+                  thinkingMode={thinkingMode}
                   isAgentRunning={isAgentRunning}
                   fileList={fileList}
+                  usage={sessionUsage}
+                  maxTokens={maxTokens}
                   onSend={handleSend}
                   onModeChange={handleModeChange}
+                  onThinkingModeChange={handleThinkingModeChange}
+                  onModelChange={handleModelChange}
                 />
               </div>
             ) : (
@@ -98,10 +108,15 @@ export const ChatArea: FC = () => {
                 />
                 <ChatInput
                   inputMode={inputMode}
+                  thinkingMode={thinkingMode}
                   isAgentRunning={isAgentRunning}
                   fileList={fileList}
+                  usage={sessionUsage}
+                  maxTokens={maxTokens}
                   onSend={handleSend}
                   onModeChange={handleModeChange}
+                  onThinkingModeChange={handleThinkingModeChange}
+                  onModelChange={handleModelChange}
                 />
               </>
             )}

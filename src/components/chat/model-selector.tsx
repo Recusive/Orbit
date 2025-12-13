@@ -2,10 +2,13 @@ import { Check, ChevronDown } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { SiClaude, SiOpenai } from 'react-icons/si';
 
+import type { Model } from '@/types/protocol';
 import type { FC } from 'react';
+
 
 import { CONTENT_WIDTH } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { useModel, useToolStore } from '@/stores/tool-store';
 
 // Wrapper components to match the expected interface
 const ClaudeIcon: FC<{ className?: string }> = ({ className }) => (
@@ -47,9 +50,14 @@ const MODEL_GROUPS: ModelGroup[] = [
   },
 ];
 
-export const ModelSelector: FC = () => {
+interface ModelSelectorProps {
+  onModelChange?: (model: Model) => void;
+}
+
+export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('sonnet');
+  const selectedModel = useModel();
+  const setModel = useToolStore((s) => s.setModel);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -79,7 +87,11 @@ export const ModelSelector: FC = () => {
     .find((m) => m.id === selectedModel);
 
   const handleSelectModel = (modelId: string): void => {
-    setSelectedModel(modelId);
+    // Only allow valid Model values
+    if (modelId === 'haiku' || modelId === 'sonnet' || modelId === 'opus') {
+      setModel(modelId);
+      onModelChange?.(modelId);
+    }
     setIsOpen(false);
   };
 

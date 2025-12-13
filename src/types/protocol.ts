@@ -10,6 +10,12 @@ const SessionIdSchema = z.string().min(1);
 // Input mode: default (ask permission), accept (auto-approve), plan (read-only)
 export const InputModeSchema = z.enum(['default', 'accept', 'plan']);
 
+// Thinking mode: off, think (4k), hard (10k), ultra (32k)
+export const ThinkingModeSchema = z.enum(['off', 'think', 'hard', 'ultra']);
+
+// Model selection: haiku (fast), sonnet (balanced), opus (best)
+export const ModelSchema = z.enum(['haiku', 'sonnet', 'opus']);
+
 // ═══════════════════════════════════════════════════════════════
 // WEBVIEW → EXTENSION (requests)
 // ═══════════════════════════════════════════════════════════════
@@ -270,6 +276,22 @@ export const SetInputModeSchema = z.object({
   mode: InputModeSchema,
 });
 
+// Set thinking mode (webview → extension)
+export const SetThinkingModeSchema = z.object({
+  type: z.literal('thinking:set'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  mode: ThinkingModeSchema,
+});
+
+// Set model (webview → extension)
+export const SetModelSchema = z.object({
+  type: z.literal('model:set'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  model: ModelSchema,
+});
+
 // System
 export const WebviewReadySchema = z.object({
   type: z.literal('webview:ready'),
@@ -322,6 +344,10 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   // Permissions
   PermissionResponseSchema,
   SetInputModeSchema,
+  // Thinking
+  SetThinkingModeSchema,
+  // Model
+  SetModelSchema,
 ]);
 
 // ═══════════════════════════════════════════════════════════════
@@ -352,6 +378,16 @@ export const AgentChunkSchema = z.object({
   session_id: SessionIdSchema,
   message_id: z.string(),
   content: z.string(),
+});
+
+// Agent thinking content (extended thinking)
+export const AgentThinkingSchema = z.object({
+  type: z.literal('agent:thinking'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  message_id: z.string(),
+  thinking: z.string(),
+  thinking_duration_ms: z.number().optional(),
 });
 
 export const AgentCompleteSchema = z.object({
@@ -418,6 +454,22 @@ export const InputModeChangedSchema = z.object({
   uuid: UUIDSchema,
   session_id: SessionIdSchema,
   mode: InputModeSchema,
+});
+
+// Thinking mode changed (from extension to webview)
+export const ThinkingModeChangedSchema = z.object({
+  type: z.literal('thinking:changed'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  mode: ThinkingModeSchema,
+});
+
+// Model changed (from extension to webview)
+export const ModelChangedSchema = z.object({
+  type: z.literal('model:changed'),
+  uuid: UUIDSchema,
+  session_id: SessionIdSchema,
+  model: ModelSchema,
 });
 
 // Panel command (from extension to webview)
@@ -650,6 +702,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   LayoutSchema,
   // Agent
   AgentChunkSchema,
+  AgentThinkingSchema,
   AgentCompleteSchema,
   AgentErrorSchema,
   // Tools
@@ -658,6 +711,10 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   // Permissions
   PermissionRequestSchema,
   InputModeChangedSchema,
+  // Thinking
+  ThinkingModeChangedSchema,
+  // Model
+  ModelChangedSchema,
   // Panel commands
   PanelCommandSchema,
   // Terminal
@@ -729,11 +786,15 @@ export type UrlOpen = z.infer<typeof UrlOpenSchema>;
 export type WebviewReady = z.infer<typeof WebviewReadySchema>;
 export type PermissionResponse = z.infer<typeof PermissionResponseSchema>;
 export type SetInputMode = z.infer<typeof SetInputModeSchema>;
+export type SetThinkingMode = z.infer<typeof SetThinkingModeSchema>;
+export type SetModel = z.infer<typeof SetModelSchema>;
+export type Model = z.infer<typeof ModelSchema>;
 
 // Extension → Webview
 export type SystemInit = z.infer<typeof SystemInitSchema>;
 export type Layout = z.infer<typeof LayoutSchema>;
 export type AgentChunk = z.infer<typeof AgentChunkSchema>;
+export type AgentThinking = z.infer<typeof AgentThinkingSchema>;
 export type AgentComplete = z.infer<typeof AgentCompleteSchema>;
 export type AgentError = z.infer<typeof AgentErrorSchema>;
 export type ToolStart = z.infer<typeof ToolStartSchema>;
@@ -741,6 +802,9 @@ export type ToolEnd = z.infer<typeof ToolEndSchema>;
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
 export type InputModeChanged = z.infer<typeof InputModeChangedSchema>;
 export type InputMode = z.infer<typeof InputModeSchema>;
+export type ThinkingModeChanged = z.infer<typeof ThinkingModeChangedSchema>;
+export type ThinkingMode = z.infer<typeof ThinkingModeSchema>;
+export type ModelChanged = z.infer<typeof ModelChangedSchema>;
 export type PanelCommandType = z.infer<typeof PanelCommandTypeSchema>;
 export type PanelCommand = z.infer<typeof PanelCommandSchema>;
 export type ShellType = z.infer<typeof ShellTypeSchema>;

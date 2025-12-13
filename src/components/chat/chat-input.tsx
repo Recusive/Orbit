@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { SlashCommand } from '@/components/chat/slash-command-popover';
 import type { ContextItem, FileEntry } from '@/types/context';
-import type { InputMode } from '@/types/protocol';
+import type { InputMode, Model, ThinkingMode } from '@/types/protocol';
 import type { FC } from 'react';
 
 import {
@@ -41,23 +41,37 @@ const INPUT_MODE_LABELS: Record<InputMode, string> = {
   accept: 'Accept',
 };
 
+interface UsageData {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+}
+
 interface ChatInputProps {
   readonly inputMode: InputMode;
+  readonly thinkingMode: ThinkingMode;
   readonly isAgentRunning: boolean;
   readonly fileList: FileEntry[];
-  readonly onSend: (text: string) => void;
+  readonly usage: UsageData;
+  readonly maxTokens: number;
+  readonly onSend: (text: string, contextFiles?: string[]) => void;
   readonly onModeChange: (mode: InputMode) => void;
+  readonly onThinkingModeChange: (mode: ThinkingMode) => void;
+  readonly onModelChange: (model: Model) => void;
 }
 
 export const ChatInput: FC<ChatInputProps> = ({
   inputMode,
+  thinkingMode,
   isAgentRunning,
   fileList,
+  usage,
+  maxTokens,
   onSend,
   onModeChange,
+  onThinkingModeChange,
+  onModelChange,
 }) => {
   const [inputText, setInputText] = useState('');
-  const [thinkingMode, setThinkingMode] = useState<'off' | 'think' | 'hard' | 'ultra'>('off');
   const [attachedContext, setAttachedContext] = useState<ContextItem[]>([]);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
@@ -139,10 +153,14 @@ export const ChatInput: FC<ChatInputProps> = ({
       inputRef.current.textContent = '';
     }
 
-    onSend(text);
-    // TODO: Send attachedContext when context support is implemented
+    // Extract file paths from attached context
+    const contextFiles = attachedContext
+      .filter((item) => item.type === 'file' || item.type === 'folder')
+      .map((item) => item.path);
+
+    onSend(text, contextFiles.length > 0 ? contextFiles : undefined);
     setAttachedContext([]);
-  }, [inputText, isAgentRunning, onSend]);
+  }, [inputText, isAgentRunning, onSend, attachedContext]);
 
   const handleMentionSelect = useCallback((file: FileEntry): void => {
     const newContext: ContextItem = {
@@ -377,7 +395,7 @@ export const ChatInput: FC<ChatInputProps> = ({
               <span className="text-xs font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
             </button>
             {/* Model Picker */}
-            <ModelSelector />
+            <ModelSelector onModelChange={onModelChange} />
           </div>
 
           {/* Right Controls - Action Buttons */}
@@ -441,7 +459,7 @@ export const ChatInput: FC<ChatInputProps> = ({
                   {(['off', 'think', 'hard', 'ultra'] as const).map((mode) => (
                     <button
                       key={mode}
-                      onClick={() => { setThinkingMode(mode); }}
+                      onClick={() => { onThinkingModeChange(mode); }}
                       className={cn(
                         'relative z-10 w-[38px] py-1 text-xs font-medium rounded transition-colors duration-200 capitalize',
                         thinkingMode === mode
@@ -462,7 +480,15 @@ export const ChatInput: FC<ChatInputProps> = ({
               <Image className="h-4 w-4" />
             </button>
             {/* Context Usage */}
-            <Context maxTokens={200000} usedTokens={45000} usage={{ promptTokens: 32000, completionTokens: 13000, totalTokens: 45000 }}>
+            <Context
+              maxTokens={maxTokens}
+              usedTokens={usage.inputTokens + usage.outputTokens}
+              usage={{
+                promptTokens: usage.inputTokens,
+                completionTokens: usage.outputTokens,
+                totalTokens: usage.inputTokens + usage.outputTokens,
+              }}
+            >
               <ContextTrigger />
               <ContextContent>
                 <ContextContentHeader />
