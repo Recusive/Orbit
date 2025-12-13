@@ -14,6 +14,7 @@ import type {ConversationSummary} from '@/stores/ui-store';
 import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/layout/file-explorer';
+import { SettingsDialog } from '@/components/settings/settings-dialog';
 import { useVSCode } from '@/hooks/use-vscode';
 import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -40,6 +41,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   const { postMessage } = useVSCode();
   const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleStartConversation = useCallback((): void => {
     postMessage({
@@ -241,9 +243,12 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         'flex flex-col shrink-0',
         isCollapsed ? 'gap-0 py-0' : 'gap-1 py-1.5'
       )}>
-        <SidebarItem icon={Settings} label="Settings" collapsed={isCollapsed} equalSpacing={isCollapsed} />
+        <SidebarItem icon={Settings} label="Settings" collapsed={isCollapsed} equalSpacing={isCollapsed} onClick={() => { setSettingsOpen(true); }} />
         <SidebarItem icon={Lightbulb} label="Feedback" collapsed={isCollapsed} equalSpacing={isCollapsed} />
       </div>
+
+      {/* Settings Dialog */}
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </aside>
   );
 };
