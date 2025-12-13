@@ -20,6 +20,13 @@ export const ModelSchema = z.enum(['haiku', 'sonnet', 'opus']);
 // WEBVIEW → EXTENSION (requests)
 // ═══════════════════════════════════════════════════════════════
 
+// Image attachment for message:send
+export const ImageAttachmentSchema = z.object({
+  name: z.string(),
+  mimeType: z.string(),
+  data: z.string(), // Base64 encoded
+});
+
 // Chat
 export const SendMessageSchema = z.object({
   type: z.literal('message:send'),
@@ -29,6 +36,7 @@ export const SendMessageSchema = z.object({
   context: z
     .object({
       files: z.array(z.string()).optional(),
+      images: z.array(ImageAttachmentSchema).optional(),
       selection: z
         .object({
           filePath: z.string(),

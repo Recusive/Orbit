@@ -46,6 +46,13 @@ interface UsageData {
   readonly outputTokens: number;
 }
 
+export interface ImageAttachment {
+  name: string;
+  mimeType: string;
+  data: string; // Base64 encoded
+  previewUrl: string; // Data URL for display
+}
+
 interface ChatInputProps {
   readonly inputMode: InputMode;
   readonly thinkingMode: ThinkingMode;
@@ -53,7 +60,7 @@ interface ChatInputProps {
   readonly fileList: FileEntry[];
   readonly usage: UsageData;
   readonly maxTokens: number;
-  readonly onSend: (text: string, contextFiles?: string[]) => void;
+  readonly onSend: (text: string, contextFiles?: string[], images?: ImageAttachment[]) => void;
   readonly onModeChange: (mode: InputMode) => void;
   readonly onThinkingModeChange: (mode: ThinkingMode) => void;
   readonly onModelChange: (model: Model) => void;
@@ -80,6 +87,7 @@ export const ChatInput: FC<ChatInputProps> = ({
   const [slashQuery, setSlashQuery] = useState('');
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Reset selection index when mention query changes
   useEffect(() => {
@@ -158,9 +166,63 @@ export const ChatInput: FC<ChatInputProps> = ({
       .filter((item) => item.type === 'file' || item.type === 'folder')
       .map((item) => item.path);
 
-    onSend(text, contextFiles.length > 0 ? contextFiles : undefined);
+    // Extract images from attached context
+    const images: ImageAttachment[] = attachedContext
+      .filter((item): item is ContextItem & { type: 'image'; imageData: string; mimeType: string } =>
+        item.type === 'image' && item.imageData !== undefined && item.mimeType !== undefined
+      )
+      .map((item) => ({
+        name: item.name,
+        mimeType: item.mimeType,
+        data: item.imageData,
+        previewUrl: item.previewUrl ?? '',
+      }));
+
+    onSend(
+      text,
+      contextFiles.length > 0 ? contextFiles : undefined,
+      images.length > 0 ? images : undefined
+    );
     setAttachedContext([]);
   }, [inputText, isAgentRunning, onSend, attachedContext]);
+
+  const handleImageClick = useCallback((): void => {
+    imageInputRef.current?.click();
+  }, []);
+
+  const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event): void => {
+        const dataUrl = event.target?.result as string;
+        // Extract base64 data (remove data:image/...;base64, prefix)
+        const base64Data = dataUrl.split(',')[1];
+
+        const newContext: ContextItem = {
+          id: crypto.randomUUID(),
+          type: 'image',
+          name: file.name,
+          path: file.name, // Use filename as path for images
+          mimeType: file.type,
+          imageData: base64Data,
+          previewUrl: dataUrl,
+        };
+        setAttachedContext((prev) => [...prev, newContext]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  }, []);
 
   const handleMentionSelect = useCallback((file: FileEntry): void => {
     const newContext: ContextItem = {
@@ -476,9 +538,22 @@ export const ChatInput: FC<ChatInputProps> = ({
             <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Web Browser">
               <Globe className="h-4 w-4" />
             </button>
-            <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Attach Image">
+            <button
+              onClick={handleImageClick}
+              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
+              title="Attach Image"
+            >
               <Image className="h-4 w-4" />
             </button>
+            {/* Hidden file input for images */}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              multiple
+              onChange={handleImageSelect}
+              className="hidden"
+            />
             {/* Context Usage */}
             <Context
               maxTokens={maxTokens}

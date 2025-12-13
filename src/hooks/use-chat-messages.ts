@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import type { ImageAttachment } from '@/components/chat/chat-input';
 import type { ChatMessage } from '@/components/chat/message-item';
 import type { ExtensionMessage, Model, ThinkingMode } from '@/types/protocol';
 
@@ -20,7 +21,7 @@ interface UseChatMessagesReturn {
   sessionId: string;
   isMockMode: boolean;
   postMessage: ReturnType<typeof useVSCode>['postMessage'];
-  handleSend: (text: string, contextFiles?: string[]) => void;
+  handleSend: (text: string, contextFiles?: string[], images?: ImageAttachment[]) => void;
   handleRewind: (messageId: string) => void;
   handlePermissionApprove: (requestId: string, always?: boolean) => void;
   handlePermissionDeny: (requestId: string) => void;
@@ -37,7 +38,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAgentRunning, setIsAgentRunning] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
-  const [pendingMessage, setPendingMessage] = useState<{ text: string; contextFiles?: string[] | undefined } | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<{ text: string; contextFiles?: string[] | undefined; images?: ImageAttachment[] | undefined } | null>(null);
 
   const { setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle, conversations } = useUIStore();
   const { setInputMode, setThinkingMode, setModel, startTool, completeTool, addPermissionRequest, removePermissionRequest, addUsage } = useToolStore();
@@ -334,7 +335,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   // Send pending message when session becomes available
   useEffect(() => {
     if (sessionId && pendingMessage) {
-      const { text, contextFiles } = pendingMessage;
+      const { text, contextFiles, images } = pendingMessage;
       setPendingMessage(null);
 
       // Send current thinking mode and model to backend BEFORE the message
@@ -367,21 +368,32 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         content: text,
         displayedContent: text,
         attachedFiles: contextFiles,
+        attachedImages: images,
       };
       setMessages((prev) => [...prev, userMessage]);
       setIsAgentRunning(true);
+
+      // Build context object with files and/or images
+      const hasFiles = contextFiles && contextFiles.length > 0;
+      const hasImages = images && images.length > 0;
+      const context = hasFiles || hasImages
+        ? {
+            files: hasFiles ? contextFiles : undefined,
+            images: hasImages ? images.map(img => ({ name: img.name, mimeType: img.mimeType, data: img.data })) : undefined,
+          }
+        : undefined;
 
       postMessage({
         type: 'message:send',
         uuid: crypto.randomUUID(),
         session_id: sessionId,
         content: text,
-        context: contextFiles ? { files: contextFiles } : undefined,
+        context,
       });
     }
   }, [sessionId, pendingMessage, postMessage, updateConversationTitle]);
 
-  const handleSend = useCallback((text: string, contextFiles?: string[]): void => {
+  const handleSend = useCallback((text: string, contextFiles?: string[], images?: ImageAttachment[]): void => {
     if (!text || isAgentRunning) return;
 
     // Check if conversation already exists in sidebar
@@ -390,8 +402,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     // If no sessionId OR (first message AND conversation doesn't exist in sidebar),
     // we need to create a conversation first via the backend
     if (!sessionId || (messages.length === 0 && !conversationExists)) {
-      // Store both text and context files for pending message
-      setPendingMessage({ text, contextFiles });
+      // Store text, context files, and images for pending message
+      setPendingMessage({ text, contextFiles, images });
       // Clear sessionId so the conversation:created handler will set the new one
       if (sessionId) {
         setSessionId('');
@@ -438,16 +450,27 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       content: text,
       displayedContent: text,
       attachedFiles: contextFiles,
+      attachedImages: images,
     };
     setMessages((prev) => [...prev, userMessage]);
     setIsAgentRunning(true);
+
+    // Build context object with files and/or images
+    const hasFiles = contextFiles && contextFiles.length > 0;
+    const hasImages = images && images.length > 0;
+    const context = hasFiles || hasImages
+      ? {
+          files: hasFiles ? contextFiles : undefined,
+          images: hasImages ? images.map(img => ({ name: img.name, mimeType: img.mimeType, data: img.data })) : undefined,
+        }
+      : undefined;
 
     postMessage({
       type: 'message:send',
       uuid: crypto.randomUUID(),
       session_id: sessionId,
       content: text,
-      context: contextFiles ? { files: contextFiles } : undefined,
+      context,
     });
   }, [sessionId, isAgentRunning, messages.length, conversations, postMessage, updateConversationTitle]);
 

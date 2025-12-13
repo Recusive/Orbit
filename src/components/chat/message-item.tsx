@@ -1,6 +1,7 @@
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
+import type { ImageAttachment } from '@/components/chat/chat-input';
 import type { ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
@@ -29,6 +30,8 @@ export interface ChatMessage {
   thinkingDurationMs?: number | undefined;
   /** Attached file paths for user messages */
   attachedFiles?: string[] | undefined;
+  /** Attached images for user messages */
+  attachedImages?: ImageAttachment[] | undefined;
 }
 
 interface MessageItemProps {
@@ -236,67 +239,89 @@ export const MessageItem: FC<MessageItemProps> = ({
     return null;
   };
 
+  const hasFiles = (message.attachedFiles?.length ?? 0) > 0;
+  const hasImages = (message.attachedImages?.length ?? 0) > 0;
+  const hasAttachments = hasFiles || hasImages;
+
   return (
-    <div
-      className={cn(
-        'p-3 rounded-lg',
-        message.role === 'user' && 'bg-muted'
-      )}
-    >
-      {message.role === 'user' ? (
-        <div className="space-y-2">
+    <div className="space-y-2">
+      {/* Message bubble */}
+      <div
+        className={cn(
+          'p-3 rounded-lg',
+          message.role === 'user' && 'bg-muted'
+        )}
+      >
+        {message.role === 'user' ? (
           <p className="text-sm whitespace-pre-wrap">{message.displayedContent}</p>
-          {/* Attached files display */}
-          {message.attachedFiles && message.attachedFiles.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {message.attachedFiles.map((filePath) => {
-                const fileName = filePath.split('/').pop() ?? filePath;
+        ) : (
+          <>
+            {/* Thinking Box - show when thinking content exists */}
+            {message.thinking ? (
+              <ThinkingBox
+                thinking={message.thinking}
+                thinkingDurationMs={message.thinkingDurationMs}
+              />
+            ) : null}
+            {buildSegments().map((segment) => {
+              if (segment.type === 'content') {
                 return (
                   <div
-                    key={filePath}
-                    className="flex items-center gap-1.5 px-2 py-1 text-xs bg-background/50 rounded-md border border-border/50"
-                    title={filePath}
+                    key={segment.key}
+                    className="text-sm prose prose-sm dark:prose-invert max-w-none [&_a]:focus:outline-none"
+                    onClick={handleContentClick}
                   >
-                    <FileIcon fileName={fileName} className="h-3.5 w-3.5" monochrome={false} />
-                    <span className="text-foreground/70">{fileName}</span>
+                    <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>{segment.text}</Streamdown>
                   </div>
                 );
-              })}
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <>
-          {/* Thinking Box - show when thinking content exists */}
-          {message.thinking ? (
-            <ThinkingBox
-              thinking={message.thinking}
-              thinkingDurationMs={message.thinkingDurationMs}
-            />
-          ) : null}
-          {buildSegments().map((segment) => {
-            if (segment.type === 'content') {
-              return (
-                <div
-                  key={segment.key}
-                  className="text-sm prose prose-sm dark:prose-invert max-w-none [&_a]:focus:outline-none"
-                  onClick={handleContentClick}
-                >
-                  <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>{segment.text}</Streamdown>
-                </div>
-              );
-            }
-            return renderToolWidget(segment.tool);
+              }
+              return renderToolWidget(segment.tool);
+            })}
+            {isComplete ? (
+              <MessageActions
+                showDisclaimer={isLastAssistantMessage}
+                rewindDisabled={isLastAssistantMessage}
+                onRewind={() => { onRewind(message.id); }}
+              />
+            ) : null}
+          </>
+        )}
+      </div>
+
+      {/* Attached context - outside the bubble */}
+      {message.role === 'user' && hasAttachments ? (
+        <div className="chat-attached-context flex flex-wrap gap-1.5 px-3">
+          {/* Attached files */}
+          {message.attachedFiles?.map((filePath) => {
+            const fileName = filePath.split('/').pop() ?? filePath;
+            return (
+              <div
+                key={filePath}
+                className="chat-attached-context-attachment flex items-center gap-1.5 px-1.5 py-1 bg-muted/40 rounded border border-border/40 hover:bg-muted/60 transition-colors cursor-pointer"
+                title={filePath}
+              >
+                <FileIcon fileName={fileName} className="h-3.5 w-3.5" monochrome={false} />
+                <span className="text-[11px] text-foreground/70">{fileName}</span>
+              </div>
+            );
           })}
-          {isComplete ? (
-            <MessageActions
-              showDisclaimer={isLastAssistantMessage}
-              rewindDisabled={isLastAssistantMessage}
-              onRewind={() => { onRewind(message.id); }}
-            />
-          ) : null}
-        </>
-      )}
+          {/* Attached images */}
+          {message.attachedImages?.map((image, index) => (
+            <div
+              key={`${image.name}-${String(index)}`}
+              className="chat-attached-context-attachment flex items-center gap-1.5 px-1.5 py-1 bg-muted/40 rounded border border-border/40 hover:bg-muted/60 transition-colors cursor-pointer"
+              title={image.name}
+            >
+              <img
+                src={image.previewUrl}
+                alt={image.name}
+                className="h-4 w-4 object-cover rounded-sm"
+              />
+              <span className="text-[11px] text-foreground/70">{image.name}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 };

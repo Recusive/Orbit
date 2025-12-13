@@ -5,7 +5,7 @@ import { z } from 'zod';
  */
 
 // Supported context types
-export const ContextTypeSchema = z.enum(['file', 'folder', 'url', 'code']);
+export const ContextTypeSchema = z.enum(['file', 'folder', 'url', 'code', 'image']);
 export type ContextType = z.infer<typeof ContextTypeSchema>;
 
 // Context item attached to a message
@@ -17,6 +17,10 @@ export const ContextItemSchema = z.object({
   icon: z.string().optional(), // Icon name from iconMap
   content: z.string().optional(), // File content (loaded when needed)
   language: z.string().optional(), // Language for code highlighting
+  // Image-specific fields
+  imageData: z.string().optional(), // Base64 encoded image data
+  mimeType: z.string().optional(), // Image MIME type (image/png, image/jpeg, etc.)
+  previewUrl: z.string().optional(), // Data URL for preview display
 });
 
 export type ContextItem = z.infer<typeof ContextItemSchema>;
@@ -44,4 +48,8 @@ export function isUrlContext(item: ContextItem): boolean {
 
 export function isCodeContext(item: ContextItem): boolean {
   return item.type === 'code';
+}
+
+export function isImageContext(item: ContextItem): boolean {
+  return item.type === 'image';
 }
