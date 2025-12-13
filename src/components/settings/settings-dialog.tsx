@@ -1,14 +1,16 @@
+import { hexagons7, tab } from '@lucide/lab';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
-  Bot,
+  AppWindowMac,
+  Bell,
   ChevronRight,
   FileText,
+  FlaskConical,
   FolderOpen,
   Globe,
+  Icon,
   Keyboard,
   MessageSquare,
-  MonitorCog,
-  Palette,
   Settings2,
   User,
   X,
@@ -571,14 +573,15 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange }) 
   const [activeSection, setActiveSection] = useState<SettingsSection>('agent');
 
   const navItems = [
-    { id: 'agent' as const, label: 'Agent', icon: <Bot className="h-4 w-4" /> },
+    { id: 'agent' as const, label: 'Agent', icon: <Icon iconNode={hexagons7} className="h-4 w-4" /> },
     { id: 'browser' as const, label: 'Browser', icon: <Globe className="h-4 w-4" /> },
-    { id: 'editor' as const, label: 'Editor', icon: <Palette className="h-4 w-4" /> },
-    { id: 'notifications' as const, label: 'Notifications', icon: <MessageSquare className="h-4 w-4" /> },
-    { id: 'tabs' as const, label: 'Tabs', icon: <MonitorCog className="h-4 w-4" /> },
+    { id: 'editor' as const, label: 'Editor', icon: <AppWindowMac className="h-4 w-4" /> },
+    { id: 'notifications' as const, label: 'Notifications', icon: <Bell className="h-4 w-4" /> },
+    { id: 'tabs' as const, label: 'Tabs', icon: <Icon iconNode={tab} className="h-4 w-4" /> },
     { id: 'account' as const, label: 'Account', icon: <User className="h-4 w-4" /> },
-    { id: 'feedback' as const, label: 'Provide Feedback', icon: <MessageSquare className="h-4 w-4" /> },
   ];
+
+  const feedbackItem = { id: 'feedback' as const, label: 'Provide Feedback', icon: <FlaskConical className="h-4 w-4" /> };
 
   const renderContent = (): ReactNode => {
     switch (activeSection) {
@@ -600,6 +603,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange }) 
   };
 
   const getSectionTitle = (): string => {
+    if (activeSection === 'feedback') return feedbackItem.label;
     const item = navItems.find((n) => n.id === activeSection);
     return item?.label ?? 'Settings';
   };
@@ -610,7 +614,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange }) 
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
         <DialogPrimitive.Content className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-background border border-border rounded-lg shadow-xl overflow-hidden flex flex-col">
           {/* Title bar */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2">
               <Settings2 className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium text-sm">Settings - {getSectionTitle()}</span>
@@ -624,8 +628,8 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange }) 
           {/* Content */}
           <div className="flex flex-1 overflow-hidden">
             {/* Sidebar */}
-            <div className="w-48 border-r border-border p-2 bg-muted/20">
-              <nav className="space-y-1">
+            <div className="w-48 border-r border-border p-2 bg-muted/20 flex flex-col">
+              <nav className="space-y-1 flex-1">
                 {navItems.map((item) => (
                   <NavItem
                     key={item.id}
@@ -636,6 +640,15 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange }) 
                   />
                 ))}
               </nav>
+              {/* Feedback at bottom */}
+              <div>
+                <NavItem
+                  icon={feedbackItem.icon}
+                  label={feedbackItem.label}
+                  isActive={activeSection === 'feedback'}
+                  onClick={() => { setActiveSection('feedback'); }}
+                />
+              </div>
             </div>
 
             {/* Main content */}
