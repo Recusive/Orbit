@@ -1,0 +1,269 @@
+import remarkGfm from 'remark-gfm';
+import { Streamdown } from 'streamdown';
+
+import type { ToolExecution } from '@/stores/tool-store';
+import type { FC } from 'react';
+
+import { MessageActions } from '@/components/chat/message-actions';
+import { BashToolWidget } from '@/components/chat/tools/bash-tool-widget';
+import { EditToolWidget } from '@/components/chat/tools/edit-tool-widget';
+import { GlobToolWidget } from '@/components/chat/tools/glob-tool-widget';
+import { GrepToolWidget } from '@/components/chat/tools/grep-tool-widget';
+import { ReadToolWidget } from '@/components/chat/tools/read-tool-widget';
+import { TaskToolWidget } from '@/components/chat/tools/task-tool-widget';
+import { TodoToolWidget } from '@/components/chat/tools/todo-tool-widget';
+import { WebFetchToolWidget } from '@/components/chat/tools/web-fetch-tool-widget';
+import { WebSearchToolWidget } from '@/components/chat/tools/web-search-tool-widget';
+import { WriteToolWidget } from '@/components/chat/tools/write-tool-widget';
+import { cn } from '@/lib/utils';
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  displayedContent: string;
+  isStreaming?: boolean;
+}
+
+interface MessageItemProps {
+  readonly message: ChatMessage;
+  readonly tools: ToolExecution[];
+  readonly isLastAssistantMessage: boolean;
+  readonly onRewind: (messageId: string) => void;
+  readonly onOpenFile: (path: string) => void;
+  readonly onOpenUrl: (url: string) => void;
+}
+
+// Helper to extract string from tool input
+const getStringInput = (tool: ToolExecution, key: string, fallback: string): string => {
+  const value = tool.toolInput[key];
+  return typeof value === 'string' ? value : fallback;
+};
+
+// Segment type for interleaving content and tools
+type Segment =
+  | { type: 'content'; text: string; key: string }
+  | { type: 'tool'; tool: ToolExecution; key: string };
+
+export const MessageItem: FC<MessageItemProps> = ({
+  message,
+  tools,
+  isLastAssistantMessage,
+  onRewind,
+  onOpenFile,
+  onOpenUrl,
+}) => {
+  const isComplete = !message.isStreaming && message.displayedContent.length === message.content.length;
+
+  // Handle clicks on links in markdown content
+  const handleContentClick = (e: React.MouseEvent<HTMLDivElement>): void => {
+    const target = e.target as HTMLElement;
+    const anchor = target.closest('a');
+    if (anchor?.href) {
+      e.preventDefault();
+      onOpenUrl(anchor.href);
+    }
+  };
+
+  // Build interleaved segments for assistant messages
+  const buildSegments = (): Segment[] => {
+    const content = message.displayedContent;
+    const sortedTools = [...tools].sort((a, b) =>
+      (a.contentOffset ?? 0) - (b.contentOffset ?? 0)
+    );
+
+    const segments: Segment[] = [];
+    let lastOffset = 0;
+
+    for (const tool of sortedTools) {
+      const offset = tool.contentOffset ?? 0;
+      // Add content before this tool
+      if (offset > lastOffset) {
+        const text = content.slice(lastOffset, offset);
+        if (text.trim()) {
+          segments.push({ type: 'content', text, key: `content-${String(lastOffset)}` });
+        }
+      }
+      // Add the tool
+      segments.push({ type: 'tool', tool, key: tool.id });
+      lastOffset = offset;
+    }
+
+    // Add remaining content after last tool
+    if (lastOffset < content.length) {
+      const text = content.slice(lastOffset);
+      if (text.trim()) {
+        segments.push({ type: 'content', text, key: `content-${String(lastOffset)}` });
+      }
+    }
+
+    // If no tools, just render all content
+    if (segments.length === 0 && content.trim()) {
+      segments.push({ type: 'content', text: content, key: 'content-0' });
+    }
+
+    return segments;
+  };
+
+  // Render a tool widget based on tool name
+  const renderToolWidget = (tool: ToolExecution): React.ReactNode => {
+    const toolName = tool.toolName.toLowerCase();
+
+    if (toolName === 'write') {
+      return (
+        <WriteToolWidget
+          key={tool.id}
+          filePath={getStringInput(tool, 'file_path', 'unknown')}
+          content={getStringInput(tool, 'content', '')}
+          isRunning={tool.status === 'running'}
+          onOpenFile={onOpenFile}
+        />
+      );
+    }
+    if (toolName === 'edit') {
+      return (
+        <EditToolWidget
+          key={tool.id}
+          filePath={getStringInput(tool, 'file_path', 'unknown')}
+          oldString={getStringInput(tool, 'old_string', '')}
+          newString={getStringInput(tool, 'new_string', '')}
+          isRunning={tool.status === 'running'}
+          onOpenFile={onOpenFile}
+        />
+      );
+    }
+    if (toolName === 'read') {
+      return (
+        <ReadToolWidget
+          key={tool.id}
+          filePath={getStringInput(tool, 'file_path', 'unknown')}
+          isRunning={tool.status === 'running'}
+          content={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+          onOpenFile={onOpenFile}
+        />
+      );
+    }
+    if (toolName === 'bash') {
+      return (
+        <BashToolWidget
+          key={tool.id}
+          command={getStringInput(tool, 'command', '')}
+          description={getStringInput(tool, 'description', '')}
+          output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+          isRunning={tool.status === 'running'}
+        />
+      );
+    }
+    if (toolName === 'glob') {
+      return (
+        <GlobToolWidget
+          key={tool.id}
+          pattern={getStringInput(tool, 'pattern', '*')}
+          path={getStringInput(tool, 'path', '') || undefined}
+          output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+          isRunning={tool.status === 'running'}
+          onOpenFile={onOpenFile}
+        />
+      );
+    }
+    if (toolName === 'grep') {
+      return (
+        <GrepToolWidget
+          key={tool.id}
+          pattern={getStringInput(tool, 'pattern', '')}
+          path={getStringInput(tool, 'path', '') || undefined}
+          outputMode={getStringInput(tool, 'output_mode', '') || undefined}
+          glob={getStringInput(tool, 'glob', '') || undefined}
+          fileType={getStringInput(tool, 'type', '') || undefined}
+          output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+          isRunning={tool.status === 'running'}
+          onOpenFile={onOpenFile}
+        />
+      );
+    }
+    if (toolName === 'todowrite') {
+      const todosInput = tool.toolInput['todos'];
+      return (
+        <TodoToolWidget
+          key={tool.id}
+          todos={Array.isArray(todosInput) ? todosInput : undefined}
+          isRunning={tool.status === 'running'}
+        />
+      );
+    }
+    if (toolName === 'websearch') {
+      return (
+        <WebSearchToolWidget
+          key={tool.id}
+          query={getStringInput(tool, 'query', '')}
+          output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+          isRunning={tool.status === 'running'}
+          onOpenUrl={onOpenUrl}
+        />
+      );
+    }
+    if (toolName === 'webfetch') {
+      return (
+        <WebFetchToolWidget
+          key={tool.id}
+          url={getStringInput(tool, 'url', '')}
+          prompt={getStringInput(tool, 'prompt', '')}
+          output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+          isRunning={tool.status === 'running'}
+          onOpenUrl={onOpenUrl}
+        />
+      );
+    }
+    if (toolName === 'task') {
+      return (
+        <TaskToolWidget
+          key={tool.id}
+          description={getStringInput(tool, 'description', '')}
+          prompt={getStringInput(tool, 'prompt', '')}
+          subagentType={getStringInput(tool, 'subagent_type', 'general-purpose')}
+          model={getStringInput(tool, 'model', '') || undefined}
+          output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
+          isRunning={tool.status === 'running'}
+        />
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div
+      className={cn(
+        'p-3 rounded-lg',
+        message.role === 'user' && 'bg-muted'
+      )}
+    >
+      {message.role === 'user' ? (
+        <p className="text-sm whitespace-pre-wrap">{message.displayedContent}</p>
+      ) : (
+        <>
+          {buildSegments().map((segment) => {
+            if (segment.type === 'content') {
+              return (
+                <div
+                  key={segment.key}
+                  className="text-sm prose prose-sm dark:prose-invert max-w-none [&_a]:focus:outline-none"
+                  onClick={handleContentClick}
+                >
+                  <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>{segment.text}</Streamdown>
+                </div>
+              );
+            }
+            return renderToolWidget(segment.tool);
+          })}
+          {isComplete ? (
+            <MessageActions
+              showDisclaimer={isLastAssistantMessage}
+              rewindDisabled={isLastAssistantMessage}
+              onRewind={() => { onRewind(message.id); }}
+            />
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+};
