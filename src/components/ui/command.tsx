@@ -4,7 +4,7 @@ import * as React from "react"
 
 import type {DialogProps} from "@radix-ui/react-dialog";
 
-import { Dialog, DialogContentTopCenter } from "@/components/ui/dialog"
+import { Dialog, DialogContentTopCenter, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
 const Command = React.forwardRef<
@@ -25,7 +25,8 @@ Command.displayName = CommandPrimitive.displayName
 const CommandDialog = ({ children, ...props }: DialogProps): React.JSX.Element => {
   return (
     <Dialog {...props}>
-      <DialogContentTopCenter className="overflow-hidden p-0">
+      <DialogContentTopCenter className="overflow-hidden p-0" aria-describedby={undefined}>
+        <DialogTitle className="sr-only">Command Palette</DialogTitle>
         <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
           {children}
         </Command>

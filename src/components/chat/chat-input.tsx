@@ -1,6 +1,7 @@
 import {
   ArrowRight,
   AtSign,
+  Coins,
   Globe,
   Image,
   Lightbulb,
@@ -217,7 +218,7 @@ export const ChatInput: FC<ChatInputProps> = ({
       case 'accept':
         return `${base} border-2 border-dashed border-mode-accept`;
       case 'default':
-        return `${base} border border-border focus-within:border-muted-foreground/50`;
+        return `${base} border border-border focus-within:border-muted-foreground/30 dark:focus-within:border-muted-foreground/50`;
     }
   };
 
@@ -311,16 +312,42 @@ export const ChatInput: FC<ChatInputProps> = ({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="center" side="top" className="p-2">
-                <div className="text-xs text-muted-foreground mb-2">Think config</div>
-                <div className="flex gap-1 bg-muted rounded-md p-1">
+                <div className="flex items-center justify-between gap-4 mb-2">
+                  <span className="text-xs text-muted-foreground">Think config</span>
+                  {thinkingMode !== 'off' ? (
+                    <span className={cn(
+                      'flex items-center gap-1 text-[10px]',
+                      thinkingMode === 'think' && 'text-mode-think',
+                      thinkingMode === 'hard' && 'text-orange-500',
+                      thinkingMode === 'ultra' && 'text-red-500'
+                    )}>
+                      {thinkingMode === 'think' && '4k'}
+                      {thinkingMode === 'hard' && '10k'}
+                      {thinkingMode === 'ultra' && '32k'}
+                      <Coins className="h-3 w-3" />
+                    </span>
+                  ) : null}
+                </div>
+                <div className="relative flex gap-1 bg-muted rounded-md p-1 border border-border">
+                  {/* Sliding indicator */}
+                  <div
+                    className="absolute top-1 bottom-1 left-1 bg-background rounded shadow-sm transition-all duration-200"
+                    style={{
+                      width: 'var(--tab-width)',
+                      transform: `translateX(calc(${String(['off', 'think', 'hard', 'ultra'].indexOf(thinkingMode))} * (var(--tab-width) + 4px)))`,
+                      transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                      // @ts-expect-error CSS custom property
+                      '--tab-width': '38px',
+                    }}
+                  />
                   {(['off', 'think', 'hard', 'ultra'] as const).map((mode) => (
                     <button
                       key={mode}
                       onClick={() => { setThinkingMode(mode); }}
                       className={cn(
-                        'px-2 py-1 text-xs font-medium rounded transition-colors capitalize',
+                        'relative z-10 w-[38px] py-1 text-xs font-medium rounded transition-colors duration-200 capitalize',
                         thinkingMode === mode
-                          ? 'bg-background text-foreground shadow-sm'
+                          ? 'text-foreground'
                           : 'text-muted-foreground hover:text-foreground'
                       )}
                     >
@@ -354,7 +381,7 @@ export const ChatInput: FC<ChatInputProps> = ({
               className={cn(
                 'h-7 w-7 flex items-center justify-center rounded-full transition-colors',
                 isInputEmpty || isAgentRunning
-                  ? 'bg-primary/30 text-primary-foreground/50 cursor-not-allowed'
+                  ? 'bg-primary/30 text-primary-foreground opacity-50 cursor-not-allowed'
                   : 'bg-primary text-primary-foreground hover:bg-primary/90'
               )}
             >

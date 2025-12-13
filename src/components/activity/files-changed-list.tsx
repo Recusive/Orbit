@@ -1,15 +1,20 @@
 import React from 'react';
 
+
 import { useFileStore } from '../../stores/file-store';
 
 import { FileChangeItem } from './file-change-item';
 
+import type { FileChange } from '../../stores/file-store';
+
 export interface FilesChangedListProps {
-  className?: string;
+  readonly className?: string;
+  readonly onOpenFile?: (file: FileChange) => void;
 }
 
 export const FilesChangedList: React.FC<FilesChangedListProps> = ({
   className = '',
+  onOpenFile,
 }) => {
   const { changedFiles, filterStatus } = useFileStore();
 
@@ -29,7 +34,11 @@ export const FilesChangedList: React.FC<FilesChangedListProps> = ({
   return (
     <div className={`divide-y divide-border ${className}`}>
       {filteredFiles.map((file) => (
-        <FileChangeItem key={file.id} file={file} />
+        <FileChangeItem
+          key={file.id}
+          file={file}
+          {...(onOpenFile ? { onOpenFile } : {})}
+        />
       ))}
     </div>
   );

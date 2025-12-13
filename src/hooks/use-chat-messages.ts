@@ -4,6 +4,8 @@ import type { ChatMessage } from '@/components/chat/message-item';
 import type { ExtensionMessage } from '@/types/protocol';
 
 import { useVSCode } from '@/hooks/use-vscode';
+import { computeSimpleDiff, getLanguageFromPath } from '@/lib/diff-utils';
+import { useFileStore } from '@/stores/file-store';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
 import { useToolStore } from '@/stores/tool-store';
 import { useUIStore } from '@/stores/ui-store';
@@ -175,6 +177,47 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
 
       case 'tool:end': {
         const toolId = message.tool_id;
+
+        // Get tool data BEFORE completing (still in activeTools)
+        const toolState = useToolStore.getState();
+        const tool = toolState.activeTools[toolId];
+
+        // Track file changes for Edit/Write tools
+        if (tool && message.success) {
+          const toolName = tool.toolName.toLowerCase();
+          const { addFileChange } = useFileStore.getState();
+
+          if (toolName === 'edit') {
+            const filePath = tool.toolInput['file_path'] as string;
+            const rawOld = tool.toolInput['old_string'];
+            const rawNew = tool.toolInput['new_string'];
+            const oldString = typeof rawOld === 'string' ? rawOld : '';
+            const newString = typeof rawNew === 'string' ? rawNew : '';
+            addFileChange({
+              path: filePath,
+              type: 'modified',
+              oldContent: oldString,
+              newContent: newString,
+              diff: computeSimpleDiff(oldString, newString),
+              language: getLanguageFromPath(filePath),
+            });
+          }
+          if (toolName === 'write') {
+            const filePath = tool.toolInput['file_path'] as string;
+            const rawContent = tool.toolInput['content'];
+            const content = typeof rawContent === 'string' ? rawContent : '';
+            addFileChange({
+              path: filePath,
+              type: 'created',
+              oldContent: '',
+              newContent: content,
+              diff: computeSimpleDiff('', content),
+              language: getLanguageFromPath(filePath),
+            });
+          }
+        }
+
+        // Complete the tool (moves to completedTools)
         completeTool(toolId, message.tool_output, message.success);
         break;
       }

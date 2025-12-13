@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ViewedFile } from '@/stores/file-viewer-store';
 import type { FC } from 'react';
 
+import { FileDiffViewer } from '@/components/activity/file-diff-viewer';
 import { MONACO_TOKEN_CSS, tokenizeCode } from '@/lib/monaco-tokenizer';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
 
@@ -44,6 +45,11 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
       inputRef.current.focus();
     }
   }, [searchOpen]);
+
+  // Render diff view when in diff mode with diff data
+  if (file.viewMode === 'diff' && file.diffData) {
+    return <FileDiffViewer diffData={file.diffData} />;
+  }
 
   // Highlight search matches in text
   const highlightText = (text: string, className: string): React.ReactNode => {

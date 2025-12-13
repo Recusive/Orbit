@@ -392,6 +392,16 @@ html.dark {
   }
 }
 
+/* Hide native scrollbar in Radix ScrollArea - use only custom scrollbar */
+[data-radix-scroll-area-viewport] {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar {
+  display: none !important;
+}
+
 /* Custom scrollbar - outside layer for higher specificity */
 ::-webkit-scrollbar {
   width: 6px !important;

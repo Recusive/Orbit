@@ -15,7 +15,7 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { FC, ReactNode } from 'react';
 
@@ -45,6 +45,7 @@ type SettingsSection =
 interface SettingsDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
+  readonly defaultSection?: SettingsSection;
 }
 
 // Sidebar navigation item
@@ -569,8 +570,15 @@ const FeedbackSettings: FC = () => {
 };
 
 // Main dialog component
-export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange }) => {
-  const [activeSection, setActiveSection] = useState<SettingsSection>('agent');
+export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange, defaultSection = 'agent' }) => {
+  const [activeSection, setActiveSection] = useState<SettingsSection>(defaultSection);
+
+  // Reset to defaultSection when dialog opens
+  useEffect(() => {
+    if (open) {
+      setActiveSection(defaultSection);
+    }
+  }, [open, defaultSection]);
 
   const navItems = [
     { id: 'agent' as const, label: 'Agent', icon: <Icon iconNode={hexagons7} className="h-4 w-4" /> },
@@ -612,7 +620,14 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange }) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
-        <DialogPrimitive.Content className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-background border border-border rounded-lg shadow-xl overflow-hidden flex flex-col">
+        <DialogPrimitive.Content
+          className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-background border border-border rounded-lg shadow-xl overflow-hidden flex flex-col"
+          aria-describedby={undefined}
+        >
+          {/* Accessibility: Hidden title for screen readers */}
+          <DialogPrimitive.Title className="sr-only">
+            Settings - {getSectionTitle()}
+          </DialogPrimitive.Title>
           {/* Title bar */}
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2">

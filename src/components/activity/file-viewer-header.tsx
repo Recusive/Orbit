@@ -1,10 +1,11 @@
-import { ArrowLeft, ArrowRight, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileCode, GitCompareArrows, X } from 'lucide-react';
 
 import type { ViewedFile } from '@/stores/file-viewer-store';
 import type { FC } from 'react';
 
+import { FileIcon } from '@/components/files/file-icon';
 import { cn } from '@/lib/utils';
-import { useFileViewerStore } from '@/stores/file-viewer-store';
+import { useActiveFile, useFileViewerStore } from '@/stores/file-viewer-store';
 
 export const FileViewerHeader: FC = () => {
   const openTabs = useFileViewerStore((state) => state.openTabs);
@@ -13,14 +14,22 @@ export const FileViewerHeader: FC = () => {
   const closeTab = useFileViewerStore((state) => state.closeTab);
   const goBack = useFileViewerStore((state) => state.goBack);
   const goForward = useFileViewerStore((state) => state.goForward);
+  const toggleViewMode = useFileViewerStore((state) => state.toggleViewMode);
+  const activeFile = useActiveFile();
 
   // Only show tabs row if there are open tabs
   if (openTabs.length === 0) {
     return null;
   }
 
+  const handleToggleViewMode = (): void => {
+    if (activeFile) {
+      toggleViewMode(activeFile.path);
+    }
+  };
+
   return (
-    <div className="flex items-center border-b border-border shrink-0 px-1 py-1">
+    <div className="flex items-center border-b border-border shrink-0 px-1 pt-1">
       {/* Navigation buttons - only show when there are multiple tabs */}
       {openTabs.length > 1 ? (
         <div className="flex items-center gap-0.5 shrink-0 mr-1">
@@ -53,6 +62,24 @@ export const FileViewerHeader: FC = () => {
           />
         ))}
       </div>
+
+      {/* View mode toggle - show when active file has diff data */}
+      {activeFile?.diffData ? (
+        <button
+          onClick={handleToggleViewMode}
+          className={cn(
+            'h-6 w-6 flex items-center justify-center rounded transition-colors shrink-0 ml-1',
+            'hover:bg-accent opacity-70 hover:opacity-100'
+          )}
+          title={activeFile.viewMode === 'diff' ? 'Show file content' : 'Show diff view'}
+        >
+          {activeFile.viewMode === 'diff' ? (
+            <FileCode className="h-3.5 w-3.5" />
+          ) : (
+            <GitCompareArrows className="h-3.5 w-3.5" />
+          )}
+        </button>
+      ) : null}
     </div>
   );
 };
@@ -76,13 +103,17 @@ const FileTab: FC<FileTabProps> = ({ file, isActive, onSelect, onClose }) => {
     <div
       onClick={onSelect}
       className={cn(
-        'group flex items-center gap-1.5 px-2 py-1 text-xs cursor-pointer rounded-t transition-colors max-w-[160px]',
+        'relative group flex items-center gap-1.5 px-2 py-1 text-xs cursor-pointer rounded-t transition-colors max-w-[160px]',
         isActive
           ? 'bg-accent text-foreground'
           : 'text-muted-foreground hover:text-foreground hover:bg-muted'
       )}
     >
-      <FileIcon language={file.language} />
+      {/* Active indicator - brand coral bottom border */}
+      {isActive ? (
+        <div className="absolute bottom-0 inset-x-0 h-0.5 bg-brand-coral" />
+      ) : null}
+      <FileIcon fileName={fileName} className="h-4 w-4" />
       <span className="truncate">{fileName}</span>
       <button
         onClick={handleCloseClick}
@@ -95,42 +126,4 @@ const FileTab: FC<FileTabProps> = ({ file, isActive, onSelect, onClose }) => {
       </button>
     </div>
   );
-};
-
-interface FileIconProps {
-  readonly language: string;
-}
-
-const FileIcon: FC<FileIconProps> = ({ language }) => {
-  // Simple colored dot for now - can be enhanced with actual file icons
-  const getColor = (): string => {
-    switch (language) {
-      case 'typescript':
-      case 'tsx':
-        return 'bg-blue-500';
-      case 'javascript':
-      case 'jsx':
-        return 'bg-yellow-500';
-      case 'css':
-      case 'scss':
-      case 'less':
-        return 'bg-purple-500';
-      case 'html':
-        return 'bg-orange-500';
-      case 'json':
-        return 'bg-green-500';
-      case 'markdown':
-        return 'bg-gray-500';
-      case 'python':
-        return 'bg-blue-400';
-      case 'rust':
-        return 'bg-orange-600';
-      case 'go':
-        return 'bg-cyan-500';
-      default:
-        return 'bg-gray-400';
-    }
-  };
-
-  return <div className={cn('h-2 w-2 rounded-full shrink-0', getColor())} />;
 };

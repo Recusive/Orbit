@@ -1,7 +1,7 @@
 import {
   ChevronDown,
+  FlaskConical,
   Inbox,
-  Lightbulb,
   MoreHorizontal,
   PanelLeft,
   Plus,
@@ -42,6 +42,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<'agent' | 'feedback'>('agent');
 
   const handleStartConversation = useCallback((): void => {
     postMessage({
@@ -138,7 +139,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
             Search files...
           </span>
           <div className="flex items-center gap-0.5 ml-auto mr-2">
-            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-[11px] font-mono bg-background/50 rounded">
+            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-sm font-mono bg-background/50 rounded">
               ⌘
             </kbd>
             <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-[11px] font-mono bg-background/50 rounded">
@@ -243,12 +244,12 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         'flex flex-col shrink-0',
         isCollapsed ? 'gap-0 py-0' : 'gap-1 py-1.5'
       )}>
-        <SidebarItem icon={Settings} label="Settings" collapsed={isCollapsed} equalSpacing={isCollapsed} onClick={() => { setSettingsOpen(true); }} />
-        <SidebarItem icon={Lightbulb} label="Feedback" collapsed={isCollapsed} equalSpacing={isCollapsed} />
+        <SidebarItem icon={Settings} label="Settings" collapsed={isCollapsed} equalSpacing={isCollapsed} onClick={() => { setSettingsSection('agent'); setSettingsOpen(true); }} />
+        <SidebarItem icon={FlaskConical} label="Feedback" collapsed={isCollapsed} equalSpacing={isCollapsed} onClick={() => { setSettingsSection('feedback'); setSettingsOpen(true); }} />
       </div>
 
       {/* Settings Dialog */}
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} defaultSection={settingsSection} />
     </aside>
   );
 };
@@ -334,7 +335,7 @@ interface WorkspaceItemProps {
 const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, collapsed = false, expanded = true, onToggle }) => {
   return (
     <button
-      className="flex items-center h-8 rounded-md mx-1.5 transition-colors overflow-hidden text-foreground/70 hover:text-foreground hover:bg-accent/50"
+      className="flex items-center h-8 rounded-md mx-1.5 transition-colors overflow-hidden text-muted-foreground hover:text-foreground hover:bg-accent/50"
       onClick={onToggle}
     >
       {/* Fixed-width icon column */}
@@ -382,7 +383,7 @@ const ConversationItem: FC<ConversationItemProps> = ({
       <button
         className={cn(
           'flex items-center h-7 w-full rounded-md pl-[7px] pr-7 transition-colors overflow-hidden hover:bg-accent/50',
-          active ? 'bg-accent/50 text-foreground' : 'text-foreground/70 hover:text-foreground'
+          active ? 'bg-accent/50 text-foreground' : 'text-muted-foreground hover:text-foreground'
         )}
         title={conversation.title}
         onClick={onClick}
@@ -438,15 +439,28 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
   return (
     <button
       className={cn(
-        'flex items-center justify-center rounded-md transition-colors h-7 px-2 flex-1',
+        'relative flex items-center justify-center transition-colors h-7 px-3 flex-1',
         active
-          ? 'bg-accent text-accent-foreground'
-          : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+          ? 'text-foreground'
+          : 'text-muted-foreground hover:text-foreground'
       )}
       onClick={onClick}
       title={label}
     >
-      <span className="text-xs font-medium truncate">{label}</span>
+      {/* Tab background - Orbit style */}
+      <div
+        className={cn(
+          'absolute inset-0 rounded-t-md transition-colors',
+          active
+            ? 'bg-sidebar-accent'
+            : 'hover:bg-muted/50'
+        )}
+      />
+      {/* Active indicator */}
+      {active ? (
+        <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary" />
+      ) : null}
+      <span className="relative text-xs font-medium truncate">{label}</span>
     </button>
   );
 };

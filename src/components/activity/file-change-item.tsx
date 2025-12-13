@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronDown, File } from 'lucide-react';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { DiffStats } from './diff-stats';
@@ -6,14 +6,19 @@ import { DiffViewer } from './diff-viewer';
 
 import type { FileChange } from '../../stores/file-store';
 
+import { FileIcon } from '@/components/files/file-icon';
+
+
 export interface FileChangeItemProps {
-  file: FileChange;
-  defaultExpanded?: boolean;
+  readonly file: FileChange;
+  readonly defaultExpanded?: boolean;
+  readonly onOpenFile?: (file: FileChange) => void;
 }
 
 export const FileChangeItem: React.FC<FileChangeItemProps> = ({
   file,
   defaultExpanded = false,
+  onOpenFile,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -21,43 +26,52 @@ export const FileChangeItem: React.FC<FileChangeItemProps> = ({
     setIsExpanded(!isExpanded);
   };
 
-  const additions = (file.diff?.additions ?? 0) !== 0 ? (file.diff?.additions ?? 0) : 0;
-  const deletions = (file.diff?.deletions ?? 0) !== 0 ? (file.diff?.deletions ?? 0) : 0;
+  const handleFileClick = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    onOpenFile?.(file);
+  };
+
+  const additions = file.diff?.additions ?? 0;
+  const deletions = file.diff?.deletions ?? 0;
+  const fileName = file.path.split('/').pop() ?? file.path;
 
   return (
     <div className="bg-background">
       {/* File Header */}
-      <button
-        onClick={toggleExpanded}
-        className="
-          w-full flex items-center gap-3 px-4 py-3
-          hover:bg-muted transition-colors
-          text-left
-        "
-      >
+      <div className="w-full flex items-center gap-2 px-3 py-2">
+        {/* File Button - Clickable with border, takes full width */}
+        <button
+          onClick={handleFileClick}
+          className="flex items-center gap-2 px-2 py-1 rounded-md border border-border bg-muted/50 hover:bg-accent hover:border-accent transition-colors flex-1 min-w-0"
+        >
+          <FileIcon fileName={fileName} className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-medium text-foreground truncate flex-1 text-left">
+            {fileName}
+          </span>
+        </button>
+
         {/* Expand Icon */}
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        ) : (
-          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        )}
-
-        {/* File Icon */}
-        <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-
-        {/* File Path */}
-        <span className="text-sm font-medium text-foreground flex-1 truncate">
-          {file.path}
-        </span>
+        <button
+          onClick={toggleExpanded}
+          className="p-0.5 rounded hover:bg-accent shrink-0"
+        >
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
 
         {/* Diff Stats */}
         <DiffStats additions={additions} deletions={deletions} />
-      </button>
+      </div>
 
       {/* Diff Content */}
-      {isExpanded && file.diff ? <div className="border-t border-border bg-muted">
+      {isExpanded && file.diff ? (
+        <div className="border-t border-border bg-muted">
           <DiffViewer hunks={file.diff.hunks} />
-        </div> : null}
+        </div>
+      ) : null}
     </div>
   );
 };

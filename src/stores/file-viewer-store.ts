@@ -1,12 +1,27 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
+import type { FileDiff } from '@/stores/file-store';
+
+// Diff data for files opened from Changes tab
+export interface ViewedFileDiff {
+  oldContent: string;
+  newContent: string;
+  diff: FileDiff;
+}
+
+// View mode for files with diff data
+export type FileViewMode = 'file' | 'diff';
+
 // File being viewed in the file viewer
 export interface ViewedFile {
   path: string;
   content: string;
   language: string;
   scrollPosition?: number;
+  // Diff support for files opened from Changes tab
+  diffData?: ViewedFileDiff;
+  viewMode: FileViewMode;
 }
 
 interface FileViewerState {
@@ -30,6 +45,7 @@ interface FileViewerState {
 interface FileViewerActions {
   // Tab management
   openFile: (path: string, content?: string) => void;
+  openFileWithDiff: (path: string, diffData: ViewedFileDiff, language?: string) => void;
   closeTab: (path: string) => void;
   setActiveTab: (path: string) => void;
   closeAllTabs: () => void;
@@ -37,6 +53,10 @@ interface FileViewerActions {
   // Content management
   setFileContent: (path: string, content: string, language?: string) => void;
   setScrollPosition: (path: string, position: number) => void;
+
+  // View mode
+  toggleViewMode: (path: string) => void;
+  setViewMode: (path: string, mode: FileViewMode) => void;
 
   // Navigation
   goBack: () => void;
@@ -125,14 +145,16 @@ export const useFileViewerStore = create<FileViewerStore>()(
         const existingTab = state.openTabs.find((tab) => tab.path === path);
 
         if (existingTab) {
-          // Just switch to existing tab
+          // Just switch to existing tab, reset to file view mode
           state.activeTabPath = path;
+          existingTab.viewMode = 'file';
         } else {
           // Create new tab
           const newTab: ViewedFile = {
             path,
             content: content ?? '',
             language: getLanguageFromPath(path),
+            viewMode: 'file',
           };
           state.openTabs.push(newTab);
           state.activeTabPath = path;
@@ -141,6 +163,38 @@ export const useFileViewerStore = create<FileViewerStore>()(
         // Update history (only if different from current position)
         if (state.history[state.historyIndex] !== path) {
           // Truncate forward history and add new entry
+          state.history = state.history.slice(0, state.historyIndex + 1);
+          state.history.push(path);
+          state.historyIndex = state.history.length - 1;
+        }
+      });
+    },
+
+    openFileWithDiff: (path: string, diffData: ViewedFileDiff, language?: string): void => {
+      set((state) => {
+        // Check if tab already exists
+        const existingTab = state.openTabs.find((tab) => tab.path === path);
+
+        if (existingTab) {
+          // Update existing tab with diff data and switch to diff view
+          existingTab.diffData = diffData;
+          existingTab.viewMode = 'diff';
+          state.activeTabPath = path;
+        } else {
+          // Create new tab with diff data
+          const newTab: ViewedFile = {
+            path,
+            content: diffData.newContent,
+            language: language ?? getLanguageFromPath(path),
+            diffData,
+            viewMode: 'diff',
+          };
+          state.openTabs.push(newTab);
+          state.activeTabPath = path;
+        }
+
+        // Update history
+        if (state.history[state.historyIndex] !== path) {
           state.history = state.history.slice(0, state.historyIndex + 1);
           state.history.push(path);
           state.historyIndex = state.history.length - 1;
@@ -208,6 +262,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
             path,
             content,
             language: language ?? getLanguageFromPath(path),
+            viewMode: 'file',
           });
           state.activeTabPath = path;
         }
@@ -221,6 +276,24 @@ export const useFileViewerStore = create<FileViewerStore>()(
         const tab = state.openTabs.find((t) => t.path === path);
         if (tab) {
           tab.scrollPosition = position;
+        }
+      });
+    },
+
+    toggleViewMode: (path: string): void => {
+      set((state) => {
+        const tab = state.openTabs.find((t) => t.path === path);
+        if (tab?.diffData) {
+          tab.viewMode = tab.viewMode === 'file' ? 'diff' : 'file';
+        }
+      });
+    },
+
+    setViewMode: (path: string, mode: FileViewMode): void => {
+      set((state) => {
+        const tab = state.openTabs.find((t) => t.path === path);
+        if (tab) {
+          tab.viewMode = mode;
         }
       });
     },

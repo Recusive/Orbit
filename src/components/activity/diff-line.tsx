@@ -8,65 +8,50 @@ export interface DiffLineProps {
 }
 
 export const DiffLine: React.FC<DiffLineProps> = ({ line, className = '' }) => {
-  const getBackgroundColor = (): string => {
+  const getStyles = (): { bg: string; border: string; indicator: string; indicatorColor: string; textColor: string } => {
     switch (line.type) {
       case 'add':
-        return 'bg-diff-added border-l-2 border-diff-added-border';
+        return {
+          bg: 'bg-success/10',
+          border: 'bg-success',
+          indicator: '+',
+          indicatorColor: 'text-success/70',
+          textColor: 'text-foreground',
+        };
       case 'delete':
-        return 'bg-diff-removed border-l-2 border-diff-removed-border';
+        return {
+          bg: 'bg-destructive/10',
+          border: 'bg-destructive',
+          indicator: '-',
+          indicatorColor: 'text-destructive/70',
+          textColor: 'text-foreground/70',
+        };
       case 'context':
-        return 'bg-background';
+        return {
+          bg: 'bg-background',
+          border: 'bg-transparent',
+          indicator: ' ',
+          indicatorColor: 'text-muted-foreground',
+          textColor: 'text-foreground',
+        };
     }
   };
 
-  const getLineIndicator = (): string => {
-    switch (line.type) {
-      case 'add':
-        return '+';
-      case 'delete':
-        return '-';
-      case 'context':
-        return ' ';
-    }
-  };
-
-  const getTextColor = (): string => {
-    switch (line.type) {
-      case 'add':
-        return 'text-diff-added-text';
-      case 'delete':
-        return 'text-diff-removed-text';
-      case 'context':
-        return 'text-foreground';
-    }
-  };
+  const styles = getStyles();
 
   return (
-    <div
-      className={`
-        flex items-start
-        ${getBackgroundColor()}
-        ${className}
-      `}
-    >
-      {/* Line Numbers */}
-      <div className="flex gap-2 px-3 py-1 select-none">
-        <span className="w-10 text-right text-muted-foreground tabular-nums">
-          {line.oldLineNumber ?? ''}
-        </span>
-        <span className="w-10 text-right text-muted-foreground tabular-nums">
-          {line.newLineNumber ?? ''}
-        </span>
-      </div>
+    <div className={`flex font-mono text-xs leading-5 ${styles.bg} ${className}`}>
+      {/* Colored border strip */}
+      <div className={`w-1 ${styles.border} shrink-0`} />
 
-      {/* Change Indicator */}
-      <div className="px-2 py-1 select-none">
-        <span className={getTextColor()}>{getLineIndicator()}</span>
+      {/* Change indicator */}
+      <div className={`w-6 px-1 text-center ${styles.indicatorColor} select-none shrink-0`}>
+        {styles.indicator}
       </div>
 
       {/* Content */}
-      <div className={`flex-1 py-1 pr-3 ${getTextColor()}`}>
-        <pre className="whitespace-pre-wrap break-all">{line.content}</pre>
+      <div className={`flex-1 px-3 ${styles.textColor} whitespace-pre overflow-x-auto`}>
+        {line.content}
       </div>
     </div>
   );
