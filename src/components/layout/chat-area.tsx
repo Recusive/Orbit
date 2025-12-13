@@ -26,10 +26,22 @@ import { Streamdown } from 'streamdown';
 
 import { ResizeHandle } from './resize-handle';
 
+import type { ContextItem, FileEntry } from '@/types/context';
 import type { ExtensionMessage, InputMode } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { FileViewer } from '@/components/activity/file-viewer';
+import {
+  Context,
+  ContextContent,
+  ContextContentBody,
+  ContextContentHeader,
+  ContextInputUsage,
+  ContextOutputUsage,
+  ContextTrigger,
+} from '@/components/chat/context';
+import { ContextChips } from '@/components/chat/context-chips';
+import { MentionPopover, getFilteredFilesCount, getFileAtIndex } from '@/components/chat/mention-popover';
 import { MessageActions } from '@/components/chat/message-actions';
 import { ModelSelector } from '@/components/chat/model-selector';
 import { PermissionModal } from '@/components/chat/permission-modal';
@@ -98,6 +110,12 @@ export const ChatArea: FC = () => {
   const [sessionId, setSessionId] = useState<string>('');
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  // Mention/context state
+  const [attachedContext, setAttachedContext] = useState<ContextItem[]>([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
+  const [fileList, setFileList] = useState<FileEntry[]>([]);
   const inputRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -333,7 +351,15 @@ export const ChatArea: FC = () => {
       case 'panel:command':
       case 'file:tree:response':
       case 'file:tree:error':
+        break;
+
       case 'file:list:response':
+        // Populate file list for mention popup
+        setFileList(message.files.map((f) => ({
+          path: f.path,
+          name: f.name,
+          isDirectory: f.isDirectory ?? false,
+        })));
         break;
     }
   }, [setWorkspace, setActiveConversation, setConversations, addConversation, setInputMode, startTool, completeTool, addPermissionRequest]);
@@ -349,6 +375,19 @@ export const ChatArea: FC = () => {
       });
     }
   }, [sessionId, postMessage]);
+
+  // Request file list for @ mentions
+  useEffect(() => {
+    postMessage({
+      type: 'file:list:request',
+      uuid: crypto.randomUUID(),
+    });
+  }, [postMessage]);
+
+  // Reset selection index when mention query changes
+  useEffect(() => {
+    setMentionSelectedIndex(0);
+  }, [mentionQuery]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -391,7 +430,34 @@ export const ChatArea: FC = () => {
   }, [sessionId, pendingMessage, postMessage, updateConversationTitle]);
 
   const handleInputChange = (e: React.FormEvent<HTMLDivElement>): void => {
-    setInputText(e.currentTarget.textContent || '');
+    const text = e.currentTarget.textContent || '';
+    setInputText(text);
+
+    // Detect @ mention
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      // Get cursor position within the text
+      const cursorPos = range.startOffset;
+      const beforeCursor = text.slice(0, cursorPos);
+      const lastAtIndex = beforeCursor.lastIndexOf('@');
+
+      if (lastAtIndex !== -1) {
+        const afterAt = beforeCursor.slice(lastAtIndex + 1);
+        // If there's no space after @, we're in a mention query
+        if (!afterAt.includes(' ')) {
+          setMentionQuery(afterAt);
+          setMentionOpen(true);
+          return;
+        }
+      }
+    }
+
+    // Close mention popup if no valid @ detected
+    if (mentionOpen) {
+      setMentionOpen(false);
+      setMentionQuery('');
+    }
   };
 
   const handleSend = (): void => {
@@ -512,9 +578,103 @@ export const ChatArea: FC = () => {
   }, [postMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
+    // Handle mention popup keyboard navigation
+    if (mentionOpen) {
+      const itemCount = getFilteredFilesCount(fileList, mentionQuery);
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionOpen(false);
+        setMentionQuery('');
+        setMentionSelectedIndex(0);
+        return;
+      }
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionSelectedIndex((prev) => (prev + 1) % Math.max(1, itemCount));
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionSelectedIndex((prev) => (prev - 1 + itemCount) % Math.max(1, itemCount));
+        return;
+      }
+
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const selectedFile = getFileAtIndex(fileList, mentionQuery, mentionSelectedIndex);
+        if (selectedFile) {
+          handleMentionSelect(selectedFile);
+        }
+        return;
+      }
+    }
+
+    // Normal Enter to send (when mention popup is closed)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+    }
+  };
+
+  // Handle file selection from mention popup
+  const handleMentionSelect = (file: FileEntry): void => {
+    // Add to attached context
+    const newContext: ContextItem = {
+      id: crypto.randomUUID(),
+      type: file.isDirectory ? 'folder' : 'file',
+      name: file.name,
+      path: file.path,
+    };
+    setAttachedContext((prev) => [...prev, newContext]);
+
+    // Remove the @query from input
+    if (inputRef.current) {
+      const text = inputRef.current.textContent || '';
+      // Find and remove @query
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const cursorPos = range.startOffset;
+        const beforeCursor = text.slice(0, cursorPos);
+        const lastAtIndex = beforeCursor.lastIndexOf('@');
+        if (lastAtIndex !== -1) {
+          const newText = text.slice(0, lastAtIndex) + text.slice(cursorPos);
+          inputRef.current.textContent = newText;
+          setInputText(newText);
+        }
+      }
+    }
+
+    setMentionOpen(false);
+    setMentionQuery('');
+    inputRef.current?.focus();
+  };
+
+  // Handle context removal
+  const handleRemoveContext = (id: string): void => {
+    setAttachedContext((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  // Handle @ button click to open mention popup
+  const handleAtClick = (): void => {
+    if (inputRef.current) {
+      // Insert @ at cursor position
+      const text = inputRef.current.textContent || '';
+      inputRef.current.textContent = text + '@';
+      setInputText(text + '@');
+      setMentionOpen(true);
+      setMentionQuery('');
+      inputRef.current.focus();
+      // Move cursor to end
+      const range = document.createRange();
+      const sel = window.getSelection();
+      range.selectNodeContents(inputRef.current);
+      range.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
     }
   };
 
@@ -884,8 +1044,17 @@ export const ChatArea: FC = () => {
           </div>
 
           {/* Chat Input */}
-          <div className="p-4 pt-0 shrink-0">
+          <div className="p-4 pt-0 shrink-0 relative">
             <div className={getInputBoxClasses()} style={{ maxWidth: CONTENT_WIDTH.inputBox }}>
+              {/* Context Chips Row - shown when items attached */}
+              {attachedContext.length > 0 ? (
+                <ContextChips
+                  items={attachedContext}
+                  onRemove={handleRemoveContext}
+                  className="border-b border-border/50"
+                />
+              ) : null}
+
               {/* Input Area */}
               <div
                 ref={inputRef}
@@ -897,6 +1066,19 @@ export const ChatArea: FC = () => {
                 data-empty={isInputEmpty}
                 onInput={handleInputChange}
                 onKeyDown={handleKeyDown}
+              />
+
+              {/* Mention Popover */}
+              <MentionPopover
+                open={mentionOpen}
+                onOpenChange={setMentionOpen}
+                query={mentionQuery}
+                onQueryChange={setMentionQuery}
+                onSelect={handleMentionSelect}
+                files={fileList}
+                anchorRef={inputRef}
+                selectedIndex={mentionSelectedIndex}
+                onSelectedIndexChange={setMentionSelectedIndex}
               />
 
               {/* Controls Row */}
@@ -921,7 +1103,11 @@ export const ChatArea: FC = () => {
 
                 {/* Right Controls - Action Buttons */}
                 <div className="flex items-center gap-0.5">
-                  <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Add Context">
+                  <button
+                    onClick={handleAtClick}
+                    className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
+                    title="Add Context (@)"
+                  >
                     <AtSign className="h-4 w-4" />
                   </button>
                   <DropdownMenu>
@@ -970,6 +1156,17 @@ export const ChatArea: FC = () => {
                   <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Attach Image">
                     <Image className="h-4 w-4" />
                   </button>
+                  {/* Context Usage */}
+                  <Context maxTokens={200000} usedTokens={45000} usage={{ promptTokens: 32000, completionTokens: 13000, totalTokens: 45000 }}>
+                    <ContextTrigger />
+                    <ContextContent>
+                      <ContextContentHeader />
+                      <ContextContentBody>
+                        <ContextInputUsage />
+                        <ContextOutputUsage />
+                      </ContextContentBody>
+                    </ContextContent>
+                  </Context>
                   {/* Send Button */}
                   <button
                     onClick={handleSend}

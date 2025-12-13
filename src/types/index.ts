@@ -128,3 +128,6 @@ export * from './diff';
 
 // UI types - UI state and preferences
 export * from './ui';
+
+// Context types - @ mentions and attached context
+export * from './context';

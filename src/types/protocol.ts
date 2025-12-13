@@ -562,6 +562,7 @@ export const FileTreeErrorSchema = z.object({
 export const FileListEntrySchema = z.object({
   name: z.string(),
   path: z.string(),
+  isDirectory: z.boolean().optional(),
 });
 
 export const FileListResponseSchema = z.object({

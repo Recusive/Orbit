@@ -11,3 +11,16 @@ export { ToolCallBlock } from './tool-call-block';
 export { NotifyUserCard } from './notify-user-card';
 export { ProceedIndicator } from './proceed-indicator';
 export { MessageFeedback } from './message-feedback';
+export { ContextChips } from './context-chips';
+export { MentionPopover, getFilteredFilesCount, getFileAtIndex } from './mention-popover';
+export {
+  Context,
+  ContextTrigger,
+  ContextContent,
+  ContextContentHeader,
+  ContextContentBody,
+  ContextContentFooter,
+  ContextInputUsage,
+  ContextOutputUsage,
+  ContextTotalUsage,
+} from './context';
