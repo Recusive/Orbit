@@ -91,7 +91,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           /* Expanded: text on left, button on right */
           <div className="flex items-center justify-between w-full px-3">
             <div className="flex items-center gap-1">
-              <span className="text-sm font-semibold whitespace-nowrap">Agent Manager</span>
+              <span className="text-sm font-semibold whitespace-nowrap">Orbit Agent</span>
               <span className="bg-muted rounded px-1 py-0.5 text-[10px] text-muted-foreground whitespace-nowrap">
                 Preview
               </span>

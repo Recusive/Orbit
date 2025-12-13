@@ -181,9 +181,9 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
         )}
       </div>
 
-      {/* Terminal Panel (bottom of activity panel) - only show when position is 'activity' */}
-      {bottomPanelOpen && terminalPosition === 'activity' ? (
-        <TerminalPanel variant="embedded" />
+      {/* Terminal Panel (bottom of activity panel) - show when position is 'activity' */}
+      {terminalPosition === 'activity' ? (
+        <TerminalPanel variant="embedded" collapsed={!bottomPanelOpen} />
       ) : null}
     </div>
   );

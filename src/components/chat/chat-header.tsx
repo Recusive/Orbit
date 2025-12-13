@@ -13,7 +13,7 @@ import type { FC } from 'react';
 import { HeaderButton } from '@/components/shared/header-button';
 import { HEIGHTS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { useUIStore, useWorkspaceName, useActiveConversationTitle } from '@/stores/ui-store';
+import { useUIStore, useWorkspaceName, useActiveConversationTitle, useTerminalPosition } from '@/stores/ui-store';
 
 type Theme = 'light' | 'dark';
 
@@ -24,6 +24,7 @@ const getInitialTheme = (): Theme => {
 
 export const ChatHeader: FC = () => {
   const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, bottomPanelOpen } = useUIStore();
+  const terminalPosition = useTerminalPosition();
   const workspaceName = useWorkspaceName();
   const activeConversationTitle = useActiveConversationTitle();
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
@@ -44,14 +45,12 @@ export const ChatHeader: FC = () => {
   }, []);
 
   const handleTerminalToggle = useCallback((): void => {
-    // If activity panel is closed and terminal is closed, open activity panel first
-    if (!reviewPanelOpen && !bottomPanelOpen) {
+    // If terminal is in activity panel and activity panel is closed, open it too
+    if (terminalPosition === 'activity' && !reviewPanelOpen && !bottomPanelOpen) {
       toggleReviewPanel();
-      toggleBottomPanel();
-    } else {
-      toggleBottomPanel();
     }
-  }, [reviewPanelOpen, bottomPanelOpen, toggleReviewPanel, toggleBottomPanel]);
+    toggleBottomPanel();
+  }, [terminalPosition, reviewPanelOpen, bottomPanelOpen, toggleReviewPanel, toggleBottomPanel]);
 
   return (
     <header
@@ -102,7 +101,7 @@ export const ChatHeader: FC = () => {
             'flex items-center gap-1.5 px-2 py-1 rounded text-sm transition-colors',
             reviewPanelOpen
               ? 'bg-accent text-foreground'
-              : 'opacity-70 hover:opacity-100 hover:bg-accent'
+              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
           )}
         >
           <ListChecks className="h-4 w-4" />

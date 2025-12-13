@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { SlashCommand } from '@/components/chat/slash-command-popover';
 import type { ContextItem, FileEntry } from '@/types/context';
 import type { InputMode } from '@/types/protocol';
 import type { FC } from 'react';
@@ -25,6 +26,7 @@ import {
 import { ContextChips } from '@/components/chat/context-chips';
 import { MentionPopover, getFilteredFilesCount, getFileAtIndex } from '@/components/chat/mention-popover';
 import { ModelSelector } from '@/components/chat/model-selector';
+import { SlashCommandPopover, getFilteredCommandsCount, getCommandAtIndex } from '@/components/chat/slash-command-popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,6 +62,9 @@ export const ChatInput: FC<ChatInputProps> = ({
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashQuery, setSlashQuery] = useState('');
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLDivElement>(null);
 
   // Reset selection index when mention query changes
@@ -67,23 +72,48 @@ export const ChatInput: FC<ChatInputProps> = ({
     setMentionSelectedIndex(0);
   }, [mentionQuery]);
 
+  // Reset selection index when slash query changes
+  useEffect(() => {
+    setSlashSelectedIndex(0);
+  }, [slashQuery]);
+
   const handleInputChange = (e: React.FormEvent<HTMLDivElement>): void => {
     const text = e.currentTarget.textContent || '';
     setInputText(text);
 
-    // Detect @ mention
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       const cursorPos = range.startOffset;
       const beforeCursor = text.slice(0, cursorPos);
-      const lastAtIndex = beforeCursor.lastIndexOf('@');
 
+      // Detect / slash command (only at start of input)
+      if (beforeCursor.startsWith('/')) {
+        const afterSlash = beforeCursor.slice(1);
+        if (!afterSlash.includes(' ')) {
+          setSlashQuery(afterSlash);
+          setSlashOpen(true);
+          // Close mention if open
+          if (mentionOpen) {
+            setMentionOpen(false);
+            setMentionQuery('');
+          }
+          return;
+        }
+      }
+
+      // Detect @ mention
+      const lastAtIndex = beforeCursor.lastIndexOf('@');
       if (lastAtIndex !== -1) {
         const afterAt = beforeCursor.slice(lastAtIndex + 1);
         if (!afterAt.includes(' ')) {
           setMentionQuery(afterAt);
           setMentionOpen(true);
+          // Close slash if open
+          if (slashOpen) {
+            setSlashOpen(false);
+            setSlashQuery('');
+          }
           return;
         }
       }
@@ -92,6 +122,10 @@ export const ChatInput: FC<ChatInputProps> = ({
     if (mentionOpen) {
       setMentionOpen(false);
       setMentionQuery('');
+    }
+    if (slashOpen) {
+      setSlashOpen(false);
+      setSlashQuery('');
     }
   };
 
@@ -141,6 +175,25 @@ export const ChatInput: FC<ChatInputProps> = ({
     inputRef.current?.focus();
   }, []);
 
+  const handleSlashSelect = useCallback((command: SlashCommand): void => {
+    // Replace the /query with the full command
+    if (inputRef.current) {
+      inputRef.current.textContent = `/${command.name} `;
+      setInputText(`/${command.name} `);
+      // Move cursor to end
+      const range = document.createRange();
+      const sel = window.getSelection();
+      range.selectNodeContents(inputRef.current);
+      range.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+
+    setSlashOpen(false);
+    setSlashQuery('');
+    inputRef.current?.focus();
+  }, []);
+
   const handleRemoveContext = useCallback((id: string): void => {
     setAttachedContext((prev) => prev.filter((item) => item.id !== id));
   }, []);
@@ -164,6 +217,41 @@ export const ChatInput: FC<ChatInputProps> = ({
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
+    // Handle slash command popover
+    if (slashOpen) {
+      const itemCount = getFilteredCommandsCount(slashQuery);
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSlashOpen(false);
+        setSlashQuery('');
+        setSlashSelectedIndex(0);
+        return;
+      }
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSlashSelectedIndex((prev) => (prev + 1) % Math.max(1, itemCount));
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSlashSelectedIndex((prev) => (prev - 1 + itemCount) % Math.max(1, itemCount));
+        return;
+      }
+
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const selectedCommand = getCommandAtIndex(slashQuery, slashSelectedIndex);
+        if (selectedCommand) {
+          handleSlashSelect(selectedCommand);
+        }
+        return;
+      }
+    }
+
+    // Handle mention popover
     if (mentionOpen) {
       const itemCount = getFilteredFilesCount(fileList, mentionQuery);
 
@@ -214,9 +302,9 @@ export const ChatInput: FC<ChatInputProps> = ({
     const base = 'mx-auto p-1 rounded-lg bg-muted transition-colors';
     switch (inputMode) {
       case 'plan':
-        return `${base} border-2 border-dashed border-mode-plan`;
+        return `${base} border-2 border-dotted border-mode-plan`;
       case 'accept':
-        return `${base} border-2 border-dashed border-mode-accept`;
+        return `${base} border-2 border-dotted border-mode-accept`;
       case 'default':
         return `${base} border border-border focus-within:border-muted-foreground/30 dark:focus-within:border-muted-foreground/50`;
     }
@@ -239,8 +327,8 @@ export const ChatInput: FC<ChatInputProps> = ({
         {/* Input Area */}
         <div
           ref={inputRef}
-          className="p-2 text-sm outline-none"
-          style={{ minHeight: INPUT_SIZES.textareaMinHeight }}
+          className="p-2 text-sm outline-none overflow-y-auto"
+          style={{ minHeight: INPUT_SIZES.textareaMinHeight, maxHeight: 300 }}
           contentEditable={!isAgentRunning}
           suppressContentEditableWarning
           data-placeholder="Plan, @ for context, / for commands"
@@ -260,6 +348,16 @@ export const ChatInput: FC<ChatInputProps> = ({
           anchorRef={inputRef}
           selectedIndex={mentionSelectedIndex}
           onSelectedIndexChange={setMentionSelectedIndex}
+        />
+
+        {/* Slash Command Popover */}
+        <SlashCommandPopover
+          open={slashOpen}
+          onOpenChange={setSlashOpen}
+          query={slashQuery}
+          onSelect={handleSlashSelect}
+          anchorRef={inputRef}
+          selectedIndex={slashSelectedIndex}
         />
 
         {/* Controls Row */}

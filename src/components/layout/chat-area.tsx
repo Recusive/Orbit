@@ -8,6 +8,7 @@ import { ActivityPanel } from '@/components/activity/activity-panel';
 import { ChatHeader } from '@/components/chat/chat-header';
 import { ChatInput } from '@/components/chat/chat-input';
 import { ChatMessages } from '@/components/chat/chat-messages';
+import { WelcomeGreeting } from '@/components/chat/welcome-greeting';
 import { ResizeHandle } from '@/components/layout/resize-handle';
 import { TerminalPanel } from '@/components/terminal/terminal-panel';
 import { useChatMessages } from '@/hooks/use-chat-messages';
@@ -26,7 +27,6 @@ export const ChatArea: FC = () => {
   const {
     messages,
     isAgentRunning,
-    isMockMode,
     postMessage,
     handleSend,
     handleRewind,
@@ -70,28 +70,41 @@ export const ChatArea: FC = () => {
         <div className="flex-1 flex min-h-0 overflow-hidden">
           {/* Chat Area */}
           <div className="flex-1 flex flex-col min-w-0">
-            {/* Message Feed */}
-            <ChatMessages
-              messages={messages}
-              pendingPermissions={pendingPermissions}
-              isAgentRunning={isAgentRunning}
-              isMockMode={isMockMode}
-              getToolsForMessage={getToolsForMessage}
-              onRewind={handleRewind}
-              onOpenFile={handleOpenFile}
-              onOpenUrl={handleOpenUrl}
-              onPermissionApprove={handlePermissionApprove}
-              onPermissionDeny={handlePermissionDeny}
-            />
-
-            {/* Chat Input */}
-            <ChatInput
-              inputMode={inputMode}
-              isAgentRunning={isAgentRunning}
-              fileList={fileList}
-              onSend={handleSend}
-              onModeChange={handleModeChange}
-            />
+            {messages.length === 0 ? (
+              /* Empty state: Welcome greeting + Input positioned above center */
+              <div className="flex-1 flex flex-col justify-center" style={{ paddingBottom: '40%' }}>
+                <WelcomeGreeting />
+                <ChatInput
+                  inputMode={inputMode}
+                  isAgentRunning={isAgentRunning}
+                  fileList={fileList}
+                  onSend={handleSend}
+                  onModeChange={handleModeChange}
+                />
+              </div>
+            ) : (
+              /* Normal layout: Messages + Input at bottom */
+              <>
+                <ChatMessages
+                  messages={messages}
+                  pendingPermissions={pendingPermissions}
+                  isAgentRunning={isAgentRunning}
+                  getToolsForMessage={getToolsForMessage}
+                  onRewind={handleRewind}
+                  onOpenFile={handleOpenFile}
+                  onOpenUrl={handleOpenUrl}
+                  onPermissionApprove={handlePermissionApprove}
+                  onPermissionDeny={handlePermissionDeny}
+                />
+                <ChatInput
+                  inputMode={inputMode}
+                  isAgentRunning={isAgentRunning}
+                  fileList={fileList}
+                  onSend={handleSend}
+                  onModeChange={handleModeChange}
+                />
+              </>
+            )}
           </div>
 
           {/* Activity Panel (split view) */}
@@ -103,9 +116,9 @@ export const ChatArea: FC = () => {
           ) : null}
         </div>
 
-        {/* Terminal Panel (spans full width when position is 'both') */}
-        {bottomPanelOpen && terminalPosition === 'both' ? (
-          <TerminalPanel variant="full-width" />
+        {/* Terminal Panel - show at bottom when position is 'both' */}
+        {terminalPosition === 'both' ? (
+          <TerminalPanel variant="full-width" collapsed={!bottomPanelOpen} />
         ) : null}
       </div>
     </div>

@@ -1,4 +1,6 @@
 import {
+  ChevronDown,
+  ChevronUp,
   ChevronsLeftRight,
   ChevronsRightLeft,
   Plus,
@@ -20,9 +22,13 @@ interface TerminalPanelProps {
    * Whether this is a full-width panel (spans chat + activity) or embedded in activity panel
    */
   readonly variant: 'full-width' | 'embedded';
+  /**
+   * Whether the panel is collapsed (shows only header)
+   */
+  readonly collapsed?: boolean;
 }
 
-export const TerminalPanel: FC<TerminalPanelProps> = ({ variant }) => {
+export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = false }) => {
   const { bottomPanelHeight, toggleBottomPanel, cycleTerminalPosition } = useUIStore();
   const terminalPosition = useTerminalPosition();
   const sessions = useTerminalStore((state) => state.sessions);
@@ -33,10 +39,12 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant }) => {
 
   const terminalManager = useTerminalInstanceManager();
   const terminalContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const hasCreatedInitialSession = useRef(false);
 
-  // Create a default terminal session when panel opens
+  // Create a default terminal session when panel opens (only once)
   useEffect(() => {
-    if (sessions.length === 0) {
+    if (sessions.length === 0 && !hasCreatedInitialSession.current) {
+      hasCreatedInitialSession.current = true;
       createSession('Terminal');
     }
   }, [sessions.length, createSession]);
@@ -143,16 +151,17 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant }) => {
   const panelBackground = isFullWidth ? 'bg-background' : 'bg-card/30';
   const CycleIcon = terminalPosition === 'activity' ? ChevronsLeftRight : ChevronsRightLeft;
   const cycleTitle = terminalPosition === 'activity' ? 'Expand to full width' : 'Collapse to activity panel';
+  const ToggleIcon = collapsed ? ChevronUp : ChevronDown;
 
   return (
     <>
-      <ResizeHandle direction="horizontal" target="bottom" />
+      {!collapsed ? <ResizeHandle direction="horizontal" target="bottom" /> : null}
       <div
-        className={`${panelBackground} flex flex-col shrink-0`}
-        style={{ height: bottomPanelHeight }}
+        className={`${panelBackground} flex flex-col shrink-0 ${collapsed ? 'border-t border-border' : ''}`}
+        style={{ height: collapsed ? HEIGHTS.panelHeader : bottomPanelHeight }}
       >
         <header
-          className="flex items-center justify-between px-2 border-b border-border shrink-0"
+          className="flex items-center justify-between px-2 shrink-0"
           style={{ height: HEIGHTS.panelHeader }}
         >
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -202,33 +211,35 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant }) => {
             <button
               className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
               onClick={toggleBottomPanel}
-              title="Close terminal"
+              title={collapsed ? 'Expand terminal' : 'Collapse terminal'}
             >
-              <X className="h-4 w-4" />
+              <ToggleIcon className="h-4 w-4" />
             </button>
           </div>
         </header>
-        <div className="flex-1 overflow-hidden relative bg-sidebar">
-          {/* Render ALL terminal containers - visibility controlled by manager */}
-          {sessions.map((session) => (
-            <div
-              key={session.id}
-              ref={(el) => { setTerminalContainerRef(session.id, el); }}
-              className="absolute inset-0"
-              style={{
-                pointerEvents: session.id === activeSessionId ? 'auto' : 'none',
-              }}
-              onClick={() => {
-                terminalManager.getInstance(session.id)?.focus();
-              }}
-            />
-          ))}
-          {sessions.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-              No terminal session
-            </div>
-          ) : null}
-        </div>
+        {!collapsed ? (
+          <div className="flex-1 overflow-hidden relative bg-sidebar">
+            {/* Render ALL terminal containers - visibility controlled by manager */}
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                ref={(el) => { setTerminalContainerRef(session.id, el); }}
+                className="absolute inset-0"
+                style={{
+                  pointerEvents: session.id === activeSessionId ? 'auto' : 'none',
+                }}
+                onClick={() => {
+                  terminalManager.getInstance(session.id)?.focus();
+                }}
+              />
+            ))}
+            {sessions.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                No terminal session
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </>
   );

@@ -37,7 +37,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   const [sessionId, setSessionId] = useState<string>('');
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
-  const { setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle } = useUIStore();
+  const { setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle, conversations } = useUIStore();
   const { setInputMode, startTool, completeTool, addPermissionRequest, removePermissionRequest } = useToolStore();
 
   // Streaming animation - use interval to reveal content progressively
@@ -324,8 +324,17 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   const handleSend = useCallback((text: string): void => {
     if (!text || isAgentRunning) return;
 
-    if (!sessionId) {
+    // Check if conversation already exists in sidebar
+    const conversationExists = sessionId !== '' && conversations.some(c => c.sessionId === sessionId);
+
+    // If no sessionId OR (first message AND conversation doesn't exist in sidebar),
+    // we need to create a conversation first via the backend
+    if (!sessionId || (messages.length === 0 && !conversationExists)) {
       setPendingMessage(text);
+      // Clear sessionId so the conversation:created handler will set the new one
+      if (sessionId) {
+        setSessionId('');
+      }
       postMessage({
         type: 'conversation:create',
         uuid: crypto.randomUUID(),
@@ -334,7 +343,9 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       return;
     }
 
-    if (messages.length === 0) {
+    // If first message but conversation exists (created via "New conversation" button),
+    // update the title from "Untitled" to the message text
+    if (messages.length === 0 && conversationExists) {
       updateConversationTitle(sessionId, text);
       postMessage({
         type: 'conversation:updateTitle',
@@ -359,7 +370,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       session_id: sessionId,
       content: text,
     });
-  }, [sessionId, isAgentRunning, messages.length, postMessage, updateConversationTitle]);
+  }, [sessionId, isAgentRunning, messages.length, conversations, postMessage, updateConversationTitle]);
 
   const handleRewind = useCallback((messageId: string): void => {
     if (!sessionId || isAgentRunning) return;
