@@ -261,6 +261,7 @@ export const MessageItem: FC<MessageItemProps> = ({
               <ThinkingBox
                 thinking={message.thinking}
                 thinkingDurationMs={message.thinkingDurationMs}
+                isStreaming={message.isStreaming}
               />
             ) : null}
             {buildSegments().map((segment) => {

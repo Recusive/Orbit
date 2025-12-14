@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { FC } from 'react';
 
@@ -9,6 +9,8 @@ interface ThinkingBoxProps {
   readonly thinking: string;
   readonly thinkingDurationMs?: number | undefined;
   readonly defaultExpanded?: boolean | undefined;
+  /** When true, auto-expand; when transitions to false, auto-collapse */
+  readonly isStreaming?: boolean | undefined;
 }
 
 const formatDuration = (ms: number): string => {
@@ -28,8 +30,22 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
   thinking,
   thinkingDurationMs = 0,
   defaultExpanded = false,
+  isStreaming = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const wasStreamingRef = useRef(false);
+
+  // Auto-expand when streaming starts, auto-collapse when streaming ends
+  useEffect(() => {
+    if (isStreaming && !wasStreamingRef.current) {
+      // Streaming just started - expand
+      setIsExpanded(true);
+    } else if (!isStreaming && wasStreamingRef.current) {
+      // Streaming just ended - collapse
+      setIsExpanded(false);
+    }
+    wasStreamingRef.current = isStreaming;
+  }, [isStreaming]);
 
   const toggleExpanded = (): void => {
     setIsExpanded(!isExpanded);
@@ -49,17 +65,17 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
       <button
         onClick={toggleExpanded}
         className={cn(
-          'w-full flex items-center gap-2 px-3 py-2 text-sm',
+          'w-full flex items-center justify-between gap-2 px-3 py-2 text-sm',
           'text-muted-foreground hover:text-foreground transition-colors',
           'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring'
         )}
         aria-expanded={isExpanded}
         aria-label={`Thought for ${durationText}, ${isExpanded ? 'expanded' : 'collapsed'}`}
       >
-        <ChevronIcon className="h-4 w-4 shrink-0" />
         <span className="text-xs font-medium">
           Thought for {durationText}
         </span>
+        <ChevronIcon className="h-4 w-4 shrink-0" />
       </button>
 
       {/* Collapsible Content */}

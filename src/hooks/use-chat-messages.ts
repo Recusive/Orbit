@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ImageAttachment } from '@/components/chat/chat-input';
 import type { ChatMessage } from '@/components/chat/message-item';
@@ -39,6 +39,9 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   const [isAgentRunning, setIsAgentRunning] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
   const [pendingMessage, setPendingMessage] = useState<{ text: string; contextFiles?: string[] | undefined; images?: ImageAttachment[] | undefined } | null>(null);
+
+  // Track thinking start times by message ID to calculate duration
+  const thinkingStartTimes = useRef<Map<string, number>>(new Map());
 
   const { setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle, conversations } = useUIStore();
   const { setInputMode, setThinkingMode, setModel, startTool, completeTool, addPermissionRequest, removePermissionRequest, addUsage } = useToolStore();
@@ -92,16 +95,27 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       }
 
       case 'agent:thinking': {
-        // Update the current streaming message with thinking content
+        // Record thinking start time on first chunk
+        if (!thinkingStartTimes.current.has(message.message_id)) {
+          thinkingStartTimes.current.set(message.message_id, Date.now());
+        }
+
+        // Calculate current duration
+        const startTime = thinkingStartTimes.current.get(message.message_id) ?? Date.now();
+        const currentDuration = Date.now() - startTime;
+
+        // Update the current streaming message with thinking content (append, not replace)
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg?.role === 'assistant') {
+            // Append thinking content like we do for regular content
+            const newThinking = (lastMsg.thinking ?? '') + message.thinking;
             return [
               ...prev.slice(0, -1),
               {
                 ...lastMsg,
-                thinking: message.thinking,
-                thinkingDurationMs: message.thinking_duration_ms,
+                thinking: newThinking,
+                thinkingDurationMs: currentDuration,
               },
             ];
           }
@@ -115,18 +129,30 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
               displayedContent: '',
               isStreaming: true,
               thinking: message.thinking,
-              thinkingDurationMs: message.thinking_duration_ms,
+              thinkingDurationMs: currentDuration,
             },
           ];
         });
         break;
       }
 
-      case 'agent:complete':
+      case 'agent:complete': {
+        // Calculate final thinking duration if we were tracking it
+        const thinkingStart = thinkingStartTimes.current.get(message.message_id);
+        const finalThinkingDuration = thinkingStart !== undefined ? Date.now() - thinkingStart : undefined;
+
+        // Clean up the tracking
+        thinkingStartTimes.current.delete(message.message_id);
+
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-            return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false }];
+            return [...prev.slice(0, -1), {
+              ...lastMsg,
+              isStreaming: false,
+              // Update final thinking duration if we have one
+              ...(finalThinkingDuration !== undefined && lastMsg.thinking ? { thinkingDurationMs: finalThinkingDuration } : {}),
+            }];
           }
           return prev;
         });
@@ -136,6 +162,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         }
         setIsAgentRunning(false);
         break;
+      }
 
       case 'agent:error': {
         setIsAgentRunning(false);
