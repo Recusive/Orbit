@@ -68,7 +68,7 @@ jobs:
       # Only upload artifacts on main branch to save storage
       - name: Upload build
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: dist-${{ github.sha }}
           path: dist/
