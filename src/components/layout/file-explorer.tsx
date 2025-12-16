@@ -92,6 +92,7 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
       case 'permission:request':
       case 'inputMode:changed':
       case 'panel:command':
+      case 'panel:visible':
       case 'terminal:output':
       case 'terminal:data':
       case 'terminal:created':

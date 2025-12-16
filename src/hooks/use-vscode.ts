@@ -443,6 +443,7 @@ function handleMockMessage(message: WebviewMessage): void {
     case 'browser:destroy':
     case 'browser:show':
     case 'browser:hide':
+    case 'browser:devtools':
       break;
   }
 }
