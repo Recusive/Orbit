@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { SlashCommand } from '@/components/chat/slash-command-popover';
 import type { ContextItem, FileEntry } from '@/types/context';
-import type { InputMode, Model, ThinkingMode } from '@/types/protocol';
+import type { InputMode, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { ElementContextList } from '@/components/browser';
@@ -62,7 +62,7 @@ interface ChatInputProps {
   readonly fileList: FileEntry[];
   readonly usage: UsageData;
   readonly maxTokens: number;
-  readonly onSend: (text: string, contextFiles?: string[], images?: ImageAttachment[]) => void;
+  readonly onSend: (text: string, contextFiles?: string[], images?: ImageAttachment[], elements?: ReactElementContext[]) => void;
   readonly onModeChange: (mode: InputMode) => void;
   readonly onThinkingModeChange: (mode: ThinkingMode) => void;
   readonly onModelChange: (model: Model) => void;
@@ -188,11 +188,12 @@ export const ChatInput: FC<ChatInputProps> = ({
     onSend(
       text,
       contextFiles.length > 0 ? contextFiles : undefined,
-      images.length > 0 ? images : undefined
+      images.length > 0 ? images : undefined,
+      elementContexts.length > 0 ? elementContexts : undefined
     );
     setAttachedContext([]);
     clearElementContexts();
-  }, [inputText, isAgentRunning, onSend, attachedContext, clearElementContexts]);
+  }, [inputText, isAgentRunning, onSend, attachedContext, clearElementContexts, elementContexts]);
 
   const handleImageClick = useCallback((): void => {
     imageInputRef.current?.click();

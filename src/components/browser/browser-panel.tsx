@@ -44,34 +44,65 @@ export const BrowserPanel: FC<BrowserPanelProps> = ({ width }) => {
   useEffect(() => {
     if (!viewportRef.current || !isActive) return;
 
+    let lastBounds = { x: 0, y: 0, width: 0, height: 0 };
+    let rafId: number | null = null;
+
     const updateBounds = (): void => {
-      if (!viewportRef.current) return;
-      const rect = viewportRef.current.getBoundingClientRect();
-      const bounds = {
-        x: Math.round(rect.x),
-        y: Math.round(rect.y),
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-      };
-      postMessage({
-        type: 'browser:bounds',
-        uuid: generateUUID(),
-        bounds,
+      // Use requestAnimationFrame to ensure layout is complete
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        if (!viewportRef.current) return;
+        const rect = viewportRef.current.getBoundingClientRect();
+        const bounds = {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        };
+
+        // Only send if bounds actually changed
+        if (bounds.x !== lastBounds.x || bounds.y !== lastBounds.y ||
+            bounds.width !== lastBounds.width || bounds.height !== lastBounds.height) {
+          lastBounds = bounds;
+          postMessage({
+            type: 'browser:bounds',
+            uuid: generateUUID(),
+            bounds,
+          });
+        }
       });
     };
 
-    // Initial bounds report
-    updateBounds();
+    // Initial bounds report (with small delay to ensure layout is ready)
+    const initTimeout = setTimeout(updateBounds, 50);
 
-    // Watch for resize
+    // Watch for resize of the viewport
     const resizeObserver = new ResizeObserver(updateBounds);
     resizeObserver.observe(viewportRef.current);
+
+    // Also watch parent elements for resize (for when devtools/panels open/close)
+    let parent = viewportRef.current.parentElement;
+    while (parent && parent !== document.body) {
+      resizeObserver.observe(parent);
+      parent = parent.parentElement;
+    }
+
+    // Listen for window resize
+    window.addEventListener('resize', updateBounds);
 
     // Also update on scroll (in case webview is scrolled)
     window.addEventListener('scroll', updateBounds, true);
 
     return (): void => {
+      clearTimeout(initTimeout);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
       resizeObserver.disconnect();
+      window.removeEventListener('resize', updateBounds);
       window.removeEventListener('scroll', updateBounds, true);
     };
   }, [isActive, postMessage]);
@@ -116,6 +147,14 @@ export const BrowserPanel: FC<BrowserPanelProps> = ({ width }) => {
     });
   }, [postMessage]);
 
+  // DevTools handler
+  const handleOpenDevTools = useCallback((): void => {
+    postMessage({
+      type: 'browser:devtools',
+      uuid: generateUUID(),
+    });
+  }, [postMessage]);
+
   return (
     <div className="h-full flex flex-col bg-background" style={{ width }}>
       {/* Toolbar */}
@@ -127,6 +166,7 @@ export const BrowserPanel: FC<BrowserPanelProps> = ({ width }) => {
         onNavigate={handleNavigate}
         onSelectElement={handleSelectElement}
         onCancelSelectElement={handleCancelSelectElement}
+        {...(isActive ? { onOpenDevTools: handleOpenDevTools } : {})}
       />
 
       {/* Viewport area - BrowserView will be positioned over this */}

@@ -1,11 +1,11 @@
 import {
   ArrowLeft,
   ArrowRight,
+  ChevronsLeftRight,
   ExternalLink,
-  MousePointer2,
   RefreshCw,
   Square,
-  Wrench,
+  SquareDashedMousePointer,
   X,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -161,7 +161,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
           </>
         ) : (
           <>
-            <MousePointer2 className="h-3.5 w-3.5" />
+            <SquareDashedMousePointer className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Select</span>
           </>
         )}
@@ -174,7 +174,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
           className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors"
           title="Open DevTools"
         >
-          <Wrench className="h-4 w-4" />
+          <ChevronsLeftRight className="h-4 w-4" />
         </button>
       ) : null}
 

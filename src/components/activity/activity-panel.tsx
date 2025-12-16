@@ -91,18 +91,36 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
     prevHasOpenFiles.current = hasOpenFiles;
   }, [hasOpenFiles, setActiveTab]);
 
-  // Send browser visibility messages when tab changes
+  // Track if this is the first render (for mount logic)
+  const isFirstRender = useRef(true);
+
+  // Send browser visibility messages when tab changes or panel mounts/unmounts
   // This is handled here (in ActivityPanel) rather than in BrowserPanel because
   // BrowserPanel unmounts when switching away, and cleanup effects are unreliable
   useEffect(() => {
     // Only send messages if browser has been created
     if (!isBrowserActive) {
       prevActiveTab.current = activeTab;
+      isFirstRender.current = false;
+      return;
+    }
+
+    const isBrowserTab = activeTab === 'browser';
+
+    // On first render (panel just mounted/re-opened), show browser if on browser tab
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      if (isBrowserTab) {
+        postMessage({
+          type: 'browser:show',
+          uuid: generateUUID(),
+        });
+      }
+      prevActiveTab.current = activeTab;
       return;
     }
 
     const wasBrowserTab = prevActiveTab.current === 'browser';
-    const isBrowserTab = activeTab === 'browser';
 
     if (wasBrowserTab && !isBrowserTab) {
       // Switching AWAY from Browser tab - hide the BrowserView
@@ -120,6 +138,24 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
 
     prevActiveTab.current = activeTab;
   }, [activeTab, isBrowserActive, postMessage]);
+
+  // Hide browser when ActivityPanel unmounts (panel collapsed)
+  // Use a ref to track current state for cleanup
+  const isBrowserActiveRef = useRef(isBrowserActive);
+  isBrowserActiveRef.current = isBrowserActive;
+
+  useEffect(() => {
+    return () => {
+      // Cleanup: hide browser when panel collapses
+      if (isBrowserActiveRef.current) {
+        postMessage({
+          type: 'browser:hide',
+          uuid: generateUUID(),
+        });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- postMessage is stable, we want cleanup to run only on unmount
+  }, []);
 
   const handleCloseFileViewer = (): void => {
     closeAllTabs();

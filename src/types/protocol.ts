@@ -27,6 +27,19 @@ export const ImageAttachmentSchema = z.object({
   data: z.string(), // Base64 encoded
 });
 
+// Element context for browser-selected React components
+export const ElementContextSchema = z.object({
+  componentName: z.string(),
+  filePath: z.string(),
+  lineNumber: z.number(),
+  props: z.record(z.unknown()),
+  componentStack: z.array(z.string()),
+  tagName: z.string(),
+  selector: z.string(),
+  outerHTML: z.string(),
+  displayName: z.string(),
+});
+
 // Chat
 export const SendMessageSchema = z.object({
   type: z.literal('message:send'),
@@ -37,6 +50,7 @@ export const SendMessageSchema = z.object({
     .object({
       files: z.array(z.string()).optional(),
       images: z.array(ImageAttachmentSchema).optional(),
+      elements: z.array(ElementContextSchema).optional(),
       selection: z
         .object({
           filePath: z.string(),
@@ -373,6 +387,12 @@ export const BrowserDestroySchema = z.object({
   uuid: UUIDSchema,
 });
 
+// Open browser DevTools
+export const BrowserDevToolsSchema = z.object({
+  type: z.literal('browser:devtools'),
+  uuid: UUIDSchema,
+});
+
 // Show browser view (when Browser tab becomes visible)
 export const BrowserShowSchema = z.object({
   type: z.literal('browser:show'),
@@ -446,6 +466,7 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   BrowserSelectElementCancelSchema,
   BrowserBoundsSchema,
   BrowserDestroySchema,
+  BrowserDevToolsSchema,
   BrowserShowSchema,
   BrowserHideSchema,
 ]);
@@ -579,6 +600,12 @@ export const PanelCommandSchema = z.object({
   type: z.literal('panel:command'),
   uuid: UUIDSchema,
   command: PanelCommandTypeSchema,
+});
+
+// Panel visibility (sent when VS Code panel becomes visible after being hidden)
+export const PanelVisibleSchema = z.object({
+  type: z.literal('panel:visible'),
+  uuid: UUIDSchema,
 });
 
 // Terminal - Shell type enum
@@ -883,6 +910,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   ModelChangedSchema,
   // Panel commands
   PanelCommandSchema,
+  PanelVisibleSchema,
   // Terminal
   TerminalOutputSchema,
   TerminalDataSchema,
@@ -973,6 +1001,7 @@ export type BrowserSelectElementStart = z.infer<typeof BrowserSelectElementStart
 export type BrowserSelectElementCancel = z.infer<typeof BrowserSelectElementCancelSchema>;
 export type BrowserBounds = z.infer<typeof BrowserBoundsSchema>;
 export type BrowserDestroy = z.infer<typeof BrowserDestroySchema>;
+export type BrowserDevTools = z.infer<typeof BrowserDevToolsSchema>;
 export type BrowserShow = z.infer<typeof BrowserShowSchema>;
 export type BrowserHide = z.infer<typeof BrowserHideSchema>;
 
@@ -993,6 +1022,7 @@ export type ThinkingMode = z.infer<typeof ThinkingModeSchema>;
 export type ModelChanged = z.infer<typeof ModelChangedSchema>;
 export type PanelCommandType = z.infer<typeof PanelCommandTypeSchema>;
 export type PanelCommand = z.infer<typeof PanelCommandSchema>;
+export type PanelVisible = z.infer<typeof PanelVisibleSchema>;
 export type ShellType = z.infer<typeof ShellTypeSchema>;
 export type TerminalCapabilitiesState = z.infer<typeof TerminalCapabilitiesStateSchema>;
 export type TerminalOutput = z.infer<typeof TerminalOutputSchema>;

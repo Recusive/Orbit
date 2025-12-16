@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ImageAttachment } from '@/components/chat/chat-input';
 import type { ChatMessage } from '@/components/chat/message-item';
-import type { ExtensionMessage, Model, ThinkingMode } from '@/types/protocol';
+import type { ExtensionMessage, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 
 import { useVSCode } from '@/hooks/use-vscode';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/diff-utils';
@@ -21,7 +21,7 @@ interface UseChatMessagesReturn {
   sessionId: string;
   isMockMode: boolean;
   postMessage: ReturnType<typeof useVSCode>['postMessage'];
-  handleSend: (text: string, contextFiles?: string[], images?: ImageAttachment[]) => void;
+  handleSend: (text: string, contextFiles?: string[], images?: ImageAttachment[], elements?: ReactElementContext[]) => void;
   handleRewind: (messageId: string) => void;
   handlePermissionApprove: (requestId: string, always?: boolean) => void;
   handlePermissionDeny: (requestId: string) => void;
@@ -38,7 +38,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAgentRunning, setIsAgentRunning] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
-  const [pendingMessage, setPendingMessage] = useState<{ text: string; contextFiles?: string[] | undefined; images?: ImageAttachment[] | undefined } | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<{ text: string; contextFiles?: string[] | undefined; images?: ImageAttachment[] | undefined; elements?: ReactElementContext[] | undefined } | null>(null);
 
   // Track thinking start times by message ID to calculate duration
   const thinkingStartTimes = useRef<Map<string, number>>(new Map());
@@ -331,6 +331,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       case 'file:written':
       case 'conversation:deleted':
       case 'panel:command':
+      case 'panel:visible':
       case 'file:tree:response':
       case 'file:tree:error':
       case 'file:list:response':
@@ -368,7 +369,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   // Send pending message when session becomes available
   useEffect(() => {
     if (sessionId && pendingMessage) {
-      const { text, contextFiles, images } = pendingMessage;
+      const { text, contextFiles, images, elements } = pendingMessage;
       setPendingMessage(null);
 
       // Send current thinking mode and model to backend BEFORE the message
@@ -406,13 +407,15 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setMessages((prev) => [...prev, userMessage]);
       setIsAgentRunning(true);
 
-      // Build context object with files and/or images
+      // Build context object with files, images, and/or elements
       const hasFiles = contextFiles && contextFiles.length > 0;
       const hasImages = images && images.length > 0;
-      const context = hasFiles || hasImages
+      const hasElements = elements && elements.length > 0;
+      const context = hasFiles || hasImages || hasElements
         ? {
             files: hasFiles ? contextFiles : undefined,
             images: hasImages ? images.map(img => ({ name: img.name, mimeType: img.mimeType, data: img.data })) : undefined,
+            elements: hasElements ? elements : undefined,
           }
         : undefined;
 
@@ -426,7 +429,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     }
   }, [sessionId, pendingMessage, postMessage, updateConversationTitle]);
 
-  const handleSend = useCallback((text: string, contextFiles?: string[], images?: ImageAttachment[]): void => {
+  const handleSend = useCallback((text: string, contextFiles?: string[], images?: ImageAttachment[], elements?: ReactElementContext[]): void => {
     if (!text || isAgentRunning) return;
 
     // Check if conversation already exists in sidebar
@@ -435,8 +438,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     // If no sessionId OR (first message AND conversation doesn't exist in sidebar),
     // we need to create a conversation first via the backend
     if (!sessionId || (messages.length === 0 && !conversationExists)) {
-      // Store text, context files, and images for pending message
-      setPendingMessage({ text, contextFiles, images });
+      // Store text, context files, images, and elements for pending message
+      setPendingMessage({ text, contextFiles, images, elements });
       // Clear sessionId so the conversation:created handler will set the new one
       if (sessionId) {
         setSessionId('');
@@ -488,13 +491,15 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     setMessages((prev) => [...prev, userMessage]);
     setIsAgentRunning(true);
 
-    // Build context object with files and/or images
+    // Build context object with files, images, and/or elements
     const hasFiles = contextFiles && contextFiles.length > 0;
     const hasImages = images && images.length > 0;
-    const context = hasFiles || hasImages
+    const hasElements = elements && elements.length > 0;
+    const context = hasFiles || hasImages || hasElements
       ? {
           files: hasFiles ? contextFiles : undefined,
           images: hasImages ? images.map(img => ({ name: img.name, mimeType: img.mimeType, data: img.data })) : undefined,
+          elements: hasElements ? elements : undefined,
         }
       : undefined;
 

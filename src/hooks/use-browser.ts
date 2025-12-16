@@ -4,7 +4,8 @@ import type { ExtensionMessage } from '@/types/protocol';
 
 import { useVSCode } from '@/hooks/use-vscode';
 import { useBrowserStore } from '@/stores/browser-store';
-import { isProtocolBrowserMessage } from '@/types/protocol';
+import { useUIStore } from '@/stores/ui-store';
+import { generateUUID } from '@/types/protocol';
 
 /**
  * Hook to handle browser messages from Orbit extension
@@ -20,11 +21,26 @@ export function useBrowser(): void {
     reset,
   } = useBrowserStore();
 
-  const handleMessage = useCallback((message: ExtensionMessage): void => {
-    // Only handle browser messages
-    if (!message.type.startsWith('browser:')) return;
+  // Get postMessage for sending browser:show when panel becomes visible
+  const { postMessage } = useVSCode({});
 
+  const handleMessage = useCallback((message: ExtensionMessage): void => {
     switch (message.type) {
+      // Handle panel visibility - show browser when VS Code panel becomes visible
+      case 'panel:visible': {
+        const browserState = useBrowserStore.getState();
+        const uiState = useUIStore.getState();
+
+        if (browserState.isActive && uiState.activityTab === 'browser') {
+          postMessage({
+            type: 'browser:show',
+            uuid: generateUUID(),
+          });
+        }
+        break;
+      }
+
+      // Browser messages
       case 'browser:created':
         setViewId(message.viewId);
         setError(null);
@@ -93,11 +109,8 @@ export function useBrowser(): void {
       case 'conversation:rewound':
         break;
     }
-  }, [setViewId, setNavigation, setLoading, setSelectedElement, setSelectingElement, setError, reset]);
+  }, [setViewId, setNavigation, setLoading, setSelectedElement, setSelectingElement, setError, reset, postMessage]);
 
   // Subscribe to extension messages
   useVSCode({ onMessage: handleMessage });
 }
-
-// Re-export the type guard for use elsewhere
-export { isProtocolBrowserMessage };
