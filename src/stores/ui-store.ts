@@ -14,6 +14,9 @@ export interface ConversationSummary {
 // Terminal position options
 export type TerminalPosition = 'activity' | 'both';
 
+// Activity panel tabs
+export type ActivityTab = 'file' | 'files' | 'source' | 'browser';
+
 interface UIState {
   // Container dimensions (from VS Code editor layout)
   containerWidth: number | null;
@@ -38,6 +41,8 @@ interface UIState {
   bottomPanelOpen: boolean;
   bottomPanelHeight: number;
   terminalPosition: TerminalPosition;
+  // Activity Panel Tab
+  activityTab: ActivityTab;
 }
 
 interface UIActions {
@@ -60,6 +65,9 @@ interface UIActions {
   setBottomPanelHeight: (height: number) => void;
   setTerminalPosition: (position: TerminalPosition) => void;
   cycleTerminalPosition: () => void;
+  // Activity panel actions
+  setActivityTab: (tab: ActivityTab) => void;
+  openBrowserTab: () => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -81,6 +89,7 @@ export const useUIStore = create<UIStore>()(
     bottomPanelOpen: DEFAULT_UI_STATE.bottomPanelOpen,
     bottomPanelHeight: DEFAULT_UI_STATE.bottomPanelHeight,
     terminalPosition: 'activity' as TerminalPosition,
+    activityTab: 'files' as ActivityTab,
 
     setContainerDimensions: (width: number, height: number): void => {
       set((state) => {
@@ -211,6 +220,20 @@ export const useUIStore = create<UIStore>()(
         state.terminalPosition = state.terminalPosition === 'activity' ? 'both' : 'activity';
       });
     },
+
+    setActivityTab: (tab: ActivityTab): void => {
+      set((state) => {
+        state.activityTab = tab;
+      });
+    },
+
+    openBrowserTab: (): void => {
+      set((state) => {
+        state.activityTab = 'browser';
+        // Also ensure the activity panel is open
+        state.reviewPanelOpen = true;
+      });
+    },
   }))
 );
 
@@ -236,4 +259,8 @@ export const useConversations = (): ConversationSummary[] => {
 
 export const useTerminalPosition = (): TerminalPosition => {
   return useUIStore((state) => state.terminalPosition);
+};
+
+export const useActivityTab = (): ActivityTab => {
+  return useUIStore((state) => state.activityTab);
 };

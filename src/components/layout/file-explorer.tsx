@@ -109,6 +109,12 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
       case 'agent:thinking':
       case 'thinking:changed':
       case 'model:changed':
+      case 'browser:created':
+      case 'browser:navigated':
+      case 'browser:element-selected':
+      case 'browser:loading':
+      case 'browser:error':
+      case 'browser:destroyed':
         break;
     }
   }, [rootPath, setRootPath, setTreeChildren, handleFileChanged, treeNodes]);

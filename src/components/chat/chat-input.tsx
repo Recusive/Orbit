@@ -14,6 +14,7 @@ import type { ContextItem, FileEntry } from '@/types/context';
 import type { InputMode, Model, ThinkingMode } from '@/types/protocol';
 import type { FC } from 'react';
 
+import { ElementContextList } from '@/components/browser';
 import {
   Context,
   ContextContent,
@@ -34,6 +35,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CONTENT_WIDTH, INPUT_SIZES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { useElementContexts, useBrowserStore } from '@/stores/browser-store';
 
 const INPUT_MODE_LABELS: Record<InputMode, string> = {
   default: 'Default',
@@ -80,6 +82,11 @@ export const ChatInput: FC<ChatInputProps> = ({
 }) => {
   const [inputText, setInputText] = useState('');
   const [attachedContext, setAttachedContext] = useState<ContextItem[]>([]);
+
+  // Browser element contexts
+  const elementContexts = useElementContexts();
+  const removeElementContext = useBrowserStore((state) => state.removeElementContext);
+  const clearElementContexts = useBrowserStore((state) => state.clearElementContexts);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
@@ -184,7 +191,8 @@ export const ChatInput: FC<ChatInputProps> = ({
       images.length > 0 ? images : undefined
     );
     setAttachedContext([]);
-  }, [inputText, isAgentRunning, onSend, attachedContext]);
+    clearElementContexts();
+  }, [inputText, isAgentRunning, onSend, attachedContext, clearElementContexts]);
 
   const handleImageClick = useCallback((): void => {
     imageInputRef.current?.click();
@@ -395,6 +403,12 @@ export const ChatInput: FC<ChatInputProps> = ({
   return (
     <div className="p-4 pt-0 shrink-0 relative">
       <div className={getInputBoxClasses()} style={{ maxWidth: CONTENT_WIDTH.inputBox }}>
+        {/* Element Context Chips - selected browser elements */}
+        <ElementContextList
+          elements={elementContexts}
+          onRemove={removeElementContext}
+        />
+
         {/* Context Chips Row - shown when items attached */}
         {attachedContext.length > 0 ? (
           <ContextChips

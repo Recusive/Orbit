@@ -431,6 +431,18 @@ function handleMockMessage(message: WebviewMessage): void {
     case 'permission:response':
     case 'thinking:set':
     case 'model:set':
+    case 'browser:create':
+    case 'browser:navigate':
+    case 'browser:back':
+    case 'browser:forward':
+    case 'browser:reload':
+    case 'browser:stop':
+    case 'browser:select-element:start':
+    case 'browser:select-element:cancel':
+    case 'browser:bounds':
+    case 'browser:destroy':
+    case 'browser:show':
+    case 'browser:hide':
       break;
   }
 }

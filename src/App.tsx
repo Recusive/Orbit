@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import type { FC } from 'react';
 
 import { RootLayout } from '@/components/layout';
+import { useBrowser } from '@/hooks/use-browser';
 
 /**
  * Syncs VS Code webview theme to the html element.
@@ -45,6 +46,7 @@ function useVSCodeThemeSync(): void {
 
 const App: FC = () => {
   useVSCodeThemeSync();
+  useBrowser(); // Handle browser messages from Orbit extension
 
   return (
     <div className="h-full">

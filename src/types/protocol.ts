@@ -306,6 +306,85 @@ export const WebviewReadySchema = z.object({
   uuid: UUIDSchema,
 });
 
+// ═══════════════════════════════════════════════════════════════
+// BROWSER (Webview → Extension)
+// ═══════════════════════════════════════════════════════════════
+
+// Create a browser view
+export const BrowserCreateSchema = z.object({
+  type: z.literal('browser:create'),
+  uuid: UUIDSchema,
+});
+
+// Navigate to URL
+export const BrowserNavigateSchema = z.object({
+  type: z.literal('browser:navigate'),
+  uuid: UUIDSchema,
+  url: z.string(),
+});
+
+// Navigation actions
+export const BrowserBackSchema = z.object({
+  type: z.literal('browser:back'),
+  uuid: UUIDSchema,
+});
+
+export const BrowserForwardSchema = z.object({
+  type: z.literal('browser:forward'),
+  uuid: UUIDSchema,
+});
+
+export const BrowserReloadSchema = z.object({
+  type: z.literal('browser:reload'),
+  uuid: UUIDSchema,
+});
+
+export const BrowserStopSchema = z.object({
+  type: z.literal('browser:stop'),
+  uuid: UUIDSchema,
+});
+
+// Element selection (React-grab)
+export const BrowserSelectElementStartSchema = z.object({
+  type: z.literal('browser:select-element:start'),
+  uuid: UUIDSchema,
+});
+
+export const BrowserSelectElementCancelSchema = z.object({
+  type: z.literal('browser:select-element:cancel'),
+  uuid: UUIDSchema,
+});
+
+// Update browser view bounds (for positioning over webview)
+export const BrowserBoundsSchema = z.object({
+  type: z.literal('browser:bounds'),
+  uuid: UUIDSchema,
+  bounds: z.object({
+    x: z.number(),
+    y: z.number(),
+    width: z.number(),
+    height: z.number(),
+  }),
+});
+
+// Destroy browser view
+export const BrowserDestroySchema = z.object({
+  type: z.literal('browser:destroy'),
+  uuid: UUIDSchema,
+});
+
+// Show browser view (when Browser tab becomes visible)
+export const BrowserShowSchema = z.object({
+  type: z.literal('browser:show'),
+  uuid: UUIDSchema,
+});
+
+// Hide browser view (when Browser tab is hidden)
+export const BrowserHideSchema = z.object({
+  type: z.literal('browser:hide'),
+  uuid: UUIDSchema,
+});
+
 // Combined webview → extension
 export const WebviewMessageSchema = z.discriminatedUnion('type', [
   // System
@@ -356,6 +435,19 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   SetThinkingModeSchema,
   // Model
   SetModelSchema,
+  // Browser
+  BrowserCreateSchema,
+  BrowserNavigateSchema,
+  BrowserBackSchema,
+  BrowserForwardSchema,
+  BrowserReloadSchema,
+  BrowserStopSchema,
+  BrowserSelectElementStartSchema,
+  BrowserSelectElementCancelSchema,
+  BrowserBoundsSchema,
+  BrowserDestroySchema,
+  BrowserShowSchema,
+  BrowserHideSchema,
 ]);
 
 // ═══════════════════════════════════════════════════════════════
@@ -703,6 +795,72 @@ export const ErrorSchema = z.object({
   code: z.string().optional(),
 });
 
+// ═══════════════════════════════════════════════════════════════
+// BROWSER (Extension → Webview)
+// ═══════════════════════════════════════════════════════════════
+
+// React element context (from element selection)
+export const ReactElementContextSchema = z.object({
+  // React component info
+  componentName: z.string(),
+  filePath: z.string(),
+  lineNumber: z.number(),
+  props: z.record(z.unknown()),
+  componentStack: z.array(z.string()),
+  // DOM info
+  tagName: z.string(),
+  selector: z.string(),
+  outerHTML: z.string(),
+  // Display helper
+  displayName: z.string(),
+});
+
+// Browser view created
+export const BrowserCreatedSchema = z.object({
+  type: z.literal('browser:created'),
+  uuid: UUIDSchema,
+  viewId: z.string(),
+});
+
+// Navigation state update
+export const BrowserNavigatedSchema = z.object({
+  type: z.literal('browser:navigated'),
+  uuid: UUIDSchema,
+  url: z.string(),
+  title: z.string(),
+  canGoBack: z.boolean(),
+  canGoForward: z.boolean(),
+  isLoading: z.boolean(),
+});
+
+// Element selected via React-grab
+export const BrowserElementSelectedSchema = z.object({
+  type: z.literal('browser:element-selected'),
+  uuid: UUIDSchema,
+  element: ReactElementContextSchema,
+});
+
+// Loading state changed
+export const BrowserLoadingSchema = z.object({
+  type: z.literal('browser:loading'),
+  uuid: UUIDSchema,
+  isLoading: z.boolean(),
+});
+
+// Browser error
+export const BrowserErrorSchema = z.object({
+  type: z.literal('browser:error'),
+  uuid: UUIDSchema,
+  error: z.string(),
+  code: z.string().optional(),
+});
+
+// Browser destroyed
+export const BrowserDestroyedSchema = z.object({
+  type: z.literal('browser:destroyed'),
+  uuid: UUIDSchema,
+});
+
 // Combined extension → webview
 export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   // System
@@ -749,6 +907,13 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   ConversationRewoundSchema,
   // Error
   ErrorSchema,
+  // Browser
+  BrowserCreatedSchema,
+  BrowserNavigatedSchema,
+  BrowserElementSelectedSchema,
+  BrowserLoadingSchema,
+  BrowserErrorSchema,
+  BrowserDestroyedSchema,
 ]);
 
 // ═══════════════════════════════════════════════════════════════
@@ -797,6 +962,19 @@ export type SetInputMode = z.infer<typeof SetInputModeSchema>;
 export type SetThinkingMode = z.infer<typeof SetThinkingModeSchema>;
 export type SetModel = z.infer<typeof SetModelSchema>;
 export type Model = z.infer<typeof ModelSchema>;
+// Browser (Webview → Extension)
+export type BrowserCreate = z.infer<typeof BrowserCreateSchema>;
+export type BrowserNavigate = z.infer<typeof BrowserNavigateSchema>;
+export type BrowserBack = z.infer<typeof BrowserBackSchema>;
+export type BrowserForward = z.infer<typeof BrowserForwardSchema>;
+export type BrowserReload = z.infer<typeof BrowserReloadSchema>;
+export type BrowserStop = z.infer<typeof BrowserStopSchema>;
+export type BrowserSelectElementStart = z.infer<typeof BrowserSelectElementStartSchema>;
+export type BrowserSelectElementCancel = z.infer<typeof BrowserSelectElementCancelSchema>;
+export type BrowserBounds = z.infer<typeof BrowserBoundsSchema>;
+export type BrowserDestroy = z.infer<typeof BrowserDestroySchema>;
+export type BrowserShow = z.infer<typeof BrowserShowSchema>;
+export type BrowserHide = z.infer<typeof BrowserHideSchema>;
 
 // Extension → Webview
 export type SystemInit = z.infer<typeof SystemInitSchema>;
@@ -839,6 +1017,14 @@ export type ConversationList = z.infer<typeof ConversationListSchema>;
 export type ConversationLoaded = z.infer<typeof ConversationLoadedSchema>;
 export type ConversationRewound = z.infer<typeof ConversationRewoundSchema>;
 export type ProtocolError = z.infer<typeof ErrorSchema>;
+// Browser (Extension → Webview)
+export type ReactElementContext = z.infer<typeof ReactElementContextSchema>;
+export type BrowserCreated = z.infer<typeof BrowserCreatedSchema>;
+export type BrowserNavigated = z.infer<typeof BrowserNavigatedSchema>;
+export type BrowserElementSelected = z.infer<typeof BrowserElementSelectedSchema>;
+export type BrowserLoading = z.infer<typeof BrowserLoadingSchema>;
+export type BrowserError = z.infer<typeof BrowserErrorSchema>;
+export type BrowserDestroyed = z.infer<typeof BrowserDestroyedSchema>;
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE GUARDS (Protocol layer - prefixed to avoid conflicts with message.ts)
@@ -872,6 +1058,12 @@ export function isProtocolFileMessage(
   msg: ExtensionMessage
 ): msg is FileContent | FileChanged | FileWritten | FileTreeResponse | FileTreeError | FileListResponse {
   return msg.type.startsWith('file:');
+}
+
+export function isProtocolBrowserMessage(
+  msg: ExtensionMessage
+): msg is BrowserCreated | BrowserNavigated | BrowserElementSelected | BrowserLoading | BrowserError | BrowserDestroyed {
+  return msg.type.startsWith('browser:');
 }
 
 // ═══════════════════════════════════════════════════════════════

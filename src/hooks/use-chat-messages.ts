@@ -335,6 +335,12 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       case 'file:tree:error':
       case 'file:list:response':
       case 'thinking:changed':
+      case 'browser:created':
+      case 'browser:navigated':
+      case 'browser:element-selected':
+      case 'browser:loading':
+      case 'browser:error':
+      case 'browser:destroyed':
         break;
     }
   }, [setWorkspace, setActiveConversation, setConversations, addConversation, setInputMode, setModel, startTool, completeTool, addPermissionRequest, addUsage, onSessionCreated]);

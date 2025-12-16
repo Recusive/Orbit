@@ -23,7 +23,7 @@ const getInitialTheme = (): Theme => {
 };
 
 export const ChatHeader: FC = () => {
-  const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, reviewPanelOpen, bottomPanelOpen } = useUIStore();
+  const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, openBrowserTab, reviewPanelOpen, bottomPanelOpen } = useUIStore();
   const terminalPosition = useTerminalPosition();
   const workspaceName = useWorkspaceName();
   const activeConversationTitle = useActiveConversationTitle();
@@ -91,7 +91,7 @@ export const ChatHeader: FC = () => {
         >
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
-        <HeaderButton icon={Globe} title="Browser" />
+        <HeaderButton icon={Globe} title="Browser" onClick={openBrowserTab} />
         <HeaderButton icon={SquareTerminal} title="Terminal" onClick={handleTerminalToggle} />
 
         {/* Review Changes Button */}

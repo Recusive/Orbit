@@ -2,10 +2,11 @@ import {
   FileCode,
   GitBranch,
   GitCompareArrows,
+  Globe,
   Search,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import type { FileChange } from '@/stores/file-store';
 import type { FC } from 'react';
@@ -13,18 +14,20 @@ import type { FC } from 'react';
 import { FileViewer } from '@/components/activity/file-viewer';
 import { FilesChangedList } from '@/components/activity/files-changed-list';
 import { SourceControlTab } from '@/components/activity/source-control-tab';
+import { BrowserPanel } from '@/components/browser';
 import { TerminalPanel } from '@/components/terminal/terminal-panel';
 import { ButtonGroup } from '@/components/ui/button-group';
+import { useVSCode } from '@/hooks/use-vscode';
 import { cn } from '@/lib/utils';
+import { useBrowserIsActive } from '@/stores/browser-store';
 import { useFileViewerStore, useHasOpenFiles } from '@/stores/file-viewer-store';
-import { useUIStore, useTerminalPosition } from '@/stores/ui-store';
+import { useUIStore, useTerminalPosition, useActivityTab } from '@/stores/ui-store';
+import { generateUUID } from '@/types/protocol';
 
 
 interface ActivityPanelProps {
   readonly width: number;
 }
-
-type TabValue = 'file' | 'files' | 'source';
 
 interface TabButtonProps {
   readonly active: boolean;
@@ -71,10 +74,14 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
   const closeAllTabs = useFileViewerStore((state) => state.closeAllTabs);
   const toggleSearch = useFileViewerStore((state) => state.toggleSearch);
   const openFileWithDiff = useFileViewerStore((state) => state.openFileWithDiff);
-  const [activeTab, setActiveTab] = useState<TabValue>('files');
+  const activeTab = useActivityTab();
+  const setActiveTab = useUIStore((state) => state.setActivityTab);
   const { bottomPanelOpen } = useUIStore();
   const terminalPosition = useTerminalPosition();
   const prevHasOpenFiles = useRef(hasOpenFiles);
+  const isBrowserActive = useBrowserIsActive();
+  const { postMessage } = useVSCode({});
+  const prevActiveTab = useRef(activeTab);
 
   // Auto-switch to File tab only when files are first opened (not continuously)
   useEffect(() => {
@@ -82,7 +89,37 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
       setActiveTab('file');
     }
     prevHasOpenFiles.current = hasOpenFiles;
-  }, [hasOpenFiles]);
+  }, [hasOpenFiles, setActiveTab]);
+
+  // Send browser visibility messages when tab changes
+  // This is handled here (in ActivityPanel) rather than in BrowserPanel because
+  // BrowserPanel unmounts when switching away, and cleanup effects are unreliable
+  useEffect(() => {
+    // Only send messages if browser has been created
+    if (!isBrowserActive) {
+      prevActiveTab.current = activeTab;
+      return;
+    }
+
+    const wasBrowserTab = prevActiveTab.current === 'browser';
+    const isBrowserTab = activeTab === 'browser';
+
+    if (wasBrowserTab && !isBrowserTab) {
+      // Switching AWAY from Browser tab - hide the BrowserView
+      postMessage({
+        type: 'browser:hide',
+        uuid: generateUUID(),
+      });
+    } else if (!wasBrowserTab && isBrowserTab) {
+      // Switching TO Browser tab - show the BrowserView
+      postMessage({
+        type: 'browser:show',
+        uuid: generateUUID(),
+      });
+    }
+
+    prevActiveTab.current = activeTab;
+  }, [activeTab, isBrowserActive, postMessage]);
 
   const handleCloseFileViewer = (): void => {
     closeAllTabs();
@@ -99,7 +136,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
       }, file.language);
     }
     setActiveTab('file');
-  }, [openFileWithDiff]);
+  }, [openFileWithDiff, setActiveTab]);
 
   return (
     <div
@@ -130,6 +167,13 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
             onClick={() => { setActiveTab('source'); }}
             icon={GitBranch}
             label="Source"
+            compact={hasOpenFiles}
+          />
+          <TabButton
+            active={activeTab === 'browser'}
+            onClick={() => { setActiveTab('browser'); }}
+            icon={Globe}
+            label="Browser"
             compact={hasOpenFiles}
           />
         </div>
@@ -174,6 +218,8 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
           <div className="h-full overflow-y-auto">
             <FilesChangedList onOpenFile={handleOpenChangedFile} />
           </div>
+        ) : activeTab === 'browser' ? (
+          <BrowserPanel width={width} />
         ) : (
           <div className="h-full overflow-y-auto">
             <SourceControlTab />
