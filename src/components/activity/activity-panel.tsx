@@ -64,7 +64,7 @@ const TabButton: FC<TabButtonProps> = ({ active, onClick, icon: Icon, label, com
         <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary" />
       ) : null}
       <Icon className="relative h-3.5 w-3.5 shrink-0" />
-      <span className={cn('relative truncate', compact ? 'hidden @[435px]:inline' : 'hidden @[350px]:inline')}>{label}</span>
+      <span className={cn('relative truncate', compact ? 'hidden @[435px]:inline' : 'hidden @[440px]:inline')}>{label}</span>
     </button>
   );
 };
