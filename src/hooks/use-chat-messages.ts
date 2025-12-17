@@ -35,16 +35,64 @@ interface UseChatMessagesReturn {
 export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMessagesReturn {
   const { onSessionCreated } = options;
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Restore state from localStorage on mount (survives webview reloads)
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('orbit-messages');
+      return saved ? JSON.parse(saved) as ChatMessage[] : [];
+    } catch {
+      return [];
+    }
+  });
   const [isAgentRunning, setIsAgentRunning] = useState(false);
-  const [sessionId, setSessionId] = useState<string>('');
+  const [sessionId, setSessionId] = useState<string>(() => {
+    try {
+      return localStorage.getItem('orbit-sessionId') ?? '';
+    } catch {
+      return '';
+    }
+  });
   const [pendingMessage, setPendingMessage] = useState<{ text: string; contextFiles?: string[] | undefined; images?: ImageAttachment[] | undefined; elements?: ReactElementContext[] | undefined } | null>(null);
 
   // Track thinking start times by message ID to calculate duration
   const thinkingStartTimes = useRef<Map<string, number>>(new Map());
 
+  // Cache messages by sessionId to preserve state when switching conversations
+  const messagesCache = useRef<Map<string, ChatMessage[]>>(new Map());
+
+  // Refs to track current state (for use in callbacks without deps issues)
+  const sessionIdRef = useRef<string>(sessionId);
+  sessionIdRef.current = sessionId;
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  messagesRef.current = messages;
+
   const { setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle, conversations } = useUIStore();
   const { setInputMode, setThinkingMode, setModel, startTool, completeTool, addPermissionRequest, removePermissionRequest, addUsage } = useToolStore();
+
+  // Save messages to cache whenever they change (for conversation switching)
+  useEffect(() => {
+    if (sessionId && messages.length > 0) {
+      messagesCache.current.set(sessionId, messages);
+    }
+  }, [sessionId, messages]);
+
+  // Persist messages to localStorage (survives webview reloads)
+  useEffect(() => {
+    try {
+      localStorage.setItem('orbit-messages', JSON.stringify(messages));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [messages]);
+
+  // Persist sessionId to localStorage (survives webview reloads)
+  useEffect(() => {
+    try {
+      localStorage.setItem('orbit-sessionId', sessionId);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [sessionId]);
 
   // Streaming animation - use interval to reveal content progressively
   useEffect(() => {
@@ -70,7 +118,11 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   const handleMessage = useCallback((message: ExtensionMessage): void => {
     switch (message.type) {
       case 'system:init':
-        setSessionId(message.session_id);
+        // Only set sessionId if we don't already have an active session with messages
+        // This prevents browser panel opening from resetting the session
+        if (!sessionIdRef.current || messagesRef.current.length === 0) {
+          setSessionId(message.session_id);
+        }
         if (message.cwd) {
           setWorkspace(message.cwd);
         }
@@ -196,16 +248,42 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         })));
         break;
 
-      case 'conversation:loaded':
+      case 'conversation:loaded': {
+        // Save current messages to cache BEFORE switching sessions
+        // This must happen synchronously before setSessionId changes the context
+        setMessages(currentMessages => {
+          const currentSessionId = sessionIdRef.current;
+          if (currentSessionId && currentMessages.length > 0) {
+            messagesCache.current.set(currentSessionId, currentMessages);
+          }
+          return currentMessages; // Don't modify state yet
+        });
+
         setSessionId(message.session_id);
         setActiveConversation(message.session_id, message.title);
-        setMessages(message.messages.map(m => ({
+
+        // Check if we have cached messages for this conversation
+        const cachedMessages = messagesCache.current.get(message.session_id);
+        const backendMessages = message.messages.map(m => ({
           id: m.id,
           role: m.role,
           content: m.content,
           displayedContent: m.content,
-        })));
+        }));
+
+        // Use cached messages if available and backend returns empty or fewer messages
+        // This preserves local state when switching between conversations
+        if (cachedMessages && cachedMessages.length > 0 && backendMessages.length === 0) {
+          setMessages(cachedMessages);
+        } else if (cachedMessages && cachedMessages.length > backendMessages.length) {
+          // Cached has more messages - likely backend hasn't synced yet
+          setMessages(cachedMessages);
+        } else {
+          // Backend has messages, use those (source of truth when available)
+          setMessages(backendMessages);
+        }
         break;
+      }
 
       case 'conversation:rewound':
         if (message.new_session_id !== message.session_id) {
@@ -437,9 +515,12 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     // Check if conversation already exists in sidebar
     const conversationExists = sessionId !== '' && conversations.some(c => c.sessionId === sessionId);
 
-    // If no sessionId OR (first message AND conversation doesn't exist in sidebar),
+    // Check if we have cached messages for the current session (even if local state is empty)
+    const hasCachedMessages = sessionId !== '' && messagesCache.current.has(sessionId) && (messagesCache.current.get(sessionId)?.length ?? 0) > 0;
+
+    // If no sessionId OR (first message AND conversation doesn't exist AND no cached messages),
     // we need to create a conversation first via the backend
-    if (!sessionId || (messages.length === 0 && !conversationExists)) {
+    if (!sessionId || (messages.length === 0 && !conversationExists && !hasCachedMessages)) {
       // Store text, context files, images, and elements for pending message
       setPendingMessage({ text, contextFiles, images, elements });
       // Clear sessionId so the conversation:created handler will set the new one
