@@ -336,6 +336,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       case 'file:tree:error':
       case 'file:list:response':
       case 'thinking:changed':
+      case 'browser:open':
+      case 'browser:close':
       case 'browser:created':
       case 'browser:navigated':
       case 'browser:element-selected':
