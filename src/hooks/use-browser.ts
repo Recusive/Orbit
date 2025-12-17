@@ -7,6 +7,9 @@ import { useBrowserStore } from '@/stores/browser-store';
 import { useUIStore } from '@/stores/ui-store';
 import { generateUUID } from '@/types/protocol';
 
+// Track pending browser:open requests to navigate after creation
+let pendingNavigationUrl: string | null = null;
+
 /**
  * Hook to handle browser messages from Orbit extension
  */
@@ -40,10 +43,53 @@ export function useBrowser(): void {
         break;
       }
 
+      // browser:open - command from extension to open browser panel and navigate
+      case 'browser:open': {
+        const browserState = useBrowserStore.getState();
+        const url = message.url ?? 'about:blank';
+
+        // 1. Open the activity panel with browser tab
+        useUIStore.getState().openBrowserTab();
+
+        // 2. If browser is not active, create it and queue navigation
+        if (!browserState.isActive && !browserState.isCreating) {
+          pendingNavigationUrl = url;
+          useBrowserStore.getState().setCreating(true);
+          postMessage({
+            type: 'browser:create',
+            uuid: generateUUID(),
+          });
+        } else if (browserState.isActive) {
+          // Browser already active, just navigate
+          postMessage({
+            type: 'browser:navigate',
+            uuid: generateUUID(),
+            url,
+          });
+        }
+        break;
+      }
+
+      // browser:close - command from extension to close browser panel
+      case 'browser:close': {
+        // Switch to a different tab (files is the default)
+        useUIStore.getState().setActivityTab('files');
+        break;
+      }
+
       // Browser messages
       case 'browser:created':
         setViewId(message.viewId);
         setError(null);
+        // Check if there's a pending navigation from browser:open
+        if (pendingNavigationUrl) {
+          postMessage({
+            type: 'browser:navigate',
+            uuid: generateUUID(),
+            url: pendingNavigationUrl,
+          });
+          pendingNavigationUrl = null;
+        }
         break;
 
       case 'browser:navigated':

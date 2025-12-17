@@ -888,6 +888,20 @@ export const BrowserDestroyedSchema = z.object({
   uuid: UUIDSchema,
 });
 
+// Browser open command (from extension to open browser panel and navigate)
+export const BrowserOpenSchema = z.object({
+  type: z.literal('browser:open'),
+  uuid: UUIDSchema,
+  /** URL to navigate to (defaults to about:blank if not provided) */
+  url: z.string().optional(),
+});
+
+// Browser close command (from extension to close browser panel)
+export const BrowserCloseSchema = z.object({
+  type: z.literal('browser:close'),
+  uuid: UUIDSchema,
+});
+
 // Combined extension → webview
 export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   // System
@@ -942,6 +956,8 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   BrowserLoadingSchema,
   BrowserErrorSchema,
   BrowserDestroyedSchema,
+  BrowserOpenSchema,
+  BrowserCloseSchema,
 ]);
 
 // ═══════════════════════════════════════════════════════════════
@@ -1055,6 +1071,8 @@ export type BrowserElementSelected = z.infer<typeof BrowserElementSelectedSchema
 export type BrowserLoading = z.infer<typeof BrowserLoadingSchema>;
 export type BrowserError = z.infer<typeof BrowserErrorSchema>;
 export type BrowserDestroyed = z.infer<typeof BrowserDestroyedSchema>;
+export type BrowserOpen = z.infer<typeof BrowserOpenSchema>;
+export type BrowserClose = z.infer<typeof BrowserCloseSchema>;
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE GUARDS (Protocol layer - prefixed to avoid conflicts with message.ts)
@@ -1092,7 +1110,7 @@ export function isProtocolFileMessage(
 
 export function isProtocolBrowserMessage(
   msg: ExtensionMessage
-): msg is BrowserCreated | BrowserNavigated | BrowserElementSelected | BrowserLoading | BrowserError | BrowserDestroyed {
+): msg is BrowserCreated | BrowserNavigated | BrowserElementSelected | BrowserLoading | BrowserError | BrowserDestroyed | BrowserOpen | BrowserClose {
   return msg.type.startsWith('browser:');
 }
 
