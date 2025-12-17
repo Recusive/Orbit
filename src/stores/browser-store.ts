@@ -135,9 +135,9 @@ export const useBrowserStore = create<BrowserStore>()(
         state.isSelectingElement = false;
         // Auto-add to contexts when selected
         if (element !== null) {
-          // Avoid duplicates by checking displayName
+          // Avoid duplicates by checking selector (unique CSS path to element)
           const exists = state.elementContexts.some(
-            (ctx) => ctx.displayName === element.displayName
+            (ctx) => ctx.selector === element.selector
           );
           if (!exists) {
             state.elementContexts.push(element);
@@ -148,9 +148,9 @@ export const useBrowserStore = create<BrowserStore>()(
 
     addElementContext: (element: ReactElementContext): void => {
       set((state) => {
-        // Avoid duplicates
+        // Avoid duplicates by checking selector (unique CSS path to element)
         const exists = state.elementContexts.some(
-          (ctx) => ctx.displayName === element.displayName
+          (ctx) => ctx.selector === element.selector
         );
         if (!exists) {
           state.elementContexts.push(element);
