@@ -11,8 +11,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { SlashCommand } from '@/components/chat/slash-command-popover';
 import type { ContextItem, FileEntry } from '@/types/context';
-import type { InputMode, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
+import type { ExtensionMessage, InputMode, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 import type { FC } from 'react';
+
 
 import { ElementContextList } from '@/components/browser';
 import {
@@ -33,6 +34,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useVSCode } from '@/hooks/use-vscode';
 import { CONTENT_WIDTH, INPUT_SIZES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useElementContexts, useBrowserStore } from '@/stores/browser-store';
@@ -84,6 +86,32 @@ export const ChatInput: FC<ChatInputProps> = ({
 }) => {
   const [inputText, setInputText] = useState('');
   const [attachedContext, setAttachedContext] = useState<ContextItem[]>([]);
+  const [slashCommands, setSlashCommands] = useState<SlashCommand[]>([]);
+  const commandsFetchedRef = useRef(false);
+
+  // Fetch slash commands from backend
+  const handleCommandsMessage = useCallback((message: ExtensionMessage): void => {
+    if (message.type === 'commands:list:response') {
+      const commands: SlashCommand[] = message.commands.map((cmd) => ({
+        name: cmd.name,
+        description: cmd.description ?? '',
+      }));
+      setSlashCommands(commands);
+    }
+  }, []);
+
+  const { postMessage } = useVSCode({ onMessage: handleCommandsMessage });
+
+  // Fetch commands on mount
+  useEffect(() => {
+    if (!commandsFetchedRef.current) {
+      commandsFetchedRef.current = true;
+      postMessage({
+        type: 'commands:list',
+        uuid: crypto.randomUUID(),
+      });
+    }
+  }, [postMessage]);
 
   // Browser element contexts
   const elementContexts = useElementContexts();
@@ -326,7 +354,7 @@ export const ChatInput: FC<ChatInputProps> = ({
 
     // Handle slash command popover
     if (slashOpen) {
-      const itemCount = getFilteredCommandsCount(slashQuery);
+      const itemCount = getFilteredCommandsCount(slashQuery, slashCommands);
 
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -350,7 +378,7 @@ export const ChatInput: FC<ChatInputProps> = ({
 
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        const selectedCommand = getCommandAtIndex(slashQuery, slashSelectedIndex);
+        const selectedCommand = getCommandAtIndex(slashQuery, slashSelectedIndex, slashCommands);
         if (selectedCommand) {
           handleSlashSelect(selectedCommand);
         }
@@ -471,6 +499,7 @@ export const ChatInput: FC<ChatInputProps> = ({
           onSelect={handleSlashSelect}
           anchorRef={inputRef}
           selectedIndex={slashSelectedIndex}
+          commands={slashCommands}
         />
 
         {/* Controls Row */}

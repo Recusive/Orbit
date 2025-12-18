@@ -13,11 +13,13 @@ import {
   Keyboard,
   MessageSquare,
   Settings2,
+  Terminal,
   User,
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { SlashCommandsSettings } from './slash-commands-settings';
 import { SubagentsSettings } from './subagents-settings';
 
 import type { FC, ReactNode } from 'react';
@@ -39,6 +41,7 @@ import { cn } from '@/lib/utils';
 type SettingsSection =
   | 'agent'
   | 'subagents'
+  | 'commands'
   | 'browser'
   | 'editor'
   | 'notifications'
@@ -587,6 +590,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange, de
   const navItems = [
     { id: 'agent' as const, label: 'Agent', icon: <Icon iconNode={hexagons7} className="h-4 w-4" /> },
     { id: 'subagents' as const, label: 'Subagents', icon: <Bot className="h-4 w-4" /> },
+    { id: 'commands' as const, label: 'Commands', icon: <Terminal className="h-4 w-4" /> },
     { id: 'browser' as const, label: 'Browser', icon: <Globe className="h-4 w-4" /> },
     { id: 'editor' as const, label: 'Editor', icon: <AppWindowMac className="h-4 w-4" /> },
     { id: 'notifications' as const, label: 'Notifications', icon: <Bell className="h-4 w-4" /> },
@@ -602,6 +606,8 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange, de
         return <AgentSettings />;
       case 'subagents':
         return <SubagentsSettings />;
+      case 'commands':
+        return <SlashCommandsSettings />;
       case 'browser':
         return <BrowserSettings />;
       case 'editor':

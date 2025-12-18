@@ -22,10 +22,8 @@ export interface SlashCommand {
   icon?: string;
 }
 
-const SLASH_COMMANDS: SlashCommand[] = [
-  { name: 'compact', description: 'Toggle compact message view' },
-  { name: 'clear', description: 'Clear current conversation' },
-  { name: 'help', description: 'Show available commands' },
+// UI-only commands that are handled client-side (not from backend)
+const UI_COMMANDS: SlashCommand[] = [
   { name: 'new', description: 'Start a new conversation' },
   { name: 'model', description: 'Change the AI model' },
   { name: 'settings', description: 'Open settings' },
@@ -38,6 +36,8 @@ interface SlashCommandPopoverProps {
   readonly onSelect: (command: SlashCommand) => void;
   readonly anchorRef: React.RefObject<HTMLElement | null>;
   readonly selectedIndex: number;
+  /** Commands fetched from backend (will be merged with UI commands) */
+  readonly commands?: SlashCommand[];
 }
 
 export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
@@ -47,9 +47,16 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
   onSelect,
   anchorRef,
   selectedIndex,
+  commands = [],
 }) => {
+  // Merge backend commands with UI-only commands, avoiding duplicates
+  const allCommands = [
+    ...commands,
+    ...UI_COMMANDS.filter((ui) => !commands.some((c) => c.name === ui.name)),
+  ];
+
   // Filter commands based on query
-  const filteredCommands = SLASH_COMMANDS.filter((cmd) =>
+  const filteredCommands = allCommands.filter((cmd) =>
     cmd.name.toLowerCase().includes(query.toLowerCase()) ||
     cmd.description.toLowerCase().includes(query.toLowerCase())
   );
@@ -101,17 +108,25 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
   );
 };
 
+// Helper to merge commands with UI commands
+const mergeCommands = (commands: SlashCommand[]): SlashCommand[] => [
+  ...commands,
+  ...UI_COMMANDS.filter((ui) => !commands.some((c) => c.name === ui.name)),
+];
+
 // Export helper to get filtered commands count
-export const getFilteredCommandsCount = (query: string): number => {
-  return SLASH_COMMANDS.filter((cmd) =>
+export const getFilteredCommandsCount = (query: string, commands: SlashCommand[] = []): number => {
+  const allCommands = mergeCommands(commands);
+  return allCommands.filter((cmd) =>
     cmd.name.toLowerCase().includes(query.toLowerCase()) ||
     cmd.description.toLowerCase().includes(query.toLowerCase())
   ).length;
 };
 
 // Export helper to get command at index
-export const getCommandAtIndex = (query: string, index: number): SlashCommand | null => {
-  const filtered = SLASH_COMMANDS.filter((cmd) =>
+export const getCommandAtIndex = (query: string, index: number, commands: SlashCommand[] = []): SlashCommand | null => {
+  const allCommands = mergeCommands(commands);
+  const filtered = allCommands.filter((cmd) =>
     cmd.name.toLowerCase().includes(query.toLowerCase()) ||
     cmd.description.toLowerCase().includes(query.toLowerCase())
   );

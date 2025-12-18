@@ -449,6 +449,58 @@ export const SubagentDeleteSchema = z.object({
   name: z.string(),
 });
 
+// ═══════════════════════════════════════════════════════════════
+// SLASH COMMANDS (Webview → Extension)
+// ═══════════════════════════════════════════════════════════════
+
+// Command scope: where the command comes from
+export const CommandScopeSchema = z.enum(['builtin', 'default', 'project', 'personal']);
+
+// Slash command definition
+export const SlashCommandDefinitionSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  content: z.string(), // The actual prompt content
+  allowedTools: z.array(z.string()).optional(),
+  argumentHint: z.string().optional(),
+  model: z.enum(['sonnet', 'opus', 'haiku']).optional(),
+  scope: CommandScopeSchema,
+  /** Whether this command is read-only (builtin/default commands) */
+  readonly: z.boolean().optional(),
+});
+
+export type SlashCommandDefinition = z.infer<typeof SlashCommandDefinitionSchema>;
+export type CommandScope = z.infer<typeof CommandScopeSchema>;
+
+// List all slash commands
+export const CommandsListSchema = z.object({
+  type: z.literal('commands:list'),
+  uuid: UUIDSchema,
+});
+
+// Create a new slash command
+export const CommandCreateSchema = z.object({
+  type: z.literal('commands:create'),
+  uuid: UUIDSchema,
+  command: SlashCommandDefinitionSchema,
+});
+
+// Update an existing slash command
+export const CommandUpdateSchema = z.object({
+  type: z.literal('commands:update'),
+  uuid: UUIDSchema,
+  originalName: z.string(),
+  command: SlashCommandDefinitionSchema,
+});
+
+// Delete a slash command
+export const CommandDeleteSchema = z.object({
+  type: z.literal('commands:delete'),
+  uuid: UUIDSchema,
+  name: z.string(),
+  scope: CommandScopeSchema,
+});
+
 // Combined webview → extension
 export const WebviewMessageSchema = z.discriminatedUnion('type', [
   // System
@@ -518,6 +570,11 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   SubagentCreateSchema,
   SubagentUpdateSchema,
   SubagentDeleteSchema,
+  // Slash Commands
+  CommandsListSchema,
+  CommandCreateSchema,
+  CommandUpdateSchema,
+  CommandDeleteSchema,
 ]);
 
 // ═══════════════════════════════════════════════════════════════
@@ -1003,6 +1060,50 @@ export const SubagentErrorSchema = z.object({
   error: z.string(),
 });
 
+// ═══════════════════════════════════════════════════════════════
+// SLASH COMMANDS (Extension → Webview)
+// ═══════════════════════════════════════════════════════════════
+
+// Response with list of all slash commands
+export const CommandsListResponseSchema = z.object({
+  type: z.literal('commands:list:response'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  commands: z.array(SlashCommandDefinitionSchema),
+});
+
+// Confirmation that a command was created
+export const CommandCreatedSchema = z.object({
+  type: z.literal('commands:created'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  command: SlashCommandDefinitionSchema,
+});
+
+// Confirmation that a command was updated
+export const CommandUpdatedSchema = z.object({
+  type: z.literal('commands:updated'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  command: SlashCommandDefinitionSchema,
+});
+
+// Confirmation that a command was deleted
+export const CommandDeletedSchema = z.object({
+  type: z.literal('commands:deleted'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  name: z.string(),
+});
+
+// Error during command operation
+export const CommandErrorSchema = z.object({
+  type: z.literal('commands:error'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  error: z.string(),
+});
+
 // Combined extension → webview
 export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   // System
@@ -1066,6 +1167,12 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   SubagentUpdatedSchema,
   SubagentDeletedSchema,
   SubagentErrorSchema,
+  // Slash Commands
+  CommandsListResponseSchema,
+  CommandCreatedSchema,
+  CommandUpdatedSchema,
+  CommandDeletedSchema,
+  CommandErrorSchema,
 ]);
 
 // ═══════════════════════════════════════════════════════════════
