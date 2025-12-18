@@ -3,6 +3,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
   AppWindowMac,
   Bell,
+  Bot,
   ChevronRight,
   FileText,
   FlaskConical,
@@ -16,6 +17,8 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+import { SubagentsSettings } from './subagents-settings';
 
 import type { FC, ReactNode } from 'react';
 
@@ -35,6 +38,7 @@ import { cn } from '@/lib/utils';
 
 type SettingsSection =
   | 'agent'
+  | 'subagents'
   | 'browser'
   | 'editor'
   | 'notifications'
@@ -582,6 +586,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange, de
 
   const navItems = [
     { id: 'agent' as const, label: 'Agent', icon: <Icon iconNode={hexagons7} className="h-4 w-4" /> },
+    { id: 'subagents' as const, label: 'Subagents', icon: <Bot className="h-4 w-4" /> },
     { id: 'browser' as const, label: 'Browser', icon: <Globe className="h-4 w-4" /> },
     { id: 'editor' as const, label: 'Editor', icon: <AppWindowMac className="h-4 w-4" /> },
     { id: 'notifications' as const, label: 'Notifications', icon: <Bell className="h-4 w-4" /> },
@@ -595,6 +600,8 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange, de
     switch (activeSection) {
       case 'agent':
         return <AgentSettings />;
+      case 'subagents':
+        return <SubagentsSettings />;
       case 'browser':
         return <BrowserSettings />;
       case 'editor':

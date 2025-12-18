@@ -405,6 +405,50 @@ export const BrowserHideSchema = z.object({
   uuid: UUIDSchema,
 });
 
+// ═══════════════════════════════════════════════════════════════
+// SUBAGENTS (Webview → Extension)
+// ═══════════════════════════════════════════════════════════════
+
+// Subagent definition
+export const SubagentDefinitionSchema = z.object({
+  name: z.string().min(1),
+  description: z.string(),
+  prompt: z.string(),
+  tools: z.array(z.string()).optional(),
+  disallowedTools: z.array(z.string()).optional(),
+  model: z.enum(['sonnet', 'opus', 'haiku', 'inherit']).optional(),
+});
+
+export type SubagentDefinition = z.infer<typeof SubagentDefinitionSchema>;
+
+// List all subagents
+export const SubagentsListSchema = z.object({
+  type: z.literal('subagents:list'),
+  uuid: UUIDSchema,
+});
+
+// Create a new subagent
+export const SubagentCreateSchema = z.object({
+  type: z.literal('subagents:create'),
+  uuid: UUIDSchema,
+  agent: SubagentDefinitionSchema,
+});
+
+// Update an existing subagent
+export const SubagentUpdateSchema = z.object({
+  type: z.literal('subagents:update'),
+  uuid: UUIDSchema,
+  originalName: z.string(),
+  agent: SubagentDefinitionSchema,
+});
+
+// Delete a subagent
+export const SubagentDeleteSchema = z.object({
+  type: z.literal('subagents:delete'),
+  uuid: UUIDSchema,
+  name: z.string(),
+});
+
 // Combined webview → extension
 export const WebviewMessageSchema = z.discriminatedUnion('type', [
   // System
@@ -469,6 +513,11 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   BrowserDevToolsSchema,
   BrowserShowSchema,
   BrowserHideSchema,
+  // Subagents
+  SubagentsListSchema,
+  SubagentCreateSchema,
+  SubagentUpdateSchema,
+  SubagentDeleteSchema,
 ]);
 
 // ═══════════════════════════════════════════════════════════════
@@ -910,6 +959,50 @@ export const BrowserCloseSchema = z.object({
   uuid: UUIDSchema,
 });
 
+// ═══════════════════════════════════════════════════════════════
+// SUBAGENTS (Extension → Webview)
+// ═══════════════════════════════════════════════════════════════
+
+// Response with list of all subagents
+export const SubagentsListResponseSchema = z.object({
+  type: z.literal('subagents:list:response'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  agents: z.array(SubagentDefinitionSchema),
+});
+
+// Confirmation that a subagent was created
+export const SubagentCreatedSchema = z.object({
+  type: z.literal('subagents:created'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  agent: SubagentDefinitionSchema,
+});
+
+// Confirmation that a subagent was updated
+export const SubagentUpdatedSchema = z.object({
+  type: z.literal('subagents:updated'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  agent: SubagentDefinitionSchema,
+});
+
+// Confirmation that a subagent was deleted
+export const SubagentDeletedSchema = z.object({
+  type: z.literal('subagents:deleted'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  name: z.string(),
+});
+
+// Error during subagent operation
+export const SubagentErrorSchema = z.object({
+  type: z.literal('subagents:error'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  error: z.string(),
+});
+
 // Combined extension → webview
 export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   // System
@@ -967,6 +1060,12 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   BrowserDestroyedSchema,
   BrowserOpenSchema,
   BrowserCloseSchema,
+  // Subagents
+  SubagentsListResponseSchema,
+  SubagentCreatedSchema,
+  SubagentUpdatedSchema,
+  SubagentDeletedSchema,
+  SubagentErrorSchema,
 ]);
 
 // ═══════════════════════════════════════════════════════════════
