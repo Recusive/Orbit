@@ -8,6 +8,7 @@ import { useVSCode } from '@/hooks/use-vscode';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/diff-utils';
 import { useFileStore } from '@/stores/file-store';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
+import { useQueuedMessageStore } from '@/stores/queued-message-store';
 import { useToolStore } from '@/stores/tool-store';
 import { useUIStore } from '@/stores/ui-store';
 
@@ -21,7 +22,10 @@ interface UseChatMessagesReturn {
   sessionId: string;
   isMockMode: boolean;
   postMessage: ReturnType<typeof useVSCode>['postMessage'];
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
+  setIsAgentRunning: React.Dispatch<React.SetStateAction<boolean>>;
   handleSend: (text: string, contextFiles?: string[], images?: ImageAttachment[], elements?: ReactElementContext[]) => void;
+  handleStop: () => void;
   handleRewind: (messageId: string) => void;
   handlePermissionApprove: (requestId: string, always?: boolean) => void;
   handlePermissionDeny: (requestId: string) => void;
@@ -67,7 +71,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   messagesRef.current = messages;
 
   const { setWorkspace, setActiveConversation, setConversations, addConversation, updateConversationTitle, conversations } = useUIStore();
-  const { setInputMode, setThinkingMode, setModel, startTool, completeTool, addPermissionRequest, removePermissionRequest, addUsage } = useToolStore();
+  const { setInputMode, setThinkingMode, setModel, startTool, completeTool, addPermissionRequest, removePermissionRequest, clearPermissions, addUsage } = useToolStore();
+  const { queueMessage: storeQueueMessage } = useQueuedMessageStore();
 
   // Save messages to cache whenever they change (for conversation switching)
   useEffect(() => {
@@ -198,6 +203,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
 
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
+          // Only update if still streaming (not already interrupted)
           if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
             return [...prev.slice(0, -1), {
               ...lastMsg,
@@ -206,6 +212,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
               ...(finalThinkingDuration !== undefined && lastMsg.thinking ? { thinkingDurationMs: finalThinkingDuration } : {}),
             }];
           }
+          // If message was already marked as interrupted, don't change it
           return prev;
         });
         // Track usage data from SDK (deduplicates by message_id)
@@ -219,10 +226,24 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       case 'agent:error': {
         setIsAgentRunning(false);
         const errorContent = `Error: ${message.error}`;
-        setMessages((prev) => [
-          ...prev,
-          { id: message.message_id, role: 'assistant', content: errorContent, displayedContent: errorContent },
-        ]);
+        setMessages((prev) => {
+          const lastMsg = prev[prev.length - 1];
+          // If there's an existing assistant message (possibly interrupted), append error to it
+          if (lastMsg?.role === 'assistant') {
+            const newContent = lastMsg.content ? `${lastMsg.content}\n\n${errorContent}` : errorContent;
+            return [...prev.slice(0, -1), {
+              ...lastMsg,
+              content: newContent,
+              displayedContent: newContent,
+              isStreaming: false,
+            }];
+          }
+          // Otherwise create new error message
+          return [
+            ...prev,
+            { id: message.message_id, role: 'assistant' as const, content: errorContent, displayedContent: errorContent },
+          ];
+        });
         break;
       }
 
@@ -511,7 +532,13 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   }, [sessionId, pendingMessage, postMessage, updateConversationTitle]);
 
   const handleSend = useCallback((text: string, contextFiles?: string[], images?: ImageAttachment[], elements?: ReactElementContext[]): void => {
-    if (!text || isAgentRunning) return;
+    if (!text) return;
+
+    // If agent is running, queue the message for later
+    if (isAgentRunning) {
+      storeQueueMessage({ text, contextFiles, images, elements, sessionId });
+      return;
+    }
 
     // Check if conversation already exists in sidebar
     const conversationExists = sessionId !== '' && conversations.some(c => c.sessionId === sessionId);
@@ -594,7 +621,44 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       content: text,
       context,
     });
-  }, [sessionId, isAgentRunning, messages.length, conversations, postMessage, updateConversationTitle]);
+  }, [sessionId, isAgentRunning, messages.length, conversations, postMessage, updateConversationTitle, storeQueueMessage]);
+
+  const handleStop = useCallback((): void => {
+    if (!sessionId || !isAgentRunning) return;
+
+    // Send interrupt to stop the agent
+    postMessage({
+      type: 'agent:stop',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+    });
+
+    // Update local state immediately for responsive UI
+    setIsAgentRunning(false);
+
+    // Clear any pending permission requests since agent is stopped
+    clearPermissions();
+
+    // Mark any streaming message as complete and interrupted, or create one if none exists
+    setMessages((prev) => {
+      const lastMsg = prev[prev.length - 1];
+      if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+        return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false, isInterrupted: true }];
+      }
+      // If no assistant message exists yet, create an interrupted placeholder
+      if (!lastMsg || lastMsg.role === 'user') {
+        return [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant' as const,
+          content: '',
+          displayedContent: '',
+          isStreaming: false,
+          isInterrupted: true,
+        }];
+      }
+      return prev;
+    });
+  }, [sessionId, isAgentRunning, postMessage, clearPermissions]);
 
   const handleRewind = useCallback((messageId: string): void => {
     if (!sessionId || isAgentRunning) return;
@@ -624,6 +688,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   const handlePermissionDeny = useCallback((requestId: string): void => {
     if (!sessionId) return;
 
+    // Send denial response to the SDK
     postMessage({
       type: 'permission:response',
       uuid: crypto.randomUUID(),
@@ -631,8 +696,41 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       request_id: requestId,
       decision: 'deny',
     });
-    removePermissionRequest(requestId);
-  }, [sessionId, postMessage, removePermissionRequest]);
+
+    // Clear ALL pending permissions since we're stopping the agent
+    clearPermissions();
+
+    // Also interrupt the agent - SDK continues after denial by default,
+    // but user expects declining permission to stop the agent
+    postMessage({
+      type: 'agent:stop',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+    });
+
+    // Update local state immediately
+    setIsAgentRunning(false);
+
+    // Mark any streaming message as complete and interrupted, or create one if none exists
+    setMessages((prev) => {
+      const lastMsg = prev[prev.length - 1];
+      if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+        return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false, isInterrupted: true }];
+      }
+      // If no assistant message exists yet, create an interrupted placeholder
+      if (!lastMsg || lastMsg.role === 'user') {
+        return [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant' as const,
+          content: '',
+          displayedContent: '',
+          isStreaming: false,
+          isInterrupted: true,
+        }];
+      }
+      return prev;
+    });
+  }, [sessionId, postMessage, clearPermissions]);
 
   const handleOpenFile = useCallback((path: string): void => {
     const fileViewerStore = useFileViewerStore.getState();
@@ -700,7 +798,10 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     sessionId,
     isMockMode,
     postMessage,
+    setMessages,
+    setIsAgentRunning,
     handleSend,
+    handleStop,
     handleRewind,
     handlePermissionApprove,
     handlePermissionDeny,

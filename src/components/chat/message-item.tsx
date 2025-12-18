@@ -5,6 +5,7 @@ import type { ImageAttachment } from '@/components/chat/chat-input';
 import type { ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
+import { InterruptIndicator } from '@/components/chat/interrupt-indicator';
 import { MessageActions } from '@/components/chat/message-actions';
 import { ThinkingBox } from '@/components/chat/thinking-box';
 import { BashToolWidget } from '@/components/chat/tools/bash-tool-widget';
@@ -26,6 +27,7 @@ export interface ChatMessage {
   content: string;
   displayedContent: string;
   isStreaming?: boolean | undefined;
+  isInterrupted?: boolean | undefined;
   thinking?: string | undefined;
   thinkingDurationMs?: number | undefined;
   /** Attached file paths for user messages */
@@ -41,6 +43,7 @@ interface MessageItemProps {
   readonly onRewind: (messageId: string) => void;
   readonly onOpenFile: (path: string) => void;
   readonly onOpenUrl: (url: string) => void;
+  readonly onFeedback: () => void;
 }
 
 // Helper to extract string from tool input
@@ -61,6 +64,7 @@ export const MessageItem: FC<MessageItemProps> = ({
   onRewind,
   onOpenFile,
   onOpenUrl,
+  onFeedback,
 }) => {
   const isComplete = !message.isStreaming && message.displayedContent.length === message.content.length;
 
@@ -284,6 +288,10 @@ export const MessageItem: FC<MessageItemProps> = ({
                 rewindDisabled={isLastAssistantMessage}
                 onRewind={() => { onRewind(message.id); }}
               />
+            ) : null}
+            {/* Interrupt indicator - shown when message was interrupted */}
+            {message.isInterrupted ? (
+              <InterruptIndicator onFeedback={onFeedback} />
             ) : null}
           </>
         )}

@@ -1,11 +1,11 @@
 import {
-  ArrowRight,
+  ArrowUp,
   AtSign,
   Coins,
   Globe,
   Image,
   Lightbulb,
-  Loader2,
+  Square,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -63,6 +63,7 @@ interface ChatInputProps {
   readonly usage: UsageData;
   readonly maxTokens: number;
   readonly onSend: (text: string, contextFiles?: string[], images?: ImageAttachment[], elements?: ReactElementContext[]) => void;
+  readonly onStop: () => void;
   readonly onModeChange: (mode: InputMode) => void;
   readonly onThinkingModeChange: (mode: ThinkingMode) => void;
   readonly onModelChange: (model: Model) => void;
@@ -76,6 +77,7 @@ export const ChatInput: FC<ChatInputProps> = ({
   usage,
   maxTokens,
   onSend,
+  onStop,
   onModeChange,
   onThinkingModeChange,
   onModelChange,
@@ -105,6 +107,15 @@ export const ChatInput: FC<ChatInputProps> = ({
   useEffect(() => {
     setSlashSelectedIndex(0);
   }, [slashQuery]);
+
+  // Listen for focus event from feedback button
+  useEffect(() => {
+    const handleFocusEvent = (): void => {
+      inputRef.current?.focus();
+    };
+    window.addEventListener('focusChatInput', handleFocusEvent);
+    return () => { window.removeEventListener('focusChatInput', handleFocusEvent); };
+  }, []);
 
   const handleInputChange = (e: React.FormEvent<HTMLDivElement>): void => {
     const text = e.currentTarget.textContent || '';
@@ -160,7 +171,7 @@ export const ChatInput: FC<ChatInputProps> = ({
 
   const handleSend = useCallback((): void => {
     const text = inputText.trim();
-    if (!text || isAgentRunning) return;
+    if (!text) return;
 
     // Clear input immediately
     setInputText('');
@@ -193,7 +204,7 @@ export const ChatInput: FC<ChatInputProps> = ({
     );
     setAttachedContext([]);
     clearElementContexts();
-  }, [inputText, isAgentRunning, onSend, attachedContext, clearElementContexts, elementContexts]);
+  }, [inputText, onSend, attachedContext, clearElementContexts, elementContexts]);
 
   const handleImageClick = useCallback((): void => {
     imageInputRef.current?.click();
@@ -306,6 +317,13 @@ export const ChatInput: FC<ChatInputProps> = ({
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
+    // Escape stops the agent when running (highest priority)
+    if (e.key === 'Escape' && isAgentRunning && !slashOpen && !mentionOpen) {
+      e.preventDefault();
+      onStop();
+      return;
+    }
+
     // Handle slash command popover
     if (slashOpen) {
       const itemCount = getFilteredCommandsCount(slashQuery);
@@ -424,7 +442,7 @@ export const ChatInput: FC<ChatInputProps> = ({
           ref={inputRef}
           className="p-2 text-sm outline-none overflow-y-auto"
           style={{ minHeight: INPUT_SIZES.textareaMinHeight, maxHeight: 300 }}
-          contentEditable={!isAgentRunning}
+          contentEditable
           suppressContentEditableWarning
           data-placeholder="Plan, @ for context, / for commands"
           data-empty={isInputEmpty}
@@ -588,23 +606,30 @@ export const ChatInput: FC<ChatInputProps> = ({
                 </ContextContentBody>
               </ContextContent>
             </Context>
-            {/* Send Button */}
-            <button
-              onClick={handleSend}
-              disabled={isInputEmpty || isAgentRunning}
-              className={cn(
-                'h-7 w-7 flex items-center justify-center rounded-full transition-colors',
-                isInputEmpty || isAgentRunning
-                  ? 'bg-primary/30 text-primary-foreground opacity-50 cursor-not-allowed'
-                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
-              )}
-            >
-              {isAgentRunning ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ArrowRight className="h-4 w-4" />
-              )}
-            </button>
+            {/* Send/Stop Button */}
+            {isAgentRunning && isInputEmpty ? (
+              <button
+                onClick={onStop}
+                className="h-7 w-7 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                title="Stop (Esc)"
+              >
+                <Square className="h-3 w-3 fill-current" />
+              </button>
+            ) : (
+              <button
+                onClick={handleSend}
+                disabled={isInputEmpty}
+                className={cn(
+                  'h-7 w-7 flex items-center justify-center rounded-full transition-colors',
+                  isInputEmpty
+                    ? 'bg-primary/30 text-primary-foreground opacity-50 cursor-not-allowed'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                )}
+                title={isAgentRunning ? 'Queue message' : 'Send message'}
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>

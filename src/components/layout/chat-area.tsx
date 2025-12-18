@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
+import type { ChatMessage } from '@/components/chat/message-item';
 import type { FileEntry } from '@/types/context';
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
@@ -8,6 +9,7 @@ import { ActivityPanel } from '@/components/activity/activity-panel';
 import { ChatHeader } from '@/components/chat/chat-header';
 import { ChatInput } from '@/components/chat/chat-input';
 import { ChatMessages } from '@/components/chat/chat-messages';
+import { useQueuedMessageHandler } from '@/components/chat/queued-message';
 import { WelcomeGreeting } from '@/components/chat/welcome-greeting';
 import { ResizeHandle } from '@/components/layout/resize-handle';
 import { TerminalPanel } from '@/components/terminal/terminal-panel';
@@ -30,8 +32,12 @@ export const ChatArea: FC = () => {
   const {
     messages,
     isAgentRunning,
+    sessionId,
     postMessage,
+    setMessages,
+    setIsAgentRunning,
     handleSend,
+    handleStop,
     handleRewind,
     handlePermissionApprove,
     handlePermissionDeny,
@@ -41,6 +47,23 @@ export const ChatArea: FC = () => {
     handleThinkingModeChange,
     handleModelChange,
   } = useChatMessages();
+
+  // Create addMessage function for queued message handler
+  const addMessage = useCallback((message: ChatMessage): void => {
+    setMessages((prev) => [...prev, message]);
+  }, [setMessages]);
+
+  // Use queued message handler for sending messages while agent is running
+  const { queuedMessage: rawQueuedMessage, cancelQueue } = useQueuedMessageHandler({
+    isAgentRunning,
+    sessionId,
+    postMessage,
+    addMessage,
+    setIsAgentRunning,
+  });
+
+  // Only show queued message if it belongs to current session
+  const queuedMessage = rawQueuedMessage?.sessionId === sessionId ? rawQueuedMessage : null;
 
   // Handle file list response for @ mentions
   const handleFileListMessage = (message: ExtensionMessage): void => {
@@ -63,6 +86,11 @@ export const ChatArea: FC = () => {
       uuid: crypto.randomUUID(),
     });
   }, [postMessage]);
+
+  // Handle feedback click - dispatches event to focus input
+  const handleFeedback = useCallback((): void => {
+    window.dispatchEvent(new CustomEvent('focusChatInput'));
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background">
@@ -87,6 +115,7 @@ export const ChatArea: FC = () => {
                   usage={sessionUsage}
                   maxTokens={maxTokens}
                   onSend={handleSend}
+                  onStop={handleStop}
                   onModeChange={handleModeChange}
                   onThinkingModeChange={handleThinkingModeChange}
                   onModelChange={handleModelChange}
@@ -99,12 +128,15 @@ export const ChatArea: FC = () => {
                   messages={messages}
                   pendingPermissions={pendingPermissions}
                   isAgentRunning={isAgentRunning}
+                  queuedMessage={queuedMessage}
                   getToolsForMessage={getToolsForMessage}
                   onRewind={handleRewind}
                   onOpenFile={handleOpenFile}
                   onOpenUrl={handleOpenUrl}
                   onPermissionApprove={handlePermissionApprove}
                   onPermissionDeny={handlePermissionDeny}
+                  onCancelQueue={cancelQueue}
+                  onFeedback={handleFeedback}
                 />
                 <ChatInput
                   inputMode={inputMode}
@@ -114,6 +146,7 @@ export const ChatArea: FC = () => {
                   usage={sessionUsage}
                   maxTokens={maxTokens}
                   onSend={handleSend}
+                  onStop={handleStop}
                   onModeChange={handleModeChange}
                   onThinkingModeChange={handleThinkingModeChange}
                   onModelChange={handleModelChange}

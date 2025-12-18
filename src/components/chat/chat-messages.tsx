@@ -2,34 +2,42 @@ import { Loader2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
 import type { ChatMessage } from '@/components/chat/message-item';
+import type { QueuedMessage } from '@/stores/queued-message-store';
 import type { PermissionRequest, ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
 import { MessageItem } from '@/components/chat/message-item';
 import { PermissionModal } from '@/components/chat/permission-modal';
+import { QueuedMessageBubble } from '@/components/chat/queued-message';
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
   readonly pendingPermissions: PermissionRequest[];
   readonly isAgentRunning: boolean;
+  readonly queuedMessage: QueuedMessage | null;
   readonly getToolsForMessage: (messageId: string) => ToolExecution[];
   readonly onRewind: (messageId: string) => void;
   readonly onOpenFile: (path: string) => void;
   readonly onOpenUrl: (url: string) => void;
   readonly onPermissionApprove: (requestId: string, always?: boolean) => void;
   readonly onPermissionDeny: (requestId: string) => void;
+  readonly onCancelQueue: () => void;
+  readonly onFeedback: () => void;
 }
 
 export const ChatMessages: FC<ChatMessagesProps> = ({
   messages,
   pendingPermissions,
   isAgentRunning,
+  queuedMessage,
   getToolsForMessage,
   onRewind,
   onOpenFile,
   onOpenUrl,
   onPermissionApprove,
   onPermissionDeny,
+  onCancelQueue,
+  onFeedback,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -57,6 +65,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
               onRewind={onRewind}
               onOpenFile={onOpenFile}
               onOpenUrl={onOpenUrl}
+              onFeedback={onFeedback}
             />
           );
         })}
@@ -70,6 +79,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             onOpenFile={onOpenFile}
           />
         ))}
+        {/* Queued message bubble - shows when user typed while agent was running */}
+        {queuedMessage !== null ? (
+          <QueuedMessageBubble
+            message={queuedMessage}
+            onCancel={onCancelQueue}
+          />
+        ) : null}
         {/* Progress indicator - shows while agent is running OR text is still animating */}
         {(isAgentRunning || isAnimating) ? (
           <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
