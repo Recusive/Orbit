@@ -56,6 +56,7 @@ export function useTerminalInstanceManager(): TerminalInstanceManager {
   const sessions = useTerminalStore((state) => state.sessions);
   const connectSession = useTerminalStore((state) => state.connectSession);
   const disconnectSession = useTerminalStore((state) => state.disconnectSession);
+  const updateSession = useTerminalStore((state) => state.updateSession);
   const updateCwd = useTerminalStore((state) => state.updateCwd);
   const updateCapabilities = useTerminalStore((state) => state.updateCapabilities);
   const startCommand = useTerminalStore((state) => state.startCommand);
@@ -80,8 +81,14 @@ export function useTerminalInstanceManager(): TerminalInstanceManager {
     // Initialize if not already (first time setup)
     if (!manager.isInitialized()) {
       manager.initialize(postMessage as (message: unknown) => void, isMockMode, {
-        onInstanceConnected: (sessionId, terminalId, pid, shellType) => {
+        onInstanceConnected: (sessionId, terminalId, pid, shellType, name) => {
           connectSession(sessionId, terminalId, pid, shellType as ShellType | undefined);
+          // Update session name to show the process name (e.g., "zsh", "node")
+          // Extract basename from full path (e.g., "/bin/zsh" -> "zsh")
+          if (name) {
+            const basename = name.split('/').pop() ?? name;
+            updateSession(sessionId, { name: basename });
+          }
         },
         onInstanceDisconnected: (sessionId, exitCode) => {
           disconnectSession(sessionId, exitCode);
@@ -113,6 +120,12 @@ export function useTerminalInstanceManager(): TerminalInstanceManager {
           if (termId) {
             updateCapabilities(termId, capabilities);
           }
+        },
+        onTitleChange: (sessionId, title) => {
+          // Update session name when PTY title changes (e.g., "zsh" -> "node")
+          // Extract basename from full path
+          const basename = title.split('/').pop() ?? title;
+          updateSession(sessionId, { name: basename });
         },
       });
     } else {
@@ -122,8 +135,14 @@ export function useTerminalInstanceManager(): TerminalInstanceManager {
 
       // Update callbacks with latest store action references
       manager.updateCallbacks({
-        onInstanceConnected: (sessionId, terminalId, pid, shellType) => {
+        onInstanceConnected: (sessionId, terminalId, pid, shellType, name) => {
           connectSession(sessionId, terminalId, pid, shellType as ShellType | undefined);
+          // Update session name to show the process name (e.g., "zsh", "node")
+          // Extract basename from full path (e.g., "/bin/zsh" -> "zsh")
+          if (name) {
+            const basename = name.split('/').pop() ?? name;
+            updateSession(sessionId, { name: basename });
+          }
         },
         onInstanceDisconnected: (sessionId, exitCode) => {
           disconnectSession(sessionId, exitCode);
@@ -155,6 +174,12 @@ export function useTerminalInstanceManager(): TerminalInstanceManager {
           if (termId) {
             updateCapabilities(termId, capabilities);
           }
+        },
+        onTitleChange: (sessionId, title) => {
+          // Update session name when PTY title changes (e.g., "zsh" -> "node")
+          // Extract basename from full path
+          const basename = title.split('/').pop() ?? title;
+          updateSession(sessionId, { name: basename });
         },
       });
     }
@@ -166,6 +191,7 @@ export function useTerminalInstanceManager(): TerminalInstanceManager {
     isMockMode,
     connectSession,
     disconnectSession,
+    updateSession,
     updateCwd,
     updateCapabilities,
     startCommand,

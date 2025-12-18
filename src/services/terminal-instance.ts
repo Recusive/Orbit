@@ -39,7 +39,7 @@ export interface TerminalInstanceOptions {
   sessionName: string;
   postMessage: (message: unknown) => void;
   isMockMode?: boolean;
-  onConnected?: (terminalId: string, pid?: number, shellType?: string) => void;
+  onConnected?: (terminalId: string, pid?: number, shellType?: string, name?: string) => void;
   onDisconnected?: (exitCode?: number) => void;
   onCwdChange?: (cwd: string) => void;
   onCommandStart?: (commandLine?: string) => void;
@@ -49,6 +49,7 @@ export interface TerminalInstanceOptions {
     command_detection: boolean;
     shell_integration: boolean;
   }) => void;
+  onTitleChange?: (title: string) => void;
 }
 
 export interface TerminalCapabilities {
@@ -100,6 +101,7 @@ export class TerminalInstance {
   private onCommandStart?: TerminalInstanceOptions['onCommandStart'];
   private onCommandEnd?: TerminalInstanceOptions['onCommandEnd'];
   private onCapabilitiesChange?: TerminalInstanceOptions['onCapabilitiesChange'];
+  private onTitleChange?: TerminalInstanceOptions['onTitleChange'];
 
   constructor(options: TerminalInstanceOptions) {
     this.sessionId = options.sessionId;
@@ -112,6 +114,7 @@ export class TerminalInstance {
     this.onCommandStart = options.onCommandStart;
     this.onCommandEnd = options.onCommandEnd;
     this.onCapabilitiesChange = options.onCapabilitiesChange;
+    this.onTitleChange = options.onTitleChange;
 
     // Initialize xterm.js with theme
     const baseTheme = getBestTheme();
@@ -346,9 +349,11 @@ export class TerminalInstance {
     exit_code?: number;
     pid?: number;
     shell_type?: string;
+    name?: string;
     cwd?: string;
     command_line?: string;
     capabilities?: TerminalCapabilities;
+    title?: string;
   }): void {
     if (this.isDisposed) return;
 
@@ -362,7 +367,8 @@ export class TerminalInstance {
         this.onConnected?.(
           message.terminal_id ?? '',
           message.pid,
-          message.shell_type
+          message.shell_type,
+          message.name
         );
         break;
       }
@@ -420,6 +426,14 @@ export class TerminalInstance {
         if (message.exit_code !== undefined) {
           this.decorationsAddon.markCommandEnd(message.exit_code);
           this.onCommandEnd?.(message.exit_code);
+        }
+        break;
+      }
+
+      case 'terminal:title': {
+        if (message.terminal_id !== this.terminalId) return;
+        if (message.title) {
+          this.onTitleChange?.(message.title);
         }
         break;
       }

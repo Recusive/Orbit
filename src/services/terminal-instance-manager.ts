@@ -24,12 +24,13 @@ export interface TerminalInstanceInfo {
 }
 
 export interface TerminalManagerCallbacks {
-  onInstanceConnected?: (sessionId: string, terminalId: string, pid?: number, shellType?: string) => void;
+  onInstanceConnected?: (sessionId: string, terminalId: string, pid?: number, shellType?: string, name?: string) => void;
   onInstanceDisconnected?: (sessionId: string, exitCode?: number) => void;
   onCwdChange?: (sessionId: string, cwd: string) => void;
   onCommandStart?: (sessionId: string, commandLine?: string) => void;
   onCommandEnd?: (sessionId: string, exitCode: number) => void;
   onCapabilitiesChange?: (sessionId: string, capabilities: TerminalCapabilities) => void;
+  onTitleChange?: (sessionId: string, title: string) => void;
 }
 
 // ============================================================================
@@ -167,8 +168,8 @@ export class TerminalInstanceManager {
       sessionName,
       postMessage: globalPostMessage,
       isMockMode: globalIsMockMode,
-      onConnected: (terminalId, pid, shellType) => {
-        globalCallbacks.onInstanceConnected?.(sessionId, terminalId, pid, shellType);
+      onConnected: (terminalId, pid, shellType, name) => {
+        globalCallbacks.onInstanceConnected?.(sessionId, terminalId, pid, shellType, name);
       },
       onDisconnected: (exitCode) => {
         globalCallbacks.onInstanceDisconnected?.(sessionId, exitCode);
@@ -184,6 +185,9 @@ export class TerminalInstanceManager {
       },
       onCapabilitiesChange: (capabilities) => {
         globalCallbacks.onCapabilitiesChange?.(sessionId, capabilities);
+      },
+      onTitleChange: (title) => {
+        globalCallbacks.onTitleChange?.(sessionId, title);
       },
     });
 

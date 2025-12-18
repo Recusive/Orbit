@@ -688,6 +688,14 @@ export const TerminalCapabilitiesChangedSchema = z.object({
   capabilities: TerminalCapabilitiesStateSchema,
 });
 
+// PTY Terminal - Title/process name changed (from PTY title escape sequence)
+export const TerminalTitleChangedSchema = z.object({
+  type: z.literal('terminal:title'),
+  uuid: UUIDSchema,
+  terminal_id: z.string(),
+  title: z.string(),
+});
+
 // Files
 export const FileContentSchema = z.object({
   type: z.literal('file:content'),
@@ -934,6 +942,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   TerminalCommandStartSchema,
   TerminalCommandEndSchema,
   TerminalCapabilitiesChangedSchema,
+  TerminalTitleChangedSchema,
   // Files
   FileContentSchema,
   FileChangedSchema,
@@ -1049,6 +1058,7 @@ export type TerminalCwdChanged = z.infer<typeof TerminalCwdChangedSchema>;
 export type TerminalCommandStart = z.infer<typeof TerminalCommandStartSchema>;
 export type TerminalCommandEnd = z.infer<typeof TerminalCommandEndSchema>;
 export type TerminalCapabilitiesChanged = z.infer<typeof TerminalCapabilitiesChangedSchema>;
+export type TerminalTitleChanged = z.infer<typeof TerminalTitleChangedSchema>;
 export type FileContent = z.infer<typeof FileContentSchema>;
 export type FileChanged = z.infer<typeof FileChangedSchema>;
 export type FileWritten = z.infer<typeof FileWrittenSchema>;
