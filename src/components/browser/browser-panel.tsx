@@ -155,6 +155,14 @@ export const BrowserPanel: FC<BrowserPanelProps> = ({ width }) => {
     });
   }, [postMessage]);
 
+  // Close/destroy browser handler
+  const handleCloseBrowser = useCallback((): void => {
+    postMessage({
+      type: 'browser:destroy',
+      uuid: generateUUID(),
+    });
+  }, [postMessage]);
+
   return (
     <div className="h-full flex flex-col bg-background" style={{ width }}>
       {/* Toolbar */}
@@ -166,7 +174,7 @@ export const BrowserPanel: FC<BrowserPanelProps> = ({ width }) => {
         onNavigate={handleNavigate}
         onSelectElement={handleSelectElement}
         onCancelSelectElement={handleCancelSelectElement}
-        {...(isActive ? { onOpenDevTools: handleOpenDevTools } : {})}
+        {...(isActive ? { onOpenDevTools: handleOpenDevTools, onClose: handleCloseBrowser } : {})}
       />
 
       {/* Viewport area - BrowserView will be positioned over this */}

@@ -59,10 +59,26 @@ interface BrowserActions {
 
 type BrowserStore = BrowserState & BrowserActions;
 
+// Restore browser state from localStorage (survives webview reloads)
+const getPersistedState = (): Partial<BrowserState> => {
+  try {
+    const viewId = localStorage.getItem('orbit-browser-viewId');
+    const isActive = localStorage.getItem('orbit-browser-isActive') === 'true';
+    return {
+      viewId: viewId ?? null,
+      isActive: viewId !== null && isActive,
+    };
+  } catch {
+    return {};
+  }
+};
+
+const persistedState = getPersistedState();
+
 const initialState: BrowserState = {
-  viewId: null,
+  viewId: persistedState.viewId ?? null,
   isCreating: false,
-  isActive: false,
+  isActive: persistedState.isActive ?? false,
   navigation: {
     url: '',
     title: '',
@@ -95,16 +111,41 @@ export const useBrowserStore = create<BrowserStore>()(
         state.isCreating = false;
         state.isActive = viewId !== null;
       });
+      // Persist to localStorage to survive webview reloads
+      try {
+        if (viewId !== null) {
+          localStorage.setItem('orbit-browser-viewId', viewId);
+          localStorage.setItem('orbit-browser-isActive', 'true');
+        } else {
+          localStorage.removeItem('orbit-browser-viewId');
+          localStorage.removeItem('orbit-browser-isActive');
+        }
+      } catch {
+        // Ignore storage errors
+      }
     },
 
     setActive: (isActive: boolean): void => {
       set((state) => {
         state.isActive = isActive;
       });
+      // Persist to localStorage
+      try {
+        localStorage.setItem('orbit-browser-isActive', String(isActive));
+      } catch {
+        // Ignore storage errors
+      }
     },
 
     reset: (): void => {
       set(() => initialState);
+      // Clear persisted state
+      try {
+        localStorage.removeItem('orbit-browser-viewId');
+        localStorage.removeItem('orbit-browser-isActive');
+      } catch {
+        // Ignore storage errors
+      }
     },
 
     setNavigation: (navigation: Partial<NavigationState>): void => {

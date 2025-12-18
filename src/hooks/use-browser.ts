@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import type { ExtensionMessage } from '@/types/protocol';
 
@@ -156,6 +156,29 @@ export function useBrowser(): void {
         break;
     }
   }, [setViewId, setNavigation, setLoading, setSelectedElement, setSelectingElement, setError, reset, postMessage]);
+
+  // Track if we've already sent browser:show on mount
+  const hasShownBrowserRef = useRef(false);
+
+  // On mount, if we have a persisted active browser, tell Orbit to show it
+  useEffect(() => {
+    if (hasShownBrowserRef.current) return;
+
+    const browserState = useBrowserStore.getState();
+    const uiState = useUIStore.getState();
+
+    // If we have a viewId from localStorage (persisted through reload) and browser tab is active
+    if (browserState.isActive && browserState.viewId && uiState.activityTab === 'browser') {
+      hasShownBrowserRef.current = true;
+      // Small delay to ensure Orbit is ready
+      setTimeout(() => {
+        postMessage({
+          type: 'browser:show',
+          uuid: generateUUID(),
+        });
+      }, 100);
+    }
+  }, [postMessage]);
 
   // Subscribe to extension messages
   useVSCode({ onMessage: handleMessage });

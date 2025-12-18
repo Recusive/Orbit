@@ -25,6 +25,7 @@ export interface BrowserToolbarProps {
   readonly onCancelSelectElement: () => void;
   readonly onOpenDevTools?: () => void;
   readonly onOpenExternal?: () => void;
+  readonly onClose?: () => void;
 }
 
 export const BrowserToolbar: FC<BrowserToolbarProps> = ({
@@ -37,6 +38,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
   onCancelSelectElement,
   onOpenDevTools,
   onOpenExternal,
+  onClose,
 }) => {
   const navigation = useBrowserNavigation();
   const isSelectingElement = useIsSelectingElement();
@@ -147,7 +149,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
       <button
         onClick={handleSelectElementClick}
         className={cn(
-          'h-7 px-2 flex items-center gap-1.5 rounded transition-colors text-xs font-medium',
+          'h-7 w-7 flex items-center justify-center rounded transition-colors',
           isSelectingElement
             ? 'bg-primary text-primary-foreground'
             : 'hover:bg-accent'
@@ -155,15 +157,9 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
         title={isSelectingElement ? 'Cancel element selection' : 'Select element (React-grab)'}
       >
         {isSelectingElement ? (
-          <>
-            <Square className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Cancel</span>
-          </>
+          <Square className="h-3.5 w-3.5" />
         ) : (
-          <>
-            <SquareDashedMousePointer className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Select</span>
-          </>
+          <SquareDashedMousePointer className="h-3.5 w-3.5" />
         )}
       </button>
 
@@ -186,6 +182,17 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
           title="Open in external browser"
         >
           <ExternalLink className="h-4 w-4" />
+        </button>
+      ) : null}
+
+      {/* Close browser button */}
+      {onClose ? (
+        <button
+          onClick={onClose}
+          className="h-7 w-7 flex items-center justify-center rounded hover:bg-destructive/90 hover:text-destructive-foreground transition-colors"
+          title="Close browser"
+        >
+          <X className="h-4 w-4" />
         </button>
       ) : null}
     </div>

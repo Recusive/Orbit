@@ -93,19 +93,38 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
 
   // Track if this is the first render (for mount logic)
   const isFirstRender = useRef(true);
+  // Track previous browser active state to detect when browser is created
+  const prevBrowserActive = useRef(isBrowserActive);
 
   // Send browser visibility messages when tab changes or panel mounts/unmounts
   // This is handled here (in ActivityPanel) rather than in BrowserPanel because
   // BrowserPanel unmounts when switching away, and cleanup effects are unreliable
   useEffect(() => {
+    const isBrowserTab = activeTab === 'browser';
+    const browserJustBecameActive = isBrowserActive && !prevBrowserActive.current;
+
+    // Update browser active tracking
+    prevBrowserActive.current = isBrowserActive;
+
     // Only send messages if browser has been created
     if (!isBrowserActive) {
+      // Don't update prevActiveTab or isFirstRender when browser isn't active
+      // This ensures we send browser:show when it becomes active
+      return;
+    }
+
+    // Browser just became active - show it if on browser tab
+    if (browserJustBecameActive) {
+      if (isBrowserTab) {
+        postMessage({
+          type: 'browser:show',
+          uuid: generateUUID(),
+        });
+      }
       prevActiveTab.current = activeTab;
       isFirstRender.current = false;
       return;
     }
-
-    const isBrowserTab = activeTab === 'browser';
 
     // On first render (panel just mounted/re-opened), show browser if on browser tab
     if (isFirstRender.current) {
