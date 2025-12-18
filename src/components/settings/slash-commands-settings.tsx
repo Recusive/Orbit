@@ -1,8 +1,8 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Edit2, Lock, Plus, Terminal, Trash2, X } from 'lucide-react';
+import { Edit2, Loader2, Lock, Plus, Sparkles, Terminal, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { CommandScope, ExtensionMessage, SlashCommandDefinition } from '@/types/protocol';
+import type { CommandScope, ExtensionMessage, SlashCommandDefinition, WebviewMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -142,9 +142,11 @@ interface CommandEditorProps {
   readonly isOpen: boolean;
   readonly onClose: () => void;
   readonly onSave: (command: SlashCommandDefinition, originalName?: string) => void;
+  readonly postMessage: (message: WebviewMessage) => void;
+  readonly onGeneratedCommand: (callback: (command: SlashCommandDefinition) => void) => void;
 }
 
-const CommandEditor: FC<CommandEditorProps> = ({ command, isOpen, onClose, onSave }) => {
+const CommandEditor: FC<CommandEditorProps> = ({ command, isOpen, onClose, onSave, postMessage, onGeneratedCommand }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
@@ -152,6 +154,11 @@ const CommandEditor: FC<CommandEditorProps> = ({ command, isOpen, onClose, onSav
   const [tools, setTools] = useState<string[]>([]);
   const [model, setModel] = useState<'sonnet' | 'opus' | 'haiku' | 'none'>('none');
   const [scope, setScope] = useState<'project' | 'personal'>('project');
+
+  // AI Generation state
+  const [showGenerateInput, setShowGenerateInput] = useState(false);
+  const [generateDescription, setGenerateDescription] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Reset form when command changes or dialog opens
   useEffect(() => {
@@ -165,8 +172,42 @@ const CommandEditor: FC<CommandEditorProps> = ({ command, isOpen, onClose, onSav
       // Only allow project or personal scope for editing
       const cmdScope = command?.scope;
       setScope(cmdScope === 'project' || cmdScope === 'personal' ? cmdScope : 'project');
+      setShowGenerateInput(false);
+      setGenerateDescription('');
+      setIsGenerating(false);
     }
   }, [command, isOpen]);
+
+  // Listen for generated command response
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleGenerated = (generatedCommand: SlashCommandDefinition): void => {
+      setName(generatedCommand.name);
+      setDescription(generatedCommand.description ?? '');
+      setContent(generatedCommand.content);
+      setArgumentHint(generatedCommand.argumentHint ?? '');
+      setTools(generatedCommand.allowedTools ?? []);
+      setModel(generatedCommand.model ?? 'none');
+      setScope(generatedCommand.scope === 'project' || generatedCommand.scope === 'personal' ? generatedCommand.scope : 'project');
+      setIsGenerating(false);
+      setShowGenerateInput(false);
+      setGenerateDescription('');
+    };
+
+    onGeneratedCommand(handleGenerated);
+  }, [isOpen, onGeneratedCommand]);
+
+  const handleGenerate = (): void => {
+    if (generateDescription.trim() === '') return;
+
+    setIsGenerating(true);
+    postMessage({
+      type: 'commands:generate',
+      uuid: crypto.randomUUID(),
+      description: generateDescription.trim(),
+    });
+  };
 
   const handleToolToggle = (tool: string): void => {
     setTools((prev) =>
@@ -368,18 +409,81 @@ const CommandEditor: FC<CommandEditorProps> = ({ command, isOpen, onClose, onSav
                   ))}
                 </div>
               </div>
+
+              {/* Generate with AI Input - Only show when creating new command and generate mode is active */}
+              {command === undefined && showGenerateInput ? <div className="p-3 rounded-lg border border-primary/30 bg-primary/5">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      Generate with AI
+                    </div>
+                    <Textarea
+                      value={generateDescription}
+                      onChange={(e) => { setGenerateDescription(e.target.value); }}
+                      placeholder="Describe what this command should do... e.g., 'A command that reviews code for security vulnerabilities and suggests fixes'"
+                      className="text-sm min-h-[80px]"
+                      disabled={isGenerating}
+                    />
+                  </div>
+                </div> : null}
             </div>
           </ScrollArea>
 
           {/* Footer */}
           <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
-            <Button variant="outline" size="sm" onClick={onClose}>
+            {/* Generate with AI button - only show when creating new command */}
+            {command === undefined && (
+              showGenerateInput ? (
+                <Button
+                  variant={generateDescription.trim() !== '' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={handleGenerate}
+                  disabled={generateDescription.trim() === '' || isGenerating}
+                  className="mr-auto gap-1.5"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Generate
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowGenerateInput(true); }}
+                  className="mr-auto gap-1.5"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Generate with AI
+                </Button>
+              )
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (showGenerateInput) {
+                  setShowGenerateInput(false);
+                  setGenerateDescription('');
+                } else {
+                  onClose();
+                }
+              }}
+              disabled={isGenerating}
+            >
               Cancel
             </Button>
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={name.trim() === '' || content.trim() === ''}
+              disabled={name.trim() === '' || content.trim() === '' || isGenerating}
             >
               {command !== undefined ? 'Save Changes' : 'Create Command'}
             </Button>
@@ -401,6 +505,9 @@ export const SlashCommandsSettings: FC = () => {
   // Use ref for the initial fetch flag to avoid re-fetching
   const hasFetched = useRef(false);
 
+  // Callback ref for generated command handler
+  const generatedCommandCallbackRef = useRef<((command: SlashCommandDefinition) => void) | null>(null);
+
   // Message handler for command-related messages
   const handleMessage = useCallback((message: ExtensionMessage): void => {
     if (message.type === 'commands:list:response') {
@@ -421,8 +528,18 @@ export const SlashCommandsSettings: FC = () => {
     } else if (message.type === 'commands:error') {
       setError(message.error);
       setIsLoading(false);
+    } else if (message.type === 'commands:generated') {
+      // Call the registered callback with the generated command
+      if (generatedCommandCallbackRef.current) {
+        generatedCommandCallbackRef.current(message.command);
+      }
     }
     // Ignore other message types
+  }, []);
+
+  // Register callback for generated command
+  const handleRegisterGeneratedCallback = useCallback((callback: (command: SlashCommandDefinition) => void): void => {
+    generatedCommandCallbackRef.current = callback;
   }, []);
 
   // Use VS Code API with message handler
@@ -634,6 +751,8 @@ export const SlashCommandsSettings: FC = () => {
         isOpen={editorOpen}
         onClose={() => { setEditorOpen(false); }}
         onSave={handleSaveCommand}
+        postMessage={postMessage}
+        onGeneratedCommand={handleRegisterGeneratedCallback}
       />
     </div>
   );

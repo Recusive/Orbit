@@ -501,6 +501,26 @@ export const CommandDeleteSchema = z.object({
   scope: CommandScopeSchema,
 });
 
+// ───────────────────────────────────────────────────────────────
+// AI Generation (Webview → Extension)
+// ───────────────────────────────────────────────────────────────
+
+// Generate a subagent from natural language description
+export const SubagentGenerateSchema = z.object({
+  type: z.literal('subagents:generate'),
+  uuid: UUIDSchema,
+  /** Natural language description of what the agent should do */
+  description: z.string(),
+});
+
+// Generate a slash command from natural language description
+export const CommandGenerateSchema = z.object({
+  type: z.literal('commands:generate'),
+  uuid: UUIDSchema,
+  /** Natural language description of what the command should do */
+  description: z.string(),
+});
+
 // Combined webview → extension
 export const WebviewMessageSchema = z.discriminatedUnion('type', [
   // System
@@ -575,6 +595,9 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   CommandCreateSchema,
   CommandUpdateSchema,
   CommandDeleteSchema,
+  // AI Generation
+  SubagentGenerateSchema,
+  CommandGenerateSchema,
 ]);
 
 // ═══════════════════════════════════════════════════════════════
@@ -1104,6 +1127,26 @@ export const CommandErrorSchema = z.object({
   error: z.string(),
 });
 
+// ═══════════════════════════════════════════════════════════════
+// AI GENERATION (Extension → Webview)
+// ═══════════════════════════════════════════════════════════════
+
+// Generated subagent definition from AI
+export const SubagentGeneratedSchema = z.object({
+  type: z.literal('subagents:generated'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  agent: SubagentDefinitionSchema,
+});
+
+// Generated slash command definition from AI
+export const CommandGeneratedSchema = z.object({
+  type: z.literal('commands:generated'),
+  uuid: UUIDSchema,
+  request_uuid: UUIDSchema,
+  command: SlashCommandDefinitionSchema,
+});
+
 // Combined extension → webview
 export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   // System
@@ -1173,6 +1216,9 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   CommandUpdatedSchema,
   CommandDeletedSchema,
   CommandErrorSchema,
+  // AI Generation
+  SubagentGeneratedSchema,
+  CommandGeneratedSchema,
 ]);
 
 // ═══════════════════════════════════════════════════════════════

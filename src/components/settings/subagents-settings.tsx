@@ -1,8 +1,8 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Bot, Edit2, Plus, Trash2, X } from 'lucide-react';
+import { Bot, Edit2, Loader2, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ExtensionMessage, SubagentDefinition } from '@/types/protocol';
+import type { ExtensionMessage, SubagentDefinition, WebviewMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -116,14 +116,21 @@ interface AgentEditorProps {
   readonly isOpen: boolean;
   readonly onClose: () => void;
   readonly onSave: (agent: SubagentDefinition, originalName?: string) => void;
+  readonly postMessage: (message: WebviewMessage) => void;
+  readonly onGeneratedAgent: (callback: (agent: SubagentDefinition) => void) => void;
 }
 
-const AgentEditor: FC<AgentEditorProps> = ({ agent, isOpen, onClose, onSave }) => {
+const AgentEditor: FC<AgentEditorProps> = ({ agent, isOpen, onClose, onSave, postMessage, onGeneratedAgent }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [prompt, setPrompt] = useState('');
   const [tools, setTools] = useState<string[]>([]);
   const [model, setModel] = useState<'sonnet' | 'opus' | 'haiku' | 'inherit'>('inherit');
+
+  // AI Generation state
+  const [showGenerateInput, setShowGenerateInput] = useState(false);
+  const [generateDescription, setGenerateDescription] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Reset form when agent changes or dialog opens
   useEffect(() => {
@@ -133,8 +140,40 @@ const AgentEditor: FC<AgentEditorProps> = ({ agent, isOpen, onClose, onSave }) =
       setPrompt(agent?.prompt ?? '');
       setTools(agent?.tools ?? []);
       setModel(agent?.model ?? 'inherit');
+      setShowGenerateInput(false);
+      setGenerateDescription('');
+      setIsGenerating(false);
     }
   }, [agent, isOpen]);
+
+  // Listen for generated agent response
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleGenerated = (generatedAgent: SubagentDefinition): void => {
+      setName(generatedAgent.name);
+      setDescription(generatedAgent.description);
+      setPrompt(generatedAgent.prompt);
+      setTools(generatedAgent.tools ?? []);
+      setModel(generatedAgent.model ?? 'inherit');
+      setIsGenerating(false);
+      setShowGenerateInput(false);
+      setGenerateDescription('');
+    };
+
+    onGeneratedAgent(handleGenerated);
+  }, [isOpen, onGeneratedAgent]);
+
+  const handleGenerate = (): void => {
+    if (generateDescription.trim() === '') return;
+
+    setIsGenerating(true);
+    postMessage({
+      type: 'subagents:generate',
+      uuid: crypto.randomUUID(),
+      description: generateDescription.trim(),
+    });
+  };
 
   const handleToolToggle = (tool: string): void => {
     setTools((prev) =>
@@ -285,18 +324,81 @@ const AgentEditor: FC<AgentEditorProps> = ({ agent, isOpen, onClose, onSave }) =
                   ))}
                 </div>
               </div>
+
+              {/* Generate with AI Input - Only show when creating new agent and generate mode is active */}
+              {agent === undefined && showGenerateInput ? <div className="p-3 rounded-lg border border-primary/30 bg-primary/5">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      Generate with AI
+                    </div>
+                    <Textarea
+                      value={generateDescription}
+                      onChange={(e) => { setGenerateDescription(e.target.value); }}
+                      placeholder="Describe what this agent should do... e.g., 'An expert code reviewer that focuses on security vulnerabilities and best practices'"
+                      className="text-sm min-h-[80px]"
+                      disabled={isGenerating}
+                    />
+                  </div>
+                </div> : null}
             </div>
           </ScrollArea>
 
           {/* Footer */}
           <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
-            <Button variant="outline" size="sm" onClick={onClose}>
+            {/* Generate with AI button - only show when creating new agent */}
+            {agent === undefined && (
+              showGenerateInput ? (
+                <Button
+                  variant={generateDescription.trim() !== '' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={handleGenerate}
+                  disabled={generateDescription.trim() === '' || isGenerating}
+                  className="mr-auto gap-1.5"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Generate
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowGenerateInput(true); }}
+                  className="mr-auto gap-1.5"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Generate with AI
+                </Button>
+              )
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (showGenerateInput) {
+                  setShowGenerateInput(false);
+                  setGenerateDescription('');
+                } else {
+                  onClose();
+                }
+              }}
+              disabled={isGenerating}
+            >
               Cancel
             </Button>
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={name.trim() === '' || prompt.trim() === ''}
+              disabled={name.trim() === '' || prompt.trim() === '' || isGenerating}
             >
               {agent !== undefined ? 'Save Changes' : 'Create Agent'}
             </Button>
@@ -318,6 +420,9 @@ export const SubagentsSettings: FC = () => {
   // Use ref for the initial fetch flag to avoid re-fetching
   const hasFetched = useRef(false);
 
+  // Callback ref for generated agent handler
+  const generatedAgentCallbackRef = useRef<((agent: SubagentDefinition) => void) | null>(null);
+
   // Message handler for subagent-related messages
   const handleMessage = useCallback((message: ExtensionMessage): void => {
     if (message.type === 'subagents:list:response') {
@@ -338,8 +443,18 @@ export const SubagentsSettings: FC = () => {
     } else if (message.type === 'subagents:error') {
       setError(message.error);
       setIsLoading(false);
+    } else if (message.type === 'subagents:generated') {
+      // Call the registered callback with the generated agent
+      if (generatedAgentCallbackRef.current) {
+        generatedAgentCallbackRef.current(message.agent);
+      }
     }
     // Ignore other message types
+  }, []);
+
+  // Register callback for generated agent
+  const handleRegisterGeneratedCallback = useCallback((callback: (agent: SubagentDefinition) => void): void => {
+    generatedAgentCallbackRef.current = callback;
   }, []);
 
   // Use VS Code API with message handler
@@ -468,6 +583,8 @@ export const SubagentsSettings: FC = () => {
         isOpen={editorOpen}
         onClose={() => { setEditorOpen(false); }}
         onSave={handleSaveAgent}
+        postMessage={postMessage}
+        onGeneratedAgent={handleRegisterGeneratedCallback}
       />
     </div>
   );
