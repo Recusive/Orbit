@@ -101,6 +101,7 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
       case 'terminal:command:start':
       case 'terminal:command:end':
       case 'terminal:capabilities':
+      case 'terminal:title':
       case 'file:written':
       case 'file:list:response':
       case 'conversation:created':
