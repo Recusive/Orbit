@@ -444,6 +444,16 @@ function handleMockMessage(message: WebviewMessage): void {
     case 'browser:show':
     case 'browser:hide':
     case 'browser:devtools':
+    case 'subagents:list':
+    case 'subagents:create':
+    case 'subagents:update':
+    case 'subagents:delete':
+    case 'subagents:generate':
+    case 'commands:list':
+    case 'commands:create':
+    case 'commands:update':
+    case 'commands:delete':
+    case 'commands:generate':
       break;
   }
 }

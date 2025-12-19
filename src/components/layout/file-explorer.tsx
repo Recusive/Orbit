@@ -119,6 +119,18 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
       case 'browser:loading':
       case 'browser:error':
       case 'browser:destroyed':
+      case 'subagents:list:response':
+      case 'subagents:created':
+      case 'subagents:updated':
+      case 'subagents:deleted':
+      case 'subagents:error':
+      case 'subagents:generated':
+      case 'commands:list:response':
+      case 'commands:created':
+      case 'commands:updated':
+      case 'commands:deleted':
+      case 'commands:error':
+      case 'commands:generated':
         break;
     }
   }, [rootPath, setRootPath, setTreeChildren, handleFileChanged, treeNodes]);
