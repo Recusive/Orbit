@@ -66,8 +66,10 @@ jobs:
       - run: npm run build
 
       # Only upload artifacts on main branch to save storage
+      # continue-on-error prevents storage quota issues from failing the build
       - name: Upload build
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        continue-on-error: true
         uses: actions/upload-artifact@v6
         with:
           name: dist-${{ github.sha }}
