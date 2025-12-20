@@ -122,12 +122,17 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // File commands
             files::read_file,
+            files::read_file_bytes,
             files::write_file,
+            files::write_file_bytes,
             files::list_directory,
+            files::create_file,
+            files::create_directory,
             files::delete_file,
             files::rename_file,
-            files::create_directory,
+            files::copy_file,
             files::file_exists,
+            files::is_directory,
             files::get_file_info,
             // LSP commands
             lsp::lsp_completions,

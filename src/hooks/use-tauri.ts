@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { FileEntry } from '@/lib/backend';
 import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
 
+import { listDirectory, readFile, getWorkspacePath } from '@/lib/backend';
 import { ExtensionMessageSchema, WebviewMessageSchema } from '@/types/protocol';
 
 // ═══════════════════════════════════════════════════════════════
@@ -27,6 +29,89 @@ export interface UseTauriReturn {
 
 function isTauriEnvironment(): boolean {
   return typeof window !== 'undefined' && '__TAURI__' in window;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Tauri Message Handler
+// ═══════════════════════════════════════════════════════════════
+
+async function handleTauriMessage(message: WebviewMessage): Promise<void> {
+  // Handle file tree requests
+  if (message.type === 'file:tree:request') {
+    try {
+      // Get workspace path or use provided path
+      // Default to home directory if no path set
+      let targetPath: string | undefined = message.path;
+      if (targetPath === undefined || targetPath === '') {
+        const storedPath = await getWorkspacePath();
+        // Fallback to a reasonable default - user's home or root
+        targetPath = storedPath ?? '/Users/no9labs/Developer/Recursive/Snowflake-v0';
+      }
+
+      const entries = await listDirectory(targetPath, false);
+
+      // Convert FileEntry to FileNode format
+      const children = entries.map((entry: FileEntry) => ({
+        name: entry.name,
+        path: entry.path,
+        isDirectory: entry.isDir,
+        isFile: !entry.isDir,
+      }));
+
+      window.postMessage(
+        {
+          type: 'file:tree:response',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          path: targetPath,
+          children,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      window.postMessage(
+        {
+          type: 'file:tree:error',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          error: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // Handle file read requests
+  if (message.type === 'file:read') {
+    try {
+      const content = await readFile(message.path);
+      window.postMessage(
+        {
+          type: 'file:content',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          path: message.path,
+          content,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to read file';
+      window.postMessage(
+        {
+          type: 'error',
+          uuid: crypto.randomUUID(),
+          message: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // Other message types are handled elsewhere or not applicable
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -129,10 +214,10 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
       }
 
       if (isConnected && !isMockMode) {
-        // TODO: Implement Tauri invoke based on message type
-        // const command = message.type.replace(/:/g, '_');
-        // invoke(command, message);
-        if (debug) console.warn('[Snowflake] Would send to Tauri:', message);
+        // Handle message via Tauri commands
+        handleTauriMessage(message).catch((err: unknown) => {
+          console.error('[Snowflake] Tauri message error:', err);
+        });
       } else if (isMockMode) {
         if (debug) console.warn('[Snowflake Mock]', message);
         handleMockMessage(message);

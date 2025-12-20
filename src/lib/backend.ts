@@ -23,10 +23,7 @@ async function invoke<T>(command: string, args?: Record<string, unknown>): Promi
 
 type EventCallback<T> = (payload: T) => void;
 
-async function listen<T>(
-  event: string,
-  callback: EventCallback<T>,
-): Promise<() => void> {
+async function listen<T>(event: string, callback: EventCallback<T>): Promise<() => void> {
   if (!IS_TAURI) {
     console.warn(`[Mock] listen('${event}')`);
     return (): void => {
@@ -48,12 +45,28 @@ export async function readFile(path: string): Promise<string> {
   return invoke<string>('read_file', { path });
 }
 
+export async function readFileBytes(path: string): Promise<number[]> {
+  return invoke<number[]>('read_file_bytes', { path });
+}
+
 export async function writeFile(path: string, content: string): Promise<void> {
   return invoke('write_file', { path, content });
 }
 
-export async function listDirectory(path: string): Promise<FileEntry[]> {
-  return invoke<FileEntry[]>('list_directory', { path });
+export async function writeFileBytes(path: string, content: number[]): Promise<void> {
+  return invoke('write_file_bytes', { path, content });
+}
+
+export async function listDirectory(path: string, showHidden?: boolean): Promise<FileEntry[]> {
+  return invoke<FileEntry[]>('list_directory', { path, showHidden });
+}
+
+export async function createFile(path: string): Promise<void> {
+  return invoke('create_file', { path });
+}
+
+export async function createDirectory(path: string): Promise<void> {
+  return invoke('create_directory', { path });
 }
 
 export async function deleteFile(path: string): Promise<void> {
@@ -64,12 +77,16 @@ export async function renameFile(oldPath: string, newPath: string): Promise<void
   return invoke('rename_file', { oldPath, newPath });
 }
 
-export async function createDirectory(path: string): Promise<void> {
-  return invoke('create_directory', { path });
+export async function copyFile(from: string, to: string): Promise<void> {
+  return invoke('copy_file', { from, to });
 }
 
 export async function fileExists(path: string): Promise<boolean> {
   return invoke<boolean>('file_exists', { path });
+}
+
+export async function isDirectory(path: string): Promise<boolean> {
+  return invoke<boolean>('is_directory', { path });
 }
 
 export async function getFileInfo(path: string): Promise<FileInfo> {
@@ -83,7 +100,7 @@ export async function getFileInfo(path: string): Promise<FileInfo> {
 export async function getCompletions(
   path: string,
   line: number,
-  column: number,
+  column: number
 ): Promise<CompletionItem[]> {
   return invoke<CompletionItem[]>('lsp_completions', { path, line, column });
 }
@@ -91,7 +108,7 @@ export async function getCompletions(
 export async function getHover(
   path: string,
   line: number,
-  column: number,
+  column: number
 ): Promise<HoverInfo | null> {
   return invoke<HoverInfo | null>('lsp_hover', { path, line, column });
 }
@@ -99,7 +116,7 @@ export async function getHover(
 export async function gotoDefinition(
   path: string,
   line: number,
-  column: number,
+  column: number
 ): Promise<Location | null> {
   return invoke<Location | null>('lsp_goto_definition', { path, line, column });
 }
@@ -107,7 +124,7 @@ export async function gotoDefinition(
 export async function findReferences(
   path: string,
   line: number,
-  column: number,
+  column: number
 ): Promise<Location[]> {
   return invoke<Location[]>('lsp_find_references', { path, line, column });
 }
@@ -123,7 +140,7 @@ export async function getDiagnostics(path: string): Promise<Diagnostic[]> {
 export async function getSignatureHelp(
   path: string,
   line: number,
-  column: number,
+  column: number
 ): Promise<SignatureHelp | null> {
   return invoke<SignatureHelp | null>('lsp_signature_help', { path, line, column });
 }
@@ -135,7 +152,7 @@ export async function getSignatureHelp(
 export async function createTerminal(
   id: string,
   cwd?: string,
-  shell?: string,
+  shell?: string
 ): Promise<TerminalInfo> {
   return invoke<TerminalInfo>('terminal_create', { id, cwd, shell });
 }
@@ -144,11 +161,7 @@ export async function writeTerminal(id: string, data: string): Promise<void> {
   return invoke('terminal_write', { id, data });
 }
 
-export async function resizeTerminal(
-  id: string,
-  cols: number,
-  rows: number,
-): Promise<void> {
+export async function resizeTerminal(id: string, cols: number, rows: number): Promise<void> {
   return invoke('terminal_resize', { id, cols, rows });
 }
 
@@ -157,13 +170,13 @@ export async function closeTerminal(id: string): Promise<void> {
 }
 
 export async function onTerminalOutput(
-  callback: (data: TerminalOutputEvent) => void,
+  callback: (data: TerminalOutputEvent) => void
 ): Promise<() => void> {
   return listen<TerminalOutputEvent>('terminal:output', callback);
 }
 
 export async function onTerminalExit(
-  callback: (data: TerminalExitEvent) => void,
+  callback: (data: TerminalExitEvent) => void
 ): Promise<() => void> {
   return listen<TerminalExitEvent>('terminal:exit', callback);
 }
@@ -192,10 +205,7 @@ export async function gitDiff(repoPath: string, file?: string): Promise<string> 
   return invoke<string>('git_diff', { repoPath, file });
 }
 
-export async function gitLog(
-  repoPath: string,
-  limit?: number,
-): Promise<GitCommit[]> {
+export async function gitLog(repoPath: string, limit?: number): Promise<GitCommit[]> {
   return invoke<GitCommit[]>('git_log', { repoPath, limit });
 }
 
@@ -203,10 +213,7 @@ export async function gitBranches(repoPath: string): Promise<GitBranch[]> {
   return invoke<GitBranch[]>('git_branches', { repoPath });
 }
 
-export async function gitCheckout(
-  repoPath: string,
-  branch: string,
-): Promise<void> {
+export async function gitCheckout(repoPath: string, branch: string): Promise<void> {
   return invoke('git_checkout', { repoPath, branch });
 }
 
@@ -217,7 +224,7 @@ export async function gitCheckout(
 export async function aiChat(
   messages: ChatMessage[],
   model?: string,
-  onChunk?: (chunk: string) => void,
+  onChunk?: (chunk: string) => void
 ): Promise<ChatResponse> {
   // Set up streaming listener if callback provided
   let unlisten: (() => void) | undefined;
@@ -235,7 +242,7 @@ export async function aiChat(
 export async function aiComplete(
   prefix: string,
   suffix: string,
-  language: string,
+  language: string
 ): Promise<string> {
   return invoke<string>('ai_complete', { prefix, suffix, language });
 }
@@ -251,7 +258,7 @@ export async function aiStopGeneration(): Promise<void> {
 export async function searchFiles(
   rootPath: string,
   query: string,
-  options?: SearchOptions,
+  options?: SearchOptions
 ): Promise<SearchResult[]> {
   return invoke<SearchResult[]>('search_files', { rootPath, query, ...options });
 }
@@ -259,7 +266,7 @@ export async function searchFiles(
 export async function searchText(
   rootPath: string,
   pattern: string,
-  options?: SearchOptions,
+  options?: SearchOptions
 ): Promise<TextSearchResult[]> {
   return invoke<TextSearchResult[]>('search_text', { rootPath, pattern, ...options });
 }
@@ -277,7 +284,7 @@ export async function unwatchPath(path: string): Promise<void> {
 }
 
 export async function onFileChange(
-  callback: (event: FileChangeEvent) => void,
+  callback: (event: FileChangeEvent) => void
 ): Promise<() => void> {
   return listen<FileChangeEvent>('file:change', callback);
 }
@@ -287,7 +294,7 @@ export async function onFileChange(
 // ============================================
 
 export async function openFileDialog(
-  options?: FileDialogOptions,
+  options?: FileDialogOptions
 ): Promise<string | string[] | null> {
   if (!IS_TAURI) {
     console.warn('[Mock] openFileDialog');
@@ -297,9 +304,7 @@ export async function openFileDialog(
   return open(options);
 }
 
-export async function saveFileDialog(
-  options?: SaveDialogOptions,
-): Promise<string | null> {
+export async function saveFileDialog(options?: SaveDialogOptions): Promise<string | null> {
   if (!IS_TAURI) {
     console.warn('[Mock] saveFileDialog');
     return null;
