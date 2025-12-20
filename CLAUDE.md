@@ -72,7 +72,7 @@ Snowflake-v0/
 ```bash
 # Frontend Development
 npm install              # Install dependencies
-npm run dev              # Start Vite dev server (port 5173)
+npm run dev              # Start Vite dev server only (port 5176)
 npm run build            # TypeScript check + production build
 npm run preview          # Preview production build
 
@@ -83,16 +83,70 @@ npm run lint:fix         # ESLint with auto-fix
 npm run check            # typecheck + lint
 npm run ci               # Full CI: typecheck + lint + build
 
-# Tauri Development
-npm run tauri            # Start Tauri dev (frontend + Rust backend)
-npm run tauri -- dev     # Same as above
-npm run tauri -- build   # Build production Tauri app
+# Tauri Development (RECOMMENDED)
+npm run tauri dev        # Start full app (Vite + Tauri + Rust)
+npm run tauri build      # Build production app (.dmg/.exe/.AppImage)
 
-# Rust Development (from project root)
-cargo build              # Build all crates
-cargo test               # Run tests
+# Rust Only (from project root)
+cargo build              # Build all Rust crates
+cargo test               # Run Rust tests
 cargo clippy             # Lint Rust code
 ```
+
+## Development Workflow
+
+### Starting Development
+
+```bash
+npm run tauri dev        # Starts everything: Vite (5176) + Tauri + Rust
+```
+
+This command:
+
+1. Starts Vite dev server on port 5176
+2. Compiles Rust backend
+3. Opens the Tauri desktop window
+4. Enables hot-reload for both frontend and backend
+
+### Hot Reload Behavior
+
+| Change Type               | Reload Behavior             |
+| ------------------------- | --------------------------- |
+| React/TypeScript (`src/`) | Instant HMR via Vite        |
+| CSS/Tailwind              | Instant HMR via Vite        |
+| Rust (`src-tauri/`)       | Auto-rebuilds, restarts app |
+| Rust crates (`crates/`)   | Auto-rebuilds, restarts app |
+
+### Production Build
+
+```bash
+npm run tauri build
+```
+
+Creates distributable app in `src-tauri/target/release/bundle/`:
+
+- **macOS**: `.dmg` and `.app`
+- **Windows**: `.exe` and `.msi`
+- **Linux**: `.AppImage` and `.deb`
+
+### Frontend-Only Development
+
+If you only need to work on React/UI without Tauri:
+
+```bash
+npm run dev              # Vite only on port 5176
+```
+
+Note: Backend features (file system, terminal, etc.) won't work in browser-only mode.
+
+### Configuration Files
+
+| File                        | Purpose                                       |
+| --------------------------- | --------------------------------------------- |
+| `src-tauri/tauri.conf.json` | Tauri app config (window, permissions, build) |
+| `vite.config.ts`            | Vite bundler config (port 5176, aliases)      |
+| `Cargo.toml`                | Rust workspace root                           |
+| `src-tauri/Cargo.toml`      | Tauri app dependencies                        |
 
 ## Frontend-Backend Communication
 
