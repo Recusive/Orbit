@@ -11,12 +11,13 @@ Snowflake is a modern AI-powered code editor built with **Tauri 2** (Rust backen
 ### Frontend
 
 - **React 19** + TypeScript + Vite
+- **pnpm** for package management
 - **Tailwind CSS v4** for styling
 - **Zustand + Immer** for state management
 - **CodeMirror 6** for code editing with custom themes
 - **xterm.js** for terminal emulation
 - **Shiki** for code block highlighting in chat
-- **Zod** for runtime validation
+- **Zod 4** for runtime validation
 
 ### Backend
 
@@ -71,21 +72,21 @@ Snowflake-v0/
 
 ```bash
 # Frontend Development
-npm install              # Install dependencies
-npm run dev              # Start Vite dev server only (port 5176)
-npm run build            # TypeScript check + production build
-npm run preview          # Preview production build
+pnpm install             # Install dependencies
+pnpm dev                 # Start Vite dev server only (port 5176)
+pnpm build               # TypeScript check + production build
+pnpm preview             # Preview production build
 
 # Quality Checks
-npm run typecheck        # TypeScript only (tsc --noEmit)
-npm run lint             # ESLint with zero warnings tolerance
-npm run lint:fix         # ESLint with auto-fix
-npm run check            # typecheck + lint
-npm run ci               # Full CI: typecheck + lint + build
+pnpm typecheck           # TypeScript only (tsc --noEmit)
+pnpm lint                # ESLint with zero warnings tolerance
+pnpm lint:fix            # ESLint with auto-fix
+pnpm check               # typecheck + lint + Rust fmt + clippy
+pnpm ci                  # Full CI: typecheck + lint + build
 
 # Tauri Development (RECOMMENDED)
-npm run tauri dev        # Start full app (Vite + Tauri + Rust)
-npm run tauri build      # Build production app (.dmg/.exe/.AppImage)
+pnpm tauri dev           # Start full app (Vite + Tauri + Rust)
+pnpm tauri build         # Build production app (.dmg/.exe/.AppImage)
 
 # Rust Only (from project root)
 cargo build              # Build all Rust crates
@@ -98,7 +99,7 @@ cargo clippy             # Lint Rust code
 ### Starting Development
 
 ```bash
-npm run tauri dev        # Starts everything: Vite (5176) + Tauri + Rust
+pnpm tauri dev           # Starts everything: Vite (5176) + Tauri + Rust
 ```
 
 This command:
@@ -120,7 +121,7 @@ This command:
 ### Production Build
 
 ```bash
-npm run tauri build
+pnpm tauri build
 ```
 
 Creates distributable app in `src-tauri/target/release/bundle/`:
@@ -134,7 +135,7 @@ Creates distributable app in `src-tauri/target/release/bundle/`:
 If you only need to work on React/UI without Tauri:
 
 ```bash
-npm run dev              # Vite only on port 5176
+pnpm dev                 # Vite only on port 5176
 ```
 
 Note: Backend features (file system, terminal, etc.) won't work in browser-only mode.
@@ -147,6 +148,9 @@ Note: Backend features (file system, terminal, etc.) won't work in browser-only 
 | `vite.config.ts`            | Vite bundler config (port 5176, aliases)      |
 | `Cargo.toml`                | Rust workspace root                           |
 | `src-tauri/Cargo.toml`      | Tauri app dependencies                        |
+| `.npmrc`                    | pnpm settings (strict peers, resolution mode) |
+| `pnpm-lock.yaml`            | pnpm lockfile                                 |
+| `deny.toml`                 | cargo-deny config (licenses, advisories)      |
 
 ## Frontend-Backend Communication
 
@@ -284,6 +288,10 @@ All message types in `src/types/protocol.ts` with Zod schemas:
 - [x] Modified indicator on tabs
 - [x] Theme switching (light/dark)
 - [x] Frontend-backend communication layer
+- [x] pnpm package management migration
+- [x] CI/CD with GitHub Actions (TypeScript, ESLint, Rust checks)
+- [x] cargo-deny for dependency security/license auditing
+- [x] Husky + lint-staged for pre-commit hooks
 
 ### TODO (Rust Backend)
 
