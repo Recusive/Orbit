@@ -187,7 +187,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    #[allow(clippy::panic_in_result_fn)]
+    #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
     async fn test_file_operations() -> Result<()> {
         let temp_dir = env::temp_dir().join("snowflake_test");
         fs::create_dir_all(&temp_dir).await?;

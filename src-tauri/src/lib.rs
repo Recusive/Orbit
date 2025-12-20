@@ -9,8 +9,14 @@ use commands::{ai, files, git, lsp, search, terminal, workspace};
 
 /// Run the Tauri application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-#[allow(clippy::disallowed_types)] // tauri::generate_context! uses std::collections::HashMap internally
-#[allow(clippy::large_stack_frames)] // tauri::generate_context! macro causes this
+#[expect(
+    clippy::disallowed_types,
+    reason = "tauri::generate_context! uses std::collections::HashMap internally"
+)]
+#[expect(
+    clippy::large_stack_frames,
+    reason = "tauri::generate_context! macro causes this"
+)]
 pub fn run() {
     let result = tauri::Builder::default()
         // Plugins

@@ -12,7 +12,10 @@ fn get_search_manager() -> &'static SearchManager {
 
 /// Search for files matching a query
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Tauri command with many optional params"
+)]
 pub async fn search_files(
     root_path: String,
     query: String,
@@ -38,7 +41,10 @@ pub async fn search_files(
 
 /// Search for text within files
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Tauri command with many optional params"
+)]
 pub async fn search_text(
     root_path: String,
     pattern: String,
