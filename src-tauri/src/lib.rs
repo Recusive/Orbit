@@ -6,6 +6,99 @@
 pub mod commands;
 
 use commands::{ai, files, git, lsp, search, terminal, workspace};
+use tauri_plugin_log::{Target, TargetKind};
+
+/// Log mode for the application.
+///
+/// Determined by `SNOWFLAKE_LOG_MODE` env var or defaults based on build type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LogMode {
+    /// Production: minimal logging (warn/error only)
+    Prod,
+    /// Development: balanced logging (info for deps, debug for snowflake)
+    Dev,
+    /// Debug: verbose logging (debug for deps, trace for snowflake)
+    Debug,
+}
+
+impl LogMode {
+    /// Determine log mode from environment or build configuration.
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "env var needed at startup before config system is available"
+    )]
+    fn from_env() -> Self {
+        use std::env;
+
+        match env::var("SNOWFLAKE_LOG_MODE")
+            .unwrap_or_default()
+            .to_lowercase()
+            .as_str()
+        {
+            "prod" | "production" => Self::Prod,
+            "debug" | "verbose" | "trace" => Self::Debug,
+            "dev" | "development" => Self::Dev,
+            _ => {
+                // Default based on build type
+                if cfg!(debug_assertions) {
+                    Self::Dev
+                } else {
+                    Self::Prod
+                }
+            },
+        }
+    }
+}
+
+/// Build the logging plugin based on the current mode.
+fn build_log_plugin() -> tauri_plugin_log::Builder {
+    let mode = LogMode::from_env();
+    let mut builder = tauri_plugin_log::Builder::default();
+
+    match mode {
+        LogMode::Prod => {
+            // Production: minimal logging
+            builder = builder
+                .level(log::LevelFilter::Warn)
+                .level_for("snowflake", log::LevelFilter::Info)
+                .level_for("snowflake_app", log::LevelFilter::Info)
+                .level_for("tao", log::LevelFilter::Error)
+                .level_for("wry", log::LevelFilter::Error);
+        },
+        LogMode::Dev => {
+            // Development: balanced logging
+            builder = builder
+                .level(log::LevelFilter::Info)
+                .level_for("snowflake", log::LevelFilter::Debug)
+                .level_for("snowflake_app", log::LevelFilter::Debug)
+                .level_for("tao", log::LevelFilter::Warn)
+                .level_for("wry", log::LevelFilter::Warn)
+                .level_for("tauri", log::LevelFilter::Info);
+        },
+        LogMode::Debug => {
+            // Debug: verbose logging
+            builder = builder
+                .level(log::LevelFilter::Debug)
+                .level_for("snowflake", log::LevelFilter::Trace)
+                .level_for("snowflake_app", log::LevelFilter::Trace)
+                .level_for("tao", log::LevelFilter::Debug)
+                .level_for("wry", log::LevelFilter::Debug)
+                .level_for("tauri", log::LevelFilter::Debug);
+        },
+    }
+
+    // Always log to stdout in dev, and add log file in prod
+    let targets = if mode == LogMode::Prod {
+        vec![
+            Target::new(TargetKind::Stdout),
+            Target::new(TargetKind::LogDir { file_name: None }),
+        ]
+    } else {
+        vec![Target::new(TargetKind::Stdout)]
+    };
+
+    builder.targets(targets)
+}
 
 /// Run the Tauri application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -20,7 +113,7 @@ use commands::{ai, files, git, lsp, search, terminal, workspace};
 pub fn run() {
     let result = tauri::Builder::default()
         // Plugins
-        .plugin(tauri_plugin_log::Builder::default().build())
+        .plugin(build_log_plugin().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
