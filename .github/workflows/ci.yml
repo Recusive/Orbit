@@ -12,6 +12,7 @@ concurrency:
 
 env:
   NODE_VERSION: '22'
+  PNPM_VERSION: '9'
   CARGO_TERM_COLOR: always
 
 jobs:
@@ -23,48 +24,60 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run typecheck
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
 
   lint:
     name: ESLint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run lint
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
 
   test:
     name: Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run test --if-present
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test --if-present
 
   build:
     name: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run build
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
 
       # Only upload artifacts on main branch to save storage
       # continue-on-error prevents storage quota issues from failing the build

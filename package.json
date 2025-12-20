@@ -20,9 +20,9 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "check": "npm run typecheck && npm run lint && npm run rust:fmt && npm run rust:lint",
-    "check:all": "npm run check && npm run rust:test",
-    "ci": "npm run typecheck && npm run lint && npm run build",
+    "check": "pnpm typecheck && pnpm lint && pnpm rust:fmt && pnpm rust:lint",
+    "check:all": "pnpm check && pnpm rust:test",
+    "ci": "pnpm typecheck && pnpm lint && pnpm build",
     "prepare": "husky"
   },
   "dependencies": {
@@ -43,6 +43,7 @@
     "@codemirror/theme-one-dark": "^6.1.2",
     "@codemirror/view": "^6.32.0",
     "@lexical/react": "^0.39.0",
+    "@lezer/highlight": "^1.2.3",
     "@lucide/lab": "^0.1.2",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-dialog": "^1.1.15",

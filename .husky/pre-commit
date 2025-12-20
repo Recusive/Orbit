@@ -1,5 +1,5 @@
 # Frontend linting
-npx lint-staged
+pnpm exec lint-staged
 
 # Rust formatting check
 echo "🦀 Checking Rust formatting..."

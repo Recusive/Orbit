@@ -1,7 +1,7 @@
 echo "🧪 Running tests before push..."
 
 # Frontend
-npm run typecheck
+pnpm typecheck
 
 # Rust
 cargo test --all-features
