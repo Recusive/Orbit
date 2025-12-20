@@ -1,0 +1,30 @@
+[build]
+# Faster linking on macOS - use lld if available
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+# Use sccache if available (comment out if not installed)
+# rustc-wrapper = "sccache"
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.aarch64-apple-darwin]
+# Uncomment if you have LLVM installed via Homebrew
+# rustflags = ["-C", "link-arg=-fuse-ld=/opt/homebrew/opt/llvm/bin/ld64.lld"]
+
+[target.x86_64-apple-darwin]
+# Uncomment if you have LLVM installed via Homebrew
+# rustflags = ["-C", "link-arg=-fuse-ld=/usr/local/opt/llvm/bin/ld64.lld"]
+
+[alias]
+c = "check"
+t = "test"
+b = "build"
+r = "run"
+br = "build --release"
+rr = "run --release"
+lint = "clippy --all-targets --all-features"
+fix = "clippy --fix --allow-dirty --allow-staged"
+
+[env]
+RUST_BACKTRACE = "1"

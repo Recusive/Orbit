@@ -1,30 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default permissions for Snowflake",
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "fs:default",
-    "fs:allow-read",
-    "fs:allow-write",
-    "fs:allow-create",
-    "fs:allow-remove",
-    "fs:allow-rename",
-    "fs:allow-exists",
-    "fs:allow-stat",
-    "fs:read-all",
-    "fs:write-all",
-    "shell:default",
-    "shell:allow-spawn",
-    "shell:allow-execute",
-    "shell:allow-open",
-    "dialog:default",
-    "dialog:allow-open",
-    "dialog:allow-save",
-    "clipboard-manager:default",
-    "clipboard-manager:allow-read-text",
-    "clipboard-manager:allow-write-text",
-    "log:default"
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-set-size",
+    "core:window:allow-set-title",
+    "core:event:allow-listen",
+    "core:event:allow-emit"
   ]
 }

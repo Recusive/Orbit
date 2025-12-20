@@ -1,0 +1,21 @@
+cognitive-complexity-threshold = 15
+too-many-arguments-threshold = 5
+too-many-lines-threshold = 100
+type-complexity-threshold = 250
+trivial-copy-size-limit = 8
+pass-by-value-size-limit = 256
+large-error-threshold = 128
+enum-variant-size-threshold = 200
+
+msrv = "1.85"
+
+disallowed-methods = [
+    { path = "std::env::var", reason = "Use config system instead" },
+    { path = "std::thread::sleep", reason = "Use tokio::time::sleep in async code" },
+]
+
+disallowed-types = [
+    { path = "std::collections::HashMap", reason = "Use hashbrown::HashMap or indexmap for determinism" },
+    { path = "std::sync::Mutex", reason = "Use parking_lot::Mutex" },
+    { path = "std::sync::RwLock", reason = "Use parking_lot::RwLock" },
+]

@@ -10,7 +10,12 @@ fn get_search_manager() -> &'static SearchManager {
     SEARCH_MANAGER.get_or_init(SearchManager::new)
 }
 
+/// Search for files matching a query
 #[tauri::command]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Tauri command with many optional params"
+)]
 pub async fn search_files(
     root_path: String,
     query: String,
@@ -34,7 +39,12 @@ pub async fn search_files(
         .await
 }
 
+/// Search for text within files
 #[tauri::command]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Tauri command with many optional params"
+)]
 pub async fn search_text(
     root_path: String,
     pattern: String,

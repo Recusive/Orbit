@@ -3,13 +3,22 @@
 //! This is the main Tauri application library that wires together
 //! all the backend functionality.
 
-mod commands;
+pub mod commands;
 
 use commands::{ai, files, git, lsp, search, terminal, workspace};
 
+/// Run the Tauri application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[expect(
+    clippy::disallowed_types,
+    reason = "tauri::generate_context! uses std::collections::HashMap internally"
+)]
+#[expect(
+    clippy::large_stack_frames,
+    reason = "tauri::generate_context! macro causes this"
+)]
 pub fn run() {
-    tauri::Builder::default()
+    let result = tauri::Builder::default()
         // Plugins
         .plugin(tauri_plugin_log::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
@@ -60,6 +69,9 @@ pub fn run() {
             workspace::get_workspace_path,
             workspace::set_workspace_path,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .run(tauri::generate_context!());
+
+    if let Err(e) = result {
+        log::error!("Error running Tauri application: {e}");
+    }
 }

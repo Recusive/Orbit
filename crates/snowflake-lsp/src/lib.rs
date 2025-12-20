@@ -8,14 +8,14 @@ use snowflake_core::{
 };
 
 /// LSP manager for handling language servers
-pub struct LspManager {
-    // Will hold active language server connections
-}
+#[derive(Debug, Clone, Copy)]
+pub struct LspManager;
 
 impl LspManager {
     /// Create a new LSP manager
-    pub fn new() -> Self {
-        Self {}
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
     }
 
     /// Get completions at a position
@@ -31,12 +31,7 @@ impl LspManager {
     }
 
     /// Get hover information at a position
-    pub async fn get_hover(
-        &self,
-        path: &str,
-        line: u32,
-        column: u32,
-    ) -> Result<Option<HoverInfo>> {
+    pub async fn get_hover(&self, path: &str, line: u32, column: u32) -> Result<Option<HoverInfo>> {
         // TODO: Implement LSP hover
         let _ = (path, line, column);
         Ok(None)
@@ -69,7 +64,7 @@ impl LspManager {
     /// Format document
     pub async fn format_document(&self, path: &str) -> Result<String> {
         // TODO: Implement LSP formatting
-        Err(Error::Lsp(format!("Formatting not available for {}", path)))
+        Err(Error::Lsp(format!("Formatting not available for {path}")))
     }
 
     /// Get diagnostics for a file
