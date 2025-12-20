@@ -10,6 +10,7 @@
     "dev:web": "vite",
     "build": "tauri build",
     "build:debug": "tauri build --debug",
+    "build:frontend": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --max-warnings=0",
