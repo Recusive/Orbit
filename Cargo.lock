@@ -2491,6 +2491,8 @@ version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
+ "allocator-api2",
+ "equivalent",
  "foldhash",
 ]
 
@@ -5203,6 +5205,7 @@ name = "snowflake-app"
 version = "0.1.0"
 dependencies = [
  "log",
+ "parking_lot",
  "serde",
  "serde_json",
  "snowflake-ai",
@@ -5284,9 +5287,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "snowflake-settings"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "snowflake-core",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "snowflake-syntax"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "snowflake-core",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "snowflake-terminal"
 version = "0.1.0"
 dependencies = [
+ "hashbrown 0.15.5",
  "portable-pty",
  "serde",
  "serde_json",

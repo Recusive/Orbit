@@ -7,6 +7,9 @@ authors.workspace = true
 license.workspace = true
 description = "Terminal emulation and PTY management for Snowflake"
 
+[lints]
+workspace = true
+
 [dependencies]
 snowflake-core = { path = "../snowflake-core" }
 tokio = { workspace = true }
@@ -14,3 +17,4 @@ portable-pty = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+hashbrown = { workspace = true }

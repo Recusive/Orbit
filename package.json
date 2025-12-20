@@ -8,23 +8,22 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --max-warnings 0",
+    "lint": "eslint src --max-warnings=0",
     "lint:fix": "eslint src --fix",
-    "check": "npm run typecheck && npm run lint",
-    "ci": "npm run typecheck && npm run lint && npm run build",
-    "prepare": "husky",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "rust:fmt": "cargo fmt --all -- --check",
+    "rust:lint": "cargo clippy --all-targets --all-features -- -D warnings",
+    "rust:test": "cargo test --all-features",
+    "rust:build": "cargo build --all-features",
+    "rust:check": "cargo check --all-features",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
-  },
-  "lint-staged": {
-    "*.{ts,tsx}": [
-      "eslint --fix --max-warnings 0",
-      "bash -c 'tsc --noEmit'"
-    ],
-    "*.{json,md,yml,yaml}": [
-      "prettier --write --ignore-unknown"
-    ]
+    "tauri:build": "tauri build",
+    "check": "npm run typecheck && npm run lint && npm run rust:fmt && npm run rust:lint",
+    "check:all": "npm run check && npm run rust:test",
+    "ci": "npm run typecheck && npm run lint && npm run build",
+    "prepare": "husky"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.0",

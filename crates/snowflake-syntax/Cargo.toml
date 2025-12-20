@@ -1,20 +1,16 @@
 [package]
-name = "snowflake-ai"
+name = "snowflake-syntax"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "AI integration for Snowflake (Claude API)"
+description = "Syntax highlighting and tree-sitter parsing for Snowflake"
 
 [lints]
 workspace = true
 
 [dependencies]
 snowflake-core = { path = "../snowflake-core" }
-tokio = { workspace = true }
-reqwest = { workspace = true }
-futures = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 thiserror = { workspace = true }

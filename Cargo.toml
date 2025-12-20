@@ -2,40 +2,42 @@
 resolver = "2"
 members = [
     "src-tauri",
-    "crates/snowflake-core",
-    "crates/snowflake-fs",
-    "crates/snowflake-lsp",
-    "crates/snowflake-terminal",
-    "crates/snowflake-git",
-    "crates/snowflake-ai",
-    "crates/snowflake-search",
+    "crates/*"
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.75"
 authors = ["Snowflake Team"]
 license = "MIT"
 
 [workspace.dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
 # Async
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 futures = "0.3"
 
-# Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-
 # Error handling
-anyhow = "1"
-thiserror = "1"
+anyhow = "1.0"
+thiserror = "1.0"
 
 # Logging
 log = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Concurrency
+parking_lot = "0.12"
+crossbeam-channel = "0.5"
+
+# Collections (deterministic)
+hashbrown = "0.15"
+indexmap = "2"
 
 # File system
 notify = "8"
@@ -68,7 +70,270 @@ tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
 
+# ============================================
+# STRICT LINTS - DENY EVERYTHING DANGEROUS
+# ============================================
+
+[workspace.lints.rust]
+# Safety - FORBID (cannot be overridden)
+unsafe_code = "forbid"
+unsafe_op_in_unsafe_fn = "forbid"
+
+# Correctness - DENY
+unused = { level = "deny", priority = -1 }
+nonstandard_style = { level = "deny", priority = -1 }
+rust_2018_idioms = { level = "deny", priority = -1 }
+rust_2021_compatibility = { level = "deny", priority = -1 }
+future_incompatible = { level = "deny", priority = -1 }
+
+# Specific denials
+dead_code = "deny"
+deprecated = "deny"
+improper_ctypes = "deny"
+non_shorthand_field_patterns = "deny"
+path_statements = "deny"
+trivial_casts = "deny"
+trivial_numeric_casts = "deny"
+unconditional_recursion = "deny"
+unused_allocation = "deny"
+unused_comparisons = "deny"
+unused_extern_crates = "deny"
+unused_import_braces = "deny"
+unused_lifetimes = "deny"
+unused_macro_rules = "deny"
+unused_must_use = "deny"
+unused_parens = "deny"
+unused_qualifications = "deny"
+unused_results = "deny"
+unreachable_pub = "deny"
+variant_size_differences = "deny"
+
+# Documentation enforcement
+missing_docs = "deny"
+missing_debug_implementations = "deny"
+missing_copy_implementations = "warn"
+single_use_lifetimes = "warn"
+elided_lifetimes_in_paths = "warn"
+
+[workspace.lints.clippy]
+# ============================================
+# CATEGORY ENABLES
+# ============================================
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+
+# ============================================
+# ABSOLUTE DENIALS - NEVER ALLOW THESE
+# ============================================
+# Panics and unwraps
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+panic_in_result_fn = "deny"
+unwrap_in_result = "deny"
+indexing_slicing = "deny"
+
+# Debug/development code
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+
+# Suspicious code
+suspicious = { level = "deny", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+
+# ============================================
+# STRICT CODE QUALITY
+# ============================================
+# Complexity
+cognitive_complexity = { level = "warn", priority = 1 }
+too_many_arguments = "warn"
+too_many_lines = "warn"
+
+# Safety adjacent
+cast_possible_truncation = "deny"
+cast_possible_wrap = "deny"
+cast_precision_loss = "deny"
+cast_sign_loss = "deny"
+cast_lossless = "warn"
+ptr_as_ptr = "deny"
+ptr_cast_constness = "deny"
+
+# Error handling
+map_err_ignore = "deny"
+result_unit_err = "deny"
+error_impl_error = "allow"
+
+# Performance
+inefficient_to_string = "deny"
+invalid_upcast_comparisons = "deny"
+large_digit_groups = "warn"
+large_stack_arrays = "warn"
+large_types_passed_by_value = "warn"
+linkedlist = "deny"
+mutex_atomic = "deny"
+rc_buffer = "deny"
+rc_mutex = "deny"
+redundant_clone = "deny"
+trivially_copy_pass_by_ref = "warn"
+unnecessary_box_returns = "warn"
+vec_box = "warn"
+
+# Correctness
+clone_on_ref_ptr = "deny"
+expl_impl_clone_on_copy = "deny"
+float_cmp = "deny"
+float_cmp_const = "deny"
+lossy_float_literal = "deny"
+mem_forget = "deny"
+same_name_method = "deny"
+self_named_module_files = "deny"
+string_add = "deny"
+
+# Style enforcement
+absolute_paths = "warn"
+alloc_instead_of_core = "warn"
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+as_underscore = "deny"
+assertions_on_result_states = "deny"
+default_numeric_fallback = "warn"
+deref_by_slicing = "warn"
+empty_drop = "deny"
+empty_structs_with_brackets = "warn"
+# Keep for enums (can still match with _ pattern)
+exhaustive_enums = "warn"
+# Allow for structs - internal app types, constructors for 20+ DTOs is impractical
+exhaustive_structs = "allow"
+filetype_is_file = "deny"
+fn_to_numeric_cast_any = "deny"
+format_push_string = "warn"
+get_unwrap = "deny"
+if_then_some_else_none = "warn"
+impl_trait_in_params = "warn"
+implicit_clone = "warn"
+infinite_loop = "deny"
+iter_over_hash_type = "warn"
+let_underscore_must_use = "deny"
+# Too noisy for unused variable suppression
+let_underscore_untyped = "allow"
+manual_assert = "warn"
+manual_instant_elapsed = "warn"
+manual_let_else = "warn"
+manual_ok_or = "warn"
+manual_string_new = "warn"
+map_unwrap_or = "warn"
+match_bool = "warn"
+match_wild_err_arm = "deny"
+match_wildcard_for_single_variants = "warn"
+missing_assert_message = "warn"
+# Allow for stubs that will be implemented later
+missing_const_for_fn = "allow"
+mixed_read_write_in_expression = "deny"
+multiple_inherent_impl = "warn"
+needless_for_each = "warn"
+needless_pass_by_ref_mut = "warn"
+needless_raw_strings = "warn"
+# Allow for unused parameter suppression in stubs
+no_effect_underscore_binding = "allow"
+option_option = "deny"
+or_fun_call = "warn"
+partial_pub_fields = "warn"
+range_minus_one = "warn"
+range_plus_one = "warn"
+redundant_else = "warn"
+redundant_type_annotations = "warn"
+ref_binding_to_reference = "warn"
+ref_option_ref = "warn"
+ref_patterns = "warn"
+rest_pat_in_fully_bound_structs = "deny"
+same_functions_in_if_condition = "deny"
+semicolon_if_nothing_returned = "warn"
+semicolon_inside_block = "warn"
+# Shadow lints - allow since shadowing parameters is common Rust idiom
+shadow_reuse = "allow"
+shadow_same = "warn"
+shadow_unrelated = "allow"
+stable_sort_primitive = "warn"
+str_to_string = "warn"
+string_lit_chars_any = "warn"
+struct_field_names = "warn"
+suspicious_xor_used_as_pow = "deny"
+tests_outside_test_module = "warn"
+try_err = "deny"
+undocumented_unsafe_blocks = "deny"
+unneeded_field_pattern = "warn"
+unnecessary_safety_comment = "warn"
+unnecessary_safety_doc = "warn"
+unnecessary_self_imports = "warn"
+unnecessary_struct_initialization = "warn"
+unnested_or_patterns = "warn"
+unused_peekable = "deny"
+unused_rounding = "warn"
+unused_trait_names = "warn"
+use_debug = "warn"
+use_self = "warn"
+verbose_file_reads = "warn"
+wildcard_dependencies = "deny"
+wildcard_imports = "deny"
+
+# ============================================
+# ALLOWED (too noisy or not applicable)
+# ============================================
+# Dependency version conflicts - outside our control
+multiple_crate_versions = "allow"
+cargo_common_metadata = "allow"
+# Nursery lint too noisy with async lock guards
+significant_drop_tightening = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+return_self_not_must_use = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+struct_excessive_bools = "allow"
+fn_params_excessive_bools = "allow"
+single_match_else = "allow"
+if_not_else = "allow"
+items_after_statements = "allow"
+similar_names = "allow"
+doc_markdown = "allow"
+unused_async = "allow"
+
+# ============================================
+# PROFILES
+# ============================================
+
+[profile.dev]
+opt-level = 0
+debug = true
+overflow-checks = true
+lto = false
+panic = "unwind"
+incremental = true
+
+[profile.dev.package."*"]
+opt-level = 2  # Optimize dependencies even in dev
+
 [profile.release]
-lto = true
-codegen-units = 1
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+lto = "fat"
 panic = "abort"
+codegen-units = 1
+strip = "symbols"
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = "none"
+
+[profile.bench]
+inherits = "release"
+debug = true
