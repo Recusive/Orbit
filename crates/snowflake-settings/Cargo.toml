@@ -13,5 +13,3 @@ workspace = true
 [dependencies]
 snowflake-core = { path = "../snowflake-core" }
 serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }

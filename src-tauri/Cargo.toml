@@ -28,8 +28,6 @@ snowflake-ai = { path = "../crates/snowflake-ai" }
 snowflake-search = { path = "../crates/snowflake-search" }
 
 # Core dependencies
-serde = { workspace = true }
-serde_json = { workspace = true }
 tokio = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }

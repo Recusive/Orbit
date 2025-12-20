@@ -12,10 +12,4 @@ workspace = true
 
 [dependencies]
 snowflake-core = { path = "../snowflake-core" }
-tokio = { workspace = true }
 ignore = { workspace = true }
-globset = { workspace = true }
-walkdir = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }

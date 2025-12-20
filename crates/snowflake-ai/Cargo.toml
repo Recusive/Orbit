@@ -12,9 +12,3 @@ workspace = true
 
 [dependencies]
 snowflake-core = { path = "../snowflake-core" }
-tokio = { workspace = true }
-reqwest = { workspace = true }
-futures = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
