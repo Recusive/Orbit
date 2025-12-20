@@ -7,7 +7,7 @@
 @plugin "tailwindcss-animate";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *, .vscode-dark *, .vscode-high-contrast *));
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
@@ -195,9 +195,7 @@
   --terminal-cursor: oklch(0.85 0.01 75);
 }
 
-/* Support both VS Code webview (body.vscode-dark) and standalone dev (html.dark) */
-body.vscode-dark,
-body.vscode-high-contrast,
+/* Dark theme */
 html.dark {
   /* Brand palette - adjusted for dark */
   --brand-oat: oklch(0.35 0.015 60);       /* Darkened */
@@ -350,7 +348,7 @@ html.dark {
   html, body, #root {
     height: 100%;
     margin: 0 !important;
-    padding: 1px 0 0 0 !important; /* 1px top padding to fix VS Code webview clipping */
+    padding: 0 !important;
   }
 
   body {

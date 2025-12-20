@@ -9,7 +9,7 @@ import type { FC } from 'react';
 
 import { QuickOpen } from '@/components/quick-open';
 import { useDefaultKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import { useUIStore } from '@/stores/ui-store';
 
 export const RootLayout: FC = () => {
@@ -44,7 +44,7 @@ export const RootLayout: FC = () => {
   }, []);
 
   // Listen to extension messages
-  useVSCode({ onMessage: handleExtensionMessage });
+  useTauri({ onMessage: handleExtensionMessage });
 
   // Listen for keyboard shortcut custom events
   useEffect(() => {

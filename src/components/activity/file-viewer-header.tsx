@@ -115,15 +115,20 @@ const FileTab: FC<FileTabProps> = ({ file, isActive, onSelect, onClose }) => {
       ) : null}
       <FileIcon fileName={fileName} className="h-4 w-4" />
       <span className="truncate">{fileName}</span>
-      <button
-        onClick={handleCloseClick}
-        className={cn(
-          'h-4 w-4 flex items-center justify-center rounded transition-opacity',
-          isActive ? 'opacity-70 hover:opacity-100' : 'opacity-0 group-hover:opacity-70 hover:opacity-100'
-        )}
-      >
-        <X className="h-3 w-3" />
-      </button>
+      {/* Modified indicator - show dot when file has unsaved changes */}
+      {file.isModified ? (
+        <span className="h-2 w-2 rounded-full bg-brand-coral shrink-0" title="Unsaved changes" />
+      ) : (
+        <button
+          onClick={handleCloseClick}
+          className={cn(
+            'h-4 w-4 flex items-center justify-center rounded transition-opacity shrink-0',
+            isActive ? 'opacity-70 hover:opacity-100' : 'opacity-0 group-hover:opacity-70 hover:opacity-100'
+          )}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 };

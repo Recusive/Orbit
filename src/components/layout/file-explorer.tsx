@@ -5,7 +5,7 @@ import type { FileNode, ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { FileIcon, FolderIcon } from '@/components/files';
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import { cn } from '@/lib/utils';
 import { useFileStore } from '@/stores/file-store';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
@@ -15,7 +15,7 @@ interface FileExplorerProps {
 }
 
 export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
-  const { postMessage } = useVSCode();
+  const { postMessage } = useTauri();
   const {
     rootPath,
     treeNodes,
@@ -136,7 +136,7 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
   }, [rootPath, setRootPath, setTreeChildren, handleFileChanged, treeNodes]);
 
   // Set up message listener
-  useVSCode({ onMessage: handleMessage });
+  useTauri({ onMessage: handleMessage });
 
   // Request root children on mount
   useEffect(() => {
@@ -234,7 +234,7 @@ interface FileTreeItemProps {
 }
 
 const FileTreeItem: FC<FileTreeItemProps> = ({ node, depth, requestChildren }) => {
-  const { postMessage } = useVSCode();
+  const { postMessage } = useTauri();
   const {
     treeNodes,
     expandedFolders,

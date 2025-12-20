@@ -17,7 +17,7 @@ import { SourceControlTab } from '@/components/activity/source-control-tab';
 import { BrowserPanel } from '@/components/browser';
 import { TerminalPanel } from '@/components/terminal/terminal-panel';
 import { ButtonGroup } from '@/components/ui/button-group';
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import { cn } from '@/lib/utils';
 import { useBrowserIsActive } from '@/stores/browser-store';
 import { useFileViewerStore, useHasOpenFiles } from '@/stores/file-viewer-store';
@@ -80,7 +80,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
   const terminalPosition = useTerminalPosition();
   const prevHasOpenFiles = useRef(hasOpenFiles);
   const isBrowserActive = useBrowserIsActive();
-  const { postMessage } = useVSCode({});
+  const { postMessage } = useTauri({});
   const prevActiveTab = useRef(activeTab);
 
   // Auto-switch to File tab only when files are first opened (not continuously)
@@ -201,15 +201,13 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
       {/* Tabs (directly at top - no separate header) */}
       <div className="flex items-center gap-2 px-4 pt-2 overflow-hidden">
         <div className="flex gap-1 min-w-0">
-          {hasOpenFiles ? (
-            <TabButton
-              active={activeTab === 'file'}
-              onClick={() => { setActiveTab('file'); }}
-              icon={FileCode}
-              label="File"
-              compact
-            />
-          ) : null}
+          <TabButton
+            active={activeTab === 'file'}
+            onClick={() => { setActiveTab('file'); }}
+            icon={FileCode}
+            label="File"
+            compact
+          />
           <TabButton
             active={activeTab === 'files'}
             onClick={() => { setActiveTab('files'); }}
@@ -267,7 +265,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === 'file' && hasOpenFiles ? (
+        {activeTab === 'file' ? (
           <FileViewer />
         ) : activeTab === 'files' ? (
           <div className="h-full overflow-y-auto">

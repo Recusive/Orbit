@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { useFileStore } from '../stores/file-store';
 import { generateUUID } from '../types/protocol';
 
-import { useVSCode } from './use-vscode';
+import { useTauri } from './use-tauri';
 
 import type { FileChange, FileChangeType } from '../stores/file-store';
 import type { FileAccept, FileReject, FileAcceptAll, FileRejectAll } from '../types/protocol';
@@ -27,7 +27,7 @@ export interface UseFileOperationsReturn {
  * Handles file change management and VS Code communication
  */
 export function useFileOperations(): UseFileOperationsReturn {
-  const { postMessage } = useVSCode();
+  const { postMessage } = useTauri();
 
   const changedFiles = useFileStore((state) => state.changedFiles);
   const selectedFile = useFileStore((state) => state.selectedFile);

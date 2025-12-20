@@ -1,7 +1,7 @@
 /**
  * useTerminalInstanceManager - React hook for accessing the terminal instance manager
  *
- * This hook initializes the singleton TerminalInstanceManager with the VS Code
+ * This hook initializes the singleton TerminalInstanceManager with the Tauri
  * postMessage function and handles message routing.
  *
  * CRITICAL: Uses module-level state and listeners to survive React lifecycle.
@@ -13,7 +13,7 @@ import { useEffect } from 'react';
 import type { TerminalInstanceManager } from '@/services/terminal-instance-manager';
 import type { ShellType } from '@/types/protocol';
 
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import { getTerminalInstanceManager } from '@/services/terminal-instance-manager';
 import { useTerminalStore } from '@/stores/terminal-store';
 
@@ -62,9 +62,9 @@ export function useTerminalInstanceManager(): TerminalInstanceManager {
   const startCommand = useTerminalStore((state) => state.startCommand);
   const endCommand = useTerminalStore((state) => state.endCommand);
 
-  // Get postMessage from VS Code
+  // Get postMessage from Tauri
   // Pass dummy handler since we use global listener instead
-  const { postMessage, isMockMode } = useVSCode({
+  const { postMessage, isMockMode } = useTauri({
     debug: false,
   });
 

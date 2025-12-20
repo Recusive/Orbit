@@ -1,0 +1,540 @@
+/**
+ * Backend abstraction layer for Tauri
+ *
+ * This module provides a unified API for all backend operations.
+ * All functions use Tauri invoke() for communication with the Rust backend.
+ */
+
+// ============================================
+// Tauri Detection & Imports
+// ============================================
+
+const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
+
+async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  if (!IS_TAURI) {
+    // Mock mode for browser development
+    console.warn(`[Mock] invoke('${command}')`, args);
+    throw new Error(`Tauri not available. Cannot invoke '${command}'`);
+  }
+  const { invoke: tauriInvoke } = await import('@tauri-apps/api/core');
+  return tauriInvoke<T>(command, args);
+}
+
+type EventCallback<T> = (payload: T) => void;
+
+async function listen<T>(
+  event: string,
+  callback: EventCallback<T>,
+): Promise<() => void> {
+  if (!IS_TAURI) {
+    console.warn(`[Mock] listen('${event}')`);
+    return (): void => {
+      // No-op for mock mode
+    };
+  }
+  const { listen: tauriListen } = await import('@tauri-apps/api/event');
+  const unlisten = await tauriListen<T>(event, (e): void => {
+    callback(e.payload);
+  });
+  return unlisten;
+}
+
+// ============================================
+// File Operations
+// ============================================
+
+export async function readFile(path: string): Promise<string> {
+  return invoke<string>('read_file', { path });
+}
+
+export async function writeFile(path: string, content: string): Promise<void> {
+  return invoke('write_file', { path, content });
+}
+
+export async function listDirectory(path: string): Promise<FileEntry[]> {
+  return invoke<FileEntry[]>('list_directory', { path });
+}
+
+export async function deleteFile(path: string): Promise<void> {
+  return invoke('delete_file', { path });
+}
+
+export async function renameFile(oldPath: string, newPath: string): Promise<void> {
+  return invoke('rename_file', { oldPath, newPath });
+}
+
+export async function createDirectory(path: string): Promise<void> {
+  return invoke('create_directory', { path });
+}
+
+export async function fileExists(path: string): Promise<boolean> {
+  return invoke<boolean>('file_exists', { path });
+}
+
+export async function getFileInfo(path: string): Promise<FileInfo> {
+  return invoke<FileInfo>('get_file_info', { path });
+}
+
+// ============================================
+// LSP Operations
+// ============================================
+
+export async function getCompletions(
+  path: string,
+  line: number,
+  column: number,
+): Promise<CompletionItem[]> {
+  return invoke<CompletionItem[]>('lsp_completions', { path, line, column });
+}
+
+export async function getHover(
+  path: string,
+  line: number,
+  column: number,
+): Promise<HoverInfo | null> {
+  return invoke<HoverInfo | null>('lsp_hover', { path, line, column });
+}
+
+export async function gotoDefinition(
+  path: string,
+  line: number,
+  column: number,
+): Promise<Location | null> {
+  return invoke<Location | null>('lsp_goto_definition', { path, line, column });
+}
+
+export async function findReferences(
+  path: string,
+  line: number,
+  column: number,
+): Promise<Location[]> {
+  return invoke<Location[]>('lsp_find_references', { path, line, column });
+}
+
+export async function formatDocument(path: string): Promise<string> {
+  return invoke<string>('lsp_format', { path });
+}
+
+export async function getDiagnostics(path: string): Promise<Diagnostic[]> {
+  return invoke<Diagnostic[]>('lsp_diagnostics', { path });
+}
+
+export async function getSignatureHelp(
+  path: string,
+  line: number,
+  column: number,
+): Promise<SignatureHelp | null> {
+  return invoke<SignatureHelp | null>('lsp_signature_help', { path, line, column });
+}
+
+// ============================================
+// Terminal Operations
+// ============================================
+
+export async function createTerminal(
+  id: string,
+  cwd?: string,
+  shell?: string,
+): Promise<TerminalInfo> {
+  return invoke<TerminalInfo>('terminal_create', { id, cwd, shell });
+}
+
+export async function writeTerminal(id: string, data: string): Promise<void> {
+  return invoke('terminal_write', { id, data });
+}
+
+export async function resizeTerminal(
+  id: string,
+  cols: number,
+  rows: number,
+): Promise<void> {
+  return invoke('terminal_resize', { id, cols, rows });
+}
+
+export async function closeTerminal(id: string): Promise<void> {
+  return invoke('terminal_close', { id });
+}
+
+export async function onTerminalOutput(
+  callback: (data: TerminalOutputEvent) => void,
+): Promise<() => void> {
+  return listen<TerminalOutputEvent>('terminal:output', callback);
+}
+
+export async function onTerminalExit(
+  callback: (data: TerminalExitEvent) => void,
+): Promise<() => void> {
+  return listen<TerminalExitEvent>('terminal:exit', callback);
+}
+
+// ============================================
+// Git Operations
+// ============================================
+
+export async function gitStatus(repoPath: string): Promise<GitStatus> {
+  return invoke<GitStatus>('git_status', { repoPath });
+}
+
+export async function gitStage(repoPath: string, files: string[]): Promise<void> {
+  return invoke('git_stage', { repoPath, files });
+}
+
+export async function gitUnstage(repoPath: string, files: string[]): Promise<void> {
+  return invoke('git_unstage', { repoPath, files });
+}
+
+export async function gitCommit(repoPath: string, message: string): Promise<string> {
+  return invoke<string>('git_commit', { repoPath, message });
+}
+
+export async function gitDiff(repoPath: string, file?: string): Promise<string> {
+  return invoke<string>('git_diff', { repoPath, file });
+}
+
+export async function gitLog(
+  repoPath: string,
+  limit?: number,
+): Promise<GitCommit[]> {
+  return invoke<GitCommit[]>('git_log', { repoPath, limit });
+}
+
+export async function gitBranches(repoPath: string): Promise<GitBranch[]> {
+  return invoke<GitBranch[]>('git_branches', { repoPath });
+}
+
+export async function gitCheckout(
+  repoPath: string,
+  branch: string,
+): Promise<void> {
+  return invoke('git_checkout', { repoPath, branch });
+}
+
+// ============================================
+// AI Operations
+// ============================================
+
+export async function aiChat(
+  messages: ChatMessage[],
+  model?: string,
+  onChunk?: (chunk: string) => void,
+): Promise<ChatResponse> {
+  // Set up streaming listener if callback provided
+  let unlisten: (() => void) | undefined;
+  if (onChunk) {
+    unlisten = await listen<string>('ai:chunk', onChunk);
+  }
+
+  try {
+    return await invoke<ChatResponse>('ai_chat', { messages, model });
+  } finally {
+    unlisten?.();
+  }
+}
+
+export async function aiComplete(
+  prefix: string,
+  suffix: string,
+  language: string,
+): Promise<string> {
+  return invoke<string>('ai_complete', { prefix, suffix, language });
+}
+
+export async function aiStopGeneration(): Promise<void> {
+  return invoke('ai_stop');
+}
+
+// ============================================
+// Search Operations
+// ============================================
+
+export async function searchFiles(
+  rootPath: string,
+  query: string,
+  options?: SearchOptions,
+): Promise<SearchResult[]> {
+  return invoke<SearchResult[]>('search_files', { rootPath, query, ...options });
+}
+
+export async function searchText(
+  rootPath: string,
+  pattern: string,
+  options?: SearchOptions,
+): Promise<TextSearchResult[]> {
+  return invoke<TextSearchResult[]>('search_text', { rootPath, pattern, ...options });
+}
+
+// ============================================
+// File Watcher
+// ============================================
+
+export async function watchPath(path: string): Promise<void> {
+  return invoke('watch_path', { path });
+}
+
+export async function unwatchPath(path: string): Promise<void> {
+  return invoke('unwatch_path', { path });
+}
+
+export async function onFileChange(
+  callback: (event: FileChangeEvent) => void,
+): Promise<() => void> {
+  return listen<FileChangeEvent>('file:change', callback);
+}
+
+// ============================================
+// Window Operations
+// ============================================
+
+export async function openFileDialog(
+  options?: FileDialogOptions,
+): Promise<string | string[] | null> {
+  if (!IS_TAURI) {
+    console.warn('[Mock] openFileDialog');
+    return null;
+  }
+  const { open } = await import('@tauri-apps/plugin-dialog');
+  return open(options);
+}
+
+export async function saveFileDialog(
+  options?: SaveDialogOptions,
+): Promise<string | null> {
+  if (!IS_TAURI) {
+    console.warn('[Mock] saveFileDialog');
+    return null;
+  }
+  const { save } = await import('@tauri-apps/plugin-dialog');
+  return save(options);
+}
+
+// ============================================
+// Clipboard
+// ============================================
+
+export async function clipboardRead(): Promise<string> {
+  if (!IS_TAURI) {
+    return navigator.clipboard.readText();
+  }
+  const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+  return readText();
+}
+
+export async function clipboardWrite(text: string): Promise<void> {
+  if (!IS_TAURI) {
+    return navigator.clipboard.writeText(text);
+  }
+  const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
+  return writeText(text);
+}
+
+// ============================================
+// App Info
+// ============================================
+
+export async function getAppVersion(): Promise<string> {
+  if (!IS_TAURI) {
+    return '0.0.0-dev';
+  }
+  const { getVersion } = await import('@tauri-apps/api/app');
+  return getVersion();
+}
+
+export async function getWorkspacePath(): Promise<string | null> {
+  return invoke<string | null>('get_workspace_path');
+}
+
+export async function setWorkspacePath(path: string): Promise<void> {
+  return invoke('set_workspace_path', { path });
+}
+
+// ============================================
+// Types
+// ============================================
+
+export interface FileEntry {
+  path: string;
+  name: string;
+  isDir: boolean;
+  size?: number;
+  modified?: number;
+}
+
+export interface FileInfo {
+  path: string;
+  name: string;
+  isDir: boolean;
+  isFile: boolean;
+  size: number;
+  modified: number;
+  created: number;
+  readonly: boolean;
+}
+
+export interface CompletionItem {
+  label: string;
+  kind: number;
+  detail?: string;
+  documentation?: string;
+  insertText?: string;
+  sortText?: string;
+}
+
+export interface HoverInfo {
+  contents: string;
+  range?: Range;
+}
+
+export interface Location {
+  path: string;
+  line: number;
+  column: number;
+}
+
+export interface Range {
+  start: Position;
+  end: Position;
+}
+
+export interface Position {
+  line: number;
+  column: number;
+}
+
+export interface Diagnostic {
+  message: string;
+  severity: 'error' | 'warning' | 'info' | 'hint';
+  range: Range;
+  source?: string;
+  code?: string;
+}
+
+export interface SignatureHelp {
+  signatures: SignatureInfo[];
+  activeSignature: number;
+  activeParameter: number;
+}
+
+export interface SignatureInfo {
+  label: string;
+  documentation?: string;
+  parameters: ParameterInfo[];
+}
+
+export interface ParameterInfo {
+  label: string;
+  documentation?: string;
+}
+
+export interface TerminalInfo {
+  id: string;
+  pid: number;
+  shell: string;
+  cwd: string;
+}
+
+export interface TerminalOutputEvent {
+  id: string;
+  data: string;
+}
+
+export interface TerminalExitEvent {
+  id: string;
+  code: number;
+}
+
+export interface GitStatus {
+  branch: string;
+  staged: string[];
+  modified: string[];
+  untracked: string[];
+  deleted: string[];
+  renamed: { from: string; to: string }[];
+  ahead: number;
+  behind: number;
+  isClean: boolean;
+}
+
+export interface GitCommit {
+  sha: string;
+  shortSha: string;
+  message: string;
+  author: string;
+  email: string;
+  date: number;
+}
+
+export interface GitBranch {
+  name: string;
+  isRemote: boolean;
+  isCurrent: boolean;
+  upstream?: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface ChatResponse {
+  content: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
+  model?: string;
+  stopReason?: string;
+}
+
+export interface SearchOptions {
+  caseSensitive?: boolean;
+  wholeWord?: boolean;
+  regex?: boolean;
+  include?: string[];
+  exclude?: string[];
+  maxResults?: number;
+}
+
+export interface SearchResult {
+  path: string;
+  name: string;
+  isDir: boolean;
+}
+
+export interface TextSearchResult {
+  path: string;
+  line: number;
+  column: number;
+  matchLength: number;
+  lineContent: string;
+  beforeContext?: string[];
+  afterContext?: string[];
+}
+
+export interface FileChangeEvent {
+  type: 'created' | 'modified' | 'deleted' | 'renamed';
+  path: string;
+  newPath?: string;
+}
+
+export interface FileDialogOptions {
+  title?: string;
+  defaultPath?: string;
+  filters?: { name: string; extensions: string[] }[];
+  multiple?: boolean;
+  directory?: boolean;
+}
+
+export interface SaveDialogOptions {
+  title?: string;
+  defaultPath?: string;
+  filters?: { name: string; extensions: string[] }[];
+}
+
+// ============================================
+// Utility: Check if running in Tauri
+// ============================================
+
+export function isTauri(): boolean {
+  return IS_TAURI;
+}

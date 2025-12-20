@@ -14,7 +14,7 @@ import { WelcomeGreeting } from '@/components/chat/welcome-greeting';
 import { ResizeHandle } from '@/components/layout/resize-handle';
 import { TerminalPanel } from '@/components/terminal/terminal-panel';
 import { useChatMessages } from '@/hooks/use-chat-messages';
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import { useToolStore, usePendingPermissions, useInputMode, useThinkingMode, useSessionUsage, useMaxTokens } from '@/stores/tool-store';
 import { useUIStore, useTerminalPosition } from '@/stores/ui-store';
 
@@ -77,7 +77,7 @@ export const ChatArea: FC = () => {
   };
 
   // Subscribe to file list messages
-  useVSCode({ onMessage: handleFileListMessage });
+  useTauri({ onMessage: handleFileListMessage });
 
   // Request file list for @ mentions on mount
   useEffect(() => {

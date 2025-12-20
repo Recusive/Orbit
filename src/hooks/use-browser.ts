@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import type { ExtensionMessage } from '@/types/protocol';
 
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import { useBrowserStore } from '@/stores/browser-store';
 import { useUIStore } from '@/stores/ui-store';
 import { generateUUID } from '@/types/protocol';
@@ -11,7 +11,7 @@ import { generateUUID } from '@/types/protocol';
 let pendingNavigationUrl: string | null = null;
 
 /**
- * Hook to handle browser messages from Orbit extension
+ * Hook to handle browser messages from Tauri backend
  */
 export function useBrowser(): void {
   const {
@@ -25,7 +25,7 @@ export function useBrowser(): void {
   } = useBrowserStore();
 
   // Get postMessage for sending browser:show when panel becomes visible
-  const { postMessage } = useVSCode({});
+  const { postMessage } = useTauri({});
 
   const handleMessage = useCallback((message: ExtensionMessage): void => {
     switch (message.type) {
@@ -193,6 +193,6 @@ export function useBrowser(): void {
     }
   }, [postMessage]);
 
-  // Subscribe to extension messages
-  useVSCode({ onMessage: handleMessage });
+  // Subscribe to backend messages
+  useTauri({ onMessage: handleMessage });
 }

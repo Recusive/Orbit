@@ -3,7 +3,7 @@ import { useCallback, useEffect } from 'react';
 import { useTerminalStore } from '../stores/terminal-store';
 import { generateUUID } from '../types/protocol';
 
-import { useVSCode } from './use-vscode';
+import { useTauri } from './use-tauri';
 
 import type { TerminalSession, TerminalOutput } from '../stores/terminal-store';
 import type { TerminalCreate, TerminalClose, TerminalCommand, TerminalClear } from '../types/protocol';
@@ -25,7 +25,7 @@ export interface UseTerminalReturn {
  * Manages terminal sessions and command execution
  */
 export function useTerminal(defaultSessionId?: string): UseTerminalReturn {
-  const { postMessage } = useVSCode();
+  const { postMessage } = useTauri();
 
   const sessions = useTerminalStore((state) => state.sessions);
   const activeSessionId = useTerminalStore((state) => state.activeSessionId);

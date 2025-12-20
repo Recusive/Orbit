@@ -17,11 +17,13 @@ export type FileViewMode = 'file' | 'diff';
 export interface ViewedFile {
   path: string;
   content: string;
+  originalContent: string; // Content when file was opened (for dirty detection)
   language: string;
   scrollPosition?: number;
   // Diff support for files opened from Changes tab
   diffData?: ViewedFileDiff;
   viewMode: FileViewMode;
+  isModified: boolean; // Track if content has been modified
 }
 
 interface FileViewerState {
@@ -52,6 +54,8 @@ interface FileViewerActions {
 
   // Content management
   setFileContent: (path: string, content: string, language?: string) => void;
+  updateContent: (path: string, content: string) => void; // For editor changes
+  markSaved: (path: string) => void; // Mark file as saved (not modified)
   setScrollPosition: (path: string, position: number) => void;
 
   // View mode
@@ -150,11 +154,14 @@ export const useFileViewerStore = create<FileViewerStore>()(
           existingTab.viewMode = 'file';
         } else {
           // Create new tab
+          const fileContent = content ?? '';
           const newTab: ViewedFile = {
             path,
-            content: content ?? '',
+            content: fileContent,
+            originalContent: fileContent,
             language: getLanguageFromPath(path),
             viewMode: 'file',
+            isModified: false,
           };
           state.openTabs.push(newTab);
           state.activeTabPath = path;
@@ -185,9 +192,11 @@ export const useFileViewerStore = create<FileViewerStore>()(
           const newTab: ViewedFile = {
             path,
             content: diffData.newContent,
+            originalContent: diffData.newContent,
             language: language ?? getLanguageFromPath(path),
             diffData,
             viewMode: 'diff',
+            isModified: false,
           };
           state.openTabs.push(newTab);
           state.activeTabPath = path;
@@ -253,6 +262,8 @@ export const useFileViewerStore = create<FileViewerStore>()(
         const tab = state.openTabs.find((t) => t.path === path);
         if (tab) {
           tab.content = content;
+          tab.originalContent = content;
+          tab.isModified = false;
           if (language) {
             tab.language = language;
           }
@@ -261,13 +272,35 @@ export const useFileViewerStore = create<FileViewerStore>()(
           state.openTabs.push({
             path,
             content,
+            originalContent: content,
             language: language ?? getLanguageFromPath(path),
             viewMode: 'file',
+            isModified: false,
           });
           state.activeTabPath = path;
         }
         state.isLoading = false;
         state.loadingPath = null;
+      });
+    },
+
+    updateContent: (path: string, content: string): void => {
+      set((state) => {
+        const tab = state.openTabs.find((t) => t.path === path);
+        if (tab) {
+          tab.content = content;
+          tab.isModified = content !== tab.originalContent;
+        }
+      });
+    },
+
+    markSaved: (path: string): void => {
+      set((state) => {
+        const tab = state.openTabs.find((t) => t.path === path);
+        if (tab) {
+          tab.originalContent = tab.content;
+          tab.isModified = false;
+        }
       });
     },
 

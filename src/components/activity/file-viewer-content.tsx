@@ -1,43 +1,49 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ViewedFile } from '@/stores/file-viewer-store';
 import type { FC } from 'react';
 
 import { FileDiffViewer } from '@/components/activity/file-diff-viewer';
-import { MONACO_TOKEN_CSS, tokenizeCode } from '@/lib/monaco-tokenizer';
+import { CodeMirrorEditor } from '@/components/editor/CodeMirrorEditor';
+import { writeFile } from '@/lib/backend';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
+
+// Hook to detect theme from DOM
+function useDetectTheme(): 'dark' | 'light' {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setTheme(isDark ? 'dark' : 'light');
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    return (): void => { observer.disconnect(); };
+  }, []);
+
+  return theme;
+}
 
 interface FileViewerContentProps {
   readonly file: ViewedFile;
 }
 
 export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
+  const theme = useDetectTheme();
   const searchOpen = useFileViewerStore((state) => state.searchOpen);
   const searchQuery = useFileViewerStore((state) => state.searchQuery);
   const setSearchQuery = useFileViewerStore((state) => state.setSearchQuery);
   const closeSearch = useFileViewerStore((state) => state.closeSearch);
-  const setScrollPosition = useFileViewerStore((state) => state.setScrollPosition);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const updateContent = useFileViewerStore((state) => state.updateContent);
+  const markSaved = useFileViewerStore((state) => state.markSaved);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Tokenize the code
-  const tokenizedLines = useMemo(() => {
-    return tokenizeCode(file.content, file.language);
-  }, [file.content, file.language]);
-
-  // Restore scroll position
-  useEffect(() => {
-    if (containerRef.current && file.scrollPosition !== undefined) {
-      containerRef.current.scrollTop = file.scrollPosition;
-    }
-  }, [file.path, file.scrollPosition]);
-
-  // Save scroll position on scroll
-  const handleScroll = useCallback((): void => {
-    if (containerRef.current) {
-      setScrollPosition(file.path, containerRef.current.scrollTop);
-    }
-  }, [file.path, setScrollPosition]);
 
   // Focus search input when opened
   useEffect(() => {
@@ -46,86 +52,39 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
     }
   }, [searchOpen]);
 
+  // Handle content changes from editor
+  const handleChange = useCallback(
+    (newContent: string): void => {
+      updateContent(file.path, newContent);
+    },
+    [file.path, updateContent],
+  );
+
+  // Handle save (Cmd-S)
+  const handleSave = useCallback(async (): Promise<void> => {
+    try {
+      await writeFile(file.path, file.content);
+      markSaved(file.path);
+    } catch (error) {
+      console.error('Failed to save file:', error);
+    }
+  }, [file.path, file.content, markSaved]);
+
   // Render diff view when in diff mode with diff data
   if (file.viewMode === 'diff' && file.diffData) {
     return <FileDiffViewer diffData={file.diffData} />;
   }
 
-  // Highlight search matches in text
-  const highlightText = (text: string, className: string): React.ReactNode => {
-    if (!searchOpen || !searchQuery || searchQuery.length === 0) {
-      return <span className={className}>{text}</span>;
-    }
-
-    try {
-      const regex = new RegExp(`(${escapeRegExp(searchQuery)})`, 'gi');
-      const parts = text.split(regex);
-
-      return parts.map((part, i) => {
-        if (part.toLowerCase() === searchQuery.toLowerCase()) {
-          return (
-            <mark key={i} className="bg-yellow-500/40 rounded-sm">
-              <span className={className}>{part}</span>
-            </mark>
-          );
-        }
-        return <span key={i} className={className}>{part}</span>;
-      });
-    } catch {
-      return <span className={className}>{text}</span>;
-    }
-  };
-
   return (
-    <div
-      ref={containerRef}
-      className="h-full w-full overflow-auto relative"
-      style={{ scrollbarWidth: 'thin' }}
-      onScroll={handleScroll}
-    >
-      {/* Inject Monaco token CSS */}
-      <style>{MONACO_TOKEN_CSS}</style>
-
-      <div className="code-block with-line-numbers" style={{ fontFamily: 'monospace', fontSize: '12px', minWidth: 'max-content', paddingTop: '5px' }}>
-        {tokenizedLines.map((line) => (
-          <div
-            key={line.lineNumber}
-            className="code-line"
-            data-line-number={line.lineNumber}
-            style={{ display: 'flex', minHeight: '1.2em' }}
-          >
-            <div
-              className="line-number select-none"
-              style={{
-                textAlign: 'right',
-                marginRight: '2em',
-                flexShrink: 0,
-                minWidth: '3ch',
-                paddingLeft: '0.5em',
-                color: 'var(--vscode-editorLineNumber-foreground, rgba(128, 128, 128, 0.5))',
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {line.lineNumber}
-            </div>
-            <div
-              className="line-content"
-              style={{
-                flex: 1,
-                whiteSpace: 'pre',
-              }}
-            >
-              {line.tokens.length > 0 ? (
-                line.tokens.map((token, i) =>
-                  token.text ? highlightText(token.text, token.className) : <span key={i}>&nbsp;</span>
-                )
-              ) : (
-                <span>&nbsp;</span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="h-full w-full relative">
+      <CodeMirrorEditor
+        value={file.content}
+        language={file.language}
+        filePath={file.path}
+        onChange={handleChange}
+        onSave={handleSave}
+        theme={theme}
+      />
 
       {/* Search overlay */}
       {searchOpen ? (
@@ -134,8 +93,12 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
             ref={inputRef}
             type="text"
             value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); }}
-            onKeyDown={(e) => { if (e.key === 'Escape') closeSearch(); }}
+            onChange={(e): void => {
+              setSearchQuery(e.target.value);
+            }}
+            onKeyDown={(e): void => {
+              if (e.key === 'Escape') closeSearch();
+            }}
             placeholder="Search..."
             className="w-48 text-sm bg-transparent border-none outline-none"
           />
@@ -144,18 +107,6 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
           </span>
         </div>
       ) : null}
-
-      {/* Selection styles */}
-      <style>{`
-        .code-block *::selection {
-          background-color: var(--vscode-editor-selectionBackground, rgba(128, 128, 128, 0.1)) !important;
-        }
-      `}</style>
     </div>
   );
 };
-
-// Escape special regex characters
-function escapeRegExp(string: string): string {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}

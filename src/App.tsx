@@ -6,47 +6,39 @@ import { RootLayout } from '@/components/layout';
 import { useBrowser } from '@/hooks/use-browser';
 
 /**
- * Syncs VS Code webview theme to the html element.
- * VS Code adds 'vscode-dark' or 'vscode-light' to the body.
- * Our CSS uses 'html.dark' selector for dark mode.
+ * Syncs system theme preference to the html element.
+ * Uses prefers-color-scheme media query with dark as default.
  */
-function useVSCodeThemeSync(): void {
+function useThemeSync(): void {
   useEffect(() => {
-    const syncTheme = (): void => {
-      const isDark = document.body.classList.contains('vscode-dark');
-      const isHighContrast = document.body.classList.contains('vscode-high-contrast');
-
-      if (isDark || isHighContrast) {
+    const syncTheme = (isDark: boolean): void => {
+      if (isDark) {
         document.documentElement.classList.add('dark');
       } else {
         document.documentElement.classList.remove('dark');
       }
     };
 
-    // Initial sync
-    syncTheme();
+    // Check system preference, default to dark
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    syncTheme(mediaQuery.matches);
 
-    // Watch for VS Code theme changes
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.attributeName === 'class') {
-          syncTheme();
-          break;
-        }
-      }
-    });
+    // Watch for system theme changes
+    const handleChange = (e: MediaQueryListEvent): void => {
+      syncTheme(e.matches);
+    };
 
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    mediaQuery.addEventListener('change', handleChange);
 
     return (): void => {
-      observer.disconnect();
+      mediaQuery.removeEventListener('change', handleChange);
     };
   }, []);
 }
 
 const App: FC = () => {
-  useVSCodeThemeSync();
-  useBrowser(); // Handle browser messages from Orbit extension
+  useThemeSync();
+  useBrowser(); // Handle browser messages from Tauri backend
 
   return (
     <div className="h-full">

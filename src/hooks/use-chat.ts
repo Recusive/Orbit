@@ -3,7 +3,7 @@ import { useCallback, useMemo } from 'react';
 import { useChatStore } from '../stores/chat-store';
 import { generateUUID } from '../types/protocol';
 
-import { useVSCode } from './use-vscode';
+import { useTauri } from './use-tauri';
 
 import type { Message } from '../stores/chat-store';
 import type { SendMessage, EditMessage, DeleteMessage } from '../types/protocol';
@@ -23,7 +23,7 @@ export interface UseChatReturn {
  * Handles message sending, editing, and deletion
  */
 export function useChat(): UseChatReturn {
-  const { postMessage } = useVSCode();
+  const { postMessage } = useTauri();
 
   const activeConversationId = useChatStore((state) => state.activeConversationId);
   const messagesRecord = useChatStore((state) => state.messages);

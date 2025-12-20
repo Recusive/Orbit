@@ -34,7 +34,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import { CONTENT_WIDTH, INPUT_SIZES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useElementContexts, useBrowserStore } from '@/stores/browser-store';
@@ -100,7 +100,7 @@ export const ChatInput: FC<ChatInputProps> = ({
     }
   }, []);
 
-  const { postMessage } = useVSCode({ onMessage: handleCommandsMessage });
+  const { postMessage } = useTauri({ onMessage: handleCommandsMessage });
 
   // Fetch commands on mount
   useEffect(() => {

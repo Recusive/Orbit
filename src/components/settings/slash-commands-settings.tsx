@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import { cn } from '@/lib/utils';
 
 
@@ -543,7 +543,7 @@ export const SlashCommandsSettings: FC = () => {
   }, []);
 
   // Use VS Code API with message handler
-  const { postMessage } = useVSCode({ onMessage: handleMessage });
+  const { postMessage } = useTauri({ onMessage: handleMessage });
 
   // Fetch commands on mount
   useEffect(() => {

@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { useAgentStore } from '../stores/agent-store';
 import { generateUUID } from '../types/protocol';
 
-import { useVSCode } from './use-vscode';
+import { useTauri } from './use-tauri';
 
 import type { AgentTask } from '../stores/agent-store';
 import type { AgentStart, AgentStop, AgentPause, AgentResume } from '../types/protocol';
@@ -21,10 +21,10 @@ export interface UseAgentReturn {
 
 /**
  * Hook for agent operations and state management
- * Connects to agent store and VS Code messaging
+ * Connects to agent store and Tauri backend
  */
 export function useAgent(): UseAgentReturn {
-  const { postMessage } = useVSCode();
+  const { postMessage } = useTauri();
 
   const phase = useAgentStore((state) => state.phase);
   const isRunning = useAgentStore((state) => state.isRunning);

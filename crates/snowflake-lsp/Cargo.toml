@@ -1,0 +1,16 @@
+[package]
+name = "snowflake-lsp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Language Server Protocol support for Snowflake"
+
+[dependencies]
+snowflake-core = { path = "../snowflake-core" }
+tokio = { workspace = true }
+lsp-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

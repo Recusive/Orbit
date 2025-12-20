@@ -6,7 +6,7 @@ import { BrowserToolbar } from './browser-toolbar';
 import type { FC } from 'react';
 
 
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import {
   useBrowserStore,
   useBrowserIsActive,
@@ -22,7 +22,7 @@ export const BrowserPanel: FC<BrowserPanelProps> = ({ width }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const isActive = useBrowserIsActive();
   const error = useBrowserError();
-  const { postMessage } = useVSCode({});
+  const { postMessage } = useTauri({});
   const {
     isCreating,
     // setCreating, // Disabled - see browser creation comment below

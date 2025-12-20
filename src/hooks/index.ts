@@ -3,9 +3,9 @@
  * Centralized export for all custom React hooks
  */
 
-// VS Code integration
-export { useVSCode, useAgentStream } from './use-vscode';
-export type { UseVSCodeOptions, UseVSCodeReturn, AgentStreamCallbacks } from './use-vscode';
+// Tauri integration
+export { useTauri, useAgentStream } from './use-tauri';
+export type { UseTauriOptions, UseTauriReturn, AgentStreamCallbacks } from './use-tauri';
 
 // Agent operations
 export { useAgent } from './use-agent';

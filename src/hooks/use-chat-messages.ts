@@ -4,7 +4,7 @@ import type { ImageAttachment } from '@/components/chat/chat-input';
 import type { ChatMessage } from '@/components/chat/message-item';
 import type { ExtensionMessage, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/diff-utils';
 import { useFileStore } from '@/stores/file-store';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
@@ -21,7 +21,7 @@ interface UseChatMessagesReturn {
   isAgentRunning: boolean;
   sessionId: string;
   isMockMode: boolean;
-  postMessage: ReturnType<typeof useVSCode>['postMessage'];
+  postMessage: ReturnType<typeof useTauri>['postMessage'];
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setIsAgentRunning: React.Dispatch<React.SetStateAction<boolean>>;
   handleSend: (text: string, contextFiles?: string[], images?: ImageAttachment[], elements?: ReactElementContext[]) => void;
@@ -460,7 +460,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     }
   }, [setWorkspace, setActiveConversation, setConversations, addConversation, setInputMode, setModel, startTool, completeTool, addPermissionRequest, addUsage, onSessionCreated]);
 
-  const { postMessage, isMockMode } = useVSCode({ onMessage: handleMessage });
+  const { postMessage, isMockMode } = useTauri({ onMessage: handleMessage });
 
   // Request conversation list when session is ready
   useEffect(() => {

@@ -12,7 +12,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import { useFileStore } from '@/stores/file-store';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
 
@@ -47,7 +47,7 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
     }
   }, []);
 
-  const { postMessage } = useVSCode({ onMessage: handleMessage });
+  const { postMessage } = useTauri({ onMessage: handleMessage });
 
   // Request file list when dialog opens
   useEffect(() => {

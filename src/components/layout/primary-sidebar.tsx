@@ -15,7 +15,7 @@ import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/layout/file-explorer';
 import { SettingsDialog } from '@/components/settings/settings-dialog';
-import { useVSCode } from '@/hooks/use-vscode';
+import { useTauri } from '@/hooks/use-tauri';
 import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useUIStore, useIsLeftSidebarCollapsed, useWorkspaceName, useConversations, useActiveConversationId  } from '@/stores/ui-store';
@@ -38,7 +38,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   const workspaceName = useWorkspaceName();
   const conversations = useConversations();
   const activeConversationId = useActiveConversationId();
-  const { postMessage } = useVSCode();
+  const { postMessage } = useTauri();
   const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
   const [settingsOpen, setSettingsOpen] = useState(false);

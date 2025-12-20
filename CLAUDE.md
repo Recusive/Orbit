@@ -1,10 +1,18 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with the Snowflake codebase.
 
 ## Project Overview
 
-Orbit Agent UI is a React 19 + TypeScript frontend for an AI coding assistant, built with Vite and Tailwind CSS v4. The UI provides a multi-panel IDE-like interface with chat, terminal, file browser, and code review capabilities.
+Snowflake is a modern AI-powered code editor built with **Tauri 2** (Rust backend) and **React 19** (TypeScript frontend). It features a multi-panel IDE-like interface with chat, terminal, file browser, and code review capabilities.
+
+**Key Technologies:**
+
+- **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS v4
+- **Backend:** Tauri 2 (Rust) - _to be implemented_
+- **Editor:** CodeMirror 6 - _to be implemented_ (currently using Shiki for syntax highlighting)
+- **Terminal:** xterm.js
+- **State:** Zustand + Immer
 
 ## Commands
 
@@ -23,6 +31,25 @@ npm run ci               # Full CI: typecheck + lint + build
 ```
 
 ## Architecture
+
+### Frontend-Backend Communication
+
+The frontend uses a `useTauri` hook (`src/hooks/use-tauri.ts`) for communication with the Tauri backend. Messages are validated with Zod schemas.
+
+```typescript
+// Send message to backend
+const { postMessage } = useTauri();
+postMessage({ type: 'message:send', session_id, content });
+
+// Listen for backend messages
+useTauri({
+  onMessage: (message) => {
+    if (message.type === 'agent:chunk') {
+      // Handle streaming response
+    }
+  },
+});
+```
 
 ### State Management
 
@@ -52,9 +79,10 @@ npm run ci               # Full CI: typecheck + lint + build
 
 ### Custom Hooks
 
+- `use-tauri` - Tauri backend communication
 - `use-chat`, `use-agent`, `use-terminal` - Domain-specific state/effects
 - `use-keyboard-shortcuts` - Global hotkeys
-- `use-vscode` - VS Code extension messaging (postMessage API)
+- `use-chat-messages` - Chat message handling with streaming
 
 ## Code Style
 
@@ -63,7 +91,7 @@ npm run ci               # Full CI: typecheck + lint + build
 - **No `any`** - All unsafe operations are errors
 - **Explicit return types** on functions
 - **Consistent type imports** - Use `import type { }` separately
-- **Import order** - External → Internal → Types, alphabetized
+- **Import order** - External -> Internal -> Types, alphabetized
 - **No console.log** - Only `warn`/`error` allowed
 - **Strict boolean expressions** - No implicit truthy checks
 - **Exhaustive switches** - All cases must be handled
@@ -80,18 +108,36 @@ npm run ci               # Full CI: typecheck + lint + build
 - Ternary for conditional rendering (ESLint enforced)
 - Props interfaces marked `readonly`
 
-## CI/CD
+## Protocol Types
 
-See `docs/CI-CD-GUIDE.md` for full details.
+All message types defined in `src/types/protocol.ts` with Zod schemas:
 
-- **CI**: Parallel jobs for typecheck, lint, test, build on push/PR to main/develop
-- **Dependabot**: Weekly updates, auto-merge for minor/patch
-- **Release**: Tag `v*` triggers GitHub Release with build artifacts
+### Frontend -> Backend (WebviewMessage)
 
-```bash
-# Run CI locally before pushing
-npm run ci
+- `message:send` - Send chat message
+- `file:read`, `file:write` - File operations
+- `terminal:create`, `terminal:write` - Terminal operations
 
-# Create a release
-git tag v1.0.0 && git push --tags
-```
+### Backend -> Frontend (ExtensionMessage)
+
+- `agent:chunk`, `agent:complete` - AI responses
+- `tool:start`, `tool:end` - Tool execution
+- `file:content`, `file:tree:response` - File data
+- `terminal:output`, `terminal:created` - Terminal data
+
+## TODO: Tauri Backend Integration
+
+The Tauri Rust backend needs to be implemented to handle:
+
+- Claude AI integration
+- File system operations
+- Terminal PTY management
+- Session persistence
+
+## TODO: CodeMirror 6 Integration
+
+Replace current Shiki-based syntax highlighting with CodeMirror 6 for:
+
+- Full code editing capabilities
+- Language server protocol support
+- Better performance for large files

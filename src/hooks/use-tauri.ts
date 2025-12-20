@@ -8,81 +8,55 @@ import { ExtensionMessageSchema, WebviewMessageSchema } from '@/types/protocol';
 // Types
 // ═══════════════════════════════════════════════════════════════
 
-interface VSCodeAPI {
-  postMessage(message: unknown): void;
-  getState(): unknown;
-  setState(state: unknown): void;
-}
-
-declare global {
-  function acquireVsCodeApi(): VSCodeAPI;
-}
-
 type MessageHandler = (message: ExtensionMessage) => void;
 
-export interface UseVSCodeOptions {
+export interface UseTauriOptions {
   onMessage?: MessageHandler;
   debug?: boolean;
 }
 
-export interface UseVSCodeReturn {
+export interface UseTauriReturn {
   postMessage: (message: WebviewMessage) => void;
-  getState: () => unknown;
-  setState: (state: unknown) => void;
   isConnected: boolean;
   isMockMode: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════
-// VS Code API Singleton
+// Tauri API Detection
 // ═══════════════════════════════════════════════════════════════
 
-let vscodeApi: VSCodeAPI | null = null;
-
-function getVSCodeAPI(): VSCodeAPI | null {
-  if (vscodeApi) return vscodeApi;
-
-  if (typeof acquireVsCodeApi !== 'undefined') {
-    try {
-      vscodeApi = acquireVsCodeApi();
-      return vscodeApi;
-    } catch {
-      return null;
-    }
-  }
-  return null;
+function isTauriEnvironment(): boolean {
+  return typeof window !== 'undefined' && '__TAURI__' in window;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Hook
 // ═══════════════════════════════════════════════════════════════
 
-export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
+export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
   const { onMessage, debug = false } = options;
 
   const [isConnected, setIsConnected] = useState(false);
   const [isMockMode, setIsMockMode] = useState(false);
-  const apiRef = useRef<VSCodeAPI | null>(null);
   const handlerRef = useRef(onMessage);
 
   handlerRef.current = onMessage;
 
-  // Initialize API
+  // Initialize Tauri connection
   useEffect(() => {
-    const api = getVSCodeAPI();
-    if (api) {
-      apiRef.current = api;
+    const isTauri = isTauriEnvironment();
+    if (isTauri) {
       setIsConnected(true);
       setIsMockMode(false);
+      if (debug) console.warn('[Snowflake] Connected to Tauri backend');
     } else {
       setIsConnected(false);
       setIsMockMode(true);
-      if (debug) console.warn('[Orbit] Mock mode - no VS Code API');
+      if (debug) console.warn('[Snowflake] Mock mode - no Tauri backend');
     }
   }, [debug]);
 
   // Listen for messages with Zod validation
-  // Track processed message UUIDs to prevent duplicate processing
   const processedUuids = useRef(new Set<string>());
 
   useEffect(() => {
@@ -91,8 +65,8 @@ export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
 
       if (!result.success) {
         if (debug) {
-          console.warn('[Orbit] Invalid message:', event.data);
-          console.warn('[Orbit] Errors:', result.error.format());
+          console.warn('[Snowflake] Invalid message:', event.data);
+          console.warn('[Snowflake] Errors:', result.error.format());
         }
         return;
       }
@@ -102,7 +76,7 @@ export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
       if (uuid) {
         if (processedUuids.current.has(uuid)) {
           if (debug) {
-            console.warn('[Orbit] Ignoring duplicate message:', result.data.type, uuid);
+            console.warn('[Snowflake] Ignoring duplicate message:', result.data.type, uuid);
           }
           return;
         }
@@ -118,7 +92,7 @@ export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
       }
 
       if (debug) {
-        console.warn('[Orbit] Received:', result.data.type);
+        console.warn('[Snowflake] Received:', result.data.type);
       }
 
       handlerRef.current?.(result.data);
@@ -130,16 +104,14 @@ export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
     };
   }, [debug]);
 
-  // Send webview:ready when connected to VS Code
+  // Send webview:ready when connected to Tauri
   useEffect(() => {
-    if (isConnected && apiRef.current && !isMockMode) {
+    if (isConnected && !isMockMode) {
       if (debug) {
-        console.warn('[Orbit] Sending webview:ready');
+        console.warn('[Snowflake] Sending webview:ready');
       }
-      apiRef.current.postMessage({
-        type: 'webview:ready',
-        uuid: crypto.randomUUID(),
-      });
+      // TODO: Implement Tauri invoke for webview:ready
+      // invoke('webview_ready', { uuid: crypto.randomUUID() });
     }
   }, [isConnected, isMockMode, debug]);
 
@@ -148,33 +120,28 @@ export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
     (message: WebviewMessage): void => {
       const result = WebviewMessageSchema.safeParse(message);
       if (!result.success) {
-        console.error('[Orbit] Invalid outgoing message:', result.error.format());
+        console.error('[Snowflake] Invalid outgoing message:', result.error.format());
         return;
       }
 
       if (debug) {
-        console.warn('[Orbit] Sending:', message.type);
+        console.warn('[Snowflake] Sending:', message.type);
       }
 
-      if (apiRef.current) {
-        apiRef.current.postMessage(message);
+      if (isConnected && !isMockMode) {
+        // TODO: Implement Tauri invoke based on message type
+        // const command = message.type.replace(/:/g, '_');
+        // invoke(command, message);
+        if (debug) console.warn('[Snowflake] Would send to Tauri:', message);
       } else if (isMockMode) {
-        if (debug) console.warn('[Orbit Mock]', message);
+        if (debug) console.warn('[Snowflake Mock]', message);
         handleMockMessage(message);
       }
     },
-    [isMockMode, debug]
+    [isConnected, isMockMode, debug]
   );
 
-  const getState = (): unknown => {
-    return apiRef.current?.getState();
-  };
-
-  const setState = (state: unknown): void => {
-    apiRef.current?.setState(state);
-  };
-
-  return { postMessage, getState, setState, isConnected, isMockMode };
+  return { postMessage, isConnected, isMockMode };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -182,15 +149,13 @@ export function useVSCode(options: UseVSCodeOptions = {}): UseVSCodeReturn {
 // ═══════════════════════════════════════════════════════════════
 
 function handleMockMessage(message: WebviewMessage): void {
-  const delay = 100; // Short delay for non-streaming responses
+  const delay = 100;
 
   switch (message.type) {
     case 'message:send': {
       const messageId = crypto.randomUUID();
 
-      // Simulate streaming with multiple chunks over 5 seconds
       setTimeout(() => {
-        console.warn('[Mock] Sending chunk 1 at 1000ms');
         window.postMessage(
           {
             type: 'agent:chunk',
@@ -204,7 +169,6 @@ function handleMockMessage(message: WebviewMessage): void {
       }, 1000);
 
       setTimeout(() => {
-        console.warn('[Mock] Sending chunk 2 at 2000ms');
         window.postMessage(
           {
             type: 'agent:chunk',
@@ -218,7 +182,6 @@ function handleMockMessage(message: WebviewMessage): void {
       }, 2000);
 
       setTimeout(() => {
-        console.warn('[Mock] Sending chunk 3 at 3000ms');
         window.postMessage(
           {
             type: 'agent:chunk',
@@ -232,32 +195,17 @@ function handleMockMessage(message: WebviewMessage): void {
       }, 3000);
 
       setTimeout(() => {
-        console.warn('[Mock] Sending chunk 4 at 4000ms');
-        window.postMessage(
-          {
-            type: 'agent:chunk',
-            uuid: crypto.randomUUID(),
-            session_id: message.session_id,
-            message_id: messageId,
-            content: 'This is a longer response to test the indicator.',
-          },
-          '*'
-        );
-      }, 4000);
-
-      setTimeout(() => {
-        console.warn('[Mock] Sending complete at 5000ms');
         window.postMessage(
           {
             type: 'agent:complete',
             uuid: crypto.randomUUID(),
             session_id: message.session_id,
             message_id: messageId,
-            duration_ms: 5000,
+            duration_ms: 3000,
           },
           '*'
         );
-      }, 5000);
+      }, 4000);
       break;
     }
 
@@ -302,7 +250,6 @@ function handleMockMessage(message: WebviewMessage): void {
     }
 
     case 'conversation:list': {
-      // Return empty list in mock mode
       setTimeout(() => {
         window.postMessage(
           {
@@ -317,7 +264,6 @@ function handleMockMessage(message: WebviewMessage): void {
     }
 
     case 'conversation:load': {
-      // Return empty conversation in mock mode
       setTimeout(() => {
         window.postMessage(
           {
@@ -334,16 +280,15 @@ function handleMockMessage(message: WebviewMessage): void {
     }
 
     case 'conversation:rewind': {
-      // Mock rewind - just echo back the request with empty messages up to rewind point
       setTimeout(() => {
         window.postMessage(
           {
             type: 'conversation:rewound',
             uuid: crypto.randomUUID(),
             session_id: message.session_id,
-            new_session_id: message.session_id, // Same session in mock
+            new_session_id: message.session_id,
             rewind_to_message_id: message.message_id,
-            messages: [], // In real implementation, this would be truncated messages
+            messages: [],
           },
           '*'
         );
@@ -352,7 +297,6 @@ function handleMockMessage(message: WebviewMessage): void {
     }
 
     case 'file:tree:request': {
-      // Mock file tree response for development
       const mockPath = message.path ?? '/mock/workspace';
       setTimeout(() => {
         window.postMessage(
@@ -364,10 +308,8 @@ function handleMockMessage(message: WebviewMessage): void {
             children: [
               { name: 'src', path: `${mockPath}/src`, isDirectory: true, isFile: false },
               { name: 'tests', path: `${mockPath}/tests`, isDirectory: true, isFile: false },
-              { name: 'node_modules', path: `${mockPath}/node_modules`, isDirectory: true, isFile: false },
               { name: 'package.json', path: `${mockPath}/package.json`, isDirectory: false, isFile: true },
               { name: 'README.md', path: `${mockPath}/README.md`, isDirectory: false, isFile: true },
-              { name: 'tsconfig.json', path: `${mockPath}/tsconfig.json`, isDirectory: false, isFile: true },
             ],
           },
           '*'
@@ -377,7 +319,6 @@ function handleMockMessage(message: WebviewMessage): void {
     }
 
     case 'file:list:request': {
-      // Mock file list response for development
       const mockPath = '/mock/workspace';
       setTimeout(() => {
         window.postMessage(
@@ -389,10 +330,6 @@ function handleMockMessage(message: WebviewMessage): void {
               { name: 'index.ts', path: `${mockPath}/src/index.ts` },
               { name: 'App.tsx', path: `${mockPath}/src/App.tsx` },
               { name: 'main.tsx', path: `${mockPath}/src/main.tsx` },
-              { name: 'utils.ts', path: `${mockPath}/src/utils.ts` },
-              { name: 'package.json', path: `${mockPath}/package.json` },
-              { name: 'README.md', path: `${mockPath}/README.md` },
-              { name: 'tsconfig.json', path: `${mockPath}/tsconfig.json` },
             ],
           },
           '*'
@@ -401,7 +338,7 @@ function handleMockMessage(message: WebviewMessage): void {
       break;
     }
 
-    // No mock responses needed for these message types
+    // All other message types don't need mock responses
     case 'webview:ready':
     case 'message:edit':
     case 'message:delete':
@@ -427,8 +364,8 @@ function handleMockMessage(message: WebviewMessage): void {
     case 'file:reject_all':
     case 'diff:open':
     case 'url:open':
-    case 'inputMode:set':
     case 'permission:response':
+    case 'inputMode:set':
     case 'thinking:set':
     case 'model:set':
     case 'browser:create':
@@ -441,18 +378,18 @@ function handleMockMessage(message: WebviewMessage): void {
     case 'browser:select-element:cancel':
     case 'browser:bounds':
     case 'browser:destroy':
+    case 'browser:devtools':
     case 'browser:show':
     case 'browser:hide':
-    case 'browser:devtools':
     case 'subagents:list':
     case 'subagents:create':
     case 'subagents:update':
     case 'subagents:delete':
-    case 'subagents:generate':
     case 'commands:list':
     case 'commands:create':
     case 'commands:update':
     case 'commands:delete':
+    case 'subagents:generate':
     case 'commands:generate':
       break;
   }
@@ -501,27 +438,24 @@ export function useAgentStream(
         case 'tool:end':
           onToolEnd?.(message.tool_name, message.success, message.message_id);
           break;
-        // Not relevant for agent stream handling (these types have session_id but aren't agent events)
+        // All other message types with session_id not relevant to agent streaming
         case 'system:init':
+        case 'agent:thinking':
+        case 'permission:request':
+        case 'inputMode:changed':
+        case 'thinking:changed':
+        case 'model:changed':
         case 'terminal:output':
         case 'terminal:created':
         case 'conversation:created':
         case 'conversation:deleted':
         case 'conversation:loaded':
         case 'conversation:rewound':
-        case 'permission:request':
-        case 'inputMode:changed':
-        case 'agent:thinking':
-        case 'thinking:changed':
-        case 'model:changed':
           break;
-        // Note: terminal:data, terminal:exited, terminal:cwd, terminal:command:start,
-        // terminal:command:end, terminal:capabilities have terminal_id instead of session_id
-        // so they are filtered out by the session_id check above
       }
     },
     [sessionId, onChunk, onComplete, onError, onToolStart, onToolEnd]
   );
 
-  useVSCode({ onMessage: handleMessage });
+  useTauri({ onMessage: handleMessage });
 }

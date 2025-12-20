@@ -1,0 +1,39 @@
+[package]
+name = "snowflake-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Snowflake - Modern AI-powered code editor"
+
+[lib]
+name = "snowflake_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { workspace = true }
+
+[dependencies]
+# Workspace crates
+snowflake-core = { path = "../crates/snowflake-core" }
+snowflake-fs = { path = "../crates/snowflake-fs" }
+snowflake-lsp = { path = "../crates/snowflake-lsp" }
+snowflake-terminal = { path = "../crates/snowflake-terminal" }
+snowflake-git = { path = "../crates/snowflake-git" }
+snowflake-ai = { path = "../crates/snowflake-ai" }
+snowflake-search = { path = "../crates/snowflake-search" }
+
+# Core dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+log = { workspace = true }
+
+# Tauri
+tauri = { workspace = true, features = ["tray-icon"] }
+tauri-plugin-log = { workspace = true }
+tauri-plugin-fs = { workspace = true }
+tauri-plugin-shell = { workspace = true }
+tauri-plugin-dialog = { workspace = true }
+tauri-plugin-clipboard-manager = { workspace = true }
