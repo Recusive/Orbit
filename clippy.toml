@@ -7,7 +7,7 @@ pass-by-value-size-limit = 256
 large-error-threshold = 128
 enum-variant-size-threshold = 200
 
-msrv = "1.75"
+msrv = "1.80"
 
 disallowed-methods = [
     { path = "std::env::var", reason = "Use config system instead" },
