@@ -1,15 +1,14 @@
 [package]
-name = "snowflake-search"
+name = "snowflake-syntax"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Search functionality for Snowflake"
+description = "Syntax highlighting and tree-sitter parsing for Snowflake"
 
 [lints]
 workspace = true
 
 [dependencies]
 snowflake-core = { path = "../snowflake-core" }
-ignore = { workspace = true }

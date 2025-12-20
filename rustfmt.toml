@@ -1,0 +1,43 @@
+# Stable rustfmt options only
+edition = "2021"
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Unix"
+use_small_heuristics = "Default"
+
+# Imports (stable)
+reorder_imports = true
+reorder_modules = true
+
+# Formatting (stable)
+fn_params_layout = "Tall"
+match_block_trailing_comma = true
+
+# Other (stable)
+remove_nested_parens = true
+use_field_init_shorthand = true
+use_try_shorthand = true
+
+# ============================================
+# Nightly-only options (uncomment with +nightly)
+# ============================================
+# imports_granularity = "Crate"
+# group_imports = "StdExternalCrate"
+# brace_style = "SameLineWhere"
+# control_brace_style = "AlwaysSameLine"
+# trailing_comma = "Vertical"
+# trailing_semicolon = true
+# blank_lines_upper_bound = 1
+# blank_lines_lower_bound = 0
+# wrap_comments = true
+# comment_width = 100
+# format_code_in_doc_comments = true
+# doc_comment_code_block_width = 80
+# normalize_comments = true
+# normalize_doc_attributes = true
+# format_strings = true
+# format_macro_matchers = true
+# format_macro_bodies = true
+# hex_literal_case = "Lower"
+# reorder_impl_items = true

@@ -8,6 +8,7 @@ use std::sync::Arc;
 use snowflake_core::{ChatMessage, ChatResponse, Error, Result};
 
 /// AI manager for Claude API interactions
+#[derive(Debug)]
 pub struct AiManager {
     api_key: Option<String>,
     model: String,
@@ -16,9 +17,20 @@ pub struct AiManager {
 
 impl AiManager {
     /// Create a new AI manager
+    #[must_use]
     pub fn new() -> Self {
         Self {
-            api_key: std::env::var("ANTHROPIC_API_KEY").ok(),
+            api_key: None,
+            model: String::from("claude-sonnet-4-20250514"),
+            stop_flag: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Create a new AI manager with an API key
+    #[must_use]
+    pub fn with_api_key(api_key: String) -> Self {
+        Self {
+            api_key: Some(api_key),
             model: String::from("claude-sonnet-4-20250514"),
             stop_flag: Arc::new(AtomicBool::new(false)),
         }
@@ -35,33 +47,41 @@ impl AiManager {
     }
 
     /// Send a chat message
-    pub async fn chat(&self, messages: Vec<ChatMessage>, model: Option<&str>) -> Result<ChatResponse> {
-        let api_key = self.api_key.as_ref().ok_or_else(|| {
-            Error::Ai("ANTHROPIC_API_KEY not set".to_string())
-        })?;
+    pub async fn chat(
+        &self,
+        messages: Vec<ChatMessage>,
+        model: Option<&str>,
+    ) -> Result<ChatResponse> {
+        let api_key = self
+            .api_key
+            .as_ref()
+            .ok_or_else(|| Error::Ai("ANTHROPIC_API_KEY not set".to_owned()))?;
 
         let model = model.unwrap_or(&self.model);
         self.stop_flag.store(false, Ordering::SeqCst);
 
         // TODO: Implement actual API call
-        let _ = (api_key, model, &messages);
+        let (_api_key, _model, _messages): (&String, &str, &Vec<ChatMessage>) =
+            (api_key, model, &messages);
 
         Ok(ChatResponse {
             content: String::from("AI response placeholder"),
             usage: None,
-            model: Some(model.to_string()),
+            model: Some(model.to_owned()),
             stop_reason: Some(String::from("end_turn")),
         })
     }
 
     /// Get code completion
     pub async fn complete(&self, prefix: &str, suffix: &str, language: &str) -> Result<String> {
-        let api_key = self.api_key.as_ref().ok_or_else(|| {
-            Error::Ai("ANTHROPIC_API_KEY not set".to_string())
-        })?;
+        let api_key = self
+            .api_key
+            .as_ref()
+            .ok_or_else(|| Error::Ai("ANTHROPIC_API_KEY not set".to_owned()))?;
 
         // TODO: Implement actual completion API call
-        let _ = (api_key, prefix, suffix, language);
+        let (_api_key, _prefix, _suffix, _language): (&String, &str, &str, &str) =
+            (api_key, prefix, suffix, language);
 
         Ok(String::new())
     }
@@ -72,6 +92,7 @@ impl AiManager {
     }
 
     /// Check if generation was stopped
+    #[must_use]
     pub fn is_stopped(&self) -> bool {
         self.stop_flag.load(Ordering::SeqCst)
     }
