@@ -55,7 +55,7 @@ export const PanelSizesSchema = z.object({
  * Panel state schema
  */
 export const PanelStateSchema = z.object({
-  type: z.nativeEnum(PanelType),
+  type: z.enum(PanelType),
   visible: z.boolean(),
   collapsed: z.boolean().optional(),
   pinned: z.boolean().optional(),
@@ -69,7 +69,7 @@ export const PanelStateSchema = z.object({
  * Layout configuration schema
  */
 export const LayoutConfigSchema = z.object({
-  viewMode: z.nativeEnum(ViewMode),
+  viewMode: z.enum(ViewMode),
   panels: z.array(PanelStateSchema),
   sizes: PanelSizesSchema,
   showSidebar: z.boolean(),
@@ -83,7 +83,7 @@ export const LayoutConfigSchema = z.object({
  */
 export const NotificationSchema = z.object({
   id: z.string(),
-  type: z.nativeEnum(NotificationType),
+  type: z.enum(NotificationType),
   title: z.string(),
   message: z.string().optional(),
   timestamp: z.number(),
@@ -147,7 +147,7 @@ export const SelectionStateSchema = z.object({
  */
 export const SearchStateSchema = z.object({
   query: z.string(),
-  filters: z.record(z.any()).optional(),
+  filters: z.record(z.string(), z.any()).optional(),
   results: z.array(z.any()).optional(),
   isSearching: z.boolean(),
   totalResults: z.number().optional(),
@@ -157,7 +157,7 @@ export const SearchStateSchema = z.object({
  * UI preferences schema
  */
 export const UIPreferencesSchema = z.object({
-  theme: z.nativeEnum(ThemeMode),
+  theme: z.enum(ThemeMode),
   fontSize: z.number().min(8).max(32).optional(),
   fontFamily: z.string().optional(),
   lineHeight: z.number().min(1).max(3).optional(),

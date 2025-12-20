@@ -58,7 +58,7 @@ export const FileMetadataSchema = z.object({
 export const FileChangeSchema = z.object({
   id: z.string(),
   path: z.string(),
-  status: z.nativeEnum(FileStatus),
+  status: z.enum(FileStatus),
   oldPath: z.string().optional(), // For rename/move operations
   timestamp: z.number(),
   changes: z
@@ -76,7 +76,7 @@ export const FileChangeSchema = z.object({
  */
 export const FileOperationSchema = z.object({
   id: z.string(),
-  type: z.nativeEnum(FileOperationType),
+  type: z.enum(FileOperationType),
   path: z.string(),
   timestamp: z.number(),
   status: z.enum(['pending', 'in_progress', 'completed', 'failed']),
@@ -146,7 +146,7 @@ export const FileSearchResultSchema = z.object({
  */
 export const FileDiffStatsSchema = z.object({
   path: z.string(),
-  status: z.nativeEnum(FileStatus),
+  status: z.enum(FileStatus),
   additions: z.number(),
   deletions: z.number(),
   changes: z.number(),
@@ -293,7 +293,10 @@ export function sortFileTreeNodes(nodes: FileTreeNode[]): FileTreeNode[] {
   });
 }
 
-export function flattenFileTree(node: FileTreeNode, depth = 0): (FileTreeNode & { depth: number })[] {
+export function flattenFileTree(
+  node: FileTreeNode,
+  depth = 0
+): (FileTreeNode & { depth: number })[] {
   const result: (FileTreeNode & { depth: number })[] = [{ ...node, depth }];
 
   if (node.children && node.expanded) {

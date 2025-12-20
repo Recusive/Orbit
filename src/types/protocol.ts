@@ -4,7 +4,7 @@ import { z } from 'zod';
 // SHARED PRIMITIVES
 // ═══════════════════════════════════════════════════════════════
 
-const UUIDSchema = z.string().uuid();
+const UUIDSchema = z.uuid();
 const SessionIdSchema = z.string().min(1);
 
 // Input mode: default (ask permission), accept (auto-approve), plan (read-only)
@@ -32,7 +32,7 @@ export const ElementContextSchema = z.object({
   componentName: z.string(),
   filePath: z.string(),
   lineNumber: z.number(),
-  props: z.record(z.unknown()),
+  props: z.record(z.string(), z.unknown()),
   componentStack: z.array(z.string()),
   tagName: z.string(),
   selector: z.string(),
@@ -124,7 +124,7 @@ export const AgentStartSchema = z.object({
   uuid: UUIDSchema,
   session_id: SessionIdSchema,
   task: z.string(),
-  context: z.record(z.unknown()).optional(),
+  context: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const AgentStopSchema = z.object({
@@ -277,7 +277,7 @@ export const DiffOpenSchema = z.object({
 export const UrlOpenSchema = z.object({
   type: z.literal('url:open'),
   uuid: UUIDSchema,
-  url: z.string().url(),
+  url: z.url(),
 });
 
 // Permission response (webview → extension)
@@ -674,7 +674,7 @@ export const ToolStartSchema = z.object({
   message_id: z.string(),
   tool_id: z.string(),
   tool_name: z.string(),
-  tool_input: z.record(z.unknown()),
+  tool_input: z.record(z.string(), z.unknown()),
 });
 
 export const ToolEndSchema = z.object({
@@ -695,7 +695,7 @@ export const PermissionRequestSchema = z.object({
   session_id: SessionIdSchema,
   request_id: z.string(),
   tool_name: z.string(),
-  tool_input: z.record(z.unknown()),
+  tool_input: z.record(z.string(), z.unknown()),
 });
 
 // Input mode changed (from extension to webview)
@@ -969,7 +969,7 @@ export const ReactElementContextSchema = z.object({
   componentName: z.string(),
   filePath: z.string(),
   lineNumber: z.number(),
-  props: z.record(z.unknown()),
+  props: z.record(z.string(), z.unknown()),
   componentStack: z.array(z.string()),
   // DOM info
   tagName: z.string(),
@@ -1366,13 +1366,27 @@ export function isProtocolTerminalMessage(
 
 export function isProtocolFileMessage(
   msg: ExtensionMessage
-): msg is FileContent | FileChanged | FileWritten | FileTreeResponse | FileTreeError | FileListResponse {
+): msg is
+  | FileContent
+  | FileChanged
+  | FileWritten
+  | FileTreeResponse
+  | FileTreeError
+  | FileListResponse {
   return msg.type.startsWith('file:');
 }
 
 export function isProtocolBrowserMessage(
   msg: ExtensionMessage
-): msg is BrowserCreated | BrowserNavigated | BrowserElementSelected | BrowserLoading | BrowserError | BrowserDestroyed | BrowserOpen | BrowserClose {
+): msg is
+  | BrowserCreated
+  | BrowserNavigated
+  | BrowserElementSelected
+  | BrowserLoading
+  | BrowserError
+  | BrowserDestroyed
+  | BrowserOpen
+  | BrowserClose {
   return msg.type.startsWith('browser:');
 }
 
