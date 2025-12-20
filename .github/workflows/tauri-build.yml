@@ -1,10 +1,11 @@
 name: Tauri Build
 
+# Only build releases - NOT on every push (saves storage)
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    tags:
+      - 'v*' # Only on version tags like v1.0.0
+  workflow_dispatch: # Manual trigger for testing
 
 jobs:
   build:
@@ -47,3 +48,17 @@ jobs:
           name: snowflake-${{ matrix.target }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/
+          retention-days: 30 # Don't keep forever
+
+      # Create GitHub Release on tags
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
+          draft: true
