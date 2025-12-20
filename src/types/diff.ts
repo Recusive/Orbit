@@ -26,7 +26,7 @@ export enum DiffChangeType {
  * Diff line schema
  */
 export const DiffLineSchema = z.object({
-  type: z.nativeEnum(DiffLineType),
+  type: z.enum(DiffLineType),
   content: z.string(),
   oldLineNumber: z.number().optional(),
   newLineNumber: z.number().optional(),
@@ -53,7 +53,7 @@ export const DiffHunkSchema = z.object({
 export const FileDiffSchema = z.object({
   oldPath: z.string(),
   newPath: z.string(),
-  changeType: z.nativeEnum(DiffChangeType),
+  changeType: z.enum(DiffChangeType),
   hunks: z.array(DiffHunkSchema),
   additions: z.number(),
   deletions: z.number(),
@@ -77,7 +77,7 @@ export const DiffSummarySchema = z.object({
       path: z.string(),
       additions: z.number(),
       deletions: z.number(),
-      changeType: z.nativeEnum(DiffChangeType),
+      changeType: z.enum(DiffChangeType),
     })
   ),
 });
@@ -304,11 +304,7 @@ export function collapseDiffHunks(hunks: DiffHunk[], minGapSize = 3): DiffHunk[]
         )
       );
 
-      const combinedLines: DiffLine[] = [
-        ...current.lines,
-        ...gapLines,
-        ...next.lines,
-      ];
+      const combinedLines: DiffLine[] = [...current.lines, ...gapLines, ...next.lines];
 
       const newOldLines = next.oldStart + next.oldLines - current.oldStart;
       const newNewLines = next.newStart + next.newLines - current.newStart;

@@ -43,8 +43,8 @@ export enum ToolCallStatus {
 export const ToolCallSchema = z.object({
   id: z.string(),
   name: z.string(),
-  status: z.nativeEnum(ToolCallStatus),
-  parameters: z.record(z.any()),
+  status: z.enum(ToolCallStatus),
+  parameters: z.record(z.string(), z.any()),
   result: z.any().optional(),
   error: z.string().optional(),
   startTime: z.number(),
@@ -76,7 +76,7 @@ export const AgentTaskSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string().optional(),
-  status: z.nativeEnum(TaskStatus),
+  status: z.enum(TaskStatus),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   parentTaskId: z.string().optional(),
   dependsOn: z.array(z.string()).optional(),
@@ -100,7 +100,7 @@ export const AgentTaskSchema = z.object({
  * Agent state schema
  */
 export const AgentStateSchema = z.object({
-  phase: z.nativeEnum(AgentPhase),
+  phase: z.enum(AgentPhase),
   currentTask: AgentTaskSchema.optional(),
   taskQueue: z.array(AgentTaskSchema),
   completedTasks: z.array(AgentTaskSchema),
@@ -153,7 +153,7 @@ export const AgentCapabilitySchema = z.object({
  */
 export const AgentMetricsSchema = z.object({
   timestamp: z.number(),
-  phase: z.nativeEnum(AgentPhase),
+  phase: z.enum(AgentPhase),
   activeTasks: z.number(),
   completedTasks: z.number(),
   failedTasks: z.number(),
@@ -354,9 +354,7 @@ export function calculateAgentStatistics(state: AgentState): AgentState['statist
   const failedTasks = allTasks.filter((t) => t.status === TaskStatus.FAILED);
 
   const allToolCalls = allTasks.flatMap((t) => t.toolCalls ?? []);
-  const successfulToolCalls = allToolCalls.filter(
-    (tc) => tc.status === ToolCallStatus.COMPLETED
-  );
+  const successfulToolCalls = allToolCalls.filter((tc) => tc.status === ToolCallStatus.COMPLETED);
   const failedToolCalls = allToolCalls.filter((tc) => tc.status === ToolCallStatus.FAILED);
 
   const taskDurations = completedTasks

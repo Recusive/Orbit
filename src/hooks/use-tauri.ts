@@ -66,7 +66,7 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
       if (!result.success) {
         if (debug) {
           console.warn('[Snowflake] Invalid message:', event.data);
-          console.warn('[Snowflake] Errors:', result.error.format());
+          console.warn('[Snowflake] Errors:', result.error.issues);
         }
         return;
       }
@@ -120,7 +120,7 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
     (message: WebviewMessage): void => {
       const result = WebviewMessageSchema.safeParse(message);
       if (!result.success) {
-        console.error('[Snowflake] Invalid outgoing message:', result.error.format());
+        console.error('[Snowflake] Invalid outgoing message:', result.error.issues);
         return;
       }
 
@@ -308,8 +308,18 @@ function handleMockMessage(message: WebviewMessage): void {
             children: [
               { name: 'src', path: `${mockPath}/src`, isDirectory: true, isFile: false },
               { name: 'tests', path: `${mockPath}/tests`, isDirectory: true, isFile: false },
-              { name: 'package.json', path: `${mockPath}/package.json`, isDirectory: false, isFile: true },
-              { name: 'README.md', path: `${mockPath}/README.md`, isDirectory: false, isFile: true },
+              {
+                name: 'package.json',
+                path: `${mockPath}/package.json`,
+                isDirectory: false,
+                isFile: true,
+              },
+              {
+                name: 'README.md',
+                path: `${mockPath}/README.md`,
+                isDirectory: false,
+                isFile: true,
+              },
             ],
           },
           '*'
@@ -401,19 +411,13 @@ function handleMockMessage(message: WebviewMessage): void {
 
 export interface AgentStreamCallbacks {
   onChunk: (content: string, messageId: string) => void;
-  onComplete: (
-    messageId: string,
-    usage?: { input_tokens: number; output_tokens: number }
-  ) => void;
+  onComplete: (messageId: string, usage?: { input_tokens: number; output_tokens: number }) => void;
   onError: (error: string, messageId: string) => void;
   onToolStart?: (toolName: string, messageId: string) => void;
   onToolEnd?: (toolName: string, success: boolean, messageId: string) => void;
 }
 
-export function useAgentStream(
-  sessionId: string,
-  callbacks: AgentStreamCallbacks
-): void {
+export function useAgentStream(sessionId: string, callbacks: AgentStreamCallbacks): void {
   const { onChunk, onComplete, onError, onToolStart, onToolEnd } = callbacks;
 
   const handleMessage = useCallback(

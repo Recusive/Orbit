@@ -15,7 +15,7 @@ export const WorkspaceConfigSchema = z.object({
   gitBranch: z.string().optional(),
   excludePatterns: z.array(z.string()).optional(),
   includePatterns: z.array(z.string()).optional(),
-  customSettings: z.record(z.any()).optional(),
+  customSettings: z.record(z.string(), z.any()).optional(),
 });
 
 /**
@@ -65,7 +65,7 @@ export const ConversationSchema = ConversationMetaSchema.extend({
       files: z.array(z.string()).optional(),
       activeTasks: z.array(z.string()).optional(),
       pinnedFiles: z.array(z.string()).optional(),
-      environment: z.record(z.string()).optional(),
+      environment: z.record(z.string(), z.string()).optional(),
     })
     .optional(),
   settings: z
@@ -183,17 +183,14 @@ export function filterConversations(
   }
 
   if (filter.tags && filter.tags.length > 0) {
-    filtered = filtered.filter((c) =>
-      filter.tags?.some((tag) => c.tags?.includes(tag)) ?? false
-    );
+    filtered = filtered.filter((c) => filter.tags?.some((tag) => c.tags?.includes(tag)) ?? false);
   }
 
   if (filter.searchQuery) {
     const query = filter.searchQuery.toLowerCase();
     filtered = filtered.filter(
       (c) =>
-        c.title.toLowerCase().includes(query) ||
-        c.lastMessagePreview?.toLowerCase().includes(query)
+        c.title.toLowerCase().includes(query) || c.lastMessagePreview?.toLowerCase().includes(query)
     );
   }
 

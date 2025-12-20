@@ -83,7 +83,7 @@ export const ToolCallContentSchema = z.object({
   type: z.literal(MessageContentType.TOOL_CALL),
   toolName: z.string(),
   toolCallId: z.string(),
-  parameters: z.record(z.any()),
+  parameters: z.record(z.string(), z.any()),
 });
 
 /**
@@ -118,7 +118,7 @@ export const ChatBaseMessageSchema = z.object({
   id: z.string(),
   conversationId: z.string(),
   timestamp: z.number(),
-  status: z.nativeEnum(MessageStatus),
+  status: z.enum(MessageStatus),
   content: z.array(MessageContentSchema),
   metadata: z
     .object({
