@@ -77,7 +77,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - run: pnpm build:frontend
 
       # Only upload artifacts on main branch to save storage
       # continue-on-error prevents storage quota issues from failing the build
