@@ -231,6 +231,7 @@ fn current_timestamp() -> u64 {
 }
 
 #[cfg(test)]
+#[expect(clippy::expect_used, reason = "tests should panic on failure")]
 mod tests {
     use super::*;
     use crate::text::Position;
@@ -318,12 +319,9 @@ mod tests {
         let edit = Edit::insert(make_range(0, 0), "hello".to_owned());
         history.push(edit);
 
-        let undo = history.undo();
-        assert!(undo.is_some());
-        if let Some(undo) = undo {
-            assert_eq!(undo.text, ""); // Inverse of insert is delete
-            assert_eq!(undo.old_text, "hello");
-        }
+        let undo = history.undo().expect("undo should succeed");
+        assert_eq!(undo.text, ""); // Inverse of insert is delete
+        assert_eq!(undo.old_text, "hello");
     }
 
     #[test]
@@ -334,11 +332,8 @@ mod tests {
         let _ = history.undo();
         assert!(history.can_redo());
 
-        let redo = history.redo();
-        assert!(redo.is_some());
-        if let Some(redo) = redo {
-            assert_eq!(redo.text, "hello");
-        }
+        let redo = history.redo().expect("redo should succeed");
+        assert_eq!(redo.text, "hello");
     }
 
     #[test]
