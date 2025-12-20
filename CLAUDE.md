@@ -4,42 +4,104 @@ This file provides guidance to Claude Code when working with the Snowflake codeb
 
 ## Project Overview
 
-Snowflake is a modern AI-powered code editor built with **Tauri 2** (Rust backend) and **React 19** (TypeScript frontend). It features a multi-panel IDE-like interface with chat, terminal, file browser, and code review capabilities.
+Snowflake is a modern AI-powered code editor built with **Tauri 2** (Rust backend) and **React 19** (TypeScript frontend). It features a multi-panel IDE-like interface with chat, terminal, file browser, and code editing capabilities.
 
-**Key Technologies:**
+## Technology Stack
 
-- **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS v4
-- **Backend:** Tauri 2 (Rust) - _to be implemented_
-- **Editor:** CodeMirror 6 - _to be implemented_ (currently using Shiki for syntax highlighting)
-- **Terminal:** xterm.js
-- **State:** Zustand + Immer
+### Frontend
+
+- **React 19** + TypeScript + Vite
+- **Tailwind CSS v4** for styling
+- **Zustand + Immer** for state management
+- **CodeMirror 6** for code editing with custom themes
+- **xterm.js** for terminal emulation
+- **Shiki** for code block highlighting in chat
+- **Zod** for runtime validation
+
+### Backend
+
+- **Tauri 2** for desktop app framework
+- **Rust** workspace with multiple crates
+- Planned: Tree-sitter for syntax parsing, portable-pty for terminal
+
+## Project Structure
+
+```
+Snowflake-v0/
+├── src/                      # React frontend (TypeScript)
+│   ├── components/           # UI components
+│   │   ├── activity/         # File viewer, changes list
+│   │   ├── chat/             # Chat interface
+│   │   ├── editor/           # CodeMirror editor
+│   │   ├── layout/           # Root layout, panels
+│   │   ├── terminal/         # xterm.js terminal
+│   │   └── ui/               # Radix UI primitives
+│   ├── hooks/                # React hooks (Tauri, chat, terminal)
+│   ├── providers/            # Context providers
+│   ├── stores/               # Zustand state management
+│   ├── types/                # TypeScript types & Zod schemas
+│   └── lib/                  # Utilities (backend API, constants)
+│
+├── src-tauri/                # Tauri backend (Rust)
+│   ├── src/
+│   │   ├── commands/         # Tauri command handlers
+│   │   │   ├── files.rs      # File operations
+│   │   │   ├── terminal.rs   # Terminal PTY
+│   │   │   ├── lsp.rs        # Language server
+│   │   │   ├── git.rs        # Git operations
+│   │   │   ├── ai.rs         # Claude API
+│   │   │   └── search.rs     # Ripgrep search
+│   │   ├── lib.rs            # Tauri app setup
+│   │   └── main.rs           # Entry point
+│   └── tauri.conf.json       # Tauri configuration
+│
+├── crates/                   # Rust library crates
+│   ├── snowflake-core/       # Core types, config, state
+│   ├── snowflake-fs/         # File system operations
+│   ├── snowflake-terminal/   # PTY management (TODO)
+│   ├── snowflake-ai/         # Claude API integration (TODO)
+│   ├── snowflake-lsp/        # Language server (TODO)
+│   ├── snowflake-git/        # Git operations (TODO)
+│   └── snowflake-search/     # Ripgrep search (TODO)
+│
+└── Cargo.toml                # Rust workspace root
+```
 
 ## Commands
 
 ```bash
-# Development
-npm run dev              # Start dev server (Vite)
+# Frontend Development
+npm install              # Install dependencies
+npm run dev              # Start Vite dev server (port 5173)
 npm run build            # TypeScript check + production build
 npm run preview          # Preview production build
 
-# Quality checks
+# Quality Checks
 npm run typecheck        # TypeScript only (tsc --noEmit)
 npm run lint             # ESLint with zero warnings tolerance
 npm run lint:fix         # ESLint with auto-fix
 npm run check            # typecheck + lint
 npm run ci               # Full CI: typecheck + lint + build
+
+# Tauri Development
+npm run tauri            # Start Tauri dev (frontend + Rust backend)
+npm run tauri -- dev     # Same as above
+npm run tauri -- build   # Build production Tauri app
+
+# Rust Development (from project root)
+cargo build              # Build all crates
+cargo test               # Run tests
+cargo clippy             # Lint Rust code
 ```
 
-## Architecture
+## Frontend-Backend Communication
 
-### Frontend-Backend Communication
-
-The frontend uses a `useTauri` hook (`src/hooks/use-tauri.ts`) for communication with the Tauri backend. Messages are validated with Zod schemas.
+### Tauri Hook (`src/hooks/use-tauri.ts`)
 
 ```typescript
 // Send message to backend
 const { postMessage } = useTauri();
-postMessage({ type: 'message:send', session_id, content });
+postMessage({ type: 'message:send', uuid, session_id, content });
 
 // Listen for backend messages
 useTauri({
@@ -51,38 +113,88 @@ useTauri({
 });
 ```
 
-### State Management
+### Backend API (`src/lib/backend.ts`)
 
-- **Zustand with Immer** for all global state (`src/stores/`)
-- Stores: `ui-store` (panels/layout), `chat-store` (conversations), `agent-store` (task execution), `terminal-store` (xterm sessions), `file-store` (file tree)
-- UI dimensions and defaults centralized in `src/lib/constants.ts`
+Direct Tauri invoke calls for file operations, LSP, terminal, git, etc:
 
-### Layout System
+```typescript
+import { readFile, writeFile, listDirectory } from '@/lib/backend';
 
-- `RootLayout` orchestrates all panels with CSS Grid
-- Panels: `LeftSidebar` (collapsible), `CenterPanel` (chat + review split), `RightSidebar` (sessions), `BottomPanel` (terminal)
-- Custom `ResizeHandle` component for panel resizing
-- All layout dimensions use constants, applied via inline `style={{ }}` (not dynamic Tailwind classes)
+// File operations
+const content = await readFile('/path/to/file');
+await writeFile('/path/to/file', content);
+const entries = await listDirectory('/path/to/dir');
 
-### Component Organization
+// LSP operations
+const completions = await getCompletions(path, line, column);
+const hover = await getHover(path, line, column);
 
-- `src/components/layout/` - Shell layout components
-- `src/components/chat/` - Message feed, input, model selector
-- `src/components/ui/` - Radix UI primitives (shadcn/ui pattern)
-- `src/components/shared/` - Reusable utilities (timestamp, copy button)
+// Terminal operations
+const info = await createTerminal(id, cwd, shell);
+await writeTerminal(id, data);
+```
 
-### Type System
+## CodeMirror Editor
 
-- Rich types in `src/types/` for domain models (agent, conversation, message, terminal, file, diff)
-- Zod schemas colocated with types for runtime validation
-- Strict TypeScript config with `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`
+The editor (`src/components/editor/CodeMirrorEditor.tsx`) provides:
 
-### Custom Hooks
+- Full editing with syntax highlighting
+- Custom dark/light themes matching app colors
+- Language support: TypeScript, JavaScript, Python, Rust, Go, JSON, HTML, CSS, Markdown
+- LSP autocompletion integration
+- Cmd-S save functionality
+- Theme-aware (syncs with app light/dark mode via MutationObserver)
 
-- `use-tauri` - Tauri backend communication
-- `use-chat`, `use-agent`, `use-terminal` - Domain-specific state/effects
-- `use-keyboard-shortcuts` - Global hotkeys
-- `use-chat-messages` - Chat message handling with streaming
+### Theme Colors
+
+**Dark theme:** `oklch(0.16 0.012 60)` background with github-dark style syntax
+**Light theme:** `oklch(0.98 0.005 75)` background with github-light style syntax
+
+## State Management
+
+Zustand stores in `src/stores/`:
+
+| Store               | Purpose                                 |
+| ------------------- | --------------------------------------- |
+| `ui-store`          | Panel layout, dimensions, active tabs   |
+| `chat-store`        | Conversations, messages                 |
+| `agent-store`       | Task execution state                    |
+| `terminal-store`    | xterm sessions                          |
+| `file-store`        | File tree state                         |
+| `file-viewer-store` | Open file tabs, content, modified state |
+
+### File Viewer Store
+
+Tracks open files with edit state:
+
+```typescript
+interface ViewedFile {
+  path: string;
+  content: string;
+  originalContent: string; // For dirty detection
+  language: string;
+  isModified: boolean; // Shows coral dot on tab when true
+  viewMode: 'file' | 'diff';
+}
+```
+
+## Protocol Types
+
+All message types in `src/types/protocol.ts` with Zod schemas:
+
+### Frontend → Backend (WebviewMessage)
+
+- `message:send` - Send chat message
+- `file:read`, `file:write` - File operations
+- `terminal:create`, `terminal:write` - Terminal operations
+- `agent:stop` - Stop AI generation
+
+### Backend → Frontend (ExtensionMessage)
+
+- `agent:chunk`, `agent:complete` - AI responses
+- `tool:start`, `tool:end` - Tool execution
+- `file:content`, `file:tree:response` - File data
+- `terminal:output`, `terminal:created` - Terminal data
 
 ## Code Style
 
@@ -91,53 +203,39 @@ useTauri({
 - **No `any`** - All unsafe operations are errors
 - **Explicit return types** on functions
 - **Consistent type imports** - Use `import type { }` separately
-- **Import order** - External -> Internal -> Types, alphabetized
+- **Import order** - External → Internal → Types, alphabetized
 - **No console.log** - Only `warn`/`error` allowed
 - **Strict boolean expressions** - No implicit truthy checks
 - **Exhaustive switches** - All cases must be handled
 
 ### Tailwind + Dynamic Styles
 
-- **Never use dynamic Tailwind classes** like `` `w-[${value}px]` `` - Tailwind can't process them at build
-- Use inline styles for dynamic dimensions: `style={{ width: CONTENT_WIDTH.inputBox }}`
-- Static Tailwind classes work normally: `w-px`, `h-[32px]`, `max-w-3xl`
+- **Never use dynamic Tailwind classes** like `` `w-[${value}px]` ``
+- Use inline styles for dynamic dimensions: `style={{ width: value }}`
+- Static Tailwind classes work normally: `w-px`, `h-[32px]`
 
 ### React Patterns
 
 - Functional components with explicit `FC` type
-- Ternary for conditional rendering (ESLint enforced)
+- Ternary for conditional rendering
 - Props interfaces marked `readonly`
 
-## Protocol Types
+## Implementation Status
 
-All message types defined in `src/types/protocol.ts` with Zod schemas:
+### Completed
 
-### Frontend -> Backend (WebviewMessage)
+- [x] Tauri 2 project setup with Rust workspace
+- [x] CodeMirror 6 editor with custom themes
+- [x] File editing with save (Cmd-S)
+- [x] Modified indicator on tabs
+- [x] Theme switching (light/dark)
+- [x] Frontend-backend communication layer
 
-- `message:send` - Send chat message
-- `file:read`, `file:write` - File operations
-- `terminal:create`, `terminal:write` - Terminal operations
+### TODO (Rust Backend)
 
-### Backend -> Frontend (ExtensionMessage)
-
-- `agent:chunk`, `agent:complete` - AI responses
-- `tool:start`, `tool:end` - Tool execution
-- `file:content`, `file:tree:response` - File data
-- `terminal:output`, `terminal:created` - Terminal data
-
-## TODO: Tauri Backend Integration
-
-The Tauri Rust backend needs to be implemented to handle:
-
-- Claude AI integration
-- File system operations
-- Terminal PTY management
-- Session persistence
-
-## TODO: CodeMirror 6 Integration
-
-Replace current Shiki-based syntax highlighting with CodeMirror 6 for:
-
-- Full code editing capabilities
-- Language server protocol support
-- Better performance for large files
+- [ ] File system operations (snowflake-fs)
+- [ ] Terminal PTY management (snowflake-terminal)
+- [ ] Claude AI integration (snowflake-ai)
+- [ ] Language server protocol (snowflake-lsp)
+- [ ] Git operations (snowflake-git)
+- [ ] Ripgrep search (snowflake-search)
