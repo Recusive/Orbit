@@ -4015,15 +4015,12 @@ version = "0.1.0"
 dependencies = [
  "grep",
  "ignore",
- "log",
  "notify",
  "regex",
  "serde",
  "snowflake-core",
  "tempfile",
- "thiserror 1.0.69",
  "tokio",
- "walkdir",
 ]
 
 [[package]]
