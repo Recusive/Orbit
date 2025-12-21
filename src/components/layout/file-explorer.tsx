@@ -158,6 +158,35 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
     }
   }, [requestChildren, treeNodes]);
 
+  // Re-fetch expanded folders when their children are cleared (e.g., by file watcher)
+  const expandedFolders = useFileStore((state) => state.expandedFolders);
+  const prevTreeNodesRef = useRef<Record<string, unknown>>({});
+
+  useEffect(() => {
+    // Check for expanded folders that were loaded but now aren't
+    for (const folderPath of expandedFolders) {
+      const wasLoaded = folderPath in prevTreeNodesRef.current;
+      const isLoaded = folderPath in treeNodes;
+
+      // If folder was loaded but now isn't (cache cleared), re-fetch
+      if (wasLoaded && !isLoaded && !pendingRequests.current.has(folderPath)) {
+        requestChildren(folderPath);
+      }
+    }
+
+    // Also check root path
+    if (rootPath) {
+      const wasRootLoaded = rootPath in prevTreeNodesRef.current;
+      const isRootLoaded = rootPath in treeNodes;
+      if (wasRootLoaded && !isRootLoaded && !pendingRequests.current.has(rootPath)) {
+        requestChildren(rootPath);
+      }
+    }
+
+    // Update ref for next comparison
+    prevTreeNodesRef.current = { ...treeNodes };
+  }, [treeNodes, expandedFolders, rootPath, requestChildren]);
+
   // Get root children
   const rootChildren = rootPath ? (treeNodes[rootPath] ?? []) : [];
   const isRootLoading =

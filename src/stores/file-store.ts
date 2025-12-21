@@ -106,7 +106,7 @@ export const useFileStore = create<FileState>()(
 
       set((state) => {
         // Check if file already exists, update it instead
-        const existingFile = state.changedFiles.find(f => f.path === change.path);
+        const existingFile = state.changedFiles.find((f) => f.path === change.path);
 
         if (existingFile) {
           // Update existing file
@@ -136,156 +136,194 @@ export const useFileStore = create<FileState>()(
       return id;
     },
 
-    updateFileChange: (id: string, updates: Partial<FileChange>) =>
-      { set((state) => {
-        const file = state.changedFiles.find(f => f.id === id);
+    updateFileChange: (id: string, updates: Partial<FileChange>) => {
+      set((state) => {
+        const file = state.changedFiles.find((f) => f.id === id);
         if (file) {
           Object.assign(file, updates);
         }
-      }); },
+      });
+    },
 
-    selectFile: (path: string | null) =>
-      { set((state) => {
+    selectFile: (path: string | null) => {
+      set((state) => {
         state.selectedFile = path;
-      }); },
+      });
+    },
 
-    acceptFile: (path: string) =>
-      { set((state) => {
-        const file = state.changedFiles.find(f => f.path === path);
+    acceptFile: (path: string) => {
+      set((state) => {
+        const file = state.changedFiles.find((f) => f.path === path);
         if (file) {
           file.status = 'accepted';
         }
-      }); },
+      });
+    },
 
-    rejectFile: (path: string) =>
-      { set((state) => {
-        const file = state.changedFiles.find(f => f.path === path);
+    rejectFile: (path: string) => {
+      set((state) => {
+        const file = state.changedFiles.find((f) => f.path === path);
         if (file) {
           file.status = 'rejected';
         }
-      }); },
+      });
+    },
 
-    acceptAllFiles: () =>
-      { set((state) => {
-        state.changedFiles.forEach(file => {
+    acceptAllFiles: () => {
+      set((state) => {
+        state.changedFiles.forEach((file) => {
           if (file.status === 'pending') {
             file.status = 'accepted';
           }
         });
-      }); },
+      });
+    },
 
-    rejectAllFiles: () =>
-      { set((state) => {
-        state.changedFiles.forEach(file => {
+    rejectAllFiles: () => {
+      set((state) => {
+        state.changedFiles.forEach((file) => {
           if (file.status === 'pending') {
             file.status = 'rejected';
           }
         });
-      }); },
+      });
+    },
 
-    removeFile: (path: string) =>
-      { set((state) => {
-        state.changedFiles = state.changedFiles.filter(f => f.path !== path);
+    removeFile: (path: string) => {
+      set((state) => {
+        state.changedFiles = state.changedFiles.filter((f) => f.path !== path);
 
         // Update selection if the removed file was selected
         if (state.selectedFile === path) {
           state.selectedFile = state.changedFiles[0]?.path ?? null;
         }
-      }); },
+      });
+    },
 
-    clearFiles: (status?: FileChangeStatus) =>
-      { set((state) => {
+    clearFiles: (status?: FileChangeStatus) => {
+      set((state) => {
         if (status) {
-          state.changedFiles = state.changedFiles.filter(f => f.status !== status);
+          state.changedFiles = state.changedFiles.filter((f) => f.status !== status);
         } else {
           state.changedFiles = [];
         }
 
         // Update selection if it was cleared
-        if (state.selectedFile && !state.changedFiles.find(f => f.path === state.selectedFile)) {
+        if (state.selectedFile && !state.changedFiles.find((f) => f.path === state.selectedFile)) {
           state.selectedFile = state.changedFiles[0]?.path ?? null;
         }
-      }); },
+      });
+    },
 
-    setFilterStatus: (status: FileChangeStatus | 'all') =>
-      { set((state) => {
+    setFilterStatus: (status: FileChangeStatus | 'all') => {
+      set((state) => {
         state.filterStatus = status;
-      }); },
+      });
+    },
 
     // ═══════════════════════════════════════════════════════════════
     // File Tree Actions
     // ═══════════════════════════════════════════════════════════════
 
-    setRootPath: (path: string) =>
-      { set((state) => {
+    setRootPath: (path: string) => {
+      set((state) => {
         state.rootPath = path;
-      }); },
+      });
+    },
 
-    setTreeChildren: (path: string, children: FileNode[]) =>
-      { set((state) => {
+    setTreeChildren: (path: string, children: FileNode[]) => {
+      set((state) => {
         state.treeNodes[path] = children;
         state.loadingPaths.delete(path);
-      }); },
+      });
+    },
 
-    toggleFolder: (path: string) =>
-      { set((state) => {
+    toggleFolder: (path: string) => {
+      set((state) => {
         if (state.expandedFolders.has(path)) {
           state.expandedFolders.delete(path);
         } else {
           state.expandedFolders.add(path);
         }
-      }); },
+      });
+    },
 
-    expandFolder: (path: string) =>
-      { set((state) => {
+    expandFolder: (path: string) => {
+      set((state) => {
         state.expandedFolders.add(path);
-      }); },
+      });
+    },
 
-    collapseFolder: (path: string) =>
-      { set((state) => {
+    collapseFolder: (path: string) => {
+      set((state) => {
         state.expandedFolders.delete(path);
-      }); },
+      });
+    },
 
-    selectTreePath: (path: string | null) =>
-      { set((state) => {
+    selectTreePath: (path: string | null) => {
+      set((state) => {
         state.selectedTreePath = path;
-      }); },
+      });
+    },
 
-    setLoading: (path: string, loading: boolean) =>
-      { set((state) => {
+    setLoading: (path: string, loading: boolean) => {
+      set((state) => {
         if (loading) {
           state.loadingPaths.add(path);
         } else {
           state.loadingPaths.delete(path);
         }
-      }); },
+      });
+    },
 
-    handleFileChanged: (path: string, changeType: FileChangeType) =>
-      { set((state) => {
+    handleFileChanged: (path: string, changeType: FileChangeType) => {
+      set((state) => {
         // Find the parent directory of the changed file
-        const parentPath = path.substring(0, path.lastIndexOf('/')) || state.rootPath;
+        const lastSlashIndex = path.lastIndexOf('/');
+        const parentPath = lastSlashIndex > 0 ? path.substring(0, lastSlashIndex) : state.rootPath;
 
-        if (parentPath && changeType === 'deleted') {
-          // Remove the file from its parent's children
-          const children = state.treeNodes[parentPath];
-          if (children) {
-            state.treeNodes[parentPath] = children.filter(c => c.path !== path);
+        if (changeType === 'deleted') {
+          // Remove the file/folder from its parent's children
+          if (parentPath) {
+            const children = state.treeNodes[parentPath];
+            if (children) {
+              state.treeNodes[parentPath] = children.filter((c) => c.path !== path);
+            }
           }
-          // Also remove any children if it was a directory
-          // Use Reflect.deleteProperty to avoid ESLint no-dynamic-delete error
-          Reflect.deleteProperty(state.treeNodes, path);
-          state.expandedFolders.delete(path);
-        } else if (parentPath && (changeType === 'created' || changeType === 'modified')) {
-          // For created/modified, we should re-fetch the parent directory
-          // The component will handle this by checking if the parent is already loaded
-          // and triggering a refresh request
-          // Here we just mark that the parent needs refresh by clearing its cache
-          if (changeType === 'created' && state.treeNodes[parentPath]) {
-            // Parent is loaded, it needs refresh - clear it to trigger reload
+
+          // Recursively clean up: remove all cached children under this path
+          // (handles deleted directories with expanded subfolders)
+          const pathsToDelete: string[] = [];
+          for (const cachedPath of Object.keys(state.treeNodes)) {
+            if (cachedPath === path || cachedPath.startsWith(`${path}/`)) {
+              pathsToDelete.push(cachedPath);
+            }
+          }
+          for (const p of pathsToDelete) {
+            Reflect.deleteProperty(state.treeNodes, p);
+          }
+
+          // Also clean up expandedFolders for this path and all subpaths
+          const foldersToCollapse: string[] = [];
+          for (const folder of state.expandedFolders) {
+            if (folder === path || folder.startsWith(`${path}/`)) {
+              foldersToCollapse.push(folder);
+            }
+          }
+          for (const f of foldersToCollapse) {
+            state.expandedFolders.delete(f);
+          }
+        } else if (changeType === 'created') {
+          // For created, clear parent's cache to trigger re-fetch
+          // Only if parent is already loaded (otherwise nothing to refresh)
+          if (parentPath && state.treeNodes[parentPath]) {
             Reflect.deleteProperty(state.treeNodes, parentPath);
           }
         }
-      }); },
+        // For 'modified', we don't need to refresh the tree structure
+        // (only file content changed, which is handled by file viewer)
+      });
+    },
 
     getChildren: (path: string): FileNode[] => {
       return get().treeNodes[path] ?? [];
