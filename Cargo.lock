@@ -4212,7 +4212,6 @@ dependencies = [
  "git2",
  "serde",
  "snowflake-core",
- "thiserror 1.0.69",
  "tracing",
 ]
 
