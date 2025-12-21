@@ -34,6 +34,7 @@ import {
   highlightActiveLine,
   highlightActiveLineGutter,
   highlightSpecialChars,
+  hoverTooltip,
   keymap,
   lineNumbers,
   rectangularSelection,
@@ -43,7 +44,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import type { CompletionItem } from '@/lib/backend';
 import type { Extension } from '@codemirror/state';
-import type { ViewUpdate } from '@codemirror/view';
+import type { Tooltip, ViewUpdate } from '@codemirror/view';
 import type { FC } from 'react';
 
 import { useLsp } from '@/hooks/use-lsp';
@@ -118,6 +119,14 @@ const darkTheme = EditorView.theme(
     '.cm-activeLine': {
       backgroundColor: 'rgba(255, 255, 255, 0.05)',
     },
+    // Hover tooltip dark theme
+    '.cm-tooltip': {
+      backgroundColor: 'oklch(0.22 0.012 60)',
+      color: '#e1e1e1',
+    },
+    '.cm-tooltip .cm-lsp-hover': {
+      backgroundColor: 'oklch(0.22 0.012 60)',
+    },
   },
   { dark: true }
 );
@@ -186,6 +195,15 @@ const lightTheme = EditorView.theme({
   },
   '.cm-activeLine': {
     backgroundColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  // Hover tooltip light theme
+  '.cm-tooltip': {
+    backgroundColor: '#ffffff',
+    color: '#24292f',
+    border: '1px solid rgba(0, 0, 0, 0.1)',
+  },
+  '.cm-tooltip .cm-lsp-hover': {
+    backgroundColor: '#ffffff',
   },
 });
 
@@ -333,6 +351,62 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
     [] // No dependencies - uses refs for current values
   );
 
+  // LSP hover tooltip source - uses refs to avoid stale closure
+  const hoverTooltipSource = useCallback(
+    async (view: EditorView, pos: number): Promise<Tooltip | null> => {
+      const currentPath = filePathRef.current;
+      const currentLsp = lspRef.current;
+
+      if (!currentPath || !currentLsp.isRunning) return null;
+
+      const line = view.state.doc.lineAt(pos);
+      const lineNumber = line.number - 1; // 0-indexed for LSP
+      const column = pos - line.from;
+
+      try {
+        const hoverInfo = await currentLsp.getHover(currentPath, lineNumber, column);
+        if (!hoverInfo?.contents) return null;
+
+        // Calculate tooltip position range
+        let from = pos;
+        let to = pos;
+
+        if (hoverInfo.range) {
+          // Convert LSP range to CodeMirror positions
+          const startLine = view.state.doc.line(hoverInfo.range.start.line + 1);
+          const endLine = view.state.doc.line(hoverInfo.range.end.line + 1);
+          from = startLine.from + hoverInfo.range.start.column;
+          to = endLine.from + hoverInfo.range.end.column;
+        } else {
+          // Find word boundaries at position
+          const wordAt = view.state.wordAt(pos);
+          if (wordAt) {
+            from = wordAt.from;
+            to = wordAt.to;
+          }
+        }
+
+        return {
+          pos: from,
+          end: to,
+          above: true,
+          create: (): { dom: HTMLElement } => {
+            const dom = document.createElement('div');
+            dom.className = 'cm-lsp-hover';
+            // Render content as pre-formatted text (LSP often returns markdown/code)
+            const pre = document.createElement('pre');
+            pre.textContent = hoverInfo.contents;
+            dom.appendChild(pre);
+            return { dom };
+          },
+        };
+      } catch {
+        return null;
+      }
+    },
+    [] // No dependencies - uses refs for current values
+  );
+
   // Initialize editor
   useEffect(() => {
     if (!containerRef.current) return;
@@ -365,6 +439,12 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
       autocompletion({
         override: [completionSource],
         defaultKeymap: true,
+      }),
+
+      // LSP hover tooltips
+      hoverTooltip(hoverTooltipSource, {
+        hideOnChange: true,
+        hoverTime: 300,
       }),
 
       // Keymaps
@@ -436,6 +516,27 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
         '.cm-lineNumbers .cm-gutterElement': {
           minWidth: '3ch',
           paddingRight: '8px',
+        },
+        // LSP hover tooltip styling
+        '.cm-tooltip': {
+          border: 'none',
+          borderRadius: '6px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+        },
+        '.cm-lsp-hover': {
+          padding: '8px 12px',
+          maxWidth: '500px',
+          maxHeight: '300px',
+          overflow: 'auto',
+          fontSize: '12px',
+          lineHeight: '1.5',
+        },
+        '.cm-lsp-hover pre': {
+          margin: '0',
+          padding: '0',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          fontFamily: '"JetBrains Mono", "Fira Code", "Menlo", "Monaco", monospace',
         },
       }),
     ];
