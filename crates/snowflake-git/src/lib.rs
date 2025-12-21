@@ -1,94 +1,1050 @@
 //! Snowflake Git - Git operations
 //!
-//! This crate provides git functionality using the gix library.
+//! This crate provides git functionality using the git2 library.
 
-use snowflake_core::{Error, GitBranch, GitCommit, GitStatus, Result};
+use std::fmt::Write as _;
+use std::fs;
+use std::path::{Path, PathBuf};
 
-/// Git manager for repository operations
+use git2::{
+    BlameOptions, Delta, DiffOptions, IndexAddOption, Repository, StatusOptions, StatusShow,
+};
+use serde::{Deserialize, Serialize};
+use snowflake_core::{Error, GitBranch, GitCommit, GitStatus, RenamedFile, Result};
+use tracing::debug;
+
+// ============================================
+// Additional Types (not in snowflake-core)
+// ============================================
+
+/// Status of a file in git.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum FileStatus {
+    /// File is newly added.
+    Added,
+    /// File has been modified.
+    Modified,
+    /// File has been deleted.
+    Deleted,
+    /// File has been renamed.
+    Renamed,
+    /// File has been copied.
+    Copied,
+    /// File is untracked.
+    Untracked,
+    /// File has conflicts.
+    Conflicted,
+}
+
+/// A single entry in the status list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusEntry {
+    /// File path relative to repo root.
+    pub path: String,
+    /// File status.
+    pub status: FileStatus,
+}
+
+/// A single line in a diff.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffLine {
+    /// Line origin character ('+', '-', ' ').
+    pub origin: char,
+    /// Line content.
+    pub content: String,
+    /// Old line number (if applicable).
+    pub old_line: Option<u32>,
+    /// New line number (if applicable).
+    pub new_line: Option<u32>,
+}
+
+/// A hunk in a diff.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffHunk {
+    /// Hunk header (e.g., "@@ -1,5 +1,6 @@").
+    pub header: String,
+    /// Lines in this hunk.
+    pub lines: Vec<DiffLine>,
+}
+
+/// Diff for a single file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileDiff {
+    /// File path.
+    pub path: String,
+    /// Old path (for renames).
+    pub old_path: Option<String>,
+    /// Hunks in the diff.
+    pub hunks: Vec<DiffHunk>,
+    /// Whether this is a binary file.
+    pub is_binary: bool,
+}
+
+/// Branch information.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchInfo {
+    /// Branch name.
+    pub name: String,
+    /// Whether this is the current branch.
+    pub is_current: bool,
+    /// Upstream tracking branch name.
+    pub upstream: Option<String>,
+}
+
+/// Commit information.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitInfo {
+    /// Full commit hash.
+    pub hash: String,
+    /// Short commit hash (7 chars).
+    pub short_hash: String,
+    /// Commit message (first line only).
+    pub message: String,
+    /// Author name.
+    pub author: String,
+    /// Author email.
+    pub email: String,
+    /// Commit timestamp (Unix seconds).
+    pub timestamp: i64,
+}
+
+/// A single line of blame output.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlameLine {
+    /// Line number (1-indexed).
+    pub line_number: usize,
+    /// Commit hash that last modified this line.
+    pub commit_hash: String,
+    /// Author of the last modification.
+    pub author: String,
+    /// Line content.
+    pub content: String,
+}
+
+// ============================================
+// Repository Operations
+// ============================================
+
+/// Open a git repository at the given path.
+///
+/// # Errors
+/// Returns an error if the path is not a git repository.
+pub fn open(path: &Path) -> Result<Repository> {
+    Repository::open(path).map_err(|e| Error::Git(format!("Failed to open repository: {e}")))
+}
+
+/// Discover the git repository containing the given path.
+///
+/// Searches upward from the given path to find the repository root.
+///
+/// # Errors
+/// Returns an error if no repository is found.
+pub fn discover(path: &Path) -> Result<PathBuf> {
+    Repository::discover(path)
+        .map(|repo| {
+            repo.workdir()
+                .map_or_else(|| repo.path().to_path_buf(), Path::to_path_buf)
+        })
+        .map_err(|e| Error::Git(format!("Failed to discover repository: {e}")))
+}
+
+/// Get the status of a git repository.
+///
+/// # Errors
+/// Returns an error if the repository cannot be opened or status cannot be retrieved.
+pub fn status(path: &Path) -> Result<GitStatus> {
+    let repo = open(path)?;
+
+    // Get current branch
+    let branch = get_current_branch(&repo)?;
+
+    // Get ahead/behind counts
+    let (ahead, behind) = get_ahead_behind(&repo).unwrap_or((0, 0));
+
+    // Get file statuses
+    let mut opts = StatusOptions::new();
+    let _self = opts
+        .show(StatusShow::IndexAndWorkdir)
+        .include_untracked(true)
+        .include_ignored(false)
+        .recurse_untracked_dirs(true);
+
+    let statuses = repo
+        .statuses(Some(&mut opts))
+        .map_err(|e| Error::Git(format!("Failed to get status: {e}")))?;
+
+    let mut staged = Vec::new();
+    let mut modified = Vec::new();
+    let mut untracked = Vec::new();
+    let mut deleted = Vec::new();
+    let mut renamed = Vec::new();
+    let mut conflicted = Vec::new();
+
+    for entry in statuses.iter() {
+        let status = entry.status();
+        let path_str = entry.path().unwrap_or_default().to_owned();
+
+        // Check for conflicts first
+        if status.is_conflicted() {
+            conflicted.push(path_str.clone());
+            continue; // Don't add conflicted files to other categories
+        }
+
+        // Index (staged) changes
+        if status.is_index_new() {
+            staged.push(path_str.clone());
+        }
+        if status.is_index_modified() {
+            staged.push(path_str.clone());
+        }
+        if status.is_index_deleted() {
+            staged.push(path_str.clone());
+        }
+        if status.is_index_renamed() {
+            // For renamed files, try to get the old path
+            if let Some(diff_delta) = entry.head_to_index() {
+                let old_path = diff_delta
+                    .old_file()
+                    .path()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                renamed.push(RenamedFile {
+                    from: old_path,
+                    to: path_str.clone(),
+                });
+            }
+            staged.push(path_str.clone());
+        }
+
+        // Worktree changes (unstaged)
+        if status.is_wt_modified() {
+            modified.push(path_str.clone());
+        }
+        if status.is_wt_deleted() {
+            deleted.push(path_str.clone());
+        }
+        if status.is_wt_new() {
+            untracked.push(path_str);
+        }
+    }
+
+    // Log if there are conflicts
+    if !conflicted.is_empty() {
+        debug!("Found {} conflicted files", conflicted.len());
+    }
+
+    let is_clean = staged.is_empty()
+        && modified.is_empty()
+        && untracked.is_empty()
+        && deleted.is_empty()
+        && conflicted.is_empty();
+
+    Ok(GitStatus {
+        branch,
+        staged,
+        modified,
+        untracked,
+        deleted,
+        renamed,
+        conflicted,
+        ahead,
+        behind,
+        is_clean,
+    })
+}
+
+/// Stage files for commit.
+///
+/// # Errors
+/// Returns an error if staging fails.
+pub fn stage(path: &Path, files: &[&Path]) -> Result<()> {
+    let repo = open(path)?;
+    let mut index = repo
+        .index()
+        .map_err(|e| Error::Git(format!("Failed to get index: {e}")))?;
+
+    for file in files {
+        let relative_path = if file.is_absolute() {
+            file.strip_prefix(path).unwrap_or(file)
+        } else {
+            file
+        };
+
+        index
+            .add_path(relative_path)
+            .map_err(|e| Error::Git(format!("Failed to stage {}: {e}", relative_path.display())))?;
+    }
+
+    index
+        .write()
+        .map_err(|e| Error::Git(format!("Failed to write index: {e}")))?;
+
+    debug!("Staged {} files", files.len());
+    Ok(())
+}
+
+/// Unstage files.
+///
+/// # Errors
+/// Returns an error if unstaging fails.
+pub fn unstage(path: &Path, files: &[&Path]) -> Result<()> {
+    let repo = open(path)?;
+    let head = repo.head().and_then(|h| h.peel_to_commit()).ok();
+
+    let head_tree = head.as_ref().and_then(|c| c.tree().ok());
+
+    for file in files {
+        let relative_path = if file.is_absolute() {
+            file.strip_prefix(path).unwrap_or(file)
+        } else {
+            file
+        };
+
+        // Reset the file to HEAD state
+        if let Some(tree) = &head_tree {
+            repo.reset_default(Some(&tree.as_object().clone()), [relative_path])
+                .map_err(|e| {
+                    Error::Git(format!(
+                        "Failed to unstage {}: {e}",
+                        relative_path.display()
+                    ))
+                })?;
+        } else {
+            // No HEAD commit, remove from index entirely
+            let mut index = repo
+                .index()
+                .map_err(|e| Error::Git(format!("Failed to get index: {e}")))?;
+            let _result = index.remove_path(relative_path);
+            index
+                .write()
+                .map_err(|e| Error::Git(format!("Failed to write index: {e}")))?;
+        }
+    }
+
+    debug!("Unstaged {} files", files.len());
+    Ok(())
+}
+
+/// Stage all changes.
+///
+/// # Errors
+/// Returns an error if staging fails.
+pub fn stage_all(path: &Path) -> Result<()> {
+    let repo = open(path)?;
+    let mut index = repo
+        .index()
+        .map_err(|e| Error::Git(format!("Failed to get index: {e}")))?;
+
+    index
+        .add_all(["."], IndexAddOption::DEFAULT, None)
+        .map_err(|e| Error::Git(format!("Failed to stage all: {e}")))?;
+
+    index
+        .write()
+        .map_err(|e| Error::Git(format!("Failed to write index: {e}")))?;
+
+    debug!("Staged all changes");
+    Ok(())
+}
+
+/// Create a commit with the staged changes.
+///
+/// # Errors
+/// Returns an error if the commit fails or if the message is empty.
+pub fn commit(path: &Path, message: &str) -> Result<String> {
+    // Validate message
+    let message = message.trim();
+    if message.is_empty() {
+        return Err(Error::Git("Commit message cannot be empty".to_owned()));
+    }
+
+    let repo = open(path)?;
+
+    // Get the index
+    let mut index = repo
+        .index()
+        .map_err(|e| Error::Git(format!("Failed to get index: {e}")))?;
+
+    // Write the index as a tree
+    let tree_oid = index
+        .write_tree()
+        .map_err(|e| Error::Git(format!("Failed to write tree: {e}")))?;
+    let tree = repo
+        .find_tree(tree_oid)
+        .map_err(|e| Error::Git(format!("Failed to find tree: {e}")))?;
+
+    // Get the signature
+    let sig = repo
+        .signature()
+        .map_err(|e| Error::Git(format!("Failed to get signature: {e}")))?;
+
+    // Get parent commits
+    let parents: Vec<git2::Commit<'_>> = match repo.head() {
+        Ok(head) => {
+            vec![head
+                .peel_to_commit()
+                .map_err(|e| Error::Git(format!("Failed to get HEAD commit: {e}")))?]
+        },
+        Err(_) => Vec::new(), // Initial commit
+    };
+
+    let parent_refs: Vec<&git2::Commit<'_>> = parents.iter().collect();
+
+    // Create the commit
+    let oid = repo
+        .commit(Some("HEAD"), &sig, &sig, message, &tree, &parent_refs)
+        .map_err(|e| Error::Git(format!("Failed to create commit: {e}")))?;
+
+    debug!(hash = %oid, "Created commit");
+    Ok(oid.to_string())
+}
+
+/// Get the diff of unstaged changes.
+///
+/// # Errors
+/// Returns an error if the diff cannot be retrieved.
+pub fn get_diff(path: &Path) -> Result<Vec<FileDiff>> {
+    let repo = open(path)?;
+
+    let mut opts = DiffOptions::new();
+    let _self = opts.include_untracked(true);
+
+    // Diff between index and workdir (unstaged changes)
+    let diff = repo
+        .diff_index_to_workdir(None, Some(&mut opts))
+        .map_err(|e| Error::Git(format!("Failed to get diff: {e}")))?;
+
+    parse_diff(&diff)
+}
+
+/// Get the diff of staged changes.
+///
+/// # Errors
+/// Returns an error if the diff cannot be retrieved.
+pub fn get_staged_diff(path: &Path) -> Result<Vec<FileDiff>> {
+    let repo = open(path)?;
+
+    // Get HEAD tree
+    let head_tree = repo.head().and_then(|h| h.peel_to_tree()).ok();
+
+    // Diff between HEAD and index (staged changes)
+    let diff = repo
+        .diff_tree_to_index(head_tree.as_ref(), None, None)
+        .map_err(|e| Error::Git(format!("Failed to get staged diff: {e}")))?;
+
+    parse_diff(&diff)
+}
+
+/// Get the diff for a specific file.
+///
+/// # Errors
+/// Returns an error if the diff cannot be retrieved.
+pub fn get_file_diff(path: &Path, file: &Path) -> Result<FileDiff> {
+    let repo = open(path)?;
+
+    let relative_path = if file.is_absolute() {
+        file.strip_prefix(path).unwrap_or(file)
+    } else {
+        file
+    };
+
+    let mut opts = DiffOptions::new();
+    let _self = opts.pathspec(relative_path);
+
+    // Get unstaged diff for this file
+    let diff = repo
+        .diff_index_to_workdir(None, Some(&mut opts))
+        .map_err(|e| Error::Git(format!("Failed to get file diff: {e}")))?;
+
+    let diffs = parse_diff(&diff)?;
+    diffs.into_iter().next().ok_or_else(|| {
+        Error::Git(format!(
+            "No diff found for file: {}",
+            relative_path.display()
+        ))
+    })
+}
+
+/// Discard changes in files.
+///
+/// This restores files to their state in HEAD. For deleted files, this will
+/// recreate them. For modified files, this will revert the changes.
+///
+/// # Errors
+/// Returns an error if discarding fails.
+pub fn discard_changes(path: &Path, files: &[&Path]) -> Result<()> {
+    let repo = open(path)?;
+
+    // Get HEAD tree for restoring deleted files
+    let head_tree = repo.head().and_then(|h| h.peel_to_tree()).ok();
+
+    for file in files {
+        let relative_path = if file.is_absolute() {
+            file.strip_prefix(path).unwrap_or(file)
+        } else {
+            file
+        };
+
+        // Try checkout from index first, then from HEAD for deleted files
+        let mut opts = git2::build::CheckoutBuilder::new();
+        let _self = opts.path(relative_path).force();
+
+        let result = repo.checkout_index(None, Some(&mut opts));
+
+        if result.is_err() {
+            // File might be deleted, try checkout from HEAD
+            if let Some(tree) = &head_tree {
+                let mut head_opts = git2::build::CheckoutBuilder::new();
+                let _self = head_opts.path(relative_path).force();
+
+                repo.checkout_tree(tree.as_object(), Some(&mut head_opts))
+                    .map_err(|e| {
+                        Error::Git(format!(
+                            "Failed to discard changes in {}: {e}",
+                            relative_path.display()
+                        ))
+                    })?;
+            } else {
+                // No HEAD, just return the original error
+                result.map_err(|e| {
+                    Error::Git(format!(
+                        "Failed to discard changes in {}: {e}",
+                        relative_path.display()
+                    ))
+                })?;
+            }
+        }
+    }
+
+    debug!("Discarded changes in {} files", files.len());
+    Ok(())
+}
+
+/// List all branches.
+///
+/// # Errors
+/// Returns an error if branches cannot be listed.
+pub fn branches(path: &Path) -> Result<Vec<BranchInfo>> {
+    let repo = open(path)?;
+    let current_branch = get_current_branch(&repo).ok();
+
+    let mut result = Vec::new();
+
+    // Get local branches
+    let branches = repo
+        .branches(Some(git2::BranchType::Local))
+        .map_err(|e| Error::Git(format!("Failed to list branches: {e}")))?;
+
+    for branch_result in branches {
+        let (branch, _) =
+            branch_result.map_err(|e| Error::Git(format!("Failed to get branch: {e}")))?;
+
+        if let Some(name) = branch.name().ok().flatten() {
+            let upstream = branch
+                .upstream()
+                .ok()
+                .and_then(|u| u.name().ok().flatten().map(String::from));
+
+            result.push(BranchInfo {
+                name: name.to_owned(),
+                is_current: current_branch.as_deref() == Some(name),
+                upstream,
+            });
+        }
+    }
+
+    Ok(result)
+}
+
+/// Checkout a branch.
+///
+/// # Errors
+/// Returns an error if checkout fails or if there are uncommitted changes
+/// that would be overwritten.
+pub fn checkout_branch(path: &Path, name: &str) -> Result<()> {
+    let repo = open(path)?;
+
+    // Find the branch
+    let branch = repo
+        .find_branch(name, git2::BranchType::Local)
+        .map_err(|e| Error::Git(format!("Branch not found: {e}")))?;
+
+    let commit = branch
+        .get()
+        .peel_to_commit()
+        .map_err(|e| Error::Git(format!("Failed to get branch commit: {e}")))?;
+
+    // Checkout the tree with safe options (don't overwrite modified files)
+    let tree = commit
+        .tree()
+        .map_err(|e| Error::Git(format!("Failed to get tree: {e}")))?;
+
+    let mut checkout_opts = git2::build::CheckoutBuilder::new();
+    let _self = checkout_opts.safe(); // Don't overwrite modified files
+
+    repo.checkout_tree(tree.as_object(), Some(&mut checkout_opts))
+        .map_err(|e| {
+            if e.code() == git2::ErrorCode::Conflict {
+                Error::Git(
+                    "Cannot checkout: you have uncommitted changes that would be overwritten"
+                        .to_owned(),
+                )
+            } else {
+                Error::Git(format!("Failed to checkout tree: {e}"))
+            }
+        })?;
+
+    // Update HEAD
+    repo.set_head(&format!("refs/heads/{name}"))
+        .map_err(|e| Error::Git(format!("Failed to update HEAD: {e}")))?;
+
+    debug!(branch = name, "Checked out branch");
+    Ok(())
+}
+
+/// Create a new branch.
+///
+/// # Errors
+/// Returns an error if branch creation fails.
+pub fn create_branch(path: &Path, name: &str) -> Result<()> {
+    let repo = open(path)?;
+
+    let head = repo
+        .head()
+        .map_err(|e| Error::Git(format!("Failed to get HEAD: {e}")))?;
+
+    let commit = head
+        .peel_to_commit()
+        .map_err(|e| Error::Git(format!("Failed to get HEAD commit: {e}")))?;
+
+    let _branch = repo
+        .branch(name, &commit, false)
+        .map_err(|e| Error::Git(format!("Failed to create branch: {e}")))?;
+
+    debug!(branch = name, "Created branch");
+    Ok(())
+}
+
+/// Delete a branch.
+///
+/// # Errors
+/// Returns an error if branch deletion fails.
+pub fn delete_branch(path: &Path, name: &str) -> Result<()> {
+    let repo = open(path)?;
+
+    let mut branch = repo
+        .find_branch(name, git2::BranchType::Local)
+        .map_err(|e| Error::Git(format!("Branch not found: {e}")))?;
+
+    branch
+        .delete()
+        .map_err(|e| Error::Git(format!("Failed to delete branch: {e}")))?;
+
+    debug!(branch = name, "Deleted branch");
+    Ok(())
+}
+
+/// Get commit log.
+///
+/// # Errors
+/// Returns an error if the log cannot be retrieved.
+/// Returns an empty list for repositories with no commits.
+pub fn log(path: &Path, limit: usize) -> Result<Vec<CommitInfo>> {
+    let repo = open(path)?;
+
+    // Handle empty repos (no HEAD)
+    let Ok(head) = repo.head().and_then(|h| h.peel_to_commit()) else {
+        return Ok(Vec::new()); // Empty repo, no commits
+    };
+
+    let mut revwalk = repo
+        .revwalk()
+        .map_err(|e| Error::Git(format!("Failed to create revwalk: {e}")))?;
+
+    revwalk
+        .push(head.id())
+        .map_err(|e| Error::Git(format!("Failed to push HEAD: {e}")))?;
+
+    let mut result = Vec::new();
+
+    for oid_result in revwalk.take(limit) {
+        let oid = oid_result.map_err(|e| Error::Git(format!("Failed to get commit oid: {e}")))?;
+
+        let commit = repo
+            .find_commit(oid)
+            .map_err(|e| Error::Git(format!("Failed to find commit: {e}")))?;
+
+        let hash = oid.to_string();
+        let short_hash = hash.chars().take(7).collect();
+
+        result.push(CommitInfo {
+            hash,
+            short_hash,
+            message: commit.summary().unwrap_or_default().to_owned(),
+            author: commit.author().name().unwrap_or("Unknown").to_owned(),
+            email: commit.author().email().unwrap_or("").to_owned(),
+            timestamp: commit.time().seconds(),
+        });
+    }
+
+    Ok(result)
+}
+
+/// Get blame information for a file.
+///
+/// # Errors
+/// Returns an error if blame cannot be retrieved.
+pub fn blame(path: &Path, file: &Path) -> Result<Vec<BlameLine>> {
+    let repo = open(path)?;
+
+    let relative_path = if file.is_absolute() {
+        file.strip_prefix(path).unwrap_or(file)
+    } else {
+        file
+    };
+
+    let mut opts = BlameOptions::new();
+    let blame = repo
+        .blame_file(relative_path, Some(&mut opts))
+        .map_err(|e| Error::Git(format!("Failed to get blame: {e}")))?;
+
+    // Read the file content
+    let file_path = path.join(relative_path);
+    let content = fs::read_to_string(&file_path)
+        .map_err(|e| Error::Git(format!("Failed to read file: {e}")))?;
+
+    let lines: Vec<&str> = content.lines().collect();
+    let mut result = Vec::new();
+
+    for (i, line_content) in lines.iter().enumerate() {
+        let line_num = i + 1;
+        if let Some(hunk) = blame.get_line(line_num) {
+            let commit_hash = hunk.final_commit_id().to_string();
+            let author = hunk
+                .final_signature()
+                .name()
+                .unwrap_or("Unknown")
+                .to_owned();
+
+            result.push(BlameLine {
+                line_number: line_num,
+                commit_hash,
+                author,
+                content: (*line_content).to_owned(),
+            });
+        }
+    }
+
+    Ok(result)
+}
+
+// ============================================
+// Helper Functions
+// ============================================
+
+/// Get the current branch name.
+fn get_current_branch(repo: &Repository) -> Result<String> {
+    let head = repo
+        .head()
+        .map_err(|e| Error::Git(format!("Failed to get HEAD: {e}")))?;
+
+    if head.is_branch() {
+        head.shorthand()
+            .map(String::from)
+            .ok_or_else(|| Error::Git("Failed to get branch name".to_owned()))
+    } else {
+        // Detached HEAD - return the short hash
+        let oid = head
+            .target()
+            .ok_or_else(|| Error::Git("Failed to get HEAD target".to_owned()))?;
+        Ok(oid.to_string().chars().take(7).collect())
+    }
+}
+
+/// Get the ahead/behind counts relative to upstream.
+fn get_ahead_behind(repo: &Repository) -> Result<(u32, u32)> {
+    let head = repo.head().ok();
+    let head_ref = head.as_ref();
+
+    if let Some(head) = head_ref {
+        if let Some(name) = head.name() {
+            if let Ok(local_oid) = repo.refname_to_id(name) {
+                // Try to find upstream branch
+                let upstream_name = format!("{name}@{{upstream}}");
+                if let Ok(upstream_oid) = repo.refname_to_id(&upstream_name) {
+                    let (ahead, behind) = repo
+                        .graph_ahead_behind(local_oid, upstream_oid)
+                        .map_err(|e| Error::Git(format!("Failed to get ahead/behind: {e}")))?;
+
+                    return Ok((
+                        u32::try_from(ahead).unwrap_or(u32::MAX),
+                        u32::try_from(behind).unwrap_or(u32::MAX),
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok((0, 0))
+}
+
+/// Parse a git diff into our FileDiff structures.
+fn parse_diff(diff: &git2::Diff<'_>) -> Result<Vec<FileDiff>> {
+    let mut result = Vec::new();
+    let mut current_file: Option<(String, Option<String>, bool, Vec<DiffHunk>)> = None;
+    let mut current_hunk: Option<(String, Vec<DiffLine>)> = None;
+
+    diff.print(git2::DiffFormat::Patch, |delta, hunk, line| {
+        let new_file_path = delta
+            .new_file()
+            .path()
+            .map(|p| p.to_string_lossy().to_string());
+        let old_file_path = delta
+            .old_file()
+            .path()
+            .map(|p| p.to_string_lossy().to_string());
+        let is_binary = delta.flags().is_binary();
+
+        // Check if we've moved to a new file
+        let file_path = new_file_path
+            .as_ref()
+            .or(old_file_path.as_ref())
+            .cloned()
+            .unwrap_or_default();
+
+        let is_new_file = current_file
+            .as_ref()
+            .is_none_or(|(p, _, _, _)| p != &file_path);
+
+        if is_new_file {
+            // Save previous file if exists
+            if let Some((path, old_path, binary, mut hunks)) = current_file.take() {
+                if let Some((header, lines)) = current_hunk.take() {
+                    hunks.push(DiffHunk { header, lines });
+                }
+                result.push(FileDiff {
+                    path,
+                    old_path,
+                    hunks,
+                    is_binary: binary,
+                });
+            }
+
+            // Determine old_path for renames
+            let old_path = if delta.status() == Delta::Renamed {
+                old_file_path
+            } else {
+                None
+            };
+
+            current_file = Some((file_path, old_path, is_binary, Vec::new()));
+        }
+
+        // Process hunk
+        if let Some(h) = hunk {
+            // Save previous hunk
+            if let Some((_, _, _, ref mut hunks)) = current_file.as_mut() {
+                if let Some((header, lines)) = current_hunk.take() {
+                    hunks.push(DiffHunk { header, lines });
+                }
+            }
+
+            // Safe string handling for hunk header
+            let header_bytes = h.header();
+            let header = String::from_utf8_lossy(header_bytes).trim().to_owned();
+            current_hunk = Some((header, Vec::new()));
+        }
+
+        // Process line
+        let origin = line.origin();
+        if origin == '+' || origin == '-' || origin == ' ' {
+            let content = String::from_utf8_lossy(line.content())
+                .trim_end()
+                .to_owned();
+
+            let diff_line = DiffLine {
+                origin,
+                content,
+                old_line: line.old_lineno(),
+                new_line: line.new_lineno(),
+            };
+
+            if let Some((_, ref mut lines)) = current_hunk.as_mut() {
+                lines.push(diff_line);
+            }
+        }
+
+        true
+    })
+    .map_err(|e| Error::Git(format!("Failed to print diff: {e}")))?;
+
+    // Save last file
+    if let Some((path, old_path, binary, mut hunks)) = current_file.take() {
+        if let Some((header, lines)) = current_hunk.take() {
+            hunks.push(DiffHunk { header, lines });
+        }
+        result.push(FileDiff {
+            path,
+            old_path,
+            hunks,
+            is_binary: binary,
+        });
+    }
+
+    Ok(result)
+}
+
+// ============================================
+// Legacy GitManager (for compatibility)
+// ============================================
+
+/// Git manager for repository operations (legacy wrapper).
 #[derive(Debug, Clone, Copy)]
 pub struct GitManager;
 
 impl GitManager {
-    /// Create a new git manager
+    /// Create a new git manager.
     #[must_use]
     pub const fn new() -> Self {
         Self
     }
 
-    /// Get repository status
-    pub async fn status(&self, repo_path: &str) -> Result<GitStatus> {
-        // TODO: Implement using gix
-        let _repo_path: &str = repo_path;
-        Ok(GitStatus {
-            branch: String::from("main"),
-            staged: Vec::new(),
-            modified: Vec::new(),
-            untracked: Vec::new(),
-            deleted: Vec::new(),
-            renamed: Vec::new(),
-            ahead: 0,
-            behind: 0,
-            is_clean: true,
-        })
+    /// Get repository status.
+    pub fn status(&self, repo_path: &str) -> Result<GitStatus> {
+        status(Path::new(repo_path))
     }
 
-    /// Stage files
-    pub async fn stage(&self, repo_path: &str, files: &[String]) -> Result<()> {
-        // TODO: Implement using gix
-        let (_repo_path, _files): (&str, &[String]) = (repo_path, files);
-        Ok(())
+    /// Stage files.
+    pub fn stage(&self, repo_path: &str, files: &[String]) -> Result<()> {
+        let paths: Vec<&Path> = files.iter().map(|s| Path::new(s.as_str())).collect();
+        stage(Path::new(repo_path), &paths)
     }
 
-    /// Unstage files
-    pub async fn unstage(&self, repo_path: &str, files: &[String]) -> Result<()> {
-        // TODO: Implement using gix
-        let (_repo_path, _files): (&str, &[String]) = (repo_path, files);
-        Ok(())
+    /// Unstage files.
+    pub fn unstage(&self, repo_path: &str, files: &[String]) -> Result<()> {
+        let paths: Vec<&Path> = files.iter().map(|s| Path::new(s.as_str())).collect();
+        unstage(Path::new(repo_path), &paths)
     }
 
-    /// Create a commit
-    pub async fn commit(&self, repo_path: &str, message: &str) -> Result<String> {
-        // TODO: Implement using gix
-        let (_repo_path, _message): (&str, &str) = (repo_path, message);
-        Err(Error::Git("Git commit not implemented".to_owned()))
+    /// Create a commit.
+    pub fn commit(&self, repo_path: &str, message: &str) -> Result<String> {
+        commit(Path::new(repo_path), message)
     }
 
-    /// Get diff
-    pub async fn diff(&self, repo_path: &str, file: Option<&str>) -> Result<String> {
-        // TODO: Implement using gix
-        let (_repo_path, _file): (&str, Option<&str>) = (repo_path, file);
-        Ok(String::new())
+    /// Get diff.
+    pub fn diff(&self, repo_path: &str, file: Option<&str>) -> Result<String> {
+        let diffs = if let Some(f) = file {
+            vec![get_file_diff(Path::new(repo_path), Path::new(f))?]
+        } else {
+            get_diff(Path::new(repo_path))?
+        };
+
+        // Format as unified diff string
+        Ok(format_diffs_as_string(&diffs))
     }
 
-    /// Get commit log
-    pub async fn log(&self, repo_path: &str, limit: Option<u32>) -> Result<Vec<GitCommit>> {
-        // TODO: Implement using gix
-        let (_repo_path, _limit): (&str, Option<u32>) = (repo_path, limit);
-        Ok(Vec::new())
+    /// Get commit log.
+    pub fn log(&self, repo_path: &str, limit: Option<u32>) -> Result<Vec<GitCommit>> {
+        let limit = limit.unwrap_or(50) as usize;
+        let commits = log(Path::new(repo_path), limit)?;
+
+        Ok(commits
+            .into_iter()
+            .map(|c| GitCommit {
+                sha: c.hash,
+                short_sha: c.short_hash,
+                message: c.message,
+                author: c.author,
+                email: c.email,
+                #[expect(clippy::cast_sign_loss, reason = "timestamps are positive")]
+                date: c.timestamp as u64,
+            })
+            .collect())
     }
 
-    /// List branches
-    pub async fn branches(&self, repo_path: &str) -> Result<Vec<GitBranch>> {
-        // TODO: Implement using gix
-        let _repo_path: &str = repo_path;
-        Ok(vec![GitBranch {
-            name: String::from("main"),
-            is_remote: false,
-            is_current: true,
-            upstream: None,
-        }])
+    /// List branches.
+    pub fn branches(&self, repo_path: &str) -> Result<Vec<GitBranch>> {
+        let branches_list = branches(Path::new(repo_path))?;
+
+        Ok(branches_list
+            .into_iter()
+            .map(|b| GitBranch {
+                name: b.name,
+                is_remote: false,
+                is_current: b.is_current,
+                upstream: b.upstream,
+            })
+            .collect())
     }
 
-    /// Checkout a branch
-    pub async fn checkout(&self, repo_path: &str, branch: &str) -> Result<()> {
-        // TODO: Implement using gix
-        let (_repo_path, _branch): (&str, &str) = (repo_path, branch);
-        Ok(())
+    /// Checkout a branch.
+    pub fn checkout(&self, repo_path: &str, branch: &str) -> Result<()> {
+        checkout_branch(Path::new(repo_path), branch)
+    }
+
+    /// Discard changes.
+    pub fn discard(&self, repo_path: &str, files: &[String]) -> Result<()> {
+        let paths: Vec<&Path> = files.iter().map(|s| Path::new(s.as_str())).collect();
+        discard_changes(Path::new(repo_path), &paths)
+    }
+
+    /// Get blame for a file.
+    pub fn blame(&self, repo_path: &str, file: &str) -> Result<Vec<BlameLine>> {
+        blame(Path::new(repo_path), Path::new(file))
+    }
+
+    /// Get structured diff.
+    pub fn get_diff_structured(&self, repo_path: &str) -> Result<Vec<FileDiff>> {
+        get_diff(Path::new(repo_path))
     }
 }
 
 impl Default for GitManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Format diffs as a unified diff string.
+fn format_diffs_as_string(diffs: &[FileDiff]) -> String {
+    let mut output = String::new();
+
+    for diff in diffs {
+        let _result = writeln!(output, "--- a/{}", diff.path);
+        let _result = writeln!(output, "+++ b/{}", diff.path);
+
+        for hunk in &diff.hunks {
+            output.push_str(&hunk.header);
+            output.push('\n');
+
+            for line in &hunk.lines {
+                output.push(line.origin);
+                output.push_str(&line.content);
+                output.push('\n');
+            }
+        }
+    }
+
+    output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_git_manager_new() {
+        let manager = GitManager::new();
+        // Just ensure it creates successfully
+        let _debug = format!("{manager:?}");
     }
 }

@@ -12,3 +12,7 @@ workspace = true
 
 [dependencies]
 snowflake-core = { path = "../snowflake-core" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+git2 = "0.20"
+tracing = { workspace = true }

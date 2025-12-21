@@ -195,6 +195,8 @@ pub struct GitStatus {
     pub deleted: Vec<String>,
     /// Renamed files
     pub renamed: Vec<RenamedFile>,
+    /// Conflicted files (merge conflicts)
+    pub conflicted: Vec<String>,
     /// Commits ahead of remote
     pub ahead: u32,
     /// Commits behind remote

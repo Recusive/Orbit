@@ -241,6 +241,10 @@ export async function onTerminalExit(
 // Git Operations
 // ============================================
 
+export async function gitDiscover(path: string): Promise<string> {
+  return invoke<string>('git_discover', { path });
+}
+
 export async function gitStatus(repoPath: string): Promise<GitStatus> {
   return invoke<GitStatus>('git_status', { repoPath });
 }
@@ -253,12 +257,28 @@ export async function gitUnstage(repoPath: string, files: string[]): Promise<voi
   return invoke('git_unstage', { repoPath, files });
 }
 
+export async function gitStageAll(repoPath: string): Promise<void> {
+  return invoke('git_stage_all', { repoPath });
+}
+
 export async function gitCommit(repoPath: string, message: string): Promise<string> {
   return invoke<string>('git_commit', { repoPath, message });
 }
 
 export async function gitDiff(repoPath: string, file?: string): Promise<string> {
   return invoke<string>('git_diff', { repoPath, file });
+}
+
+export async function gitDiffStructured(repoPath: string): Promise<FileDiff[]> {
+  return invoke<FileDiff[]>('git_diff_structured', { repoPath });
+}
+
+export async function gitStagedDiff(repoPath: string): Promise<FileDiff[]> {
+  return invoke<FileDiff[]>('git_staged_diff', { repoPath });
+}
+
+export async function gitDiscard(repoPath: string, files: string[]): Promise<void> {
+  return invoke('git_discard', { repoPath, files });
 }
 
 export async function gitLog(repoPath: string, limit?: number): Promise<GitCommit[]> {
@@ -269,8 +289,24 @@ export async function gitBranches(repoPath: string): Promise<GitBranch[]> {
   return invoke<GitBranch[]>('git_branches', { repoPath });
 }
 
+export async function gitBranchInfo(repoPath: string): Promise<BranchInfo[]> {
+  return invoke<BranchInfo[]>('git_branch_info', { repoPath });
+}
+
 export async function gitCheckout(repoPath: string, branch: string): Promise<void> {
   return invoke('git_checkout', { repoPath, branch });
+}
+
+export async function gitCreateBranch(repoPath: string, name: string): Promise<void> {
+  return invoke('git_create_branch', { repoPath, name });
+}
+
+export async function gitDeleteBranch(repoPath: string, name: string): Promise<void> {
+  return invoke('git_delete_branch', { repoPath, name });
+}
+
+export async function gitBlame(repoPath: string, file: string): Promise<BlameLine[]> {
+  return invoke<BlameLine[]>('git_blame', { repoPath, file });
 }
 
 // ============================================
@@ -530,6 +566,38 @@ export interface GitBranch {
   isRemote: boolean;
   isCurrent: boolean;
   upstream?: string;
+}
+
+export interface BranchInfo {
+  name: string;
+  isCurrent: boolean;
+  upstream?: string;
+}
+
+export interface DiffLine {
+  origin: string;
+  content: string;
+  oldLine?: number;
+  newLine?: number;
+}
+
+export interface DiffHunk {
+  header: string;
+  lines: DiffLine[];
+}
+
+export interface FileDiff {
+  path: string;
+  oldPath?: string;
+  hunks: DiffHunk[];
+  isBinary: boolean;
+}
+
+export interface BlameLine {
+  lineNumber: number;
+  commitHash: string;
+  author: string;
+  content: string;
 }
 
 export interface ChatMessage {
