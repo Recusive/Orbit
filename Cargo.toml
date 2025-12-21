@@ -45,7 +45,7 @@ walkdir = "2"
 globset = "0.4"
 
 # Terminal
-portable-pty = "0.8"
+portable-pty = "0.9"
 
 # Git
 gix = { version = "0.69", default-features = false, features = ["basic", "status"] }
