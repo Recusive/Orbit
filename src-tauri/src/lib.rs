@@ -152,6 +152,7 @@ pub fn run() {
             terminal::terminal_write,
             terminal::terminal_resize,
             terminal::terminal_close,
+            terminal::terminal_list,
             // Git commands
             git::git_status,
             git::git_stage,

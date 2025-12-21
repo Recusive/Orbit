@@ -12,5 +12,9 @@ workspace = true
 
 [dependencies]
 snowflake-core = { path = "../snowflake-core" }
+serde = { workspace = true }
 tokio = { workspace = true }
+parking_lot = { workspace = true }
 hashbrown = { workspace = true }
+portable-pty = { workspace = true }
+tracing = { workspace = true }

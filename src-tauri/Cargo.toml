@@ -31,6 +31,8 @@ snowflake-search = { path = "../crates/snowflake-search" }
 tokio = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
+serde = { workspace = true }
+base64 = { workspace = true }
 
 # Tauri
 tauri = { workspace = true, features = ["tray-icon"] }

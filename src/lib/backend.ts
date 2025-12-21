@@ -172,9 +172,11 @@ export async function lspDidClose(path: string): Promise<void> {
 export async function createTerminal(
   id: string,
   cwd?: string,
-  shell?: string
+  shell?: string,
+  cols?: number,
+  rows?: number
 ): Promise<TerminalInfo> {
-  return invoke<TerminalInfo>('terminal_create', { id, cwd, shell });
+  return invoke<TerminalInfo>('terminal_create', { id, cwd, shell, cols, rows });
 }
 
 export async function writeTerminal(id: string, data: string): Promise<void> {
@@ -189,10 +191,44 @@ export async function closeTerminal(id: string): Promise<void> {
   return invoke('terminal_close', { id });
 }
 
+export async function listTerminals(): Promise<string[]> {
+  return invoke<string[]>('terminal_list');
+}
+
+// Internal interface for raw base64 terminal output from backend
+interface RawTerminalOutputEvent {
+  id: string;
+  data: string; // base64 encoded
+}
+
+/**
+ * Decode base64 string to UTF-8 text.
+ */
+function decodeBase64(base64: string): string {
+  try {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return new TextDecoder().decode(bytes);
+  } catch {
+    // If decoding fails, return empty string
+    return '';
+  }
+}
+
 export async function onTerminalOutput(
   callback: (data: TerminalOutputEvent) => void
 ): Promise<() => void> {
-  return listen<TerminalOutputEvent>('terminal:output', callback);
+  return listen<RawTerminalOutputEvent>('terminal:output', (raw): void => {
+    // Decode base64 data to string
+    const decoded = decodeBase64(raw.data);
+    callback({
+      id: raw.id,
+      data: decoded,
+    });
+  });
 }
 
 export async function onTerminalExit(
