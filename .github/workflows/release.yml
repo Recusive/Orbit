@@ -13,6 +13,7 @@ on:
 
 env:
   NODE_VERSION: '22'
+  PNPM_VERSION: '9'
 
 jobs:
   release:
@@ -23,18 +24,22 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: 'pnpm'
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       # Run all checks
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run test --if-present
-      - run: npm run build
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test --if-present
+      - run: pnpm build
 
       - name: Get version
         id: version

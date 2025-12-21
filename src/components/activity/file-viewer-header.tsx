@@ -4,6 +4,7 @@ import type { ViewedFile } from '@/stores/file-viewer-store';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files/file-icon';
+import { lspDidClose } from '@/lib/backend';
 import { cn } from '@/lib/utils';
 import { useActiveFile, useFileViewerStore } from '@/stores/file-viewer-store';
 
@@ -26,6 +27,15 @@ export const FileViewerHeader: FC = () => {
     if (activeFile) {
       toggleViewMode(activeFile.path);
     }
+  };
+
+  const handleCloseTab = (path: string): void => {
+    closeTab(path);
+
+    // Notify LSP that document was closed
+    lspDidClose(path).catch((err: unknown) => {
+      console.warn('[FileViewerHeader] Failed to notify LSP of file close:', err);
+    });
   };
 
   return (
@@ -57,8 +67,12 @@ export const FileViewerHeader: FC = () => {
             key={tab.path}
             file={tab}
             isActive={tab.path === activeTabPath}
-            onSelect={() => { setActiveTab(tab.path); }}
-            onClose={() => { closeTab(tab.path); }}
+            onSelect={() => {
+              setActiveTab(tab.path);
+            }}
+            onClose={() => {
+              handleCloseTab(tab.path);
+            }}
           />
         ))}
       </div>
@@ -110,9 +124,7 @@ const FileTab: FC<FileTabProps> = ({ file, isActive, onSelect, onClose }) => {
       )}
     >
       {/* Active indicator - brand coral bottom border */}
-      {isActive ? (
-        <div className="absolute bottom-0 inset-x-0 h-0.5 bg-brand-coral" />
-      ) : null}
+      {isActive ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-brand-coral" /> : null}
       <FileIcon fileName={fileName} className="h-4 w-4" />
       <span className="truncate">{fileName}</span>
       {/* Modified indicator - show dot when file has unsaved changes */}
@@ -123,7 +135,9 @@ const FileTab: FC<FileTabProps> = ({ file, isActive, onSelect, onClose }) => {
           onClick={handleCloseClick}
           className={cn(
             'h-4 w-4 flex items-center justify-center rounded transition-opacity shrink-0',
-            isActive ? 'opacity-70 hover:opacity-100' : 'opacity-0 group-hover:opacity-70 hover:opacity-100'
+            isActive
+              ? 'opacity-70 hover:opacity-100'
+              : 'opacity-0 group-hover:opacity-70 hover:opacity-100'
           )}
         >
           <X className="h-3 w-3" />

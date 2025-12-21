@@ -135,6 +135,7 @@ pub fn run() {
             files::is_directory,
             files::get_file_info,
             // LSP commands
+            lsp::lsp_set_workspace,
             lsp::lsp_completions,
             lsp::lsp_hover,
             lsp::lsp_goto_definition,
@@ -142,6 +143,10 @@ pub fn run() {
             lsp::lsp_format,
             lsp::lsp_diagnostics,
             lsp::lsp_signature_help,
+            lsp::lsp_did_open,
+            lsp::lsp_did_change,
+            lsp::lsp_did_save,
+            lsp::lsp_did_close,
             // Terminal commands
             terminal::terminal_create,
             terminal::terminal_write,

@@ -5,7 +5,7 @@ import type { FC } from 'react';
 
 import { FileDiffViewer } from '@/components/activity/file-diff-viewer';
 import { CodeMirrorEditor } from '@/components/editor/CodeMirrorEditor';
-import { writeFile } from '@/lib/backend';
+import { writeFile, lspDidChange, lspDidSave } from '@/lib/backend';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
 
 // Hook to detect theme from DOM
@@ -25,7 +25,9 @@ function useDetectTheme(): 'dark' | 'light' {
       attributeFilter: ['class'],
     });
 
-    return (): void => { observer.disconnect(); };
+    return (): void => {
+      observer.disconnect();
+    };
   }, []);
 
   return theme;
@@ -44,6 +46,7 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   const updateContent = useFileViewerStore((state) => state.updateContent);
   const markSaved = useFileViewerStore((state) => state.markSaved);
   const inputRef = useRef<HTMLInputElement>(null);
+  const documentVersionRef = useRef(1); // Track document version for LSP
 
   // Focus search input when opened
   useEffect(() => {
@@ -56,8 +59,14 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   const handleChange = useCallback(
     (newContent: string): void => {
       updateContent(file.path, newContent);
+
+      // Notify LSP of document change
+      documentVersionRef.current += 1;
+      lspDidChange(file.path, newContent, documentVersionRef.current).catch((err: unknown) => {
+        console.warn('[FileViewerContent] Failed to notify LSP of change:', err);
+      });
     },
-    [file.path, updateContent],
+    [file.path, updateContent]
   );
 
   // Handle save (Cmd-S)
@@ -65,6 +74,11 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
     try {
       await writeFile(file.path, file.content);
       markSaved(file.path);
+
+      // Notify LSP of document save
+      lspDidSave(file.path).catch((err: unknown) => {
+        console.warn('[FileViewerContent] Failed to notify LSP of save:', err);
+      });
     } catch (error) {
       console.error('Failed to save file:', error);
     }

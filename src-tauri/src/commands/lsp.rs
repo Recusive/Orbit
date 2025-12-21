@@ -1,7 +1,10 @@
 //! LSP commands
+//!
+//! Provides Language Server Protocol integration for code intelligence features.
 
 use snowflake_core::{CompletionItem, Diagnostic, HoverInfo, Location, Result, SignatureHelp};
 use snowflake_lsp::LspManager;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 use tokio::sync::Mutex;
 
@@ -9,6 +12,14 @@ static LSP_MANAGER: OnceLock<Mutex<LspManager>> = OnceLock::new();
 
 fn get_lsp_manager() -> &'static Mutex<LspManager> {
     LSP_MANAGER.get_or_init(|| Mutex::new(LspManager::new()))
+}
+
+/// Set the workspace root for LSP operations
+#[tauri::command]
+pub async fn lsp_set_workspace(path: String) -> Result<()> {
+    let manager = get_lsp_manager().lock().await;
+    manager.set_workspace_root(PathBuf::from(path)).await;
+    Ok(())
 }
 
 /// Get code completions at a position in a file
@@ -62,4 +73,32 @@ pub async fn lsp_signature_help(
 ) -> Result<Option<SignatureHelp>> {
     let manager = get_lsp_manager().lock().await;
     manager.get_signature_help(&path, line, column).await
+}
+
+/// Notify that a document was opened
+#[tauri::command]
+pub async fn lsp_did_open(path: String, language: String, content: String) -> Result<()> {
+    let manager = get_lsp_manager().lock().await;
+    manager.did_open(&path, &language, &content).await
+}
+
+/// Notify that a document changed
+#[tauri::command]
+pub async fn lsp_did_change(path: String, content: String, version: i32) -> Result<()> {
+    let manager = get_lsp_manager().lock().await;
+    manager.did_change(&path, &content, version).await
+}
+
+/// Notify that a document was saved
+#[tauri::command]
+pub async fn lsp_did_save(path: String) -> Result<()> {
+    let manager = get_lsp_manager().lock().await;
+    manager.did_save(&path).await
+}
+
+/// Notify that a document was closed
+#[tauri::command]
+pub async fn lsp_did_close(path: String) -> Result<()> {
+    let manager = get_lsp_manager().lock().await;
+    manager.did_close(&path).await
 }

@@ -80,7 +80,7 @@ interface FileViewerActions {
 type FileViewerStore = FileViewerState & FileViewerActions;
 
 // Map file extensions to language identifiers
-function getLanguageFromPath(path: string): string {
+export function getLanguageFromPath(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
   const languageMap: Record<string, string> = {
     ts: 'typescript',

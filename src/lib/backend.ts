@@ -97,6 +97,10 @@ export async function getFileInfo(path: string): Promise<FileInfo> {
 // LSP Operations
 // ============================================
 
+export async function lspSetWorkspace(path: string): Promise<void> {
+  return invoke('lsp_set_workspace', { path });
+}
+
 export async function getCompletions(
   path: string,
   line: number,
@@ -143,6 +147,22 @@ export async function getSignatureHelp(
   column: number
 ): Promise<SignatureHelp | null> {
   return invoke<SignatureHelp | null>('lsp_signature_help', { path, line, column });
+}
+
+export async function lspDidOpen(path: string, language: string, content: string): Promise<void> {
+  return invoke('lsp_did_open', { path, language, content });
+}
+
+export async function lspDidChange(path: string, content: string, version: number): Promise<void> {
+  return invoke('lsp_did_change', { path, content, version });
+}
+
+export async function lspDidSave(path: string): Promise<void> {
+  return invoke('lsp_did_save', { path });
+}
+
+export async function lspDidClose(path: string): Promise<void> {
+  return invoke('lsp_did_close', { path });
 }
 
 // ============================================

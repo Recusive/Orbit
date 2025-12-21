@@ -6,9 +6,10 @@ import type { FC } from 'react';
 
 import { FileIcon, FolderIcon } from '@/components/files';
 import { useTauri } from '@/hooks/use-tauri';
+import { lspDidOpen } from '@/lib/backend';
 import { cn } from '@/lib/utils';
 import { useFileStore } from '@/stores/file-store';
-import { useFileViewerStore } from '@/stores/file-viewer-store';
+import { useFileViewerStore, getLanguageFromPath } from '@/stores/file-viewer-store';
 
 interface FileExplorerProps {
   readonly collapsed?: boolean;
@@ -16,124 +17,136 @@ interface FileExplorerProps {
 
 export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
   const { postMessage } = useTauri();
-  const {
-    rootPath,
-    treeNodes,
-    setRootPath,
-    setTreeChildren,
-    handleFileChanged,
-  } = useFileStore();
+  const { rootPath, treeNodes, setRootPath, setTreeChildren, handleFileChanged } = useFileStore();
 
   // Track pending requests to avoid duplicates
   const pendingRequests = useRef(new Map<string, string>());
 
   // Request children for a path
-  const requestChildren = useCallback((path?: string): void => {
-    const requestPath = path ?? rootPath ?? '';
+  const requestChildren = useCallback(
+    (path?: string): void => {
+      const requestPath = path ?? rootPath ?? '';
 
-    // Don't request if already pending
-    if (pendingRequests.current.has(requestPath)) {
-      return;
-    }
+      // Don't request if already pending
+      if (pendingRequests.current.has(requestPath)) {
+        return;
+      }
 
-    const uuid = crypto.randomUUID();
-    pendingRequests.current.set(requestPath, uuid);
+      const uuid = crypto.randomUUID();
+      pendingRequests.current.set(requestPath, uuid);
 
-    useFileStore.getState().setLoading(requestPath || '__root__', true);
-    postMessage({
-      type: 'file:tree:request',
-      uuid,
-      path: path,
-    });
-  }, [postMessage, rootPath]);
+      useFileStore.getState().setLoading(requestPath || '__root__', true);
+      postMessage({
+        type: 'file:tree:request',
+        uuid,
+        path: path,
+      });
+    },
+    [postMessage, rootPath]
+  );
 
   // Handle incoming messages
-  const handleMessage = useCallback((message: ExtensionMessage): void => {
-    switch (message.type) {
-      case 'file:tree:response': {
-        // Clear pending request
-        pendingRequests.current.delete(message.path);
+  const handleMessage = useCallback(
+    (message: ExtensionMessage): void => {
+      switch (message.type) {
+        case 'file:tree:response': {
+          // Clear pending request
+          pendingRequests.current.delete(message.path);
 
-        // Store the root path if this is the first response
-        if (!rootPath) {
-          setRootPath(message.path);
+          // Store the root path if this is the first response
+          if (!rootPath) {
+            setRootPath(message.path);
+          }
+          setTreeChildren(message.path, message.children);
+          break;
         }
-        setTreeChildren(message.path, message.children);
-        break;
+        case 'file:tree:error': {
+          // Clear loading state on error
+          const pathKey = Object.keys(treeNodes).length === 0 ? '__root__' : message.request_uuid;
+          useFileStore.getState().setLoading(pathKey, false);
+
+          console.error('[FileExplorer] Error fetching tree:', message.error);
+          break;
+        }
+        case 'file:changed': {
+          // Handle file system changes
+          handleFileChanged(message.path, message.change_type);
+          break;
+        }
+        case 'file:content': {
+          // Check if file is already open (avoid duplicate LSP notifications)
+          const store = useFileViewerStore.getState();
+          const isAlreadyOpen = store.openTabs.some((tab) => tab.path === message.path);
+
+          // File content received - update the file viewer
+          store.setFileContent(message.path, message.content);
+
+          // Notify LSP only if this is a newly opened file
+          if (!isAlreadyOpen) {
+            const language = getLanguageFromPath(message.path);
+            lspDidOpen(message.path, language, message.content).catch((err: unknown) => {
+              console.warn('[FileExplorer] Failed to notify LSP of file open:', err);
+            });
+          }
+          break;
+        }
+        // Ignore other message types - handled elsewhere
+        case 'conversation:list':
+        case 'system:init':
+        case 'layout':
+        case 'agent:chunk':
+        case 'agent:complete':
+        case 'agent:error':
+        case 'error':
+        case 'tool:start':
+        case 'tool:end':
+        case 'permission:request':
+        case 'inputMode:changed':
+        case 'panel:command':
+        case 'panel:visible':
+        case 'terminal:output':
+        case 'terminal:data':
+        case 'terminal:created':
+        case 'terminal:exited':
+        case 'terminal:cwd':
+        case 'terminal:command:start':
+        case 'terminal:command:end':
+        case 'terminal:capabilities':
+        case 'terminal:title':
+        case 'file:written':
+        case 'file:list:response':
+        case 'conversation:created':
+        case 'conversation:deleted':
+        case 'conversation:loaded':
+        case 'conversation:rewound':
+        case 'agent:thinking':
+        case 'thinking:changed':
+        case 'model:changed':
+        case 'browser:open':
+        case 'browser:close':
+        case 'browser:created':
+        case 'browser:navigated':
+        case 'browser:element-selected':
+        case 'browser:loading':
+        case 'browser:error':
+        case 'browser:destroyed':
+        case 'subagents:list:response':
+        case 'subagents:created':
+        case 'subagents:updated':
+        case 'subagents:deleted':
+        case 'subagents:error':
+        case 'subagents:generated':
+        case 'commands:list:response':
+        case 'commands:created':
+        case 'commands:updated':
+        case 'commands:deleted':
+        case 'commands:error':
+        case 'commands:generated':
+          break;
       }
-      case 'file:tree:error': {
-        // Clear loading state on error
-        const pathKey = Object.keys(treeNodes).length === 0 ? '__root__' : message.request_uuid;
-        useFileStore.getState().setLoading(pathKey, false);
-         
-        console.error('[FileExplorer] Error fetching tree:', message.error);
-        break;
-      }
-      case 'file:changed': {
-        // Handle file system changes
-        handleFileChanged(message.path, message.change_type);
-        break;
-      }
-      case 'file:content': {
-        // File content received - update the file viewer
-        useFileViewerStore.getState().setFileContent(message.path, message.content);
-        break;
-      }
-      // Ignore other message types - handled elsewhere
-      case 'conversation:list':
-      case 'system:init':
-      case 'layout':
-      case 'agent:chunk':
-      case 'agent:complete':
-      case 'agent:error':
-      case 'error':
-      case 'tool:start':
-      case 'tool:end':
-      case 'permission:request':
-      case 'inputMode:changed':
-      case 'panel:command':
-      case 'panel:visible':
-      case 'terminal:output':
-      case 'terminal:data':
-      case 'terminal:created':
-      case 'terminal:exited':
-      case 'terminal:cwd':
-      case 'terminal:command:start':
-      case 'terminal:command:end':
-      case 'terminal:capabilities':
-      case 'terminal:title':
-      case 'file:written':
-      case 'file:list:response':
-      case 'conversation:created':
-      case 'conversation:deleted':
-      case 'conversation:loaded':
-      case 'conversation:rewound':
-      case 'agent:thinking':
-      case 'thinking:changed':
-      case 'model:changed':
-      case 'browser:open':
-      case 'browser:close':
-      case 'browser:created':
-      case 'browser:navigated':
-      case 'browser:element-selected':
-      case 'browser:loading':
-      case 'browser:error':
-      case 'browser:destroyed':
-      case 'subagents:list:response':
-      case 'subagents:created':
-      case 'subagents:updated':
-      case 'subagents:deleted':
-      case 'subagents:error':
-      case 'subagents:generated':
-      case 'commands:list:response':
-      case 'commands:created':
-      case 'commands:updated':
-      case 'commands:deleted':
-      case 'commands:error':
-      case 'commands:generated':
-        break;
-    }
-  }, [rootPath, setRootPath, setTreeChildren, handleFileChanged, treeNodes]);
+    },
+    [rootPath, setRootPath, setTreeChildren, handleFileChanged, treeNodes]
+  );
 
   // Set up message listener
   useTauri({ onMessage: handleMessage });
@@ -146,8 +159,10 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
   }, [requestChildren, treeNodes]);
 
   // Get root children
-  const rootChildren = rootPath ? treeNodes[rootPath] ?? [] : [];
-  const isRootLoading = useFileStore.getState().isLoading('__root__') || useFileStore.getState().isLoading(rootPath ?? '');
+  const rootChildren = rootPath ? (treeNodes[rootPath] ?? []) : [];
+  const isRootLoading =
+    useFileStore.getState().isLoading('__root__') ||
+    useFileStore.getState().isLoading(rootPath ?? '');
 
   const handleRefresh = useCallback((): void => {
     // Clear the tree and re-fetch
@@ -275,7 +290,17 @@ const FileTreeItem: FC<FileTreeItemProps> = ({ node, depth, requestChildren }) =
         path: node.path,
       });
     }
-  }, [node, isExpanded, hasLoadedChildren, toggleFolder, selectTreePath, requestChildren, postMessage, openFile, setLoading]);
+  }, [
+    node,
+    isExpanded,
+    hasLoadedChildren,
+    toggleFolder,
+    selectTreePath,
+    requestChildren,
+    postMessage,
+    openFile,
+    setLoading,
+  ]);
 
   const indentPx = depth * 12 + 8;
 

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FileEntry } from '@/lib/backend';
 import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
 
-import { listDirectory, readFile, getWorkspacePath } from '@/lib/backend';
+import { listDirectory, readFile, getWorkspacePath, lspSetWorkspace } from '@/lib/backend';
 import { ExtensionMessageSchema, WebviewMessageSchema } from '@/types/protocol';
 
 // ═══════════════════════════════════════════════════════════════
@@ -47,6 +47,11 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
         // Fallback to a reasonable default - user's home or root
         targetPath = storedPath ?? '/Users/no9labs/Developer/Recursive/Snowflake-v0';
       }
+
+      // Set workspace for LSP - this initializes language servers for the workspace
+      lspSetWorkspace(targetPath).catch((err: unknown) => {
+        console.warn('[Snowflake] Failed to set LSP workspace:', err);
+      });
 
       const entries = await listDirectory(targetPath, false);
 

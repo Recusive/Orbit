@@ -1,11 +1,4 @@
-import {
-  FileCode,
-  GitBranch,
-  GitCompareArrows,
-  Globe,
-  Search,
-  X,
-} from 'lucide-react';
+import { FileCode, GitBranch, GitCompareArrows, Globe, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { FileChange } from '@/stores/file-store';
@@ -18,12 +11,16 @@ import { BrowserPanel } from '@/components/browser';
 import { TerminalPanel } from '@/components/terminal/terminal-panel';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { useTauri } from '@/hooks/use-tauri';
+import { lspDidClose, lspDidOpen } from '@/lib/backend';
 import { cn } from '@/lib/utils';
 import { useBrowserIsActive } from '@/stores/browser-store';
-import { useFileViewerStore, useHasOpenFiles } from '@/stores/file-viewer-store';
+import {
+  useFileViewerStore,
+  useHasOpenFiles,
+  getLanguageFromPath,
+} from '@/stores/file-viewer-store';
 import { useUIStore, useTerminalPosition, useActivityTab } from '@/stores/ui-store';
 import { generateUUID } from '@/types/protocol';
-
 
 interface ActivityPanelProps {
   readonly width: number;
@@ -44,9 +41,7 @@ const TabButton: FC<TabButtonProps> = ({ active, onClick, icon: Icon, label, com
       disabled={active}
       className={cn(
         'relative flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-colors select-none shrink-0',
-        active
-          ? 'text-foreground cursor-default'
-          : 'text-muted-foreground hover:text-foreground'
+        active ? 'text-foreground cursor-default' : 'text-muted-foreground hover:text-foreground'
       )}
       title={label}
     >
@@ -54,23 +49,27 @@ const TabButton: FC<TabButtonProps> = ({ active, onClick, icon: Icon, label, com
       <div
         className={cn(
           'absolute inset-0 rounded-t-md transition-colors',
-          active
-            ? 'bg-sidebar-accent'
-            : 'hover:bg-muted/50'
+          active ? 'bg-sidebar-accent' : 'hover:bg-muted/50'
         )}
       />
       {/* Active indicator - bottom border accent */}
-      {active ? (
-        <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary" />
-      ) : null}
+      {active ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary" /> : null}
       <Icon className="relative h-3.5 w-3.5 shrink-0" />
-      <span className={cn('relative truncate', compact ? 'hidden @[435px]:inline' : 'hidden @[440px]:inline')}>{label}</span>
+      <span
+        className={cn(
+          'relative truncate',
+          compact ? 'hidden @[435px]:inline' : 'hidden @[440px]:inline'
+        )}
+      >
+        {label}
+      </span>
     </button>
   );
 };
 
 export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
   const hasOpenFiles = useHasOpenFiles();
+  const openTabs = useFileViewerStore((state) => state.openTabs);
   const closeAllTabs = useFileViewerStore((state) => state.closeAllTabs);
   const toggleSearch = useFileViewerStore((state) => state.toggleSearch);
   const openFileWithDiff = useFileViewerStore((state) => state.openFileWithDiff);
@@ -177,54 +176,83 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
   }, []);
 
   const handleCloseFileViewer = (): void => {
+    // Notify LSP that all open documents are being closed
+    for (const tab of openTabs) {
+      lspDidClose(tab.path).catch((err: unknown) => {
+        console.warn('[ActivityPanel] Failed to notify LSP of file close:', err);
+      });
+    }
     closeAllTabs();
     setActiveTab('files');
   };
 
   // Open file from Changes tab with diff view
-  const handleOpenChangedFile = useCallback((file: FileChange): void => {
-    if (file.diff && file.oldContent !== undefined && file.newContent !== undefined) {
-      openFileWithDiff(file.path, {
-        oldContent: file.oldContent,
-        newContent: file.newContent,
-        diff: file.diff,
-      }, file.language);
-    }
-    setActiveTab('file');
-  }, [openFileWithDiff, setActiveTab]);
+  const handleOpenChangedFile = useCallback(
+    (file: FileChange): void => {
+      if (file.diff && file.oldContent !== undefined && file.newContent !== undefined) {
+        // Check if file is already open to avoid duplicate LSP notifications
+        const isAlreadyOpen = openTabs.some((tab) => tab.path === file.path);
+
+        openFileWithDiff(
+          file.path,
+          {
+            oldContent: file.oldContent,
+            newContent: file.newContent,
+            diff: file.diff,
+          },
+          file.language
+        );
+
+        // Notify LSP if this is a newly opened file
+        if (!isAlreadyOpen) {
+          const language = file.language ?? getLanguageFromPath(file.path);
+          lspDidOpen(file.path, language, file.newContent).catch((err: unknown) => {
+            console.warn('[ActivityPanel] Failed to notify LSP of file open:', err);
+          });
+        }
+      }
+      setActiveTab('file');
+    },
+    [openFileWithDiff, setActiveTab, openTabs]
+  );
 
   return (
-    <div
-      className="@container h-full flex flex-col bg-background shrink-0"
-      style={{ width }}
-    >
+    <div className="@container h-full flex flex-col bg-background shrink-0" style={{ width }}>
       {/* Tabs (directly at top - no separate header) */}
       <div className="flex items-center gap-2 px-4 pt-2 overflow-hidden">
         <div className="flex gap-1 min-w-0">
           <TabButton
             active={activeTab === 'file'}
-            onClick={() => { setActiveTab('file'); }}
+            onClick={() => {
+              setActiveTab('file');
+            }}
             icon={FileCode}
             label="File"
             compact
           />
           <TabButton
             active={activeTab === 'files'}
-            onClick={() => { setActiveTab('files'); }}
+            onClick={() => {
+              setActiveTab('files');
+            }}
             icon={GitCompareArrows}
             label="Changed"
             compact={hasOpenFiles}
           />
           <TabButton
             active={activeTab === 'source'}
-            onClick={() => { setActiveTab('source'); }}
+            onClick={() => {
+              setActiveTab('source');
+            }}
             icon={GitBranch}
             label="Source"
             compact={hasOpenFiles}
           />
           <TabButton
             active={activeTab === 'browser'}
-            onClick={() => { setActiveTab('browser'); }}
+            onClick={() => {
+              setActiveTab('browser');
+            }}
             icon={Globe}
             label="Browser"
             compact={hasOpenFiles}
