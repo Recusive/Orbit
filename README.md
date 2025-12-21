@@ -5,7 +5,6 @@
 **A modern AI-powered code editor built with Tauri 2 and React 19**
 
 [![CI](https://github.com/Recusive/Snowflake-V0/actions/workflows/ci.yml/badge.svg)](https://github.com/Recusive/Snowflake-V0/actions/workflows/ci.yml)
-[![Tauri Build](https://github.com/Recusive/Snowflake-V0/actions/workflows/tauri-build.yml/badge.svg)](https://github.com/Recusive/Snowflake-V0/actions/workflows/tauri-build.yml)
 ![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?logo=tauri&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Rust](https://img.shields.io/badge/Rust-1.85-DEA584?logo=rust&logoColor=black)
