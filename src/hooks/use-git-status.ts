@@ -1,0 +1,216 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import type { GitStatus } from '@/lib/backend';
+
+import { gitDiscover, gitStatus } from '@/lib/backend';
+
+export interface UseGitStatusOptions {
+  /** Polling interval in ms (default: 5000, set to 0 to disable) */
+  pollInterval?: number;
+  /** Whether to start polling immediately (default: true) */
+  enabled?: boolean;
+  /** Pause polling when document is hidden (default: true) */
+  pauseWhenHidden?: boolean;
+}
+
+export interface UseGitStatusResult {
+  /** Git status data, null if not in a git repo or not loaded */
+  status: GitStatus | null;
+  /** Path to the git repository root */
+  repoPath: string | null;
+  /** Whether the initial load is in progress (not background polling) */
+  isLoading: boolean;
+  /** Error if the fetch failed */
+  error: Error | null;
+  /** Manually refresh the status */
+  refresh: () => Promise<void>;
+}
+
+/**
+ * Hook to fetch and poll git status for a workspace
+ *
+ * @param workspacePath - The path to check for git status
+ * @param options - Configuration options
+ * @returns Git status, repo path, loading state, error, and refresh function
+ *
+ * @example
+ * ```tsx
+ * function GitPanel() {
+ *   const { status, isLoading, refresh } = useGitStatus('/path/to/project');
+ *
+ *   if (isLoading) return <Spinner />;
+ *   if (!status) return <div>Not a git repository</div>;
+ *
+ *   return (
+ *     <div>
+ *       <p>Branch: {status.branch}</p>
+ *       <p>Modified: {status.modified.length} files</p>
+ *       <button onClick={refresh}>Refresh</button>
+ *     </div>
+ *   );
+ * }
+ * ```
+ */
+export function useGitStatus(
+  workspacePath: string | null,
+  options: UseGitStatusOptions = {}
+): UseGitStatusResult {
+  const { pollInterval = 5000, enabled = true, pauseWhenHidden = true } = options;
+
+  const [status, setStatus] = useState<GitStatus | null>(null);
+  const [repoPath, setRepoPath] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  // Request counter to handle race conditions - only apply results from latest request
+  const requestIdRef = useRef(0);
+  // Track if we have data (to distinguish initial load from background refresh)
+  const hasLoadedRef = useRef(false);
+
+  // Normalize workspace path: treat empty/whitespace-only string as null
+  const trimmedPath = workspacePath?.trim();
+  const normalizedPath = trimmedPath && trimmedPath.length > 0 ? trimmedPath : null;
+
+  const loadStatus = useCallback(
+    async (isBackgroundRefresh: boolean): Promise<void> => {
+      if (!normalizedPath) {
+        setStatus(null);
+        setRepoPath(null);
+        setError(null);
+        hasLoadedRef.current = false;
+        return;
+      }
+
+      // Increment request ID to invalidate any in-flight requests
+      const currentRequestId = ++requestIdRef.current;
+
+      // Only show loading spinner for initial load or manual refresh, not background polling
+      if (!isBackgroundRefresh) {
+        setIsLoading(true);
+      }
+      setError(null);
+
+      try {
+        // First discover the git repo root
+        const discovered = await gitDiscover(normalizedPath);
+
+        // Check if this request is still current
+        if (requestIdRef.current !== currentRequestId) {
+          return;
+        }
+
+        setRepoPath(discovered);
+
+        // Then fetch the status
+        const result = await gitStatus(discovered);
+
+        // Check again after second async operation
+        if (requestIdRef.current !== currentRequestId) {
+          return;
+        }
+
+        setStatus(result);
+        hasLoadedRef.current = true;
+
+        if (!isBackgroundRefresh) {
+          setIsLoading(false);
+        }
+      } catch (err) {
+        // Only update state if this is still the current request
+        if (requestIdRef.current !== currentRequestId) {
+          return;
+        }
+
+        // Not a git repo or other error
+        setError(err instanceof Error ? err : new Error(String(err)));
+        setStatus(null);
+        setRepoPath(null);
+        hasLoadedRef.current = false;
+
+        if (!isBackgroundRefresh) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [normalizedPath]
+  );
+
+  // Wrap for external refresh (always shows loading)
+  const refresh = useCallback(async (): Promise<void> => {
+    await loadStatus(false);
+  }, [loadStatus]);
+
+  // Initial load and reload when workspace changes
+  useEffect(() => {
+    if (enabled) {
+      hasLoadedRef.current = false;
+      void loadStatus(false);
+    } else {
+      // Clear state when disabled
+      setStatus(null);
+      setRepoPath(null);
+      setError(null);
+      hasLoadedRef.current = false;
+    }
+  }, [loadStatus, enabled]);
+
+  // Polling with visibility awareness
+  useEffect(() => {
+    if (!enabled || pollInterval <= 0 || !normalizedPath) {
+      return;
+    }
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const startPolling = (): void => {
+      if (intervalId) return;
+      intervalId = setInterval(() => {
+        void loadStatus(true); // Background refresh, no loading spinner
+      }, pollInterval);
+    };
+
+    const stopPolling = (): void => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden && pauseWhenHidden) {
+        stopPolling();
+      } else {
+        // Refresh immediately when becoming visible, then resume polling
+        if (!document.hidden && pauseWhenHidden) {
+          void loadStatus(true);
+        }
+        startPolling();
+      }
+    };
+
+    // Start polling if document is visible (or if we don't care about visibility)
+    if (!pauseWhenHidden || !document.hidden) {
+      startPolling();
+    }
+
+    // Listen for visibility changes
+    if (pauseWhenHidden) {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    return (): void => {
+      stopPolling();
+      if (pauseWhenHidden) {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    };
+  }, [loadStatus, pollInterval, enabled, normalizedPath, pauseWhenHidden]);
+
+  return {
+    status,
+    repoPath,
+    isLoading,
+    error,
+    refresh,
+  };
+}
