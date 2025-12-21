@@ -44,3 +44,11 @@ export type {
   UseKeyboardShortcutsOptions,
   UseKeyboardShortcutsReturn,
 } from './use-keyboard-shortcuts';
+
+// Git status
+export { useGitStatus } from './use-git-status';
+export type { UseGitStatusOptions, UseGitStatusResult } from './use-git-status';
+
+// File tree
+export { useFileTree } from './use-file-tree';
+export type { UseFileTreeOptions, UseFileTreeResult } from './use-file-tree';
