@@ -59,6 +59,8 @@ export interface FileState {
   selectedTreePath: string | null;
   /** Paths currently being loaded */
   loadingPaths: Set<string>;
+  /** Paths that failed to load (path → error message) */
+  errorPaths: Map<string, string>;
 
   // File change actions (existing)
   addFileChange: (change: Omit<FileChange, 'id' | 'status' | 'timestamp'>) => string;
@@ -80,6 +82,8 @@ export interface FileState {
   collapseFolder: (path: string) => void;
   selectTreePath: (path: string | null) => void;
   setLoading: (path: string, loading: boolean) => void;
+  setError: (path: string, error: string) => void;
+  clearError: (path: string) => void;
   handleFileChanged: (path: string, changeType: FileChangeType) => void;
   getChildren: (path: string) => FileNode[];
   isExpanded: (path: string) => boolean;
@@ -99,6 +103,7 @@ export const useFileStore = create<FileState>()(
     expandedFolders: new Set<string>(),
     selectedTreePath: null,
     loadingPaths: new Set<string>(),
+    errorPaths: new Map<string, string>(),
 
     addFileChange: (change: Omit<FileChange, 'id' | 'status' | 'timestamp'>) => {
       const random = Math.random().toString(36);
@@ -273,6 +278,18 @@ export const useFileStore = create<FileState>()(
         } else {
           state.loadingPaths.delete(path);
         }
+      });
+    },
+
+    setError: (path: string, error: string) => {
+      set((state) => {
+        state.errorPaths.set(path, error);
+      });
+    },
+
+    clearError: (path: string) => {
+      set((state) => {
+        state.errorPaths.delete(path);
       });
     },
 

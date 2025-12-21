@@ -7,6 +7,10 @@ import { lspDidOpen } from '@/lib/backend';
 import { useFileStore } from '@/stores/file-store';
 import { useFileViewerStore, getLanguageFromPath } from '@/stores/file-viewer-store';
 
+// ═══════════════════════════════════════════════════════════════
+// Types
+// ═══════════════════════════════════════════════════════════════
+
 export interface UseFileTreeOptions {
   /** Whether to automatically request root children on mount (default: true) */
   autoLoad?: boolean;
@@ -18,60 +22,57 @@ export interface UseFileTreeResult {
   /** Root path of the file tree */
   rootPath: string | null;
   /** Children of the root path */
-  rootChildren: FileNode[];
+  rootChildren: readonly FileNode[];
   /** Whether the root is currently loading */
   isRootLoading: boolean;
-  /** Request children for a path (defaults to root if not specified) */
-  requestChildren: (path?: string) => void;
+  /** Error message if root failed to load */
+  rootError: string | null;
   /** Refresh the entire tree (clears cache and re-fetches) */
   refresh: () => void;
-  /** Toggle folder expansion */
+  /** Toggle folder expansion (auto-fetches children if needed) */
   toggleFolder: (path: string) => void;
-  /** Check if a folder is expanded */
-  isExpanded: (path: string) => boolean;
-  /** Check if a path is loading */
-  isLoading: (path: string) => boolean;
-  /** Get children for a specific path */
-  getChildren: (path: string) => FileNode[];
   /** Open a file in the file viewer */
   openFile: (path: string) => void;
+  /** Retry loading a failed folder */
+  retryFolder: (path: string) => void;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Constants
+// ═══════════════════════════════════════════════════════════════
+
+/** Request timeout in ms - if no response, mark as error */
+const REQUEST_TIMEOUT_MS = 30000;
+
+/** Stable empty array reference for selectors (prevents re-renders) */
+const EMPTY_CHILDREN: readonly FileNode[] = [];
+
+// ═══════════════════════════════════════════════════════════════
+// Hook
+// ═══════════════════════════════════════════════════════════════
+
 /**
- * Hook to manage file tree state and operations
+ * Hook to manage file tree orchestration.
  *
- * @param options - Configuration options
- * @returns File tree state and actions
+ * This hook handles:
+ * - Initial tree loading
+ * - Message routing (tree responses, file changes, file content)
+ * - Request timeout handling
+ * - Cache invalidation from file watcher
+ *
+ * Individual tree items should use `useFileTreeItem` for their state
+ * to avoid cascading re-renders.
  *
  * @example
  * ```tsx
  * function FileExplorer() {
- *   const {
- *     rootPath,
- *     rootChildren,
- *     isRootLoading,
- *     requestChildren,
- *     refresh,
- *     toggleFolder,
- *     isExpanded,
- *     openFile,
- *   } = useFileTree();
- *
- *   if (isRootLoading && rootChildren.length === 0) {
- *     return <Spinner />;
- *   }
+ *   const { rootPath, rootChildren, isRootLoading, refresh } = useFileTree();
  *
  *   return (
  *     <div>
  *       {rootChildren.map((node) => (
- *         <TreeNode
- *           key={node.path}
- *           node={node}
- *           onToggle={() => toggleFolder(node.path)}
- *           onOpen={() => openFile(node.path)}
- *         />
+ *         <FileTreeItem key={node.path} path={node.path} depth={0} />
  *       ))}
- *       <button onClick={refresh}>Refresh</button>
  *     </div>
  *   );
  * }
@@ -81,33 +82,30 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
   const { autoLoad = true, debug = false } = options;
 
   const { postMessage } = useTauri();
-  const {
-    rootPath,
-    treeNodes,
-    expandedFolders,
-    loadingPaths,
-    setRootPath,
-    setTreeChildren,
-    toggleFolder: storeToggleFolder,
-    handleFileChanged,
-    setLoading,
-    getChildren,
-    isExpanded,
-    isLoading,
-  } = useFileStore();
 
-  const { openFile: viewerOpenFile, setLoading: setViewerLoading } = useFileViewerStore();
+  // Get only what we need from store (minimizes re-renders)
+  const rootPath = useFileStore((s) => s.rootPath);
+  const rootChildren = useFileStore((s) =>
+    s.rootPath ? (s.treeNodes[s.rootPath] ?? EMPTY_CHILDREN) : EMPTY_CHILDREN
+  );
+  const isRootLoading = useFileStore(
+    (s) => s.loadingPaths.has('__root__') || s.loadingPaths.has(s.rootPath ?? '')
+  );
+  const rootError = useFileStore((s) => s.errorPaths.get(s.rootPath ?? '__root__') ?? null);
 
-  // Track pending requests to avoid duplicates
-  const pendingRequests = useRef(new Map<string, string>());
+  // Track pending requests: path -> { uuid, timeoutId }
+  const pendingRequests = useRef(
+    new Map<string, { uuid: string; timeoutId: ReturnType<typeof setTimeout> }>()
+  );
 
   // Track previous treeNodes for detecting cleared cache
-  const prevTreeNodesRef = useRef<Record<string, unknown>>({});
+  const prevTreeNodesRef = useRef<Set<string>>(new Set());
 
   // Request children for a path
   const requestChildren = useCallback(
     (path?: string): void => {
-      const requestPath = path ?? rootPath ?? '';
+      const store = useFileStore.getState();
+      const requestPath = path ?? store.rootPath ?? '';
 
       // Don't request if already pending
       if (pendingRequests.current.has(requestPath)) {
@@ -118,11 +116,24 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
       }
 
       const uuid = crypto.randomUUID();
-      pendingRequests.current.set(requestPath, uuid);
-
-      // Set loading state
       const loadingKey = requestPath || '__root__';
-      setLoading(loadingKey, true);
+
+      // Set timeout for request
+      const timeoutId = setTimeout(() => {
+        const pending = pendingRequests.current.get(requestPath);
+        if (pending?.uuid === uuid) {
+          pendingRequests.current.delete(requestPath);
+          useFileStore.getState().setLoading(loadingKey, false);
+          useFileStore.getState().setError(loadingKey, 'Request timed out');
+          console.error('[useFileTree] Request timed out for:', requestPath);
+        }
+      }, REQUEST_TIMEOUT_MS);
+
+      pendingRequests.current.set(requestPath, { uuid, timeoutId });
+
+      // Clear any previous error and set loading
+      useFileStore.getState().clearError(loadingKey);
+      useFileStore.getState().setLoading(loadingKey, true);
 
       if (debug) {
         console.warn('[useFileTree] Requesting children for:', requestPath || '(root)');
@@ -134,7 +145,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         path: path,
       });
     },
-    [postMessage, rootPath, setLoading, debug]
+    [postMessage, debug]
   );
 
   // Handle incoming messages
@@ -142,27 +153,40 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
     (message: ExtensionMessage): void => {
       switch (message.type) {
         case 'file:tree:response': {
-          // Clear pending request
-          pendingRequests.current.delete(message.path);
+          // Clear pending request and timeout
+          const pending = pendingRequests.current.get(message.path);
+          if (pending) {
+            clearTimeout(pending.timeoutId);
+            pendingRequests.current.delete(message.path);
+          }
 
           if (debug) {
-            console.warn('[useFileTree] Received tree response for:', message.path);
+            console.warn(
+              '[useFileTree] Received tree response for:',
+              message.path,
+              `(${String(message.children.length)} children)`
+            );
           }
 
+          const store = useFileStore.getState();
+
           // Store the root path if this is the first response
-          if (!rootPath) {
-            setRootPath(message.path);
+          if (!store.rootPath) {
+            store.setRootPath(message.path);
           }
-          setTreeChildren(message.path, message.children);
+          store.setTreeChildren(message.path, message.children);
           break;
         }
 
         case 'file:tree:error': {
           // Find and clear the pending request by request_uuid
-          for (const [path, uuid] of pendingRequests.current.entries()) {
-            if (uuid === message.request_uuid) {
+          for (const [path, pending] of pendingRequests.current.entries()) {
+            if (pending.uuid === message.request_uuid) {
+              clearTimeout(pending.timeoutId);
               pendingRequests.current.delete(path);
-              setLoading(path || '__root__', false);
+              const loadingKey = path || '__root__';
+              useFileStore.getState().setLoading(loadingKey, false);
+              useFileStore.getState().setError(loadingKey, message.error);
               break;
             }
           }
@@ -176,16 +200,16 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
             console.warn('[useFileTree] File changed:', message.path, message.change_type);
           }
           // Handle file system changes (updates store, may clear cached children)
-          handleFileChanged(message.path, message.change_type);
+          useFileStore.getState().handleFileChanged(message.path, message.change_type);
           break;
         }
 
         case 'file:content': {
           // File content received - update the file viewer
-          const store = useFileViewerStore.getState();
-          const isAlreadyOpen = store.openTabs.some((tab) => tab.path === message.path);
+          const viewerStore = useFileViewerStore.getState();
+          const isAlreadyOpen = viewerStore.openTabs.some((tab) => tab.path === message.path);
 
-          store.setFileContent(message.path, message.content);
+          viewerStore.setFileContent(message.path, message.content);
 
           // Notify LSP only if this is a newly opened file
           if (!isAlreadyOpen) {
@@ -254,7 +278,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
           break;
       }
     },
-    [rootPath, setRootPath, setTreeChildren, handleFileChanged, setLoading, debug]
+    [debug]
   );
 
   // Set up message listener
@@ -262,17 +286,23 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
 
   // Request root children on mount (if autoLoad enabled)
   useEffect(() => {
-    if (autoLoad && Object.keys(treeNodes).length === 0) {
-      requestChildren();
+    if (autoLoad) {
+      const store = useFileStore.getState();
+      if (Object.keys(store.treeNodes).length === 0) {
+        requestChildren();
+      }
     }
-  }, [autoLoad, requestChildren, treeNodes]);
+  }, [autoLoad, requestChildren]);
 
   // Re-fetch expanded folders when their children are cleared (e.g., by file watcher)
   useEffect(() => {
+    const store = useFileStore.getState();
+    const currentPaths = new Set(Object.keys(store.treeNodes));
+
     // Check for expanded folders that were loaded but now aren't
-    for (const folderPath of expandedFolders) {
-      const wasLoaded = folderPath in prevTreeNodesRef.current;
-      const isLoaded = folderPath in treeNodes;
+    for (const folderPath of store.expandedFolders) {
+      const wasLoaded = prevTreeNodesRef.current.has(folderPath);
+      const isLoaded = currentPaths.has(folderPath);
 
       // If folder was loaded but now isn't (cache cleared), re-fetch
       if (wasLoaded && !isLoaded && !pendingRequests.current.has(folderPath)) {
@@ -284,44 +314,80 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
     }
 
     // Also check root path
-    if (rootPath) {
-      const wasRootLoaded = rootPath in prevTreeNodesRef.current;
-      const isRootLoaded = rootPath in treeNodes;
-      if (wasRootLoaded && !isRootLoaded && !pendingRequests.current.has(rootPath)) {
+    if (store.rootPath) {
+      const wasRootLoaded = prevTreeNodesRef.current.has(store.rootPath);
+      const isRootLoaded = currentPaths.has(store.rootPath);
+      if (wasRootLoaded && !isRootLoaded && !pendingRequests.current.has(store.rootPath)) {
         if (debug) {
-          console.warn('[useFileTree] Re-fetching cleared root:', rootPath);
+          console.warn('[useFileTree] Re-fetching cleared root:', store.rootPath);
         }
-        requestChildren(rootPath);
+        requestChildren(store.rootPath);
       }
     }
 
     // Update ref for next comparison
-    prevTreeNodesRef.current = { ...treeNodes };
-  }, [treeNodes, expandedFolders, rootPath, requestChildren, debug]);
+    prevTreeNodesRef.current = currentPaths;
+  });
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    const requests = pendingRequests.current;
+    return (): void => {
+      for (const pending of requests.values()) {
+        clearTimeout(pending.timeoutId);
+      }
+      requests.clear();
+    };
+  }, []);
 
   // Refresh: clear tree and re-fetch
   const refresh = useCallback((): void => {
     if (debug) {
       console.warn('[useFileTree] Refreshing tree');
     }
-    // Clear the tree and expanded state
-    useFileStore.setState({ treeNodes: {}, expandedFolders: new Set() });
+
+    // Clear all pending request timeouts
+    for (const pending of pendingRequests.current.values()) {
+      clearTimeout(pending.timeoutId);
+    }
     pendingRequests.current.clear();
+
+    // Clear the tree, expanded state, and errors
+    useFileStore.setState({
+      treeNodes: {},
+      expandedFolders: new Set(),
+      errorPaths: new Map(),
+    });
+
     requestChildren();
   }, [requestChildren, debug]);
 
   // Toggle folder with auto-fetch
   const toggleFolder = useCallback(
     (path: string): void => {
-      const wasExpanded = expandedFolders.has(path);
-      storeToggleFolder(path);
+      const store = useFileStore.getState();
+      const wasExpanded = store.expandedFolders.has(path);
+
+      store.toggleFolder(path);
 
       // If expanding and children not loaded, request them
-      if (!wasExpanded && !(path in treeNodes)) {
+      if (!wasExpanded && !(path in store.treeNodes)) {
         requestChildren(path);
       }
     },
-    [expandedFolders, storeToggleFolder, treeNodes, requestChildren]
+    [requestChildren]
+  );
+
+  // Retry loading a failed folder
+  const retryFolder = useCallback(
+    (path: string): void => {
+      if (debug) {
+        console.warn('[useFileTree] Retrying folder:', path);
+      }
+      useFileStore.getState().clearError(path);
+      requestChildren(path);
+    },
+    [requestChildren, debug]
   );
 
   // Open file in viewer
@@ -331,9 +397,11 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         console.warn('[useFileTree] Opening file:', path);
       }
 
+      const viewerStore = useFileViewerStore.getState();
+
       // Open tab in viewer (shows loading state)
-      viewerOpenFile(path);
-      setViewerLoading(true, path);
+      viewerStore.openFile(path);
+      viewerStore.setLoading(true, path);
 
       // Request file content
       postMessage({
@@ -342,23 +410,91 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         path,
       });
     },
-    [viewerOpenFile, setViewerLoading, postMessage, debug]
+    [postMessage, debug]
   );
-
-  // Compute derived state
-  const rootChildren = rootPath ? (treeNodes[rootPath] ?? []) : [];
-  const isRootLoading = loadingPaths.has('__root__') || loadingPaths.has(rootPath ?? '');
 
   return {
     rootPath,
     rootChildren,
     isRootLoading,
-    requestChildren,
+    rootError,
     refresh,
     toggleFolder,
+    openFile,
+    retryFolder,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Tree Item Hook - For Individual Items (Prevents Cascading Re-renders)
+// ═══════════════════════════════════════════════════════════════
+
+export interface UseFileTreeItemResult {
+  /** The node data (null if not found) */
+  node: FileNode | null;
+  /** Whether this folder is expanded */
+  isExpanded: boolean;
+  /** Whether this path is currently loading */
+  isLoading: boolean;
+  /** Whether this path is selected */
+  isSelected: boolean;
+  /** Error message if this folder failed to load */
+  error: string | null;
+  /** Children of this folder (empty if not loaded or not a folder) */
+  children: readonly FileNode[];
+}
+
+/**
+ * Hook for individual tree items to subscribe to ONLY their own state.
+ *
+ * This prevents cascading re-renders - a parent expanding doesn't re-render
+ * siblings or deeply nested children.
+ *
+ * @param path - The path of this tree item
+ * @returns State for this specific tree item
+ *
+ * @example
+ * ```tsx
+ * const FileTreeItem = memo(({ path, depth }: Props) => {
+ *   const { node, isExpanded, isLoading, isSelected, children } = useFileTreeItem(path);
+ *
+ *   if (!node) return null;
+ *
+ *   return (
+ *     <div>
+ *       <TreeRow node={node} isExpanded={isExpanded} isSelected={isSelected} />
+ *       {isExpanded && children.map(child => (
+ *         <FileTreeItem key={child.path} path={child.path} depth={depth + 1} />
+ *       ))}
+ *     </div>
+ *   );
+ * });
+ * ```
+ */
+export function useFileTreeItem(path: string): UseFileTreeItemResult {
+  // Each selector subscribes to a minimal slice of state
+  // Zustand only triggers re-render if the selected value changes
+
+  const node = useFileStore((s) => {
+    // Find the node in its parent's children
+    const parentPath = path.substring(0, path.lastIndexOf('/')) || s.rootPath;
+    if (!parentPath) return null;
+    const siblings = s.treeNodes[parentPath];
+    return siblings?.find((n) => n.path === path) ?? null;
+  });
+
+  const isExpanded = useFileStore((s) => s.expandedFolders.has(path));
+  const isLoading = useFileStore((s) => s.loadingPaths.has(path));
+  const isSelected = useFileStore((s) => s.selectedTreePath === path);
+  const error = useFileStore((s) => s.errorPaths.get(path) ?? null);
+  const children = useFileStore((s) => s.treeNodes[path] ?? EMPTY_CHILDREN);
+
+  return {
+    node,
     isExpanded,
     isLoading,
-    getChildren,
-    openFile,
+    isSelected,
+    error,
+    children,
   };
 }

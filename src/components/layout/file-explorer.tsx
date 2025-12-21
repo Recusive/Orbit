@@ -1,204 +1,34 @@
-import { ChevronDown, ChevronRight, Loader2, RefreshCw, Search } from 'lucide-react';
-import { useCallback, useEffect, useRef } from 'react';
+import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Search } from 'lucide-react';
+import { memo, useCallback } from 'react';
 
-import type { FileNode, ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { FileIcon, FolderIcon } from '@/components/files';
-import { useTauri } from '@/hooks/use-tauri';
-import { lspDidOpen } from '@/lib/backend';
+import { useFileTree, useFileTreeItem } from '@/hooks/use-file-tree';
 import { cn } from '@/lib/utils';
 import { useFileStore } from '@/stores/file-store';
-import { useFileViewerStore, getLanguageFromPath } from '@/stores/file-viewer-store';
+
+// ═══════════════════════════════════════════════════════════════
+// File Explorer Component
+// ═══════════════════════════════════════════════════════════════
 
 interface FileExplorerProps {
   readonly collapsed?: boolean;
 }
 
 export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
-  const { postMessage } = useTauri();
-  const { rootPath, treeNodes, setRootPath, setTreeChildren, handleFileChanged } = useFileStore();
+  const {
+    rootPath,
+    rootChildren,
+    isRootLoading,
+    rootError,
+    refresh,
+    toggleFolder,
+    openFile,
+    retryFolder,
+  } = useFileTree();
 
-  // Track pending requests to avoid duplicates
-  const pendingRequests = useRef(new Map<string, string>());
-
-  // Request children for a path
-  const requestChildren = useCallback(
-    (path?: string): void => {
-      const requestPath = path ?? rootPath ?? '';
-
-      // Don't request if already pending
-      if (pendingRequests.current.has(requestPath)) {
-        return;
-      }
-
-      const uuid = crypto.randomUUID();
-      pendingRequests.current.set(requestPath, uuid);
-
-      useFileStore.getState().setLoading(requestPath || '__root__', true);
-      postMessage({
-        type: 'file:tree:request',
-        uuid,
-        path: path,
-      });
-    },
-    [postMessage, rootPath]
-  );
-
-  // Handle incoming messages
-  const handleMessage = useCallback(
-    (message: ExtensionMessage): void => {
-      switch (message.type) {
-        case 'file:tree:response': {
-          // Clear pending request
-          pendingRequests.current.delete(message.path);
-
-          // Store the root path if this is the first response
-          if (!rootPath) {
-            setRootPath(message.path);
-          }
-          setTreeChildren(message.path, message.children);
-          break;
-        }
-        case 'file:tree:error': {
-          // Clear loading state on error
-          const pathKey = Object.keys(treeNodes).length === 0 ? '__root__' : message.request_uuid;
-          useFileStore.getState().setLoading(pathKey, false);
-
-          console.error('[FileExplorer] Error fetching tree:', message.error);
-          break;
-        }
-        case 'file:changed': {
-          // Handle file system changes
-          handleFileChanged(message.path, message.change_type);
-          break;
-        }
-        case 'file:content': {
-          // Check if file is already open (avoid duplicate LSP notifications)
-          const store = useFileViewerStore.getState();
-          const isAlreadyOpen = store.openTabs.some((tab) => tab.path === message.path);
-
-          // File content received - update the file viewer
-          store.setFileContent(message.path, message.content);
-
-          // Notify LSP only if this is a newly opened file
-          if (!isAlreadyOpen) {
-            const language = getLanguageFromPath(message.path);
-            lspDidOpen(message.path, language, message.content).catch((err: unknown) => {
-              console.warn('[FileExplorer] Failed to notify LSP of file open:', err);
-            });
-          }
-          break;
-        }
-        // Ignore other message types - handled elsewhere
-        case 'conversation:list':
-        case 'system:init':
-        case 'layout':
-        case 'agent:chunk':
-        case 'agent:complete':
-        case 'agent:error':
-        case 'error':
-        case 'tool:start':
-        case 'tool:end':
-        case 'permission:request':
-        case 'inputMode:changed':
-        case 'panel:command':
-        case 'panel:visible':
-        case 'terminal:output':
-        case 'terminal:data':
-        case 'terminal:created':
-        case 'terminal:exited':
-        case 'terminal:cwd':
-        case 'terminal:command:start':
-        case 'terminal:command:end':
-        case 'terminal:capabilities':
-        case 'terminal:title':
-        case 'file:written':
-        case 'file:list:response':
-        case 'conversation:created':
-        case 'conversation:deleted':
-        case 'conversation:loaded':
-        case 'conversation:rewound':
-        case 'agent:thinking':
-        case 'thinking:changed':
-        case 'model:changed':
-        case 'browser:open':
-        case 'browser:close':
-        case 'browser:created':
-        case 'browser:navigated':
-        case 'browser:element-selected':
-        case 'browser:loading':
-        case 'browser:error':
-        case 'browser:destroyed':
-        case 'subagents:list:response':
-        case 'subagents:created':
-        case 'subagents:updated':
-        case 'subagents:deleted':
-        case 'subagents:error':
-        case 'subagents:generated':
-        case 'commands:list:response':
-        case 'commands:created':
-        case 'commands:updated':
-        case 'commands:deleted':
-        case 'commands:error':
-        case 'commands:generated':
-          break;
-      }
-    },
-    [rootPath, setRootPath, setTreeChildren, handleFileChanged, treeNodes]
-  );
-
-  // Set up message listener
-  useTauri({ onMessage: handleMessage });
-
-  // Request root children on mount
-  useEffect(() => {
-    if (Object.keys(treeNodes).length === 0) {
-      requestChildren();
-    }
-  }, [requestChildren, treeNodes]);
-
-  // Re-fetch expanded folders when their children are cleared (e.g., by file watcher)
-  const expandedFolders = useFileStore((state) => state.expandedFolders);
-  const prevTreeNodesRef = useRef<Record<string, unknown>>({});
-
-  useEffect(() => {
-    // Check for expanded folders that were loaded but now aren't
-    for (const folderPath of expandedFolders) {
-      const wasLoaded = folderPath in prevTreeNodesRef.current;
-      const isLoaded = folderPath in treeNodes;
-
-      // If folder was loaded but now isn't (cache cleared), re-fetch
-      if (wasLoaded && !isLoaded && !pendingRequests.current.has(folderPath)) {
-        requestChildren(folderPath);
-      }
-    }
-
-    // Also check root path
-    if (rootPath) {
-      const wasRootLoaded = rootPath in prevTreeNodesRef.current;
-      const isRootLoaded = rootPath in treeNodes;
-      if (wasRootLoaded && !isRootLoaded && !pendingRequests.current.has(rootPath)) {
-        requestChildren(rootPath);
-      }
-    }
-
-    // Update ref for next comparison
-    prevTreeNodesRef.current = { ...treeNodes };
-  }, [treeNodes, expandedFolders, rootPath, requestChildren]);
-
-  // Get root children
-  const rootChildren = rootPath ? (treeNodes[rootPath] ?? []) : [];
-  const isRootLoading =
-    useFileStore.getState().isLoading('__root__') ||
-    useFileStore.getState().isLoading(rootPath ?? '');
-
-  const handleRefresh = useCallback((): void => {
-    // Clear the tree and re-fetch
-    useFileStore.setState({ treeNodes: {}, expandedFolders: new Set() });
-    pendingRequests.current.clear();
-    requestChildren();
-  }, [requestChildren]);
+  const selectTreePath = useFileStore((s) => s.selectTreePath);
 
   const handleOpenQuickSearch = useCallback((): void => {
     window.dispatchEvent(new CustomEvent('openCommandPalette'));
@@ -231,7 +61,7 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
           </button>
           <button
             className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100"
-            onClick={handleRefresh}
+            onClick={refresh}
             title="Refresh"
           >
             <RefreshCw className="h-3 w-3" />
@@ -241,7 +71,21 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
 
       {/* Tree content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
-        {isRootLoading && rootChildren.length === 0 ? (
+        {/* Root error state */}
+        {rootError ? (
+          <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+            <AlertCircle className="h-5 w-5 text-destructive mb-2" />
+            <span className="text-sm text-muted-foreground mb-2">{rootError}</span>
+            <button
+              className="text-xs text-primary hover:underline"
+              onClick={(): void => {
+                retryFolder(rootPath ?? '__root__');
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        ) : isRootLoading && rootChildren.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
             <span className="text-sm">Loading...</span>
@@ -255,9 +99,12 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
             {rootChildren.map((node) => (
               <FileTreeItem
                 key={node.path}
-                node={node}
+                path={node.path}
                 depth={0}
-                requestChildren={requestChildren}
+                onToggle={toggleFolder}
+                onOpen={openFile}
+                onSelect={selectTreePath}
+                onRetry={retryFolder}
               />
             ))}
           </div>
@@ -268,121 +115,133 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// File Tree Item Component
+// File Tree Item Component (Memoized for Performance)
 // ═══════════════════════════════════════════════════════════════
 
 interface FileTreeItemProps {
-  readonly node: FileNode;
+  readonly path: string;
   readonly depth: number;
-  readonly requestChildren: (path?: string) => void;
+  readonly onToggle: (path: string) => void;
+  readonly onOpen: (path: string) => void;
+  readonly onSelect: (path: string | null) => void;
+  readonly onRetry: (path: string) => void;
 }
 
-const FileTreeItem: FC<FileTreeItemProps> = ({ node, depth, requestChildren }) => {
-  const { postMessage } = useTauri();
-  const {
-    treeNodes,
-    expandedFolders,
-    selectedTreePath,
-    loadingPaths,
-    toggleFolder,
-    selectTreePath,
-  } = useFileStore();
-  const { openFile, setLoading } = useFileViewerStore();
+/**
+ * Memoized tree item that subscribes to ONLY its own state.
+ *
+ * This prevents cascading re-renders:
+ * - Parent expanding doesn't re-render siblings
+ * - Sibling selection doesn't re-render other siblings
+ * - Each item only re-renders when ITS state changes
+ */
+const FileTreeItem: FC<FileTreeItemProps> = memo(
+  ({ path, depth, onToggle, onOpen, onSelect, onRetry }) => {
+    // Subscribe to only this item's state (prevents cascading re-renders)
+    const { node, isExpanded, isLoading, isSelected, error, children } = useFileTreeItem(path);
 
-  const isExpanded = expandedFolders.has(node.path);
-  const isSelected = selectedTreePath === node.path;
-  const isLoading = loadingPaths.has(node.path);
-  const children = treeNodes[node.path] ?? [];
-  const hasLoadedChildren = node.path in treeNodes;
+    const handleClick = useCallback((): void => {
+      if (!node) return;
 
-  const handleClick = useCallback((): void => {
-    if (node.isDirectory) {
-      // Toggle expansion
-      toggleFolder(node.path);
-
-      // Request children if expanding and not yet loaded
-      if (!isExpanded && !hasLoadedChildren) {
-        requestChildren(node.path);
+      if (node.isDirectory) {
+        // Toggle expansion (hook auto-fetches children if needed)
+        onToggle(path);
+      } else {
+        // Select the file in explorer
+        onSelect(path);
+        // Open file in the viewer (hook handles content fetch + LSP)
+        onOpen(path);
       }
-    } else {
-      // Select the file in explorer
-      selectTreePath(node.path);
+    }, [node, path, onToggle, onSelect, onOpen]);
 
-      // Open file in the review panel's file viewer
-      openFile(node.path); // Opens tab with loading state
-      setLoading(true, node.path);
+    const handleRetry = useCallback(
+      (e: React.MouseEvent): void => {
+        e.stopPropagation();
+        onRetry(path);
+      },
+      [path, onRetry]
+    );
 
-      // Request file content
-      postMessage({
-        type: 'file:read',
-        uuid: crypto.randomUUID(),
-        path: node.path,
-      });
+    // Node not found (shouldn't happen, but be defensive)
+    if (!node) {
+      return null;
     }
-  }, [
-    node,
-    isExpanded,
-    hasLoadedChildren,
-    toggleFolder,
-    selectTreePath,
-    requestChildren,
-    postMessage,
-    openFile,
-    setLoading,
-  ]);
 
-  const indentPx = depth * 12 + 8;
+    const indentPx = depth * 12 + 8;
 
-  return (
-    <>
-      <button
-        className={cn(
-          'flex items-center w-full h-6 text-sm hover:bg-accent/50 transition-colors',
-          isSelected && 'bg-accent text-accent-foreground'
-        )}
-        style={{ paddingLeft: indentPx }}
-        onClick={handleClick}
-        title={node.path}
-      >
-        {/* Expand/collapse chevron for directories */}
-        <span className="w-4 h-4 flex items-center justify-center shrink-0">
-          {node.isDirectory ? (
-            isLoading ? (
-              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-            ) : isExpanded ? (
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-3 w-3 text-muted-foreground" />
-            )
-          ) : null}
-        </span>
-
-        {/* Icon */}
-        <span className="w-4 h-4 flex items-center justify-center shrink-0 mr-1">
-          {node.isDirectory ? (
-            <FolderIcon folderName={node.name} isOpen={isExpanded} className="h-4 w-4" />
-          ) : (
-            <FileIcon fileName={node.name} className="h-4 w-4" />
+    return (
+      <>
+        <button
+          className={cn(
+            'flex items-center w-full h-6 text-sm hover:bg-accent/50 transition-colors',
+            isSelected && 'bg-accent text-accent-foreground'
           )}
-        </span>
+          style={{ paddingLeft: indentPx }}
+          onClick={handleClick}
+          title={path}
+        >
+          {/* Expand/collapse chevron for directories */}
+          <span className="w-4 h-4 flex items-center justify-center shrink-0">
+            {node.isDirectory ? (
+              isLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              ) : error ? (
+                <AlertCircle className="h-3 w-3 text-destructive" />
+              ) : isExpanded ? (
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-3 w-3 text-muted-foreground" />
+              )
+            ) : null}
+          </span>
 
-        {/* Name */}
-        <span className="truncate text-left">{node.name}</span>
-      </button>
+          {/* Icon */}
+          <span className="w-4 h-4 flex items-center justify-center shrink-0 mr-1">
+            {node.isDirectory ? (
+              <FolderIcon folderName={node.name} isOpen={isExpanded} className="h-4 w-4" />
+            ) : (
+              <FileIcon fileName={node.name} className="h-4 w-4" />
+            )}
+          </span>
 
-      {/* Children (if directory is expanded) */}
-      {node.isDirectory && isExpanded && children.length > 0 ? (
-        <div>
-          {children.map((child) => (
-            <FileTreeItem
-              key={child.path}
-              node={child}
-              depth={depth + 1}
-              requestChildren={requestChildren}
-            />
-          ))}
-        </div>
-      ) : null}
-    </>
-  );
-};
+          {/* Name */}
+          <span className="truncate text-left flex-1">{node.name}</span>
+
+          {/* Error retry button */}
+          {error ? (
+            <span
+              className="text-xs text-destructive hover:underline px-1"
+              onClick={handleRetry}
+              role="button"
+              tabIndex={0}
+            >
+              retry
+            </span>
+          ) : null}
+        </button>
+
+        {/* Children (if directory is expanded and loaded) */}
+        {node.isDirectory && isExpanded && !error && children.length > 0 ? (
+          <div>
+            {children.map((child) => (
+              <FileTreeItem
+                key={child.path}
+                path={child.path}
+                depth={depth + 1}
+                onToggle={onToggle}
+                onOpen={onOpen}
+                onSelect={onSelect}
+                onRetry={onRetry}
+              />
+            ))}
+          </div>
+        ) : null}
+      </>
+    );
+  },
+  // Custom comparison - only re-render if path or depth changes
+  // State changes are handled by the hook's selectors
+  (prevProps, nextProps) => prevProps.path === nextProps.path && prevProps.depth === nextProps.depth
+);
+
+FileTreeItem.displayName = 'FileTreeItem';

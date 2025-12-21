@@ -50,5 +50,5 @@ export { useGitStatus } from './use-git-status';
 export type { UseGitStatusOptions, UseGitStatusResult } from './use-git-status';
 
 // File tree
-export { useFileTree } from './use-file-tree';
-export type { UseFileTreeOptions, UseFileTreeResult } from './use-file-tree';
+export { useFileTree, useFileTreeItem } from './use-file-tree';
+export type { UseFileTreeOptions, UseFileTreeResult, UseFileTreeItemResult } from './use-file-tree';
