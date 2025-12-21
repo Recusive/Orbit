@@ -143,6 +143,9 @@ pub fn run() {
             files::file_exists,
             files::is_directory,
             files::get_file_info,
+            // File watcher commands
+            files::watch_path,
+            files::unwatch_path,
             // LSP commands
             lsp::lsp_set_workspace,
             lsp::lsp_completions,

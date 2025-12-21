@@ -3,7 +3,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FileEntry } from '@/lib/backend';
 import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
 
-import { listDirectory, readFile, getWorkspacePath, lspSetWorkspace } from '@/lib/backend';
+import {
+  listDirectory,
+  readFile,
+  getWorkspacePath,
+  lspSetWorkspace,
+  createTerminal,
+  writeTerminal,
+  resizeTerminal,
+  closeTerminal,
+  onTerminalOutput,
+  onTerminalExit,
+} from '@/lib/backend';
 import { ExtensionMessageSchema, WebviewMessageSchema } from '@/types/protocol';
 
 // ═══════════════════════════════════════════════════════════════
@@ -29,6 +40,48 @@ export interface UseTauriReturn {
 
 function isTauriEnvironment(): boolean {
   return typeof window !== 'undefined' && '__TAURI__' in window;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Terminal Listener Singleton
+// ═══════════════════════════════════════════════════════════════
+
+let terminalListenersInitialized = false;
+
+async function initTerminalListeners(): Promise<void> {
+  if (terminalListenersInitialized) return;
+  terminalListenersInitialized = true;
+
+  try {
+    await onTerminalOutput((event) => {
+      window.postMessage(
+        {
+          type: 'terminal:data',
+          uuid: crypto.randomUUID(),
+          terminal_id: event.id,
+          data: event.data,
+        },
+        '*'
+      );
+    });
+
+    await onTerminalExit((event) => {
+      window.postMessage(
+        {
+          type: 'terminal:exited',
+          uuid: crypto.randomUUID(),
+          terminal_id: event.id,
+          exit_code: event.code,
+        },
+        '*'
+      );
+    });
+
+    console.warn('[Snowflake] Terminal event listeners initialized');
+  } catch (err) {
+    console.error('[Snowflake] Failed to set up terminal listeners:', err);
+    terminalListenersInitialized = false;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -116,6 +169,71 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
     return;
   }
 
+  // Handle terminal creation
+  if (message.type === 'terminal:create') {
+    try {
+      const info = await createTerminal(
+        message.session_id,
+        undefined, // cwd - use default
+        undefined, // shell - use default
+        message.cols,
+        message.rows
+      );
+      window.postMessage(
+        {
+          type: 'terminal:created',
+          uuid: crypto.randomUUID(),
+          session_id: message.session_id,
+          terminal_id: info.id,
+          name: message.name ?? info.shell,
+          pid: info.pid,
+          cwd: info.cwd,
+          shell_type: info.shell,
+          capabilities: {
+            cwd_detection: true,
+            command_detection: true,
+            shell_integration: true,
+          },
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create terminal';
+      console.error('[Snowflake] Terminal creation error:', errorMessage);
+    }
+    return;
+  }
+
+  // Handle terminal write
+  if (message.type === 'terminal:write') {
+    try {
+      await writeTerminal(message.terminal_id, message.data);
+    } catch (err: unknown) {
+      console.error('[Snowflake] Terminal write error:', err);
+    }
+    return;
+  }
+
+  // Handle terminal resize
+  if (message.type === 'terminal:resize') {
+    try {
+      await resizeTerminal(message.terminal_id, message.cols, message.rows);
+    } catch (err: unknown) {
+      console.error('[Snowflake] Terminal resize error:', err);
+    }
+    return;
+  }
+
+  // Handle terminal close
+  if (message.type === 'terminal:close') {
+    try {
+      await closeTerminal(message.terminal_id);
+    } catch (err: unknown) {
+      console.error('[Snowflake] Terminal close error:', err);
+    }
+    return;
+  }
+
   // Other message types are handled elsewhere or not applicable
 }
 
@@ -194,14 +312,14 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
     };
   }, [debug]);
 
-  // Send webview:ready when connected to Tauri
+  // Initialize terminal listeners once when connected to Tauri
   useEffect(() => {
     if (isConnected && !isMockMode) {
       if (debug) {
-        console.warn('[Snowflake] Sending webview:ready');
+        console.warn('[Snowflake] Connected to Tauri, initializing terminal listeners');
       }
-      // TODO: Implement Tauri invoke for webview:ready
-      // invoke('webview_ready', { uuid: crypto.randomUUID() });
+      // Initialize terminal listeners (singleton - only runs once)
+      initTerminalListeners().catch(console.error);
     }
   }, [isConnected, isMockMode, debug]);
 
