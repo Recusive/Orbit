@@ -12,6 +12,10 @@ pub struct FileEntry {
     pub name: String,
     /// Whether this is a directory
     pub is_dir: bool,
+    /// Whether this is a symbolic link
+    pub is_symlink: bool,
+    /// Whether this is a hidden file (name starts with dot)
+    pub is_hidden: bool,
     /// File size in bytes (None for directories)
     pub size: Option<u64>,
     /// Last modified timestamp (Unix epoch seconds)

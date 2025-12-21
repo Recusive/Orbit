@@ -510,10 +510,19 @@ export async function getSettingsPath(): Promise<string> {
 // ============================================
 
 export interface FileEntry {
+  /** Full path to the file */
   path: string;
+  /** File name without directory */
   name: string;
+  /** Whether this is a directory */
   isDir: boolean;
+  /** Whether this is a symbolic link */
+  isSymlink: boolean;
+  /** Whether this is a hidden file (name starts with dot) */
+  isHidden: boolean;
+  /** File size in bytes (undefined for directories) */
   size?: number;
+  /** Last modified timestamp (Unix epoch seconds) */
   modified?: number;
 }
 

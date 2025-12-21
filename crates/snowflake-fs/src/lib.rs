@@ -106,26 +106,69 @@ pub async fn list_directory(path: &str, show_hidden: bool) -> Result<Vec<FileEnt
     })?;
 
     while let Some(entry) = dir.next_entry().await? {
-        let path = entry.path();
+        let entry_path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
 
+        // Determine if hidden (starts with dot)
+        let is_hidden = name.starts_with('.');
+
         // Skip hidden files if not requested
-        if !show_hidden && name.starts_with('.') {
+        if !show_hidden && is_hidden {
             continue;
         }
 
-        let metadata = entry.metadata().await.ok();
+        // Use symlink_metadata to detect symlinks without following them
+        let symlink_meta = fs::symlink_metadata(&entry_path).await.ok();
+        let is_symlink = symlink_meta
+            .as_ref()
+            .is_some_and(|m| m.file_type().is_symlink());
+
+        // For symlinks, get the target's metadata (follows the link)
+        // This is used for is_dir, size, and modified of the target
+        let target_meta = if is_symlink {
+            fs::metadata(&entry_path).await.ok()
+        } else {
+            None
+        };
+
+        // For is_dir: if symlink, check target; otherwise use symlink metadata
+        let is_dir = if is_symlink {
+            target_meta.as_ref().is_some_and(Metadata::is_dir)
+        } else {
+            symlink_meta.as_ref().is_some_and(Metadata::is_dir)
+        };
+
+        // For size: use target metadata for symlinks, symlink metadata otherwise
+        // Only show size for files (not directories)
+        let size = if is_symlink {
+            // For symlinks, get size of target if it's a file
+            if target_meta.as_ref().is_some_and(Metadata::is_file) {
+                target_meta.as_ref().map(Metadata::len)
+            } else {
+                None
+            }
+        } else if symlink_meta.as_ref().is_some_and(Metadata::is_file) {
+            symlink_meta.as_ref().map(Metadata::len)
+        } else {
+            None
+        };
+
+        // For modified time: use symlink's own modified time
+        // (when the link itself was last modified, not the target)
+        let modified = symlink_meta.as_ref().and_then(|m| {
+            m.modified()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs()))
+        });
 
         let file_entry = FileEntry {
-            path: path.to_string_lossy().into_owned(),
+            path: entry_path.to_string_lossy().into_owned(),
             name,
-            is_dir: path.is_dir(),
-            size: metadata.as_ref().map(Metadata::len),
-            modified: metadata.and_then(|m| {
-                m.modified()
-                    .ok()
-                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs()))
-            }),
+            is_dir,
+            is_symlink,
+            is_hidden,
+            size,
+            modified,
         };
 
         entries.push(file_entry);
@@ -686,6 +729,168 @@ mod tests {
         assert_eq!(data, read_data);
 
         delete_file(&test_path).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
+    #[expect(clippy::unwrap_used, reason = "tests use unwrap after assert")]
+    async fn test_file_entry_is_hidden() -> Result<()> {
+        let temp_dir = env::temp_dir().join("snowflake_fs_hidden_entry_test");
+        fs::create_dir_all(&temp_dir).await?;
+
+        // Create visible and hidden files
+        let visible = temp_dir.join("visible.txt");
+        let hidden = temp_dir.join(".hidden.txt");
+        write_file(&visible.to_string_lossy(), "visible").await?;
+        write_file(&hidden.to_string_lossy(), "hidden").await?;
+
+        // List with hidden files
+        let entries = list_directory(&temp_dir.to_string_lossy(), true).await?;
+
+        // Find the entries
+        let visible_entry = entries.iter().find(|e| e.name == "visible.txt");
+        let hidden_entry = entries.iter().find(|e| e.name == ".hidden.txt");
+
+        assert!(visible_entry.is_some(), "visible.txt should exist");
+        assert!(hidden_entry.is_some(), ".hidden.txt should exist");
+
+        assert!(
+            !visible_entry.unwrap().is_hidden,
+            "visible.txt should not be hidden"
+        );
+        assert!(
+            hidden_entry.unwrap().is_hidden,
+            ".hidden.txt should be hidden"
+        );
+
+        // Cleanup
+        delete_file(&visible.to_string_lossy()).await?;
+        delete_file(&hidden.to_string_lossy()).await?;
+
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
+    #[expect(clippy::unwrap_used, reason = "tests use unwrap after assert")]
+    async fn test_file_entry_symlink() -> Result<()> {
+        use std::os::unix::fs::symlink;
+
+        let temp_dir = env::temp_dir().join("snowflake_fs_symlink_test");
+        fs::create_dir_all(&temp_dir).await?;
+
+        // Create a regular file and a symlink to it
+        let original = temp_dir.join("original.txt");
+        let link = temp_dir.join("link.txt");
+
+        write_file(&original.to_string_lossy(), "original content").await?;
+        symlink(&original, &link).map_err(Error::Io)?;
+
+        // List directory
+        let entries = list_directory(&temp_dir.to_string_lossy(), false).await?;
+
+        // Find the entries
+        let original_entry = entries.iter().find(|e| e.name == "original.txt");
+        let link_entry = entries.iter().find(|e| e.name == "link.txt");
+
+        assert!(original_entry.is_some(), "original.txt should exist");
+        assert!(link_entry.is_some(), "link.txt should exist");
+
+        assert!(
+            !original_entry.unwrap().is_symlink,
+            "original.txt should not be a symlink"
+        );
+        assert!(
+            link_entry.unwrap().is_symlink,
+            "link.txt should be a symlink"
+        );
+        assert!(
+            !link_entry.unwrap().is_dir,
+            "link.txt should not be a directory"
+        );
+
+        // Cleanup
+        fs::remove_file(&link).await?;
+        delete_file(&original.to_string_lossy()).await?;
+
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
+    #[expect(clippy::unwrap_used, reason = "tests use unwrap after assert")]
+    async fn test_file_entry_symlink_to_directory() -> Result<()> {
+        use std::os::unix::fs::symlink;
+
+        let temp_dir = env::temp_dir().join("snowflake_fs_symlink_dir_test");
+        fs::create_dir_all(&temp_dir).await?;
+
+        // Create a directory and a symlink to it
+        let subdir = temp_dir.join("subdir");
+        let link = temp_dir.join("link_to_dir");
+
+        fs::create_dir_all(&subdir).await?;
+        symlink(&subdir, &link).map_err(Error::Io)?;
+
+        // List directory
+        let entries = list_directory(&temp_dir.to_string_lossy(), false).await?;
+
+        // Find the symlink entry
+        let link_entry = entries.iter().find(|e| e.name == "link_to_dir");
+
+        assert!(link_entry.is_some(), "link_to_dir should exist");
+        assert!(
+            link_entry.unwrap().is_symlink,
+            "link_to_dir should be a symlink"
+        );
+        assert!(
+            link_entry.unwrap().is_dir,
+            "link_to_dir should be a directory (follows symlink)"
+        );
+
+        // Cleanup
+        fs::remove_file(&link).await?;
+        fs::remove_dir(&subdir).await?;
+
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
+    #[expect(clippy::unwrap_used, reason = "tests use unwrap after assert")]
+    async fn test_file_entry_broken_symlink() -> Result<()> {
+        use std::os::unix::fs::symlink;
+
+        let temp_dir = env::temp_dir().join("snowflake_fs_broken_symlink_test");
+        fs::create_dir_all(&temp_dir).await?;
+
+        // Create a symlink to a non-existent file (broken symlink)
+        let non_existent = temp_dir.join("does_not_exist.txt");
+        let broken_link = temp_dir.join("broken_link.txt");
+
+        symlink(&non_existent, &broken_link).map_err(Error::Io)?;
+
+        // List directory
+        let entries = list_directory(&temp_dir.to_string_lossy(), false).await?;
+
+        // Find the broken symlink entry
+        let link_entry = entries.iter().find(|e| e.name == "broken_link.txt");
+
+        assert!(link_entry.is_some(), "broken_link.txt should exist");
+        let entry = link_entry.unwrap();
+        assert!(entry.is_symlink, "broken_link.txt should be a symlink");
+        // Broken symlinks should not be marked as directories (target doesn't exist)
+        assert!(!entry.is_dir, "broken symlink should not be a directory");
+        // Broken symlinks should have no size (target doesn't exist)
+        assert!(entry.size.is_none(), "broken symlink should have no size");
+
+        // Cleanup
+        fs::remove_file(&broken_link).await?;
 
         Ok(())
     }
