@@ -5,7 +5,8 @@
 
 pub mod commands;
 
-use commands::{ai, files, git, lsp, search, terminal, workspace};
+use commands::{ai, files, git, lsp, search, settings, terminal, workspace};
+use snowflake_settings::SettingsManager;
 use tauri_plugin_log::{Target, TargetKind};
 
 /// Log mode for the application.
@@ -111,7 +112,15 @@ fn build_log_plugin() -> tauri_plugin_log::Builder {
     reason = "tauri::generate_context! macro causes this"
 )]
 pub fn run() {
+    // Initialize settings manager and load settings
+    let settings_manager = SettingsManager::new();
+    if let Err(e) = settings_manager.load() {
+        log::warn!("Failed to load settings: {e}");
+    }
+
     let result = tauri::Builder::default()
+        // Managed state
+        .manage(settings_manager)
         // Plugins
         .plugin(build_log_plugin().build())
         .plugin(tauri_plugin_fs::init())
@@ -181,6 +190,13 @@ pub fn run() {
             // Workspace commands
             workspace::get_workspace_path,
             workspace::set_workspace_path,
+            // Settings commands
+            settings::get_settings,
+            settings::update_settings,
+            settings::add_recent_project,
+            settings::get_recent_projects,
+            settings::clear_recent_projects,
+            settings::get_settings_path,
         ])
         .run(tauri::generate_context!());
 

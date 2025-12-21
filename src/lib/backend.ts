@@ -446,6 +446,34 @@ export async function setWorkspacePath(path: string): Promise<void> {
 }
 
 // ============================================
+// Settings Operations
+// ============================================
+
+export async function getSettings(): Promise<Settings> {
+  return invoke<Settings>('get_settings');
+}
+
+export async function updateSettings(settings: Settings): Promise<void> {
+  return invoke('update_settings', { settings });
+}
+
+export async function addRecentProject(path: string): Promise<void> {
+  return invoke('add_recent_project', { path });
+}
+
+export async function getRecentProjects(): Promise<string[]> {
+  return invoke<string[]>('get_recent_projects');
+}
+
+export async function clearRecentProjects(): Promise<void> {
+  return invoke('clear_recent_projects');
+}
+
+export async function getSettingsPath(): Promise<string> {
+  return invoke<string>('get_settings_path');
+}
+
+// ============================================
 // Types
 // ============================================
 
@@ -658,6 +686,43 @@ export interface SaveDialogOptions {
   title?: string;
   defaultPath?: string;
   filters?: { name: string; extensions: string[] }[];
+}
+
+export interface EditorSettings {
+  fontFamily: string;
+  fontSize: number;
+  tabSize: number;
+  insertSpaces: boolean;
+  wordWrap: boolean;
+  lineNumbers: boolean;
+  minimap: boolean;
+  vimMode: boolean;
+}
+
+export interface ThemeSettings {
+  theme: string;
+  accentColor?: string;
+}
+
+export interface AISettings {
+  enabled: boolean;
+  inlineSuggestions: boolean;
+}
+
+export interface WindowState {
+  width: number;
+  height: number;
+  x?: number;
+  y?: number;
+  maximized: boolean;
+}
+
+export interface Settings {
+  editor: EditorSettings;
+  theme: ThemeSettings;
+  ai: AISettings;
+  windowState: WindowState;
+  recentProjects: string[];
 }
 
 // ============================================
