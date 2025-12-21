@@ -52,3 +52,7 @@ export type { UseGitStatusOptions, UseGitStatusResult } from './use-git-status';
 // File tree
 export { useFileTree, useFileTreeItem } from './use-file-tree';
 export type { UseFileTreeOptions, UseFileTreeResult, UseFileTreeItemResult } from './use-file-tree';
+
+// LSP
+export { useLsp } from './use-lsp';
+export type { UseLspResult } from './use-lsp';

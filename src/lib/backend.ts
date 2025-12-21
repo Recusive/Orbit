@@ -165,6 +165,38 @@ export async function lspDidClose(path: string): Promise<void> {
   return invoke('lsp_did_close', { path });
 }
 
+/**
+ * Start a language server for the given language.
+ * @param language - Language ID (e.g., "rust", "typescript", "python")
+ * @param rootPath - Workspace root path
+ */
+export async function lspStart(language: string, rootPath: string): Promise<void> {
+  return invoke('lsp_start', { language, rootPath });
+}
+
+/**
+ * Stop a language server.
+ * @param language - Language ID to stop
+ */
+export async function lspStop(language: string): Promise<void> {
+  return invoke('lsp_stop', { language });
+}
+
+/**
+ * Check if a language server is running.
+ * @param language - Language ID to check
+ */
+export async function lspIsRunning(language: string): Promise<boolean> {
+  return invoke<boolean>('lsp_is_running', { language });
+}
+
+/**
+ * Get list of running language servers.
+ */
+export async function lspRunningServers(): Promise<string[]> {
+  return invoke<string[]>('lsp_running_servers');
+}
+
 // ============================================
 // Terminal Operations
 // ============================================

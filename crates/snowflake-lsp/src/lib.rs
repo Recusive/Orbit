@@ -1567,6 +1567,105 @@ impl LspManager {
         client.did_close(Path::new(path)).await
     }
 
+    /// Start a language server for the given language.
+    ///
+    /// If the server is already running, returns Ok without restarting.
+    /// If a stale client exists (crashed server), it will be cleaned up first.
+    pub async fn start_server(&self, language: &str, root_path: &str) -> Result<()> {
+        let root = PathBuf::from(root_path);
+
+        // Get configuration first (before acquiring lock)
+        let config = default_config_for_language(language)
+            .ok_or_else(|| Error::Lsp(format!("Unsupported language: {}", language)))?;
+
+        // Use write lock for entire operation to prevent race conditions
+        let mut clients = self.clients.write().await;
+
+        // Check if already running
+        if let Some(existing) = clients.get(language) {
+            if existing.is_running().await {
+                info!(
+                    "Language server for {} already running, skipping start",
+                    language
+                );
+                return Ok(());
+            }
+            // Stale client exists (server crashed) - remove it
+            info!("Cleaning up stale {} language server", language);
+            let _removed = clients.remove(language);
+        }
+
+        // Create and start client
+        let client = Arc::new(LspClient::new(config, &root));
+        client.start().await?;
+
+        // Store client
+        let _prev = clients.insert(language.to_string(), Arc::clone(&client));
+
+        info!("Started language server for {} at {}", language, root_path);
+        Ok(())
+    }
+
+    /// Stop a language server for the given language.
+    pub async fn stop_server(&self, language: &str) -> Result<()> {
+        let client = {
+            let mut clients = self.clients.write().await;
+            clients.remove(language)
+        };
+
+        if let Some(client) = client {
+            client.shutdown().await?;
+            info!("Stopped language server for {}", language);
+        }
+
+        Ok(())
+    }
+
+    /// Check if a language server is running.
+    pub async fn is_server_running(&self, language: &str) -> bool {
+        let clients = self.clients.read().await;
+        if let Some(client) = clients.get(language) {
+            client.is_running().await
+        } else {
+            false
+        }
+    }
+
+    /// Get list of running language servers.
+    pub async fn running_servers(&self) -> Vec<String> {
+        // Collect clients first, then check status outside the lock
+        let clients_snapshot: Vec<(String, Arc<LspClient>)> = {
+            let clients = self.clients.read().await;
+            clients
+                .iter()
+                .map(|(lang, client)| (lang.clone(), Arc::clone(client)))
+                .collect()
+        };
+
+        let mut running = Vec::new();
+        for (language, client) in clients_snapshot {
+            if client.is_running().await {
+                running.push(language);
+            }
+        }
+        running
+    }
+
+    /// Stop all language servers.
+    pub async fn stop_all(&self) {
+        let clients = {
+            let mut clients = self.clients.write().await;
+            std::mem::take(&mut *clients)
+        };
+
+        for (language, client) in clients {
+            if let Err(e) = client.shutdown().await {
+                warn!("Error shutting down {} language server: {}", language, e);
+            }
+        }
+        info!("Stopped all language servers");
+    }
+
     /// Shutdown all language servers
     pub async fn shutdown_all(&self) -> Result<()> {
         let clients = self.clients.read().await;

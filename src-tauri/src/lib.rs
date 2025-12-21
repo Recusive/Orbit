@@ -159,6 +159,10 @@ pub fn run() {
             lsp::lsp_did_change,
             lsp::lsp_did_save,
             lsp::lsp_did_close,
+            lsp::lsp_start,
+            lsp::lsp_stop,
+            lsp::lsp_is_running,
+            lsp::lsp_running_servers,
             // Terminal commands
             terminal::terminal_create,
             terminal::terminal_write,

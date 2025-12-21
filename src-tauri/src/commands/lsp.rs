@@ -102,3 +102,31 @@ pub async fn lsp_did_close(path: String) -> Result<()> {
     let manager = get_lsp_manager().lock().await;
     manager.did_close(&path).await
 }
+
+/// Start a language server
+#[tauri::command]
+pub async fn lsp_start(language: String, root_path: String) -> Result<()> {
+    let manager = get_lsp_manager().lock().await;
+    manager.start_server(&language, &root_path).await
+}
+
+/// Stop a language server
+#[tauri::command]
+pub async fn lsp_stop(language: String) -> Result<()> {
+    let manager = get_lsp_manager().lock().await;
+    manager.stop_server(&language).await
+}
+
+/// Check if a language server is running
+#[tauri::command]
+pub async fn lsp_is_running(language: String) -> Result<bool> {
+    let manager = get_lsp_manager().lock().await;
+    Ok(manager.is_server_running(&language).await)
+}
+
+/// Get list of running language servers
+#[tauri::command]
+pub async fn lsp_running_servers() -> Result<Vec<String>> {
+    let manager = get_lsp_manager().lock().await;
+    Ok(manager.running_servers().await)
+}
