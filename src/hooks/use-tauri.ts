@@ -379,25 +379,30 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
 export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
   const { onMessage, debug = false } = options;
 
-  const [isConnected, setIsConnected] = useState(false);
-  const [isMockMode, setIsMockMode] = useState(false);
+  // Initialize connection state correctly from the start (no useEffect needed)
+  // This avoids state updates during commit phase which can cause infinite re-renders
+  const [isConnected] = useState(() => isTauriEnvironment());
+  const [isMockMode] = useState(() => !isTauriEnvironment());
   const handlerRef = useRef(onMessage);
 
-  handlerRef.current = onMessage;
+  // Use refs for connection state so postMessage callback stays stable
+  const isConnectedRef = useRef(isConnected);
+  const isMockModeRef = useRef(isMockMode);
 
-  // Initialize Tauri connection
+  handlerRef.current = onMessage;
+  isConnectedRef.current = isConnected;
+  isMockModeRef.current = isMockMode;
+
+  // Log connection status once on mount
   useEffect(() => {
-    const isTauri = isTauriEnvironment();
-    if (isTauri) {
-      setIsConnected(true);
-      setIsMockMode(false);
-      if (debug) console.warn('[Snowflake] Connected to Tauri backend');
-    } else {
-      setIsConnected(false);
-      setIsMockMode(true);
-      if (debug) console.warn('[Snowflake] Mock mode - no Tauri backend');
+    if (debug) {
+      if (isConnected && !isMockMode) {
+        console.warn('[Snowflake] Connected to Tauri backend');
+      } else {
+        console.warn('[Snowflake] Mock mode - no Tauri backend');
+      }
     }
-  }, [debug]);
+  }, [debug, isConnected, isMockMode]);
 
   // Listen for messages with Zod validation
   const processedUuids = useRef(new Set<string>());
@@ -459,6 +464,7 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
   }, [isConnected, isMockMode, debug]);
 
   // Send message with validation
+  // Uses refs for connection state so this callback reference stays stable
   const postMessage = useCallback(
     (message: WebviewMessage): void => {
       const result = WebviewMessageSchema.safeParse(message);
@@ -471,17 +477,18 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
         console.warn('[Snowflake] Sending:', message.type);
       }
 
-      if (isConnected && !isMockMode) {
+      // Use refs to avoid dependency on state (prevents infinite re-renders)
+      if (isConnectedRef.current && !isMockModeRef.current) {
         // Handle message via Tauri commands
         handleTauriMessage(message).catch((err: unknown) => {
           console.error('[Snowflake] Tauri message error:', err);
         });
-      } else if (isMockMode) {
+      } else if (isMockModeRef.current) {
         if (debug) console.warn('[Snowflake Mock]', message);
         handleMockMessage(message);
       }
     },
-    [isConnected, isMockMode, debug]
+    [debug]
   );
 
   return { postMessage, isConnected, isMockMode };

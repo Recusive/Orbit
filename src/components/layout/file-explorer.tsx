@@ -110,29 +110,64 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
     retryFolder,
   } = useFileTree();
 
-  // Get tree state for flattening - these selectors are stable (Immer)
-  const treeNodes = useFileStore((s) => s.treeNodes);
-  const expandedFolders = useFileStore((s) => s.expandedFolders);
-  // Get action directly from store (not via selector to avoid new reference each render)
-  const selectTreePath = useFileStore.getState().selectTreePath;
+  // Use stable selectors to trigger re-render when tree structure changes
+  const treeNodesVersion = useFileStore((s) => Object.keys(s.treeNodes).join(','));
+  const expandedFoldersVersion = useFileStore((s) => Array.from(s.expandedFolders).join(','));
+  const selectTreePath = useFileStore((s) => s.selectTreePath);
 
-  // Flatten tree for virtualization
-  // Recalculates when tree structure or expansion state changes
-  const flatItems = useMemo(
-    () => flattenTree(rootChildren, treeNodes, expandedFolders),
-    [rootChildren, treeNodes, expandedFolders]
+  // Stable ref for scroll container - must be defined before useVirtualizer
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  // Memoize flat items with stable dependencies
+  const flatItems = useMemo(() => {
+    void treeNodesVersion;
+    void expandedFoldersVersion;
+    const state = useFileStore.getState();
+    return flattenTree(rootChildren, state.treeNodes, state.expandedFolders);
+  }, [rootChildren, treeNodesVersion, expandedFoldersVersion]);
+
+  // CRITICAL: Memoize callbacks passed to useVirtualizer to prevent infinite loops
+  const getScrollElement = useCallback(() => parentRef.current, []);
+  const estimateSize = useCallback(() => ROW_HEIGHT, []);
+  const getItemKey = useCallback((index: number) => flatItems[index]?.path ?? index, [flatItems]);
+
+  // Initialize virtualizer with stable callbacks
+  const rowVirtualizer = useVirtualizer({
+    count: flatItems.length,
+    getScrollElement,
+    estimateSize,
+    overscan: OVERSCAN,
+    getItemKey,
+  });
+
+  // Memoize row interaction callbacks
+  const handleToggle = useCallback(
+    (path: string): void => {
+      toggleFolder(path);
+    },
+    [toggleFolder]
   );
 
-  // Virtualizer setup
-  const parentRef = useRef<HTMLDivElement>(null);
-  const virtualizer = useVirtualizer({
-    count: flatItems.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: OVERSCAN,
-    // Maintain scroll position when items change
-    getItemKey: (index) => flatItems[index]?.path ?? index,
-  });
+  const handleOpen = useCallback(
+    (path: string): void => {
+      openFile(path);
+    },
+    [openFile]
+  );
+
+  const handleSelect = useCallback(
+    (path: string | null): void => {
+      selectTreePath(path);
+    },
+    [selectTreePath]
+  );
+
+  const handleRetry = useCallback(
+    (path: string): void => {
+      retryFolder(path);
+    },
+    [retryFolder]
+  );
 
   const handleOpenQuickSearch = useCallback((): void => {
     window.dispatchEvent(new CustomEvent('openCommandPalette'));
@@ -142,7 +177,8 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
     return null;
   }
 
-  const virtualItems = virtualizer.getVirtualItems();
+  // Get virtual items once per render
+  const virtualItems = rowVirtualizer.getVirtualItems();
 
   return (
     <div className="flex flex-col h-full">
@@ -191,38 +227,39 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
               Retry
             </button>
           </div>
-        ) : isRootLoading && rootChildren.length === 0 ? (
+        ) : isRootLoading && flatItems.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
             <span className="text-sm">Loading...</span>
           </div>
-        ) : rootChildren.length === 0 ? (
+        ) : flatItems.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <span className="text-sm">No files found</span>
           </div>
         ) : (
           <div
             style={{
-              height: virtualizer.getTotalSize(),
+              height: rowVirtualizer.getTotalSize(),
               width: '100%',
               position: 'relative',
             }}
           >
-            {virtualItems.map((virtualRow) => {
-              const item = flatItems[virtualRow.index];
+            {virtualItems.map((virtualItem) => {
+              const item = flatItems[virtualItem.index];
               if (!item) return null;
+
               return (
                 <FileTreeRow
                   key={item.path}
                   path={item.path}
                   depth={item.depth}
                   node={item.node}
-                  top={virtualRow.start}
-                  height={virtualRow.size}
-                  onToggle={toggleFolder}
-                  onOpen={openFile}
-                  onSelect={selectTreePath}
-                  onRetry={retryFolder}
+                  top={virtualItem.start}
+                  height={virtualItem.size}
+                  onToggle={handleToggle}
+                  onOpen={handleOpen}
+                  onSelect={handleSelect}
+                  onRetry={handleRetry}
                 />
               );
             })}

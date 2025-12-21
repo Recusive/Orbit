@@ -81,18 +81,6 @@ const EMPTY_CHILDREN: readonly FileNode[] = [];
 export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult {
   const { autoLoad = true, debug = false } = options;
 
-  const { postMessage } = useTauri();
-
-  // Get only what we need from store (minimizes re-renders)
-  const rootPath = useFileStore((s) => s.rootPath);
-  const rootChildren = useFileStore((s) =>
-    s.rootPath ? (s.treeNodes[s.rootPath] ?? EMPTY_CHILDREN) : EMPTY_CHILDREN
-  );
-  const isRootLoading = useFileStore(
-    (s) => s.loadingPaths.has('__root__') || s.loadingPaths.has(s.rootPath ?? '')
-  );
-  const rootError = useFileStore((s) => s.errorPaths.get(s.rootPath ?? '__root__') ?? null);
-
   // Track pending requests: path -> { uuid, timeoutId }
   const pendingRequests = useRef(
     new Map<string, { uuid: string; timeoutId: ReturnType<typeof setTimeout> }>()
@@ -101,54 +89,10 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
   // Track previous treeNodes for detecting cleared cache
   const prevTreeNodesRef = useRef<Set<string>>(new Set());
 
-  // Request children for a path
-  const requestChildren = useCallback(
-    (path?: string): void => {
-      const store = useFileStore.getState();
-      const requestPath = path ?? store.rootPath ?? '';
+  // Guard to ensure autoLoad only runs once per mount
+  const hasAutoLoaded = useRef(false);
 
-      // Don't request if already pending
-      if (pendingRequests.current.has(requestPath)) {
-        if (debug) {
-          console.warn('[useFileTree] Skipping duplicate request for:', requestPath);
-        }
-        return;
-      }
-
-      const uuid = crypto.randomUUID();
-      const loadingKey = requestPath || '__root__';
-
-      // Set timeout for request
-      const timeoutId = setTimeout(() => {
-        const pending = pendingRequests.current.get(requestPath);
-        if (pending?.uuid === uuid) {
-          pendingRequests.current.delete(requestPath);
-          useFileStore.getState().setLoading(loadingKey, false);
-          useFileStore.getState().setError(loadingKey, 'Request timed out');
-          console.error('[useFileTree] Request timed out for:', requestPath);
-        }
-      }, REQUEST_TIMEOUT_MS);
-
-      pendingRequests.current.set(requestPath, { uuid, timeoutId });
-
-      // Clear any previous error and set loading
-      useFileStore.getState().clearError(loadingKey);
-      useFileStore.getState().setLoading(loadingKey, true);
-
-      if (debug) {
-        console.warn('[useFileTree] Requesting children for:', requestPath || '(root)');
-      }
-
-      postMessage({
-        type: 'file:tree:request',
-        uuid,
-        path: path,
-      });
-    },
-    [postMessage, debug]
-  );
-
-  // Handle incoming messages
+  // Handle incoming messages - defined before useTauri so we can pass it in
   const handleMessage = useCallback(
     (message: ExtensionMessage): void => {
       switch (message.type) {
@@ -281,22 +225,85 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
     [debug]
   );
 
-  // Set up message listener
-  useTauri({ onMessage: handleMessage });
+  // Single useTauri call - consolidates message handling and postMessage
+  const { postMessage } = useTauri({ onMessage: handleMessage });
+
+  // Get only what we need from store (minimizes re-renders)
+  const rootPath = useFileStore((s) => s.rootPath);
+  const rootChildren = useFileStore((s) =>
+    s.rootPath ? (s.treeNodes[s.rootPath] ?? EMPTY_CHILDREN) : EMPTY_CHILDREN
+  );
+  const isRootLoading = useFileStore(
+    (s) => s.loadingPaths.has('__root__') || s.loadingPaths.has(s.rootPath ?? '')
+  );
+  const rootError = useFileStore((s) => s.errorPaths.get(s.rootPath ?? '__root__') ?? null);
+
+  // Request children for a path
+  const requestChildren = useCallback(
+    (path?: string): void => {
+      const store = useFileStore.getState();
+      const requestPath = path ?? store.rootPath ?? '';
+
+      // Don't request if already pending
+      if (pendingRequests.current.has(requestPath)) {
+        if (debug) {
+          console.warn('[useFileTree] Skipping duplicate request for:', requestPath);
+        }
+        return;
+      }
+
+      const uuid = crypto.randomUUID();
+      const loadingKey = requestPath || '__root__';
+
+      // Set timeout for request
+      const timeoutId = setTimeout(() => {
+        const pending = pendingRequests.current.get(requestPath);
+        if (pending?.uuid === uuid) {
+          pendingRequests.current.delete(requestPath);
+          useFileStore.getState().setLoading(loadingKey, false);
+          useFileStore.getState().setError(loadingKey, 'Request timed out');
+          console.error('[useFileTree] Request timed out for:', requestPath);
+        }
+      }, REQUEST_TIMEOUT_MS);
+
+      pendingRequests.current.set(requestPath, { uuid, timeoutId });
+
+      // Clear any previous error and set loading
+      useFileStore.getState().clearError(loadingKey);
+      useFileStore.getState().setLoading(loadingKey, true);
+
+      if (debug) {
+        console.warn('[useFileTree] Requesting children for:', requestPath || '(root)');
+      }
+
+      postMessage({
+        type: 'file:tree:request',
+        uuid,
+        path: path,
+      });
+    },
+    [postMessage, debug]
+  );
 
   // Request root children on mount (if autoLoad enabled)
+  // Uses a ref guard to ensure this only runs once per mount
+  // Deferred via queueMicrotask to avoid synchronous re-render during commit
   useEffect(() => {
-    if (autoLoad) {
-      const store = useFileStore.getState();
-      if (Object.keys(store.treeNodes).length === 0) {
-        requestChildren();
-      }
+    if (autoLoad && !hasAutoLoaded.current) {
+      hasAutoLoaded.current = true;
+      queueMicrotask(() => {
+        const store = useFileStore.getState();
+        if (Object.keys(store.treeNodes).length === 0) {
+          requestChildren();
+        }
+      });
     }
   }, [autoLoad, requestChildren]);
 
   // Subscribe to treeNodes keys for detecting cleared folders
+  // Use Array.from instead of spread to handle Immer proxies more reliably
   const treeNodeKeys = useFileStore((s) => Object.keys(s.treeNodes).join(','));
-  const expandedFoldersList = useFileStore((s) => [...s.expandedFolders].join(','));
+  const expandedFoldersList = useFileStore((s) => Array.from(s.expandedFolders).join(','));
   const currentRootPath = useFileStore((s) => s.rootPath);
 
   // Re-fetch expanded folders when their children are cleared (e.g., by file watcher)

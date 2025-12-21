@@ -17,7 +17,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use snowflake_core::{Error, FileEntry, FileInfo, Result};
 use snowflake_fs::FileWatcher;
-use tauri::{AppHandle, Emitter as _};
+use tauri::{async_runtime, AppHandle, Emitter as _};
 use tokio::time::sleep;
 
 // ============================================
@@ -205,7 +205,7 @@ fn start_event_forwarder(app: AppHandle) {
         return;
     }
 
-    let _handle = tokio::spawn(async move {
+    let _handle = async_runtime::spawn(async move {
         log::debug!("File watcher event forwarder started");
 
         loop {
