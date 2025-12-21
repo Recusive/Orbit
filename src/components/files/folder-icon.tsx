@@ -10,13 +10,15 @@ export interface FolderIconProps {
   readonly isOpen?: boolean;
   readonly className?: string;
   readonly monochrome?: boolean;
+  readonly isSymlink?: boolean;
 }
 
 // Import all icons from the assets directory
-const iconModules = import.meta.glob<{ default: string }>(
-  '/src/assets/icons/*.svg',
-  { eager: true, query: '?url', import: 'default' }
-);
+const iconModules = import.meta.glob<{ default: string }>('/src/assets/icons/*.svg', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+});
 
 // Build a map of icon name to URL
 const iconMap: Record<string, string> = {};
@@ -32,11 +34,9 @@ export const FolderIcon: FC<FolderIconProps> = ({
   isOpen = false,
   className = '',
   monochrome = true,
+  isSymlink = false,
 }) => {
-  const iconName = useMemo(
-    () => getFolderIconName(folderName, isOpen),
-    [folderName, isOpen]
-  );
+  const iconName = useMemo(() => getFolderIconName(folderName, isOpen), [folderName, isOpen]);
 
   // Try to get the specific folder icon, fall back to default folder
   const iconUrl = iconMap[iconName] ?? iconMap[isOpen ? 'folder-open' : 'folder'];
@@ -45,7 +45,7 @@ export const FolderIcon: FC<FolderIconProps> = ({
     // Fallback to a simple folder representation
     return (
       <svg
-        className={cn('shrink-0', className)}
+        className={cn('shrink-0', isSymlink && 'opacity-60', className)}
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -70,6 +70,7 @@ export const FolderIcon: FC<FolderIconProps> = ({
       className={cn(
         'shrink-0',
         monochrome && 'dark:invert dark:brightness-90 opacity-80',
+        isSymlink && 'opacity-60',
         className
       )}
       draggable={false}

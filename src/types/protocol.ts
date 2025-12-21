@@ -855,6 +855,7 @@ export const FileNodeSchema = z.object({
   path: z.string(),
   isDirectory: z.boolean(),
   isFile: z.boolean(),
+  isSymlink: z.boolean().optional(),
 });
 
 export const FileTreeResponseSchema = z.object({

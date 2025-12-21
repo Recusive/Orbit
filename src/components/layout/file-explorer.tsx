@@ -113,7 +113,8 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
   // Get tree state for flattening - these selectors are stable (Immer)
   const treeNodes = useFileStore((s) => s.treeNodes);
   const expandedFolders = useFileStore((s) => s.expandedFolders);
-  const selectTreePath = useFileStore((s) => s.selectTreePath);
+  // Get action directly from store (not via selector to avoid new reference each render)
+  const selectTreePath = useFileStore.getState().selectTreePath;
 
   // Flatten tree for virtualization
   // Recalculates when tree structure or expansion state changes
@@ -318,9 +319,18 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
         {/* Icon */}
         <span className="w-4 h-4 flex items-center justify-center shrink-0 mr-1">
           {node.isDirectory ? (
-            <FolderIcon folderName={node.name} isOpen={isExpanded} className="h-4 w-4" />
+            <FolderIcon
+              folderName={node.name}
+              isOpen={isExpanded}
+              isSymlink={node.isSymlink ?? false}
+              className="h-4 w-4"
+            />
           ) : (
-            <FileIcon fileName={node.name} className="h-4 w-4" />
+            <FileIcon
+              fileName={node.name}
+              isSymlink={node.isSymlink ?? false}
+              className="h-4 w-4"
+            />
           )}
         </span>
 

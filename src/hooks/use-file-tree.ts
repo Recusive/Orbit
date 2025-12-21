@@ -294,13 +294,18 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
     }
   }, [autoLoad, requestChildren]);
 
+  // Subscribe to treeNodes keys for detecting cleared folders
+  const treeNodeKeys = useFileStore((s) => Object.keys(s.treeNodes).join(','));
+  const expandedFoldersList = useFileStore((s) => [...s.expandedFolders].join(','));
+  const currentRootPath = useFileStore((s) => s.rootPath);
+
   // Re-fetch expanded folders when their children are cleared (e.g., by file watcher)
   useEffect(() => {
-    const store = useFileStore.getState();
-    const currentPaths = new Set(Object.keys(store.treeNodes));
+    const currentPaths = new Set(treeNodeKeys.split(',').filter(Boolean));
+    const expandedFolders = new Set(expandedFoldersList.split(',').filter(Boolean));
 
     // Check for expanded folders that were loaded but now aren't
-    for (const folderPath of store.expandedFolders) {
+    for (const folderPath of expandedFolders) {
       const wasLoaded = prevTreeNodesRef.current.has(folderPath);
       const isLoaded = currentPaths.has(folderPath);
 
@@ -314,20 +319,20 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
     }
 
     // Also check root path
-    if (store.rootPath) {
-      const wasRootLoaded = prevTreeNodesRef.current.has(store.rootPath);
-      const isRootLoaded = currentPaths.has(store.rootPath);
-      if (wasRootLoaded && !isRootLoaded && !pendingRequests.current.has(store.rootPath)) {
+    if (currentRootPath) {
+      const wasRootLoaded = prevTreeNodesRef.current.has(currentRootPath);
+      const isRootLoaded = currentPaths.has(currentRootPath);
+      if (wasRootLoaded && !isRootLoaded && !pendingRequests.current.has(currentRootPath)) {
         if (debug) {
-          console.warn('[useFileTree] Re-fetching cleared root:', store.rootPath);
+          console.warn('[useFileTree] Re-fetching cleared root:', currentRootPath);
         }
-        requestChildren(store.rootPath);
+        requestChildren(currentRootPath);
       }
     }
 
     // Update ref for next comparison
     prevTreeNodesRef.current = currentPaths;
-  });
+  }, [treeNodeKeys, expandedFoldersList, currentRootPath, debug, requestChildren]);
 
   // Cleanup timeouts on unmount
   useEffect(() => {

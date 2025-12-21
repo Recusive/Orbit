@@ -248,6 +248,7 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
         path: entry.path,
         isDirectory: entry.isDir,
         isFile: !entry.isDir,
+        isSymlink: entry.isSymlink,
       }));
 
       window.postMessage(

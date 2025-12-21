@@ -14,7 +14,6 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use directories::ProjectDirs;
 use parking_lot::RwLock;
@@ -467,15 +466,13 @@ impl SettingsManager {
     }
 
     /// Generate a unique temp filename for atomic writes.
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "intentionally truncating nanos for uniqueness, not precision"
-    )]
     fn unique_temp_name() -> String {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |d| d.as_nanos() as u32);
-        format!("settings.json.{}.tmp", process::id() ^ nanos)
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+        // Use atomic counter to guarantee uniqueness across threads
+        let count = COUNTER.fetch_add(1, Ordering::Relaxed);
+        format!("settings.json.{}.{}.tmp", process::id(), count)
     }
 
     /// Save settings to disk without updating in-memory state.
