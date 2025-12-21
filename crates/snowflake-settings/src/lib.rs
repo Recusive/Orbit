@@ -936,21 +936,27 @@ mod tests {
 
     #[test]
     fn test_concurrent_save_load() {
-        use std::sync::Arc;
+        use std::sync::{Arc, Barrier};
         use std::thread;
 
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let config_dir = temp_dir.path().to_path_buf();
+
+        // Create config directory BEFORE creating manager
+        fs::create_dir_all(&config_dir).expect("Failed to create dir");
+
         let manager = Arc::new(SettingsManager::with_config_dir(config_dir));
         let _ = manager.load();
 
-        // Create config directory before spawning threads
-        fs::create_dir_all(manager.config_dir()).expect("Failed to create dir");
+        // Use a barrier to ensure all threads start together
+        let barrier = Arc::new(Barrier::new(10));
 
         let handles: Vec<_> = (0..10)
             .map(|i| {
                 let mgr = Arc::clone(&manager);
+                let bar = Arc::clone(&barrier);
                 thread::spawn(move || {
+                    let _ = bar.wait(); // Sync all threads
                     let path = format!("/project{}", i);
                     mgr.add_recent_project(Path::new(&path))
                         .expect("Failed to add");
@@ -965,8 +971,7 @@ mod tests {
         let recent = manager.recent_projects();
         assert_eq!(recent.len(), 10);
 
-        // Keep temp_dir alive until after all operations
-        drop(temp_dir);
+        // temp_dir lives until end of function
     }
 
     #[test]
