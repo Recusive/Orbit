@@ -4,12 +4,7 @@ import {
   closeBracketsKeymap,
   completionKeymap,
 } from '@codemirror/autocomplete';
-import {
-  defaultKeymap,
-  history,
-  historyKeymap,
-  indentWithTab,
-} from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { css } from '@codemirror/lang-css';
 import { go } from '@codemirror/lang-go';
 import { html } from '@codemirror/lang-html';
@@ -44,16 +39,15 @@ import {
   rectangularSelection,
 } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import type { CompletionItem } from '@/lib/backend';
 import type { Extension } from '@codemirror/state';
 import type { ViewUpdate } from '@codemirror/view';
 import type { FC } from 'react';
 
-import { getCompletions } from '@/lib/backend';
-
-
+import { useLsp } from '@/hooks/use-lsp';
+import { useFileStore } from '@/stores/file-store';
 
 // ============================================
 // Compartments for runtime reconfiguration
@@ -92,38 +86,41 @@ const languages: Record<string, LanguageFactory> = {
 // Custom dark theme (matches app background)
 // ============================================
 
-const darkTheme = EditorView.theme({
-  '&': {
-    backgroundColor: 'oklch(0.16 0.012 60)', // Same as --background in dark mode
-    color: '#e1e1e1',
+const darkTheme = EditorView.theme(
+  {
+    '&': {
+      backgroundColor: 'oklch(0.16 0.012 60)', // Same as --background in dark mode
+      color: '#e1e1e1',
+    },
+    '.cm-scroller': {
+      overflow: 'auto',
+    },
+    '.cm-content': {
+      caretColor: '#e1e1e1',
+    },
+    '&.cm-focused .cm-cursor': {
+      borderLeftColor: '#e1e1e1',
+    },
+    '.cm-dropCursor': {
+      borderLeftColor: '#e1e1e1',
+    },
+    '&.cm-focused .cm-selectionBackground, ::selection': {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    '.cm-gutters': {
+      backgroundColor: 'transparent',
+      color: 'oklch(0.55 0.03 60)', // Warm brown matching --muted-foreground
+      border: 'none',
+    },
+    '.cm-activeLineGutter': {
+      backgroundColor: 'transparent',
+    },
+    '.cm-activeLine': {
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    },
   },
-  '.cm-scroller': {
-    overflow: 'auto',
-  },
-  '.cm-content': {
-    caretColor: '#e1e1e1',
-  },
-  '&.cm-focused .cm-cursor': {
-    borderLeftColor: '#e1e1e1',
-  },
-  '.cm-dropCursor': {
-    borderLeftColor: '#e1e1e1',
-  },
-  '&.cm-focused .cm-selectionBackground, ::selection': {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  '.cm-gutters': {
-    backgroundColor: 'transparent',
-    color: 'oklch(0.55 0.03 60)', // Warm brown matching --muted-foreground
-    border: 'none',
-  },
-  '.cm-activeLineGutter': {
-    backgroundColor: 'transparent',
-  },
-  '.cm-activeLine': {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-}, { dark: true });
+  { dark: true }
+);
 
 // Custom syntax highlighting (similar to github-dark)
 const darkHighlightStyle = HighlightStyle.define([
@@ -254,6 +251,21 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const valueRef = useRef(value);
+  const versionRef = useRef(0);
+
+  // Get workspace root path for LSP
+  const rootPath = useFileStore((state) => state.rootPath);
+
+  // Initialize LSP hook
+  const lsp = useLsp(language, rootPath);
+
+  // Refs to access current values in callbacks without stale closures
+  const lspRef = useRef(lsp);
+  const filePathRef = useRef(filePath);
+  // Track which file is currently registered with LSP to prevent race conditions
+  const lspOpenedFileRef = useRef<string | null>(null);
+  lspRef.current = lsp;
+  filePathRef.current = filePath;
 
   // Get language extension
   const getLanguageExtension = useCallback((lang: string): Extension => {
@@ -261,9 +273,13 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
     return factory ? factory() : [];
   }, []);
 
-  // LSP completion source
-  const completionSource = useMemo(() => {
-    return async (context: { state: EditorState; pos: number; explicit: boolean }): Promise<{
+  // LSP completion source - uses refs to avoid stale closure in editor initialization
+  const completionSource = useCallback(
+    async (context: {
+      state: EditorState;
+      pos: number;
+      explicit: boolean;
+    }): Promise<{
       from: number;
       options: {
         label: string;
@@ -273,7 +289,10 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
         apply?: string;
       }[];
     } | null> => {
-      if (!filePath) return null;
+      const currentPath = filePathRef.current;
+      const currentLsp = lspRef.current;
+
+      if (!currentPath || !currentLsp.isRunning) return null;
 
       const { state, pos } = context;
       const line = state.doc.lineAt(pos);
@@ -281,7 +300,11 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
       const column = pos - line.from;
 
       try {
-        const completions: CompletionItem[] = await getCompletions(filePath, lineNumber, column);
+        const completions: CompletionItem[] = await currentLsp.getCompletions(
+          currentPath,
+          lineNumber,
+          column
+        );
         if (completions.length === 0) return null;
 
         return {
@@ -306,8 +329,9 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
       } catch {
         return null;
       }
-    };
-  }, [filePath]);
+    },
+    [] // No dependencies - uses refs for current values
+  );
 
   // Initialize editor
   useEffect(() => {
@@ -357,6 +381,12 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
           key: 'Mod-s',
           run: (): boolean => {
             onSave?.();
+            // Notify LSP that file was saved
+            const currentPath = filePathRef.current;
+            const currentLsp = lspRef.current;
+            if (currentPath && currentLsp.isRunning) {
+              void currentLsp.didSave(currentPath);
+            }
             return true;
           },
         },
@@ -364,7 +394,11 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
 
       // Compartments for runtime reconfiguration
       languageCompartment.of(getLanguageExtension(language)),
-      themeCompartment.of(theme === 'dark' ? [darkTheme, syntaxHighlighting(darkHighlightStyle)] : [lightTheme, syntaxHighlighting(lightHighlightStyle)]),
+      themeCompartment.of(
+        theme === 'dark'
+          ? [darkTheme, syntaxHighlighting(darkHighlightStyle)]
+          : [lightTheme, syntaxHighlighting(lightHighlightStyle)]
+      ),
       readOnlyCompartment.of(EditorState.readOnly.of(readOnly)),
 
       // Update listener
@@ -373,6 +407,14 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
           const newValue = update.state.doc.toString();
           valueRef.current = newValue;
           onChange?.(newValue);
+
+          // Notify LSP of document changes
+          const currentLsp = lspRef.current;
+          const currentPath = filePathRef.current;
+          if (currentPath && currentLsp.isRunning) {
+            versionRef.current += 1;
+            void currentLsp.didChange(currentPath, newValue, versionRef.current);
+          }
         }
       }),
 
@@ -433,6 +475,42 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
     valueRef.current = value;
   }, [value]);
 
+  // LSP lifecycle: didOpen when file opens, didClose on unmount or file change
+  useEffect(() => {
+    if (!filePath) {
+      // If filePath becomes null/undefined, close any previously opened file
+      const previousFile = lspOpenedFileRef.current;
+      if (previousFile) {
+        void lsp.didClose(previousFile);
+        lspOpenedFileRef.current = null;
+      }
+      return;
+    }
+
+    // Close previous file if different (handles rapid file switching)
+    const previousFile = lspOpenedFileRef.current;
+    if (previousFile && previousFile !== filePath) {
+      void lsp.didClose(previousFile);
+    }
+
+    // Open new file
+    lspOpenedFileRef.current = filePath;
+    void lsp.didOpen(filePath, language, valueRef.current);
+    // Reset version when opening a new file
+    versionRef.current = 0;
+
+    return (): void => {
+      // Only close if this file is still the one we opened
+      // (prevents race condition with rapid file switching)
+      if (lspOpenedFileRef.current === filePath) {
+        void lsp.didClose(filePath);
+        lspOpenedFileRef.current = null;
+      }
+    };
+    // Only trigger on filePath/language change, not lsp object changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filePath, language]);
+
   // Update language
   useEffect(() => {
     viewRef.current?.dispatch({
@@ -443,7 +521,11 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
   // Update theme
   useEffect(() => {
     viewRef.current?.dispatch({
-      effects: themeCompartment.reconfigure(theme === 'dark' ? [darkTheme, syntaxHighlighting(darkHighlightStyle)] : [lightTheme, syntaxHighlighting(lightHighlightStyle)]),
+      effects: themeCompartment.reconfigure(
+        theme === 'dark'
+          ? [darkTheme, syntaxHighlighting(darkHighlightStyle)]
+          : [lightTheme, syntaxHighlighting(lightHighlightStyle)]
+      ),
     });
   }, [theme]);
 
@@ -454,12 +536,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
     });
   }, [readOnly]);
 
-  return (
-    <div
-      ref={containerRef}
-      className={`h-full w-full overflow-hidden ${className ?? ''}`}
-    />
-  );
+  return <div ref={containerRef} className={`h-full w-full overflow-hidden ${className ?? ''}`} />;
 };
 
 // ============================================
@@ -469,31 +546,57 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
 function getCompletionType(kind: number): string {
   // LSP CompletionItemKind mapping
   switch (kind) {
-    case 1: return 'text';
-    case 2: return 'method';
-    case 3: return 'function';
-    case 4: return 'constructor';
-    case 5: return 'field';
-    case 6: return 'variable';
-    case 7: return 'class';
-    case 8: return 'interface';
-    case 9: return 'module';
-    case 10: return 'property';
-    case 11: return 'unit';
-    case 12: return 'value';
-    case 13: return 'enum';
-    case 14: return 'keyword';
-    case 15: return 'snippet';
-    case 16: return 'color';
-    case 17: return 'file';
-    case 18: return 'reference';
-    case 19: return 'folder';
-    case 20: return 'enum-member';
-    case 21: return 'constant';
-    case 22: return 'struct';
-    case 23: return 'event';
-    case 24: return 'operator';
-    case 25: return 'type';
-    default: return 'text';
+    case 1:
+      return 'text';
+    case 2:
+      return 'method';
+    case 3:
+      return 'function';
+    case 4:
+      return 'constructor';
+    case 5:
+      return 'field';
+    case 6:
+      return 'variable';
+    case 7:
+      return 'class';
+    case 8:
+      return 'interface';
+    case 9:
+      return 'module';
+    case 10:
+      return 'property';
+    case 11:
+      return 'unit';
+    case 12:
+      return 'value';
+    case 13:
+      return 'enum';
+    case 14:
+      return 'keyword';
+    case 15:
+      return 'snippet';
+    case 16:
+      return 'color';
+    case 17:
+      return 'file';
+    case 18:
+      return 'reference';
+    case 19:
+      return 'folder';
+    case 20:
+      return 'enum-member';
+    case 21:
+      return 'constant';
+    case 22:
+      return 'struct';
+    case 23:
+      return 'event';
+    case 24:
+      return 'operator';
+    case 25:
+      return 'type';
+    default:
+      return 'text';
   }
 }
