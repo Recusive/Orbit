@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { GitStatus } from '@/lib/backend';
+import type { FileStatus, GitStatus, StatusEntry } from '@/lib/backend';
 
 import { gitDiscover, gitStatus } from '@/lib/backend';
 
@@ -24,6 +24,14 @@ export interface UseGitStatusResult {
   error: Error | null;
   /** Manually refresh the status */
   refresh: () => Promise<void>;
+  /** Whether repo is clean (no changes) */
+  isClean: boolean;
+  /** Whether there are merge conflicts */
+  hasConflicts: boolean;
+  /** Total count of all changes */
+  totalChanges: number;
+  /** Get entries by status type */
+  getByStatus: (status: FileStatus) => StatusEntry[];
 }
 
 /**
@@ -206,11 +214,44 @@ export function useGitStatus(
     };
   }, [loadStatus, pollInterval, enabled, normalizedPath, pauseWhenHidden]);
 
+  // Derived values
+  const isClean =
+    !status ||
+    (status.staged.length === 0 &&
+      status.modified.length === 0 &&
+      status.untracked.length === 0 &&
+      status.conflicted.length === 0);
+
+  const hasConflicts = (status?.conflicted.length ?? 0) > 0;
+
+  const totalChanges =
+    (status?.staged.length ?? 0) +
+    (status?.modified.length ?? 0) +
+    (status?.untracked.length ?? 0) +
+    (status?.conflicted.length ?? 0);
+
+  const getByStatus = useCallback(
+    (fileStatus: FileStatus): StatusEntry[] => {
+      if (!status) return [];
+      return [
+        ...status.staged,
+        ...status.modified,
+        ...status.untracked,
+        ...status.conflicted,
+      ].filter((e) => e.status === fileStatus);
+    },
+    [status]
+  );
+
   return {
     status,
     repoPath,
     isLoading,
     error,
     refresh,
+    isClean,
+    hasConflicts,
+    totalChanges,
+    getByStatus,
   };
 }

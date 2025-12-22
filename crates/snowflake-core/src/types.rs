@@ -1,5 +1,7 @@
 //! Shared types for Snowflake
 
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 /// File entry returned by directory listing
@@ -184,32 +186,51 @@ pub struct TerminalInfo {
 }
 
 /// Git repository status
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitStatus {
-    /// Current branch name
+    /// Current branch name (empty if detached HEAD)
     pub branch: String,
-    /// Staged files
-    pub staged: Vec<String>,
-    /// Modified files (unstaged)
-    pub modified: Vec<String>,
-    /// Untracked files
-    pub untracked: Vec<String>,
-    /// Deleted files
-    pub deleted: Vec<String>,
-    /// Renamed files
-    pub renamed: Vec<RenamedFile>,
-    /// Conflicted files (merge conflicts)
-    pub conflicted: Vec<String>,
-    /// Commits ahead of remote
+    /// Upstream branch name if tracking
+    pub upstream: Option<String>,
+    /// Commits ahead of upstream
     pub ahead: u32,
-    /// Commits behind remote
+    /// Commits behind upstream
     pub behind: u32,
-    /// Whether working directory is clean
-    pub is_clean: bool,
+    /// Files staged for commit (in index)
+    pub staged: Vec<StatusEntry>,
+    /// Files modified but not staged (in working tree)
+    pub modified: Vec<StatusEntry>,
+    /// Untracked files
+    pub untracked: Vec<StatusEntry>,
+    /// Files with merge conflicts
+    pub conflicted: Vec<StatusEntry>,
 }
 
-/// Renamed file pair
+impl GitStatus {
+    /// Check if there are any changes.
+    #[must_use]
+    pub fn is_clean(&self) -> bool {
+        self.staged.is_empty()
+            && self.modified.is_empty()
+            && self.untracked.is_empty()
+            && self.conflicted.is_empty()
+    }
+
+    /// Get total count of changed files.
+    #[must_use]
+    pub fn total_changes(&self) -> usize {
+        self.staged.len() + self.modified.len() + self.untracked.len() + self.conflicted.len()
+    }
+
+    /// Check if there are conflicts.
+    #[must_use]
+    pub fn has_conflicts(&self) -> bool {
+        !self.conflicted.is_empty()
+    }
+}
+
+/// Renamed file pair (legacy - use StatusEntry instead)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RenamedFile {
@@ -217,6 +238,111 @@ pub struct RenamedFile {
     pub from: String,
     /// New file path
     pub to: String,
+}
+
+/// Status of a file in git.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum FileStatus {
+    /// File is newly added (staged).
+    Added,
+    /// File has been modified.
+    Modified,
+    /// File has been deleted.
+    Deleted,
+    /// File has been renamed.
+    Renamed,
+    /// File has been copied.
+    Copied,
+    /// File is untracked (not in git).
+    Untracked,
+    /// File has merge conflicts.
+    Conflicted,
+    /// File type changed (e.g., file to symlink).
+    TypeChange,
+}
+
+impl fmt::Display for FileStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Added => write!(f, "A"),
+            Self::Modified => write!(f, "M"),
+            Self::Deleted => write!(f, "D"),
+            Self::Renamed => write!(f, "R"),
+            Self::Copied => write!(f, "C"),
+            Self::Untracked => write!(f, "?"),
+            Self::Conflicted => write!(f, "U"),
+            Self::TypeChange => write!(f, "T"),
+        }
+    }
+}
+
+/// A file's status entry in git.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusEntry {
+    /// File path relative to repository root.
+    pub path: String,
+    /// Status type.
+    pub status: FileStatus,
+    /// Original path for renames/copies (None if not renamed/copied).
+    pub old_path: Option<String>,
+    /// Similarity percentage for renames/copies (0-100).
+    pub similarity: Option<u8>,
+}
+
+#[expect(
+    clippy::impl_trait_in_params,
+    reason = "ergonomic API for string-like types"
+)]
+impl StatusEntry {
+    /// Create a new status entry.
+    #[must_use]
+    pub fn new(path: impl Into<String>, status: FileStatus) -> Self {
+        Self {
+            path: path.into(),
+            status,
+            old_path: None,
+            similarity: None,
+        }
+    }
+
+    /// Create a renamed/moved entry.
+    #[must_use]
+    pub fn renamed(
+        old_path: impl Into<String>,
+        new_path: impl Into<String>,
+        similarity: Option<u8>,
+    ) -> Self {
+        Self {
+            path: new_path.into(),
+            status: FileStatus::Renamed,
+            old_path: Some(old_path.into()),
+            similarity,
+        }
+    }
+
+    /// Create a copied entry.
+    #[must_use]
+    pub fn copied(
+        source_path: impl Into<String>,
+        new_path: impl Into<String>,
+        similarity: Option<u8>,
+    ) -> Self {
+        Self {
+            path: new_path.into(),
+            status: FileStatus::Copied,
+            old_path: Some(source_path.into()),
+            similarity,
+        }
+    }
+
+    /// Check if this is a rename or copy.
+    #[must_use]
+    pub fn has_old_path(&self) -> bool {
+        self.old_path.is_some()
+    }
 }
 
 /// Git commit information

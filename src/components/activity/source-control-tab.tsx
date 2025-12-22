@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 
-import type { GitStatus } from '@/lib/backend';
+import type { FileStatus as BackendFileStatus, GitStatus } from '@/lib/backend';
 
 import { useGitStatus } from '@/hooks/use-git-status';
 import { gitCommit, gitDiscard, gitStage, gitUnstage } from '@/lib/backend';
@@ -26,27 +26,32 @@ export interface SourceControlTabProps {
   onPush?: () => void;
 }
 
-type FileStatus = 'staged' | 'modified' | 'untracked' | 'deleted' | 'renamed';
+// UI file status for display purposes
+type DisplayFileStatus = 'added' | 'modified' | 'untracked' | 'deleted' | 'renamed' | 'conflicted';
 
 interface FileItem {
   path: string;
-  status: FileStatus;
+  displayStatus: DisplayFileStatus;
+  /** Backend file status */
+  backendStatus: BackendFileStatus;
   /** Original path for renamed files */
-  oldPath?: string;
+  oldPath?: string | null;
 }
 
-function getStatusIcon(status: FileStatus): React.ReactNode {
+function getStatusIcon(status: DisplayFileStatus): React.ReactNode {
   switch (status) {
-    case 'staged':
-      return <Check className="h-3 w-3 text-green-500" />;
+    case 'added':
+      return <span className="text-green-500 text-xs font-bold">A</span>;
     case 'modified':
       return <span className="text-yellow-500 text-xs font-bold">M</span>;
     case 'untracked':
-      return <span className="text-green-500 text-xs font-bold">U</span>;
+      return <span className="text-gray-400 text-xs font-bold">U</span>;
     case 'deleted':
       return <span className="text-red-500 text-xs font-bold">D</span>;
     case 'renamed':
       return <span className="text-blue-500 text-xs font-bold">R</span>;
+    case 'conflicted':
+      return <span className="text-orange-500 text-xs font-bold">!</span>;
     default:
       return null;
   }
@@ -78,28 +83,66 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
   // Track ongoing operations to prevent concurrent actions
   const operationInProgress = useRef(false);
 
+  // Helper to convert backend status to display status
+  const toDisplayStatus = (backendStatus: BackendFileStatus): DisplayFileStatus => {
+    switch (backendStatus) {
+      case 'added':
+        return 'added';
+      case 'modified':
+        return 'modified';
+      case 'deleted':
+        return 'deleted';
+      case 'renamed':
+        return 'renamed';
+      case 'copied':
+        return 'renamed'; // Treat copies like renames for display
+      case 'untracked':
+        return 'untracked';
+      case 'conflicted':
+        return 'conflicted';
+      case 'typechange':
+        return 'modified'; // Treat typechange as modified for display
+      default:
+        return 'modified';
+    }
+  };
+
   // Build file lists from git status
+  // Note: Staged files keep their actual status (added/modified/deleted/renamed)
+  // The fact that they're staged is indicated by being in the "Staged Changes" section
   const stagedFiles = useMemo<FileItem[]>(
     () =>
-      (status?.staged ?? []).map((path) => ({
-        path,
-        status: 'staged' as const,
+      (status?.staged ?? []).map((entry) => ({
+        path: entry.path,
+        displayStatus: toDisplayStatus(entry.status),
+        backendStatus: entry.status,
+        oldPath: entry.oldPath,
       })),
     [status?.staged]
   );
 
   const unstagedFiles = useMemo<FileItem[]>(
     () => [
-      ...(status?.modified ?? []).map((path) => ({ path, status: 'modified' as const })),
-      ...(status?.untracked ?? []).map((path) => ({ path, status: 'untracked' as const })),
-      ...(status?.deleted ?? []).map((path) => ({ path, status: 'deleted' as const })),
-      ...(status?.renamed ?? []).map((r) => ({
-        path: r.to,
-        status: 'renamed' as const,
-        oldPath: r.from,
+      ...(status?.modified ?? []).map((entry) => ({
+        path: entry.path,
+        displayStatus: toDisplayStatus(entry.status),
+        backendStatus: entry.status,
+        oldPath: entry.oldPath,
+      })),
+      ...(status?.untracked ?? []).map((entry) => ({
+        path: entry.path,
+        displayStatus: 'untracked' as const,
+        backendStatus: entry.status,
+        oldPath: entry.oldPath,
+      })),
+      ...(status?.conflicted ?? []).map((entry) => ({
+        path: entry.path,
+        displayStatus: 'conflicted' as const,
+        backendStatus: entry.status,
+        oldPath: entry.oldPath,
       })),
     ],
-    [status?.modified, status?.untracked, status?.deleted, status?.renamed]
+    [status?.modified, status?.untracked, status?.conflicted]
   );
 
   // Clear operation error after 5 seconds
@@ -308,7 +351,11 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
         <div className="flex items-center gap-2 text-sm min-w-0">
           <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="font-medium truncate">{status.branch}</span>
+          <span
+            className={cn('font-medium truncate', !status.branch && 'text-muted-foreground italic')}
+          >
+            {status.branch || 'No commits yet'}
+          </span>
           <SyncStatus status={status} />
         </div>
         <button
@@ -536,11 +583,24 @@ const FileSection: React.FC<FileSectionProps> = ({
             key={file.path}
             className="group flex items-center gap-2 px-3 py-1 hover:bg-accent/50"
           >
-            <span className="w-4 flex justify-center shrink-0">{getStatusIcon(file.status)}</span>
+            <span className="w-4 flex justify-center shrink-0">
+              {getStatusIcon(file.displayStatus)}
+            </span>
             <div className="flex-1 min-w-0 text-sm">
-              <span className="truncate block">{getFileName(file.path)}</span>
+              {file.oldPath ? (
+                // Renamed file: show "oldName → newName"
+                <span className="truncate block">
+                  <span className="text-muted-foreground">{getFileName(file.oldPath)}</span>
+                  <span className="text-muted-foreground mx-1">→</span>
+                  <span>{getFileName(file.path)}</span>
+                </span>
+              ) : (
+                <span className="truncate block">{getFileName(file.path)}</span>
+              )}
               <span className="text-xs text-muted-foreground truncate block">
-                {getFileDirectory(file.path)}
+                {file.oldPath && getFileDirectory(file.oldPath) !== getFileDirectory(file.path)
+                  ? `${getFileDirectory(file.oldPath)} → ${getFileDirectory(file.path)}`
+                  : getFileDirectory(file.path)}
               </span>
             </div>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

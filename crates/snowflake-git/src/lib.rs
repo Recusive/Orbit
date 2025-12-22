@@ -10,43 +10,12 @@ use git2::{
     BlameOptions, Delta, DiffOptions, IndexAddOption, Repository, StatusOptions, StatusShow,
 };
 use serde::{Deserialize, Serialize};
-use snowflake_core::{Error, GitBranch, GitCommit, GitStatus, RenamedFile, Result};
+use snowflake_core::{Error, FileStatus, GitBranch, GitCommit, GitStatus, Result, StatusEntry};
 use tracing::debug;
 
 // ============================================
 // Additional Types (not in snowflake-core)
 // ============================================
-
-/// Status of a file in git.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-#[non_exhaustive]
-pub enum FileStatus {
-    /// File is newly added.
-    Added,
-    /// File has been modified.
-    Modified,
-    /// File has been deleted.
-    Deleted,
-    /// File has been renamed.
-    Renamed,
-    /// File has been copied.
-    Copied,
-    /// File is untracked.
-    Untracked,
-    /// File has conflicts.
-    Conflicted,
-}
-
-/// A single entry in the status list.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StatusEntry {
-    /// File path relative to repo root.
-    pub path: String,
-    /// File status.
-    pub status: FileStatus,
-}
 
 /// A single line in a diff.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -157,108 +126,176 @@ pub fn discover(path: &Path) -> Result<PathBuf> {
         .map_err(|e| Error::Git(format!("Failed to discover repository: {e}")))
 }
 
-/// Get the status of a git repository.
+/// Get the status of a git repository with detailed file information.
 ///
 /// # Errors
 /// Returns an error if the repository cannot be opened or status cannot be retrieved.
+#[expect(
+    clippy::cognitive_complexity,
+    clippy::too_many_lines,
+    reason = "Git status gathering is inherently complex with many checks"
+)]
 pub fn status(path: &Path) -> Result<GitStatus> {
+    debug!(?path, "Getting git status");
+
     let repo = open(path)?;
+    let mut result = GitStatus::default();
 
-    // Get current branch
-    let branch = get_current_branch(&repo)?;
+    // Get current branch and upstream info
+    if let Ok(head) = repo.head() {
+        if head.is_branch() {
+            // Regular branch
+            if let Some(name) = head.shorthand() {
+                name.clone_into(&mut result.branch);
+            }
 
-    // Get ahead/behind counts
-    let (ahead, behind) = get_ahead_behind(&repo).unwrap_or((0, 0));
+            // Get upstream tracking info (only for branches)
+            if let Some(name) = head.shorthand() {
+                if let Ok(branch) = repo.find_branch(name, git2::BranchType::Local) {
+                    if let Ok(upstream) = branch.upstream() {
+                        if let Ok(Some(upstream_name)) = upstream.name() {
+                            result.upstream = Some(upstream_name.to_owned());
+                        }
 
-    // Get file statuses
+                        // Get ahead/behind counts
+                        if let (Ok(local_oid), Ok(upstream_oid)) = (
+                            head.peel_to_commit().map(|c| c.id()),
+                            upstream.get().peel_to_commit().map(|c| c.id()),
+                        ) {
+                            if let Ok((ahead, behind)) =
+                                repo.graph_ahead_behind(local_oid, upstream_oid)
+                            {
+                                result.ahead = u32::try_from(ahead).unwrap_or(u32::MAX);
+                                result.behind = u32::try_from(behind).unwrap_or(u32::MAX);
+                            }
+                        }
+                    }
+                }
+            }
+        } else if let Some(oid) = head.target() {
+            // Detached HEAD - show short commit hash
+            result.branch = format!("HEAD@{}", &oid.to_string()[..7]);
+        }
+    }
+
+    // Get file statuses with rename detection
     let mut opts = StatusOptions::new();
     let _self = opts
         .show(StatusShow::IndexAndWorkdir)
         .include_untracked(true)
         .include_ignored(false)
-        .recurse_untracked_dirs(true);
+        .recurse_untracked_dirs(true)
+        .renames_head_to_index(true)
+        .renames_index_to_workdir(true)
+        .renames_from_rewrites(true);
 
     let statuses = repo
         .statuses(Some(&mut opts))
         .map_err(|e| Error::Git(format!("Failed to get status: {e}")))?;
 
-    let mut staged = Vec::new();
-    let mut modified = Vec::new();
-    let mut untracked = Vec::new();
-    let mut deleted = Vec::new();
-    let mut renamed = Vec::new();
-    let mut conflicted = Vec::new();
-
     for entry in statuses.iter() {
-        let status = entry.status();
-        let path_str = entry.path().unwrap_or_default().to_owned();
+        // Skip entries with empty or invalid paths
+        let Some(path_str) = entry.path().map(String::from) else {
+            continue;
+        };
+        if path_str.is_empty() {
+            continue;
+        }
 
-        // Check for conflicts first
-        if status.is_conflicted() {
-            conflicted.push(path_str.clone());
+        let s = entry.status();
+
+        // === CONFLICTED FILES (check first) ===
+        if s.is_conflicted() {
+            result
+                .conflicted
+                .push(StatusEntry::new(&path_str, FileStatus::Conflicted));
             continue; // Don't add conflicted files to other categories
         }
 
-        // Index (staged) changes
-        if status.is_index_new() {
-            staged.push(path_str.clone());
-        }
-        if status.is_index_modified() {
-            staged.push(path_str.clone());
-        }
-        if status.is_index_deleted() {
-            staged.push(path_str.clone());
-        }
-        if status.is_index_renamed() {
-            // For renamed files, try to get the old path
-            if let Some(diff_delta) = entry.head_to_index() {
-                let old_path = diff_delta
-                    .old_file()
-                    .path()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                renamed.push(RenamedFile {
-                    from: old_path,
-                    to: path_str.clone(),
-                });
-            }
-            staged.push(path_str.clone());
+        // === INDEX (STAGED) CHANGES ===
+        if s.is_index_new() {
+            result
+                .staged
+                .push(StatusEntry::new(&path_str, FileStatus::Added));
+        } else if s.is_index_modified() {
+            result
+                .staged
+                .push(StatusEntry::new(&path_str, FileStatus::Modified));
+        } else if s.is_index_deleted() {
+            result
+                .staged
+                .push(StatusEntry::new(&path_str, FileStatus::Deleted));
+        } else if s.is_index_renamed() {
+            let (old_path, similarity) = get_rename_info(&entry, true);
+            result.staged.push(StatusEntry::renamed(
+                old_path.unwrap_or_default(),
+                &path_str,
+                similarity,
+            ));
+        } else if s.is_index_typechange() {
+            result
+                .staged
+                .push(StatusEntry::new(&path_str, FileStatus::TypeChange));
         }
 
-        // Worktree changes (unstaged)
-        if status.is_wt_modified() {
-            modified.push(path_str.clone());
+        // === WORKING TREE (UNSTAGED) CHANGES ===
+        if s.is_wt_modified() {
+            result
+                .modified
+                .push(StatusEntry::new(&path_str, FileStatus::Modified));
+        } else if s.is_wt_deleted() {
+            result
+                .modified
+                .push(StatusEntry::new(&path_str, FileStatus::Deleted));
+        } else if s.is_wt_renamed() {
+            let (old_path, similarity) = get_rename_info(&entry, false);
+            result.modified.push(StatusEntry::renamed(
+                old_path.unwrap_or_default(),
+                &path_str,
+                similarity,
+            ));
+        } else if s.is_wt_typechange() {
+            result
+                .modified
+                .push(StatusEntry::new(&path_str, FileStatus::TypeChange));
         }
-        if status.is_wt_deleted() {
-            deleted.push(path_str.clone());
-        }
-        if status.is_wt_new() {
-            untracked.push(path_str);
+
+        // === UNTRACKED FILES ===
+        if s.is_wt_new() {
+            result
+                .untracked
+                .push(StatusEntry::new(&path_str, FileStatus::Untracked));
         }
     }
 
     // Log if there are conflicts
-    if !conflicted.is_empty() {
-        debug!("Found {} conflicted files", conflicted.len());
+    if !result.conflicted.is_empty() {
+        debug!("Found {} conflicted files", result.conflicted.len());
     }
 
-    let is_clean = staged.is_empty()
-        && modified.is_empty()
-        && untracked.is_empty()
-        && deleted.is_empty()
-        && conflicted.is_empty();
+    Ok(result)
+}
 
-    Ok(GitStatus {
-        branch,
-        staged,
-        modified,
-        untracked,
-        deleted,
-        renamed,
-        conflicted,
-        ahead,
-        behind,
-        is_clean,
+/// Extract rename info from a status entry.
+///
+/// Note: The git2 crate doesn't expose similarity scores directly,
+/// so we return None for similarity.
+fn get_rename_info(entry: &git2::StatusEntry<'_>, index: bool) -> (Option<String>, Option<u8>) {
+    let diff_delta = if index {
+        entry.head_to_index()
+    } else {
+        entry.index_to_workdir()
+    };
+
+    diff_delta.map_or((None, None), |delta| {
+        let old_path = delta
+            .old_file()
+            .path()
+            .and_then(|p| p.to_str())
+            .map(String::from);
+
+        // Note: git2 crate doesn't expose similarity scores from DiffDelta
+        (old_path, None)
     })
 }
 
@@ -768,33 +805,6 @@ fn get_current_branch(repo: &Repository) -> Result<String> {
             .ok_or_else(|| Error::Git("Failed to get HEAD target".to_owned()))?;
         Ok(oid.to_string().chars().take(7).collect())
     }
-}
-
-/// Get the ahead/behind counts relative to upstream.
-fn get_ahead_behind(repo: &Repository) -> Result<(u32, u32)> {
-    let head = repo.head().ok();
-    let head_ref = head.as_ref();
-
-    if let Some(head) = head_ref {
-        if let Some(name) = head.name() {
-            if let Ok(local_oid) = repo.refname_to_id(name) {
-                // Try to find upstream branch
-                let upstream_name = format!("{name}@{{upstream}}");
-                if let Ok(upstream_oid) = repo.refname_to_id(&upstream_name) {
-                    let (ahead, behind) = repo
-                        .graph_ahead_behind(local_oid, upstream_oid)
-                        .map_err(|e| Error::Git(format!("Failed to get ahead/behind: {e}")))?;
-
-                    return Ok((
-                        u32::try_from(ahead).unwrap_or(u32::MAX),
-                        u32::try_from(behind).unwrap_or(u32::MAX),
-                    ));
-                }
-            }
-        }
-    }
-
-    Ok((0, 0))
 }
 
 /// Parse a git diff into our FileDiff structures.

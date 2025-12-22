@@ -609,16 +609,53 @@ export interface TerminalExitEvent {
   code: number;
 }
 
+/**
+ * File status in git.
+ */
+export type FileStatus =
+  | 'added'
+  | 'modified'
+  | 'deleted'
+  | 'renamed'
+  | 'copied'
+  | 'untracked'
+  | 'conflicted'
+  | 'typechange';
+
+/**
+ * A file's status entry in git.
+ */
+export interface StatusEntry {
+  /** File path relative to repository root */
+  path: string;
+  /** Status type */
+  status: FileStatus;
+  /** Original path for renames/copies */
+  oldPath: string | null;
+  /** Similarity percentage for renames/copies (0-100) */
+  similarity: number | null;
+}
+
+/**
+ * Complete git repository status.
+ */
 export interface GitStatus {
+  /** Current branch name (empty if detached HEAD) */
   branch: string;
-  staged: string[];
-  modified: string[];
-  untracked: string[];
-  deleted: string[];
-  renamed: { from: string; to: string }[];
+  /** Upstream branch name if tracking */
+  upstream: string | null;
+  /** Number of commits ahead of upstream */
   ahead: number;
+  /** Number of commits behind upstream */
   behind: number;
-  isClean: boolean;
+  /** Files staged for commit (in index) */
+  staged: StatusEntry[];
+  /** Files modified but not staged (in working tree) */
+  modified: StatusEntry[];
+  /** Untracked files */
+  untracked: StatusEntry[];
+  /** Files with merge conflicts */
+  conflicted: StatusEntry[];
 }
 
 export interface GitCommit {
