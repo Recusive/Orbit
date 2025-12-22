@@ -369,6 +369,119 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
     return;
   }
 
+  // Handle conversation creation
+  if (message.type === 'conversation:create') {
+    const sessionId = crypto.randomUUID();
+    window.postMessage(
+      {
+        type: 'conversation:created',
+        uuid: crypto.randomUUID(),
+        session_id: sessionId,
+        title: message.title ?? 'New Conversation',
+      },
+      '*'
+    );
+    return;
+  }
+
+  // Handle conversation list request
+  if (message.type === 'conversation:list') {
+    // TODO: Implement persistent conversation storage
+    // For now, return empty list (conversations are in-memory only)
+    window.postMessage(
+      {
+        type: 'conversation:list',
+        uuid: crypto.randomUUID(),
+        conversations: [],
+      },
+      '*'
+    );
+    return;
+  }
+
+  // Handle conversation load request
+  if (message.type === 'conversation:load') {
+    // TODO: Implement persistent conversation storage
+    // For now, return empty conversation (no persistence yet)
+    window.postMessage(
+      {
+        type: 'conversation:loaded',
+        uuid: crypto.randomUUID(),
+        session_id: message.session_id,
+        title: 'Loaded Conversation',
+        messages: [],
+      },
+      '*'
+    );
+    return;
+  }
+
+  // Handle conversation rewind request
+  if (message.type === 'conversation:rewind') {
+    // TODO: Implement conversation history management
+    window.postMessage(
+      {
+        type: 'conversation:rewound',
+        uuid: crypto.randomUUID(),
+        session_id: message.session_id,
+        new_session_id: message.session_id,
+        rewind_to_message_id: message.message_id,
+        messages: [],
+      },
+      '*'
+    );
+    return;
+  }
+
+  // Handle file list request (for file search/picker)
+  if (message.type === 'file:list:request') {
+    try {
+      const storedPath = await getWorkspacePath();
+      const workspacePath = storedPath ?? '/Users/no9labs/Developer/Recursive/Snowflake-v0';
+
+      // Get all files recursively (flatten the tree)
+      // For now, just list the root directory files
+      const entries = await listDirectory(workspacePath, false);
+      const files = entries
+        .filter((entry: FileEntry) => !entry.isDir)
+        .map((entry: FileEntry) => ({
+          name: entry.name,
+          path: entry.path,
+        }));
+
+      window.postMessage(
+        {
+          type: 'file:list:response',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          files,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to list files';
+      console.error('[Snowflake] File list error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'file:list:response',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          files: [],
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // TODO: AI SDK Integration needed for message:send
+  // This requires integrating with Claude API via the snowflake-ai crate
+  // The handler should:
+  // 1. Send the message to Claude API
+  // 2. Stream responses back via agent:chunk messages
+  // 3. Send agent:complete when done
+  // 4. Handle tool calls (tool:start, tool:end)
+
   // Other message types are handled elsewhere or not applicable
 }
 
