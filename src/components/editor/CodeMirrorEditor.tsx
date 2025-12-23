@@ -51,6 +51,7 @@ import type { FC } from 'react';
 import { useFileDiagnostics } from '@/hooks/use-file-diagnostics';
 import { useLsp } from '@/hooks/use-lsp';
 import { useFileStore } from '@/stores/file-store';
+import { useFileViewerStore } from '@/stores/file-viewer-store';
 
 // ============================================
 // Compartments for runtime reconfiguration
@@ -585,6 +586,14 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
             versionRef.current += 1;
             void currentLsp.didChange(currentPath, newValue, versionRef.current);
           }
+        }
+
+        // Update cursor position on selection changes
+        if (update.selectionSet || update.docChanged) {
+          const pos = update.state.selection.main.head;
+          const line = update.state.doc.lineAt(pos);
+          // Status bar uses 1-indexed line/column
+          useFileViewerStore.getState().setCursorPosition(line.number, pos - line.from + 1);
         }
       }),
 

@@ -34,10 +34,19 @@ export interface GotoPosition {
   id: number;
 }
 
+// Cursor position for status bar display
+export interface CursorPosition {
+  line: number; // 1-indexed for display
+  column: number; // 1-indexed for display
+}
+
 interface FileViewerState {
   // Open file tabs
   openTabs: ViewedFile[];
   activeTabPath: string | null;
+
+  // Cursor position (for status bar)
+  cursorPosition: CursorPosition;
 
   // Navigation history
   history: string[];
@@ -82,6 +91,9 @@ interface FileViewerActions {
   // Goto line/column (for diagnostics, etc.)
   gotoPosition: (path: string, line: number, column: number, content?: string) => void;
   clearPendingGoto: () => void;
+
+  // Cursor position (for status bar)
+  setCursorPosition: (line: number, column: number) => void;
 
   // Loading
   setLoading: (isLoading: boolean, path?: string) => void;
@@ -151,6 +163,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
     // Initial state
     openTabs: [],
     activeTabPath: null,
+    cursorPosition: { line: 1, column: 1 },
     history: [],
     historyIndex: -1,
     isLoading: false,
@@ -437,6 +450,12 @@ export const useFileViewerStore = create<FileViewerStore>()(
         state.pendingGoto = null;
       });
     },
+
+    setCursorPosition: (line: number, column: number): void => {
+      set((state) => {
+        state.cursorPosition = { line, column };
+      });
+    },
   }))
 );
 
@@ -461,4 +480,8 @@ export const useFileViewerLoading = (): { isLoading: boolean; path: string | nul
   const isLoading = useFileViewerStore((state) => state.isLoading);
   const path = useFileViewerStore((state) => state.loadingPath);
   return { isLoading, path };
+};
+
+export const useCursorPosition = (): CursorPosition => {
+  return useFileViewerStore((state) => state.cursorPosition);
 };

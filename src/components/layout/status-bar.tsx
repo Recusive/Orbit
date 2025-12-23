@@ -1,8 +1,18 @@
-import { AlertCircle, ArrowDown, ArrowUp, GitBranch } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  CheckCircle2,
+  GitBranch,
+  XCircle,
+} from 'lucide-react';
 
 import type { FC } from 'react';
 
+import { useDiagnostics } from '@/hooks/use-diagnostics';
 import { cn } from '@/lib/utils';
+import { useActiveFile, useCursorPosition } from '@/stores/file-viewer-store';
 import {
   selectAhead,
   selectBehind,
@@ -16,24 +26,93 @@ export interface StatusBarProps {
 }
 
 /** Maximum length for branch name before truncation */
-const MAX_BRANCH_LENGTH = 30;
+const MAX_BRANCH_LENGTH = 20;
 
 /**
  * Truncate a branch name if it exceeds max length
  */
 function truncateBranch(branch: string, maxLength: number = MAX_BRANCH_LENGTH): string {
   if (branch.length <= maxLength) return branch;
-  // Keep first and last parts with ellipsis in middle
   const halfLength = Math.floor((maxLength - 3) / 2);
   return `${branch.slice(0, halfLength)}...${branch.slice(-halfLength)}`;
 }
 
 /**
- * StatusBar displays git branch info and sync status.
- * Uses git store selectors for optimized re-renders - only updates when relevant state changes.
+ * Get display name for a language
+ */
+function getLanguageDisplayName(language: string): string {
+  const displayNames: Record<string, string> = {
+    typescript: 'TypeScript',
+    tsx: 'TypeScript JSX',
+    javascript: 'JavaScript',
+    jsx: 'JavaScript JSX',
+    json: 'JSON',
+    markdown: 'Markdown',
+    css: 'CSS',
+    scss: 'SCSS',
+    less: 'Less',
+    html: 'HTML',
+    xml: 'XML',
+    yaml: 'YAML',
+    python: 'Python',
+    ruby: 'Ruby',
+    go: 'Go',
+    rust: 'Rust',
+    java: 'Java',
+    c: 'C',
+    cpp: 'C++',
+    csharp: 'C#',
+    php: 'PHP',
+    swift: 'Swift',
+    kotlin: 'Kotlin',
+    bash: 'Shell Script',
+    sql: 'SQL',
+    graphql: 'GraphQL',
+    vue: 'Vue',
+    svelte: 'Svelte',
+    toml: 'TOML',
+    ini: 'INI',
+    dockerfile: 'Dockerfile',
+    makefile: 'Makefile',
+    dotenv: 'Environment',
+    plaintext: 'Plain Text',
+  };
+  return displayNames[language] ?? language;
+}
+
+/**
+ * Status bar item component
+ */
+interface StatusItemProps {
+  children: React.ReactNode;
+  title?: string;
+  onClick?: () => void;
+  className?: string;
+}
+
+const StatusItem: FC<StatusItemProps> = ({ children, title, onClick, className }) => {
+  const baseClasses = 'flex items-center gap-1 px-1.5 py-0.5 text-[11px] leading-none';
+  const interactiveClasses = onClick ? 'hover:bg-accent/50 cursor-pointer rounded-sm' : '';
+
+  return (
+    <div
+      className={cn(baseClasses, interactiveClasses, className)}
+      title={title}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
+      {children}
+    </div>
+  );
+};
+
+/**
+ * StatusBar displays git info, cursor position, and file info.
+ * Styled similar to VS Code's status bar.
  */
 export const StatusBar: FC<StatusBarProps> = ({ className }) => {
-  // Optimized subscriptions - each selector only triggers re-render when its value changes
+  // Git state
   const branch = useGitStore(selectBranch);
   const ahead = useGitStore(selectAhead);
   const behind = useGitStore(selectBehind);
@@ -42,88 +121,142 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
   const error = useGitStore((s) => s.error);
   const repoPath = useGitStore((s) => s.repoPath);
 
-  // Determine if we're in a git repo (have repo path but may not have status yet)
+  // File state
+  const activeFile = useActiveFile();
+  const cursorPosition = useCursorPosition();
+
+  // Diagnostics (LSP problems)
+  const { totalErrors, totalWarnings } = useDiagnostics();
+
   const isGitRepo = repoPath !== null;
+  const hasFile = activeFile !== null;
+  const hasProblems = totalErrors > 0 || totalWarnings > 0;
 
   return (
     <div
       className={cn(
-        'h-6 flex items-center justify-between px-2 text-xs',
+        'h-[22px] flex items-center justify-between px-3',
         'bg-sidebar border-t border-border',
         'text-muted-foreground',
         className
       )}
     >
       {/* Left section - Git info */}
-      <div className="flex items-center gap-3 min-w-0">
-        {/* Error indicator */}
+      <div className="flex items-center gap-0.5 min-w-0">
+        {/* Git branch */}
         {error ? (
-          <div className="flex items-center gap-1.5 text-destructive" title={`Git error: ${error}`}>
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate max-w-[150px]">Git error</span>
-          </div>
+          <StatusItem title={`Git error: ${error}`} className="text-destructive">
+            <AlertCircle className="h-3 w-3" />
+            <span>error</span>
+          </StatusItem>
         ) : branch ? (
-          /* Branch - only show if we have branch info */
-          <div className="flex items-center gap-1.5 min-w-0">
-            <GitBranch className="h-3.5 w-3.5 shrink-0" />
-            <span
-              className="font-medium truncate"
-              title={branch.length > MAX_BRANCH_LENGTH ? branch : undefined}
-            >
-              {truncateBranch(branch)}
-            </span>
-          </div>
+          <StatusItem title={branch.length > MAX_BRANCH_LENGTH ? branch : `Branch: ${branch}`}>
+            <GitBranch className="h-3 w-3" />
+            <span className="truncate max-w-[100px]">{truncateBranch(branch)}</span>
+            {/* Sync indicators inline */}
+            {ahead > 0 || behind > 0 ? (
+              <span className="flex items-center gap-0.5 ml-0.5">
+                {behind > 0 ? (
+                  <>
+                    <ArrowDown className="h-2.5 w-2.5" />
+                    <span>{behind}</span>
+                  </>
+                ) : null}
+                {ahead > 0 ? (
+                  <>
+                    <ArrowUp className="h-2.5 w-2.5" />
+                    <span>{ahead}</span>
+                  </>
+                ) : null}
+              </span>
+            ) : null}
+          </StatusItem>
         ) : isGitRepo ? (
-          /* In a git repo but no branch yet (loading or detached HEAD) */
-          <div className="flex items-center gap-1.5 text-muted-foreground/70">
-            <GitBranch className="h-3.5 w-3.5 shrink-0" />
-            <span className="italic">detached</span>
-          </div>
+          <StatusItem title="Detached HEAD">
+            <GitBranch className="h-3 w-3" />
+            <span className="italic opacity-70">detached</span>
+          </StatusItem>
         ) : null}
 
-        {/* Sync status - only show if we have a branch */}
-        {branch && (ahead > 0 || behind > 0) ? (
-          <div className="flex items-center gap-1.5">
-            {ahead > 0 ? (
-              <span
-                className="flex items-center gap-0.5"
-                title={`${String(ahead)} commit${ahead !== 1 ? 's' : ''} ahead of upstream`}
-              >
-                <ArrowUp className="h-3 w-3" />
-                {ahead}
-              </span>
-            ) : null}
-            {behind > 0 ? (
-              <span
-                className="flex items-center gap-0.5"
-                title={`${String(behind)} commit${behind !== 1 ? 's' : ''} behind upstream`}
-              >
-                <ArrowDown className="h-3 w-3" />
-                {behind}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-
-        {/* Changes count - only show if we have changes */}
+        {/* Changes indicator */}
         {totalChanges > 0 ? (
-          <span
-            className="text-yellow-500"
+          <StatusItem
             title={`${String(totalChanges)} uncommitted change${totalChanges !== 1 ? 's' : ''}`}
           >
-            {totalChanges} change{totalChanges !== 1 ? 's' : ''}
-          </span>
+            <span className="text-yellow-500">●</span>
+            <span>{totalChanges}</span>
+          </StatusItem>
         ) : null}
 
-        {/* Loading indicator - only during initial load or refresh */}
+        {/* Loading indicator */}
         {isLoading ? (
-          <span className="text-muted-foreground/50 animate-pulse">syncing...</span>
+          <StatusItem>
+            <span className="animate-pulse opacity-50">syncing...</span>
+          </StatusItem>
+        ) : null}
+
+        {/* Problems indicator - LSP diagnostics */}
+        {hasProblems ? (
+          <StatusItem
+            title={`${String(totalErrors)} error${totalErrors !== 1 ? 's' : ''}, ${String(totalWarnings)} warning${totalWarnings !== 1 ? 's' : ''}`}
+          >
+            {totalErrors > 0 ? (
+              <>
+                <XCircle className="h-3 w-3 text-red-500" />
+                <span>{totalErrors}</span>
+              </>
+            ) : null}
+            {totalWarnings > 0 ? (
+              <>
+                <AlertTriangle
+                  className={cn('h-3 w-3 text-yellow-500', totalErrors > 0 && 'ml-1')}
+                />
+                <span>{totalWarnings}</span>
+              </>
+            ) : null}
+          </StatusItem>
+        ) : hasFile ? (
+          <StatusItem title="No problems detected">
+            <CheckCircle2 className="h-3 w-3 text-green-500" />
+            <span>0</span>
+          </StatusItem>
         ) : null}
       </div>
 
-      {/* Right section - placeholder for future items (line/col, encoding, etc.) */}
-      <div className="flex items-center gap-3">
-        {/* Future: cursor position, file encoding, etc. */}
+      {/* Right section - File info */}
+      <div className="flex items-center gap-0.5">
+        {hasFile ? (
+          <>
+            {/* Cursor position */}
+            <StatusItem
+              title={`Line ${String(cursorPosition.line)}, Column ${String(cursorPosition.column)}`}
+            >
+              <span>
+                Ln {cursorPosition.line}, Col {cursorPosition.column}
+              </span>
+            </StatusItem>
+
+            {/* Indentation - static for now */}
+            <StatusItem title="Indentation: 2 Spaces">
+              <span>Spaces: 2</span>
+            </StatusItem>
+
+            {/* Encoding - static */}
+            <StatusItem title="File Encoding">
+              <span>UTF-8</span>
+            </StatusItem>
+
+            {/* End of line - static */}
+            <StatusItem title="End of Line Sequence">
+              <span>LF</span>
+            </StatusItem>
+
+            {/* Language */}
+            <StatusItem title={`Language Mode: ${getLanguageDisplayName(activeFile.language)}`}>
+              <span>{getLanguageDisplayName(activeFile.language)}</span>
+            </StatusItem>
+          </>
+        ) : null}
       </div>
     </div>
   );
