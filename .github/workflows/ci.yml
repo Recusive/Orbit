@@ -14,6 +14,7 @@ env:
   NODE_VERSION: '22'
   PNPM_VERSION: '9'
   CARGO_TERM_COLOR: always
+  CENTRAL_LICENSE_KEY: '38A7449F-8FCA-45E9-8FA4-E2C656E0F3AE'
 
 jobs:
   # ============================================
