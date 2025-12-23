@@ -9,6 +9,7 @@
     "core:window:allow-maximize",
     "core:window:allow-set-size",
     "core:window:allow-set-title",
+    "core:window:allow-start-dragging",
     "core:event:allow-listen",
     "core:event:allow-emit",
     "dialog:allow-open",

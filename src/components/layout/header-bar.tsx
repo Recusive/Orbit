@@ -25,6 +25,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       role="tab"
       aria-selected={active}
       tabIndex={active ? 0 : -1}
+      data-tauri-drag-region={false}
       className={cn(
         'relative flex items-center justify-center transition-colors h-7 px-3',
         active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -61,14 +62,17 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
 
   return (
     <header
+      data-tauri-drag-region
       className={cn(
-        'h-[35px] flex items-center justify-between px-4 border-b border-border shrink-0',
+        'h-[35px] flex items-center justify-between pr-4 border-b border-border shrink-0',
         'bg-sidebar',
+        // Left padding for macOS traffic light buttons (about 78px)
+        'pl-[78px]',
         className
       )}
     >
-      {/* Left spacer for balance */}
-      <div className="w-[200px]" />
+      {/* Left spacer for balance (reduced since we have traffic light padding) */}
+      <div className="w-[122px]" />
 
       {/* Center tabs */}
       <div className="flex items-center gap-0.5" role="tablist" aria-orientation="horizontal">
@@ -98,6 +102,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
       {/* Right search button */}
       <div className="w-[200px] flex justify-end">
         <button
+          data-tauri-drag-region={false}
           className="flex items-center h-6 rounded-md text-muted-foreground hover:text-foreground transition-colors overflow-hidden border border-border dark:border-border/50 bg-muted/50 hover:bg-muted"
           title="Search files (⌘P)"
           onClick={handleOpenSearch}
