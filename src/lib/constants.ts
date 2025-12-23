@@ -265,7 +265,7 @@ export const AGENT_PHASES = [
   'error',
 ] as const;
 
-export type AgentPhase = typeof AGENT_PHASES[number];
+export type AgentPhase = (typeof AGENT_PHASES)[number];
 
 /**
  * Available Claude model options
@@ -297,6 +297,37 @@ export const MODEL_OPTIONS = [
   },
 ] as const;
 
-export type ModelOption = typeof MODEL_OPTIONS[number];
+export type ModelOption = (typeof MODEL_OPTIONS)[number];
 export type ModelId = ModelOption['id'];
 export type ModelTier = ModelOption['tier'];
+
+// ============================================
+// GIT STATUS STYLING
+// ============================================
+
+/**
+ * Git file status display configuration
+ * Used by file explorer, file tabs, and source control panel
+ */
+export interface GitStatusStyle {
+  /** Single character label (A, M, D, etc.) */
+  label: string;
+  /** Tailwind text color class */
+  color: string;
+  /** Human-readable description */
+  title: string;
+}
+
+/**
+ * Styling for each git file status type
+ */
+export const GIT_STATUS_STYLES = {
+  added: { label: 'A', color: 'text-green-500', title: 'Added' },
+  modified: { label: 'M', color: 'text-yellow-500', title: 'Modified' },
+  deleted: { label: 'D', color: 'text-red-500', title: 'Deleted' },
+  renamed: { label: 'R', color: 'text-blue-500', title: 'Renamed' },
+  copied: { label: 'C', color: 'text-blue-500', title: 'Copied' },
+  untracked: { label: 'U', color: 'text-gray-400', title: 'Untracked' },
+  conflicted: { label: '!', color: 'text-orange-500', title: 'Conflict' },
+  typechange: { label: 'T', color: 'text-purple-500', title: 'Type Changed' },
+} as const satisfies Record<string, GitStatusStyle>;

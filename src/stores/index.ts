@@ -17,10 +17,27 @@ export type {
 } from './file-store';
 
 export { useTerminalStore } from './terminal-store';
-export type {
-  TerminalState,
-  TerminalSession,
-  TerminalOutput,
-} from './terminal-store';
+export type { TerminalState, TerminalSession, TerminalOutput } from './terminal-store';
 
 export { useUIStore, useIsLeftSidebarCollapsed } from './ui-store';
+
+export {
+  useGitStore,
+  selectBranch,
+  selectUpstream,
+  selectAhead,
+  selectBehind,
+  selectIsClean,
+  selectHasConflicts,
+  selectTotalChanges,
+  selectFileStatus,
+  selectIsStaged,
+  selectEntriesByStatus,
+  useGitBranch,
+  useGitAhead,
+  useGitBehind,
+  useGitIsClean,
+  useGitTotalChanges,
+  useIsGitRepo,
+} from './git-store';
+export type { FileStatus, GitBranch, GitStatus, StatusEntry } from './git-store';

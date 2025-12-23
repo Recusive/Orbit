@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ChatArea } from './chat-area';
 import { PrimarySidebar } from './primary-sidebar';
 import { SecondaryPanel } from './secondary-panel';
+import { StatusBar } from './status-bar';
 
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
@@ -13,10 +14,7 @@ import { useTauri } from '@/hooks/use-tauri';
 import { useUIStore } from '@/stores/ui-store';
 
 export const RootLayout: FC = () => {
-  const {
-    leftSidebarWidth,
-    rightSidebarOpen,
-  } = useUIStore();
+  const { leftSidebarWidth, rightSidebarOpen } = useUIStore();
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
 
@@ -69,6 +67,9 @@ export const RootLayout: FC = () => {
         {/* Secondary Panel - Sessions list */}
         {rightSidebarOpen ? <SecondaryPanel /> : null}
       </div>
+
+      {/* Status Bar - Git branch, sync status */}
+      <StatusBar />
 
       {/* Quick Open Dialog */}
       <QuickOpen open={quickOpenVisible} onOpenChange={setQuickOpenVisible} />

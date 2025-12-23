@@ -2,13 +2,16 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Search } from 'lucide-react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 
+import type { FileStatus } from '@/lib/backend';
 import type { FileNode } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { FileIcon, FolderIcon } from '@/components/files';
 import { useFileTree } from '@/hooks/use-file-tree';
+import { GIT_STATUS_STYLES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useFileStore } from '@/stores/file-store';
+import { selectFileStatus, useGitStore } from '@/stores/git-store';
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -33,6 +36,26 @@ const ROW_HEIGHT = 24;
 
 /** Overscan - render extra rows above/below viewport for smooth scrolling */
 const OVERSCAN = 10;
+
+// ═══════════════════════════════════════════════════════════════
+// Git Status Indicator
+// ═══════════════════════════════════════════════════════════════
+
+interface GitStatusBadgeProps {
+  status: FileStatus;
+}
+
+const GitStatusBadge: FC<GitStatusBadgeProps> = ({ status }) => {
+  const style = GIT_STATUS_STYLES[status];
+  return (
+    <span
+      className={cn('text-xs font-bold shrink-0 w-4 text-center', style.color)}
+      title={style.title}
+    >
+      {style.label}
+    </span>
+  );
+};
 
 // ═══════════════════════════════════════════════════════════════
 // Tree Flattening (Iterative to avoid stack overflow on deep trees)
@@ -301,6 +324,9 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
     const isSelected = useFileStore((s) => s.selectedTreePath === path);
     const error = useFileStore((s) => s.errorPaths.get(path) ?? null);
 
+    // Git status for this file (uses full path for matching)
+    const gitStatus = useGitStore(selectFileStatus(path));
+
     const handleClick = useCallback((): void => {
       if (node.isDirectory) {
         onToggle(path);
@@ -372,7 +398,18 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
         </span>
 
         {/* Name */}
-        <span className="truncate text-left flex-1">{node.name}</span>
+        <span
+          className={cn(
+            'truncate text-left flex-1',
+            // Dim untracked files slightly
+            gitStatus === 'untracked' && 'text-muted-foreground'
+          )}
+        >
+          {node.name}
+        </span>
+
+        {/* Git status badge */}
+        {gitStatus && !node.isDirectory ? <GitStatusBadge status={gitStatus} /> : null}
 
         {/* Error retry button */}
         {error ? (

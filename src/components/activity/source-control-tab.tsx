@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useGitStatus } from '@/hooks/use-git-status';
+import { GIT_STATUS_STYLES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui-store';
 
@@ -45,22 +46,8 @@ interface FileItem {
 }
 
 function getStatusIcon(status: DisplayFileStatus): React.ReactNode {
-  switch (status) {
-    case 'added':
-      return <span className="text-green-500 text-xs font-bold">A</span>;
-    case 'modified':
-      return <span className="text-yellow-500 text-xs font-bold">M</span>;
-    case 'untracked':
-      return <span className="text-gray-400 text-xs font-bold">U</span>;
-    case 'deleted':
-      return <span className="text-red-500 text-xs font-bold">D</span>;
-    case 'renamed':
-      return <span className="text-blue-500 text-xs font-bold">R</span>;
-    case 'conflicted':
-      return <span className="text-orange-500 text-xs font-bold">!</span>;
-    default:
-      return null;
-  }
+  const style = GIT_STATUS_STYLES[status];
+  return <span className={cn('text-xs font-bold', style.color)}>{style.label}</span>;
 }
 
 function getFileName(path: string): string {
@@ -394,7 +381,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           <AlertCircle className="h-4 w-4" />
           <span className="text-sm font-medium">Git Error</span>
         </div>
-        <p className="text-sm text-muted-foreground">{error.message}</p>
+        <p className="text-sm text-muted-foreground">{error}</p>
         <button onClick={refresh} className="text-sm text-primary hover:underline">
           Retry
         </button>

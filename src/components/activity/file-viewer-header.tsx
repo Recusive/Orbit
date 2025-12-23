@@ -5,8 +5,10 @@ import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files/file-icon';
 import { lspDidClose } from '@/lib/backend';
+import { GIT_STATUS_STYLES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useActiveFile, useFileViewerStore } from '@/stores/file-viewer-store';
+import { selectFileStatus, useGitStore } from '@/stores/git-store';
 
 export const FileViewerHeader: FC = () => {
   const openTabs = useFileViewerStore((state) => state.openTabs);
@@ -108,6 +110,10 @@ interface FileTabProps {
 const FileTab: FC<FileTabProps> = ({ file, isActive, onSelect, onClose }) => {
   const fileName = file.path.split('/').pop() ?? file.path;
 
+  // Git status for this file
+  const gitStatus = useGitStore(selectFileStatus(file.path));
+  const gitStyle = gitStatus ? GIT_STATUS_STYLES[gitStatus] : null;
+
   const handleCloseClick = (e: React.MouseEvent): void => {
     e.stopPropagation();
     onClose();
@@ -117,7 +123,7 @@ const FileTab: FC<FileTabProps> = ({ file, isActive, onSelect, onClose }) => {
     <div
       onClick={onSelect}
       className={cn(
-        'relative group flex items-center gap-1.5 px-2 py-1 text-xs cursor-pointer rounded-t transition-colors max-w-[160px]',
+        'relative group flex items-center gap-1.5 px-2 py-1 text-xs cursor-pointer rounded-t transition-colors max-w-[180px]',
         isActive
           ? 'bg-accent text-foreground'
           : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -125,8 +131,18 @@ const FileTab: FC<FileTabProps> = ({ file, isActive, onSelect, onClose }) => {
     >
       {/* Active indicator - brand coral bottom border */}
       {isActive ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-brand-coral" /> : null}
-      <FileIcon fileName={fileName} className="h-4 w-4" />
-      <span className="truncate">{fileName}</span>
+
+      {/* File icon */}
+      <FileIcon fileName={fileName} className="h-4 w-4 shrink-0" />
+
+      {/* File name - colored by git status if applicable */}
+      <span
+        className={cn('truncate', gitStyle?.color)}
+        title={gitStyle ? `${fileName} (${gitStyle.title})` : fileName}
+      >
+        {fileName}
+      </span>
+
       {/* Modified indicator - show dot when file has unsaved changes */}
       {file.isModified ? (
         <span className="h-2 w-2 rounded-full bg-brand-coral shrink-0" title="Unsaved changes" />

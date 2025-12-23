@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import type { FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/backend';
 
@@ -6,14 +6,20 @@ import {
   gitBranches,
   gitCheckout,
   gitCommit,
-  gitDiscover,
   gitDiscard,
+  gitDiscover,
   gitPull,
   gitPush,
   gitStage,
   gitStatus,
   gitUnstage,
 } from '@/lib/backend';
+import {
+  selectHasConflicts,
+  selectIsClean,
+  selectTotalChanges,
+  useGitStore,
+} from '@/stores/git-store';
 
 export interface UseGitStatusOptions {
   /** Polling interval in ms (default: 5000, set to 0 to disable) */
@@ -32,7 +38,7 @@ export interface UseGitStatusResult {
   /** Whether the initial load is in progress (not background polling) */
   isLoading: boolean;
   /** Error if the fetch failed */
-  error: Error | null;
+  error: string | null;
   /** Manually refresh the status */
   refresh: () => Promise<void>;
   /** Whether repo is clean (no changes) */
@@ -64,27 +70,28 @@ export interface UseGitStatusResult {
 }
 
 /**
- * Hook to fetch and poll git status for a workspace
+ * Hook to fetch and poll git status for a workspace.
+ *
+ * This hook manages polling and writes to the shared gitStore.
+ * Components can also subscribe directly to gitStore for reads.
  *
  * @param workspacePath - The path to check for git status
  * @param options - Configuration options
- * @returns Git status, repo path, loading state, error, and refresh function
+ * @returns Git status, repo path, loading state, error, and actions
  *
  * @example
  * ```tsx
+ * // Full usage (manages polling)
  * function GitPanel() {
- *   const { status, isLoading, refresh } = useGitStatus('/path/to/project');
+ *   const { status, stage, commit } = useGitStatus('/path/to/project');
+ *   // ...
+ * }
  *
- *   if (isLoading) return <Spinner />;
- *   if (!status) return <div>Not a git repository</div>;
- *
- *   return (
- *     <div>
- *       <p>Branch: {status.branch}</p>
- *       <p>Modified: {status.modified.length} files</p>
- *       <button onClick={refresh}>Refresh</button>
- *     </div>
- *   );
+ * // Read-only usage (no polling overhead)
+ * function StatusBar() {
+ *   const branch = useGitStore(selectBranch);
+ *   const { ahead, behind } = useGitStore(selectAheadBehind);
+ *   // ...
  * }
  * ```
  */
@@ -94,86 +101,86 @@ export function useGitStatus(
 ): UseGitStatusResult {
   const { pollInterval = 5000, enabled = true, pauseWhenHidden = true } = options;
 
-  const [status, setStatus] = useState<GitStatus | null>(null);
-  const [repoPath, setRepoPath] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [branches, setBranches] = useState<GitBranch[]>([]);
+  // Store state
+  const status = useGitStore((s) => s.status);
+  const repoPath = useGitStore((s) => s.repoPath);
+  const isLoading = useGitStore((s) => s.isLoading);
+  const error = useGitStore((s) => s.error);
+  const branches = useGitStore((s) => s.branches);
 
-  // Request counter to handle race conditions - only apply results from latest request
+  // Derived selectors (optimized subscriptions)
+  const isClean = useGitStore(selectIsClean);
+  const hasConflicts = useGitStore(selectHasConflicts);
+  const totalChanges = useGitStore(selectTotalChanges);
+
+  // Store actions (stable references from zustand)
+  const setRepoPath = useGitStore((s) => s.setRepoPath);
+  const setStatus = useGitStore((s) => s.setStatus);
+  const setLoading = useGitStore((s) => s.setLoading);
+  const setError = useGitStore((s) => s.setError);
+  const setBranches = useGitStore((s) => s.setBranches);
+  const reset = useGitStore((s) => s.reset);
+
+  // Request counter to handle race conditions
   const requestIdRef = useRef(0);
-  // Track if we have data (to distinguish initial load from background refresh)
+  // Track if we have data
   const hasLoadedRef = useRef(false);
 
-  // Normalize workspace path: treat empty/whitespace-only string as null
+  // Normalize workspace path
   const trimmedPath = workspacePath?.trim();
   const normalizedPath = trimmedPath && trimmedPath.length > 0 ? trimmedPath : null;
 
   const loadStatus = useCallback(
     async (isBackgroundRefresh: boolean): Promise<void> => {
       if (!normalizedPath) {
-        setStatus(null);
-        setRepoPath(null);
-        setError(null);
+        reset();
         hasLoadedRef.current = false;
         return;
       }
 
-      // Increment request ID to invalidate any in-flight requests
       const currentRequestId = ++requestIdRef.current;
 
-      // Only show loading spinner for initial load or manual refresh, not background polling
       if (!isBackgroundRefresh) {
-        setIsLoading(true);
+        setLoading(true);
       }
-      setError(null);
 
       try {
-        // First discover the git repo root
         const discovered = await gitDiscover(normalizedPath);
 
-        // Check if this request is still current
         if (requestIdRef.current !== currentRequestId) {
           return;
         }
 
         setRepoPath(discovered);
 
-        // Then fetch the status
         const result = await gitStatus(discovered);
 
-        // Check again after second async operation
         if (requestIdRef.current !== currentRequestId) {
           return;
         }
 
         setStatus(result);
         hasLoadedRef.current = true;
-
-        if (!isBackgroundRefresh) {
-          setIsLoading(false);
-        }
       } catch (err) {
-        // Only update state if this is still the current request
         if (requestIdRef.current !== currentRequestId) {
           return;
         }
 
-        // Not a git repo or other error
-        setError(err instanceof Error ? err : new Error(String(err)));
-        setStatus(null);
-        setRepoPath(null);
-        hasLoadedRef.current = false;
+        const errStr = err instanceof Error ? err.message : String(err);
 
-        if (!isBackgroundRefresh) {
-          setIsLoading(false);
+        // Not a git repo is not an error state
+        if (errStr.includes('not a git repository') || errStr.includes('NOT_A_REPO')) {
+          reset();
+        } else {
+          setError(errStr);
         }
+        hasLoadedRef.current = false;
       }
     },
-    [normalizedPath]
+    [normalizedPath, reset, setRepoPath, setStatus, setLoading, setError]
   );
 
-  // Wrap for external refresh (always shows loading)
+  // Wrap for external refresh
   const refresh = useCallback(async (): Promise<void> => {
     await loadStatus(false);
   }, [loadStatus]);
@@ -184,13 +191,10 @@ export function useGitStatus(
       hasLoadedRef.current = false;
       void loadStatus(false);
     } else {
-      // Clear state when disabled
-      setStatus(null);
-      setRepoPath(null);
-      setError(null);
+      reset();
       hasLoadedRef.current = false;
     }
-  }, [loadStatus, enabled]);
+  }, [loadStatus, enabled, reset]);
 
   // Polling with visibility awareness
   useEffect(() => {
@@ -203,7 +207,7 @@ export function useGitStatus(
     const startPolling = (): void => {
       if (intervalId) return;
       intervalId = setInterval(() => {
-        void loadStatus(true); // Background refresh, no loading spinner
+        void loadStatus(true);
       }, pollInterval);
     };
 
@@ -218,7 +222,6 @@ export function useGitStatus(
       if (document.hidden && pauseWhenHidden) {
         stopPolling();
       } else {
-        // Refresh immediately when becoming visible, then resume polling
         if (!document.hidden && pauseWhenHidden) {
           void loadStatus(true);
         }
@@ -226,12 +229,10 @@ export function useGitStatus(
       }
     };
 
-    // Start polling if document is visible (or if we don't care about visibility)
     if (!pauseWhenHidden || !document.hidden) {
       startPolling();
     }
 
-    // Listen for visibility changes
     if (pauseWhenHidden) {
       document.addEventListener('visibilitychange', handleVisibilityChange);
     }
@@ -244,22 +245,7 @@ export function useGitStatus(
     };
   }, [loadStatus, pollInterval, enabled, normalizedPath, pauseWhenHidden]);
 
-  // Derived values
-  const isClean =
-    !status ||
-    (status.staged.length === 0 &&
-      status.modified.length === 0 &&
-      status.untracked.length === 0 &&
-      status.conflicted.length === 0);
-
-  const hasConflicts = (status?.conflicted.length ?? 0) > 0;
-
-  const totalChanges =
-    (status?.staged.length ?? 0) +
-    (status?.modified.length ?? 0) +
-    (status?.untracked.length ?? 0) +
-    (status?.conflicted.length ?? 0);
-
+  // Derived helper
   const getByStatus = useCallback(
     (fileStatus: FileStatus): StatusEntry[] => {
       if (!status) return [];
@@ -280,7 +266,7 @@ export function useGitStatus(
         throw new Error('Not a git repository');
       }
       await gitStage(repoPath, files);
-      await loadStatus(true); // Background refresh
+      await loadStatus(true);
     },
     [repoPath, loadStatus]
   );
@@ -292,7 +278,7 @@ export function useGitStatus(
         throw new Error('Not a git repository');
       }
       await gitUnstage(repoPath, files);
-      await loadStatus(true); // Background refresh
+      await loadStatus(true);
     },
     [repoPath, loadStatus]
   );
@@ -304,7 +290,7 @@ export function useGitStatus(
         throw new Error('Not a git repository');
       }
       const hash = await gitCommit(repoPath, message);
-      await loadStatus(true); // Background refresh
+      await loadStatus(true);
       return hash;
     },
     [repoPath, loadStatus]
@@ -317,7 +303,7 @@ export function useGitStatus(
         throw new Error('Not a git repository');
       }
       await gitDiscard(repoPath, files);
-      await loadStatus(true); // Background refresh
+      await loadStatus(true);
     },
     [repoPath, loadStatus]
   );
@@ -329,7 +315,7 @@ export function useGitStatus(
         throw new Error('Not a git repository');
       }
       await gitPush(repoPath, remote);
-      await loadStatus(true); // Background refresh
+      await loadStatus(true);
     },
     [repoPath, loadStatus]
   );
@@ -341,7 +327,7 @@ export function useGitStatus(
         throw new Error('Not a git repository');
       }
       await gitPull(repoPath, remote);
-      await loadStatus(true); // Background refresh
+      await loadStatus(true);
     },
     [repoPath, loadStatus]
   );
@@ -354,17 +340,17 @@ export function useGitStatus(
     const branchList = await gitBranches(repoPath);
     setBranches(branchList);
     return branchList;
-  }, [repoPath]);
+  }, [repoPath, setBranches]);
 
   // Git operations - checkout branch
   const checkout = useCallback(
-    async (branch: string): Promise<void> => {
+    async (branchName: string): Promise<void> => {
       if (!repoPath) {
         throw new Error('Not a git repository');
       }
-      await gitCheckout(repoPath, branch);
-      await loadStatus(true); // Background refresh
-      await listBranches(); // Refresh branch list
+      await gitCheckout(repoPath, branchName);
+      await loadStatus(true);
+      await listBranches();
     },
     [repoPath, loadStatus, listBranches]
   );
