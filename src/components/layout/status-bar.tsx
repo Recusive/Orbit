@@ -7,6 +7,7 @@ import {
   GitBranch,
   XCircle,
 } from 'lucide-react';
+import { useCallback } from 'react';
 
 import type { FC } from 'react';
 
@@ -136,6 +137,28 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
   const hasFile = activeFile !== null;
   const hasProblems = totalErrors > 0 || totalWarnings > 0;
 
+  // Click handlers for right side items (placeholder implementations)
+  const handleGoToLine = useCallback((): void => {
+    // TODO: Open "Go to Line" dialog
+    // For now, could trigger Cmd+G behavior
+  }, []);
+
+  const handleIndentationClick = useCallback((): void => {
+    // TODO: Open indentation picker (spaces vs tabs, size)
+  }, []);
+
+  const handleEncodingClick = useCallback((): void => {
+    // TODO: Open encoding picker
+  }, []);
+
+  const handleLineEndingClick = useCallback((): void => {
+    // TODO: Open line ending picker (LF, CRLF)
+  }, []);
+
+  const handleLanguageClick = useCallback((): void => {
+    // TODO: Open language mode picker
+  }, []);
+
   return (
     <div
       className={cn(
@@ -244,31 +267,29 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
         {hasFile ? (
           <>
             {/* Cursor position */}
-            <StatusItem
-              title={`Line ${String(cursorPosition.line)}, Column ${String(cursorPosition.column)}`}
-            >
+            <StatusItem title="Go to Line" onClick={handleGoToLine}>
               <span>
                 Ln {cursorPosition.line}, Col {cursorPosition.column}
               </span>
             </StatusItem>
 
-            {/* Indentation - static for now */}
-            <StatusItem title="Indentation: 2 Spaces">
+            {/* Indentation */}
+            <StatusItem title="Select Indentation" onClick={handleIndentationClick}>
               <span>Spaces: 2</span>
             </StatusItem>
 
-            {/* Encoding - static */}
-            <StatusItem title="File Encoding">
+            {/* Encoding */}
+            <StatusItem title="Select Encoding" onClick={handleEncodingClick}>
               <span>UTF-8</span>
             </StatusItem>
 
-            {/* End of line - static */}
-            <StatusItem title="End of Line Sequence">
+            {/* End of line */}
+            <StatusItem title="Select End of Line Sequence" onClick={handleLineEndingClick}>
               <span>LF</span>
             </StatusItem>
 
             {/* Language */}
-            <StatusItem title={`Language Mode: ${getLanguageDisplayName(activeFile.language)}`}>
+            <StatusItem title="Select Language Mode" onClick={handleLanguageClick}>
               <span>{getLanguageDisplayName(activeFile.language)}</span>
             </StatusItem>
           </>
