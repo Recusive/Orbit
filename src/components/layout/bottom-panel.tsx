@@ -6,7 +6,7 @@
  */
 
 import { Plus, X, Maximize2 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import type { Diagnostic } from '@/lib/backend';
 import type { FC } from 'react';
@@ -19,22 +19,20 @@ import { readFile } from '@/lib/backend';
 import { HEIGHTS } from '@/lib/constants';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
 import { useTerminalStore } from '@/stores/terminal-store';
-import { useUIStore } from '@/stores/ui-store';
-
-type BottomPanelTab = 'terminal' | 'problems';
+import { useBottomPanelTab, useUIStore } from '@/stores/ui-store';
 
 interface BottomPanelProps {
   readonly height: number;
 }
 
 export const BottomPanel: FC<BottomPanelProps> = ({ height }) => {
-  const { toggleBottomPanel } = useUIStore();
+  const { toggleBottomPanel, setBottomPanelTab } = useUIStore();
+  const activeTab = useBottomPanelTab();
   const { sessions, activeSessionId, createSession, setActiveSession, closeSession } =
     useTerminalStore();
   const { totalErrors, totalWarnings } = useDiagnostics();
   const gotoPosition = useFileViewerStore((state) => state.gotoPosition);
   const openTabs = useFileViewerStore((state) => state.openTabs);
-  const [activeTab, setActiveTab] = useState<BottomPanelTab>('terminal');
 
   // Get the terminal instance manager (singleton)
   const manager = useTerminalInstanceManager();
@@ -132,7 +130,7 @@ export const BottomPanel: FC<BottomPanelProps> = ({ height }) => {
           <div className="flex items-center gap-1">
             <button
               onClick={(): void => {
-                setActiveTab('problems');
+                setBottomPanelTab('problems');
               }}
               className={`px-2 py-0.5 text-xs flex items-center gap-1.5 ${
                 activeTab === 'problems'
@@ -151,7 +149,7 @@ export const BottomPanel: FC<BottomPanelProps> = ({ height }) => {
             </button>
             <button
               onClick={(): void => {
-                setActiveTab('terminal');
+                setBottomPanelTab('terminal');
               }}
               className={`px-2 py-0.5 text-xs ${
                 activeTab === 'terminal'

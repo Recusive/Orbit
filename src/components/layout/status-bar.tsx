@@ -20,6 +20,7 @@ import {
   selectTotalChanges,
   useGitStore,
 } from '@/stores/git-store';
+import { useUIStore } from '@/stores/ui-store';
 
 export interface StatusBarProps {
   className?: string;
@@ -128,6 +129,9 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
   // Diagnostics (LSP problems)
   const { totalErrors, totalWarnings } = useDiagnostics();
 
+  // UI actions
+  const { openSourceControl, openProblemsPanel } = useUIStore();
+
   const isGitRepo = repoPath !== null;
   const hasFile = activeFile !== null;
   const hasProblems = totalErrors > 0 || totalWarnings > 0;
@@ -145,12 +149,19 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
       <div className="flex items-center gap-0.5 min-w-0">
         {/* Git branch */}
         {error ? (
-          <StatusItem title={`Git error: ${error}`} className="text-destructive">
+          <StatusItem
+            title={`Git error: ${error}`}
+            className="text-destructive"
+            onClick={openSourceControl}
+          >
             <AlertCircle className="h-3 w-3" />
             <span>error</span>
           </StatusItem>
         ) : branch ? (
-          <StatusItem title={branch.length > MAX_BRANCH_LENGTH ? branch : `Branch: ${branch}`}>
+          <StatusItem
+            title={branch.length > MAX_BRANCH_LENGTH ? branch : `Branch: ${branch}`}
+            onClick={openSourceControl}
+          >
             <GitBranch className="h-3 w-3" />
             <span className="truncate max-w-[100px]">{truncateBranch(branch)}</span>
             {/* Sync indicators inline */}
@@ -172,7 +183,7 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
             ) : null}
           </StatusItem>
         ) : isGitRepo ? (
-          <StatusItem title="Detached HEAD">
+          <StatusItem title="Detached HEAD" onClick={openSourceControl}>
             <GitBranch className="h-3 w-3" />
             <span className="italic opacity-70">detached</span>
           </StatusItem>
@@ -181,7 +192,8 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
         {/* Changes indicator */}
         {totalChanges > 0 ? (
           <StatusItem
-            title={`${String(totalChanges)} uncommitted change${totalChanges !== 1 ? 's' : ''}`}
+            title={`${String(totalChanges)} uncommitted change${totalChanges !== 1 ? 's' : ''} - Click to open Source Control`}
+            onClick={openSourceControl}
           >
             <span className="text-yellow-500">●</span>
             <span>{totalChanges}</span>
@@ -198,7 +210,8 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
         {/* Problems indicator - LSP diagnostics */}
         {hasProblems ? (
           <StatusItem
-            title={`${String(totalErrors)} error${totalErrors !== 1 ? 's' : ''}, ${String(totalWarnings)} warning${totalWarnings !== 1 ? 's' : ''}`}
+            title={`${String(totalErrors)} error${totalErrors !== 1 ? 's' : ''}, ${String(totalWarnings)} warning${totalWarnings !== 1 ? 's' : ''} - Click to open Problems`}
+            onClick={openProblemsPanel}
           >
             {totalErrors > 0 ? (
               <>
@@ -216,7 +229,10 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
             ) : null}
           </StatusItem>
         ) : hasFile ? (
-          <StatusItem title="No problems detected">
+          <StatusItem
+            title="No problems detected - Click to open Problems"
+            onClick={openProblemsPanel}
+          >
             <CheckCircle2 className="h-3 w-3 text-green-500" />
             <span>0</span>
           </StatusItem>

@@ -17,6 +17,9 @@ export type TerminalPosition = 'activity' | 'both';
 // Activity panel tabs
 export type ActivityTab = 'file' | 'files' | 'source' | 'browser';
 
+// Bottom panel tabs
+export type BottomPanelTab = 'terminal' | 'problems';
+
 interface UIState {
   // Container dimensions (from VS Code editor layout)
   containerWidth: number | null;
@@ -40,6 +43,7 @@ interface UIState {
   // Bottom Panel (Terminal)
   bottomPanelOpen: boolean;
   bottomPanelHeight: number;
+  bottomPanelTab: BottomPanelTab;
   terminalPosition: TerminalPosition;
   // Activity Panel Tab
   activityTab: ActivityTab;
@@ -68,6 +72,10 @@ interface UIActions {
   // Activity panel actions
   setActivityTab: (tab: ActivityTab) => void;
   openBrowserTab: () => void;
+  // Bottom panel actions
+  setBottomPanelTab: (tab: BottomPanelTab) => void;
+  openProblemsPanel: () => void;
+  openSourceControl: () => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -88,6 +96,7 @@ export const useUIStore = create<UIStore>()(
     rightSidebarOpen: DEFAULT_UI_STATE.rightSidebarOpen,
     bottomPanelOpen: DEFAULT_UI_STATE.bottomPanelOpen,
     bottomPanelHeight: DEFAULT_UI_STATE.bottomPanelHeight,
+    bottomPanelTab: 'terminal' as BottomPanelTab,
     terminalPosition: 'activity' as TerminalPosition,
     activityTab: 'files' as ActivityTab,
 
@@ -234,6 +243,26 @@ export const useUIStore = create<UIStore>()(
         state.reviewPanelOpen = true;
       });
     },
+
+    setBottomPanelTab: (tab: BottomPanelTab): void => {
+      set((state) => {
+        state.bottomPanelTab = tab;
+      });
+    },
+
+    openProblemsPanel: (): void => {
+      set((state) => {
+        state.bottomPanelOpen = true;
+        state.bottomPanelTab = 'problems';
+      });
+    },
+
+    openSourceControl: (): void => {
+      set((state) => {
+        state.activityTab = 'source';
+        state.reviewPanelOpen = true;
+      });
+    },
   }))
 );
 
@@ -267,4 +296,8 @@ export const useTerminalPosition = (): TerminalPosition => {
 
 export const useActivityTab = (): ActivityTab => {
   return useUIStore((state) => state.activityTab);
+};
+
+export const useBottomPanelTab = (): BottomPanelTab => {
+  return useUIStore((state) => state.bottomPanelTab);
 };
