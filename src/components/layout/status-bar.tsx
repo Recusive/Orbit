@@ -131,17 +131,16 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
   const { totalErrors, totalWarnings } = useDiagnostics();
 
   // UI actions
-  const { openSourceControl, openProblemsPanel } = useUIStore();
+  const { openSourceControl, openProblemsPanel, setGoToLineDialogOpen } = useUIStore();
 
   const isGitRepo = repoPath !== null;
   const hasFile = activeFile !== null;
   const hasProblems = totalErrors > 0 || totalWarnings > 0;
 
-  // Click handlers for right side items (placeholder implementations)
+  // Click handlers for right side items
   const handleGoToLine = useCallback((): void => {
-    // TODO: Open "Go to Line" dialog
-    // For now, could trigger Cmd+G behavior
-  }, []);
+    setGoToLineDialogOpen(true);
+  }, [setGoToLineDialogOpen]);
 
   const handleIndentationClick = useCallback((): void => {
     // TODO: Open indentation picker (spaces vs tabs, size)

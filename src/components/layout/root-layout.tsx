@@ -9,6 +9,7 @@ import { StatusBar } from './status-bar';
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
+import { GoToLineDialog } from '@/components/dialogs';
 import { QuickOpen } from '@/components/quick-open';
 import { WelcomePage } from '@/components/welcome';
 import { useDefaultKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
@@ -16,7 +17,8 @@ import { useTauri } from '@/hooks/use-tauri';
 import { useHasWorkspace, useUIStore } from '@/stores/ui-store';
 
 export const RootLayout: FC = () => {
-  const { leftSidebarWidth, rightSidebarOpen } = useUIStore();
+  const { leftSidebarWidth, rightSidebarOpen, goToLineDialogOpen, setGoToLineDialogOpen } =
+    useUIStore();
   const hasWorkspace = useHasWorkspace();
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
@@ -32,6 +34,10 @@ export const RootLayout: FC = () => {
   const handleQuickOpenFile = useCallback((): void => {
     setQuickOpenVisible(true);
   }, []);
+
+  const handleGoToLine = useCallback((): void => {
+    setGoToLineDialogOpen(true);
+  }, [setGoToLineDialogOpen]);
 
   // Handle messages from Orbit extension (including panel:command)
   const handleExtensionMessage = useCallback((message: ExtensionMessage): void => {
@@ -51,12 +57,14 @@ export const RootLayout: FC = () => {
   useEffect(() => {
     window.addEventListener('openCommandPalette', handleOpenCommandPalette);
     window.addEventListener('quickOpenFile', handleQuickOpenFile);
+    window.addEventListener('goToLine', handleGoToLine);
 
     return (): void => {
       window.removeEventListener('openCommandPalette', handleOpenCommandPalette);
       window.removeEventListener('quickOpenFile', handleQuickOpenFile);
+      window.removeEventListener('goToLine', handleGoToLine);
     };
-  }, [handleOpenCommandPalette, handleQuickOpenFile]);
+  }, [handleOpenCommandPalette, handleQuickOpenFile, handleGoToLine]);
 
   // Show welcome page when no workspace is open
   if (!hasWorkspace) {
@@ -97,6 +105,9 @@ export const RootLayout: FC = () => {
 
       {/* Quick Open Dialog */}
       <QuickOpen open={quickOpenVisible} onOpenChange={setQuickOpenVisible} />
+
+      {/* Go to Line Dialog */}
+      <GoToLineDialog open={goToLineDialogOpen} onOpenChange={setGoToLineDialogOpen} />
     </div>
   );
 };

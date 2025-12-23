@@ -47,6 +47,8 @@ interface UIState {
   terminalPosition: TerminalPosition;
   // Activity Panel Tab
   activityTab: ActivityTab;
+  // Dialogs
+  goToLineDialogOpen: boolean;
 }
 
 interface UIActions {
@@ -76,6 +78,8 @@ interface UIActions {
   setBottomPanelTab: (tab: BottomPanelTab) => void;
   openProblemsPanel: () => void;
   openSourceControl: () => void;
+  // Dialog actions
+  setGoToLineDialogOpen: (open: boolean) => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -99,6 +103,7 @@ export const useUIStore = create<UIStore>()(
     bottomPanelTab: 'terminal' as BottomPanelTab,
     terminalPosition: 'activity' as TerminalPosition,
     activityTab: 'files' as ActivityTab,
+    goToLineDialogOpen: false,
 
     setContainerDimensions: (width: number, height: number): void => {
       set((state) => {
@@ -261,6 +266,12 @@ export const useUIStore = create<UIStore>()(
       set((state) => {
         state.activityTab = 'source';
         state.reviewPanelOpen = true;
+      });
+    },
+
+    setGoToLineDialogOpen: (open: boolean): void => {
+      set((state) => {
+        state.goToLineDialogOpen = open;
       });
     },
   }))

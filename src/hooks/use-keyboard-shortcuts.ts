@@ -67,9 +67,7 @@ export function useKeyboardShortcuts(
       // Don't trigger shortcuts when typing in input fields
       const target = event.target as HTMLElement;
       const isInput =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable;
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
       for (const shortcut of shortcuts) {
         if (matchesShortcut(event, shortcut)) {
@@ -212,6 +210,14 @@ export const defaultShortcuts: KeyboardShortcut[] = [
       window.dispatchEvent(new CustomEvent('cancel'));
     },
     preventDefault: false,
+  },
+  {
+    key: 'g',
+    cmd: true,
+    description: 'Go to line',
+    handler: (): void => {
+      window.dispatchEvent(new CustomEvent('goToLine'));
+    },
   },
   {
     key: 'f',
