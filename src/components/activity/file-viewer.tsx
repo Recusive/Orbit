@@ -2,11 +2,14 @@ import { FileCode, Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
 
 import { FileViewerContent } from './file-viewer-content';
-import { FileViewerHeader } from './file-viewer-header';
 
 import type { FC } from 'react';
 
-import { useActiveFile, useFileViewerLoading, useFileViewerStore } from '@/stores/file-viewer-store';
+import {
+  useActiveFile,
+  useFileViewerLoading,
+  useFileViewerStore,
+} from '@/stores/file-viewer-store';
 
 export const FileViewer: FC = () => {
   const activeFile = useActiveFile();
@@ -31,8 +34,6 @@ export const FileViewer: FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-background relative">
-      <FileViewerHeader />
-
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
         {isLoading ? (

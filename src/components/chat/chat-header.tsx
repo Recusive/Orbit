@@ -1,11 +1,5 @@
-import {
-  Globe,
-  ListChecks,
-  Moon,
-  PanelRight,
-  SquareTerminal,
-  Sun,
-} from 'lucide-react';
+import { IconSidebar } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSidebar';
+import { Globe, Moon, PanelRight, SquareTerminal, Sun } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { FC } from 'react';
@@ -13,7 +7,12 @@ import type { FC } from 'react';
 import { HeaderButton } from '@/components/shared/header-button';
 import { HEIGHTS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { useUIStore, useWorkspaceName, useActiveConversationTitle, useTerminalPosition } from '@/stores/ui-store';
+import {
+  useUIStore,
+  useWorkspaceName,
+  useActiveConversationTitle,
+  useTerminalPosition,
+} from '@/stores/ui-store';
 
 type Theme = 'light' | 'dark';
 
@@ -23,7 +22,14 @@ const getInitialTheme = (): Theme => {
 };
 
 export const ChatHeader: FC = () => {
-  const { toggleReviewPanel, toggleBottomPanel, toggleRightSidebar, openBrowserTab, reviewPanelOpen, bottomPanelOpen } = useUIStore();
+  const {
+    toggleReviewPanel,
+    toggleBottomPanel,
+    toggleRightSidebar,
+    openBrowserTab,
+    reviewPanelOpen,
+    bottomPanelOpen,
+  } = useUIStore();
   const terminalPosition = useTerminalPosition();
   const workspaceName = useWorkspaceName();
   const activeConversationTitle = useActiveConversationTitle();
@@ -98,14 +104,16 @@ export const ChatHeader: FC = () => {
         <button
           onClick={toggleReviewPanel}
           className={cn(
-            'flex items-center gap-1.5 px-2 py-1 rounded text-sm transition-colors',
+            'h-7 w-7 flex items-center justify-center rounded transition-colors',
             reviewPanelOpen
               ? 'bg-accent text-foreground'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent'
           )}
+          title="Activity"
         >
-          <ListChecks className="h-4 w-4" />
-          <span>Activity</span>
+          <div className="rotate-180">
+            <IconSidebar size={16} />
+          </div>
         </button>
 
         <HeaderButton icon={PanelRight} title="Right Panel" onClick={toggleRightSidebar} />

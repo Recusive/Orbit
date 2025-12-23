@@ -10,4 +10,3 @@ export { GitStatusBadge } from './git-status-badge';
 export { SourceControlTab } from './source-control-tab';
 export { FileViewer } from './file-viewer';
 export { FileViewerContent } from './file-viewer-content';
-export { FileViewerHeader } from './file-viewer-header';

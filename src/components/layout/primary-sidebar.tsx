@@ -3,22 +3,54 @@ import {
   FlaskConical,
   Inbox,
   MoreHorizontal,
-  PanelLeft,
   Plus,
   Search,
   Settings,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
-import type {ConversationSummary} from '@/stores/ui-store';
+import type { ConversationSummary } from '@/stores/ui-store';
 import type { FC } from 'react';
+
+// Custom sidebar toggle icon - thicker middle line when expanded
+const SidebarToggleIcon: FC<{ expanded: boolean }> = ({ expanded }) => (
+  <svg
+    aria-hidden="true"
+    width="16"
+    height="16"
+    viewBox="1 1 22 22"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* Outer frame */}
+    <path
+      d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
+      fill="currentColor"
+    />
+    {/* Middle vertical line - thicker when expanded, with gap from left edge */}
+    <rect
+      x={expanded ? 7 : 7}
+      y="7"
+      width={expanded ? 5 : 2}
+      height="10"
+      rx="1"
+      fill="currentColor"
+    />
+  </svg>
+);
 
 import { FileExplorer } from '@/components/layout/file-explorer';
 import { SettingsDialog } from '@/components/settings/settings-dialog';
 import { useTauri } from '@/hooks/use-tauri';
 import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { useUIStore, useIsLeftSidebarCollapsed, useWorkspaceName, useConversations, useActiveConversationId  } from '@/stores/ui-store';
+import {
+  useUIStore,
+  useIsLeftSidebarCollapsed,
+  useWorkspaceName,
+  useConversations,
+  useActiveConversationId,
+} from '@/stores/ui-store';
 
 type SidebarTab = 'conversations' | 'explorer';
 
@@ -52,13 +84,16 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
     });
   }, [postMessage]);
 
-  const handleLoadConversation = useCallback((sessionId: string): void => {
-    postMessage({
-      type: 'conversation:load',
-      uuid: crypto.randomUUID(),
-      session_id: sessionId,
-    });
-  }, [postMessage]);
+  const handleLoadConversation = useCallback(
+    (sessionId: string): void => {
+      postMessage({
+        type: 'conversation:load',
+        uuid: crypto.randomUUID(),
+        session_id: sessionId,
+      });
+    },
+    [postMessage]
+  );
 
   const handleOpenQuickSearch = useCallback((): void => {
     window.dispatchEvent(new CustomEvent('openCommandPalette'));
@@ -82,9 +117,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
               title="Expand sidebar"
             >
-              <div className="relative h-4 w-4">
-                <PanelLeft className="h-4 w-4" />
-              </div>
+              <SidebarToggleIcon expanded={false} />
             </button>
           </div>
         ) : (
@@ -101,14 +134,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
               title="Collapse sidebar"
             >
-              <div className="relative h-4 w-4">
-                <PanelLeft className="h-4 w-4" />
-                {/* Fill indicator when sidebar is expanded */}
-                <div
-                  className="absolute left-[2px] top-[2px] w-[4px] h-[12px] bg-current opacity-100"
-                  style={{ borderRadius: '1px 0 0 1px' }}
-                />
-              </div>
+              <SidebarToggleIcon expanded={true} />
             </button>
           </div>
         )}
@@ -160,39 +186,62 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         <TabButton
           label="Sessions"
           active={activeTab === 'conversations'}
-          onClick={() => { setActiveTab('conversations'); }}
+          onClick={() => {
+            setActiveTab('conversations');
+          }}
         />
         <TabButton
           label="Explorer"
           active={activeTab === 'explorer'}
-          onClick={() => { setActiveTab('explorer'); }}
+          onClick={() => {
+            setActiveTab('explorer');
+          }}
         />
       </div>
 
       {/* Main Actions (only show for conversations tab) - slides up when collapsed */}
       {activeTab === 'conversations' ? (
-        <div className={cn(
-          'flex flex-col border-b border-border shrink-0 transition-all duration-150 ease-in-out',
-          isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
-        )}>
-          <SidebarItem icon={Inbox} label="Inbox" collapsed={isCollapsed} equalSpacing={isCollapsed} />
-          <SidebarItem icon={Plus} label="Start conversation" collapsed={isCollapsed} equalSpacing={isCollapsed} onClick={handleStartConversation} />
+        <div
+          className={cn(
+            'flex flex-col border-b border-border shrink-0 transition-all duration-150 ease-in-out',
+            isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
+          )}
+        >
+          <SidebarItem
+            icon={Inbox}
+            label="Inbox"
+            collapsed={isCollapsed}
+            equalSpacing={isCollapsed}
+          />
+          <SidebarItem
+            icon={Plus}
+            label="Start conversation"
+            collapsed={isCollapsed}
+            equalSpacing={isCollapsed}
+            onClick={handleStartConversation}
+          />
         </div>
       ) : null}
 
       {/* Tab Content */}
-      <div className={cn(
-        'flex-1 overflow-x-hidden',
-        isCollapsed ? 'overflow-y-hidden' : 'overflow-y-auto'
-      )}>
+      <div
+        className={cn(
+          'flex-1 overflow-x-hidden',
+          isCollapsed ? 'overflow-y-hidden' : 'overflow-y-auto'
+        )}
+      >
         {activeTab === 'conversations' ? (
           /* Conversations Tab Content */
-          <div className={cn(
-            'py-1.5 transition-opacity duration-150',
-            isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-          )}>
+          <div
+            className={cn(
+              'py-1.5 transition-opacity duration-150',
+              isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            )}
+          >
             <div className="flex items-center justify-between px-3 py-1">
-              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Workspaces</span>
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                Workspaces
+              </span>
               <button className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground shrink-0">
                 <Plus className="h-3 w-3" />
               </button>
@@ -204,11 +253,14 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
                   active
                   collapsed={isCollapsed}
                   expanded={workspaceExpanded}
-                  onToggle={() => { setWorkspaceExpanded(!workspaceExpanded); }}
+                  onToggle={() => {
+                    setWorkspaceExpanded(!workspaceExpanded);
+                  }}
                 />
               ) : null}
               {/* Conversation list with timeline */}
-              {workspaceExpanded && conversations.length > 0 ? <div className="relative ml-[19px]">
+              {workspaceExpanded && conversations.length > 0 ? (
+                <div className="relative ml-[19px]">
                   {/* Vertical timeline line */}
                   <div className="absolute left-0 top-0 bottom-2 w-px bg-border" />
                   {/* Conversations */}
@@ -219,19 +271,24 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
                         conversation={conv}
                         active={conv.sessionId === activeConversationId}
                         collapsed={isCollapsed}
-                        onClick={() => { handleLoadConversation(conv.sessionId); }}
+                        onClick={() => {
+                          handleLoadConversation(conv.sessionId);
+                        }}
                       />
                     ))}
                   </div>
-                </div> : null}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : (
           /* Explorer Tab Content */
-          <div className={cn(
-            'h-full transition-opacity duration-150',
-            isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-          )}>
+          <div
+            className={cn(
+              'h-full transition-opacity duration-150',
+              isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            )}
+          >
             <FileExplorer collapsed={isCollapsed} />
           </div>
         )}
@@ -240,16 +297,35 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       <hr className={cn('border-border shrink-0', isCollapsed ? 'my-0' : 'my-2')} />
 
       {/* Utilities */}
-      <div className={cn(
-        'flex flex-col shrink-0',
-        isCollapsed ? 'gap-0 py-0' : 'gap-1 py-1.5'
-      )}>
-        <SidebarItem icon={Settings} label="Settings" collapsed={isCollapsed} equalSpacing={isCollapsed} onClick={() => { setSettingsSection('agent'); setSettingsOpen(true); }} />
-        <SidebarItem icon={FlaskConical} label="Feedback" collapsed={isCollapsed} equalSpacing={isCollapsed} onClick={() => { setSettingsSection('feedback'); setSettingsOpen(true); }} />
+      <div className={cn('flex flex-col shrink-0', isCollapsed ? 'gap-0 py-0' : 'gap-1 py-1.5')}>
+        <SidebarItem
+          icon={Settings}
+          label="Settings"
+          collapsed={isCollapsed}
+          equalSpacing={isCollapsed}
+          onClick={() => {
+            setSettingsSection('agent');
+            setSettingsOpen(true);
+          }}
+        />
+        <SidebarItem
+          icon={FlaskConical}
+          label="Feedback"
+          collapsed={isCollapsed}
+          equalSpacing={isCollapsed}
+          onClick={() => {
+            setSettingsSection('feedback');
+            setSettingsOpen(true);
+          }}
+        />
       </div>
 
       {/* Settings Dialog */}
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} defaultSection={settingsSection} />
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        defaultSection={settingsSection}
+      />
     </aside>
   );
 };
@@ -332,7 +408,12 @@ interface WorkspaceItemProps {
   readonly onToggle?: () => void;
 }
 
-const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, collapsed = false, expanded = true, onToggle }) => {
+const WorkspaceItem: FC<WorkspaceItemProps> = ({
+  name,
+  collapsed = false,
+  expanded = true,
+  onToggle,
+}) => {
   return (
     <button
       className="flex items-center h-8 rounded-md mx-1.5 transition-colors overflow-hidden text-muted-foreground hover:text-foreground hover:bg-accent/50"
@@ -343,7 +424,9 @@ const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, collapsed = false, expand
         className="flex items-center justify-center shrink-0"
         style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
       >
-        <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', !expanded && '-rotate-90')} />
+        <ChevronDown
+          className={cn('h-4 w-4 shrink-0 transition-transform', !expanded && '-rotate-90')}
+        />
       </div>
       {/* Text that slides in */}
       <span
@@ -377,8 +460,12 @@ const ConversationItem: FC<ConversationItemProps> = ({
   return (
     <div
       className="relative group mx-1.5 ml-2"
-      onMouseEnter={() => { setIsHovered(true); }}
-      onMouseLeave={() => { setIsHovered(false); }}
+      onMouseEnter={() => {
+        setIsHovered(true);
+      }}
+      onMouseLeave={() => {
+        setIsHovered(false);
+      }}
     >
       <button
         className={cn(
@@ -440,9 +527,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
     <button
       className={cn(
         'relative flex items-center justify-center transition-colors h-7 px-3 flex-1',
-        active
-          ? 'text-foreground'
-          : 'text-muted-foreground hover:text-foreground'
+        active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
       )}
       onClick={onClick}
       title={label}
@@ -451,15 +536,11 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       <div
         className={cn(
           'absolute inset-0 rounded-t-md transition-colors',
-          active
-            ? 'bg-sidebar-accent'
-            : 'hover:bg-muted/50'
+          active ? 'bg-sidebar-accent' : 'hover:bg-muted/50'
         )}
       />
       {/* Active indicator */}
-      {active ? (
-        <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary" />
-      ) : null}
+      {active ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary" /> : null}
       <span className="relative text-xs font-medium truncate">{label}</span>
     </button>
   );

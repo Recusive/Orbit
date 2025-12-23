@@ -46,6 +46,12 @@ export interface PermissionRequest {
   createdAt: number;
 }
 
+// Cached usage data per session
+interface CachedUsage {
+  usage: UsageData;
+  processedIds: Set<string>;
+}
+
 export interface ToolState {
   // Input mode (synced with extension)
   inputMode: InputMode;
@@ -65,11 +71,17 @@ export interface ToolState {
   // Pending permission requests
   pendingPermissions: PermissionRequest[];
 
+  // Current session ID for usage tracking
+  currentSessionId: string | null;
+
   // Cumulative session usage (from SDK)
   sessionUsage: UsageData;
 
   // Track processed message IDs to avoid double-counting (SDK sends same usage for parallel tools)
   processedMessageIds: Set<string>;
+
+  // Cache of usage data per session
+  usageCache: Map<string, CachedUsage>;
 
   // Actions
   setInputMode: (mode: InputMode) => void;
@@ -77,7 +89,13 @@ export interface ToolState {
   setModel: (model: Model) => void;
 
   // Tool lifecycle
-  startTool: (id: string, messageId: string, toolName: string, toolInput: Record<string, unknown>, contentOffset?: number) => void;
+  startTool: (
+    id: string,
+    messageId: string,
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    contentOffset?: number
+  ) => void;
   completeTool: (id: string, toolOutput: unknown, success: boolean) => void;
 
   // Permission management
@@ -86,13 +104,18 @@ export interface ToolState {
   clearPermissions: () => void;
 
   // Usage tracking
-  addUsage: (messageId: string, usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens?: number | undefined;
-    cache_creation_input_tokens?: number | undefined;
-  }, totalCostUsd?: number  ) => void;
+  addUsage: (
+    messageId: string,
+    usage: {
+      input_tokens: number;
+      output_tokens: number;
+      cache_read_input_tokens?: number | undefined;
+      cache_creation_input_tokens?: number | undefined;
+    },
+    totalCostUsd?: number
+  ) => void;
   resetUsage: () => void;
+  switchSession: (newSessionId: string) => void;
 
   // Computed values
   getContextPercentage: () => number;
@@ -122,8 +145,10 @@ export const useToolStore = create<ToolState>()(
     activeTools: {},
     completedTools: [],
     pendingPermissions: [],
+    currentSessionId: null,
     sessionUsage: { ...initialUsage },
     processedMessageIds: new Set<string>(),
+    usageCache: new Map<string, CachedUsage>(),
 
     setInputMode: (mode: InputMode) => {
       set((state) => {
@@ -143,7 +168,13 @@ export const useToolStore = create<ToolState>()(
       });
     },
 
-    startTool: (id: string, messageId: string, toolName: string, toolInput: Record<string, unknown>, contentOffset?: number) => {
+    startTool: (
+      id: string,
+      messageId: string,
+      toolName: string,
+      toolInput: Record<string, unknown>,
+      contentOffset?: number
+    ) => {
       set((state) => {
         const tool: ToolExecution = {
           id,
@@ -195,12 +226,16 @@ export const useToolStore = create<ToolState>()(
       });
     },
 
-    addUsage: (messageId: string, usage: {
-      input_tokens: number;
-      output_tokens: number;
-      cache_read_input_tokens?: number | undefined;
-      cache_creation_input_tokens?: number | undefined;
-    }, totalCostUsd?: number  ) => {
+    addUsage: (
+      messageId: string,
+      usage: {
+        input_tokens: number;
+        output_tokens: number;
+        cache_read_input_tokens?: number | undefined;
+        cache_creation_input_tokens?: number | undefined;
+      },
+      totalCostUsd?: number
+    ) => {
       set((state) => {
         // SDK sends same usage for all messages with same ID (parallel tool uses)
         // Only count each message ID once to avoid double-charging
@@ -227,6 +262,32 @@ export const useToolStore = create<ToolState>()(
       });
     },
 
+    switchSession: (newSessionId: string) => {
+      set((state) => {
+        // Save current session's usage to cache (if we have a current session)
+        if (state.currentSessionId) {
+          state.usageCache.set(state.currentSessionId, {
+            usage: { ...state.sessionUsage },
+            processedIds: new Set(state.processedMessageIds),
+          });
+        }
+
+        // Check if we have cached usage for the new session
+        const cached = state.usageCache.get(newSessionId);
+        if (cached) {
+          // Restore cached usage
+          state.sessionUsage = { ...cached.usage };
+          state.processedMessageIds = new Set(cached.processedIds);
+        } else {
+          // New session - reset to zero
+          state.sessionUsage = { ...initialUsage };
+          state.processedMessageIds = new Set<string>();
+        }
+
+        state.currentSessionId = newSessionId;
+      });
+    },
+
     getContextPercentage: () => {
       const state = get();
       const maxTokens = MODEL_CONTEXT_WINDOWS[state.model];
@@ -246,19 +307,19 @@ export const useToolStore = create<ToolState>()(
 
     getToolsForMessage: (messageId: string) => {
       const state = get();
-      const active = Object.values(state.activeTools).filter(
-        (t) => t.messageId === messageId
-      );
-      const completed = state.completedTools.filter(
-        (t) => t.messageId === messageId
-      );
+      const active = Object.values(state.activeTools).filter((t) => t.messageId === messageId);
+      const completed = state.completedTools.filter((t) => t.messageId === messageId);
 
       // Deduplicate by tool ID (keep latest version of each)
       const toolMap = new Map<string, ToolExecution>();
       for (const tool of [...active, ...completed]) {
         const existing = toolMap.get(tool.id);
         // Keep the tool if it's newer or has more complete status
-        if (!existing || tool.startedAt > existing.startedAt || (tool.completedAt !== undefined && existing.completedAt === undefined)) {
+        if (
+          !existing ||
+          tool.startedAt > existing.startedAt ||
+          (tool.completedAt !== undefined && existing.completedAt === undefined)
+        ) {
           toolMap.set(tool.id, tool);
         }
       }
@@ -274,8 +335,10 @@ export const useToolStore = create<ToolState>()(
         state.activeTools = {};
         state.completedTools = [];
         state.pendingPermissions = [];
+        state.currentSessionId = null;
         state.sessionUsage = { ...initialUsage };
         state.processedMessageIds = new Set<string>();
+        state.usageCache = new Map<string, CachedUsage>();
       });
     },
   }))
@@ -285,11 +348,14 @@ export const useToolStore = create<ToolState>()(
 export const useInputMode = (): InputMode => useToolStore((state) => state.inputMode);
 export const useThinkingMode = (): ThinkingMode => useToolStore((state) => state.thinkingMode);
 export const useModel = (): Model => useToolStore((state) => state.model);
-export const useActiveTools = (): Record<string, ToolExecution> => useToolStore((state) => state.activeTools);
-export const usePendingPermissions = (): PermissionRequest[] => useToolStore((state) => state.pendingPermissions);
+export const useActiveTools = (): Record<string, ToolExecution> =>
+  useToolStore((state) => state.activeTools);
+export const usePendingPermissions = (): PermissionRequest[] =>
+  useToolStore((state) => state.pendingPermissions);
 
 // Usage selectors
 export const useSessionUsage = (): UsageData => useToolStore((state) => state.sessionUsage);
-export const useContextPercentage = (): number => useToolStore((state) => state.getContextPercentage());
+export const useContextPercentage = (): number =>
+  useToolStore((state) => state.getContextPercentage());
 export const useMaxTokens = (): number => useToolStore((state) => state.getMaxTokens());
 export const useUsedTokens = (): number => useToolStore((state) => state.getUsedTokens());
