@@ -17,7 +17,6 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import type { FileStatus as BackendFileStatus, GitStatus } from '@/lib/backend';
 
 import { useGitStatus } from '@/hooks/use-git-status';
-import { gitCommit, gitDiscard, gitStage, gitUnstage } from '@/lib/backend';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui-store';
 
@@ -69,7 +68,16 @@ function getFileDirectory(path: string): string {
 
 export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = '', onPush }) => {
   const workspacePath = useUIStore((state) => state.workspacePath);
-  const { status, repoPath, isLoading, error, refresh } = useGitStatus(workspacePath, {
+  const {
+    status,
+    isLoading,
+    error,
+    refresh,
+    stage: gitStage,
+    unstage: gitUnstage,
+    commit: gitCommit,
+    discard: gitDiscard,
+  } = useGitStatus(workspacePath, {
     pollInterval: 5000,
   });
 
@@ -154,13 +162,12 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
 
   const handleStageFile = useCallback(
     async (path: string): Promise<void> => {
-      if (!repoPath || operationInProgress.current) return;
+      if (operationInProgress.current) return;
       operationInProgress.current = true;
       setIsStaging(true);
       setOperationError(null);
       try {
-        await gitStage(repoPath, [path]);
-        await refresh();
+        await gitStage([path]);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setOperationError(`Failed to stage: ${message}`);
@@ -170,18 +177,17 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
         operationInProgress.current = false;
       }
     },
-    [repoPath, refresh, clearOperationError]
+    [gitStage, clearOperationError]
   );
 
   const handleUnstageFile = useCallback(
     async (path: string): Promise<void> => {
-      if (!repoPath || operationInProgress.current) return;
+      if (operationInProgress.current) return;
       operationInProgress.current = true;
       setIsStaging(true);
       setOperationError(null);
       try {
-        await gitUnstage(repoPath, [path]);
-        await refresh();
+        await gitUnstage([path]);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setOperationError(`Failed to unstage: ${message}`);
@@ -191,11 +197,11 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
         operationInProgress.current = false;
       }
     },
-    [repoPath, refresh, clearOperationError]
+    [gitUnstage, clearOperationError]
   );
 
   const handleStageAll = useCallback(async (): Promise<void> => {
-    if (!repoPath || operationInProgress.current) return;
+    if (operationInProgress.current) return;
     const allPaths = unstagedFiles.map((f) => f.path);
     if (allPaths.length === 0) return;
 
@@ -203,8 +209,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     setIsStaging(true);
     setOperationError(null);
     try {
-      await gitStage(repoPath, allPaths);
-      await refresh();
+      await gitStage(allPaths);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setOperationError(`Failed to stage all: ${message}`);
@@ -213,10 +218,10 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
       setIsStaging(false);
       operationInProgress.current = false;
     }
-  }, [repoPath, unstagedFiles, refresh, clearOperationError]);
+  }, [unstagedFiles, gitStage, clearOperationError]);
 
   const handleUnstageAll = useCallback(async (): Promise<void> => {
-    if (!repoPath || operationInProgress.current) return;
+    if (operationInProgress.current) return;
     const allPaths = stagedFiles.map((f) => f.path);
     if (allPaths.length === 0) return;
 
@@ -224,8 +229,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     setIsStaging(true);
     setOperationError(null);
     try {
-      await gitUnstage(repoPath, allPaths);
-      await refresh();
+      await gitUnstage(allPaths);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setOperationError(`Failed to unstage all: ${message}`);
@@ -234,7 +238,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
       setIsStaging(false);
       operationInProgress.current = false;
     }
-  }, [repoPath, stagedFiles, refresh, clearOperationError]);
+  }, [stagedFiles, gitUnstage, clearOperationError]);
 
   // Request discard confirmation
   const handleRequestDiscard = useCallback((path: string): void => {
@@ -248,7 +252,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
 
   // Confirm and execute discard
   const handleConfirmDiscard = useCallback(async (): Promise<void> => {
-    if (!repoPath || !pendingDiscard || operationInProgress.current) return;
+    if (!pendingDiscard || operationInProgress.current) return;
 
     operationInProgress.current = true;
     setOperationError(null);
@@ -256,8 +260,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     setPendingDiscard(null);
 
     try {
-      await gitDiscard(repoPath, [pathToDiscard]);
-      await refresh();
+      await gitDiscard([pathToDiscard]);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setOperationError(`Failed to discard: ${message}`);
@@ -265,15 +268,10 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     } finally {
       operationInProgress.current = false;
     }
-  }, [repoPath, pendingDiscard, refresh, clearOperationError]);
+  }, [pendingDiscard, gitDiscard, clearOperationError]);
 
   const handleCommit = useCallback(async (): Promise<void> => {
-    if (
-      !repoPath ||
-      !commitMessage.trim() ||
-      stagedFiles.length === 0 ||
-      operationInProgress.current
-    ) {
+    if (!commitMessage.trim() || stagedFiles.length === 0 || operationInProgress.current) {
       return;
     }
 
@@ -281,9 +279,8 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     setIsCommitting(true);
     setCommitError(null);
     try {
-      await gitCommit(repoPath, commitMessage.trim());
+      await gitCommit(commitMessage.trim());
       setCommitMessage('');
-      await refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setCommitError(message);
@@ -291,7 +288,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
       setIsCommitting(false);
       operationInProgress.current = false;
     }
-  }, [repoPath, commitMessage, stagedFiles.length, refresh]);
+  }, [commitMessage, stagedFiles.length, gitCommit]);
 
   // Handle Ctrl/Cmd+Enter to commit
   const handleKeyDown = useCallback(

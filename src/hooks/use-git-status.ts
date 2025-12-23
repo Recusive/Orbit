@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { FileStatus, GitStatus, StatusEntry } from '@/lib/backend';
 
-import { gitDiscover, gitStatus } from '@/lib/backend';
+import { gitCommit, gitDiscover, gitDiscard, gitStage, gitStatus, gitUnstage } from '@/lib/backend';
 
 export interface UseGitStatusOptions {
   /** Polling interval in ms (default: 5000, set to 0 to disable) */
@@ -32,6 +32,14 @@ export interface UseGitStatusResult {
   totalChanges: number;
   /** Get entries by status type */
   getByStatus: (status: FileStatus) => StatusEntry[];
+  /** Stage files for commit */
+  stage: (files: string[]) => Promise<void>;
+  /** Unstage files from index */
+  unstage: (files: string[]) => Promise<void>;
+  /** Commit staged changes, returns commit hash */
+  commit: (message: string) => Promise<string>;
+  /** Discard changes to files */
+  discard: (files: string[]) => Promise<void>;
 }
 
 /**
@@ -243,6 +251,55 @@ export function useGitStatus(
     [status]
   );
 
+  // Git operations - stage files
+  const stage = useCallback(
+    async (files: string[]): Promise<void> => {
+      if (!repoPath) {
+        throw new Error('Not a git repository');
+      }
+      await gitStage(repoPath, files);
+      await loadStatus(true); // Background refresh
+    },
+    [repoPath, loadStatus]
+  );
+
+  // Git operations - unstage files
+  const unstage = useCallback(
+    async (files: string[]): Promise<void> => {
+      if (!repoPath) {
+        throw new Error('Not a git repository');
+      }
+      await gitUnstage(repoPath, files);
+      await loadStatus(true); // Background refresh
+    },
+    [repoPath, loadStatus]
+  );
+
+  // Git operations - commit staged changes
+  const commit = useCallback(
+    async (message: string): Promise<string> => {
+      if (!repoPath) {
+        throw new Error('Not a git repository');
+      }
+      const hash = await gitCommit(repoPath, message);
+      await loadStatus(true); // Background refresh
+      return hash;
+    },
+    [repoPath, loadStatus]
+  );
+
+  // Git operations - discard changes
+  const discard = useCallback(
+    async (files: string[]): Promise<void> => {
+      if (!repoPath) {
+        throw new Error('Not a git repository');
+      }
+      await gitDiscard(repoPath, files);
+      await loadStatus(true); // Background refresh
+    },
+    [repoPath, loadStatus]
+  );
+
   return {
     status,
     repoPath,
@@ -253,5 +310,9 @@ export function useGitStatus(
     hasConflicts,
     totalChanges,
     getByStatus,
+    stage,
+    unstage,
+    commit,
+    discard,
   };
 }
