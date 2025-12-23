@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  ChevronDown,
   Download,
   GitBranch,
   GitCommit,
@@ -13,10 +14,16 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { FileStatus as BackendFileStatus, GitStatus } from '@/lib/backend';
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useGitStatus } from '@/hooks/use-git-status';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui-store';
@@ -79,6 +86,9 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     discard: gitDiscard,
     push: gitPush,
     pull: gitPull,
+    branches,
+    listBranches,
+    checkout: gitCheckout,
   } = useGitStatus(workspacePath, {
     pollInterval: 5000,
   });
@@ -88,9 +98,17 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
   const [isStaging, setIsStaging] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [pendingDiscard, setPendingDiscard] = useState<string | null>(null);
+
+  // Fetch branches when status loads
+  useEffect(() => {
+    if (status) {
+      void listBranches();
+    }
+  }, [status, listBranches]);
 
   // Track ongoing operations to prevent concurrent actions
   const operationInProgress = useRef(false);
@@ -339,6 +357,26 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     }
   }, [gitPull, clearOperationError]);
 
+  const handleCheckout = useCallback(
+    async (branch: string): Promise<void> => {
+      if (operationInProgress.current) return;
+      operationInProgress.current = true;
+      setIsCheckingOut(true);
+      setOperationError(null);
+      try {
+        await gitCheckout(branch);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setOperationError(`Checkout failed: ${message}`);
+        clearOperationError();
+      } finally {
+        setIsCheckingOut(false);
+        operationInProgress.current = false;
+      }
+    },
+    [gitCheckout, clearOperationError]
+  );
+
   // Loading state
   if (isLoading && !status) {
     return (
@@ -378,25 +416,65 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
 
   return (
     <div className={cn('flex flex-col h-full', className)}>
-      {/* Header with Branch Info */}
+      {/* Header with Branch Dropdown */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <div className="flex items-center gap-2 text-sm min-w-0">
-          <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span
-            className={cn('font-medium truncate', !status.branch && 'text-muted-foreground italic')}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            disabled={isCheckingOut || branches.length === 0}
+            className="flex items-center gap-1.5 text-sm min-w-0 hover:bg-accent rounded px-1.5 py-0.5 -ml-1.5 disabled:opacity-50"
           >
-            {status.branch || 'No commits yet'}
-          </span>
+            {isCheckingOut ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+            ) : (
+              <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            <span
+              className={cn(
+                'font-medium truncate',
+                !status.branch && 'text-muted-foreground italic'
+              )}
+            >
+              {status.branch || 'No commits yet'}
+            </span>
+            {branches.length > 0 ? (
+              <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+            ) : null}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
+            {branches.map((branch) => (
+              <DropdownMenuItem
+                key={branch.name}
+                onClick={() => {
+                  if (branch.name !== status.branch) {
+                    void handleCheckout(branch.name);
+                  }
+                }}
+                className="flex items-center gap-2"
+              >
+                {branch.isCurrent ? (
+                  <Check className="h-3.5 w-3.5 text-green-500" />
+                ) : (
+                  <span className="w-3.5" />
+                )}
+                <span className="truncate">{branch.name}</span>
+                {branch.upstream ? (
+                  <span className="text-xs text-muted-foreground ml-auto">→ {branch.upstream}</span>
+                ) : null}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <div className="flex items-center gap-1">
           <SyncStatus status={status} />
+          <button
+            onClick={refresh}
+            disabled={isLoading}
+            className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+            title="Refresh"
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
+          </button>
         </div>
-        <button
-          onClick={refresh}
-          disabled={isLoading}
-          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-          title="Refresh"
-        >
-          <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
-        </button>
       </div>
 
       {/* Scrollable content */}

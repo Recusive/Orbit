@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { FileStatus, GitStatus, StatusEntry } from '@/lib/backend';
+import type { FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/backend';
 
 import {
+  gitBranches,
+  gitCheckout,
   gitCommit,
   gitDiscover,
   gitDiscard,
@@ -53,6 +55,12 @@ export interface UseGitStatusResult {
   push: (remote?: string) => Promise<void>;
   /** Pull changes from remote */
   pull: (remote?: string) => Promise<void>;
+  /** List of branches */
+  branches: GitBranch[];
+  /** Fetch branches from repository */
+  listBranches: () => Promise<GitBranch[]>;
+  /** Checkout a branch */
+  checkout: (branch: string) => Promise<void>;
 }
 
 /**
@@ -90,6 +98,7 @@ export function useGitStatus(
   const [repoPath, setRepoPath] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [branches, setBranches] = useState<GitBranch[]>([]);
 
   // Request counter to handle race conditions - only apply results from latest request
   const requestIdRef = useRef(0);
@@ -337,6 +346,29 @@ export function useGitStatus(
     [repoPath, loadStatus]
   );
 
+  // Git operations - list branches
+  const listBranches = useCallback(async (): Promise<GitBranch[]> => {
+    if (!repoPath) {
+      return [];
+    }
+    const branchList = await gitBranches(repoPath);
+    setBranches(branchList);
+    return branchList;
+  }, [repoPath]);
+
+  // Git operations - checkout branch
+  const checkout = useCallback(
+    async (branch: string): Promise<void> => {
+      if (!repoPath) {
+        throw new Error('Not a git repository');
+      }
+      await gitCheckout(repoPath, branch);
+      await loadStatus(true); // Background refresh
+      await listBranches(); // Refresh branch list
+    },
+    [repoPath, loadStatus, listBranches]
+  );
+
   return {
     status,
     repoPath,
@@ -353,5 +385,8 @@ export function useGitStatus(
     discard,
     push,
     pull,
+    branches,
+    listBranches,
+    checkout,
   };
 }
