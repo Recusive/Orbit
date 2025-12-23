@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ViewedFile } from '@/stores/file-viewer-store';
+import type { GotoPosition, ViewedFile } from '@/stores/file-viewer-store';
 import type { FC } from 'react';
 
 import { FileDiffViewer } from '@/components/activity/file-diff-viewer';
@@ -45,8 +45,13 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   const closeSearch = useFileViewerStore((state) => state.closeSearch);
   const updateContent = useFileViewerStore((state) => state.updateContent);
   const markSaved = useFileViewerStore((state) => state.markSaved);
+  const pendingGoto = useFileViewerStore((state) => state.pendingGoto);
+  const clearPendingGoto = useFileViewerStore((state) => state.clearPendingGoto);
   const inputRef = useRef<HTMLInputElement>(null);
   const documentVersionRef = useRef(1); // Track document version for LSP
+
+  // Only apply goto if it's for the current file
+  const gotoForThisFile: GotoPosition | null = pendingGoto;
 
   // Focus search input when opened
   useEffect(() => {
@@ -98,6 +103,8 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
         onChange={handleChange}
         onSave={handleSave}
         theme={theme}
+        gotoPosition={gotoForThisFile}
+        onGotoComplete={clearPendingGoto}
       />
 
       {/* Search overlay */}

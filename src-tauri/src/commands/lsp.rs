@@ -2,16 +2,32 @@
 //!
 //! Provides Language Server Protocol integration for code intelligence features.
 
+use futures::StreamExt as _;
+use log::{debug, error};
+use serde::Serialize;
 use snowflake_core::{CompletionItem, Diagnostic, HoverInfo, Location, Result, SignatureHelp};
 use snowflake_lsp::LspManager;
 use std::path::PathBuf;
 use std::sync::OnceLock;
+use tauri::{AppHandle, Emitter as _};
 use tokio::sync::Mutex;
 
 static LSP_MANAGER: OnceLock<Mutex<LspManager>> = OnceLock::new();
 
 fn get_lsp_manager() -> &'static Mutex<LspManager> {
     LSP_MANAGER.get_or_init(|| Mutex::new(LspManager::new()))
+}
+
+/// Diagnostics event payload sent to the frontend.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticsEvent {
+    /// File path (absolute).
+    pub path: String,
+    /// Diagnostics for this file.
+    pub diagnostics: Vec<Diagnostic>,
+    /// Language server that produced these.
+    pub language: String,
 }
 
 /// Set the workspace root for LSP operations
@@ -103,11 +119,41 @@ pub async fn lsp_did_close(path: String) -> Result<()> {
     manager.did_close(&path).await
 }
 
-/// Start a language server
+/// Start a language server and begin emitting diagnostics events.
 #[tauri::command]
-pub async fn lsp_start(language: String, root_path: String) -> Result<()> {
-    let manager = get_lsp_manager().lock().await;
-    manager.start_server(&language, &root_path).await
+pub async fn lsp_start(language: String, root_path: String, app: AppHandle) -> Result<()> {
+    let client = {
+        let manager = get_lsp_manager().lock().await;
+        manager.start_server(&language, &root_path).await?
+    };
+
+    // If a new client was started, set up diagnostics event emitter
+    if let Some(client) = client {
+        if let Some(mut rx) = client.take_diagnostics_receiver().await {
+            let lang = language.clone();
+            let app_handle = app.clone();
+
+            // Spawn task to emit diagnostics events (drop handle since we don't need to join)
+            drop(tokio::spawn(async move {
+                while let Some((path, diagnostics)) = rx.next().await {
+                    let path_str = path.to_string_lossy().to_string();
+                    let event = DiagnosticsEvent {
+                        path: path_str.clone(),
+                        diagnostics,
+                        language: lang.clone(),
+                    };
+
+                    if let Err(e) = app_handle.emit("lsp:diagnostics", &event) {
+                        error!("Failed to emit diagnostics event for {path_str}: {e}");
+                    }
+                }
+
+                debug!("Diagnostics emitter stopped for {lang}");
+            }));
+        }
+    }
+
+    Ok(())
 }
 
 /// Stop a language server

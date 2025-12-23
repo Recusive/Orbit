@@ -26,6 +26,14 @@ export interface ViewedFile {
   isModified: boolean; // Track if content has been modified
 }
 
+// Position to navigate to after opening a file
+export interface GotoPosition {
+  line: number; // 0-indexed
+  column: number; // 0-indexed
+  /** Unique ID to ensure effect re-triggers for same position */
+  id: number;
+}
+
 interface FileViewerState {
   // Open file tabs
   openTabs: ViewedFile[];
@@ -42,6 +50,9 @@ interface FileViewerState {
   // Search state
   searchOpen: boolean;
   searchQuery: string;
+
+  // Pending goto position (for diagnostic clicks, etc.)
+  pendingGoto: GotoPosition | null;
 }
 
 interface FileViewerActions {
@@ -67,6 +78,10 @@ interface FileViewerActions {
   goForward: () => void;
   canGoBack: () => boolean;
   canGoForward: () => boolean;
+
+  // Goto line/column (for diagnostics, etc.)
+  gotoPosition: (path: string, line: number, column: number, content?: string) => void;
+  clearPendingGoto: () => void;
 
   // Loading
   setLoading: (isLoading: boolean, path?: string) => void;
@@ -142,6 +157,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
     loadingPath: null,
     searchOpen: false,
     searchQuery: '',
+    pendingGoto: null,
 
     openFile: (path: string, content?: string): void => {
       set((state) => {
@@ -403,6 +419,22 @@ export const useFileViewerStore = create<FileViewerStore>()(
       set((state) => {
         state.searchOpen = false;
         state.searchQuery = '';
+      });
+    },
+
+    gotoPosition: (path: string, line: number, column: number, content?: string): void => {
+      // Open the file (or switch to it if already open)
+      get().openFile(path, content);
+
+      // Set the pending goto position with unique ID to ensure effect re-triggers
+      set((state) => {
+        state.pendingGoto = { line, column, id: Date.now() };
+      });
+    },
+
+    clearPendingGoto: (): void => {
+      set((state) => {
+        state.pendingGoto = null;
       });
     },
   }))

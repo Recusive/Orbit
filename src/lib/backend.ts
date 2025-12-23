@@ -197,6 +197,50 @@ export async function lspRunningServers(): Promise<string[]> {
   return invoke<string[]>('lsp_running_servers');
 }
 
+/**
+ * Subscribe to diagnostics events (push-based).
+ *
+ * @param callback - Called when diagnostics are received for any file
+ * @returns Unsubscribe function
+ *
+ * @example
+ * ```typescript
+ * const unlisten = await onDiagnostics((event) => {
+ *   console.log(`${event.path}: ${event.diagnostics.length} issues`);
+ * });
+ *
+ * // Later...
+ * unlisten();
+ * ```
+ */
+export async function onDiagnostics(
+  callback: (event: DiagnosticsEvent) => void
+): Promise<() => void> {
+  return listen<DiagnosticsEvent>('lsp:diagnostics', callback);
+}
+
+/**
+ * Subscribe to diagnostics for a specific file.
+ *
+ * @param filePath - Absolute path to watch
+ * @param callback - Called when diagnostics change for this file
+ * @returns Unsubscribe function
+ */
+export async function onFileDiagnostics(
+  filePath: string,
+  callback: (diagnostics: Diagnostic[]) => void
+): Promise<() => void> {
+  return listen<DiagnosticsEvent>('lsp:diagnostics', (event): void => {
+    // Normalize paths for comparison
+    const eventPath = event.path.replace(/\\/g, '/');
+    const watchPath = filePath.replace(/\\/g, '/');
+
+    if (eventPath === watchPath) {
+      callback(event.diagnostics);
+    }
+  });
+}
+
 // ============================================
 // Terminal Operations
 // ============================================
@@ -573,6 +617,18 @@ export interface Diagnostic {
   range: Range;
   source?: string;
   code?: string;
+}
+
+/**
+ * Diagnostics event from LSP server (push-based).
+ */
+export interface DiagnosticsEvent {
+  /** File path (absolute) */
+  path: string;
+  /** Diagnostics for this file */
+  diagnostics: Diagnostic[];
+  /** Language server that produced these */
+  language: string;
 }
 
 export interface SignatureHelp {

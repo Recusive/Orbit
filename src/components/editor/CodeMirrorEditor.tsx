@@ -23,7 +23,7 @@ import {
   indentUnit,
   syntaxHighlighting,
 } from '@codemirror/language';
-import { lintKeymap } from '@codemirror/lint';
+import { linter, lintGutter, lintKeymap, setDiagnostics } from '@codemirror/lint';
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState } from '@codemirror/state';
 import {
@@ -43,10 +43,12 @@ import { tags } from '@lezer/highlight';
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { CompletionItem } from '@/lib/backend';
+import type { Diagnostic as CmDiagnostic } from '@codemirror/lint';
 import type { Extension } from '@codemirror/state';
 import type { Tooltip, ViewUpdate } from '@codemirror/view';
 import type { FC } from 'react';
 
+import { useFileDiagnostics } from '@/hooks/use-file-diagnostics';
 import { useLsp } from '@/hooks/use-lsp';
 import { useFileStore } from '@/stores/file-store';
 
@@ -127,6 +129,40 @@ const darkTheme = EditorView.theme(
     '.cm-tooltip .cm-lsp-hover': {
       backgroundColor: 'oklch(0.22 0.012 60)',
     },
+    // Diagnostic squiggles
+    '.cm-lintRange-error': {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 3 L2 0 L4 3 L6 0' fill='none' stroke='%23f87171' stroke-width='1'/%3E%3C/svg%3E")`,
+      backgroundRepeat: 'repeat-x',
+      backgroundPosition: 'bottom',
+      paddingBottom: '2px',
+    },
+    '.cm-lintRange-warning': {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 3 L2 0 L4 3 L6 0' fill='none' stroke='%23fbbf24' stroke-width='1'/%3E%3C/svg%3E")`,
+      backgroundRepeat: 'repeat-x',
+      backgroundPosition: 'bottom',
+      paddingBottom: '2px',
+    },
+    '.cm-lintRange-info': {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 3 L2 0 L4 3 L6 0' fill='none' stroke='%2360a5fa' stroke-width='1'/%3E%3C/svg%3E")`,
+      backgroundRepeat: 'repeat-x',
+      backgroundPosition: 'bottom',
+      paddingBottom: '2px',
+    },
+    '.cm-lintRange-hint': {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 3 L2 0 L4 3 L6 0' fill='none' stroke='%239ca3af' stroke-width='1'/%3E%3C/svg%3E")`,
+      backgroundRepeat: 'repeat-x',
+      backgroundPosition: 'bottom',
+      paddingBottom: '2px',
+    },
+    // Lint gutter markers
+    '.cm-lint-marker-error': {
+      content: '"●"',
+      color: '#f87171',
+    },
+    '.cm-lint-marker-warning': {
+      content: '"●"',
+      color: '#fbbf24',
+    },
   },
   { dark: true }
 );
@@ -205,6 +241,40 @@ const lightTheme = EditorView.theme({
   '.cm-tooltip .cm-lsp-hover': {
     backgroundColor: '#ffffff',
   },
+  // Diagnostic squiggles (darker colors for light mode)
+  '.cm-lintRange-error': {
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 3 L2 0 L4 3 L6 0' fill='none' stroke='%23dc2626' stroke-width='1'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'repeat-x',
+    backgroundPosition: 'bottom',
+    paddingBottom: '2px',
+  },
+  '.cm-lintRange-warning': {
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 3 L2 0 L4 3 L6 0' fill='none' stroke='%23d97706' stroke-width='1'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'repeat-x',
+    backgroundPosition: 'bottom',
+    paddingBottom: '2px',
+  },
+  '.cm-lintRange-info': {
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 3 L2 0 L4 3 L6 0' fill='none' stroke='%232563eb' stroke-width='1'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'repeat-x',
+    backgroundPosition: 'bottom',
+    paddingBottom: '2px',
+  },
+  '.cm-lintRange-hint': {
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 3 L2 0 L4 3 L6 0' fill='none' stroke='%236b7280' stroke-width='1'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'repeat-x',
+    backgroundPosition: 'bottom',
+    paddingBottom: '2px',
+  },
+  // Lint gutter markers
+  '.cm-lint-marker-error': {
+    content: '"●"',
+    color: '#dc2626',
+  },
+  '.cm-lint-marker-warning': {
+    content: '"●"',
+    color: '#d97706',
+  },
 });
 
 // Light syntax highlighting (github-light style)
@@ -241,6 +311,13 @@ const lightHighlightStyle = HighlightStyle.define([
 // Props
 // ============================================
 
+interface GotoPosition {
+  line: number; // 0-indexed
+  column: number; // 0-indexed
+  /** Unique ID to ensure effect re-triggers for same position */
+  id: number;
+}
+
 interface CodeMirrorEditorProps {
   readonly value: string;
   readonly language: string;
@@ -250,6 +327,10 @@ interface CodeMirrorEditorProps {
   readonly readOnly?: boolean;
   readonly theme?: 'dark' | 'light';
   readonly className?: string;
+  /** Position to scroll to (0-indexed line/column) */
+  readonly gotoPosition?: GotoPosition | null;
+  /** Called after scrolling to the position */
+  readonly onGotoComplete?: () => void;
 }
 
 // ============================================
@@ -265,6 +346,8 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
   readOnly = false,
   theme = 'dark',
   className,
+  gotoPosition,
+  onGotoComplete,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -276,6 +359,9 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
 
   // Initialize LSP hook
   const lsp = useLsp(language, rootPath);
+
+  // Get diagnostics for this file
+  const { diagnostics: lspDiagnostics } = useFileDiagnostics(filePath ?? null);
 
   // Refs to access current values in callbacks without stale closures
   const lspRef = useRef(lsp);
@@ -446,6 +532,10 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
         hideOnChange: true,
         hoverTime: 300,
       }),
+
+      // Diagnostics (squiggles) - using external setDiagnostics, linter just enables display
+      linter(() => [], { delay: 0 }),
+      lintGutter(),
 
       // Keymaps
       keymap.of([
@@ -636,6 +726,119 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
       effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly)),
     });
   }, [readOnly]);
+
+  // Update diagnostics (squiggles)
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+
+    // Convert LSP diagnostics to CodeMirror diagnostics
+    const cmDiagnostics: CmDiagnostic[] = lspDiagnostics
+      .map((d) => {
+        const doc = view.state.doc;
+
+        // Convert 0-indexed line/column to CodeMirror positions
+        const startLine = Math.min(d.range.start.line + 1, doc.lines);
+        const endLine = Math.min(d.range.end.line + 1, doc.lines);
+
+        const startLineInfo = doc.line(startLine);
+        const endLineInfo = doc.line(endLine);
+
+        const from = startLineInfo.from + Math.min(d.range.start.column, startLineInfo.length);
+        const to = endLineInfo.from + Math.min(d.range.end.column, endLineInfo.length);
+
+        // Ensure valid range (from <= to)
+        if (from > to || from < 0 || to > doc.length) return null;
+
+        // Map LSP severity to CodeMirror severity
+        const severityMap: Record<string, 'error' | 'warning' | 'info' | 'hint'> = {
+          error: 'error',
+          warning: 'warning',
+          info: 'info',
+          hint: 'hint',
+        };
+
+        const diagnostic: CmDiagnostic = {
+          from,
+          to,
+          severity: severityMap[d.severity] ?? 'info',
+          message: d.message,
+        };
+
+        // Only add source if present
+        if (d.source) {
+          diagnostic.source = d.source;
+        }
+
+        return diagnostic;
+      })
+      .filter((d): d is CmDiagnostic => d !== null);
+
+    // Dispatch diagnostics to CodeMirror
+    view.dispatch(setDiagnostics(view.state, cmDiagnostics));
+  }, [lspDiagnostics]);
+
+  // Track the last executed goto ID to prevent double execution
+  const lastExecutedGotoIdRef = useRef<number | null>(null);
+
+  // Function to execute goto (only if not already executed)
+  const executeGoto = useCallback(
+    (view: EditorView, pos: GotoPosition): void => {
+      // Skip if already executed this goto
+      if (lastExecutedGotoIdRef.current === pos.id) return;
+      lastExecutedGotoIdRef.current = pos.id;
+
+      // Convert 0-indexed line to 1-indexed for CodeMirror
+      const lineNumber = pos.line + 1;
+      const doc = view.state.doc;
+
+      // Clamp line number to valid range
+      const clampedLineNumber = Math.max(1, Math.min(lineNumber, doc.lines));
+      const line = doc.line(clampedLineNumber);
+
+      // Calculate position (clamp column to line length)
+      const column = Math.min(pos.column, line.length);
+      const cursorPos = line.from + column;
+
+      // Scroll to position and set cursor
+      view.dispatch({
+        selection: { anchor: cursorPos },
+        scrollIntoView: true,
+        effects: EditorView.scrollIntoView(cursorPos, { y: 'center' }),
+      });
+
+      // Focus the editor
+      view.focus();
+
+      // Notify that goto is complete
+      onGotoComplete?.();
+    },
+    [onGotoComplete]
+  );
+
+  // Handle goto position (scroll to line/column)
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !gotoPosition) return;
+
+    executeGoto(view, gotoPosition);
+  }, [gotoPosition, executeGoto]);
+
+  // Check for pending goto after editor mounts (handles race condition)
+  useEffect(() => {
+    // Small delay to ensure editor is fully initialized
+    const timeoutId = setTimeout(() => {
+      const view = viewRef.current;
+      if (view && gotoPosition) {
+        executeGoto(view, gotoPosition);
+      }
+    }, 50);
+
+    return (): void => {
+      clearTimeout(timeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once after mount
 
   return <div ref={containerRef} className={`h-full w-full overflow-hidden ${className ?? ''}`} />;
 };

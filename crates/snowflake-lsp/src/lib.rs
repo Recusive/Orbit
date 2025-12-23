@@ -1571,7 +1571,13 @@ impl LspManager {
     ///
     /// If the server is already running, returns Ok without restarting.
     /// If a stale client exists (crashed server), it will be cleaned up first.
-    pub async fn start_server(&self, language: &str, root_path: &str) -> Result<()> {
+    ///
+    /// Returns the client if a new one was started (so caller can set up diagnostics).
+    pub async fn start_server(
+        &self,
+        language: &str,
+        root_path: &str,
+    ) -> Result<Option<Arc<LspClient>>> {
         let root = PathBuf::from(root_path);
 
         // Get configuration first (before acquiring lock)
@@ -1588,7 +1594,7 @@ impl LspManager {
                     "Language server for {} already running, skipping start",
                     language
                 );
-                return Ok(());
+                return Ok(None);
             }
             // Stale client exists (server crashed) - remove it
             info!("Cleaning up stale {} language server", language);
@@ -1603,7 +1609,7 @@ impl LspManager {
         let _prev = clients.insert(language.to_string(), Arc::clone(&client));
 
         info!("Started language server for {} at {}", language, root_path);
-        Ok(())
+        Ok(Some(client))
     }
 
     /// Stop a language server for the given language.
