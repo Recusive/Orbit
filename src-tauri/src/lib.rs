@@ -187,6 +187,8 @@ pub fn run() {
             git::git_create_branch,
             git::git_delete_branch,
             git::git_blame,
+            git::git_push,
+            git::git_pull,
             // AI commands
             ai::ai_chat,
             ai::ai_complete,

@@ -385,6 +385,14 @@ export async function gitBlame(repoPath: string, file: string): Promise<BlameLin
   return invoke<BlameLine[]>('git_blame', { repoPath, file });
 }
 
+export async function gitPush(repoPath: string, remote?: string): Promise<void> {
+  return invoke('git_push', { repoPath, remote });
+}
+
+export async function gitPull(repoPath: string, remote?: string): Promise<void> {
+  return invoke('git_pull', { repoPath, remote });
+}
+
 // ============================================
 // AI Operations
 // ============================================

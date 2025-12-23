@@ -2,7 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { FileStatus, GitStatus, StatusEntry } from '@/lib/backend';
 
-import { gitCommit, gitDiscover, gitDiscard, gitStage, gitStatus, gitUnstage } from '@/lib/backend';
+import {
+  gitCommit,
+  gitDiscover,
+  gitDiscard,
+  gitPull,
+  gitPush,
+  gitStage,
+  gitStatus,
+  gitUnstage,
+} from '@/lib/backend';
 
 export interface UseGitStatusOptions {
   /** Polling interval in ms (default: 5000, set to 0 to disable) */
@@ -40,6 +49,10 @@ export interface UseGitStatusResult {
   commit: (message: string) => Promise<string>;
   /** Discard changes to files */
   discard: (files: string[]) => Promise<void>;
+  /** Push commits to remote */
+  push: (remote?: string) => Promise<void>;
+  /** Pull changes from remote */
+  pull: (remote?: string) => Promise<void>;
 }
 
 /**
@@ -300,6 +313,30 @@ export function useGitStatus(
     [repoPath, loadStatus]
   );
 
+  // Git operations - push to remote
+  const push = useCallback(
+    async (remote?: string): Promise<void> => {
+      if (!repoPath) {
+        throw new Error('Not a git repository');
+      }
+      await gitPush(repoPath, remote);
+      await loadStatus(true); // Background refresh
+    },
+    [repoPath, loadStatus]
+  );
+
+  // Git operations - pull from remote
+  const pull = useCallback(
+    async (remote?: string): Promise<void> => {
+      if (!repoPath) {
+        throw new Error('Not a git repository');
+      }
+      await gitPull(repoPath, remote);
+      await loadStatus(true); // Background refresh
+    },
+    [repoPath, loadStatus]
+  );
+
   return {
     status,
     repoPath,
@@ -314,5 +351,7 @@ export function useGitStatus(
     unstage,
     commit,
     discard,
+    push,
+    pull,
   };
 }

@@ -127,3 +127,15 @@ pub fn git_blame(repo_path: String, file: String) -> Result<Vec<BlameLine>> {
 pub fn git_stage_all(repo_path: String) -> Result<()> {
     snowflake_git::stage_all(Path::new(&repo_path))
 }
+
+/// Push commits to the remote repository.
+#[tauri::command]
+pub fn git_push(repo_path: String, remote: Option<String>) -> Result<()> {
+    snowflake_git::push(Path::new(&repo_path), remote.as_deref())
+}
+
+/// Pull changes from the remote repository.
+#[tauri::command]
+pub fn git_pull(repo_path: String, remote: Option<String>) -> Result<()> {
+    snowflake_git::pull(Path::new(&repo_path), remote.as_deref())
+}
