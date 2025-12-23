@@ -3,6 +3,7 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  Download,
   GitBranch,
   GitCommit,
   Loader2,
@@ -22,7 +23,6 @@ import { useUIStore } from '@/stores/ui-store';
 
 export interface SourceControlTabProps {
   className?: string;
-  onPush?: () => void;
 }
 
 // UI file status for display purposes
@@ -66,7 +66,7 @@ function getFileDirectory(path: string): string {
   return parts.join('/');
 }
 
-export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = '', onPush }) => {
+export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = '' }) => {
   const workspacePath = useUIStore((state) => state.workspacePath);
   const {
     status,
@@ -77,6 +77,8 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     unstage: gitUnstage,
     commit: gitCommit,
     discard: gitDiscard,
+    push: gitPush,
+    pull: gitPull,
   } = useGitStatus(workspacePath, {
     pollInterval: 5000,
   });
@@ -84,6 +86,8 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
   const [isStaging, setIsStaging] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+  const [isPulling, setIsPulling] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [pendingDiscard, setPendingDiscard] = useState<string | null>(null);
@@ -301,9 +305,39 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     [handleCommit]
   );
 
-  const handlePush = useCallback((): void => {
-    onPush?.();
-  }, [onPush]);
+  const handlePush = useCallback(async (): Promise<void> => {
+    if (operationInProgress.current) return;
+    operationInProgress.current = true;
+    setIsPushing(true);
+    setOperationError(null);
+    try {
+      await gitPush();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setOperationError(`Push failed: ${message}`);
+      clearOperationError();
+    } finally {
+      setIsPushing(false);
+      operationInProgress.current = false;
+    }
+  }, [gitPush, clearOperationError]);
+
+  const handlePull = useCallback(async (): Promise<void> => {
+    if (operationInProgress.current) return;
+    operationInProgress.current = true;
+    setIsPulling(true);
+    setOperationError(null);
+    try {
+      await gitPull();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setOperationError(`Pull failed: ${message}`);
+      clearOperationError();
+    } finally {
+      setIsPulling(false);
+      operationInProgress.current = false;
+    }
+  }, [gitPull, clearOperationError]);
 
   // Loading state
   if (isLoading && !status) {
@@ -474,10 +508,10 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
         ) : null}
       </div>
 
-      {/* Footer with Commit/Push */}
+      {/* Footer with Commit/Push/Pull */}
       <div className="p-3 border-t border-border flex gap-2">
         <button
-          onClick={handleCommit}
+          onClick={() => void handleCommit()}
           disabled={isCommitting || !commitMessage.trim() || stagedFiles.length === 0}
           className="
             flex-1 flex items-center justify-center gap-2
@@ -495,15 +529,38 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           Commit
         </button>
         <button
-          onClick={handlePush}
+          onClick={() => void handlePull()}
+          disabled={isPulling || isPushing}
           className="
             px-3 py-1.5 rounded-md
             border border-border hover:bg-accent
             text-sm
+            disabled:opacity-50 disabled:cursor-not-allowed
+          "
+          title="Pull"
+        >
+          {isPulling ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+        </button>
+        <button
+          onClick={() => void handlePush()}
+          disabled={isPushing || isPulling}
+          className="
+            px-3 py-1.5 rounded-md
+            border border-border hover:bg-accent
+            text-sm
+            disabled:opacity-50 disabled:cursor-not-allowed
           "
           title="Push"
         >
-          <Upload className="h-4 w-4" />
+          {isPushing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Upload className="h-4 w-4" />
+          )}
         </button>
       </div>
     </div>
