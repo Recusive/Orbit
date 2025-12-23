@@ -1,5 +1,13 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { AlertCircle, ChevronDown, ChevronRight, Loader2, RefreshCw, Search } from 'lucide-react';
+import {
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  FolderOpen,
+  Loader2,
+  RefreshCw,
+  Search,
+} from 'lucide-react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 
 import type { FileStatus } from '@/lib/backend';
@@ -8,10 +16,12 @@ import type { FC } from 'react';
 
 import { FileIcon, FolderIcon } from '@/components/files';
 import { useFileTree } from '@/hooks/use-file-tree';
+import { openFileDialog, setWorkspacePath } from '@/lib/backend';
 import { GIT_STATUS_STYLES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useFileStore } from '@/stores/file-store';
 import { selectFileStatus, useGitStore } from '@/stores/git-store';
+import { useUIStore } from '@/stores/ui-store';
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -196,6 +206,31 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
     window.dispatchEvent(new CustomEvent('openCommandPalette'));
   }, []);
 
+  const setRootPath = useFileStore((s) => s.setRootPath);
+
+  const handleOpenFolder = useCallback(async (): Promise<void> => {
+    try {
+      const selected = await openFileDialog({
+        title: 'Open Folder',
+        directory: true,
+        multiple: false,
+      });
+
+      if (selected !== null && typeof selected === 'string') {
+        // Persist the workspace path to backend storage
+        await setWorkspacePath(selected);
+        // Update UI store with workspace name (for header display)
+        useUIStore.getState().setWorkspace(selected);
+        // Update the file store to load the new folder
+        setRootPath(selected);
+        // Refresh the file tree
+        refresh();
+      }
+    } catch (err) {
+      console.error('[FileExplorer] Failed to open folder:', err);
+    }
+  }, [setRootPath, refresh]);
+
   if (collapsed) {
     return null;
   }
@@ -223,6 +258,13 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
             title="Quick Open (Search Files)"
           >
             <Search className="h-3 w-3" />
+          </button>
+          <button
+            className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100"
+            onClick={handleOpenFolder}
+            title="Open Folder"
+          >
+            <FolderOpen className="h-3 w-3" />
           </button>
           <button
             className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100"

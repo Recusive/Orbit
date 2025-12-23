@@ -17,6 +17,7 @@ import {
   watchPath,
   onFileChange,
 } from '@/lib/backend';
+import { useUIStore } from '@/stores/ui-store';
 import { ExtensionMessageSchema, WebviewMessageSchema } from '@/types/protocol';
 
 // ═══════════════════════════════════════════════════════════════
@@ -226,9 +227,22 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
       let targetPath: string | undefined = message.path;
       if (targetPath === undefined || targetPath === '') {
         const storedPath = await getWorkspacePath();
-        // Fallback to a reasonable default - user's home or root
-        targetPath = storedPath ?? '/Users/no9labs/Developer/Recursive/Snowflake-v0';
+        if (!storedPath) {
+          // No workspace path set - try to get home directory
+          try {
+            const { homeDir } = await import('@tauri-apps/api/path');
+            targetPath = await homeDir();
+          } catch {
+            // Fallback to root if home dir fails
+            targetPath = '/';
+          }
+        } else {
+          targetPath = storedPath;
+        }
       }
+
+      // Update UI store with workspace name (for header display)
+      useUIStore.getState().setWorkspace(targetPath);
 
       // Set workspace for LSP - this initializes language servers for the workspace
       lspSetWorkspace(targetPath).catch((err: unknown) => {
@@ -437,7 +451,19 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
   if (message.type === 'file:list:request') {
     try {
       const storedPath = await getWorkspacePath();
-      const workspacePath = storedPath ?? '/Users/no9labs/Developer/Recursive/Snowflake-v0';
+      let workspacePath: string;
+      if (!storedPath) {
+        // No workspace path set - try to get home directory
+        try {
+          const { homeDir } = await import('@tauri-apps/api/path');
+          workspacePath = await homeDir();
+        } catch {
+          // Fallback to root if home dir fails
+          workspacePath = '/';
+        }
+      } else {
+        workspacePath = storedPath;
+      }
 
       // Get all files recursively (flatten the tree)
       // For now, just list the root directory files

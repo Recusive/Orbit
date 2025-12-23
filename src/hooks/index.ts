@@ -56,3 +56,7 @@ export type { UseFileTreeOptions, UseFileTreeResult, UseFileTreeItemResult } fro
 // LSP
 export { useLsp } from './use-lsp';
 export type { UseLspResult } from './use-lsp';
+
+// Search
+export { useSearch } from './use-search';
+export type { UseSearchOptions, UseSearchReturn } from './use-search';

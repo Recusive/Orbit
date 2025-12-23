@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
-import type { ExtensionMessage, FileListEntry } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files/file-icon';
@@ -12,10 +11,10 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { useSearch } from '@/hooks/use-search';
 import { useTauri } from '@/hooks/use-tauri';
 import { useFileStore } from '@/stores/file-store';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
-
 
 interface QuickOpenProps {
   readonly open: boolean;
@@ -28,68 +27,28 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
   const openFile = useFileViewerStore((state) => state.openFile);
   const setLoading = useFileViewerStore((state) => state.setLoading);
 
-  const [search, setSearch] = useState('');
-  const [files, setFiles] = useState<FileListEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Track request UUID to match response
-  const requestUuidRef = useRef<string | null>(null);
-
-  // Handle messages from extension
-  const handleMessage = useCallback((message: ExtensionMessage): void => {
-    if (
-      message.type === 'file:list:response' &&
-      message.request_uuid === requestUuidRef.current
-    ) {
-      setFiles(message.files);
-      setIsLoading(false);
-      requestUuidRef.current = null;
-    }
-  }, []);
-
-  const { postMessage } = useTauri({ onMessage: handleMessage });
-
-  // Request file list when dialog opens
-  useEffect(() => {
-    if (open && files.length === 0) {
-      setIsLoading(true);
-      const uuid = crypto.randomUUID();
-      requestUuidRef.current = uuid;
-      postMessage({
-        type: 'file:list:request',
-        uuid,
-      });
-    }
-  }, [open, files.length, postMessage]);
+  // Use search hook for file searching
+  const { query, setQuery, results, isLoading, clear } = useSearch({
+    rootPath,
+    maxResults: 100,
+    enabled: open, // Only search when dialog is open
+  });
 
   // Reset search when dialog closes
   useEffect(() => {
     if (!open) {
-      setSearch('');
+      clear();
     }
-  }, [open]);
+  }, [open, clear]);
 
   // Get recently opened file paths
   const recentPaths = useMemo(() => {
     return new Set(openTabs.map((tab) => tab.path));
   }, [openTabs]);
 
-  // Filter and sort files based on search
-  const filteredFiles = useMemo(() => {
-    const searchLower = search.toLowerCase();
-
-    // Filter by search query
-    const matches = files.filter((file) => {
-      if (search.length === 0) return true;
-      // Match against filename or path
-      return (
-        file.name.toLowerCase().includes(searchLower) ||
-        file.path.toLowerCase().includes(searchLower)
-      );
-    });
-
-    // Sort: recent files first, then alphabetically by name
-    return matches.sort((a, b) => {
+  // Convert search results to display format and sort (recent first)
+  const searchResults = useMemo(() => {
+    return [...results].sort((a, b) => {
       const aRecent = recentPaths.has(a.path);
       const bRecent = recentPaths.has(b.path);
 
@@ -98,7 +57,17 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
 
       return a.name.localeCompare(b.name);
     });
-  }, [files, search, recentPaths]);
+  }, [results, recentPaths]);
+
+  // Recent files from open tabs (shown when no search query)
+  const recentFiles = useMemo(() => {
+    return openTabs.map((tab) => ({
+      name: tab.path.split('/').pop() ?? tab.path,
+      path: tab.path,
+    }));
+  }, [openTabs]);
+
+  const { postMessage } = useTauri();
 
   // Get display path (relative to workspace root)
   const getDisplayPath = useCallback(
@@ -131,29 +100,27 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
     [openFile, setLoading, postMessage, onOpenChange]
   );
 
-  // Separate recent and other files
-  const recentFiles = filteredFiles.filter((f) => recentPaths.has(f.path));
-  const otherFiles = filteredFiles.filter((f) => !recentPaths.has(f.path));
+  // Determine what to show: search results or recent files
+  const hasQuery = query.trim().length > 0;
+  const displayResults = hasQuery ? searchResults : [];
+  const showRecent = !hasQuery && recentFiles.length > 0;
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput
-        placeholder="Search files..."
-        value={search}
-        onValueChange={setSearch}
-      />
+      <CommandInput placeholder="Search files..." value={query} onValueChange={setQuery} />
       <CommandList>
         <CommandEmpty>
           {isLoading
-            ? 'Loading files...'
-            : files.length === 0
-              ? 'No files found in workspace.'
-              : 'No matching files found.'}
+            ? 'Searching...'
+            : hasQuery
+              ? 'No matching files found.'
+              : 'Type to search files...'}
         </CommandEmpty>
 
-        {recentFiles.length > 0 ? (
+        {/* Show recent files when no query */}
+        {showRecent ? (
           <CommandGroup heading="Recent">
-            {recentFiles.slice(0, 5).map((file) => (
+            {recentFiles.slice(0, 10).map((file) => (
               <CommandItem
                 key={file.path}
                 value={file.path}
@@ -172,9 +139,10 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
           </CommandGroup>
         ) : null}
 
-        {otherFiles.length > 0 ? (
-          <CommandGroup heading={recentFiles.length > 0 ? 'Files' : undefined}>
-            {otherFiles.slice(0, 50).map((file) => (
+        {/* Show search results when query is present */}
+        {displayResults.length > 0 ? (
+          <CommandGroup heading="Files">
+            {displayResults.slice(0, 50).map((file) => (
               <CommandItem
                 key={file.path}
                 value={file.path}

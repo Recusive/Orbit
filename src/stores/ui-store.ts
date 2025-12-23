@@ -129,7 +129,7 @@ export const useUIStore = create<UIStore>()(
 
     removeConversation: (sessionId: string): void => {
       set((state) => {
-        state.conversations = state.conversations.filter(c => c.sessionId !== sessionId);
+        state.conversations = state.conversations.filter((c) => c.sessionId !== sessionId);
         // Clear active if deleted
         if (state.activeConversationId === sessionId) {
           state.activeConversationId = null;
@@ -140,7 +140,7 @@ export const useUIStore = create<UIStore>()(
 
     updateConversationTitle: (sessionId: string, title: string): void => {
       set((state) => {
-        const conversation = state.conversations.find(c => c.sessionId === sessionId);
+        const conversation = state.conversations.find((c) => c.sessionId === sessionId);
         if (conversation) {
           conversation.title = title;
         }
@@ -243,6 +243,10 @@ export const useIsLeftSidebarCollapsed = (): boolean => {
 
 export const useWorkspaceName = (): string | null => {
   return useUIStore((state) => state.workspaceName);
+};
+
+export const useHasWorkspace = (): boolean => {
+  return useUIStore((state) => state.workspacePath !== null);
 };
 
 export const useActiveConversationId = (): string | null => {

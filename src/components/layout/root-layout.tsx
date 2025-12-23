@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { ChatArea } from './chat-area';
+import { HeaderBar } from './header-bar';
 import { PrimarySidebar } from './primary-sidebar';
 import { SecondaryPanel } from './secondary-panel';
 import { StatusBar } from './status-bar';
@@ -9,12 +10,14 @@ import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { QuickOpen } from '@/components/quick-open';
+import { WelcomePage } from '@/components/welcome';
 import { useDefaultKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { useTauri } from '@/hooks/use-tauri';
-import { useUIStore } from '@/stores/ui-store';
+import { useHasWorkspace, useUIStore } from '@/stores/ui-store';
 
 export const RootLayout: FC = () => {
   const { leftSidebarWidth, rightSidebarOpen } = useUIStore();
+  const hasWorkspace = useHasWorkspace();
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
 
@@ -55,8 +58,29 @@ export const RootLayout: FC = () => {
     };
   }, [handleOpenCommandPalette, handleQuickOpenFile]);
 
+  // Show welcome page when no workspace is open
+  if (!hasWorkspace) {
+    return (
+      <div className="h-full w-full flex flex-col overflow-hidden bg-background text-foreground">
+        {/* Header Bar - minimal, no tabs */}
+        <HeaderBar />
+
+        {/* Welcome Page - centered content */}
+        <div className="flex-1 min-h-0">
+          <WelcomePage />
+        </div>
+
+        {/* Status Bar */}
+        <StatusBar />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full flex flex-col overflow-hidden bg-background text-foreground">
+      {/* Header Bar - Workspace info, quick actions */}
+      <HeaderBar />
+
       <div className="flex-1 flex min-h-0">
         {/* Primary Sidebar - File explorer, conversations */}
         <PrimarySidebar width={leftSidebarWidth} />

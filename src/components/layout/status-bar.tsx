@@ -49,7 +49,7 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
     <div
       className={cn(
         'h-6 flex items-center justify-between px-2 text-xs',
-        'bg-muted/50 border-t border-border',
+        'bg-sidebar border-t border-border',
         'text-muted-foreground',
         className
       )}
