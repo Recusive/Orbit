@@ -103,6 +103,9 @@
 }
 
 :root {
+  /* Enable system color scheme for proper scrollbar colors in WKWebView */
+  color-scheme: light dark;
+
   --radius: 0.65rem;
 
   /* Brand palette */
@@ -197,6 +200,9 @@
 
 /* Dark theme */
 html.dark {
+  /* Force dark color scheme for scrollbars in WKWebView */
+  color-scheme: dark;
+
   /* Brand palette - adjusted for dark */
   --brand-oat: oklch(0.35 0.015 60);       /* Darkened */
   --brand-clay: oklch(0.55 0.08 55);       /* Lighter for contrast */
@@ -390,37 +396,40 @@ html.dark {
   }
 }
 
-/* Hide native scrollbar in Radix ScrollArea - use only custom scrollbar */
-[data-radix-scroll-area-viewport] {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-}
-
-[data-radix-scroll-area-viewport]::-webkit-scrollbar {
-  display: none !important;
-}
-
-/* Custom scrollbar - outside layer for higher specificity */
+/* Scrollbar styling for WKWebView */
 ::-webkit-scrollbar {
-  width: 6px !important;
-  height: 6px !important;
+  width: 8px;
+  height: 8px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent !important;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in oklch, var(--muted-foreground) 40%, transparent) !important;
-  border-radius: 3px !important;
+  background: oklch(0.55 0.02 60 / 50%);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in oklch, var(--muted-foreground) 60%, transparent) !important;
+  background: oklch(0.55 0.02 60 / 70%);
+  background-clip: padding-box;
 }
 
-/* Firefox scrollbar */
-* {
-  scrollbar-width: thin !important;
-  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 40%, transparent) transparent !important;
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Dark mode scrollbar */
+html.dark ::-webkit-scrollbar-thumb {
+  background: oklch(0.65 0.02 60 / 40%);
+  background-clip: padding-box;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.65 0.02 60 / 60%);
+  background-clip: padding-box;
 }
