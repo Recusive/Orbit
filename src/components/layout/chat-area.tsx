@@ -15,7 +15,14 @@ import { ResizeHandle } from '@/components/layout/resize-handle';
 import { TerminalPanel } from '@/components/terminal/terminal-panel';
 import { useChatMessages } from '@/hooks/use-chat-messages';
 import { useTauri } from '@/hooks/use-tauri';
-import { useToolStore, usePendingPermissions, useInputMode, useThinkingMode, useSessionUsage, useMaxTokens } from '@/stores/tool-store';
+import {
+  useToolStore,
+  usePendingPermissions,
+  useInputMode,
+  useThinkingMode,
+  useSessionUsage,
+  useMaxTokens,
+} from '@/stores/tool-store';
 import { useUIStore, useTerminalPosition } from '@/stores/ui-store';
 
 export const ChatArea: FC = () => {
@@ -49,9 +56,12 @@ export const ChatArea: FC = () => {
   } = useChatMessages();
 
   // Create addMessage function for queued message handler
-  const addMessage = useCallback((message: ChatMessage): void => {
-    setMessages((prev) => [...prev, message]);
-  }, [setMessages]);
+  const addMessage = useCallback(
+    (message: ChatMessage): void => {
+      setMessages((prev) => [...prev, message]);
+    },
+    [setMessages]
+  );
 
   // Use queued message handler for sending messages while agent is running
   const { queuedMessage: rawQueuedMessage, cancelQueue } = useQueuedMessageHandler({
@@ -68,11 +78,13 @@ export const ChatArea: FC = () => {
   // Handle file list response for @ mentions
   const handleFileListMessage = (message: ExtensionMessage): void => {
     if (message.type === 'file:list:response') {
-      setFileList(message.files.map((f) => ({
-        path: f.path,
-        name: f.name,
-        isDirectory: f.isDirectory ?? false,
-      })));
+      setFileList(
+        message.files.map((f) => ({
+          path: f.path,
+          name: f.name,
+          isDirectory: f.isDirectory ?? false,
+        }))
+      );
     }
   };
 
@@ -93,82 +105,79 @@ export const ChatArea: FC = () => {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background">
-      {/* Shared Header */}
-      <ChatHeader />
+    <div className="flex-1 flex min-w-0 bg-background overflow-hidden">
+      {/* Chat Section (Header + Content) */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Chat Header - only for chat */}
+        <ChatHeader />
 
-      {/* Content Area */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Top area: Chat + Activity side by side */}
-        <div className="flex-1 flex min-h-0 overflow-hidden">
-          {/* Chat Area */}
-          <div className="flex-1 flex flex-col min-w-0">
-            {messages.length === 0 ? (
-              /* Empty state: Welcome greeting + Input positioned above center */
-              <div className="flex-1 flex flex-col justify-center" style={{ paddingBottom: '40%' }}>
-                <WelcomeGreeting />
-                <ChatInput
-                  inputMode={inputMode}
-                  thinkingMode={thinkingMode}
-                  isAgentRunning={isAgentRunning}
-                  fileList={fileList}
-                  usage={sessionUsage}
-                  maxTokens={maxTokens}
-                  onSend={handleSend}
-                  onStop={handleStop}
-                  onModeChange={handleModeChange}
-                  onThinkingModeChange={handleThinkingModeChange}
-                  onModelChange={handleModelChange}
-                />
-              </div>
-            ) : (
-              /* Normal layout: Messages + Input at bottom */
-              <>
-                <ChatMessages
-                  messages={messages}
-                  pendingPermissions={pendingPermissions}
-                  isAgentRunning={isAgentRunning}
-                  queuedMessage={queuedMessage}
-                  getToolsForMessage={getToolsForMessage}
-                  onRewind={handleRewind}
-                  onOpenFile={handleOpenFile}
-                  onOpenUrl={handleOpenUrl}
-                  onPermissionApprove={handlePermissionApprove}
-                  onPermissionDeny={handlePermissionDeny}
-                  onCancelQueue={cancelQueue}
-                  onFeedback={handleFeedback}
-                />
-                <ChatInput
-                  inputMode={inputMode}
-                  thinkingMode={thinkingMode}
-                  isAgentRunning={isAgentRunning}
-                  fileList={fileList}
-                  usage={sessionUsage}
-                  maxTokens={maxTokens}
-                  onSend={handleSend}
-                  onStop={handleStop}
-                  onModeChange={handleModeChange}
-                  onThinkingModeChange={handleThinkingModeChange}
-                  onModelChange={handleModelChange}
-                />
-              </>
-            )}
-          </div>
-
-          {/* Activity Panel (split view) */}
-          {reviewPanelOpen ? (
+        {/* Chat Content */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {messages.length === 0 ? (
+            /* Empty state: Welcome greeting + Input positioned above center */
+            <div className="flex-1 flex flex-col justify-center" style={{ paddingBottom: '40%' }}>
+              <WelcomeGreeting />
+              <ChatInput
+                inputMode={inputMode}
+                thinkingMode={thinkingMode}
+                isAgentRunning={isAgentRunning}
+                fileList={fileList}
+                usage={sessionUsage}
+                maxTokens={maxTokens}
+                onSend={handleSend}
+                onStop={handleStop}
+                onModeChange={handleModeChange}
+                onThinkingModeChange={handleThinkingModeChange}
+                onModelChange={handleModelChange}
+              />
+            </div>
+          ) : (
+            /* Normal layout: Messages + Input at bottom */
             <>
-              <ResizeHandle direction="vertical" target="review" />
-              <ActivityPanel width={reviewPanelWidth} />
+              <ChatMessages
+                messages={messages}
+                pendingPermissions={pendingPermissions}
+                isAgentRunning={isAgentRunning}
+                queuedMessage={queuedMessage}
+                getToolsForMessage={getToolsForMessage}
+                onRewind={handleRewind}
+                onOpenFile={handleOpenFile}
+                onOpenUrl={handleOpenUrl}
+                onPermissionApprove={handlePermissionApprove}
+                onPermissionDeny={handlePermissionDeny}
+                onCancelQueue={cancelQueue}
+                onFeedback={handleFeedback}
+              />
+              <ChatInput
+                inputMode={inputMode}
+                thinkingMode={thinkingMode}
+                isAgentRunning={isAgentRunning}
+                fileList={fileList}
+                usage={sessionUsage}
+                maxTokens={maxTokens}
+                onSend={handleSend}
+                onStop={handleStop}
+                onModeChange={handleModeChange}
+                onThinkingModeChange={handleThinkingModeChange}
+                onModelChange={handleModelChange}
+              />
             </>
+          )}
+
+          {/* Terminal Panel - show at bottom when position is 'both' */}
+          {terminalPosition === 'both' ? (
+            <TerminalPanel variant="full-width" collapsed={!bottomPanelOpen} />
           ) : null}
         </div>
-
-        {/* Terminal Panel - show at bottom when position is 'both' */}
-        {terminalPosition === 'both' ? (
-          <TerminalPanel variant="full-width" collapsed={!bottomPanelOpen} />
-        ) : null}
       </div>
+
+      {/* Activity Panel (split view) - at same level as chat section */}
+      {reviewPanelOpen ? (
+        <>
+          <ResizeHandle direction="vertical" target="review" />
+          <ActivityPanel width={reviewPanelWidth} />
+        </>
+      ) : null}
     </div>
   );
 };

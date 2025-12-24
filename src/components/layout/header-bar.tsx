@@ -64,7 +64,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
     <header
       data-tauri-drag-region
       className={cn(
-        'h-[35px] flex items-center justify-between pr-4 border-b border-border shrink-0',
+        'h-[35px] flex items-center justify-between pr-4 border-y border-border shrink-0',
         'bg-sidebar',
         // Left padding for macOS traffic light buttons (about 78px)
         'pl-[78px]',

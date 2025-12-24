@@ -279,7 +279,10 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
   return (
     <div className="@container h-full flex flex-col bg-background shrink-0" style={{ width }}>
       {/* Header - different view when on File tab vs other tabs */}
-      <div className="flex items-center gap-2 px-4 pt-2 overflow-hidden">
+      <div
+        className="flex items-center gap-2 px-4 overflow-hidden border-b border-border shrink-0"
+        style={{ height: 35 }}
+      >
         {activeTab === 'file' && hasOpenFiles ? (
           <>
             {/* File view header: "File:" label + navigation + inline file tabs + exit */}
