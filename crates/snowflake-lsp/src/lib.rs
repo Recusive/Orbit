@@ -146,16 +146,150 @@ pub fn gopls() -> ServerConfig {
     ServerConfig::new("go", "gopls")
 }
 
+/// Configuration for vscode-json-language-server (JSON)
+#[must_use]
+pub fn json_language_server() -> ServerConfig {
+    ServerConfig::new("json", "vscode-json-language-server").with_args(vec!["--stdio".into()])
+}
+
+/// Configuration for vscode-html-language-server (HTML)
+#[must_use]
+pub fn html_language_server() -> ServerConfig {
+    ServerConfig::new("html", "vscode-html-language-server").with_args(vec!["--stdio".into()])
+}
+
+/// Configuration for vscode-css-language-server (CSS)
+#[must_use]
+pub fn css_language_server() -> ServerConfig {
+    ServerConfig::new("css", "vscode-css-language-server").with_args(vec!["--stdio".into()])
+}
+
+/// Configuration for yaml-language-server (YAML)
+#[must_use]
+pub fn yaml_language_server() -> ServerConfig {
+    ServerConfig::new("yaml", "yaml-language-server").with_args(vec!["--stdio".into()])
+}
+
+/// Configuration for taplo (TOML)
+#[must_use]
+pub fn taplo() -> ServerConfig {
+    ServerConfig::new("toml", "taplo").with_args(vec!["lsp".into(), "stdio".into()])
+}
+
+/// Configuration for marksman (Markdown)
+#[must_use]
+pub fn marksman() -> ServerConfig {
+    ServerConfig::new("markdown", "marksman").with_args(vec!["server".into()])
+}
+
+/// Configuration for bash-language-server (Bash/Shell)
+#[must_use]
+pub fn bash_language_server() -> ServerConfig {
+    ServerConfig::new("bash", "bash-language-server").with_args(vec!["start".into()])
+}
+
+/// Configuration for clangd (C/C++)
+#[must_use]
+pub fn clangd() -> ServerConfig {
+    ServerConfig::new("cpp", "clangd")
+}
+
+/// Configuration for dockerfile-language-server (Dockerfile)
+#[must_use]
+pub fn dockerfile_language_server() -> ServerConfig {
+    ServerConfig::new("dockerfile", "docker-langserver").with_args(vec!["--stdio".into()])
+}
+
+/// Configuration for lua-language-server (Lua)
+#[must_use]
+pub fn lua_language_server() -> ServerConfig {
+    ServerConfig::new("lua", "lua-language-server")
+}
+
+/// Configuration for intelephense (PHP)
+#[must_use]
+pub fn intelephense() -> ServerConfig {
+    ServerConfig::new("php", "intelephense").with_args(vec!["--stdio".into()])
+}
+
+/// Configuration for solargraph (Ruby)
+#[must_use]
+pub fn solargraph() -> ServerConfig {
+    ServerConfig::new("ruby", "solargraph").with_args(vec!["stdio".into()])
+}
+
+/// Configuration for sourcekit-lsp (Swift)
+#[must_use]
+pub fn sourcekit_lsp() -> ServerConfig {
+    ServerConfig::new("swift", "sourcekit-lsp")
+}
+
+/// Configuration for graphql-language-service (GraphQL)
+#[must_use]
+pub fn graphql_language_server() -> ServerConfig {
+    ServerConfig::new("graphql", "graphql-lsp").with_args(vec![
+        "server".into(),
+        "-m".into(),
+        "stream".into(),
+    ])
+}
+
+/// Configuration for sql-language-server (SQL)
+#[must_use]
+pub fn sql_language_server() -> ServerConfig {
+    ServerConfig::new("sql", "sql-language-server").with_args(vec![
+        "up".into(),
+        "--method".into(),
+        "stdio".into(),
+    ])
+}
+
+/// Configuration for Vue language server
+#[must_use]
+pub fn vue_language_server() -> ServerConfig {
+    ServerConfig::new("vue", "vue-language-server").with_args(vec!["--stdio".into()])
+}
+
+/// Configuration for Svelte language server
+#[must_use]
+pub fn svelte_language_server() -> ServerConfig {
+    ServerConfig::new("svelte", "svelteserver").with_args(vec!["--stdio".into()])
+}
+
+/// Configuration for zls (Zig)
+#[must_use]
+pub fn zls() -> ServerConfig {
+    ServerConfig::new("zig", "zls")
+}
+
 /// Get the default server configuration for a language
 #[must_use]
 pub fn default_config_for_language(language: &str) -> Option<ServerConfig> {
     match language {
         "rust" => Some(rust_analyzer()),
-        "typescript" | "javascript" | "typescriptreact" | "javascriptreact" => {
+        "typescript" | "javascript" | "typescriptreact" | "javascriptreact" | "tsx" | "jsx" => {
             Some(typescript_language_server())
         },
         "python" => Some(pyright()),
         "go" => Some(gopls()),
+        "json" | "jsonc" => Some(json_language_server()),
+        "html" | "htm" => Some(html_language_server()),
+        "css" | "scss" | "less" => Some(css_language_server()),
+        "yaml" | "yml" => Some(yaml_language_server()),
+        "toml" => Some(taplo()),
+        "markdown" | "md" => Some(marksman()),
+        "bash" | "sh" | "zsh" | "shell" => Some(bash_language_server()),
+        "c" | "cpp" | "cc" | "cxx" | "h" | "hpp" | "hxx" => Some(clangd()),
+        "dockerfile" => Some(dockerfile_language_server()),
+        "lua" => Some(lua_language_server()),
+        "php" => Some(intelephense()),
+        "ruby" | "rb" => Some(solargraph()),
+        "swift" => Some(sourcekit_lsp()),
+        "graphql" | "gql" => Some(graphql_language_server()),
+        "sql" => Some(sql_language_server()),
+        "vue" => Some(vue_language_server()),
+        "svelte" => Some(svelte_language_server()),
+        "zig" => Some(zls()),
         _ => None,
     }
 }
@@ -163,20 +297,59 @@ pub fn default_config_for_language(language: &str) -> Option<ServerConfig> {
 /// Detect language from file extension
 #[must_use]
 pub fn language_from_path(path: &Path) -> Option<&'static str> {
+    // Check for special filenames first (no extension)
+    if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
+        match filename {
+            "Dockerfile" | "dockerfile" => return Some("dockerfile"),
+            "Makefile" | "makefile" | "GNUmakefile" => return Some("makefile"),
+            ".bashrc" | ".bash_profile" | ".zshrc" | ".zprofile" => return Some("bash"),
+            _ => {},
+        }
+    }
+
     path.extension().and_then(|ext| match ext.to_str() {
+        // Rust
         Some("rs") => Some("rust"),
+        // TypeScript/JavaScript
         Some("ts") => Some("typescript"),
         Some("tsx") => Some("typescriptreact"),
-        Some("js") => Some("javascript"),
+        Some("js" | "mjs" | "cjs") => Some("javascript"),
         Some("jsx") => Some("javascriptreact"),
-        Some("py") => Some("python"),
+        // Python
+        Some("py" | "pyw" | "pyi") => Some("python"),
+        // Go
         Some("go") => Some("go"),
-        Some("json") => Some("json"),
-        Some("html") => Some("html"),
-        Some("css") => Some("css"),
-        Some("md") => Some("markdown"),
-        Some("toml") => Some("toml"),
+        // Data formats
+        Some("json" | "jsonc") => Some("json"),
         Some("yaml" | "yml") => Some("yaml"),
+        Some("toml") => Some("toml"),
+        Some("xml" | "xsd" | "xsl" | "xslt" | "svg") => Some("xml"),
+        // Web
+        Some("html" | "htm") => Some("html"),
+        Some("css") => Some("css"),
+        Some("scss") => Some("scss"),
+        Some("less") => Some("less"),
+        Some("vue") => Some("vue"),
+        Some("svelte") => Some("svelte"),
+        // Documentation
+        Some("md" | "markdown") => Some("markdown"),
+        // Shell
+        Some("sh" | "bash" | "zsh") => Some("bash"),
+        // C/C++
+        Some("c" | "h") => Some("c"),
+        Some("cpp" | "cc" | "cxx" | "c++" | "hpp" | "hxx" | "h++") => Some("cpp"),
+        // Other languages
+        Some("lua") => Some("lua"),
+        Some("php") => Some("php"),
+        Some("rb" | "ruby" | "rake" | "gemspec") => Some("ruby"),
+        Some("swift") => Some("swift"),
+        Some("graphql" | "gql") => Some("graphql"),
+        Some("sql") => Some("sql"),
+        Some("zig") => Some("zig"),
+        // Config files
+        Some("dockerfile") => Some("dockerfile"),
+        Some("env") => Some("dotenv"),
+        Some("ini" | "cfg" | "conf") => Some("ini"),
         _ => None,
     })
 }
@@ -1723,6 +1896,12 @@ mod tests {
         assert!(default_config_for_language("typescript").is_some());
         assert!(default_config_for_language("python").is_some());
         assert!(default_config_for_language("go").is_some());
+        assert!(default_config_for_language("json").is_some());
+        assert!(default_config_for_language("html").is_some());
+        assert!(default_config_for_language("css").is_some());
+        assert!(default_config_for_language("yaml").is_some());
+        assert!(default_config_for_language("toml").is_some());
+        assert!(default_config_for_language("markdown").is_some());
         assert!(default_config_for_language("unknown").is_none());
     }
 

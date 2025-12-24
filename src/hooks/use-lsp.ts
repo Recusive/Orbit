@@ -16,6 +16,76 @@ import {
 } from '@/lib/backend';
 
 // ============================================
+// Supported Languages
+// ============================================
+
+/**
+ * Languages that have LSP server support.
+ * This must match the backend's default_config_for_language() in snowflake-lsp.
+ */
+const SUPPORTED_LSP_LANGUAGES = new Set([
+  // Core languages
+  'rust',
+  'typescript',
+  'javascript',
+  'typescriptreact',
+  'javascriptreact',
+  'tsx',
+  'jsx',
+  'python',
+  'go',
+  // Data formats
+  'json',
+  'jsonc',
+  'yaml',
+  'yml',
+  'toml',
+  // Web
+  'html',
+  'htm',
+  'css',
+  'scss',
+  'less',
+  'vue',
+  'svelte',
+  // Documentation
+  'markdown',
+  'md',
+  // Shell
+  'bash',
+  'sh',
+  'zsh',
+  'shell',
+  // C/C++
+  'c',
+  'cpp',
+  'cc',
+  'cxx',
+  'h',
+  'hpp',
+  'hxx',
+  // Other languages
+  'dockerfile',
+  'lua',
+  'php',
+  'ruby',
+  'rb',
+  'swift',
+  'graphql',
+  'gql',
+  'sql',
+  'zig',
+]);
+
+/**
+ * Check if a language has LSP support.
+ */
+function hasLspSupport(language: string | null): boolean {
+  if (!language) return false;
+  return SUPPORTED_LSP_LANGUAGES.has(language.toLowerCase());
+}
+
+// ============================================
 // Types
 // ============================================
 
@@ -90,7 +160,7 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
 
   // Refresh function to sync state with backend
   const refresh = useCallback(async (): Promise<void> => {
-    if (!language) {
+    if (!language || !hasLspSupport(language)) {
       setIsRunning(false);
       return;
     }
@@ -104,7 +174,7 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
 
   // Check if server is running on mount and when language changes
   useEffect(() => {
-    if (!language) {
+    if (!language || !hasLspSupport(language)) {
       setIsRunning(false);
       return;
     }
@@ -172,6 +242,11 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
 
   const didOpen = useCallback(
     async (path: string, lang: string, content: string): Promise<void> => {
+      // Skip LSP for unsupported languages
+      if (!hasLspSupport(lang)) {
+        return;
+      }
+
       // Auto-start server if not running, with race condition protection
       if (rootPath && !startingRef.current) {
         // Check actual backend state, not local state
