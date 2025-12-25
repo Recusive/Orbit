@@ -6,6 +6,16 @@
 import type { AttachmentContentBlock } from '../messages.js';
 
 /**
+ * Supported image media types for Claude SDK
+ */
+export type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+
+/**
+ * Supported document media types for Claude SDK
+ */
+export type DocumentMediaType = 'application/pdf';
+
+/**
  * Claude SDK content block types
  */
 export type ClaudeContentBlock =
@@ -14,7 +24,7 @@ export type ClaudeContentBlock =
       type: 'image';
       source: {
         type: 'base64';
-        media_type: string;
+        media_type: ImageMediaType;
         data: string;
       };
     }
@@ -22,7 +32,7 @@ export type ClaudeContentBlock =
       type: 'document';
       source: {
         type: 'base64';
-        media_type: string;
+        media_type: DocumentMediaType;
         data: string;
       };
     };
@@ -47,12 +57,12 @@ export function buildContentBlocks(
   // Process attachments FIRST (Claude processes content blocks in order)
   for (const attachment of attachments) {
     if (attachment.type === 'document' && attachment.source) {
-      // Binary document (PDF, Word, Excel, etc.)
+      // Binary document (PDF)
       contentBlocks.push({
         type: 'document',
         source: {
           type: 'base64',
-          media_type: attachment.source.media_type,
+          media_type: attachment.source.media_type as DocumentMediaType,
           data: attachment.source.data,
         },
       });
@@ -62,7 +72,7 @@ export function buildContentBlocks(
         type: 'image',
         source: {
           type: 'base64',
-          media_type: attachment.source.media_type,
+          media_type: attachment.source.media_type as ImageMediaType,
           data: attachment.source.data,
         },
       });

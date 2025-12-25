@@ -16,6 +16,7 @@ import type { PermissionRequestCallback, SnapshotCallback } from './permissions.
 import type { OrbitSessionMode } from './session-mode.js';
 import type {
   AgentDefinition,
+  HookJSONOutput,
   McpServerConfig,
   NotificationHookInput,
   Options,
@@ -496,25 +497,25 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             // No matcher means match ALL tools
             timeout: 86400, // 24 hours for indefinite waiting
             hooks: [
-              (input: unknown): Record<string, unknown> => {
+              (input: unknown): Promise<HookJSONOutput> => {
                 const preToolInput = input as PreToolUseHookInput;
                 const toolName = preToolInput.tool_name;
                 const toolInput = preToolInput.tool_input as Record<string, unknown>;
 
                 // Auto-approve TodoWrite - it just updates UI, no file modifications
                 if (toolName === 'TodoWrite') {
-                  return {
+                  return Promise.resolve({
                     hookSpecificOutput: {
                       hookEventName: 'PreToolUse' as const,
                       permissionDecision: 'allow' as const,
                       updatedInput: toolInput,
                     },
-                  };
+                  });
                 }
 
                 // Return empty object to continue SDK permission flow
                 // SDK will check Deny Rules → Allow Rules → Ask Rules → Permission Mode → canUseTool
-                return {};
+                return Promise.resolve({});
               },
             ],
           },
@@ -525,7 +526,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           {
             timeout: 30,
             hooks: [
-              (input: unknown, toolUseId: string): Record<string, unknown> => {
+              (input: unknown, toolUseId?: string): Promise<HookJSONOutput> => {
                 const postInput = input as PostToolUseHookInput;
                 logger.debug(
                   {
@@ -535,7 +536,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
                   },
                   'Tool execution completed'
                 );
-                return {};
+                return Promise.resolve({});
               },
             ],
           },
@@ -546,7 +547,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           {
             timeout: 30,
             hooks: [
-              (input: unknown, toolUseId: string): Record<string, unknown> => {
+              (input: unknown, toolUseId?: string): Promise<HookJSONOutput> => {
                 const failureInput = input as PostToolUseFailureHookInput;
                 logger.warn(
                   {
@@ -557,7 +558,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
                   },
                   'Tool execution failed'
                 );
-                return {};
+                return Promise.resolve({});
               },
             ],
           },
@@ -568,7 +569,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           {
             timeout: 30,
             hooks: [
-              (input: unknown): Record<string, unknown> => {
+              (input: unknown): Promise<HookJSONOutput> => {
                 const notifInput = input as NotificationHookInput;
                 logger.info(
                   {
@@ -577,7 +578,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
                   },
                   'Agent notification'
                 );
-                return {};
+                return Promise.resolve({});
               },
             ],
           },
@@ -588,7 +589,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           {
             timeout: 30,
             hooks: [
-              (input: unknown): Record<string, unknown> => {
+              (input: unknown): Promise<HookJSONOutput> => {
                 const compactInput = input as PreCompactHookInput;
                 logger.info(
                   {
@@ -597,7 +598,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
                   },
                   'Context compaction starting'
                 );
-                return {};
+                return Promise.resolve({});
               },
             ],
           },
@@ -608,7 +609,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           {
             timeout: 30,
             hooks: [
-              (input: unknown): Record<string, unknown> => {
+              (input: unknown): Promise<HookJSONOutput> => {
                 const startInput = input as SubagentStartHookInput;
                 logger.info(
                   {
@@ -617,7 +618,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
                   },
                   'Subagent started'
                 );
-                return {};
+                return Promise.resolve({});
               },
             ],
           },
@@ -628,7 +629,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           {
             timeout: 30,
             hooks: [
-              (input: unknown): Record<string, unknown> => {
+              (input: unknown): Promise<HookJSONOutput> => {
                 const stopInput = input as SubagentStopHookInput;
                 logger.info(
                   {
@@ -636,7 +637,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
                   },
                   'Subagent stopped'
                 );
-                return {};
+                return Promise.resolve({});
               },
             ],
           },
@@ -647,7 +648,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           {
             timeout: 30,
             hooks: [
-              (input: unknown): Record<string, unknown> => {
+              (input: unknown): Promise<HookJSONOutput> => {
                 const sessionInput = input as SessionStartHookInput;
                 logger.info(
                   {
@@ -655,7 +656,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
                   },
                   'Session started'
                 );
-                return {};
+                return Promise.resolve({});
               },
             ],
           },
@@ -666,7 +667,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           {
             timeout: 30,
             hooks: [
-              (input: unknown): Record<string, unknown> => {
+              (input: unknown): Promise<HookJSONOutput> => {
                 const sessionInput = input as SessionEndHookInput;
                 logger.info(
                   {
@@ -674,7 +675,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
                   },
                   'Session ended'
                 );
-                return {};
+                return Promise.resolve({});
               },
             ],
           },
