@@ -294,8 +294,12 @@ impl ConversationManager {
             }
         }
 
-        // Sort by updated_at descending (most recent first)
-        summaries.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        // Sort by updated_at descending (most recent first), then by session_id for determinism
+        summaries.sort_by(|a, b| {
+            b.updated_at
+                .cmp(&a.updated_at)
+                .then_with(|| b.session_id.cmp(&a.session_id))
+        });
 
         // Update cache
         {
