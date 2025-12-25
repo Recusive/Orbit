@@ -27,14 +27,19 @@ snowflake-git = { path = "../crates/snowflake-git" }
 snowflake-ai = { path = "../crates/snowflake-ai" }
 snowflake-search = { path = "../crates/snowflake-search" }
 snowflake-settings = { path = "../crates/snowflake-settings" }
+snowflake-conversations = { path = "../crates/snowflake-conversations" }
 
 # Core dependencies
 tokio = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 base64 = { workspace = true }
 futures = { workspace = true }
+thiserror = { workspace = true }
+crossbeam-channel = { workspace = true }
+hashbrown = { workspace = true }
 
 # Tauri
 tauri = { workspace = true, features = ["tray-icon"] }

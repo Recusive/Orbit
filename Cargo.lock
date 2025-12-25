@@ -4201,11 +4201,15 @@ name = "snowflake-app"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "crossbeam-channel",
  "futures",
+ "hashbrown 0.15.5",
  "log",
  "parking_lot",
  "serde",
+ "serde_json",
  "snowflake-ai",
+ "snowflake-conversations",
  "snowflake-core",
  "snowflake-fs",
  "snowflake-git",
@@ -4220,7 +4224,23 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-log",
  "tauri-plugin-shell",
+ "thiserror 1.0.69",
  "tokio",
+]
+
+[[package]]
+name = "snowflake-conversations"
+version = "0.1.0"
+dependencies = [
+ "directories",
+ "dirs 5.0.1",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "snowflake-core",
+ "tempfile",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

@@ -84,6 +84,25 @@ interface UIActions {
 
 type UIStore = UIState & UIActions;
 
+// Helper to load conversations from localStorage
+const loadConversationsFromStorage = (): ConversationSummary[] => {
+  try {
+    const saved = localStorage.getItem('orbit-conversations');
+    return saved ? (JSON.parse(saved) as ConversationSummary[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+// Helper to save conversations to localStorage
+const saveConversationsToStorage = (conversations: ConversationSummary[]): void => {
+  try {
+    localStorage.setItem('orbit-conversations', JSON.stringify(conversations));
+  } catch {
+    // Ignore storage errors
+  }
+};
+
 export const useUIStore = create<UIStore>()(
   immer((set) => ({
     containerWidth: null,
@@ -92,7 +111,7 @@ export const useUIStore = create<UIStore>()(
     workspaceName: null,
     activeConversationId: null,
     activeConversationTitle: null,
-    conversations: [],
+    conversations: loadConversationsFromStorage(),
     leftSidebarOpen: DEFAULT_UI_STATE.leftSidebarOpen,
     leftSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
     reviewPanelOpen: DEFAULT_UI_STATE.reviewPanelOpen,
@@ -131,13 +150,19 @@ export const useUIStore = create<UIStore>()(
     setConversations: (conversations: ConversationSummary[]): void => {
       set((state) => {
         state.conversations = conversations;
+        saveConversationsToStorage(conversations);
       });
     },
 
     addConversation: (conversation: ConversationSummary): void => {
       set((state) => {
-        // Add to front of list (most recent first)
-        state.conversations = [conversation, ...state.conversations];
+        // Check if conversation already exists (prevent duplicates)
+        const exists = state.conversations.some((c) => c.sessionId === conversation.sessionId);
+        if (!exists) {
+          // Add to front of list (most recent first)
+          state.conversations = [conversation, ...state.conversations];
+          saveConversationsToStorage(state.conversations);
+        }
       });
     },
 
@@ -149,6 +174,7 @@ export const useUIStore = create<UIStore>()(
           state.activeConversationId = null;
           state.activeConversationTitle = null;
         }
+        saveConversationsToStorage(state.conversations);
       });
     },
 
@@ -157,6 +183,7 @@ export const useUIStore = create<UIStore>()(
         const conversation = state.conversations.find((c) => c.sessionId === sessionId);
         if (conversation) {
           conversation.title = title;
+          saveConversationsToStorage(state.conversations);
         }
         // Also update active title if this is the active conversation
         if (state.activeConversationId === sessionId) {

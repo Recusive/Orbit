@@ -312,14 +312,18 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           break;
 
         case 'conversation:list':
-          setConversations(
-            message.conversations.map((c) => ({
-              sessionId: c.session_id,
-              title: c.title,
-              updatedAt: c.updated_at,
-              messageCount: c.message_count,
-            }))
-          );
+          // Only update if backend returns conversations (has persistence)
+          // Don't overwrite local conversations with empty list from backend
+          if (message.conversations.length > 0) {
+            setConversations(
+              message.conversations.map((c) => ({
+                sessionId: c.session_id,
+                title: c.title,
+                updatedAt: c.updated_at,
+                messageCount: c.message_count,
+              }))
+            );
+          }
           break;
 
         case 'conversation:loaded': {

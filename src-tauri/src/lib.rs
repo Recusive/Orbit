@@ -3,9 +3,17 @@
 //! This is the main Tauri application library that wires together
 //! all the backend functionality.
 
+pub mod agent;
 pub mod commands;
 
-use commands::{ai, files, git, lsp, search, settings, terminal, workspace};
+use std::env;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use commands::{
+    agent as agent_cmd, ai, conversations, files, git, lsp, search, settings, terminal, workspace,
+};
+use snowflake_conversations::ConversationManager;
 use snowflake_settings::SettingsManager;
 use tauri_plugin_log::{Target, TargetKind};
 
@@ -111,6 +119,10 @@ fn build_log_plugin() -> tauri_plugin_log::Builder {
     clippy::large_stack_frames,
     reason = "tauri::generate_context! macro causes this"
 )]
+#[expect(
+    clippy::too_many_lines,
+    reason = "Tauri app setup requires listing all commands in one invoke_handler"
+)]
 pub fn run() {
     // Initialize settings manager and load settings
     let settings_manager = SettingsManager::new();
@@ -118,17 +130,57 @@ pub fn run() {
         log::warn!("Failed to load settings: {e}");
     }
 
+    // Initialize conversation manager and load summaries
+    let conversation_manager = ConversationManager::new();
+    if let Err(e) = conversation_manager.load_summaries() {
+        log::warn!("Failed to load conversation summaries: {e}");
+    }
+
+    // Initialize agent session manager
+    // The sidecar path will be resolved relative to the app bundle in production
+    // For development, it uses the local agent-bridge directory
+    let sidecar_path = env::current_dir().map_or_else(
+        |_| PathBuf::from("agent-bridge/dist/index.js"),
+        |p| p.join("../agent-bridge/dist/index.js"),
+    );
+    let session_manager = Arc::new(agent::SessionManager::new(sidecar_path));
+
+    // Clone for .manage() before moving into .setup()
+    let session_manager_for_state = Arc::clone(&session_manager);
+
     let result = tauri::Builder::default()
         // Managed state
         .manage(settings_manager)
+        .manage(conversation_manager)
+        .manage(session_manager_for_state)
         // Plugins
         .plugin(build_log_plugin().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // Setup event callbacks for agent
+        .setup(move |app| {
+            agent_cmd::setup_event_callbacks(app.handle(), &session_manager);
+            Ok(())
+        })
         // Commands
         .invoke_handler(tauri::generate_handler![
+            // Agent commands
+            agent_cmd::agent_create_session,
+            agent_cmd::agent_delete_session,
+            agent_cmd::agent_send_message,
+            agent_cmd::agent_interrupt,
+            agent_cmd::agent_is_session_ready,
+            agent_cmd::agent_get_sdk_session_id,
+            agent_cmd::agent_respond_permission,
+            agent_cmd::agent_set_thinking_mode,
+            agent_cmd::agent_get_thinking_mode,
+            agent_cmd::agent_set_model,
+            agent_cmd::agent_set_plan_mode,
+            agent_cmd::agent_get_plan_mode,
+            agent_cmd::agent_set_accept_mode,
+            agent_cmd::agent_get_accept_mode,
             // File commands
             files::read_file,
             files::read_file_bytes,
@@ -206,6 +258,15 @@ pub fn run() {
             settings::get_recent_projects,
             settings::clear_recent_projects,
             settings::get_settings_path,
+            // Conversation commands
+            conversations::conversation_create,
+            conversations::conversation_list,
+            conversations::conversation_load,
+            conversations::conversation_delete,
+            conversations::conversation_update_title,
+            conversations::conversation_add_message,
+            conversations::conversation_fork,
+            conversations::conversation_data_path,
         ])
         .run(tauri::generate_context!());
 

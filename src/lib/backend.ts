@@ -394,6 +394,286 @@ export async function gitPull(repoPath: string, remote?: string): Promise<void> 
 }
 
 // ============================================
+// Agent Operations (Claude Agent SDK)
+// ============================================
+
+export interface SessionConfig {
+  cwd?: string;
+  model?: 'haiku' | 'sonnet' | 'opus';
+  thinkingEnabled?: boolean;
+  thinkingTokens?: number;
+  acceptEnabled?: boolean;
+  planEnabled?: boolean;
+}
+
+export interface AttachmentContentBlock {
+  type: 'document' | 'image' | 'text';
+  source?: {
+    type: 'base64';
+    mediaType: string;
+    data: string;
+  };
+  content?: {
+    type: 'text';
+    text: string;
+  };
+  title?: string;
+  context?: string;
+}
+
+export interface AgentMessageEvent {
+  sessionId: string;
+  message: AgentMessage;
+}
+
+export interface AgentMessage {
+  type:
+    | 'text'
+    | 'thinking'
+    | 'tool_use'
+    | 'tool_result'
+    | 'result'
+    | 'turn_complete'
+    | 'turn_cancel';
+  content?: string;
+  toolId?: string;
+  toolName?: string;
+  toolInput?: Record<string, unknown>;
+  toolResult?: string;
+  success?: boolean;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadInputTokens?: number;
+    cacheCreationInputTokens?: number;
+  };
+}
+
+export interface PermissionRequestEvent {
+  sessionId: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  requestId: string;
+}
+
+export interface SessionInitEvent {
+  sessionId: string;
+  sdkSessionId: string;
+  isResumed: boolean;
+  isForked: boolean;
+}
+
+export interface ModeChangedEvent {
+  sessionId: string;
+  enabled: boolean;
+}
+
+export interface AgentErrorEvent {
+  message: string;
+  stack?: string;
+}
+
+export async function agentCreateSession(sessionId: string, config?: SessionConfig): Promise<void> {
+  return invoke('agent_create_session', { sessionId, config });
+}
+
+export async function agentDeleteSession(sessionId: string): Promise<void> {
+  return invoke('agent_delete_session', { sessionId });
+}
+
+export async function agentSendMessage(
+  sessionId: string,
+  message: string,
+  attachments?: AttachmentContentBlock[]
+): Promise<void> {
+  return invoke('agent_send_message', { sessionId, message, attachments });
+}
+
+export async function agentInterrupt(sessionId: string): Promise<void> {
+  return invoke('agent_interrupt', { sessionId });
+}
+
+export async function agentIsSessionReady(sessionId: string): Promise<boolean> {
+  return invoke<boolean>('agent_is_session_ready', { sessionId });
+}
+
+export async function agentGetSdkSessionId(sessionId: string): Promise<string | null> {
+  return invoke<string | null>('agent_get_sdk_session_id', { sessionId });
+}
+
+export async function agentRespondPermission(
+  requestId: string,
+  decision: 'approve' | 'deny',
+  always: boolean,
+  answers?: Record<string, string>
+): Promise<void> {
+  return invoke('agent_respond_permission', { requestId, decision, always, answers });
+}
+
+export async function agentSetThinkingMode(
+  sessionId: string,
+  enabled: boolean,
+  maxTokens?: number
+): Promise<void> {
+  return invoke('agent_set_thinking_mode', { sessionId, enabled, maxTokens });
+}
+
+export async function agentGetThinkingMode(sessionId: string): Promise<boolean> {
+  return invoke<boolean>('agent_get_thinking_mode', { sessionId });
+}
+
+export async function agentSetModel(
+  sessionId: string,
+  model: 'haiku' | 'sonnet' | 'opus'
+): Promise<void> {
+  return invoke('agent_set_model', { sessionId, model });
+}
+
+export async function agentSetPlanMode(sessionId: string, enabled: boolean): Promise<void> {
+  return invoke('agent_set_plan_mode', { sessionId, enabled });
+}
+
+export async function agentGetPlanMode(sessionId: string): Promise<boolean> {
+  return invoke<boolean>('agent_get_plan_mode', { sessionId });
+}
+
+export async function agentSetAcceptMode(sessionId: string, enabled: boolean): Promise<void> {
+  return invoke('agent_set_accept_mode', { sessionId, enabled });
+}
+
+export async function agentGetAcceptMode(sessionId: string): Promise<boolean> {
+  return invoke<boolean>('agent_get_accept_mode', { sessionId });
+}
+
+// Agent Event Listeners
+
+export async function onAgentMessage(
+  callback: (event: AgentMessageEvent) => void
+): Promise<() => void> {
+  return listen<AgentMessageEvent>('agent:message', callback);
+}
+
+export async function onAgentPermissionRequest(
+  callback: (event: PermissionRequestEvent) => void
+): Promise<() => void> {
+  return listen<PermissionRequestEvent>('agent:permission_request', callback);
+}
+
+export async function onAgentSessionInit(
+  callback: (event: SessionInitEvent) => void
+): Promise<() => void> {
+  return listen<SessionInitEvent>('agent:session_init', callback);
+}
+
+export async function onAgentPlanModeChanged(
+  callback: (event: ModeChangedEvent) => void
+): Promise<() => void> {
+  return listen<ModeChangedEvent>('agent:plan_mode_changed', callback);
+}
+
+export async function onAgentAcceptModeChanged(
+  callback: (event: ModeChangedEvent) => void
+): Promise<() => void> {
+  return listen<ModeChangedEvent>('agent:accept_mode_changed', callback);
+}
+
+export async function onAgentError(
+  callback: (event: AgentErrorEvent) => void
+): Promise<() => void> {
+  return listen<AgentErrorEvent>('agent:error', callback);
+}
+
+export async function onAgentReady(callback: () => void): Promise<() => void> {
+  return listen<undefined>('agent:ready', () => {
+    callback();
+  });
+}
+
+// ============================================
+// Conversation Operations
+// ============================================
+
+export interface ConversationMessageDto {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  thinking?: string;
+  createdAt: number;
+  toolUses?: ToolUseDto[];
+}
+
+export interface ToolUseDto {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+  output?: string;
+  success: boolean;
+}
+
+export interface ConversationDto {
+  sessionId: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: ConversationMessageDto[];
+  workspacePath?: string;
+  forkedFrom?: string;
+}
+
+export interface ConversationSummaryDto {
+  sessionId: string;
+  title: string;
+  updatedAt: number;
+  messageCount: number;
+}
+
+export async function conversationCreate(
+  sessionId: string,
+  title: string
+): Promise<ConversationDto> {
+  return invoke<ConversationDto>('conversation_create', { sessionId, title });
+}
+
+export async function conversationList(): Promise<ConversationSummaryDto[]> {
+  return invoke<ConversationSummaryDto[]>('conversation_list');
+}
+
+export async function conversationLoad(sessionId: string): Promise<ConversationDto | null> {
+  return invoke<ConversationDto | null>('conversation_load', { sessionId });
+}
+
+export async function conversationDelete(sessionId: string): Promise<void> {
+  return invoke('conversation_delete', { sessionId });
+}
+
+export async function conversationUpdateTitle(sessionId: string, title: string): Promise<void> {
+  return invoke('conversation_update_title', { sessionId, title });
+}
+
+export async function conversationAddMessage(
+  sessionId: string,
+  message: ConversationMessageDto
+): Promise<void> {
+  return invoke('conversation_add_message', { sessionId, message });
+}
+
+export async function conversationFork(
+  sessionId: string,
+  newSessionId: string,
+  upToMessageId?: string
+): Promise<ConversationDto | null> {
+  return invoke<ConversationDto | null>('conversation_fork', {
+    sessionId,
+    newSessionId,
+    upToMessageId,
+  });
+}
+
+export async function conversationDataPath(): Promise<string> {
+  return invoke<string>('conversation_data_path');
+}
+
+// ============================================
 // AI Operations
 // ============================================
 

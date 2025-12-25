@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { FileEntry } from '@/lib/backend';
+import type { AttachmentContentBlock, FileEntry, SessionConfig } from '@/lib/backend';
 import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
 
 import {
@@ -16,6 +16,29 @@ import {
   onTerminalExit,
   watchPath,
   onFileChange,
+  // Agent SDK operations
+  agentCreateSession,
+  agentSendMessage,
+  agentInterrupt,
+  agentRespondPermission,
+  agentSetThinkingMode,
+  agentSetModel,
+  agentSetPlanMode,
+  agentSetAcceptMode,
+  // Agent event listeners
+  onAgentMessage,
+  onAgentPermissionRequest,
+  onAgentSessionInit,
+  onAgentPlanModeChanged,
+  onAgentAcceptModeChanged,
+  onAgentError,
+  // Conversation operations
+  conversationCreate,
+  conversationList,
+  conversationLoad,
+  conversationDelete,
+  conversationUpdateTitle,
+  conversationFork,
 } from '@/lib/backend';
 import { useUIStore } from '@/stores/ui-store';
 import { ExtensionMessageSchema, WebviewMessageSchema } from '@/types/protocol';
@@ -215,6 +238,221 @@ async function initFileWatcher(workspacePath: string): Promise<void> {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Agent Listener Singleton
+// ═══════════════════════════════════════════════════════════════
+
+let agentListenersInitialized = false;
+
+/** Track created sessions to ensure we create before sending */
+const createdSessions = new Set<string>();
+
+/** Ensure a session exists before sending messages */
+async function ensureSession(sessionId: string): Promise<void> {
+  if (createdSessions.has(sessionId)) {
+    return;
+  }
+
+  // Get current workspace for session config
+  const cwd = await getWorkspacePath();
+
+  // Build config with optional cwd
+  const config: SessionConfig = {
+    model: 'sonnet',
+    thinkingEnabled: false,
+    acceptEnabled: true,
+    planEnabled: false,
+  };
+  if (cwd) {
+    config.cwd = cwd;
+  }
+
+  await agentCreateSession(sessionId, config);
+
+  createdSessions.add(sessionId);
+}
+
+async function initAgentListeners(): Promise<void> {
+  if (agentListenersInitialized) return;
+  agentListenersInitialized = true;
+
+  try {
+    // Listen for agent messages and convert to window.postMessage format
+    await onAgentMessage((event) => {
+      const { sessionId, message } = event;
+      const messageId = crypto.randomUUID();
+
+      switch (message.type) {
+        case 'text':
+          window.postMessage(
+            {
+              type: 'agent:chunk',
+              uuid: crypto.randomUUID(),
+              session_id: sessionId,
+              message_id: messageId,
+              content: message.content ?? '',
+            },
+            '*'
+          );
+          break;
+
+        case 'thinking':
+          window.postMessage(
+            {
+              type: 'agent:thinking',
+              uuid: crypto.randomUUID(),
+              session_id: sessionId,
+              message_id: messageId,
+              thinking: message.content ?? '',
+            },
+            '*'
+          );
+          break;
+
+        case 'tool_use': {
+          const toolId = message.toolId ?? crypto.randomUUID();
+          window.postMessage(
+            {
+              type: 'tool:start',
+              uuid: crypto.randomUUID(),
+              session_id: sessionId,
+              message_id: messageId,
+              tool_id: toolId,
+              tool_name: message.toolName ?? 'unknown',
+              tool_input: message.toolInput ?? {},
+            },
+            '*'
+          );
+          break;
+        }
+
+        case 'tool_result': {
+          const toolId = message.toolId ?? crypto.randomUUID();
+          window.postMessage(
+            {
+              type: 'tool:end',
+              uuid: crypto.randomUUID(),
+              session_id: sessionId,
+              message_id: messageId,
+              tool_id: toolId,
+              tool_name: message.toolName ?? 'unknown',
+              tool_output: message.toolResult ?? '',
+              success: message.success ?? true,
+            },
+            '*'
+          );
+          break;
+        }
+
+        case 'result':
+        case 'turn_complete':
+          window.postMessage(
+            {
+              type: 'agent:complete',
+              uuid: crypto.randomUUID(),
+              session_id: sessionId,
+              message_id: messageId,
+              usage: message.usage
+                ? {
+                    input_tokens: message.usage.inputTokens,
+                    output_tokens: message.usage.outputTokens,
+                  }
+                : undefined,
+            },
+            '*'
+          );
+          break;
+
+        case 'turn_cancel':
+          window.postMessage(
+            {
+              type: 'agent:complete',
+              uuid: crypto.randomUUID(),
+              session_id: sessionId,
+              message_id: messageId,
+              cancelled: true,
+            },
+            '*'
+          );
+          break;
+      }
+    });
+
+    // Listen for permission requests
+    await onAgentPermissionRequest((event) => {
+      window.postMessage(
+        {
+          type: 'permission:request',
+          uuid: crypto.randomUUID(),
+          session_id: event.sessionId,
+          request_id: event.requestId,
+          tool_name: event.toolName,
+          tool_input: event.toolInput,
+        },
+        '*'
+      );
+    });
+
+    // Listen for session init events
+    await onAgentSessionInit((event) => {
+      window.postMessage(
+        {
+          type: 'system:init',
+          uuid: crypto.randomUUID(),
+          session_id: event.sessionId,
+          sdk_session_id: event.sdkSessionId,
+          is_resumed: event.isResumed,
+          is_forked: event.isForked,
+        },
+        '*'
+      );
+    });
+
+    // Listen for plan mode changes
+    await onAgentPlanModeChanged((event) => {
+      window.postMessage(
+        {
+          type: 'inputMode:changed',
+          uuid: crypto.randomUUID(),
+          session_id: event.sessionId,
+          mode: event.enabled ? 'plan' : 'default',
+        },
+        '*'
+      );
+    });
+
+    // Listen for accept mode changes
+    await onAgentAcceptModeChanged((event) => {
+      window.postMessage(
+        {
+          type: 'inputMode:changed',
+          uuid: crypto.randomUUID(),
+          session_id: event.sessionId,
+          mode: event.enabled ? 'accept' : 'default',
+        },
+        '*'
+      );
+    });
+
+    // Listen for agent errors
+    await onAgentError((event) => {
+      window.postMessage(
+        {
+          type: 'error',
+          uuid: crypto.randomUUID(),
+          message: event.message,
+        },
+        '*'
+      );
+    });
+
+    console.warn('[Snowflake] Agent event listeners initialized');
+  } catch (err) {
+    console.error('[Snowflake] Failed to set up agent listeners:', err);
+    agentListenersInitialized = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Tauri Message Handler
 // ═══════════════════════════════════════════════════════════════
 
@@ -385,65 +623,205 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
 
   // Handle conversation creation
   if (message.type === 'conversation:create') {
-    const sessionId = crypto.randomUUID();
-    window.postMessage(
-      {
-        type: 'conversation:created',
-        uuid: crypto.randomUUID(),
-        session_id: sessionId,
-        title: message.title ?? 'New Conversation',
-      },
-      '*'
-    );
+    try {
+      const sessionId = crypto.randomUUID();
+      const title = message.title ?? 'New Conversation';
+      await conversationCreate(sessionId, title);
+      window.postMessage(
+        {
+          type: 'conversation:created',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+          title,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      console.error('[Snowflake] Conversation create error:', err);
+      // Still emit created event so UI can proceed (will use localStorage fallback)
+      const sessionId = crypto.randomUUID();
+      window.postMessage(
+        {
+          type: 'conversation:created',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+          title: message.title ?? 'New Conversation',
+        },
+        '*'
+      );
+    }
     return;
   }
 
   // Handle conversation list request
   if (message.type === 'conversation:list') {
-    // TODO: Implement persistent conversation storage
-    // For now, return empty list (conversations are in-memory only)
-    window.postMessage(
-      {
-        type: 'conversation:list',
-        uuid: crypto.randomUUID(),
-        conversations: [],
-      },
-      '*'
-    );
+    try {
+      const conversations = await conversationList();
+      window.postMessage(
+        {
+          type: 'conversation:list',
+          uuid: crypto.randomUUID(),
+          conversations: conversations.map((c) => ({
+            session_id: c.sessionId,
+            title: c.title,
+            updated_at: c.updatedAt,
+            message_count: c.messageCount,
+          })),
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      console.error('[Snowflake] Conversation list error:', err);
+      // Return empty list on error (localStorage will still have data)
+      window.postMessage(
+        {
+          type: 'conversation:list',
+          uuid: crypto.randomUUID(),
+          conversations: [],
+        },
+        '*'
+      );
+    }
     return;
   }
 
   // Handle conversation load request
   if (message.type === 'conversation:load') {
-    // TODO: Implement persistent conversation storage
-    // For now, return empty conversation (no persistence yet)
-    window.postMessage(
-      {
-        type: 'conversation:loaded',
-        uuid: crypto.randomUUID(),
-        session_id: message.session_id,
-        title: 'Loaded Conversation',
-        messages: [],
-      },
-      '*'
-    );
+    try {
+      const conv = await conversationLoad(message.session_id);
+      if (conv) {
+        window.postMessage(
+          {
+            type: 'conversation:loaded',
+            uuid: crypto.randomUUID(),
+            session_id: conv.sessionId,
+            title: conv.title,
+            messages: conv.messages.map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              thinking: m.thinking,
+              created_at: m.createdAt,
+              tool_uses: m.toolUses?.map((t) => ({
+                id: t.id,
+                name: t.name,
+                input: t.input,
+                output: t.output,
+                success: t.success,
+              })),
+            })),
+          },
+          '*'
+        );
+      } else {
+        // Conversation not found in backend - return empty
+        window.postMessage(
+          {
+            type: 'conversation:loaded',
+            uuid: crypto.randomUUID(),
+            session_id: message.session_id,
+            title: 'Conversation',
+            messages: [],
+          },
+          '*'
+        );
+      }
+    } catch (err: unknown) {
+      console.error('[Snowflake] Conversation load error:', err);
+      window.postMessage(
+        {
+          type: 'conversation:loaded',
+          uuid: crypto.randomUUID(),
+          session_id: message.session_id,
+          title: 'Conversation',
+          messages: [],
+        },
+        '*'
+      );
+    }
     return;
   }
 
-  // Handle conversation rewind request
+  // Handle conversation delete request
+  if (message.type === 'conversation:delete') {
+    try {
+      await conversationDelete(message.session_id);
+      window.postMessage(
+        {
+          type: 'conversation:deleted',
+          uuid: crypto.randomUUID(),
+          session_id: message.session_id,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      console.error('[Snowflake] Conversation delete error:', err);
+    }
+    return;
+  }
+
+  // Handle conversation title update
+  if (message.type === 'conversation:updateTitle') {
+    try {
+      await conversationUpdateTitle(message.session_id, message.title);
+    } catch (err: unknown) {
+      console.error('[Snowflake] Conversation title update error:', err);
+    }
+    return;
+  }
+
+  // Handle conversation rewind request (fork)
   if (message.type === 'conversation:rewind') {
-    // TODO: Implement conversation history management
-    window.postMessage(
-      {
-        type: 'conversation:rewound',
-        uuid: crypto.randomUUID(),
-        session_id: message.session_id,
-        new_session_id: message.session_id,
-        rewind_to_message_id: message.message_id,
-        messages: [],
-      },
-      '*'
-    );
+    try {
+      const newSessionId = crypto.randomUUID();
+      const forked = await conversationFork(message.session_id, newSessionId, message.message_id);
+      if (forked) {
+        window.postMessage(
+          {
+            type: 'conversation:rewound',
+            uuid: crypto.randomUUID(),
+            session_id: message.session_id,
+            new_session_id: forked.sessionId,
+            rewind_to_message_id: message.message_id,
+            messages: forked.messages.map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              thinking: m.thinking,
+              created_at: m.createdAt,
+            })),
+          },
+          '*'
+        );
+      } else {
+        // Original not found - just create empty fork
+        window.postMessage(
+          {
+            type: 'conversation:rewound',
+            uuid: crypto.randomUUID(),
+            session_id: message.session_id,
+            new_session_id: newSessionId,
+            rewind_to_message_id: message.message_id,
+            messages: [],
+          },
+          '*'
+        );
+      }
+    } catch (err: unknown) {
+      console.error('[Snowflake] Conversation rewind error:', err);
+      const newSessionId = crypto.randomUUID();
+      window.postMessage(
+        {
+          type: 'conversation:rewound',
+          uuid: crypto.randomUUID(),
+          session_id: message.session_id,
+          new_session_id: newSessionId,
+          rewind_to_message_id: message.message_id,
+          messages: [],
+        },
+        '*'
+      );
+    }
     return;
   }
 
@@ -500,13 +878,122 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
     return;
   }
 
-  // TODO: AI SDK Integration needed for message:send
-  // This requires integrating with Claude API via the snowflake-ai crate
-  // The handler should:
-  // 1. Send the message to Claude API
-  // 2. Stream responses back via agent:chunk messages
-  // 3. Send agent:complete when done
-  // 4. Handle tool calls (tool:start, tool:end)
+  // ═══════════════════════════════════════════════════════════════
+  // Agent SDK Message Handlers
+  // ═══════════════════════════════════════════════════════════════
+
+  // Handle sending a message to the agent
+  if (message.type === 'message:send') {
+    try {
+      // Ensure session exists
+      await ensureSession(message.session_id);
+
+      // Convert context images to attachments if present
+      const attachments: AttachmentContentBlock[] = [];
+
+      if (message.context?.images) {
+        for (const img of message.context.images) {
+          attachments.push({
+            type: 'image',
+            source: {
+              type: 'base64',
+              mediaType: img.mimeType,
+              data: img.data,
+            },
+            title: img.name,
+          });
+        }
+      }
+
+      // Send message to agent
+      await agentSendMessage(
+        message.session_id,
+        message.content,
+        attachments.length > 0 ? attachments : undefined
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
+      console.error('[Snowflake] Agent send message error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'agent:error',
+          uuid: crypto.randomUUID(),
+          session_id: message.session_id,
+          message_id: crypto.randomUUID(),
+          error: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // Handle stopping the agent
+  if (message.type === 'agent:stop') {
+    try {
+      await agentInterrupt(message.session_id);
+    } catch (err: unknown) {
+      console.error('[Snowflake] Agent interrupt error:', err);
+    }
+    return;
+  }
+
+  // Handle permission response
+  if (message.type === 'permission:response') {
+    try {
+      await agentRespondPermission(message.request_id, message.decision, message.always ?? false);
+    } catch (err: unknown) {
+      console.error('[Snowflake] Permission response error:', err);
+    }
+    return;
+  }
+
+  // Handle thinking mode change
+  if (message.type === 'thinking:set') {
+    try {
+      const enabled = message.mode !== 'off';
+      const maxTokens =
+        message.mode === 'think'
+          ? 4096
+          : message.mode === 'hard'
+            ? 10240
+            : message.mode === 'ultra'
+              ? 32768
+              : undefined;
+      await agentSetThinkingMode(message.session_id, enabled, maxTokens);
+    } catch (err: unknown) {
+      console.error('[Snowflake] Set thinking mode error:', err);
+    }
+    return;
+  }
+
+  // Handle model change
+  if (message.type === 'model:set') {
+    try {
+      await agentSetModel(message.session_id, message.model);
+    } catch (err: unknown) {
+      console.error('[Snowflake] Set model error:', err);
+    }
+    return;
+  }
+
+  // Handle input mode change
+  if (message.type === 'inputMode:set') {
+    try {
+      if (message.mode === 'plan') {
+        await agentSetPlanMode(message.session_id, true);
+      } else if (message.mode === 'accept') {
+        await agentSetAcceptMode(message.session_id, true);
+      } else {
+        // Default mode - disable both plan and accept
+        await agentSetPlanMode(message.session_id, false);
+        await agentSetAcceptMode(message.session_id, false);
+      }
+    } catch (err: unknown) {
+      console.error('[Snowflake] Set input mode error:', err);
+    }
+    return;
+  }
 
   // Other message types are handled elsewhere or not applicable
 }
@@ -599,6 +1086,17 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
       }
       // Initialize terminal listeners (singleton - only runs once)
       initTerminalListeners().catch(console.error);
+    }
+  }, [isConnected, isMockMode, debug]);
+
+  // Initialize agent listeners once when connected to Tauri
+  useEffect(() => {
+    if (isConnected && !isMockMode) {
+      if (debug) {
+        console.warn('[Snowflake] Connected to Tauri, initializing agent listeners');
+      }
+      // Initialize agent listeners (singleton - only runs once)
+      initAgentListeners().catch(console.error);
     }
   }, [isConnected, isMockMode, debug]);
 
