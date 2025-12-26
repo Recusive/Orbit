@@ -3,6 +3,8 @@
  * Newline-delimited JSON messages over stdin/stdout
  */
 
+import type { SubagentDefinition } from './agent-definitions.js';
+import type { CommandScope, SlashCommandDefinition } from './command-definitions.js';
 import type { AttachmentContentBlock } from './messages.js';
 import type {
   AgentMessage,
@@ -138,6 +140,159 @@ export interface GetSDKSessionIdRequest {
 }
 
 /**
+ * Get stored SDK session ID for resume
+ */
+export interface GetStoredSessionRequest {
+  type: 'get_stored_session';
+  sessionId: string;
+}
+
+/**
+ * Cleanup old sessions
+ */
+export interface CleanupSessionsRequest {
+  type: 'cleanup_sessions';
+  maxAgeDays?: number;
+}
+
+// ============================================================================
+// Agent Definition Requests
+// ============================================================================
+
+/**
+ * List all agents in workspace
+ */
+export interface ListAgentsRequest {
+  type: 'list_agents';
+  workspacePath: string;
+}
+
+/**
+ * Get a single agent by name
+ */
+export interface GetAgentRequest {
+  type: 'get_agent';
+  workspacePath: string;
+  name: string;
+}
+
+/**
+ * Create a new agent
+ */
+export interface CreateAgentRequest {
+  type: 'create_agent';
+  workspacePath: string;
+  agent: SubagentDefinition;
+}
+
+/**
+ * Update an existing agent
+ */
+export interface UpdateAgentRequest {
+  type: 'update_agent';
+  workspacePath: string;
+  originalName: string;
+  agent: SubagentDefinition;
+}
+
+/**
+ * Delete an agent
+ */
+export interface DeleteAgentRequest {
+  type: 'delete_agent';
+  workspacePath: string;
+  name: string;
+}
+
+// ============================================================================
+// Command Definition Requests
+// ============================================================================
+
+/**
+ * List all commands in workspace
+ */
+export interface ListCommandsRequest {
+  type: 'list_commands';
+  workspacePath: string;
+}
+
+/**
+ * Get a single command by name and scope
+ */
+export interface GetCommandRequest {
+  type: 'get_command';
+  workspacePath: string;
+  name: string;
+  scope: CommandScope;
+}
+
+/**
+ * Create a new command
+ */
+export interface CreateCommandRequest {
+  type: 'create_command';
+  workspacePath: string;
+  command: SlashCommandDefinition;
+}
+
+/**
+ * Update an existing command
+ */
+export interface UpdateCommandRequest {
+  type: 'update_command';
+  workspacePath: string;
+  originalName: string;
+  command: SlashCommandDefinition;
+}
+
+/**
+ * Delete a command
+ */
+export interface DeleteCommandRequest {
+  type: 'delete_command';
+  workspacePath: string;
+  name: string;
+  scope: CommandScope;
+}
+
+/**
+ * Fork a session (create a checkpoint/branch)
+ */
+export interface ForkSessionRequest {
+  type: 'fork_session';
+  sessionId: string;
+  options?: {
+    keepAlive?: boolean;
+    checkpointPrompt?: string;
+    displayName?: string;
+  };
+}
+
+/**
+ * Fork session result
+ */
+export interface ForkSessionResult {
+  sdkSessionId: string;
+  orbitSessionId?: string;
+}
+
+/**
+ * Generate an agent definition from natural language
+ */
+export interface GenerateAgentDefinitionRequest {
+  type: 'generate_agent_definition';
+  description: string;
+}
+
+/**
+ * Generate a command definition from natural language
+ */
+export interface GenerateCommandDefinitionRequest {
+  type: 'generate_command_definition';
+  description: string;
+}
+
+/**
  * Shutdown the bridge
  */
 export interface ShutdownRequest {
@@ -162,6 +317,21 @@ export type BridgeRequest =
   | GetAcceptModeRequest
   | IsSessionReadyRequest
   | GetSDKSessionIdRequest
+  | GetStoredSessionRequest
+  | CleanupSessionsRequest
+  | ListAgentsRequest
+  | GetAgentRequest
+  | CreateAgentRequest
+  | UpdateAgentRequest
+  | DeleteAgentRequest
+  | ListCommandsRequest
+  | GetCommandRequest
+  | CreateCommandRequest
+  | UpdateCommandRequest
+  | DeleteCommandRequest
+  | ForkSessionRequest
+  | GenerateAgentDefinitionRequest
+  | GenerateCommandDefinitionRequest
   | ShutdownRequest;
 
 // ============================================================================
@@ -204,9 +374,73 @@ export interface StringResponse {
 }
 
 /**
+ * Number result response
+ */
+export interface NumberResponse {
+  type: 'number';
+  requestType: string;
+  value: number;
+}
+
+/**
+ * Agent list response
+ */
+export interface AgentListResponse {
+  type: 'agent_list';
+  requestType: string;
+  agents: SubagentDefinition[];
+}
+
+/**
+ * Single agent response
+ */
+export interface AgentResponse {
+  type: 'agent';
+  requestType: string;
+  agent: SubagentDefinition | null;
+}
+
+/**
+ * Command list response
+ */
+export interface CommandListResponse {
+  type: 'command_list';
+  requestType: string;
+  commands: SlashCommandDefinition[];
+}
+
+/**
+ * Single command response
+ */
+export interface CommandResponse {
+  type: 'command';
+  requestType: string;
+  command: SlashCommandDefinition | null;
+}
+
+/**
+ * Fork session response
+ */
+export interface ForkSessionResponse {
+  type: 'fork_result';
+  requestType: string;
+  result: ForkSessionResult;
+}
+
+/**
  * All possible command responses
  */
-export type CommandResponse = SuccessResponse | ErrorResponse | BooleanResponse | StringResponse;
+export type BridgeCommandResponse =
+  | SuccessResponse
+  | ErrorResponse
+  | BooleanResponse
+  | StringResponse
+  | NumberResponse
+  | AgentListResponse
+  | AgentResponse
+  | CommandListResponse
+  | CommandResponse
+  | ForkSessionResponse;
 
 // ============================================================================
 // Event Types (Node.js → Rust, unsolicited)
@@ -285,4 +519,4 @@ export type BridgeEvent =
 /**
  * All possible messages from Node.js to Rust
  */
-export type BridgeResponse = CommandResponse | BridgeEvent;
+export type BridgeResponse = BridgeCommandResponse | BridgeEvent;

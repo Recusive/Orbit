@@ -39,6 +39,18 @@ import {
   conversationDelete,
   conversationUpdateTitle,
   conversationFork,
+  // Subagent operations
+  listAgents,
+  createAgent,
+  updateAgent,
+  deleteAgent,
+  generateAgentDefinition,
+  // Command operations
+  listCommands,
+  createCommand,
+  updateCommand,
+  deleteCommand,
+  generateCommandDefinition,
 } from '@/lib/backend';
 import { useUIStore } from '@/stores/ui-store';
 import { ExtensionMessageSchema, WebviewMessageSchema } from '@/types/protocol';
@@ -991,6 +1003,352 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
       }
     } catch (err: unknown) {
       console.error('[Snowflake] Set input mode error:', err);
+    }
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Subagent Management Handlers
+  // ═══════════════════════════════════════════════════════════════
+
+  // Handle listing subagents
+  if (message.type === 'subagents:list') {
+    try {
+      const workspacePath = (await getWorkspacePath()) ?? '/';
+      const agents = await listAgents(workspacePath);
+      window.postMessage(
+        {
+          type: 'subagents:list:response',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          agents,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to list subagents';
+      console.error('[Snowflake] List subagents error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'subagents:error',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          error: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // Handle creating a subagent
+  if (message.type === 'subagents:create') {
+    try {
+      const workspacePath = (await getWorkspacePath()) ?? '/';
+      // Filter undefined values to match exactOptionalPropertyTypes
+      const agentInput = {
+        name: message.agent.name,
+        description: message.agent.description,
+        prompt: message.agent.prompt,
+        ...(message.agent.tools && { tools: message.agent.tools }),
+        ...(message.agent.disallowedTools && { disallowedTools: message.agent.disallowedTools }),
+        ...(message.agent.model && { model: message.agent.model }),
+      };
+      const agent = await createAgent(workspacePath, agentInput);
+      window.postMessage(
+        {
+          type: 'subagents:created',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          agent,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create subagent';
+      console.error('[Snowflake] Create subagent error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'subagents:error',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          error: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // Handle updating a subagent
+  if (message.type === 'subagents:update') {
+    try {
+      const workspacePath = (await getWorkspacePath()) ?? '/';
+      // Filter undefined values to match exactOptionalPropertyTypes
+      const agentInput = {
+        name: message.agent.name,
+        description: message.agent.description,
+        prompt: message.agent.prompt,
+        ...(message.agent.tools && { tools: message.agent.tools }),
+        ...(message.agent.disallowedTools && { disallowedTools: message.agent.disallowedTools }),
+        ...(message.agent.model && { model: message.agent.model }),
+      };
+      const agent = await updateAgent(workspacePath, message.originalName, agentInput);
+      window.postMessage(
+        {
+          type: 'subagents:updated',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          agent,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update subagent';
+      console.error('[Snowflake] Update subagent error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'subagents:error',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          error: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // Handle deleting a subagent
+  if (message.type === 'subagents:delete') {
+    try {
+      const workspacePath = (await getWorkspacePath()) ?? '/';
+      await deleteAgent(workspacePath, message.name);
+      window.postMessage(
+        {
+          type: 'subagents:deleted',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          name: message.name,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete subagent';
+      console.error('[Snowflake] Delete subagent error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'subagents:error',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          error: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // Handle generating a subagent from description
+  if (message.type === 'subagents:generate') {
+    try {
+      const agent = await generateAgentDefinition(message.description);
+      window.postMessage(
+        {
+          type: 'subagents:generated',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          agent,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate subagent';
+      console.error('[Snowflake] Generate subagent error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'subagents:error',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          error: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Command (Slash Command) Management Handlers
+  // ═══════════════════════════════════════════════════════════════
+
+  // Handle listing commands
+  if (message.type === 'commands:list') {
+    try {
+      const workspacePath = (await getWorkspacePath()) ?? '/';
+      const commands = await listCommands(workspacePath);
+      window.postMessage(
+        {
+          type: 'commands:list:response',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          commands,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to list commands';
+      console.error('[Snowflake] List commands error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'commands:error',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          error: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // Handle creating a command
+  if (message.type === 'commands:create') {
+    try {
+      const workspacePath = (await getWorkspacePath()) ?? '/';
+      // Filter undefined values to match exactOptionalPropertyTypes
+      const commandInput = {
+        name: message.command.name,
+        content: message.command.content,
+        scope: message.command.scope,
+        ...(message.command.description && { description: message.command.description }),
+        ...(message.command.allowedTools && { allowedTools: message.command.allowedTools }),
+        ...(message.command.argumentHint && { argumentHint: message.command.argumentHint }),
+        ...(message.command.model && { model: message.command.model }),
+        ...(message.command.readonly !== undefined && { readonly: message.command.readonly }),
+      };
+      const command = await createCommand(workspacePath, commandInput);
+      window.postMessage(
+        {
+          type: 'commands:created',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          command,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create command';
+      console.error('[Snowflake] Create command error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'commands:error',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          error: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // Handle updating a command
+  if (message.type === 'commands:update') {
+    try {
+      const workspacePath = (await getWorkspacePath()) ?? '/';
+      // Filter undefined values to match exactOptionalPropertyTypes
+      const commandInput = {
+        name: message.command.name,
+        content: message.command.content,
+        scope: message.command.scope,
+        ...(message.command.description && { description: message.command.description }),
+        ...(message.command.allowedTools && { allowedTools: message.command.allowedTools }),
+        ...(message.command.argumentHint && { argumentHint: message.command.argumentHint }),
+        ...(message.command.model && { model: message.command.model }),
+        ...(message.command.readonly !== undefined && { readonly: message.command.readonly }),
+      };
+      const command = await updateCommand(workspacePath, message.originalName, commandInput);
+      window.postMessage(
+        {
+          type: 'commands:updated',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          command,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update command';
+      console.error('[Snowflake] Update command error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'commands:error',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          error: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // Handle deleting a command
+  if (message.type === 'commands:delete') {
+    try {
+      const workspacePath = (await getWorkspacePath()) ?? '/';
+      await deleteCommand(workspacePath, message.name, message.scope);
+      window.postMessage(
+        {
+          type: 'commands:deleted',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          name: message.name,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete command';
+      console.error('[Snowflake] Delete command error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'commands:error',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          error: errorMessage,
+        },
+        '*'
+      );
+    }
+    return;
+  }
+
+  // Handle generating a command from description
+  if (message.type === 'commands:generate') {
+    try {
+      const command = await generateCommandDefinition(message.description);
+      window.postMessage(
+        {
+          type: 'commands:generated',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          command,
+        },
+        '*'
+      );
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate command';
+      console.error('[Snowflake] Generate command error:', errorMessage);
+      window.postMessage(
+        {
+          type: 'commands:error',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          error: errorMessage,
+        },
+        '*'
+      );
     }
     return;
   }

@@ -6,10 +6,36 @@
 
 import * as readline from 'readline';
 
+import {
+  createAgent,
+  deleteAgent,
+  getAgent,
+  listAgents,
+  updateAgent,
+} from './agent-definitions.js';
+import {
+  createCommand,
+  deleteCommand,
+  getCommand,
+  listCommands,
+  updateCommand,
+} from './command-definitions.js';
 import { createLogger } from './logger.js';
 import { SessionManager } from './session-manager.js';
+import {
+  cleanupOldSessions,
+  deleteSession as deleteStoredSession,
+  getSDKSessionIdForSession,
+  saveSession,
+  touchSession,
+} from './session-storage.js';
 
-import type { BridgeEvent, BridgeRequest, BridgeResponse, CommandResponse } from './protocol.js';
+import type {
+  BridgeCommandResponse,
+  BridgeEvent,
+  BridgeRequest,
+  BridgeResponse,
+} from './protocol.js';
 
 const logger = createLogger('AgentBridge');
 
@@ -25,7 +51,7 @@ function sendMessage(message: BridgeResponse): void {
 /**
  * Send a command response
  */
-function sendResponse(response: CommandResponse): void {
+function sendResponse(response: BridgeCommandResponse): void {
   sendMessage(response);
 }
 
@@ -62,6 +88,14 @@ function main(): void {
   });
 
   sessionManager.onSessionInit((event) => {
+    // Persist session mapping for resume functionality
+    saveSession({
+      sessionId: event.sessionId,
+      sdkSessionId: event.sdkSessionId,
+      createdAt: Date.now(),
+      lastActiveAt: Date.now(),
+    });
+
     sendEvent({
       type: 'session_init',
       event,
@@ -148,6 +182,12 @@ function main(): void {
     process.exit(0);
   });
 
+  // Clean up old sessions on startup (30 days default)
+  const removedCount = cleanupOldSessions(30);
+  if (removedCount > 0) {
+    logger.info({ removedCount }, 'Cleaned up old stored sessions');
+  }
+
   // Send ready event
   sendEvent({ type: 'ready' });
   logger.info('Agent Bridge ready');
@@ -169,12 +209,16 @@ async function handleRequest(
 
     case 'delete_session': {
       await sessionManager.deleteSession(request.sessionId);
+      // Also remove from persistent storage
+      deleteStoredSession(request.sessionId);
       sendResponse({ type: 'success', requestType: request.type });
       break;
     }
 
     case 'send_message': {
       sessionManager.sendMessage(request.message, request.sessionId, request.attachments);
+      // Update last active timestamp in persistent storage
+      touchSession(request.sessionId);
       sendResponse({ type: 'success', requestType: request.type });
       break;
     }
@@ -242,6 +286,104 @@ async function handleRequest(
     case 'get_sdk_session_id': {
       const sdkSessionId = sessionManager.getSDKSessionId(request.sessionId);
       sendResponse({ type: 'string', requestType: request.type, value: sdkSessionId ?? null });
+      break;
+    }
+
+    case 'get_stored_session': {
+      // Get stored SDK session ID for resume functionality
+      const storedSdkSessionId = getSDKSessionIdForSession(request.sessionId);
+      sendResponse({
+        type: 'string',
+        requestType: request.type,
+        value: storedSdkSessionId ?? null,
+      });
+      break;
+    }
+
+    case 'cleanup_sessions': {
+      const removed = cleanupOldSessions(request.maxAgeDays ?? 30);
+      sendResponse({ type: 'number', requestType: request.type, value: removed });
+      break;
+    }
+
+    // Agent Definition Operations
+    case 'list_agents': {
+      const agents = listAgents(request.workspacePath);
+      sendResponse({ type: 'agent_list', requestType: request.type, agents });
+      break;
+    }
+
+    case 'get_agent': {
+      const agent = getAgent(request.workspacePath, request.name);
+      sendResponse({ type: 'agent', requestType: request.type, agent });
+      break;
+    }
+
+    case 'create_agent': {
+      const created = createAgent(request.workspacePath, request.agent);
+      sendResponse({ type: 'agent', requestType: request.type, agent: created });
+      break;
+    }
+
+    case 'update_agent': {
+      const updated = updateAgent(request.workspacePath, request.originalName, request.agent);
+      sendResponse({ type: 'agent', requestType: request.type, agent: updated });
+      break;
+    }
+
+    case 'delete_agent': {
+      deleteAgent(request.workspacePath, request.name);
+      sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
+    // Command Definition Operations
+    case 'list_commands': {
+      const commands = listCommands(request.workspacePath);
+      sendResponse({ type: 'command_list', requestType: request.type, commands });
+      break;
+    }
+
+    case 'get_command': {
+      const command = getCommand(request.workspacePath, request.name, request.scope);
+      sendResponse({ type: 'command', requestType: request.type, command });
+      break;
+    }
+
+    case 'create_command': {
+      const created = createCommand(request.workspacePath, request.command);
+      sendResponse({ type: 'command', requestType: request.type, command: created });
+      break;
+    }
+
+    case 'update_command': {
+      const updated = updateCommand(request.workspacePath, request.originalName, request.command);
+      sendResponse({ type: 'command', requestType: request.type, command: updated });
+      break;
+    }
+
+    case 'delete_command': {
+      deleteCommand(request.workspacePath, request.name, request.scope);
+      sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
+    // Fork and Generate Operations
+    case 'fork_session': {
+      const result = await sessionManager.forkSession(request.sessionId, request.options);
+      sendResponse({ type: 'fork_result', requestType: request.type, result });
+      break;
+    }
+
+    case 'generate_agent_definition': {
+      const agent = await sessionManager.generateAgentDefinition(request.description);
+      sendResponse({ type: 'agent', requestType: request.type, agent });
+      break;
+    }
+
+    case 'generate_command_definition': {
+      const command = await sessionManager.generateCommandDefinition(request.description);
+      sendResponse({ type: 'command', requestType: request.type, command });
       break;
     }
 

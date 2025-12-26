@@ -18,8 +18,9 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter as _, State};
 
 use crate::agent::{
-    AttachmentContentBlock, Model, PermissionDecision, PermissionResponse, SessionConfig,
-    SessionManager,
+    AttachmentContentBlock, CommandScope, ForkSessionOptions, ForkSessionResult, Model,
+    PermissionDecision, PermissionResponse, SessionConfig, SessionManager, SlashCommandDefinition,
+    SubagentDefinition,
 };
 
 /// Result type for agent commands
@@ -203,6 +204,206 @@ pub async fn agent_get_accept_mode(
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<bool> {
     state.get_accept_mode(&session_id).map_err(to_error)
+}
+
+// ============================================================================
+// Session Storage Commands
+// ============================================================================
+
+/// Get stored SDK session ID for resume
+#[tauri::command]
+pub async fn agent_get_stored_session(
+    session_id: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<Option<String>> {
+    state.get_stored_session(&session_id).map_err(to_error)
+}
+
+/// Cleanup old sessions
+#[tauri::command]
+pub async fn agent_cleanup_sessions(
+    max_age_days: Option<u32>,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<i64> {
+    state.cleanup_sessions(max_age_days).map_err(to_error)
+}
+
+// ============================================================================
+// Agent Definition Commands
+// ============================================================================
+
+/// List all agents in workspace
+#[tauri::command]
+pub async fn agent_list_agents(
+    workspace_path: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<Vec<SubagentDefinition>> {
+    state.list_agents(&workspace_path).map_err(to_error)
+}
+
+/// Get a single agent by name
+#[tauri::command]
+pub async fn agent_get_agent(
+    workspace_path: String,
+    name: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<Option<SubagentDefinition>> {
+    state.get_agent(&workspace_path, &name).map_err(to_error)
+}
+
+/// Create a new agent
+#[tauri::command]
+pub async fn agent_create_agent(
+    workspace_path: String,
+    agent: SubagentDefinition,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<SubagentDefinition> {
+    state.create_agent(&workspace_path, agent).map_err(to_error)
+}
+
+/// Update an existing agent
+#[tauri::command]
+pub async fn agent_update_agent(
+    workspace_path: String,
+    original_name: String,
+    agent: SubagentDefinition,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<SubagentDefinition> {
+    state
+        .update_agent(&workspace_path, &original_name, agent)
+        .map_err(to_error)
+}
+
+/// Delete an agent
+#[tauri::command]
+pub async fn agent_delete_agent(
+    workspace_path: String,
+    name: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<()> {
+    state.delete_agent(&workspace_path, &name).map_err(to_error)
+}
+
+// ============================================================================
+// Command Definition Commands
+// ============================================================================
+
+/// List all commands in workspace
+#[tauri::command]
+pub async fn agent_list_commands(
+    workspace_path: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<Vec<SlashCommandDefinition>> {
+    state.list_commands(&workspace_path).map_err(to_error)
+}
+
+/// Get a single command by name and scope
+#[tauri::command]
+pub async fn agent_get_command(
+    workspace_path: String,
+    name: String,
+    scope: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<Option<SlashCommandDefinition>> {
+    let scope = match scope.as_str() {
+        "builtin" => CommandScope::Builtin,
+        "default" => CommandScope::Default,
+        "project" => CommandScope::Project,
+        "personal" => CommandScope::Personal,
+        _ => {
+            return Err(
+                "Invalid scope: must be 'builtin', 'default', 'project', or 'personal'".to_owned(),
+            )
+        },
+    };
+    state
+        .get_command(&workspace_path, &name, scope)
+        .map_err(to_error)
+}
+
+/// Create a new command
+#[tauri::command]
+pub async fn agent_create_command(
+    workspace_path: String,
+    command: SlashCommandDefinition,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<SlashCommandDefinition> {
+    state
+        .create_command(&workspace_path, command)
+        .map_err(to_error)
+}
+
+/// Update an existing command
+#[tauri::command]
+pub async fn agent_update_command(
+    workspace_path: String,
+    original_name: String,
+    command: SlashCommandDefinition,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<SlashCommandDefinition> {
+    state
+        .update_command(&workspace_path, &original_name, command)
+        .map_err(to_error)
+}
+
+/// Delete a command
+#[tauri::command]
+pub async fn agent_delete_command(
+    workspace_path: String,
+    name: String,
+    scope: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<()> {
+    let scope = match scope.as_str() {
+        "builtin" => CommandScope::Builtin,
+        "default" => CommandScope::Default,
+        "project" => CommandScope::Project,
+        "personal" => CommandScope::Personal,
+        _ => {
+            return Err(
+                "Invalid scope: must be 'builtin', 'default', 'project', or 'personal'".to_owned(),
+            )
+        },
+    };
+    state
+        .delete_command(&workspace_path, &name, scope)
+        .map_err(to_error)
+}
+
+// ============================================================================
+// Fork and Generate Commands
+// ============================================================================
+
+/// Fork a session (create a checkpoint/branch)
+#[tauri::command]
+pub async fn agent_fork_session(
+    session_id: String,
+    options: Option<ForkSessionOptions>,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<ForkSessionResult> {
+    state.fork_session(&session_id, options).map_err(to_error)
+}
+
+/// Generate an agent definition from a natural language description
+#[tauri::command]
+pub async fn agent_generate_agent_definition(
+    description: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<SubagentDefinition> {
+    state
+        .generate_agent_definition(&description)
+        .map_err(to_error)
+}
+
+/// Generate a command definition from a natural language description
+#[tauri::command]
+pub async fn agent_generate_command_definition(
+    description: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<SlashCommandDefinition> {
+    state
+        .generate_command_definition(&description)
+        .map_err(to_error)
 }
 
 // ============================================================================

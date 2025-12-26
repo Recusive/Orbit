@@ -313,6 +313,59 @@ export async function onTerminalExit(
   return listen<TerminalExitEvent>('terminal:exit', callback);
 }
 
+export type TerminalSignal = 'SIGINT' | 'SIGTERM' | 'SIGKILL';
+
+/**
+ * Send a signal to a terminal process.
+ * - SIGINT: Interrupt (Ctrl+C)
+ * - SIGTERM: Graceful termination
+ * - SIGKILL: Force kill
+ */
+export async function sendTerminalSignal(id: string, signal: TerminalSignal): Promise<void> {
+  return invoke('terminal_signal', { id, signal });
+}
+
+/**
+ * Acknowledge data received from a terminal (for flow control).
+ * Call this after processing terminal output to prevent buffer overflow.
+ */
+export async function acknowledgeTerminalData(id: string, byteCount: number): Promise<void> {
+  return invoke('terminal_acknowledge', { id, byteCount });
+}
+
+/**
+ * Get the number of pending bytes (written but not acknowledged) for a terminal.
+ * Useful for implementing backpressure.
+ */
+export async function getTerminalPendingBytes(id: string): Promise<number> {
+  return invoke<number>('terminal_pending_bytes', { id });
+}
+
+export interface TerminalPromptEvent {
+  id: string;
+  promptType?: 'primary' | 'continuation' | 'secondary';
+}
+
+/**
+ * Emit a prompt event (called when shell integration detects a prompt).
+ * This is typically called by the frontend when xterm.js shell integration fires.
+ */
+export async function emitTerminalPrompt(
+  id: string,
+  promptType?: 'primary' | 'continuation' | 'secondary'
+): Promise<void> {
+  return invoke('terminal_emit_prompt', { id, promptType });
+}
+
+/**
+ * Subscribe to terminal prompt events.
+ */
+export async function onTerminalPrompt(
+  callback: (data: TerminalPromptEvent) => void
+): Promise<() => void> {
+  return listen<TerminalPromptEvent>('terminal:prompt', callback);
+}
+
 // ============================================
 // Git Operations
 // ============================================
@@ -587,6 +640,151 @@ export async function onAgentReady(callback: () => void): Promise<() => void> {
   return listen<undefined>('agent:ready', () => {
     callback();
   });
+}
+
+// ============================================
+// Session Storage Operations
+// ============================================
+
+export async function agentGetStoredSession(sessionId: string): Promise<string | null> {
+  return invoke<string | null>('agent_get_stored_session', { sessionId });
+}
+
+export async function agentCleanupSessions(maxAgeDays?: number): Promise<number> {
+  return invoke<number>('agent_cleanup_sessions', { maxAgeDays });
+}
+
+// ============================================
+// Agent Definition Operations (Subagents)
+// ============================================
+
+export type AgentModel = 'sonnet' | 'opus' | 'haiku' | 'inherit';
+
+export interface SubagentDefinition {
+  name: string;
+  description: string;
+  prompt: string;
+  tools?: string[];
+  disallowedTools?: string[];
+  model?: AgentModel;
+}
+
+export async function listAgents(workspacePath: string): Promise<SubagentDefinition[]> {
+  return invoke<SubagentDefinition[]>('agent_list_agents', { workspacePath });
+}
+
+export async function getAgent(
+  workspacePath: string,
+  name: string
+): Promise<SubagentDefinition | null> {
+  return invoke<SubagentDefinition | null>('agent_get_agent', { workspacePath, name });
+}
+
+export async function createAgent(
+  workspacePath: string,
+  agent: SubagentDefinition
+): Promise<SubagentDefinition> {
+  return invoke<SubagentDefinition>('agent_create_agent', { workspacePath, agent });
+}
+
+export async function updateAgent(
+  workspacePath: string,
+  originalName: string,
+  agent: SubagentDefinition
+): Promise<SubagentDefinition> {
+  return invoke<SubagentDefinition>('agent_update_agent', { workspacePath, originalName, agent });
+}
+
+export async function deleteAgent(workspacePath: string, name: string): Promise<void> {
+  return invoke('agent_delete_agent', { workspacePath, name });
+}
+
+// ============================================
+// Command Definition Operations (Slash Commands)
+// ============================================
+
+export type CommandScope = 'builtin' | 'default' | 'project' | 'personal';
+
+export interface SlashCommandDefinition {
+  name: string;
+  description?: string;
+  content: string;
+  allowedTools?: string[];
+  argumentHint?: string;
+  model?: 'sonnet' | 'opus' | 'haiku';
+  scope: CommandScope;
+  readonly?: boolean;
+}
+
+export async function listCommands(workspacePath: string): Promise<SlashCommandDefinition[]> {
+  return invoke<SlashCommandDefinition[]>('agent_list_commands', { workspacePath });
+}
+
+export async function getCommand(
+  workspacePath: string,
+  name: string,
+  scope: CommandScope
+): Promise<SlashCommandDefinition | null> {
+  return invoke<SlashCommandDefinition | null>('agent_get_command', { workspacePath, name, scope });
+}
+
+export async function createCommand(
+  workspacePath: string,
+  command: SlashCommandDefinition
+): Promise<SlashCommandDefinition> {
+  return invoke<SlashCommandDefinition>('agent_create_command', { workspacePath, command });
+}
+
+export async function updateCommand(
+  workspacePath: string,
+  originalName: string,
+  command: SlashCommandDefinition
+): Promise<SlashCommandDefinition> {
+  return invoke<SlashCommandDefinition>('agent_update_command', {
+    workspacePath,
+    originalName,
+    command,
+  });
+}
+
+export async function deleteCommand(
+  workspacePath: string,
+  name: string,
+  scope: CommandScope
+): Promise<void> {
+  return invoke('agent_delete_command', { workspacePath, name, scope });
+}
+
+// ============================================
+// Fork and Generate Operations
+// ============================================
+
+export interface ForkSessionOptions {
+  keepAlive?: boolean;
+  checkpointPrompt?: string;
+  displayName?: string;
+}
+
+export interface ForkSessionResult {
+  sdkSessionId: string;
+  orbitSessionId?: string;
+}
+
+export async function forkSession(
+  sessionId: string,
+  options?: ForkSessionOptions
+): Promise<ForkSessionResult> {
+  return invoke<ForkSessionResult>('agent_fork_session', { sessionId, options });
+}
+
+export async function generateAgentDefinition(description: string): Promise<SubagentDefinition> {
+  return invoke<SubagentDefinition>('agent_generate_agent_definition', { description });
+}
+
+export async function generateCommandDefinition(
+  description: string
+): Promise<SlashCommandDefinition> {
+  return invoke<SlashCommandDefinition>('agent_generate_command_definition', { description });
 }
 
 // ============================================

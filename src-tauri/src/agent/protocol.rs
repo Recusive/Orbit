@@ -230,6 +230,31 @@ pub struct SerializableError {
 }
 
 // ============================================================================
+// Fork Session Types
+// ============================================================================
+
+/// Fork session options
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForkSessionOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keep_alive: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checkpoint_prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+}
+
+/// Fork session result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForkSessionResult {
+    pub sdk_session_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub orbit_session_id: Option<String>,
+}
+
+// ============================================================================
 // Request Types (Rust → Node.js)
 // ============================================================================
 
@@ -303,6 +328,83 @@ pub enum BridgeRequest {
         #[serde(rename = "sessionId")]
         session_id: String,
     },
+    GetStoredSession {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+    },
+    CleanupSessions {
+        #[serde(rename = "maxAgeDays", skip_serializing_if = "Option::is_none")]
+        max_age_days: Option<u32>,
+    },
+    // Agent Definition Operations
+    ListAgents {
+        #[serde(rename = "workspacePath")]
+        workspace_path: String,
+    },
+    GetAgent {
+        #[serde(rename = "workspacePath")]
+        workspace_path: String,
+        name: String,
+    },
+    CreateAgent {
+        #[serde(rename = "workspacePath")]
+        workspace_path: String,
+        agent: SubagentDefinition,
+    },
+    UpdateAgent {
+        #[serde(rename = "workspacePath")]
+        workspace_path: String,
+        #[serde(rename = "originalName")]
+        original_name: String,
+        agent: SubagentDefinition,
+    },
+    DeleteAgent {
+        #[serde(rename = "workspacePath")]
+        workspace_path: String,
+        name: String,
+    },
+    // Command Definition Operations
+    ListCommands {
+        #[serde(rename = "workspacePath")]
+        workspace_path: String,
+    },
+    GetCommand {
+        #[serde(rename = "workspacePath")]
+        workspace_path: String,
+        name: String,
+        scope: CommandScope,
+    },
+    CreateCommand {
+        #[serde(rename = "workspacePath")]
+        workspace_path: String,
+        command: SlashCommandDefinition,
+    },
+    UpdateCommand {
+        #[serde(rename = "workspacePath")]
+        workspace_path: String,
+        #[serde(rename = "originalName")]
+        original_name: String,
+        command: SlashCommandDefinition,
+    },
+    DeleteCommand {
+        #[serde(rename = "workspacePath")]
+        workspace_path: String,
+        name: String,
+        scope: CommandScope,
+    },
+    // Fork and Generate Operations
+    ForkSession {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        options: Option<ForkSessionOptions>,
+    },
+    GenerateAgentDefinition {
+        description: String,
+    },
+    GenerateCommandDefinition {
+        description: String,
+    },
     Shutdown,
 }
 
@@ -332,6 +434,39 @@ pub enum CommandResponse {
         #[serde(rename = "requestType")]
         request_type: String,
         value: Option<String>,
+    },
+    Number {
+        #[serde(rename = "requestType")]
+        request_type: String,
+        value: i64,
+    },
+    #[serde(rename = "agent_list")]
+    AgentList {
+        #[serde(rename = "requestType")]
+        request_type: String,
+        agents: Vec<SubagentDefinition>,
+    },
+    Agent {
+        #[serde(rename = "requestType")]
+        request_type: String,
+        agent: Option<SubagentDefinition>,
+    },
+    #[serde(rename = "command_list")]
+    CommandList {
+        #[serde(rename = "requestType")]
+        request_type: String,
+        commands: Vec<SlashCommandDefinition>,
+    },
+    Command {
+        #[serde(rename = "requestType")]
+        request_type: String,
+        command: Option<SlashCommandDefinition>,
+    },
+    #[serde(rename = "fork_result")]
+    ForkResult {
+        #[serde(rename = "requestType")]
+        request_type: String,
+        result: ForkSessionResult,
     },
 }
 
@@ -400,4 +535,66 @@ impl BridgeResponse {
             Self::Event(evt) => Some(evt),
         }
     }
+}
+
+// ============================================================================
+// Subagent Definition Types
+// ============================================================================
+
+/// Model type for agents/commands (includes 'inherit' option)
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AgentModel {
+    Sonnet,
+    Opus,
+    Haiku,
+    Inherit,
+}
+
+/// Subagent definition from .claude/agents/*.md
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubagentDefinition {
+    pub name: String,
+    pub description: String,
+    pub prompt: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disallowed_tools: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<AgentModel>,
+}
+
+// ============================================================================
+// Slash Command Definition Types
+// ============================================================================
+
+/// Command scope: where the command comes from
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CommandScope {
+    Builtin,
+    Default,
+    Project,
+    Personal,
+}
+
+/// Slash command definition from .claude/commands/*.md
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SlashCommandDefinition {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_tools: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub argument_hint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<Model>,
+    pub scope: CommandScope,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub readonly: Option<bool>,
 }

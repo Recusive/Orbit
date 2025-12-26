@@ -4,8 +4,9 @@
 
 use super::bridge::{AgentBridge, BridgeError, EventCallback, Result};
 use super::protocol::{
-    AttachmentContentBlock, BridgeRequest, CommandResponse, Model, PermissionResponse,
-    SessionConfig,
+    AttachmentContentBlock, BridgeRequest, CommandResponse, CommandScope, ForkSessionOptions,
+    ForkSessionResult, Model, PermissionResponse, SessionConfig, SlashCommandDefinition,
+    SubagentDefinition,
 };
 use parking_lot::Mutex;
 use std::collections::HashSet;
@@ -73,6 +74,74 @@ impl SessionManager {
         match response {
             CommandResponse::Error { error, .. } => Err(BridgeError::SidecarError(error)),
             CommandResponse::String { value, .. } => Ok(value),
+            _ => Err(BridgeError::ReceiveError(
+                "Unexpected response type".to_owned(),
+            )),
+        }
+    }
+
+    /// Check response for number value
+    fn check_response_number(response: CommandResponse) -> Result<i64> {
+        match response {
+            CommandResponse::Error { error, .. } => Err(BridgeError::SidecarError(error)),
+            CommandResponse::Number { value, .. } => Ok(value),
+            _ => Err(BridgeError::ReceiveError(
+                "Unexpected response type".to_owned(),
+            )),
+        }
+    }
+
+    /// Check response for agent list
+    fn check_response_agent_list(response: CommandResponse) -> Result<Vec<SubagentDefinition>> {
+        match response {
+            CommandResponse::Error { error, .. } => Err(BridgeError::SidecarError(error)),
+            CommandResponse::AgentList { agents, .. } => Ok(agents),
+            _ => Err(BridgeError::ReceiveError(
+                "Unexpected response type".to_owned(),
+            )),
+        }
+    }
+
+    /// Check response for single agent
+    fn check_response_agent(response: CommandResponse) -> Result<Option<SubagentDefinition>> {
+        match response {
+            CommandResponse::Error { error, .. } => Err(BridgeError::SidecarError(error)),
+            CommandResponse::Agent { agent, .. } => Ok(agent),
+            _ => Err(BridgeError::ReceiveError(
+                "Unexpected response type".to_owned(),
+            )),
+        }
+    }
+
+    /// Check response for command list
+    fn check_response_command_list(
+        response: CommandResponse,
+    ) -> Result<Vec<SlashCommandDefinition>> {
+        match response {
+            CommandResponse::Error { error, .. } => Err(BridgeError::SidecarError(error)),
+            CommandResponse::CommandList { commands, .. } => Ok(commands),
+            _ => Err(BridgeError::ReceiveError(
+                "Unexpected response type".to_owned(),
+            )),
+        }
+    }
+
+    /// Check response for single command
+    fn check_response_command(response: CommandResponse) -> Result<Option<SlashCommandDefinition>> {
+        match response {
+            CommandResponse::Error { error, .. } => Err(BridgeError::SidecarError(error)),
+            CommandResponse::Command { command, .. } => Ok(command),
+            _ => Err(BridgeError::ReceiveError(
+                "Unexpected response type".to_owned(),
+            )),
+        }
+    }
+
+    /// Check response for fork result
+    fn check_response_fork_result(response: CommandResponse) -> Result<ForkSessionResult> {
+        match response {
+            CommandResponse::Error { error, .. } => Err(BridgeError::SidecarError(error)),
+            CommandResponse::ForkResult { result, .. } => Ok(result),
             _ => Err(BridgeError::ReceiveError(
                 "Unexpected response type".to_owned(),
             )),
@@ -303,6 +372,270 @@ impl SessionManager {
     /// Get all active session IDs
     pub fn get_active_sessions(&self) -> Vec<String> {
         self.active_sessions.lock().iter().cloned().collect()
+    }
+
+    // ========================================================================
+    // Session Storage Operations
+    // ========================================================================
+
+    /// Get stored SDK session ID for resume functionality
+    pub fn get_stored_session(&self, session_id: &str) -> Result<Option<String>> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::GetStoredSession {
+            session_id: session_id.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_string(response)
+    }
+
+    /// Cleanup old sessions
+    pub fn cleanup_sessions(&self, max_age_days: Option<u32>) -> Result<i64> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::CleanupSessions { max_age_days };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_number(response)
+    }
+
+    // ========================================================================
+    // Agent Definition Operations
+    // ========================================================================
+
+    /// List all agents in workspace
+    pub fn list_agents(&self, workspace_path: &str) -> Result<Vec<SubagentDefinition>> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::ListAgents {
+            workspace_path: workspace_path.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_agent_list(response)
+    }
+
+    /// Get a single agent by name
+    pub fn get_agent(
+        &self,
+        workspace_path: &str,
+        name: &str,
+    ) -> Result<Option<SubagentDefinition>> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::GetAgent {
+            workspace_path: workspace_path.to_owned(),
+            name: name.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_agent(response)
+    }
+
+    /// Create a new agent
+    pub fn create_agent(
+        &self,
+        workspace_path: &str,
+        agent: SubagentDefinition,
+    ) -> Result<SubagentDefinition> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::CreateAgent {
+            workspace_path: workspace_path.to_owned(),
+            agent,
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_agent(response)?
+            .ok_or_else(|| BridgeError::SidecarError("Agent creation returned null".to_owned()))
+    }
+
+    /// Update an existing agent
+    pub fn update_agent(
+        &self,
+        workspace_path: &str,
+        original_name: &str,
+        agent: SubagentDefinition,
+    ) -> Result<SubagentDefinition> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::UpdateAgent {
+            workspace_path: workspace_path.to_owned(),
+            original_name: original_name.to_owned(),
+            agent,
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_agent(response)?
+            .ok_or_else(|| BridgeError::SidecarError("Agent update returned null".to_owned()))
+    }
+
+    /// Delete an agent
+    pub fn delete_agent(&self, workspace_path: &str, name: &str) -> Result<()> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::DeleteAgent {
+            workspace_path: workspace_path.to_owned(),
+            name: name.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response(response)
+    }
+
+    // ========================================================================
+    // Command Definition Operations
+    // ========================================================================
+
+    /// List all commands in workspace
+    pub fn list_commands(&self, workspace_path: &str) -> Result<Vec<SlashCommandDefinition>> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::ListCommands {
+            workspace_path: workspace_path.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_command_list(response)
+    }
+
+    /// Get a single command by name and scope
+    pub fn get_command(
+        &self,
+        workspace_path: &str,
+        name: &str,
+        scope: CommandScope,
+    ) -> Result<Option<SlashCommandDefinition>> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::GetCommand {
+            workspace_path: workspace_path.to_owned(),
+            name: name.to_owned(),
+            scope,
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_command(response)
+    }
+
+    /// Create a new command
+    pub fn create_command(
+        &self,
+        workspace_path: &str,
+        command: SlashCommandDefinition,
+    ) -> Result<SlashCommandDefinition> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::CreateCommand {
+            workspace_path: workspace_path.to_owned(),
+            command,
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_command(response)?
+            .ok_or_else(|| BridgeError::SidecarError("Command creation returned null".to_owned()))
+    }
+
+    /// Update an existing command
+    pub fn update_command(
+        &self,
+        workspace_path: &str,
+        original_name: &str,
+        command: SlashCommandDefinition,
+    ) -> Result<SlashCommandDefinition> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::UpdateCommand {
+            workspace_path: workspace_path.to_owned(),
+            original_name: original_name.to_owned(),
+            command,
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_command(response)?
+            .ok_or_else(|| BridgeError::SidecarError("Command update returned null".to_owned()))
+    }
+
+    /// Delete a command
+    pub fn delete_command(
+        &self,
+        workspace_path: &str,
+        name: &str,
+        scope: CommandScope,
+    ) -> Result<()> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::DeleteCommand {
+            workspace_path: workspace_path.to_owned(),
+            name: name.to_owned(),
+            scope,
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response(response)
+    }
+
+    // ========================================================================
+    // Fork and Generate Operations
+    // ========================================================================
+
+    /// Fork a session (create a checkpoint/branch)
+    pub fn fork_session(
+        &self,
+        session_id: &str,
+        options: Option<ForkSessionOptions>,
+    ) -> Result<ForkSessionResult> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::ForkSession {
+            session_id: session_id.to_owned(),
+            options,
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_fork_result(response)
+    }
+
+    /// Generate an agent definition from a natural language description
+    pub fn generate_agent_definition(&self, description: &str) -> Result<SubagentDefinition> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::GenerateAgentDefinition {
+            description: description.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_agent(response)?
+            .ok_or_else(|| BridgeError::SidecarError("Generation returned null".to_owned()))
+    }
+
+    /// Generate a command definition from a natural language description
+    pub fn generate_command_definition(&self, description: &str) -> Result<SlashCommandDefinition> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::GenerateCommandDefinition {
+            description: description.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_command(response)?
+            .ok_or_else(|| BridgeError::SidecarError("Generation returned null".to_owned()))
     }
 
     /// Shutdown the session manager

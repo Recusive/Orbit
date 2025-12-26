@@ -181,6 +181,25 @@ pub fn run() {
             agent_cmd::agent_get_plan_mode,
             agent_cmd::agent_set_accept_mode,
             agent_cmd::agent_get_accept_mode,
+            // Session storage commands
+            agent_cmd::agent_get_stored_session,
+            agent_cmd::agent_cleanup_sessions,
+            // Agent definition commands
+            agent_cmd::agent_list_agents,
+            agent_cmd::agent_get_agent,
+            agent_cmd::agent_create_agent,
+            agent_cmd::agent_update_agent,
+            agent_cmd::agent_delete_agent,
+            // Command definition commands
+            agent_cmd::agent_list_commands,
+            agent_cmd::agent_get_command,
+            agent_cmd::agent_create_command,
+            agent_cmd::agent_update_command,
+            agent_cmd::agent_delete_command,
+            // Fork and generate commands
+            agent_cmd::agent_fork_session,
+            agent_cmd::agent_generate_agent_definition,
+            agent_cmd::agent_generate_command_definition,
             // File commands
             files::read_file,
             files::read_file_bytes,
@@ -221,6 +240,10 @@ pub fn run() {
             terminal::terminal_resize,
             terminal::terminal_close,
             terminal::terminal_list,
+            terminal::terminal_signal,
+            terminal::terminal_acknowledge,
+            terminal::terminal_pending_bytes,
+            terminal::terminal_emit_prompt,
             // Git commands
             git::git_discover,
             git::git_status,

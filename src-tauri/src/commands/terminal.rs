@@ -6,9 +6,9 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use snowflake_core::{Result, TerminalInfo};
-use snowflake_terminal::{TerminalConfig, TerminalManager};
+use snowflake_terminal::{Signal, TerminalConfig, TerminalManager};
 use tauri::{AppHandle, Emitter as _};
 
 static TERMINAL_MANAGER: OnceLock<TerminalManager> = OnceLock::new();
@@ -134,4 +134,58 @@ pub async fn terminal_close(id: String) -> Result<()> {
 pub async fn terminal_list() -> Result<Vec<String>> {
     let manager = get_terminal_manager();
     Ok(manager.list())
+}
+
+/// Send a signal to a terminal.
+#[tauri::command]
+pub async fn terminal_signal(id: String, signal: String) -> Result<()> {
+    let signal = match signal.to_uppercase().as_str() {
+        "SIGINT" => Signal::Sigint,
+        "SIGTERM" => Signal::Sigterm,
+        "SIGKILL" => Signal::Sigkill,
+        _ => {
+            return Err(snowflake_core::Error::Terminal(format!(
+                "Invalid signal: {signal}. Must be SIGINT, SIGTERM, or SIGKILL"
+            )))
+        },
+    };
+
+    let manager = get_terminal_manager();
+    manager.send_signal(&id, signal)
+}
+
+/// Acknowledge data received from a terminal (for flow control).
+#[tauri::command]
+pub async fn terminal_acknowledge(id: String, byte_count: u64) -> Result<()> {
+    let manager = get_terminal_manager();
+    manager.acknowledge_data(&id, byte_count)
+}
+
+/// Get pending bytes for a terminal (bytes written but not acknowledged).
+#[tauri::command]
+pub async fn terminal_pending_bytes(id: String) -> Result<u64> {
+    let manager = get_terminal_manager();
+    manager.pending_bytes(&id)
+}
+
+/// Prompt event payload (emitted when shell integration detects a prompt).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerminalPromptEvent {
+    /// Terminal ID.
+    pub id: String,
+    /// Prompt type: "primary", "continuation", or "secondary".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_type: Option<String>,
+}
+
+/// Emit a prompt event (called by frontend when shell integration detects a prompt).
+#[tauri::command]
+pub async fn terminal_emit_prompt(
+    app: AppHandle,
+    id: String,
+    prompt_type: Option<String>,
+) -> Result<()> {
+    let event = TerminalPromptEvent { id, prompt_type };
+    app.emit("terminal:prompt", &event)
+        .map_err(|e| snowflake_core::Error::Terminal(format!("Failed to emit prompt event: {e}")))
 }

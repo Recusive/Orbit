@@ -78,6 +78,23 @@ export interface SerializableError {
 }
 
 /**
+ * Fork session options
+ */
+export interface ForkSessionOptions {
+  keepAlive?: boolean;
+  checkpointPrompt?: string;
+  displayName?: string;
+}
+
+/**
+ * Fork session result
+ */
+export interface ForkSessionResult {
+  sdkSessionId: string;
+  orbitSessionId?: string;
+}
+
+/**
  * Session configuration
  */
 export interface SessionConfig {
@@ -276,6 +293,7 @@ export class SessionManager extends Disposable {
   private approvedToolNames = new Map<string, Set<string>>();
   private sessionResumeState = new Map<string, { isResumed: boolean; isForked: boolean }>();
   private sessionInitFired = new Set<string>();
+  private pendingDisplayNames = new Map<string, string>();
 
   /**
    * Create a new agent session
@@ -652,6 +670,7 @@ export class SessionManager extends Disposable {
     this.approvedToolNames.delete(sessionId);
     this.sessionResumeState.delete(sessionId);
     this.sessionInitFired.delete(sessionId);
+    this.pendingDisplayNames.delete(sessionId);
   }
 
   /**
@@ -820,6 +839,310 @@ export class SessionManager extends Disposable {
       return prefs?.acceptEnabled ?? false;
     }
     return agent.getAcceptMode();
+  }
+
+  /**
+   * Fork a session (create a checkpoint/branch)
+   */
+  async forkSession(sessionId: string, options?: ForkSessionOptions): Promise<ForkSessionResult> {
+    const agent = this.activeSessions.get(sessionId);
+    if (agent === undefined) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    const currentSDKSessionId = agent.getCurrentSessionId();
+    if (currentSDKSessionId === undefined) {
+      throw new Error(`No SDK session ID available for session ${sessionId}`);
+    }
+
+    const keepAlive = options?.keepAlive ?? false;
+    const checkpointPrompt = options?.checkpointPrompt;
+    const displayName = options?.displayName;
+
+    // Create new session ID for the fork
+    const newSessionId = `${sessionId}_fork_${String(Date.now())}`;
+
+    // Set pending display name before creating session
+    if (displayName !== undefined) {
+      this.pendingDisplayNames.set(newSessionId, displayName);
+    }
+
+    // Create the forked session
+    this.createSession(newSessionId, {
+      resumeSessionId: currentSDKSessionId,
+      forkSession: true,
+    });
+
+    const forkedAgent = this.activeSessions.get(newSessionId);
+    if (forkedAgent === undefined) {
+      throw new Error(`Failed to create forked session ${newSessionId}`);
+    }
+
+    // Queue a checkpoint message to trigger SDK session initialization
+    const prompt =
+      checkpointPrompt ??
+      '[CHECKPOINT] This is an automatic checkpoint for session management. Please respond with "Checkpoint acknowledged." and nothing else.';
+    forkedAgent.queueMessage(prompt);
+
+    // Wait for the session ID to be captured (poll with timeout)
+    const maxWait = 30000;
+    const pollInterval = 100;
+    let waited = 0;
+
+    while (forkedAgent.getCurrentSessionId() === undefined && waited < maxWait) {
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      waited += pollInterval;
+    }
+
+    const newSDKSessionId = forkedAgent.getCurrentSessionId();
+    if (newSDKSessionId === undefined) {
+      await this.deleteSession(newSessionId);
+      throw new Error(`Failed to get SDK session ID for forked session after ${String(maxWait)}ms`);
+    }
+
+    if (keepAlive) {
+      return {
+        sdkSessionId: newSDKSessionId,
+        orbitSessionId: newSessionId,
+      };
+    } else {
+      await this.deleteSession(newSessionId);
+      return {
+        sdkSessionId: newSDKSessionId,
+      };
+    }
+  }
+
+  /**
+   * Generate an agent definition from a natural language description using AI
+   */
+  async generateAgentDefinition(description: string): Promise<{
+    name: string;
+    description: string;
+    prompt: string;
+    tools?: string[];
+    disallowedTools?: string[];
+    model?: 'sonnet' | 'opus' | 'haiku' | 'inherit';
+  }> {
+    const agentSchema = {
+      type: 'json_schema' as const,
+      schema: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description:
+              'A short, descriptive name for the agent (no spaces, use kebab-case like "code-reviewer" or "test-runner")',
+          },
+          description: {
+            type: 'string',
+            description: 'A brief description of when to use this agent (1-2 sentences)',
+          },
+          prompt: {
+            type: 'string',
+            description:
+              'The system prompt for the agent - detailed instructions on what it should do and how',
+          },
+          tools: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional list of specific tool names this agent should use',
+          },
+          model: {
+            type: 'string',
+            enum: ['sonnet', 'opus', 'haiku', 'inherit'],
+            description: 'Model to use (default: inherit from parent)',
+          },
+        },
+        required: ['name', 'description', 'prompt'],
+      },
+    };
+
+    const prompt = `Generate a subagent definition based on this description:
+
+"${description}"
+
+Create a well-structured agent with:
+1. A kebab-case name (e.g., "code-reviewer", "api-tester")
+2. A clear description of when to use this agent
+3. A detailed system prompt that explains the agent's purpose, capabilities, and how it should behave
+4. Optionally specify which tools the agent should use (if not specified, it inherits all tools)
+5. Optionally specify a model (sonnet for balanced, opus for complex tasks, haiku for fast simple tasks)
+
+Return ONLY the JSON object with the agent definition.`;
+
+    // Create temporary agent with structured output
+    const agent = new OrbitAgent({
+      outputFormat: agentSchema,
+      model: 'sonnet',
+    });
+
+    agent.startSession();
+    agent.queueMessage(prompt);
+
+    // Consume responses until we get a result with structured output
+    let result:
+      | {
+          name: string;
+          description: string;
+          prompt: string;
+          tools?: string[];
+          model?: 'sonnet' | 'opus' | 'haiku' | 'inherit';
+        }
+      | undefined = undefined;
+
+    for await (const rawMessage of agent.receiveResponse()) {
+      const sdkMessage = rawMessage as { type: string; structured_output?: unknown };
+      if (sdkMessage.type === 'result') {
+        if (
+          sdkMessage.structured_output !== undefined &&
+          sdkMessage.structured_output !== null &&
+          typeof sdkMessage.structured_output === 'object'
+        ) {
+          const output = sdkMessage.structured_output as Record<string, unknown>;
+          result = {
+            name: typeof output.name === 'string' ? output.name : '',
+            description: typeof output.description === 'string' ? output.description : '',
+            prompt: typeof output.prompt === 'string' ? output.prompt : '',
+            tools: Array.isArray(output.tools) ? (output.tools as string[]) : undefined,
+            model: output.model as 'sonnet' | 'opus' | 'haiku' | 'inherit' | undefined,
+          };
+        }
+        break;
+      }
+    }
+
+    await agent.stopSession();
+
+    if (result === undefined) {
+      throw new Error('Failed to generate agent definition - no structured output received');
+    }
+
+    if (result.name === '' || result.description === '' || result.prompt === '') {
+      throw new Error('Generated agent definition is missing required fields');
+    }
+
+    return result;
+  }
+
+  /**
+   * Generate a command definition from a natural language description using AI
+   */
+  async generateCommandDefinition(description: string): Promise<{
+    name: string;
+    description?: string;
+    content: string;
+    allowedTools?: string[];
+    argumentHint?: string;
+    model?: 'sonnet' | 'opus' | 'haiku';
+    scope: 'builtin' | 'default' | 'project' | 'personal';
+    readonly?: boolean;
+  }> {
+    const commandSchema = {
+      type: 'json_schema' as const,
+      schema: {
+        type: 'object',
+        properties: {
+          name: {
+            type: 'string',
+            description:
+              'A short, descriptive name for the command (no spaces, use kebab-case like "review-code" or "run-tests")',
+          },
+          description: {
+            type: 'string',
+            description: 'A brief description of what the command does (1-2 sentences)',
+          },
+          content: {
+            type: 'string',
+            description: 'The prompt content - what the AI should do when this command is invoked',
+          },
+          argumentHint: {
+            type: 'string',
+            description: 'Optional hint for command arguments (e.g., "[file] [options]")',
+          },
+          model: {
+            type: 'string',
+            enum: ['sonnet', 'opus', 'haiku'],
+            description: 'Optional model to use for this command',
+          },
+        },
+        required: ['name', 'description', 'content'],
+      },
+    };
+
+    const prompt = `Generate a slash command definition based on this description:
+
+"${description}"
+
+Create a well-structured command with:
+1. A kebab-case name (e.g., "review-code", "run-tests", "fix-lint")
+2. A clear description of what the command does
+3. A detailed prompt content that tells the AI exactly what to do when the command is invoked
+4. Optionally specify argument hints if the command accepts parameters
+5. Optionally specify a model (sonnet for balanced, opus for complex tasks, haiku for fast simple tasks)
+
+Return ONLY the JSON object with the command definition.`;
+
+    // Create temporary agent with structured output
+    const agent = new OrbitAgent({
+      outputFormat: commandSchema,
+      model: 'sonnet',
+    });
+
+    agent.startSession();
+    agent.queueMessage(prompt);
+
+    // Consume responses until we get a result with structured output
+    let result:
+      | {
+          name: string;
+          description?: string;
+          content: string;
+          argumentHint?: string;
+          model?: 'sonnet' | 'opus' | 'haiku';
+        }
+      | undefined = undefined;
+
+    for await (const rawMessage of agent.receiveResponse()) {
+      const sdkMessage = rawMessage as { type: string; structured_output?: unknown };
+      if (sdkMessage.type === 'result') {
+        if (
+          sdkMessage.structured_output !== undefined &&
+          sdkMessage.structured_output !== null &&
+          typeof sdkMessage.structured_output === 'object'
+        ) {
+          const output = sdkMessage.structured_output as Record<string, unknown>;
+          result = {
+            name: typeof output.name === 'string' ? output.name : '',
+            description: typeof output.description === 'string' ? output.description : undefined,
+            content: typeof output.content === 'string' ? output.content : '',
+            argumentHint: typeof output.argumentHint === 'string' ? output.argumentHint : undefined,
+            model: output.model as 'sonnet' | 'opus' | 'haiku' | undefined,
+          };
+        }
+        break;
+      }
+    }
+
+    await agent.stopSession();
+
+    if (result === undefined) {
+      throw new Error('Failed to generate command definition - no structured output received');
+    }
+
+    if (result.name === '' || result.content === '') {
+      throw new Error('Generated command definition is missing required fields');
+    }
+
+    return {
+      name: result.name,
+      description: result.description,
+      content: result.content,
+      argumentHint: result.argumentHint,
+      model: result.model,
+      scope: 'project',
+      readonly: false,
+    };
   }
 
   /**
