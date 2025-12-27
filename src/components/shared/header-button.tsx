@@ -13,7 +13,7 @@ export const HeaderButton: FC<HeaderButtonProps> = ({ icon: Icon, title, onClick
       className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
       title={title}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className="h-[18px] w-[18px]" />
     </button>
   );
 };

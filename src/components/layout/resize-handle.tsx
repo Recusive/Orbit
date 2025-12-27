@@ -11,7 +11,8 @@ interface ResizeHandleProps {
 }
 
 export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
-  const { setReviewPanelWidth, setBottomPanelHeight, reviewPanelWidth, bottomPanelHeight } = useUIStore();
+  const { setReviewPanelWidth, setBottomPanelHeight, reviewPanelWidth, bottomPanelHeight } =
+    useUIStore();
   const startValueRef = useRef(0);
 
   const handleMouseDown = (e: React.MouseEvent): void => {
@@ -48,7 +49,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
     <div
       className={cn(
         'group relative shrink-0 flex items-center justify-center',
-        isVertical ? 'w-1 h-full cursor-col-resize' : 'h-1 w-full cursor-row-resize'
+        isVertical ? 'w-px h-full cursor-col-resize' : 'h-1 w-full cursor-row-resize'
       )}
       onMouseDown={handleMouseDown}
     >
@@ -63,9 +64,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
       <div
         className={cn(
           'absolute opacity-0 group-hover:opacity-100 bg-primary transition-all duration-100',
-          isVertical
-            ? 'w-px group-hover:w-[3px] h-full'
-            : 'h-px group-hover:h-[3px] w-full'
+          isVertical ? 'w-px group-hover:w-[3px] h-full' : 'h-px group-hover:h-[3px] w-full'
         )}
       />
     </div>

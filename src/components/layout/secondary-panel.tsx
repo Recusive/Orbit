@@ -3,11 +3,15 @@ import { Terminal, Plus, X } from 'lucide-react';
 import type { FC } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { HEIGHTS } from '@/lib/constants';
 
 export const SecondaryPanel: FC = () => {
   return (
     <aside className="w-[150px] h-full flex flex-col border-l border-border bg-card/20">
-      <header className="h-[40px] flex items-center justify-between px-2 border-b border-border">
+      <header
+        className="flex items-center justify-between px-4 border-b border-border shrink-0"
+        style={{ height: HEIGHTS.headerBar }}
+      >
         <span className="text-xs font-medium">Sessions</span>
         <Button variant="ghost" size="icon" className="h-5 w-5">
           <Plus className="h-3 w-3" />
