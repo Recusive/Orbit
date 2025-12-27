@@ -105,78 +105,81 @@ export const ChatArea: FC = () => {
   }, []);
 
   return (
-    <div className="flex-1 flex min-w-0 bg-background overflow-hidden">
-      {/* Chat Section (Header + Content) */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Chat Header - only for chat */}
-        <ChatHeader />
+    <div className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
+      {/* Main horizontal area: Chat + Activity */}
+      <div className="flex-1 flex min-h-0">
+        {/* Chat Section (Header + Content) */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Chat Header - only for chat */}
+          <ChatHeader />
 
-        {/* Chat Content */}
-        <div className="flex-1 flex flex-col min-h-0">
-          {messages.length === 0 ? (
-            /* Empty state: Welcome greeting + Input positioned above center */
-            <div className="flex-1 flex flex-col justify-center" style={{ paddingBottom: '40%' }}>
-              <WelcomeGreeting />
-              <ChatInput
-                inputMode={inputMode}
-                thinkingMode={thinkingMode}
-                isAgentRunning={isAgentRunning}
-                fileList={fileList}
-                usage={sessionUsage}
-                maxTokens={maxTokens}
-                onSend={handleSend}
-                onStop={handleStop}
-                onModeChange={handleModeChange}
-                onThinkingModeChange={handleThinkingModeChange}
-                onModelChange={handleModelChange}
-              />
-            </div>
-          ) : (
-            /* Normal layout: Messages + Input at bottom */
-            <>
-              <ChatMessages
-                messages={messages}
-                pendingPermissions={pendingPermissions}
-                isAgentRunning={isAgentRunning}
-                queuedMessage={queuedMessage}
-                getToolsForMessage={getToolsForMessage}
-                onRewind={handleRewind}
-                onOpenFile={handleOpenFile}
-                onOpenUrl={handleOpenUrl}
-                onPermissionApprove={handlePermissionApprove}
-                onPermissionDeny={handlePermissionDeny}
-                onCancelQueue={cancelQueue}
-                onFeedback={handleFeedback}
-              />
-              <ChatInput
-                inputMode={inputMode}
-                thinkingMode={thinkingMode}
-                isAgentRunning={isAgentRunning}
-                fileList={fileList}
-                usage={sessionUsage}
-                maxTokens={maxTokens}
-                onSend={handleSend}
-                onStop={handleStop}
-                onModeChange={handleModeChange}
-                onThinkingModeChange={handleThinkingModeChange}
-                onModelChange={handleModelChange}
-              />
-            </>
-          )}
-
-          {/* Terminal Panel - show at bottom when position is 'both' */}
-          {terminalPosition === 'both' ? (
-            <TerminalPanel variant="full-width" collapsed={!bottomPanelOpen} />
-          ) : null}
+          {/* Chat Content */}
+          <div className="flex-1 flex flex-col min-h-0">
+            {messages.length === 0 ? (
+              /* Empty state: Welcome greeting + Input positioned above center */
+              <div className="flex-1 flex flex-col justify-center" style={{ paddingBottom: '40%' }}>
+                <WelcomeGreeting />
+                <ChatInput
+                  inputMode={inputMode}
+                  thinkingMode={thinkingMode}
+                  isAgentRunning={isAgentRunning}
+                  fileList={fileList}
+                  usage={sessionUsage}
+                  maxTokens={maxTokens}
+                  onSend={handleSend}
+                  onStop={handleStop}
+                  onModeChange={handleModeChange}
+                  onThinkingModeChange={handleThinkingModeChange}
+                  onModelChange={handleModelChange}
+                />
+              </div>
+            ) : (
+              /* Normal layout: Messages + Input at bottom */
+              <>
+                <ChatMessages
+                  messages={messages}
+                  pendingPermissions={pendingPermissions}
+                  isAgentRunning={isAgentRunning}
+                  queuedMessage={queuedMessage}
+                  getToolsForMessage={getToolsForMessage}
+                  onRewind={handleRewind}
+                  onOpenFile={handleOpenFile}
+                  onOpenUrl={handleOpenUrl}
+                  onPermissionApprove={handlePermissionApprove}
+                  onPermissionDeny={handlePermissionDeny}
+                  onCancelQueue={cancelQueue}
+                  onFeedback={handleFeedback}
+                />
+                <ChatInput
+                  inputMode={inputMode}
+                  thinkingMode={thinkingMode}
+                  isAgentRunning={isAgentRunning}
+                  fileList={fileList}
+                  usage={sessionUsage}
+                  maxTokens={maxTokens}
+                  onSend={handleSend}
+                  onStop={handleStop}
+                  onModeChange={handleModeChange}
+                  onThinkingModeChange={handleThinkingModeChange}
+                  onModelChange={handleModelChange}
+                />
+              </>
+            )}
+          </div>
         </div>
+
+        {/* Activity Panel (split view) - at same level as chat section */}
+        {reviewPanelOpen ? (
+          <>
+            <ResizeHandle direction="vertical" target="review" />
+            <ActivityPanel width={reviewPanelWidth} />
+          </>
+        ) : null}
       </div>
 
-      {/* Activity Panel (split view) - at same level as chat section */}
-      {reviewPanelOpen ? (
-        <>
-          <ResizeHandle direction="vertical" target="review" />
-          <ActivityPanel width={reviewPanelWidth} />
-        </>
+      {/* Terminal Panel - show at bottom spanning FULL width when position is 'both' */}
+      {terminalPosition === 'both' ? (
+        <TerminalPanel variant="full-width" collapsed={!bottomPanelOpen} />
       ) : null}
     </div>
   );

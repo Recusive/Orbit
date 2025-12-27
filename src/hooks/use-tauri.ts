@@ -254,6 +254,57 @@ async function initFileWatcher(workspacePath: string): Promise<void> {
 // ═══════════════════════════════════════════════════════════════
 
 let agentListenersInitialized = false;
+let agentListenerUnlisten: (() => void) | null = null; // Store unlisten function to prevent duplicates
+
+// ═══════════════════════════════════════════════════════════════
+// Window Message Listener Singleton
+// ═══════════════════════════════════════════════════════════════
+
+// Registry of message handlers - each useTauri hook registers its handler here
+const messageHandlers = new Set<(message: ExtensionMessage) => void>();
+let windowListenerInitialized = false;
+
+// Singleton window message listener
+function initWindowMessageListener(): void {
+  if (windowListenerInitialized) return;
+  windowListenerInitialized = true;
+
+  // Single global UUID deduplication set
+  const processedUuids = new Set<string>();
+
+  const handleWindowMessage = (event: MessageEvent<unknown>): void => {
+    const result = ExtensionMessageSchema.safeParse(event.data);
+
+    if (!result.success) {
+      return; // Invalid message, ignore
+    }
+
+    // Deduplicate messages by UUID (globally, once)
+    const uuid = 'uuid' in result.data ? result.data.uuid : undefined;
+    if (uuid) {
+      if (processedUuids.has(uuid)) {
+        return; // Already processed this message
+      }
+      processedUuids.add(uuid);
+      // Limit set size to prevent memory leak
+      if (processedUuids.size > 1000) {
+        const iterator = processedUuids.values();
+        for (let i = 0; i < 500; i++) {
+          const value = iterator.next().value;
+          if (value) processedUuids.delete(value);
+        }
+      }
+    }
+
+    // Dispatch to all registered handlers
+    for (const handler of messageHandlers) {
+      handler(result.data);
+    }
+  };
+
+  window.addEventListener('message', handleWindowMessage);
+  console.warn('[Snowflake] Singleton window message listener initialized');
+}
 
 /** Track created sessions to ensure we create before sending */
 const createdSessions = new Set<string>();
@@ -268,10 +319,11 @@ async function ensureSession(sessionId: string): Promise<void> {
   const cwd = await getWorkspacePath();
 
   // Build config with optional cwd
+  // Start in default mode (requires permission approval for each tool)
   const config: SessionConfig = {
     model: 'sonnet',
     thinkingEnabled: false,
-    acceptEnabled: true,
+    acceptEnabled: false,
     planEnabled: false,
   };
   if (cwd) {
@@ -283,15 +335,45 @@ async function ensureSession(sessionId: string): Promise<void> {
   createdSessions.add(sessionId);
 }
 
+// Track last received message to detect duplicates from Tauri events
+// Uses content + type + sessionId to identify duplicates
+interface LastMessage {
+  content: string;
+  type: string;
+  sessionId: string;
+  timestamp: number;
+}
+let lastAgentMessage: LastMessage | null = null;
+const DEDUP_WINDOW_MS = 100; // Ignore duplicates within 100ms
+
 async function initAgentListeners(): Promise<void> {
-  if (agentListenersInitialized) return;
+  // Guard: only register listeners once (multiple components call useTauri)
+  if (agentListenerUnlisten !== null || agentListenersInitialized) {
+    return;
+  }
   agentListenersInitialized = true;
 
   try {
     // Listen for agent messages and convert to window.postMessage format
-    await onAgentMessage((event) => {
+    // Store the unlisten function to prevent duplicate registrations
+    agentListenerUnlisten = await onAgentMessage((event) => {
       const { sessionId, message } = event;
+      const content = message.content ?? '';
       const messageId = crypto.randomUUID();
+
+      // Content-based deduplication: if we receive the exact same message
+      // content + type + session within a short window, it's likely a duplicate
+      const now = Date.now();
+      if (
+        lastAgentMessage?.content === content &&
+        lastAgentMessage.type === message.type &&
+        lastAgentMessage.sessionId === sessionId &&
+        now - lastAgentMessage.timestamp < DEDUP_WINDOW_MS
+      ) {
+        console.warn('[Snowflake] Duplicate agent message detected and skipped');
+        return;
+      }
+      lastAgentMessage = { content, type: message.type, sessionId, timestamp: now };
 
       switch (message.type) {
         case 'text':
@@ -301,7 +383,7 @@ async function initAgentListeners(): Promise<void> {
               uuid: crypto.randomUUID(),
               session_id: sessionId,
               message_id: messageId,
-              content: message.content ?? '',
+              content,
             },
             '*'
           );
@@ -314,44 +396,48 @@ async function initAgentListeners(): Promise<void> {
               uuid: crypto.randomUUID(),
               session_id: sessionId,
               message_id: messageId,
-              thinking: message.content ?? '',
+              thinking: content,
             },
             '*'
           );
           break;
 
         case 'tool_use': {
-          const toolId = message.toolId ?? crypto.randomUUID();
-          window.postMessage(
-            {
-              type: 'tool:start',
-              uuid: crypto.randomUUID(),
-              session_id: sessionId,
-              message_id: messageId,
-              tool_id: toolId,
-              tool_name: message.toolName ?? 'unknown',
-              tool_input: message.toolInput ?? {},
-            },
-            '*'
-          );
-          break;
-        }
+          const meta = message.metadata;
+          const toolId = meta?.toolId ?? crypto.randomUUID();
+          const status = meta?.status;
 
-        case 'tool_result': {
-          const toolId = message.toolId ?? crypto.randomUUID();
-          window.postMessage(
-            {
-              type: 'tool:end',
-              uuid: crypto.randomUUID(),
-              session_id: sessionId,
-              message_id: messageId,
-              tool_id: toolId,
-              tool_name: message.toolName ?? 'unknown',
-              tool_output: message.toolResult ?? '',
-              success: message.success ?? true,
-            },
-            '*'
-          );
+          // Handle different tool statuses
+          if (status === 'success' || status === 'error') {
+            // Tool completed - emit tool:end
+            window.postMessage(
+              {
+                type: 'tool:end',
+                uuid: crypto.randomUUID(),
+                session_id: sessionId,
+                message_id: messageId,
+                tool_id: toolId,
+                tool_name: meta?.toolName ?? 'unknown',
+                tool_output: meta?.toolOutput ?? '',
+                success: status === 'success',
+              },
+              '*'
+            );
+          } else {
+            // Tool starting (awaiting-permission or running) - emit tool:start
+            window.postMessage(
+              {
+                type: 'tool:start',
+                uuid: crypto.randomUUID(),
+                session_id: sessionId,
+                message_id: messageId,
+                tool_id: toolId,
+                tool_name: meta?.toolName ?? 'unknown',
+                tool_input: meta?.toolInput ?? {},
+              },
+              '*'
+            );
+          }
           break;
         }
 
@@ -382,6 +468,19 @@ async function initAgentListeners(): Promise<void> {
               session_id: sessionId,
               message_id: messageId,
               cancelled: true,
+            },
+            '*'
+          );
+          break;
+
+        case 'error':
+          window.postMessage(
+            {
+              type: 'agent:error',
+              uuid: crypto.randomUUID(),
+              session_id: sessionId,
+              message_id: messageId,
+              error: content || 'Unknown error',
             },
             '*'
           );
@@ -461,6 +560,7 @@ async function initAgentListeners(): Promise<void> {
   } catch (err) {
     console.error('[Snowflake] Failed to set up agent listeners:', err);
     agentListenersInitialized = false;
+    agentListenerUnlisten = null;
   }
 }
 
@@ -1388,51 +1488,25 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
     }
   }, [debug, isConnected, isMockMode]);
 
-  // Listen for messages with Zod validation
-  const processedUuids = useRef(new Set<string>());
-
+  // Register/unregister handler with singleton message listener
   useEffect(() => {
-    const handleMessage = (event: MessageEvent<unknown>): void => {
-      const result = ExtensionMessageSchema.safeParse(event.data);
+    // Initialize singleton window listener (only runs once globally)
+    initWindowMessageListener();
 
-      if (!result.success) {
-        if (debug) {
-          console.warn('[Snowflake] Invalid message:', event.data);
-          console.warn('[Snowflake] Errors:', result.error.issues);
-        }
-        return;
-      }
-
-      // Deduplicate messages by UUID (if present)
-      const uuid = 'uuid' in result.data ? result.data.uuid : undefined;
-      if (uuid) {
-        if (processedUuids.current.has(uuid)) {
-          if (debug) {
-            console.warn('[Snowflake] Ignoring duplicate message:', result.data.type, uuid);
-          }
-          return;
-        }
-        processedUuids.current.add(uuid);
-        // Limit set size to prevent memory leak
-        if (processedUuids.current.size > 1000) {
-          const iterator = processedUuids.current.values();
-          for (let i = 0; i < 500; i++) {
-            const value = iterator.next().value;
-            if (value) processedUuids.current.delete(value);
-          }
-        }
-      }
-
+    // Create a stable handler wrapper that uses the ref
+    const handler = (message: ExtensionMessage): void => {
       if (debug) {
-        console.warn('[Snowflake] Received:', result.data.type);
+        console.warn('[Snowflake] Received:', message.type);
       }
-
-      handlerRef.current?.(result.data);
+      handlerRef.current?.(message);
     };
 
-    window.addEventListener('message', handleMessage);
+    // Register this hook's handler
+    messageHandlers.add(handler);
+
     return (): void => {
-      window.removeEventListener('message', handleMessage);
+      // Unregister this hook's handler
+      messageHandlers.delete(handler);
     };
   }, [debug]);
 

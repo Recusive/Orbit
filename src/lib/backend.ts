@@ -479,27 +479,28 @@ export interface AgentMessageEvent {
   message: AgentMessage;
 }
 
-export interface AgentMessage {
-  type:
-    | 'text'
-    | 'thinking'
-    | 'tool_use'
-    | 'tool_result'
-    | 'result'
-    | 'turn_complete'
-    | 'turn_cancel';
-  content?: string;
-  toolId?: string;
+export interface ToolMetadata {
   toolName?: string;
+  toolId?: string;
   toolInput?: Record<string, unknown>;
-  toolResult?: string;
-  success?: boolean;
+  toolOutput?: string;
+  status?: 'awaiting-permission' | 'running' | 'success' | 'error';
+}
+
+export interface AgentMessage {
+  type: 'text' | 'thinking' | 'tool_use' | 'result' | 'error' | 'turn_complete' | 'turn_cancel';
+  content?: string;
+  metadata?: ToolMetadata;
   usage?: {
     inputTokens: number;
     outputTokens: number;
     cacheReadInputTokens?: number;
     cacheCreationInputTokens?: number;
   };
+  totalCostUsd?: number;
+  durationMs?: number;
+  structuredOutput?: unknown;
+  resultSubtype?: string;
 }
 
 export interface PermissionRequestEvent {

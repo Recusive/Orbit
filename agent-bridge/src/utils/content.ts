@@ -58,21 +58,23 @@ export function buildContentBlocks(
   for (const attachment of attachments) {
     if (attachment.type === 'document' && attachment.source) {
       // Binary document (PDF)
+      // Convert from camelCase (from Rust) to snake_case (for Claude SDK)
       contentBlocks.push({
         type: 'document',
         source: {
           type: 'base64',
-          media_type: attachment.source.media_type as DocumentMediaType,
+          media_type: attachment.source.mediaType as DocumentMediaType,
           data: attachment.source.data,
         },
       });
     } else if (attachment.type === 'image' && attachment.source) {
       // Image file
+      // Convert from camelCase (from Rust) to snake_case (for Claude SDK)
       contentBlocks.push({
         type: 'image',
         source: {
           type: 'base64',
-          media_type: attachment.source.media_type as ImageMediaType,
+          media_type: attachment.source.mediaType as ImageMediaType,
           data: attachment.source.data,
         },
       });

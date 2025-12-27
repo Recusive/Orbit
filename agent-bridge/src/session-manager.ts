@@ -438,6 +438,10 @@ export class SessionManager extends Disposable {
           { name: string; input: Record<string, unknown>; pendingMessages: AgentMessage[] }
         >();
 
+        // Track whether text was streamed for this turn (via stream_event)
+        // If not streamed, we need to emit text from the assistant message
+        let textWasStreamed = false;
+
         for await (const rawMessage of agent.receiveResponse()) {
           if (state.cancelled) {
             break;
@@ -478,6 +482,7 @@ export class SessionManager extends Disposable {
             if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
               const textDelta = event.delta.text;
               if (textDelta !== undefined) {
+                textWasStreamed = true; // Mark that we received streaming text
                 this._onAgentMessage.fire({
                   sessionId,
                   message: { type: 'text', content: textDelta },
@@ -506,8 +511,15 @@ export class SessionManager extends Disposable {
             if (content === undefined) continue;
 
             for (const block of content) {
-              // Skip text blocks (already streamed)
+              // Handle text blocks - emit if not already streamed
               if (block.type === 'text') {
+                if (!textWasStreamed && block.text) {
+                  // No streaming happened (e.g., image input), emit full text
+                  this._onAgentMessage.fire({
+                    sessionId,
+                    message: { type: 'text', content: block.text },
+                  });
+                }
                 continue;
               }
               if (block.type === 'thinking') {
@@ -639,6 +651,8 @@ export class SessionManager extends Disposable {
                 resultSubtype: resultMsg.subtype,
               },
             });
+            // Reset streaming flag for next turn
+            textWasStreamed = false;
           }
         }
       } catch (error) {

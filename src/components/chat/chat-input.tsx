@@ -1,19 +1,16 @@
-import {
-  ArrowUp,
-  AtSign,
-  Coins,
-  Globe,
-  Image,
-  Lightbulb,
-  Square,
-} from 'lucide-react';
+import { ArrowUp, AtSign, Coins, Globe, Image, Lightbulb, Square } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { SlashCommand } from '@/components/chat/slash-command-popover';
 import type { ContextItem, FileEntry } from '@/types/context';
-import type { ExtensionMessage, InputMode, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
+import type {
+  ExtensionMessage,
+  InputMode,
+  Model,
+  ReactElementContext,
+  ThinkingMode,
+} from '@/types/protocol';
 import type { FC } from 'react';
-
 
 import { ElementContextList } from '@/components/browser';
 import {
@@ -26,9 +23,17 @@ import {
   ContextTrigger,
 } from '@/components/chat/context';
 import { ContextChips } from '@/components/chat/context-chips';
-import { MentionPopover, getFilteredFilesCount, getFileAtIndex } from '@/components/chat/mention-popover';
+import {
+  MentionPopover,
+  getFilteredFilesCount,
+  getFileAtIndex,
+} from '@/components/chat/mention-popover';
 import { ModelSelector } from '@/components/chat/model-selector';
-import { SlashCommandPopover, getFilteredCommandsCount, getCommandAtIndex } from '@/components/chat/slash-command-popover';
+import {
+  SlashCommandPopover,
+  getFilteredCommandsCount,
+  getCommandAtIndex,
+} from '@/components/chat/slash-command-popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +41,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useTauri } from '@/hooks/use-tauri';
 import { CONTENT_WIDTH, INPUT_SIZES } from '@/lib/constants';
+import { compressImage } from '@/lib/image-utils';
 import { cn } from '@/lib/utils';
 import { useElementContexts, useBrowserStore } from '@/stores/browser-store';
 
@@ -64,7 +70,12 @@ interface ChatInputProps {
   readonly fileList: FileEntry[];
   readonly usage: UsageData;
   readonly maxTokens: number;
-  readonly onSend: (text: string, contextFiles?: string[], images?: ImageAttachment[], elements?: ReactElementContext[]) => void;
+  readonly onSend: (
+    text: string,
+    contextFiles?: string[],
+    images?: ImageAttachment[],
+    elements?: ReactElementContext[]
+  ) => void;
   readonly onStop: () => void;
   readonly onModeChange: (mode: InputMode) => void;
   readonly onThinkingModeChange: (mode: ThinkingMode) => void;
@@ -142,7 +153,9 @@ export const ChatInput: FC<ChatInputProps> = ({
       inputRef.current?.focus();
     };
     window.addEventListener('focusChatInput', handleFocusEvent);
-    return () => { window.removeEventListener('focusChatInput', handleFocusEvent); };
+    return () => {
+      window.removeEventListener('focusChatInput', handleFocusEvent);
+    };
   }, []);
 
   const handleInputChange = (e: React.FormEvent<HTMLDivElement>): void => {
@@ -214,8 +227,9 @@ export const ChatInput: FC<ChatInputProps> = ({
 
     // Extract images from attached context
     const images: ImageAttachment[] = attachedContext
-      .filter((item): item is ContextItem & { type: 'image'; imageData: string; mimeType: string } =>
-        item.type === 'image' && item.imageData !== undefined && item.mimeType !== undefined
+      .filter(
+        (item): item is ContextItem & { type: 'image'; imageData: string; mimeType: string } =>
+          item.type === 'image' && item.imageData !== undefined && item.mimeType !== undefined
       )
       .map((item) => ({
         name: item.name,
@@ -248,24 +262,26 @@ export const ChatInput: FC<ChatInputProps> = ({
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = (event): void => {
-        const dataUrl = event.target?.result as string;
-        // Extract base64 data (remove data:image/...;base64, prefix)
-        const base64Data = dataUrl.split(',')[1];
+      // Compress and resize image before adding
+      compressImage(file)
+        .then((compressed) => {
+          // Create preview URL from compressed data
+          const previewUrl = `data:${compressed.mimeType};base64,${compressed.data}`;
 
-        const newContext: ContextItem = {
-          id: crypto.randomUUID(),
-          type: 'image',
-          name: file.name,
-          path: file.name, // Use filename as path for images
-          mimeType: file.type,
-          imageData: base64Data,
-          previewUrl: dataUrl,
-        };
-        setAttachedContext((prev) => [...prev, newContext]);
-      };
-      reader.readAsDataURL(file);
+          const newContext: ContextItem = {
+            id: crypto.randomUUID(),
+            type: 'image',
+            name: file.name,
+            path: file.name,
+            mimeType: compressed.mimeType,
+            imageData: compressed.data,
+            previewUrl,
+          };
+          setAttachedContext((prev) => [...prev, newContext]);
+        })
+        .catch((error: unknown) => {
+          console.error('[ImageCompression] Failed to compress image:', error);
+        });
     });
 
     // Reset input so same file can be selected again
@@ -427,9 +443,8 @@ export const ChatInput: FC<ChatInputProps> = ({
   };
 
   const cycleInputMode = useCallback((): void => {
-    const nextMode: InputMode = inputMode === 'default' ? 'plan'
-      : inputMode === 'plan' ? 'accept'
-      : 'default';
+    const nextMode: InputMode =
+      inputMode === 'default' ? 'plan' : inputMode === 'plan' ? 'accept' : 'default';
     onModeChange(nextMode);
   }, [inputMode, onModeChange]);
 
@@ -451,10 +466,7 @@ export const ChatInput: FC<ChatInputProps> = ({
     <div className="p-4 pt-0 shrink-0 relative">
       <div className={getInputBoxClasses()} style={{ maxWidth: CONTENT_WIDTH.inputBox }}>
         {/* Element Context Chips - selected browser elements */}
-        <ElementContextList
-          elements={elementContexts}
-          onRemove={removeElementContext}
-        />
+        <ElementContextList elements={elementContexts} onRemove={removeElementContext} />
 
         {/* Context Chips Row - shown when items attached */}
         {attachedContext.length > 0 ? (
@@ -543,24 +555,28 @@ export const ChatInput: FC<ChatInputProps> = ({
                   )}
                   title="Think Config"
                 >
-                  <Lightbulb className={cn(
-                    'h-4 w-4',
-                    thinkingMode === 'think' && 'fill-mode-think',
-                    thinkingMode === 'hard' && 'fill-orange-500',
-                    thinkingMode === 'ultra' && 'fill-red-500'
-                  )} />
+                  <Lightbulb
+                    className={cn(
+                      'h-4 w-4',
+                      thinkingMode === 'think' && 'fill-mode-think',
+                      thinkingMode === 'hard' && 'fill-orange-500',
+                      thinkingMode === 'ultra' && 'fill-red-500'
+                    )}
+                  />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="center" side="top" className="p-2">
                 <div className="flex items-center justify-between gap-4 mb-2">
                   <span className="text-xs text-muted-foreground">Think config</span>
                   {thinkingMode !== 'off' ? (
-                    <span className={cn(
-                      'flex items-center gap-1 text-[10px]',
-                      thinkingMode === 'think' && 'text-mode-think',
-                      thinkingMode === 'hard' && 'text-orange-500',
-                      thinkingMode === 'ultra' && 'text-red-500'
-                    )}>
+                    <span
+                      className={cn(
+                        'flex items-center gap-1 text-[10px]',
+                        thinkingMode === 'think' && 'text-mode-think',
+                        thinkingMode === 'hard' && 'text-orange-500',
+                        thinkingMode === 'ultra' && 'text-red-500'
+                      )}
+                    >
                       {thinkingMode === 'think' && '4k'}
                       {thinkingMode === 'hard' && '10k'}
                       {thinkingMode === 'ultra' && '32k'}
@@ -583,7 +599,9 @@ export const ChatInput: FC<ChatInputProps> = ({
                   {(['off', 'think', 'hard', 'ultra'] as const).map((mode) => (
                     <button
                       key={mode}
-                      onClick={() => { onThinkingModeChange(mode); }}
+                      onClick={() => {
+                        onThinkingModeChange(mode);
+                      }}
                       className={cn(
                         'relative z-10 w-[38px] py-1 text-xs font-medium rounded transition-colors duration-200 capitalize',
                         thinkingMode === mode
@@ -597,7 +615,10 @@ export const ChatInput: FC<ChatInputProps> = ({
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
-            <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors" title="Web Browser">
+            <button
+              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
+              title="Web Browser"
+            >
               <Globe className="h-4 w-4" />
             </button>
             <button

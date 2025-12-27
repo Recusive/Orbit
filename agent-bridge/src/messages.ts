@@ -10,7 +10,7 @@ export interface AttachmentContentBlock {
   type: 'document' | 'image' | 'text';
   source?: {
     type: 'base64';
-    media_type: string; // 'application/pdf', 'image/png', 'text/plain', etc.
+    mediaType: string; // camelCase from Rust - 'application/pdf', 'image/png', etc.
     data: string; // base64 encoded content
   };
   text?: string; // For text blocks

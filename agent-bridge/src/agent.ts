@@ -889,69 +889,84 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Track tool use blocks to match with their results
     const toolUseMap = new Map<string, { name: string; input: Record<string, unknown> }>();
 
+    logger.info('Starting to iterate over query messages...');
+    let messageCount = 0;
+
     // Yield messages as they arrive
     // In streaming mode, the query continues running and processing messages from the queue
-    for await (const message of this.currentQuery) {
-      // Capture session ID from system:init message
-      if (message.type === 'system' && (message as { subtype?: string }).subtype === 'init') {
-        const initMessage = message as { session_id?: string };
-        if (initMessage.session_id) {
-          this._currentSessionId = initMessage.session_id;
+    try {
+      for await (const message of this.currentQuery) {
+        messageCount++;
+        logger.info({ messageCount, type: message.type }, 'Received SDK message');
+        // Capture session ID from system:init message
+        if (message.type === 'system' && (message as { subtype?: string }).subtype === 'init') {
+          const initMessage = message as { session_id?: string };
+          if (initMessage.session_id) {
+            this._currentSessionId = initMessage.session_id;
+          }
         }
-      }
 
-      // Track tool use blocks from assistant messages
-      if (message.type === 'assistant') {
-        const contentArray = getMessageContentArray(message);
-        if (contentArray !== null) {
-          for (const block of contentArray) {
-            if (isToolUseBlock(block)) {
-              toolUseMap.set(block.id, {
-                name: block.name,
-                input: block.input,
-              });
+        // Track tool use blocks from assistant messages
+        if (message.type === 'assistant') {
+          const contentArray = getMessageContentArray(message);
+          if (contentArray !== null) {
+            for (const block of contentArray) {
+              if (isToolUseBlock(block)) {
+                toolUseMap.set(block.id, {
+                  name: block.name,
+                  input: block.input,
+                });
+              }
             }
           }
         }
-      }
 
-      // Format tool results in user messages
-      if (message.type === 'user') {
-        const contentArray = getMessageContentArray(message);
-        if (contentArray !== null) {
-          // Create a shallow copy of the message for formatting
-          const msg = message as { message: { content: unknown } };
-          const formattedContent = contentArray.map((block: unknown) => {
-            if (isToolResultBlock(block)) {
-              const toolInfo = toolUseMap.get(block.tool_use_id);
-              if (toolInfo !== undefined) {
-                // Format the content
-                const formatted = formatToolResult(
-                  toolInfo.name,
-                  toolInfo.input,
-                  block.content,
-                  block.is_error === true
-                );
-                return { ...block, content: formatted };
+        // Format tool results in user messages
+        if (message.type === 'user') {
+          const contentArray = getMessageContentArray(message);
+          if (contentArray !== null) {
+            // Create a shallow copy of the message for formatting
+            const msg = message as { message: { content: unknown } };
+            const formattedContent = contentArray.map((block: unknown) => {
+              if (isToolResultBlock(block)) {
+                const toolInfo = toolUseMap.get(block.tool_use_id);
+                if (toolInfo !== undefined) {
+                  // Format the content
+                  const formatted = formatToolResult(
+                    toolInfo.name,
+                    toolInfo.input,
+                    block.content,
+                    block.is_error === true
+                  );
+                  return { ...block, content: formatted };
+                }
               }
-            }
-            return block;
-          });
-          const formattedMessage = {
-            ...message,
-            message: { ...msg.message, content: formattedContent },
-          };
-          yield formattedMessage as SDKMessage;
+              return block;
+            });
+            const formattedMessage = {
+              ...message,
+              message: { ...msg.message, content: formattedContent },
+            };
+            yield formattedMessage as SDKMessage;
+          } else {
+            yield message;
+          }
         } else {
           yield message;
         }
-      } else {
-        yield message;
       }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error(
+        { error: errorMessage, stack: errorStack, messageCount },
+        'Error iterating over SDK query'
+      );
+      throw error;
     }
 
     // Query completed (session ended)
-    logger.debug('Query session completed');
+    logger.info({ messageCount }, 'Query session completed');
     this.sessionActive = false;
     this.currentQuery = null;
   }
