@@ -27,6 +27,7 @@ import type { FC, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogPortal } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
@@ -38,10 +39,11 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
-type SettingsSection =
+export type SettingsSection =
   | 'agent'
   | 'subagents'
   | 'commands'
+  | 'shortcuts'
   | 'browser'
   | 'editor'
   | 'notifications'
@@ -106,9 +108,7 @@ interface SectionHeaderProps {
 const SectionHeader: FC<SectionHeaderProps> = ({ title, children }) => (
   <div className="mb-4">
     <h3 className="text-sm font-semibold mb-1">{title}</h3>
-    {children !== undefined && (
-      <p className="text-xs text-muted-foreground">{children}</p>
-    )}
+    {children !== undefined && <p className="text-xs text-muted-foreground">{children}</p>}
   </div>
 );
 
@@ -152,9 +152,7 @@ const AgentSettings: FC = () => {
       <SectionDivider />
 
       {/* Artifact */}
-      <SectionHeader title="Artifact">
-        Configure artifact generation and handling
-      </SectionHeader>
+      <SectionHeader title="Artifact">Configure artifact generation and handling</SectionHeader>
 
       <div className="space-y-1 divide-y divide-border">
         <SettingItem
@@ -168,19 +166,16 @@ const AgentSettings: FC = () => {
       <SectionDivider />
 
       {/* Terminal */}
-      <SectionHeader title="Terminal">
-        Configure terminal behavior and appearance
-      </SectionHeader>
+      <SectionHeader title="Terminal">Configure terminal behavior and appearance</SectionHeader>
 
       <div className="space-y-1 divide-y divide-border">
-        <SettingItem
-          label="Terminal Rows"
-          description="Number of rows visible in the terminal"
-        >
+        <SettingItem label="Terminal Rows" description="Number of rows visible in the terminal">
           <Input
             type="number"
             value={terminalRows}
-            onChange={(e) => { setTerminalRows(e.target.value); }}
+            onChange={(e) => {
+              setTerminalRows(e.target.value);
+            }}
             className="w-20 h-8 text-sm"
           />
         </SettingItem>
@@ -194,10 +189,7 @@ const AgentSettings: FC = () => {
       </SectionHeader>
 
       <div className="space-y-1 divide-y divide-border">
-        <SettingItem
-          label="File Access Level"
-          description="Define the scope of file system access"
-        >
+        <SettingItem label="File Access Level" description="Define the scope of file system access">
           <Select value={fileAccess} onValueChange={setFileAccess}>
             <SelectTrigger className="w-40 h-8 text-sm">
               <SelectValue />
@@ -214,15 +206,10 @@ const AgentSettings: FC = () => {
       <SectionDivider />
 
       {/* Automation */}
-      <SectionHeader title="Automation">
-        Configure autonomous behavior
-      </SectionHeader>
+      <SectionHeader title="Automation">Configure autonomous behavior</SectionHeader>
 
       <div className="space-y-1 divide-y divide-border">
-        <SettingItem
-          label="Enable Auto Mode"
-          description="Allow the agent to work autonomously"
-        >
+        <SettingItem label="Enable Auto Mode" description="Allow the agent to work autonomously">
           <Switch checked={enableAuto} onCheckedChange={setEnableAuto} />
         </SettingItem>
 
@@ -233,14 +220,13 @@ const AgentSettings: FC = () => {
           <Switch checked={autoClose} onCheckedChange={setAutoClose} />
         </SettingItem>
 
-        <SettingItem
-          label="Max Turns"
-          description="Maximum number of turns in auto mode"
-        >
+        <SettingItem label="Max Turns" description="Maximum number of turns in auto mode">
           <Input
             type="number"
             value={maxTurns}
-            onChange={(e) => { setMaxTurns(e.target.value); }}
+            onChange={(e) => {
+              setMaxTurns(e.target.value);
+            }}
             className="w-20 h-8 text-sm"
           />
         </SettingItem>
@@ -249,20 +235,12 @@ const AgentSettings: FC = () => {
       <SectionDivider />
 
       {/* General */}
-      <SectionHeader title="General">
-        General agent settings
-      </SectionHeader>
+      <SectionHeader title="General">General agent settings</SectionHeader>
 
       <div className="space-y-1 divide-y divide-border">
-        <SettingItem
-          label="Custom Instructions"
-          description="Path to custom instructions file"
-        >
+        <SettingItem label="Custom Instructions" description="Path to custom instructions file">
           <div className="flex items-center gap-2">
-            <Input
-              placeholder="CLAUDE.md"
-              className="w-40 h-8 text-sm"
-            />
+            <Input placeholder="CLAUDE.md" className="w-40 h-8 text-sm" />
             <Button variant="outline" size="sm" className="h-8">
               <FolderOpen className="h-4 w-4" />
             </Button>
@@ -280,22 +258,14 @@ const BrowserSettings: FC = () => {
 
   return (
     <div>
-      <SectionHeader title="Browser">
-        Configure browser automation settings
-      </SectionHeader>
+      <SectionHeader title="Browser">Configure browser automation settings</SectionHeader>
 
       <div className="space-y-1 divide-y divide-border">
-        <SettingItem
-          label="Enable Browser Tool"
-          description="Allow the agent to browse websites"
-        >
+        <SettingItem label="Enable Browser Tool" description="Allow the agent to browse websites">
           <Switch checked={enableBrowser} onCheckedChange={setEnableBrowser} />
         </SettingItem>
 
-        <SettingItem
-          label="Headless Mode"
-          description="Run browser without visible window"
-        >
+        <SettingItem label="Headless Mode" description="Run browser without visible window">
           <Switch checked={headless} onCheckedChange={setHeadless} />
         </SettingItem>
       </div>
@@ -313,15 +283,10 @@ const EditorSettings: FC = () => {
 
   return (
     <div>
-      <SectionHeader title="Appearance">
-        Customize the editor appearance
-      </SectionHeader>
+      <SectionHeader title="Appearance">Customize the editor appearance</SectionHeader>
 
       <div className="space-y-1 divide-y divide-border">
-        <SettingItem
-          label="Theme"
-          description="Choose your preferred color theme"
-        >
+        <SettingItem label="Theme" description="Choose your preferred color theme">
           <Select value={theme} onValueChange={setTheme}>
             <SelectTrigger className="w-32 h-8 text-sm">
               <SelectValue />
@@ -334,26 +299,24 @@ const EditorSettings: FC = () => {
           </Select>
         </SettingItem>
 
-        <SettingItem
-          label="Font Size"
-          description="Editor font size in pixels"
-        >
+        <SettingItem label="Font Size" description="Editor font size in pixels">
           <Input
             type="number"
             value={fontSize}
-            onChange={(e) => { setFontSize(e.target.value); }}
+            onChange={(e) => {
+              setFontSize(e.target.value);
+            }}
             className="w-20 h-8 text-sm"
           />
         </SettingItem>
 
-        <SettingItem
-          label="Tab Size"
-          description="Number of spaces per tab"
-        >
+        <SettingItem label="Tab Size" description="Number of spaces per tab">
           <Input
             type="number"
             value={tabSize}
-            onChange={(e) => { setTabSize(e.target.value); }}
+            onChange={(e) => {
+              setTabSize(e.target.value);
+            }}
             className="w-20 h-8 text-sm"
           />
         </SettingItem>
@@ -361,22 +324,14 @@ const EditorSettings: FC = () => {
 
       <SectionDivider />
 
-      <SectionHeader title="Features">
-        Toggle editor features
-      </SectionHeader>
+      <SectionHeader title="Features">Toggle editor features</SectionHeader>
 
       <div className="space-y-1 divide-y divide-border">
-        <SettingItem
-          label="Word Wrap"
-          description="Wrap long lines to fit the editor width"
-        >
+        <SettingItem label="Word Wrap" description="Wrap long lines to fit the editor width">
           <Switch checked={wordWrap} onCheckedChange={setWordWrap} />
         </SettingItem>
 
-        <SettingItem
-          label="Minimap"
-          description="Show code minimap on the side"
-        >
+        <SettingItem label="Minimap" description="Show code minimap on the side">
           <Switch checked={minimap} onCheckedChange={setMinimap} />
         </SettingItem>
       </div>
@@ -393,36 +348,22 @@ const NotificationsSettings: FC = () => {
 
   return (
     <div>
-      <SectionHeader title="Notifications">
-        Configure notification preferences
-      </SectionHeader>
+      <SectionHeader title="Notifications">Configure notification preferences</SectionHeader>
 
       <div className="space-y-1 divide-y divide-border">
-        <SettingItem
-          label="Enable Notifications"
-          description="Show system notifications"
-        >
+        <SettingItem label="Enable Notifications" description="Show system notifications">
           <Switch checked={enableNotifications} onCheckedChange={setEnableNotifications} />
         </SettingItem>
 
-        <SettingItem
-          label="Sound"
-          description="Play sound for notifications"
-        >
+        <SettingItem label="Sound" description="Play sound for notifications">
           <Switch checked={soundEnabled} onCheckedChange={setSoundEnabled} />
         </SettingItem>
 
-        <SettingItem
-          label="Show Errors"
-          description="Display error notifications"
-        >
+        <SettingItem label="Show Errors" description="Display error notifications">
           <Switch checked={showErrors} onCheckedChange={setShowErrors} />
         </SettingItem>
 
-        <SettingItem
-          label="Show Warnings"
-          description="Display warning notifications"
-        >
+        <SettingItem label="Show Warnings" description="Display warning notifications">
           <Switch checked={showWarnings} onCheckedChange={setShowWarnings} />
         </SettingItem>
       </div>
@@ -438,34 +379,25 @@ const TabsSettings: FC = () => {
 
   return (
     <div>
-      <SectionHeader title="Tab Behavior">
-        Configure how tabs work
-      </SectionHeader>
+      <SectionHeader title="Tab Behavior">Configure how tabs work</SectionHeader>
 
       <div className="space-y-1 divide-y divide-border">
-        <SettingItem
-          label="Close on Task Complete"
-          description="Auto-close tab when task finishes"
-        >
+        <SettingItem label="Close on Task Complete" description="Auto-close tab when task finishes">
           <Switch checked={closeOnComplete} onCheckedChange={setCloseOnComplete} />
         </SettingItem>
 
-        <SettingItem
-          label="Maximum Tabs"
-          description="Limit the number of open tabs"
-        >
+        <SettingItem label="Maximum Tabs" description="Limit the number of open tabs">
           <Input
             type="number"
             value={maxTabs}
-            onChange={(e) => { setMaxTabs(e.target.value); }}
+            onChange={(e) => {
+              setMaxTabs(e.target.value);
+            }}
             className="w-20 h-8 text-sm"
           />
         </SettingItem>
 
-        <SettingItem
-          label="Show Tab Icons"
-          description="Display icons in tab headers"
-        >
+        <SettingItem label="Show Tab Icons" description="Display icons in tab headers">
           <Switch checked={showIcons} onCheckedChange={setShowIcons} />
         </SettingItem>
       </div>
@@ -477,9 +409,7 @@ const TabsSettings: FC = () => {
 const AccountSettings: FC = () => {
   return (
     <div>
-      <SectionHeader title="Account">
-        Manage your account settings
-      </SectionHeader>
+      <SectionHeader title="Account">Manage your account settings</SectionHeader>
 
       <div className="rounded-lg border border-border p-4 bg-muted/30">
         <div className="flex items-center gap-3">
@@ -498,26 +428,16 @@ const AccountSettings: FC = () => {
 
       <SectionDivider />
 
-      <SectionHeader title="API Keys">
-        Manage your API credentials
-      </SectionHeader>
+      <SectionHeader title="API Keys">Manage your API credentials</SectionHeader>
 
       <div className="space-y-3">
         <div>
           <label className="text-xs font-medium text-muted-foreground">Anthropic API Key</label>
-          <Input
-            type="password"
-            placeholder="sk-ant-..."
-            className="mt-1 h-8 text-sm"
-          />
+          <Input type="password" placeholder="sk-ant-..." className="mt-1 h-8 text-sm" />
         </div>
         <div>
           <label className="text-xs font-medium text-muted-foreground">OpenAI API Key</label>
-          <Input
-            type="password"
-            placeholder="sk-..."
-            className="mt-1 h-8 text-sm"
-          />
+          <Input type="password" placeholder="sk-..." className="mt-1 h-8 text-sm" />
         </div>
       </div>
     </div>
@@ -528,9 +448,7 @@ const AccountSettings: FC = () => {
 const FeedbackSettings: FC = () => {
   return (
     <div>
-      <SectionHeader title="Provide Feedback">
-        Help us improve Orbit
-      </SectionHeader>
+      <SectionHeader title="Provide Feedback">Help us improve Orbit</SectionHeader>
 
       <div className="space-y-4">
         <div className="rounded-lg border border-border p-4 hover:bg-accent/50 cursor-pointer transition-colors">
@@ -558,26 +476,86 @@ const FeedbackSettings: FC = () => {
             <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground" />
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
 
-        <div className="rounded-lg border border-border p-4 hover:bg-accent/50 cursor-pointer transition-colors">
-          <div className="flex items-center gap-3">
-            <Keyboard className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <div className="font-medium text-sm">Keyboard Shortcuts</div>
-              <div className="text-xs text-muted-foreground">
-                View all available shortcuts
-              </div>
-            </div>
-            <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground" />
-          </div>
-        </div>
+// Shortcut item component
+interface ShortcutItemProps {
+  readonly label: string;
+  readonly keys: string[];
+}
+
+const ShortcutItem: FC<ShortcutItemProps> = ({ label, keys }) => (
+  <div className="flex items-center justify-between py-2">
+    <span className="text-sm text-muted-foreground">{label}</span>
+    <KbdGroup>
+      {keys.map((key, index) => (
+        <Kbd key={index}>{key}</Kbd>
+      ))}
+    </KbdGroup>
+  </div>
+);
+
+// Shortcuts settings panel
+const ShortcutsSettings: FC = () => {
+  return (
+    <div>
+      <SectionHeader title="General">Global keyboard shortcuts</SectionHeader>
+
+      <div className="space-y-1 divide-y divide-border">
+        <ShortcutItem label="Command Palette" keys={['⌘', 'P']} />
+        <ShortcutItem label="Settings" keys={['⌘', ',']} />
+        <ShortcutItem label="New Chat" keys={['⌘', 'N']} />
+        <ShortcutItem label="Close Tab" keys={['⌘', 'W']} />
+      </div>
+
+      <SectionDivider />
+
+      <SectionHeader title="Chat">Chat-related shortcuts</SectionHeader>
+
+      <div className="space-y-1 divide-y divide-border">
+        <ShortcutItem label="Send Message" keys={['⌘', '↵']} />
+        <ShortcutItem label="Stop Generation" keys={['Esc']} />
+        <ShortcutItem label="Add Context" keys={['@']} />
+        <ShortcutItem label="Slash Commands" keys={['/']} />
+        <ShortcutItem label="New Line" keys={['Shift', '↵']} />
+      </div>
+
+      <SectionDivider />
+
+      <SectionHeader title="Editor">Editor shortcuts</SectionHeader>
+
+      <div className="space-y-1 divide-y divide-border">
+        <ShortcutItem label="Save File" keys={['⌘', 'S']} />
+        <ShortcutItem label="Find in File" keys={['⌘', 'F']} />
+        <ShortcutItem label="Go to Line" keys={['⌘', 'G']} />
+        <ShortcutItem label="Undo" keys={['⌘', 'Z']} />
+        <ShortcutItem label="Redo" keys={['⌘', 'Shift', 'Z']} />
+      </div>
+
+      <SectionDivider />
+
+      <SectionHeader title="Panels">Panel visibility shortcuts</SectionHeader>
+
+      <div className="space-y-1 divide-y divide-border">
+        <ShortcutItem label="Toggle Left Sidebar" keys={['⌘', '.']} />
+        <ShortcutItem label="Toggle File Browser" keys={['⌘', 'B']} />
+        <ShortcutItem label="Toggle Terminal" keys={['⌘', 'J']} />
+        <ShortcutItem label="Toggle Activity" keys={['⌘', 'Shift', 'A']} />
+        <ShortcutItem label="Toggle Sessions" keys={['⌘', 'Shift', 'S']} />
       </div>
     </div>
   );
 };
 
 // Main dialog component
-export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange, defaultSection = 'agent' }) => {
+export const SettingsDialog: FC<SettingsDialogProps> = ({
+  open,
+  onOpenChange,
+  defaultSection = 'agent',
+}) => {
   const [activeSection, setActiveSection] = useState<SettingsSection>(defaultSection);
 
   // Reset to defaultSection when dialog opens
@@ -588,9 +566,14 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange, de
   }, [open, defaultSection]);
 
   const navItems = [
-    { id: 'agent' as const, label: 'Agent', icon: <Icon iconNode={hexagons7} className="h-4 w-4" /> },
+    {
+      id: 'agent' as const,
+      label: 'Agent',
+      icon: <Icon iconNode={hexagons7} className="h-4 w-4" />,
+    },
     { id: 'subagents' as const, label: 'Subagents', icon: <Bot className="h-4 w-4" /> },
     { id: 'commands' as const, label: 'Commands', icon: <Terminal className="h-4 w-4" /> },
+    { id: 'shortcuts' as const, label: 'Shortcuts', icon: <Keyboard className="h-4 w-4" /> },
     { id: 'browser' as const, label: 'Browser', icon: <Globe className="h-4 w-4" /> },
     { id: 'editor' as const, label: 'Editor', icon: <AppWindowMac className="h-4 w-4" /> },
     { id: 'notifications' as const, label: 'Notifications', icon: <Bell className="h-4 w-4" /> },
@@ -598,7 +581,11 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange, de
     { id: 'account' as const, label: 'Account', icon: <User className="h-4 w-4" /> },
   ];
 
-  const feedbackItem = { id: 'feedback' as const, label: 'Provide Feedback', icon: <FlaskConical className="h-4 w-4" /> };
+  const feedbackItem = {
+    id: 'feedback' as const,
+    label: 'Provide Feedback',
+    icon: <FlaskConical className="h-4 w-4" />,
+  };
 
   const renderContent = (): ReactNode => {
     switch (activeSection) {
@@ -608,6 +595,8 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange, de
         return <SubagentsSettings />;
       case 'commands':
         return <SlashCommandsSettings />;
+      case 'shortcuts':
+        return <ShortcutsSettings />;
       case 'browser':
         return <BrowserSettings />;
       case 'editor':
@@ -664,7 +653,9 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange, de
                     icon={item.icon}
                     label={item.label}
                     isActive={activeSection === item.id}
-                    onClick={() => { setActiveSection(item.id); }}
+                    onClick={() => {
+                      setActiveSection(item.id);
+                    }}
                   />
                 ))}
               </nav>
@@ -674,7 +665,9 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({ open, onOpenChange, de
                   icon={feedbackItem.icon}
                   label={feedbackItem.label}
                   isActive={activeSection === 'feedback'}
-                  onClick={() => { setActiveSection('feedback'); }}
+                  onClick={() => {
+                    setActiveSection('feedback');
+                  }}
                 />
               </div>
             </div>

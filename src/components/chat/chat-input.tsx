@@ -39,6 +39,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTauri } from '@/hooks/use-tauri';
 import { CONTENT_WIDTH, INPUT_SIZES } from '@/lib/constants';
 import { compressImage } from '@/lib/image-utils';
@@ -519,115 +520,134 @@ export const ChatInput: FC<ChatInputProps> = ({
           {/* Left Controls - Mode & Model Pickers */}
           <div className="flex items-center gap-0.5">
             {/* Mode Picker */}
-            <button
-              onClick={cycleInputMode}
-              className={cn(
-                'h-7 px-2 flex items-center gap-1.5 rounded hover:bg-accent transition-colors',
-                inputMode === 'default' && 'border border-border opacity-70 hover:opacity-100',
-                inputMode === 'plan' && 'text-mode-plan',
-                inputMode === 'accept' && 'text-mode-accept'
-              )}
-            >
-              <span className="text-xs font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={cycleInputMode}
+                  className={cn(
+                    'h-7 px-2 flex items-center gap-1.5 rounded hover:bg-accent transition-colors',
+                    inputMode === 'default' && 'border border-border opacity-70 hover:opacity-100',
+                    inputMode === 'plan' && 'text-mode-plan',
+                    inputMode === 'accept' && 'text-mode-accept'
+                  )}
+                >
+                  <span className="text-xs font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Input mode</TooltipContent>
+            </Tooltip>
             {/* Model Picker */}
             <ModelSelector onModelChange={onModelChange} />
           </div>
 
           {/* Right Controls - Action Buttons */}
           <div className="flex items-center gap-0.5">
-            <button
-              onClick={handleAtClick}
-              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
-              title="Add Context (@)"
-            >
-              <AtSign className="h-4 w-4" />
-            </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <button
-                  className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors',
-                    thinkingMode === 'off' && 'opacity-70 hover:opacity-100',
-                    thinkingMode === 'think' && 'opacity-100 text-mode-think',
-                    thinkingMode === 'hard' && 'opacity-100 text-orange-500',
-                    thinkingMode === 'ultra' && 'opacity-100 text-red-500'
-                  )}
-                  title="Think Config"
+                  onClick={handleAtClick}
+                  className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
                 >
-                  <Lightbulb
-                    className={cn(
-                      'h-4 w-4',
-                      thinkingMode === 'think' && 'fill-mode-think',
-                      thinkingMode === 'hard' && 'fill-orange-500',
-                      thinkingMode === 'ultra' && 'fill-red-500'
-                    )}
-                  />
+                  <AtSign className="h-4 w-4" />
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" side="top" className="p-2">
-                <div className="flex items-center justify-between gap-4 mb-2">
-                  <span className="text-xs text-muted-foreground">Think config</span>
-                  {thinkingMode !== 'off' ? (
-                    <span
-                      className={cn(
-                        'flex items-center gap-1 text-[10px]',
-                        thinkingMode === 'think' && 'text-mode-think',
-                        thinkingMode === 'hard' && 'text-orange-500',
-                        thinkingMode === 'ultra' && 'text-red-500'
-                      )}
-                    >
-                      {thinkingMode === 'think' && '4k'}
-                      {thinkingMode === 'hard' && '10k'}
-                      {thinkingMode === 'ultra' && '32k'}
-                      <Coins className="h-3 w-3" />
-                    </span>
-                  ) : null}
-                </div>
-                <div className="relative flex gap-1 bg-muted rounded-md p-1 border border-border">
-                  {/* Sliding indicator */}
-                  <div
-                    className="absolute top-1 bottom-1 left-1 bg-background rounded shadow-sm transition-all duration-200"
-                    style={{
-                      width: 'var(--tab-width)',
-                      transform: `translateX(calc(${String(['off', 'think', 'hard', 'ultra'].indexOf(thinkingMode))} * (var(--tab-width) + 4px)))`,
-                      transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-                      // @ts-expect-error CSS custom property
-                      '--tab-width': '38px',
-                    }}
-                  />
-                  {(['off', 'think', 'hard', 'ultra'] as const).map((mode) => (
+              </TooltipTrigger>
+              <TooltipContent>Add context (@)</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <DropdownMenu>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
                     <button
-                      key={mode}
-                      onClick={() => {
-                        onThinkingModeChange(mode);
-                      }}
                       className={cn(
-                        'relative z-10 w-[38px] py-1 text-xs font-medium rounded transition-colors duration-200 capitalize',
-                        thinkingMode === mode
-                          ? 'text-foreground'
-                          : 'text-muted-foreground hover:text-foreground'
+                        'h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors',
+                        thinkingMode === 'off' && 'opacity-70 hover:opacity-100',
+                        thinkingMode === 'think' && 'opacity-100 text-mode-think',
+                        thinkingMode === 'hard' && 'opacity-100 text-orange-500',
+                        thinkingMode === 'ultra' && 'opacity-100 text-red-500'
                       )}
                     >
-                      {mode}
+                      <Lightbulb
+                        className={cn(
+                          'h-4 w-4',
+                          thinkingMode === 'think' && 'fill-mode-think',
+                          thinkingMode === 'hard' && 'fill-orange-500',
+                          thinkingMode === 'ultra' && 'fill-red-500'
+                        )}
+                      />
                     </button>
-                  ))}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <button
-              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
-              title="Web Browser"
-            >
-              <Globe className="h-4 w-4" />
-            </button>
-            <button
-              onClick={handleImageClick}
-              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
-              title="Attach Image"
-            >
-              <Image className="h-4 w-4" />
-            </button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Think config</TooltipContent>
+                <DropdownMenuContent align="center" side="top" className="p-2">
+                  <div className="flex items-center justify-between gap-4 mb-2">
+                    <span className="text-xs text-muted-foreground">Think config</span>
+                    {thinkingMode !== 'off' ? (
+                      <span
+                        className={cn(
+                          'flex items-center gap-1 text-[10px]',
+                          thinkingMode === 'think' && 'text-mode-think',
+                          thinkingMode === 'hard' && 'text-orange-500',
+                          thinkingMode === 'ultra' && 'text-red-500'
+                        )}
+                      >
+                        {thinkingMode === 'think' && '4k'}
+                        {thinkingMode === 'hard' && '10k'}
+                        {thinkingMode === 'ultra' && '32k'}
+                        <Coins className="h-3 w-3" />
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="relative flex gap-1 bg-muted rounded-md p-1 border border-border">
+                    {/* Sliding indicator */}
+                    <div
+                      className="absolute top-1 bottom-1 left-1 bg-background rounded shadow-sm transition-all duration-200"
+                      style={{
+                        width: 'var(--tab-width)',
+                        transform: `translateX(calc(${String(['off', 'think', 'hard', 'ultra'].indexOf(thinkingMode))} * (var(--tab-width) + 4px)))`,
+                        transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                        // @ts-expect-error CSS custom property
+                        '--tab-width': '38px',
+                      }}
+                    />
+                    {(['off', 'think', 'hard', 'ultra'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => {
+                          onThinkingModeChange(mode);
+                        }}
+                        className={cn(
+                          'relative z-10 w-[38px] py-1 text-xs font-medium rounded transition-colors duration-200 capitalize',
+                          thinkingMode === mode
+                            ? 'text-foreground'
+                            : 'text-muted-foreground hover:text-foreground'
+                        )}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors">
+                  <Globe className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Web browser</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleImageClick}
+                  className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
+                >
+                  <Image className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Attach image</TooltipContent>
+            </Tooltip>
             {/* Hidden file input for images */}
             <input
               ref={imageInputRef}
@@ -658,27 +678,35 @@ export const ChatInput: FC<ChatInputProps> = ({
             </Context>
             {/* Send/Stop Button */}
             {isAgentRunning && isInputEmpty ? (
-              <button
-                onClick={onStop}
-                className="h-7 w-7 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                title="Stop (Esc)"
-              >
-                <Square className="h-3 w-3 fill-current" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onStop}
+                    className="h-7 w-7 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                  >
+                    <Square className="h-3 w-3 fill-current" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Stop (Esc)</TooltipContent>
+              </Tooltip>
             ) : (
-              <button
-                onClick={handleSend}
-                disabled={isInputEmpty}
-                className={cn(
-                  'h-7 w-7 flex items-center justify-center rounded-full transition-colors',
-                  isInputEmpty
-                    ? 'bg-primary/30 text-primary-foreground opacity-50 cursor-not-allowed'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                )}
-                title={isAgentRunning ? 'Queue message' : 'Send message'}
-              >
-                <ArrowUp className="h-4 w-4" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleSend}
+                    disabled={isInputEmpty}
+                    className={cn(
+                      'h-7 w-7 flex items-center justify-center rounded-full transition-colors',
+                      isInputEmpty
+                        ? 'bg-primary/30 text-primary-foreground opacity-50 cursor-not-allowed'
+                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    )}
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{isAgentRunning ? 'Queue message' : 'Send message'}</TooltipContent>
+              </Tooltip>
             )}
           </div>
         </div>

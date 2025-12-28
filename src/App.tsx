@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import type { FC } from 'react';
 
 import { RootLayout } from '@/components/layout';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { useBrowser } from '@/hooks/use-browser';
 
 /**
@@ -41,9 +42,11 @@ const App: FC = () => {
   useBrowser(); // Handle browser messages from Tauri backend
 
   return (
-    <div className="h-full">
-      <RootLayout />
-    </div>
+    <TooltipProvider delayDuration={0}>
+      <div className="h-full">
+        <RootLayout />
+      </div>
+    </TooltipProvider>
   );
 };
 

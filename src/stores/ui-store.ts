@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
+import type { SettingsSection } from '@/components/settings/settings-dialog';
+
 import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/constants';
 
 // Conversation summary for sidebar list
@@ -49,6 +51,8 @@ interface UIState {
   activityTab: ActivityTab;
   // Dialogs
   goToLineDialogOpen: boolean;
+  settingsDialogOpen: boolean;
+  settingsDialogSection: SettingsSection;
 }
 
 interface UIActions {
@@ -80,6 +84,8 @@ interface UIActions {
   openSourceControl: () => void;
   // Dialog actions
   setGoToLineDialogOpen: (open: boolean) => void;
+  setSettingsDialogOpen: (open: boolean) => void;
+  openSettings: (section?: SettingsSection) => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -123,6 +129,8 @@ export const useUIStore = create<UIStore>()(
     terminalPosition: 'activity' as TerminalPosition,
     activityTab: 'files' as ActivityTab,
     goToLineDialogOpen: false,
+    settingsDialogOpen: false,
+    settingsDialogSection: 'agent' as const,
 
     setContainerDimensions: (width: number, height: number): void => {
       set((state) => {
@@ -301,6 +309,19 @@ export const useUIStore = create<UIStore>()(
         state.goToLineDialogOpen = open;
       });
     },
+
+    setSettingsDialogOpen: (open: boolean): void => {
+      set((state) => {
+        state.settingsDialogOpen = open;
+      });
+    },
+
+    openSettings: (section?: SettingsSection): void => {
+      set((state) => {
+        state.settingsDialogSection = section ?? 'agent';
+        state.settingsDialogOpen = true;
+      });
+    },
   }))
 );
 
@@ -310,6 +331,10 @@ export const useIsLeftSidebarCollapsed = (): boolean => {
 
 export const useWorkspaceName = (): string | null => {
   return useUIStore((state) => state.workspaceName);
+};
+
+export const useWorkspacePath = (): string | null => {
+  return useUIStore((state) => state.workspacePath);
 };
 
 export const useHasWorkspace = (): boolean => {

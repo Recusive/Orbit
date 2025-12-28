@@ -41,6 +41,8 @@ const SidebarToggleIcon: FC<{ expanded: boolean }> = ({ expanded }) => (
 
 import { FileExplorer } from '@/components/layout/file-explorer';
 import { SettingsDialog } from '@/components/settings/settings-dialog';
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTauri } from '@/hooks/use-tauri';
 import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -65,7 +67,13 @@ const getCollapseTransition = (collapsed: boolean): string =>
     : `width ${TRANSITIONS.sidebar}, opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
 
 export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
-  const { toggleLeftSidebar } = useUIStore();
+  const {
+    toggleLeftSidebar,
+    settingsDialogOpen,
+    settingsDialogSection,
+    setSettingsDialogOpen,
+    openSettings,
+  } = useUIStore();
   const isCollapsed = useIsLeftSidebarCollapsed();
   const workspaceName = useWorkspaceName();
   const conversations = useConversations();
@@ -73,8 +81,6 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   const { postMessage } = useTauri();
   const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<'agent' | 'feedback'>('agent');
 
   const handleStartConversation = useCallback((): void => {
     postMessage({
@@ -112,13 +118,23 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
             className="flex items-center justify-center shrink-0 h-full"
             style={{ width: SIDEBAR.iconColumnWidth }}
           >
-            <button
-              onClick={toggleLeftSidebar}
-              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-              title="Expand sidebar"
-            >
-              <SidebarToggleIcon expanded={false} />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={toggleLeftSidebar}
+                  className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                >
+                  <SidebarToggleIcon expanded={false} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="flex items-center gap-2">
+                <span>Expand sidebar</span>
+                <KbdGroup>
+                  <Kbd className="bg-background/15 text-background border-background/25">⌘</Kbd>
+                  <Kbd className="bg-background/15 text-background border-background/25">.</Kbd>
+                </KbdGroup>
+              </TooltipContent>
+            </Tooltip>
           </div>
         ) : (
           /* Expanded: text on left, button on right */
@@ -129,13 +145,23 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
                 Preview
               </span>
             </div>
-            <button
-              onClick={toggleLeftSidebar}
-              className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-              title="Collapse sidebar"
-            >
-              <SidebarToggleIcon expanded={true} />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={toggleLeftSidebar}
+                  className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                >
+                  <SidebarToggleIcon expanded={true} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="flex items-center gap-2">
+                <span>Collapse sidebar</span>
+                <KbdGroup>
+                  <Kbd className="bg-background/15 text-background border-background/25">⌘</Kbd>
+                  <Kbd className="bg-background/15 text-background border-background/25">.</Kbd>
+                </KbdGroup>
+              </TooltipContent>
+            </Tooltip>
           </div>
         )}
       </div>
@@ -303,9 +329,9 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           label="Settings"
           collapsed={isCollapsed}
           equalSpacing={isCollapsed}
+          shortcut={['⌘', ',']}
           onClick={() => {
-            setSettingsSection('agent');
-            setSettingsOpen(true);
+            openSettings('agent');
           }}
         />
         <SidebarItem
@@ -314,17 +340,16 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           collapsed={isCollapsed}
           equalSpacing={isCollapsed}
           onClick={() => {
-            setSettingsSection('feedback');
-            setSettingsOpen(true);
+            openSettings('feedback');
           }}
         />
       </div>
 
       {/* Settings Dialog */}
       <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        defaultSection={settingsSection}
+        open={settingsDialogOpen}
+        onOpenChange={setSettingsDialogOpen}
+        defaultSection={settingsDialogSection}
       />
     </aside>
   );
@@ -337,6 +362,7 @@ interface SidebarItemProps {
   readonly active?: boolean;
   readonly small?: boolean;
   readonly equalSpacing?: boolean;
+  readonly shortcut?: string[];
   readonly onClick?: () => void;
 }
 
@@ -347,6 +373,7 @@ const SidebarItem: FC<SidebarItemProps> = ({
   active,
   small,
   equalSpacing,
+  shortcut,
   onClick,
 }) => {
   // When collapsed with equalSpacing, render a small square button like the panel toggler
@@ -389,13 +416,21 @@ const SidebarItem: FC<SidebarItemProps> = ({
       {/* Text that slides in */}
       <span
         className={cn(
-          'text-sm whitespace-nowrap overflow-hidden pr-2',
+          'text-sm whitespace-nowrap overflow-hidden',
           collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
         )}
         style={{ transition: getCollapseTransition(collapsed) }}
       >
         {label}
       </span>
+      {/* Keyboard shortcut */}
+      {shortcut && !collapsed ? (
+        <KbdGroup className="ml-auto mr-2">
+          {shortcut.map((key, index) => (
+            <Kbd key={index}>{key}</Kbd>
+          ))}
+        </KbdGroup>
+      ) : null}
     </button>
   );
 };

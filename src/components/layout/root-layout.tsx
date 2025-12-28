@@ -17,8 +17,14 @@ import { useTauri } from '@/hooks/use-tauri';
 import { useHasWorkspace, useUIStore } from '@/stores/ui-store';
 
 export const RootLayout: FC = () => {
-  const { leftSidebarWidth, rightSidebarOpen, goToLineDialogOpen, setGoToLineDialogOpen } =
-    useUIStore();
+  const {
+    leftSidebarWidth,
+    rightSidebarOpen,
+    goToLineDialogOpen,
+    setGoToLineDialogOpen,
+    toggleLeftSidebar,
+    openSettings,
+  } = useUIStore();
   const hasWorkspace = useHasWorkspace();
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
@@ -39,6 +45,10 @@ export const RootLayout: FC = () => {
     setGoToLineDialogOpen(true);
   }, [setGoToLineDialogOpen]);
 
+  const handleOpenSettings = useCallback((): void => {
+    openSettings();
+  }, [openSettings]);
+
   // Handle messages from Orbit extension (including panel:command)
   const handleExtensionMessage = useCallback((message: ExtensionMessage): void => {
     if (message.type === 'panel:command') {
@@ -58,13 +68,23 @@ export const RootLayout: FC = () => {
     window.addEventListener('openCommandPalette', handleOpenCommandPalette);
     window.addEventListener('quickOpenFile', handleQuickOpenFile);
     window.addEventListener('goToLine', handleGoToLine);
+    window.addEventListener('toggleLeftSidebar', toggleLeftSidebar);
+    window.addEventListener('openSettings', handleOpenSettings);
 
     return (): void => {
       window.removeEventListener('openCommandPalette', handleOpenCommandPalette);
       window.removeEventListener('quickOpenFile', handleQuickOpenFile);
       window.removeEventListener('goToLine', handleGoToLine);
+      window.removeEventListener('toggleLeftSidebar', toggleLeftSidebar);
+      window.removeEventListener('openSettings', handleOpenSettings);
     };
-  }, [handleOpenCommandPalette, handleQuickOpenFile, handleGoToLine]);
+  }, [
+    handleOpenCommandPalette,
+    handleQuickOpenFile,
+    handleGoToLine,
+    toggleLeftSidebar,
+    handleOpenSettings,
+  ]);
 
   // Show welcome page when no workspace is open
   if (!hasWorkspace) {

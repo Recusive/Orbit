@@ -139,11 +139,27 @@ export const defaultShortcuts: KeyboardShortcut[] = [
     },
   },
   {
+    key: ',',
+    cmd: true,
+    description: 'Open settings',
+    handler: (): void => {
+      window.dispatchEvent(new CustomEvent('openSettings'));
+    },
+  },
+  {
     key: '/',
     cmd: true,
     description: 'Toggle sidebar',
     handler: (): void => {
-      window.dispatchEvent(new CustomEvent('toggleSidebar'));
+      window.dispatchEvent(new CustomEvent('toggleLeftSidebar'));
+    },
+  },
+  {
+    key: '.',
+    cmd: true,
+    description: 'Toggle left sidebar',
+    handler: (): void => {
+      window.dispatchEvent(new CustomEvent('toggleLeftSidebar'));
     },
   },
   {

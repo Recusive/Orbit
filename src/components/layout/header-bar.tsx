@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { FC } from 'react';
 
-import { HeaderButton } from '@/components/shared/header-button';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useUIStore, useWorkspaceName, useTerminalPosition } from '@/stores/ui-store';
 
@@ -163,67 +163,97 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
 
         <div className="flex items-center gap-1">
           {/* Theme Toggle */}
-          <button
-            data-tauri-drag-region={false}
-            onClick={toggleTheme}
-            className="h-7 w-7 flex items-center justify-center rounded opacity-70 hover:opacity-100 hover:bg-accent transition-colors"
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-          <HeaderButton icon={SquareTerminal} title="Terminal" onClick={handleTerminalToggle} />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                data-tauri-drag-region={false}
+                onClick={toggleTheme}
+                className="h-7 w-7 flex items-center justify-center rounded opacity-70 hover:opacity-100 hover:bg-accent transition-colors"
+              >
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</TooltipContent>
+          </Tooltip>
+
+          {/* Terminal Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                data-tauri-drag-region={false}
+                onClick={handleTerminalToggle}
+                className={cn(
+                  'h-7 w-7 flex items-center justify-center rounded transition-colors',
+                  bottomPanelOpen
+                    ? 'bg-accent text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                )}
+              >
+                <SquareTerminal className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Terminal</TooltipContent>
+          </Tooltip>
 
           {/* Activity Button */}
-          <button
-            data-tauri-drag-region={false}
-            onClick={toggleReviewPanel}
-            className={cn(
-              'h-7 w-7 flex items-center justify-center rounded transition-colors',
-              reviewPanelOpen
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-            )}
-            title="Activity"
-          >
-            <div className="rotate-180">
-              <svg
-                aria-hidden="true"
-                width="18"
-                height="18"
-                viewBox="1 1 22 22"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                data-tauri-drag-region={false}
+                onClick={toggleReviewPanel}
+                className={cn(
+                  'h-7 w-7 flex items-center justify-center rounded transition-colors',
+                  reviewPanelOpen
+                    ? 'bg-accent text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                )}
               >
-                <path
-                  d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
-                  fill="currentColor"
-                />
-                <rect
-                  x="7"
-                  y="7"
-                  width={reviewPanelOpen ? 5 : 2}
-                  height="10"
-                  rx="1"
-                  fill="currentColor"
-                />
-              </svg>
-            </div>
-          </button>
+                <div className="rotate-180">
+                  <svg
+                    aria-hidden="true"
+                    width="16"
+                    height="16"
+                    viewBox="1 1 22 22"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
+                      fill="currentColor"
+                    />
+                    <rect
+                      x="7"
+                      y="7"
+                      width={reviewPanelOpen ? 5 : 2}
+                      height="10"
+                      rx="1"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Editor</TooltipContent>
+          </Tooltip>
 
           {/* Right Sidebar Button */}
-          <button
-            data-tauri-drag-region={false}
-            onClick={toggleRightSidebar}
-            className={cn(
-              'h-7 w-7 flex items-center justify-center rounded transition-colors',
-              rightSidebarOpen
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-            )}
-            title={rightSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-          >
-            <IconCodeInsert size={18} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                data-tauri-drag-region={false}
+                onClick={toggleRightSidebar}
+                className={cn(
+                  'h-7 w-7 flex items-center justify-center rounded transition-colors',
+                  rightSidebarOpen
+                    ? 'bg-accent text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                )}
+              >
+                <IconCodeInsert size={16} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{rightSidebarOpen ? 'Hide sessions' : 'Show sessions'}</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </header>

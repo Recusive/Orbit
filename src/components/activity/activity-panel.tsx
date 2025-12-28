@@ -312,7 +312,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
             ) : null}
 
             {/* Inline file tabs */}
-            <div className="flex items-center overflow-x-auto scrollbar-thin flex-1 min-w-0">
+            <div className="flex items-center overflow-x-auto scrollbar-hide flex-1 min-w-0">
               {openTabs.map((tab) => (
                 <InlineFileTab
                   key={tab.path}
