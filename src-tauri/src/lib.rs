@@ -109,6 +109,58 @@ fn build_log_plugin() -> tauri_plugin_log::Builder {
     builder.targets(targets)
 }
 
+/// Resolve the path to the agent-bridge sidecar binary.
+///
+/// In development, the binary is at `src-tauri/binaries/agent-bridge-{target}`.
+/// In production, the binary is bundled next to the app executable.
+fn resolve_sidecar_path() -> PathBuf {
+    let target_triple = if cfg!(target_os = "macos") {
+        if cfg!(target_arch = "aarch64") {
+            "aarch64-apple-darwin"
+        } else {
+            "x86_64-apple-darwin"
+        }
+    } else if cfg!(target_os = "windows") {
+        if cfg!(target_arch = "aarch64") {
+            "aarch64-pc-windows-msvc"
+        } else {
+            "x86_64-pc-windows-msvc"
+        }
+    } else {
+        // Linux
+        if cfg!(target_arch = "aarch64") {
+            "aarch64-unknown-linux-gnu"
+        } else {
+            "x86_64-unknown-linux-gnu"
+        }
+    };
+
+    let binary_name = format!("agent-bridge-{target_triple}");
+
+    // Try to find the binary relative to the executable (production)
+    if let Ok(exe_path) = env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            // On macOS, Tauri bundles without target triple suffix
+            // Check for "agent-bridge" first (Tauri bundle naming)
+            let prod_path_simple = exe_dir.join("agent-bridge");
+            if prod_path_simple.exists() {
+                return prod_path_simple;
+            }
+
+            // Also check with target triple (manual builds)
+            let prod_path = exe_dir.join(&binary_name);
+            if prod_path.exists() {
+                return prod_path;
+            }
+        }
+    }
+
+    // Fall back to development path (src-tauri/binaries/)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("binaries")
+        .join(&binary_name)
+}
+
 /// Run the Tauri application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 #[expect(
@@ -137,12 +189,11 @@ pub fn run() {
     }
 
     // Initialize agent session manager
-    // The sidecar path will be resolved relative to the app bundle in production
-    // For development, it uses the local agent-bridge directory
-    let sidecar_path = env::current_dir().map_or_else(
-        |_| PathBuf::from("agent-bridge/dist/index.js"),
-        |p| p.join("../agent-bridge/dist/index.js"),
-    );
+    // The sidecar path is resolved based on environment:
+    // - Production: bundled next to the executable
+    // - Development: in src-tauri/binaries/
+    let sidecar_path = resolve_sidecar_path();
+    log::info!("Agent bridge sidecar path: {}", sidecar_path.display());
     let session_manager = Arc::new(agent::SessionManager::new(sidecar_path));
 
     // Clone for .manage() before moving into .setup()

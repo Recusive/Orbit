@@ -4,6 +4,30 @@
  * Bridges Rust/Tauri backend with Claude Agent SDK via stdin/stdout JSON IPC
  */
 
+// Ensure common binary paths are in PATH (important for production apps launched from Finder)
+const homeDir = process.env.HOME ?? '';
+const commonPaths = [
+  '/opt/homebrew/bin', // macOS Homebrew (Apple Silicon)
+  '/usr/local/bin', // macOS Homebrew (Intel) / Linux
+  '/usr/bin',
+  '/bin',
+  ...(homeDir !== ''
+    ? [
+        `${homeDir}/.local/bin`, // User local
+        `${homeDir}/.npm-global/bin`, // npm global
+        `${homeDir}/.bun/bin`, // Bun
+      ]
+    : []),
+];
+const currentPath = process.env.PATH ?? '';
+const pathSet = new Set(currentPath.split(':'));
+for (const p of commonPaths) {
+  if (!pathSet.has(p)) {
+    pathSet.add(p);
+  }
+}
+process.env.PATH = Array.from(pathSet).join(':');
+
 import * as readline from 'readline';
 
 import {

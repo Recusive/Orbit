@@ -4,6 +4,7 @@
 
 use std::fmt;
 use std::io::{BufRead as _, BufReader, Write as _};
+use std::path::Path;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::result;
 use std::sync::Arc;
@@ -84,21 +85,31 @@ impl AgentBridge {
     /// # Errors
     ///
     /// Returns an error if the sidecar cannot be spawned or doesn't become ready.
-    pub fn spawn(&mut self, node_script_path: &str) -> Result<()> {
+    pub fn spawn(&mut self, sidecar_path: &str) -> Result<()> {
         if self.child.is_some() {
             return Ok(()); // Already running
         }
 
-        log::info!("Spawning agent bridge sidecar: {node_script_path}");
+        log::info!("Spawning agent bridge sidecar: {sidecar_path}");
 
-        // Spawn the Node.js process
-        let mut child = Command::new("node")
-            .arg(node_script_path)
+        // Derive claude binary path from sidecar path (same directory)
+        let sidecar_dir = Path::new(sidecar_path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let claude_path = format!("{sidecar_dir}/claude");
+
+        log::info!("Claude CLI path: {claude_path}");
+
+        // Spawn the compiled sidecar binary directly
+        // Pass CLAUDE_CLI_PATH env var so the sidecar can find the bundled claude binary
+        let mut child = Command::new(sidecar_path)
+            .env("CLAUDE_CLI_PATH", &claude_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit()) // Let stderr go to parent's stderr for debugging
             .spawn()
-            .map_err(|e| BridgeError::SpawnError(e.to_string()))?;
+            .map_err(|e| BridgeError::SpawnError(format!("{e} (path: {sidecar_path})")))?;
 
         // Take ownership of stdin
         let stdin = child

@@ -2,6 +2,8 @@
  * Claude Agent SDK integration for Snowflake (TypeScript).
  */
 
+import { existsSync } from 'fs';
+
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
 import { ClaudeCredentials } from './credentials.js';
@@ -335,11 +337,37 @@ export class OrbitAgent {
     return this.permissionManager;
   }
 
+  /**
+   * Find the Claude Code executable path.
+   * Priority:
+   * 1. Bundled Claude CLI (production - same dir as agent-bridge)
+   * 2. SDK's built-in executable (development)
+   * 3. System-installed Claude CLI (fallback)
+   */
+  private _findClaudeExecutable(): string | undefined {
+    // Check if CLAUDE_CLI_PATH env var is set (passed by Tauri when spawning sidecar)
+    const envClaudePath = process.env.CLAUDE_CLI_PATH;
+    if (envClaudePath !== undefined && envClaudePath !== '') {
+      if (existsSync(envClaudePath)) {
+        logger.info({ path: envClaudePath }, 'Found Claude CLI from CLAUDE_CLI_PATH env var');
+        return envClaudePath;
+      }
+      logger.warn({ path: envClaudePath }, 'CLAUDE_CLI_PATH set but file not found');
+    }
+
+    // No env var means we're likely in development mode
+    // Let SDK use its built-in executable
+    logger.info('No CLAUDE_CLI_PATH env var - SDK will use built-in executable');
+    return undefined;
+  }
+
   private _createOptions(): Options {
     /**
      * Create Claude agent options with full Claude Code capabilities.
      */
     const options: Options = {
+      // Explicitly set Claude Code CLI path for bundled environments (Bun compile)
+      pathToClaudeCodeExecutable: this._findClaudeExecutable(),
       // Use Claude Code's official system prompt with browser automation docs
       systemPrompt: {
         type: 'preset' as const,

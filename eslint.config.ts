@@ -1,13 +1,17 @@
 import eslint from '@eslint/js';
-import tseslint from 'typescript-eslint';
+import { defineConfig } from 'eslint/config';
+import importPlugin from 'eslint-plugin-import-x';
 import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
-import importPlugin from 'eslint-plugin-import-x';
+import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+export default defineConfig(
+  {
+    ignores: ['dist/', 'node_modules/', '*.config.js', '*.config.mjs', '**/scripts/'],
+  },
   eslint.configs.recommended,
-  ...tseslint.configs.strictTypeChecked,
-  ...tseslint.configs.stylisticTypeChecked,
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
   {
     languageOptions: {
       parserOptions: {
@@ -81,8 +85,5 @@ export default tseslint.config(
       'no-console': ['error', { allow: ['warn', 'error'] }],
       eqeqeq: ['error', 'always'],
     },
-  },
-  {
-    ignores: ['dist/', 'node_modules/', '*.config.js', '*.config.mjs'],
   }
 );
