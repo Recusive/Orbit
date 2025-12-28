@@ -2,65 +2,161 @@
 /**
  * Build script for Claude CLI binary
  *
- * This script patches the Claude Code CLI to embed yoga.wasm as base64,
- * then compiles it with Bun to create a standalone binary.
+ * Downloads the official Claude Code binary from Anthropic's distribution.
+ * This is more robust than patching the source code ourselves.
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { execSync } from 'child_process';
+import { createHash } from 'crypto';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, chmodSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { get as httpsGet } from 'https';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const agentBridgeDir = dirname(__dirname);
 const binariesDir = join(agentBridgeDir, '..', 'src-tauri', 'binaries');
 
-// Ensure binaries directory exists
-mkdirSync(binariesDir, { recursive: true });
+// Base URL for Claude Code distribution
+const DIST_BASE = 'https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases';
 
-console.log('📦 Building Claude CLI binary with embedded yoga.wasm...');
+// Platform mappings
+const PLATFORMS = {
+  'darwin-arm64': 'aarch64-apple-darwin',
+  'darwin-x64': 'x86_64-apple-darwin',
+  'linux-arm64': 'aarch64-unknown-linux-gnu',
+  'linux-x64': 'x86_64-unknown-linux-gnu',
+};
 
-// Read the original CLI
-const cliPath = join(agentBridgeDir, 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js');
-const wasmPath = join(agentBridgeDir, 'node_modules', '@anthropic-ai', 'claude-code', 'yoga.wasm');
-
-console.log('  Reading CLI source...');
-const cli = readFileSync(cliPath, 'utf8');
-
-// Read yoga.wasm and convert to base64
-console.log('  Embedding yoga.wasm as base64...');
-const wasmBuffer = readFileSync(wasmPath);
-const wasmBase64 = wasmBuffer.toString('base64');
-
-// Replace the yoga.wasm loading pattern
-// Original: await idQ(ndQ(import.meta.url).resolve("./yoga.wasm"))
-// New: Buffer.from("base64data","base64")
-const patched = cli.replace(
-  'await idQ(ndQ(import.meta.url).resolve("./yoga.wasm"))',
-  `Buffer.from("${wasmBase64}","base64")`
-);
-
-if (patched === cli) {
-  console.error('❌ Failed to patch yoga.wasm loading - pattern not found');
-  process.exit(1);
-}
-
-// Write patched file to temp location
-const patchedPath = '/tmp/claude-cli-patched.js';
-writeFileSync(patchedPath, patched);
-console.log(`  Patched CLI size: ${patched.length} bytes (was ${cli.length})`);
-
-// Compile with Bun
-const outputPath = join(binariesDir, 'claude-aarch64-apple-darwin');
-console.log('  Compiling with Bun...');
-
-try {
-  execSync(`bun build --compile --minify --target=bun-darwin-arm64 ${patchedPath} --outfile ${outputPath}`, {
-    stdio: 'inherit',
-    cwd: agentBridgeDir
+/**
+ * Fetch text content from a URL
+ */
+function fetchText(url) {
+  return new Promise((resolve, reject) => {
+    httpsGet(url, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        return fetchText(res.headers.location).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+        return;
+      }
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => resolve(data));
+      res.on('error', reject);
+    }).on('error', reject);
   });
-  console.log('✅ Claude CLI binary built successfully');
-} catch (error) {
-  console.error('❌ Failed to compile Claude CLI:', error.message);
-  process.exit(1);
 }
+
+/**
+ * Download a file to disk
+ */
+function downloadFile(url, dest) {
+  return new Promise((resolve, reject) => {
+    const file = createWriteStream(dest);
+    httpsGet(url, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        file.close();
+        return downloadFile(res.headers.location, dest).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        file.close();
+        reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+        return;
+      }
+      res.pipe(file);
+      file.on('finish', () => {
+        file.close();
+        resolve();
+      });
+      res.on('error', (err) => {
+        file.close();
+        reject(err);
+      });
+    }).on('error', (err) => {
+      file.close();
+      reject(err);
+    });
+  });
+}
+
+/**
+ * Calculate SHA256 hash of a file
+ */
+function sha256File(filePath) {
+  const content = readFileSync(filePath);
+  return createHash('sha256').update(content).digest('hex');
+}
+
+/**
+ * Download Claude CLI for a specific platform
+ */
+async function downloadClaudeCli(platform, version, manifest) {
+  const tauriTriple = PLATFORMS[platform];
+  if (!tauriTriple) {
+    throw new Error(`Unknown platform: ${platform}`);
+  }
+
+  const outputPath = join(binariesDir, `claude-${tauriTriple}`);
+
+  // Check if already downloaded with correct checksum
+  const expectedHash = manifest.platforms[platform]?.checksum;
+  if (existsSync(outputPath) && expectedHash) {
+    const actualHash = sha256File(outputPath);
+    if (actualHash === expectedHash) {
+      console.log(`  ✓ ${platform} already up-to-date`);
+      return;
+    }
+  }
+
+  console.log(`  Downloading ${platform}...`);
+
+  const url = `${DIST_BASE}/${version}/${platform}/claude`;
+  await downloadFile(url, outputPath);
+
+  // Verify checksum
+  if (expectedHash) {
+    const actualHash = sha256File(outputPath);
+    if (actualHash !== expectedHash) {
+      throw new Error(`Checksum mismatch for ${platform}: expected ${expectedHash}, got ${actualHash}`);
+    }
+    console.log(`  ✓ ${platform} checksum verified`);
+  }
+
+  // Make executable
+  chmodSync(outputPath, 0o755);
+}
+
+async function main() {
+  console.log('📦 Downloading official Claude CLI binaries...\n');
+
+  // Ensure binaries directory exists
+  mkdirSync(binariesDir, { recursive: true });
+
+  // Get latest stable version
+  console.log('  Fetching latest version...');
+  const version = (await fetchText(`${DIST_BASE}/stable`)).trim();
+  console.log(`  Latest version: ${version}\n`);
+
+  // Get manifest with checksums
+  console.log('  Fetching manifest...');
+  const manifestText = await fetchText(`${DIST_BASE}/${version}/manifest.json`);
+  const manifest = JSON.parse(manifestText);
+  console.log('');
+
+  // Determine which platform to download
+  const currentPlatform = `${process.platform === 'darwin' ? 'darwin' : 'linux'}-${process.arch === 'arm64' ? 'arm64' : 'x64'}`;
+
+  // For now, just download the current platform
+  // TODO: Add cross-platform support if needed
+  await downloadClaudeCli(currentPlatform, version, manifest);
+
+  console.log('\n✅ Claude CLI binary downloaded successfully');
+  console.log(`   Version: ${version}`);
+  console.log(`   Location: ${binariesDir}`);
+}
+
+main().catch((error) => {
+  console.error('❌ Failed to download Claude CLI:', error.message);
+  process.exit(1);
+});
