@@ -293,56 +293,303 @@ html.dark {
 
 /* Streamdown overrides */
 [data-streamdown="code-block-header"] {
-  padding: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  background-color: var(--muted);
+  border-bottom: 1px solid oklch(0 0 0 / 6%);
+}
+
+html.dark [data-streamdown="code-block-header"] {
+  border-bottom: 1px solid oklch(1 0 0 / 8%);
 }
 
 [data-streamdown="code-block-download-button"] {
   display: none;
 }
 
-/* Table styling - rounded like code blocks */
-.prose table {
-  border-collapse: separate;
-  border-spacing: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+[data-streamdown="code-block-container"] {
+  border-radius: 0.75rem;
   overflow: hidden;
-  width: 100%;
-  margin: 1rem 0;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid oklch(0 0 0 / 6%);
 }
 
-.prose thead {
+html.dark [data-streamdown="code-block-container"] {
+  border: 1px solid oklch(1 0 0 / 8%);
+}
+
+/* ============================================
+   Chat Typography & Layout System
+   Compact shadcn/ui inspired patterns
+   ============================================ */
+
+/* Base markdown container */
+.chat-markdown {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--foreground);
+}
+
+/* Headings - compact scale */
+.chat-markdown h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: var(--foreground);
+}
+
+.chat-markdown h1:not(:first-child) {
+  margin-top: 1.25rem;
+}
+
+.chat-markdown h2 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+  margin-top: 1.25rem;
+  margin-bottom: 0.375rem;
+  color: var(--foreground);
+}
+
+.chat-markdown h2:first-child {
+  margin-top: 0;
+}
+
+.chat-markdown h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+  color: var(--foreground);
+}
+
+.chat-markdown h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 0.875rem;
+  margin-bottom: 0.25rem;
+  color: var(--foreground);
+}
+
+.chat-markdown h5,
+.chat-markdown h6 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 0.75rem;
+  margin-bottom: 0.125rem;
+  color: var(--foreground);
+}
+
+/* First element in content - reduce top margin */
+.chat-markdown > *:first-child,
+.chat-markdown > div > *:first-child {
+  margin-top: 0;
+}
+
+/* Paragraphs */
+.chat-markdown p {
+  line-height: 1.6;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.chat-markdown p:not(:first-child) {
+  margin-top: 0.75rem;
+}
+
+/* Lists - compact spacing */
+.chat-markdown ul {
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  margin-left: 1.25rem;
+  padding-left: 0;
+  list-style-type: disc;
+  list-style-position: outside;
+}
+
+.chat-markdown ol {
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  margin-left: 1.25rem;
+  padding-left: 0;
+  list-style-type: decimal;
+  list-style-position: outside;
+}
+
+.chat-markdown li {
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+  padding-left: 0;
+  line-height: 1.6;
+}
+
+.chat-markdown li::marker {
+  color: var(--muted-foreground);
+}
+
+/* Nested lists */
+.chat-markdown ul ul,
+.chat-markdown ol ol,
+.chat-markdown ul ol,
+.chat-markdown ol ul {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Inline code */
+.chat-markdown code:not(pre code) {
+  position: relative;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  background-color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* Code blocks */
+.chat-markdown pre {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.chat-markdown pre code {
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* Links */
+.chat-markdown a {
+  color: var(--primary);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 150ms ease;
+}
+
+.chat-markdown a:hover {
+  opacity: 0.8;
+}
+
+.chat-markdown a:focus {
+  outline: none;
+}
+
+/* Blockquotes */
+.chat-markdown blockquote {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--border);
+  font-style: italic;
+  color: var(--foreground);
+}
+
+.chat-markdown blockquote p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Strong/Bold */
+.chat-markdown strong {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* Horizontal rules */
+.chat-markdown hr {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  border: none;
+  height: 1px;
+  background-color: var(--border);
+}
+
+/* Remove margins on last elements */
+.chat-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Tool widget spacing within chat */
+.chat-markdown + .tool-widget,
+.tool-widget + .chat-markdown {
+  margin-top: 0.75rem;
+}
+
+.tool-widget + .tool-widget {
+  margin-top: 0.375rem;
+}
+
+/* Table styling - compact */
+.chat-markdown table,
+.prose table {
+  width: 100%;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  overflow-y: auto;
+}
+
+.chat-markdown tr,
+.prose tr {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.chat-markdown tr:nth-child(even),
+.prose tr:nth-child(even) {
   background-color: var(--muted);
 }
 
-.prose th,
+.chat-markdown th,
+.prose th {
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--border);
+  text-align: left;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.chat-markdown th[align="center"],
+.prose th[align="center"] {
+  text-align: center;
+}
+
+.chat-markdown th[align="right"],
+.prose th[align="right"] {
+  text-align: right;
+}
+
+.chat-markdown td,
 .prose td {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--border);
   text-align: left;
 }
 
-.prose th:last-child,
-.prose td:last-child {
-  border-right: none;
+.chat-markdown td[align="center"],
+.prose td[align="center"] {
+  text-align: center;
 }
 
-.prose tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.prose th {
-  font-weight: 600;
-  font-size: 0.875rem;
-}
-
-.prose td {
-  font-size: 0.875rem;
-}
-
-.prose tbody tr:hover {
-  background-color: var(--accent);
+.chat-markdown td[align="right"],
+.prose td[align="right"] {
+  text-align: right;
 }
 
 @layer base {

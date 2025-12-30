@@ -30,35 +30,30 @@ export const MessageActions: FC<MessageActionsProps> = ({
     }, 2000);
   };
 
+  const iconButtonClasses =
+    'h-6 w-6 flex items-center justify-center rounded-md bg-transparent text-muted-foreground/70 transition-all duration-150 hover:bg-muted/50 hover:text-foreground hover:scale-[1.08] active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50';
+
   return (
     <div className="mt-3 flex flex-col gap-2 items-end">
       <div className="flex items-center gap-1">
         <button
-          className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+          className={iconButtonClasses}
           title={copied ? 'Copied!' : 'Copy'}
           onClick={handleCopy}
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
-        <button
-          className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-          title="Like"
-          onClick={onLike}
-        >
+        <button className={iconButtonClasses} title="Like" onClick={onLike}>
           <ThumbsUp className="h-3.5 w-3.5" />
         </button>
-        <button
-          className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-          title="Dislike"
-          onClick={onDislike}
-        >
+        <button className={iconButtonClasses} title="Dislike" onClick={onDislike}>
           <ThumbsDown className="h-3.5 w-3.5" />
         </button>
         <button
-          className={`h-6 px-2 flex items-center rounded border border-border transition-colors text-xs ${
+          className={`h-6 px-2.5 flex items-center rounded-md text-[11px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50 ${
             rewindDisabled
-              ? 'opacity-40 cursor-not-allowed text-muted-foreground'
-              : 'hover:bg-accent text-muted-foreground hover:text-foreground'
+              ? 'bg-muted/30 text-muted-foreground/50 cursor-not-allowed'
+              : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground hover:scale-[1.02] active:scale-[0.98]'
           }`}
           title={rewindDisabled ? 'Cannot rewind last message' : 'Rewind'}
           onClick={rewindDisabled ? undefined : onRewind}
@@ -68,7 +63,7 @@ export const MessageActions: FC<MessageActionsProps> = ({
         </button>
       </div>
       {showDisclaimer ? (
-        <p className="text-xs text-muted-foreground/70">
+        <p className="text-[11px] text-muted-foreground/60">
           Orbit is AI and can make mistakes. Please double-check responses.
         </p>
       ) : null}

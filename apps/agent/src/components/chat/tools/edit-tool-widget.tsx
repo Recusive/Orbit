@@ -10,7 +10,6 @@ interface EditToolWidgetProps {
   readonly oldString: string;
   readonly newString: string;
   readonly isRunning?: boolean;
-  readonly success?: boolean | undefined;
   readonly onOpenFile?: (path: string) => void;
 }
 
@@ -90,113 +89,121 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   };
 
   return (
-    <div className="my-2 rounded-lg border border-border bg-card overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
-        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-accent/50 transition-colors"
-      >
-        {/* File icon */}
-        <FilePen
-          className={cn(
-            'h-4 w-4 shrink-0',
-            isRunning ? 'text-muted-foreground animate-pulse' : 'text-warning'
-          )}
-        />
-
-        {/* File info */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span
-            className="text-sm font-medium text-foreground hover:underline truncate cursor-pointer"
-            onClick={handleFileClick}
-            title={filePath}
-          >
-            {fileName}
-          </span>
-          <span className="text-xs text-muted-foreground shrink-0">(modified)</span>
-        </div>
-
-        {/* Status - Diff stat or loading */}
-        <div className="flex items-center gap-2 shrink-0">
-          {isRunning ? (
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span className="text-xs">Editing...</span>
-            </div>
-          ) : (
-            <DiffStat additions={additions} deletions={deletions} />
-          )}
-          <ChevronDown
-            className={cn(
-              'h-4 w-4 text-muted-foreground transition-transform',
-              isExpanded && 'rotate-180'
-            )}
-          />
-        </div>
-      </button>
-
-      {/* Diff preview */}
+    <div>
       <div
         className={cn(
-          'border-t border-border overflow-hidden transition-all',
-          isExpanded ? 'max-h-[500px]' : 'max-h-[250px]'
+          'rounded-xl bg-card overflow-hidden transition-all duration-200',
+          isExpanded
+            ? 'shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
+            : 'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
         )}
       >
-        <div className="overflow-auto">
-          {/* Deleted lines (old) */}
-          {displayOldLines.map((line, index) => (
-            <div
-              key={`old-${String(index)}`}
-              className="flex font-mono text-xs leading-5 bg-destructive/10"
-            >
-              {/* Gutter */}
-              <div className="w-1 bg-destructive shrink-0" />
-              {/* Line indicator */}
-              <div className="w-6 px-1 text-center text-destructive/70 select-none shrink-0">-</div>
-              {/* Content */}
-              <div className="flex-1 px-3 text-foreground/70 whitespace-pre overflow-x-auto">
-                {line || ' '}
-              </div>
-            </div>
-          ))}
+        {/* Header */}
+        <button
+          onClick={() => {
+            setIsExpanded(!isExpanded);
+          }}
+          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-muted/40 transition-colors duration-150"
+        >
+          {/* Icon container */}
+          <div className="w-6 h-6 rounded-md flex items-center justify-center bg-warning/10">
+            <FilePen className={cn('h-3.5 w-3.5 text-warning/70', isRunning && 'animate-pulse')} />
+          </div>
 
-          {/* Separator */}
-          {displayOldLines.length > 0 && displayNewLines.length > 0 ? (
-            <div className="h-px bg-border" />
+          {/* File info */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span
+              className="text-[13px] font-medium text-foreground hover:underline truncate cursor-pointer"
+              onClick={handleFileClick}
+              title={filePath}
+            >
+              {fileName}
+            </span>
+            <span className="text-xs text-muted-foreground/60 shrink-0">(modified)</span>
+          </div>
+
+          {/* Status - Diff stat or loading */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            {isRunning ? (
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span className="text-xs">Editing...</span>
+              </div>
+            ) : (
+              <DiffStat additions={additions} deletions={deletions} />
+            )}
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200',
+                isExpanded && 'rotate-180'
+              )}
+            />
+          </div>
+        </button>
+
+        {/* Diff preview */}
+        <div
+          className={cn(
+            'overflow-hidden transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
+            isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-[250px] opacity-100'
+          )}
+        >
+          <div className="overflow-auto">
+            {/* Deleted lines (old) */}
+            {displayOldLines.map((line, index) => (
+              <div
+                key={`old-${String(index)}`}
+                className="flex font-mono text-xs leading-5 bg-destructive/10"
+              >
+                {/* Gutter */}
+                <div className="w-1 bg-destructive shrink-0" />
+                {/* Line indicator */}
+                <div className="w-6 px-1 text-center text-destructive/70 select-none shrink-0">
+                  -
+                </div>
+                {/* Content */}
+                <div className="flex-1 px-3 text-foreground/70 whitespace-pre overflow-x-auto">
+                  {line || ' '}
+                </div>
+              </div>
+            ))}
+
+            {/* Separator */}
+            {displayOldLines.length > 0 && displayNewLines.length > 0 ? (
+              <div className="h-px bg-border/50" />
+            ) : null}
+
+            {/* Added lines (new) */}
+            {displayNewLines.map((line, index) => (
+              <div
+                key={`new-${String(index)}`}
+                className="flex font-mono text-xs leading-5 bg-success/10"
+              >
+                {/* Gutter */}
+                <div className="w-1 bg-success shrink-0" />
+                {/* Line indicator */}
+                <div className="w-6 px-1 text-center text-success/70 select-none shrink-0">+</div>
+                {/* Content */}
+                <div className="flex-1 px-3 text-foreground whitespace-pre overflow-x-auto">
+                  {line || ' '}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Expand bar */}
+          {hasMore && !isExpanded ? (
+            <button
+              onClick={() => {
+                setIsExpanded(true);
+              }}
+              className="w-full py-1.5 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-1"
+            >
+              <ChevronDown className="h-3 w-3" />
+              <span>Show all changes</span>
+            </button>
           ) : null}
-
-          {/* Added lines (new) */}
-          {displayNewLines.map((line, index) => (
-            <div
-              key={`new-${String(index)}`}
-              className="flex font-mono text-xs leading-5 bg-success/10"
-            >
-              {/* Gutter */}
-              <div className="w-1 bg-success shrink-0" />
-              {/* Line indicator */}
-              <div className="w-6 px-1 text-center text-success/70 select-none shrink-0">+</div>
-              {/* Content */}
-              <div className="flex-1 px-3 text-foreground whitespace-pre overflow-x-auto">
-                {line || ' '}
-              </div>
-            </div>
-          ))}
         </div>
-
-        {/* Expand bar */}
-        {hasMore && !isExpanded ? (
-          <button
-            onClick={() => {
-              setIsExpanded(true);
-            }}
-            className="w-full py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors border-t border-border flex items-center justify-center gap-1"
-          >
-            <ChevronDown className="h-3 w-3" />
-            <span>Show all changes</span>
-          </button>
-        ) : null}
       </div>
     </div>
   );

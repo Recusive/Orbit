@@ -450,14 +450,18 @@ export const ChatInput: FC<ChatInputProps> = ({
   }, [inputMode, onModeChange]);
 
   const getInputBoxClasses = (): string => {
-    const base = 'mx-auto p-1 rounded-lg bg-muted transition-colors';
+    const base = cn(
+      'mx-auto p-1 rounded-[14px] bg-card border transition-all duration-200',
+      'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),0_4px_12px_-4px_rgba(0,0,0,0.05)]',
+      'focus-within:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.12),0_8px_24px_-8px_rgba(0,0,0,0.08)]'
+    );
     switch (inputMode) {
       case 'plan':
         return `${base} border-2 border-dotted border-mode-plan`;
       case 'accept':
         return `${base} border-2 border-dotted border-mode-accept`;
       case 'default':
-        return `${base} border border-border focus-within:border-muted-foreground/30 dark:focus-within:border-muted-foreground/50`;
+        return `${base} border-transparent focus-within:border-border/40`;
     }
   };
 
@@ -489,6 +493,19 @@ export const ChatInput: FC<ChatInputProps> = ({
           data-empty={isInputEmpty}
           onInput={handleInputChange}
           onKeyDown={handleKeyDown}
+          onPaste={(e) => {
+            e.preventDefault();
+            const text = e.clipboardData.getData('text/plain');
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+              const range = selection.getRangeAt(0);
+              range.deleteContents();
+              range.insertNode(document.createTextNode(text));
+              range.collapse(false);
+              selection.removeAllRanges();
+              selection.addRange(range);
+            }
+          }}
         />
 
         {/* Mention Popover */}
@@ -525,13 +542,17 @@ export const ChatInput: FC<ChatInputProps> = ({
                 <button
                   onClick={cycleInputMode}
                   className={cn(
-                    'h-7 px-2 flex items-center gap-1.5 rounded hover:bg-accent transition-colors',
-                    inputMode === 'default' && 'border border-border opacity-70 hover:opacity-100',
-                    inputMode === 'plan' && 'text-mode-plan',
-                    inputMode === 'accept' && 'text-mode-accept'
+                    'h-7 px-2.5 flex items-center gap-1.5 rounded-lg transition-all duration-150',
+                    'hover:scale-[1.02] active:scale-[0.98]',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
+                    inputMode === 'default' &&
+                      'bg-muted/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                    inputMode === 'plan' && 'bg-mode-plan/10 text-mode-plan hover:bg-mode-plan/20',
+                    inputMode === 'accept' &&
+                      'bg-mode-accept/10 text-mode-accept hover:bg-mode-accept/20'
                   )}
                 >
-                  <span className="text-xs font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
+                  <span className="text-[11px] font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent>Input mode</TooltipContent>
@@ -546,7 +567,14 @@ export const ChatInput: FC<ChatInputProps> = ({
               <TooltipTrigger asChild>
                 <button
                   onClick={handleAtClick}
-                  className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
+                  className={cn(
+                    'h-7 w-7 flex items-center justify-center rounded-lg',
+                    'bg-transparent text-muted-foreground/70',
+                    'transition-all duration-150',
+                    'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
+                    'active:scale-95',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+                  )}
                 >
                   <AtSign className="h-4 w-4" />
                 </button>
@@ -559,11 +587,15 @@ export const ChatInput: FC<ChatInputProps> = ({
                   <DropdownMenuTrigger asChild>
                     <button
                       className={cn(
-                        'h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors',
-                        thinkingMode === 'off' && 'opacity-70 hover:opacity-100',
-                        thinkingMode === 'think' && 'opacity-100 text-mode-think',
-                        thinkingMode === 'hard' && 'opacity-100 text-orange-500',
-                        thinkingMode === 'ultra' && 'opacity-100 text-red-500'
+                        'h-7 w-7 flex items-center justify-center rounded-lg',
+                        'transition-all duration-150',
+                        'hover:bg-muted/50 hover:scale-[1.08]',
+                        'active:scale-95',
+                        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
+                        thinkingMode === 'off' && 'text-muted-foreground/70 hover:text-foreground',
+                        thinkingMode === 'think' && 'text-mode-think',
+                        thinkingMode === 'hard' && 'text-orange-500',
+                        thinkingMode === 'ultra' && 'text-red-500'
                       )}
                     >
                       <Lightbulb
@@ -631,7 +663,16 @@ export const ChatInput: FC<ChatInputProps> = ({
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors">
+                <button
+                  className={cn(
+                    'h-7 w-7 flex items-center justify-center rounded-lg',
+                    'bg-transparent text-muted-foreground/70',
+                    'transition-all duration-150',
+                    'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
+                    'active:scale-95',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+                  )}
+                >
                   <Globe className="h-4 w-4" />
                 </button>
               </TooltipTrigger>
@@ -641,7 +682,14 @@ export const ChatInput: FC<ChatInputProps> = ({
               <TooltipTrigger asChild>
                 <button
                   onClick={handleImageClick}
-                  className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100 transition-colors"
+                  className={cn(
+                    'h-7 w-7 flex items-center justify-center rounded-lg',
+                    'bg-transparent text-muted-foreground/70',
+                    'transition-all duration-150',
+                    'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
+                    'active:scale-95',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+                  )}
                 >
                   <Image className="h-4 w-4" />
                 </button>
@@ -682,7 +730,14 @@ export const ChatInput: FC<ChatInputProps> = ({
                 <TooltipTrigger asChild>
                   <button
                     onClick={onStop}
-                    className="h-7 w-7 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                    className={cn(
+                      'h-7 w-7 flex items-center justify-center rounded-full',
+                      'bg-destructive text-destructive-foreground',
+                      'transition-all duration-150',
+                      'hover:bg-destructive/90 hover:scale-105',
+                      'active:scale-95',
+                      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+                    )}
                   >
                     <Square className="h-3 w-3 fill-current" />
                   </button>
@@ -696,10 +751,12 @@ export const ChatInput: FC<ChatInputProps> = ({
                     onClick={handleSend}
                     disabled={isInputEmpty}
                     className={cn(
-                      'h-7 w-7 flex items-center justify-center rounded-full transition-colors',
+                      'h-7 w-7 flex items-center justify-center rounded-full',
+                      'transition-all duration-150',
+                      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
                       isInputEmpty
-                        ? 'bg-primary/30 text-primary-foreground opacity-50 cursor-not-allowed'
-                        : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                        ? 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed'
+                        : 'bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 hover:shadow-[0_0_16px_-2px_var(--primary)] active:scale-95'
                     )}
                   >
                     <ArrowUp className="h-4 w-4" />

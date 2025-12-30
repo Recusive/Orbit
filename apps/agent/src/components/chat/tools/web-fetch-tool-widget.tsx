@@ -13,7 +13,6 @@ interface WebFetchToolWidgetProps {
   readonly onOpenUrl?: (url: string) => void;
 }
 
-// Get display hostname from URL
 function getHostname(url: string): string {
   try {
     return new URL(url).hostname;
@@ -34,84 +33,92 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
   const hostname = getHostname(url);
 
   return (
-    <div className="my-2 rounded-md border border-border bg-card overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+    <div>
+      <div
         className={cn(
-          'w-full flex items-center justify-between bg-muted px-3 py-1.5 hover:bg-accent/50 transition-colors',
-          isExpanded && 'border-b border-border'
+          'rounded-xl bg-card overflow-hidden transition-all duration-200',
+          isExpanded
+            ? 'shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
+            : 'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
         )}
       >
-        <div className="flex items-center gap-2">
-          <Globe
+        {/* Header */}
+        <button
+          onClick={() => {
+            setIsExpanded(!isExpanded);
+          }}
+          className="w-full flex items-center justify-between px-3.5 py-2.5 bg-transparent hover:bg-muted/40 active:bg-muted/50 transition-colors duration-150"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-info/10">
+              <Globe className={cn('h-3.5 w-3.5 text-info/70', isRunning && 'animate-pulse')} />
+            </div>
+            <span className="text-[13px] font-medium text-foreground">
+              {isRunning ? 'Fetching URL' : 'Fetched URL'}
+            </span>
+            {isRunning ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /> : null}
+          </div>
+          <ChevronDown
             className={cn(
-              'h-3.5 w-3.5',
-              isRunning ? 'text-muted-foreground animate-pulse' : 'text-muted-foreground'
+              'h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200',
+              isExpanded && 'rotate-180'
             )}
           />
-          <span className="text-sm font-medium text-foreground">
-            {isRunning ? 'Fetching URL' : 'Fetched URL'}
-          </span>
-          {isRunning ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /> : null}
-        </div>
-        <ChevronDown
-          className={cn(
-            'h-4 w-4 text-muted-foreground transition-transform',
-            isExpanded && 'rotate-180'
-          )}
-        />
-      </button>
+        </button>
 
-      {/* Collapsible content */}
-      {isExpanded ? (
-        <>
+        {/* Collapsible content */}
+        <div
+          className={cn(
+            'overflow-hidden transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
+            isExpanded ? 'opacity-100' : 'max-h-0 opacity-0'
+          )}
+        >
           {/* URL */}
-          <div className="border-b border-border px-3 py-2">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-muted-foreground shrink-0">URL:</span>
-              <button
-                type="button"
-                onClick={() => {
-                  onOpenUrl?.(url);
-                }}
-                className="flex items-center gap-1.5 min-w-0 group focus:outline-none"
-              >
-                <code className="bg-muted text-foreground rounded px-1.5 py-0.5 font-mono truncate group-hover:bg-accent transition-colors">
-                  {hostname}
-                </code>
-                <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
+          <div className="px-3.5 py-3 bg-muted/30">
+            <div className="text-[10px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1.5">
+              url
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                onOpenUrl?.(url);
+              }}
+              className="flex items-center gap-1.5 group focus:outline-none"
+            >
+              <code className="bg-muted/50 text-foreground rounded-lg px-2.5 py-1.5 font-mono text-xs group-hover:bg-muted transition-colors truncate max-w-full">
+                {hostname}
+              </code>
+              <ExternalLink className="h-3 w-3 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
           </div>
 
           {/* Prompt */}
-          <div className="border-b border-border px-3 py-2">
-            <div className="flex items-start gap-2 text-xs">
-              <span className="text-muted-foreground shrink-0">Prompt:</span>
-              <span className="text-foreground line-clamp-2">{prompt}</span>
+          <div className="h-px bg-border/30 mx-3.5" />
+          <div className="px-3.5 py-3">
+            <div className="text-[10px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1.5">
+              prompt
             </div>
+            <div className="text-xs text-foreground line-clamp-2">{prompt}</div>
           </div>
 
           {/* Output */}
-          <div className="p-3">
+          <div className="h-px bg-border/30 mx-3.5" />
+          <div className="p-3.5">
             {isRunning ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 <span>Fetching and processing content...</span>
               </div>
             ) : output ? (
-              <div className="overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs">
-                <pre className="break-words whitespace-pre-wrap text-foreground">{output}</pre>
+              <div className="bg-muted/40 rounded-[10px] p-3 border border-border/30 font-mono text-xs leading-relaxed text-foreground/90 overflow-x-auto max-h-[300px] overflow-y-auto">
+                <pre className="whitespace-pre-wrap break-words m-0">{output}</pre>
               </div>
             ) : (
-              <div className="text-xs text-muted-foreground italic">No content fetched</div>
+              <div className="text-xs text-muted-foreground/60 italic">No content fetched</div>
             )}
           </div>
-        </>
-      ) : null}
+        </div>
+      </div>
     </div>
   );
 };

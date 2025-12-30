@@ -41,63 +41,72 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
   const fileCount = files.length;
 
   return (
-    <div className="my-2 rounded-md border border-border bg-card overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+    <div>
+      <div
         className={cn(
-          'w-full flex items-center justify-between bg-muted px-3 py-1.5 hover:bg-accent/50 transition-colors',
-          isExpanded && 'border-b border-border'
+          'rounded-xl bg-card overflow-hidden transition-all duration-200',
+          isExpanded
+            ? 'shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
+            : 'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
         )}
       >
-        <div className="flex items-center gap-2">
-          <Search
+        {/* Header */}
+        <button
+          onClick={() => {
+            setIsExpanded(!isExpanded);
+          }}
+          className="w-full flex items-center justify-between px-3.5 py-2.5 bg-transparent hover:bg-muted/40 active:bg-muted/50 transition-colors duration-150"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-primary/10">
+              <Search className={cn('h-3.5 w-3.5 text-primary/70', isRunning && 'animate-pulse')} />
+            </div>
+            <span className="text-[13px] font-medium text-foreground">
+              {isRunning ? 'Searching files' : 'Found files'}
+            </span>
+            {!isRunning && fileCount > 0 ? (
+              <span className="text-xs text-muted-foreground/60">
+                ({fileCount} {fileCount === 1 ? 'file' : 'files'})
+              </span>
+            ) : null}
+            {isRunning ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /> : null}
+          </div>
+          <ChevronDown
             className={cn(
-              'h-3.5 w-3.5',
-              isRunning ? 'text-muted-foreground animate-pulse' : 'text-muted-foreground'
+              'h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200',
+              isExpanded && 'rotate-180'
             )}
           />
-          <span className="text-sm font-medium text-foreground">
-            {isRunning ? 'Searching files' : 'Found files'}
-          </span>
-          {!isRunning && fileCount > 0 ? (
-            <span className="text-xs text-muted-foreground">
-              ({fileCount} {fileCount === 1 ? 'file' : 'files'})
-            </span>
-          ) : null}
-          {isRunning ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /> : null}
-        </div>
-        <ChevronDown
-          className={cn(
-            'h-4 w-4 text-muted-foreground transition-transform',
-            isExpanded && 'rotate-180'
-          )}
-        />
-      </button>
+        </button>
 
-      {/* Collapsible content */}
-      {isExpanded ? (
-        <>
+        {/* Collapsible content */}
+        <div
+          className={cn(
+            'overflow-hidden transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
+            isExpanded ? 'opacity-100' : 'max-h-0 opacity-0'
+          )}
+        >
           {/* Pattern & Path */}
-          <div className="border-b border-border space-y-1.5 px-3 py-2">
-            <div className="flex items-start gap-2 text-xs">
-              <span className="text-muted-foreground shrink-0">Pattern:</span>
-              <code className="flex-1 rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
-                {pattern}
-              </code>
+          <div className="px-3.5 py-3 bg-muted/30">
+            <div className="text-[10px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1.5">
+              pattern
             </div>
+            <code className="block bg-muted/50 rounded-lg px-2.5 py-1.5 font-mono text-xs text-foreground">
+              {pattern}
+            </code>
             {path ? (
-              <div className="flex items-start gap-2 text-xs">
-                <span className="text-muted-foreground shrink-0">In:</span>
-                <span className="text-muted-foreground font-mono">{path}</span>
-              </div>
+              <>
+                <div className="text-[10px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1.5 mt-2.5">
+                  in
+                </div>
+                <span className="text-xs text-muted-foreground font-mono">{path}</span>
+              </>
             ) : null}
           </div>
 
           {/* Results */}
-          <div className="p-3">
+          <div className="h-px bg-border/30 mx-3.5" />
+          <div className="p-3.5">
             {isRunning ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -112,26 +121,29 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                     onClick={() => {
                       onOpenFile?.(file);
                     }}
-                    className="w-full flex items-center gap-2 text-xs py-0.5 hover:bg-accent/50 rounded px-1 -mx-1 transition-colors overflow-hidden cursor-pointer text-left"
+                    className="w-full flex items-center gap-2 text-xs py-1 hover:bg-muted/40 rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
                   >
                     {file.endsWith('/') ? (
-                      <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <Folder className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
                     ) : (
-                      <File className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <File className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
                     )}
                     <span className="font-mono text-foreground shrink-0">{getFileName(file)}</span>
-                    <span className="text-muted-foreground truncate text-right flex-1" title={file}>
+                    <span
+                      className="text-muted-foreground/60 truncate text-right flex-1"
+                      title={file}
+                    >
                       {file}
                     </span>
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="text-xs text-muted-foreground italic">No files found</div>
+              <div className="text-xs text-muted-foreground/60 italic">No files found</div>
             )}
           </div>
-        </>
-      ) : null}
+        </div>
+      </div>
     </div>
   );
 };

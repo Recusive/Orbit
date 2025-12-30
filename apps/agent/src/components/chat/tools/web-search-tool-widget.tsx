@@ -18,12 +18,9 @@ interface SearchResult {
   snippet?: string | undefined;
 }
 
-// Parse search results from output
-// Expected format: JSON array or markdown-style list
 function parseSearchResults(output: string | undefined): SearchResult[] {
   if (!output) return [];
 
-  // Try parsing as JSON first
   try {
     const parsed: unknown = JSON.parse(output);
     if (Array.isArray(parsed)) {
@@ -42,17 +39,12 @@ function parseSearchResults(output: string | undefined): SearchResult[] {
     // Not JSON, try parsing as text
   }
 
-  // Parse markdown-style links: [title](url) or just URLs
   const results: SearchResult[] = [];
   const lines = output.split('\n');
-
-  // Markdown link pattern: [title](url)
   const mdLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-  // URL pattern for standalone URLs
   const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
 
   for (const line of lines) {
-    // Try markdown links first
     let match = mdLinkRegex.exec(line);
     while (match !== null) {
       results.push({
@@ -62,7 +54,6 @@ function parseSearchResults(output: string | undefined): SearchResult[] {
       match = mdLinkRegex.exec(line);
     }
 
-    // If no markdown links found, try standalone URLs
     if (results.length === 0) {
       let urlMatch = urlRegex.exec(line);
       while (urlMatch !== null) {
@@ -75,7 +66,6 @@ function parseSearchResults(output: string | undefined): SearchResult[] {
     }
   }
 
-  // Deduplicate by URL
   const seen = new Set<string>();
   return results.filter((r) => {
     if (seen.has(r.url)) return false;
@@ -84,7 +74,6 @@ function parseSearchResults(output: string | undefined): SearchResult[] {
   });
 }
 
-// Get display hostname from URL
 function getHostname(url: string): string {
   try {
     return new URL(url).hostname;
@@ -105,64 +94,71 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
   const resultCount = results.length;
 
   return (
-    <div className="my-2 rounded-md border border-border bg-card overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+    <div>
+      <div
         className={cn(
-          'w-full flex items-center justify-between bg-muted px-3 py-1.5 hover:bg-accent/50 transition-colors',
-          isExpanded && 'border-b border-border'
+          'rounded-xl bg-card overflow-hidden transition-all duration-200',
+          isExpanded
+            ? 'shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
+            : 'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
         )}
       >
-        <div className="flex items-center gap-2">
-          <Search
+        {/* Header */}
+        <button
+          onClick={() => {
+            setIsExpanded(!isExpanded);
+          }}
+          className="w-full flex items-center justify-between px-3.5 py-2.5 bg-transparent hover:bg-muted/40 active:bg-muted/50 transition-colors duration-150"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-info/10">
+              <Search className={cn('h-3.5 w-3.5 text-info/70', isRunning && 'animate-pulse')} />
+            </div>
+            <span className="text-[13px] font-medium text-foreground">
+              {isRunning ? 'Searching the web' : 'Web search'}
+            </span>
+            {!isRunning && resultCount > 0 ? (
+              <span className="text-xs text-muted-foreground/60">
+                ({resultCount} {resultCount === 1 ? 'result' : 'results'})
+              </span>
+            ) : null}
+            {isRunning ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /> : null}
+          </div>
+          <ChevronDown
             className={cn(
-              'h-3.5 w-3.5',
-              isRunning ? 'text-muted-foreground animate-pulse' : 'text-muted-foreground'
+              'h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200',
+              isExpanded && 'rotate-180'
             )}
           />
-          <span className="text-sm font-medium text-foreground">
-            {isRunning ? 'Searching the web' : 'Web Search Results'}
-          </span>
-          {!isRunning && resultCount > 0 ? (
-            <span className="text-xs text-muted-foreground">
-              {resultCount} {resultCount === 1 ? 'result' : 'results'}
-            </span>
-          ) : null}
-          {isRunning ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /> : null}
-        </div>
-        <ChevronDown
-          className={cn(
-            'h-4 w-4 text-muted-foreground transition-transform',
-            isExpanded && 'rotate-180'
-          )}
-        />
-      </button>
+        </button>
 
-      {/* Collapsible content */}
-      {isExpanded ? (
-        <>
+        {/* Collapsible content */}
+        <div
+          className={cn(
+            'overflow-hidden transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
+            isExpanded ? 'opacity-100' : 'max-h-0 opacity-0'
+          )}
+        >
           {/* Query */}
-          <div className="border-b border-border px-3 py-2">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-muted-foreground">Query:</span>
-              <code className="bg-muted text-foreground rounded px-1.5 py-0.5 font-mono">
-                {query}
-              </code>
+          <div className="px-3.5 py-3 bg-muted/30">
+            <div className="text-[10px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1.5">
+              query
             </div>
+            <code className="block bg-muted/50 rounded-lg px-2.5 py-1.5 font-mono text-xs text-foreground">
+              {query}
+            </code>
           </div>
 
           {/* Results */}
-          <div className="p-3">
+          <div className="h-px bg-border/30 mx-3.5" />
+          <div className="p-3.5">
             {isRunning ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 <span>Searching for results...</span>
               </div>
             ) : results.length > 0 ? (
-              <div className="space-y-2">
+              <div className="relative">
                 {results.map((result, index) => (
                   <button
                     key={`${result.url}-${String(index)}`}
@@ -170,31 +166,24 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                     onClick={() => {
                       onOpenUrl?.(result.url);
                     }}
-                    className="block w-full text-left rounded-md p-2.5 hover:bg-muted/50 transition-colors focus:outline-none cursor-pointer"
+                    className="block w-full text-left rounded-lg p-2.5 hover:bg-muted/40 transition-colors focus:outline-none cursor-pointer"
                   >
-                    <div className="relative flex items-start gap-2">
-                      {/* Icon with timeline */}
-                      <div className="relative mt-0.5 shrink-0">
-                        <Globe className="h-3.5 w-3.5" style={{ color: '#9B8AA6' }} />
-                        {/* Vertical timeline line (except for last item) */}
-                        {index < results.length - 1 ? (
-                          <div
-                            className="absolute left-1/2 w-px"
-                            style={{
-                              top: '18px',
-                              height: '32px',
-                              transform: 'translateX(-50%)',
-                              backgroundColor: '#9B8AA6',
-                            }}
-                          />
-                        ) : null}
+                    <div className="relative flex items-start gap-2.5">
+                      {/* Vertical connecting line */}
+                      {index < results.length - 1 ? (
+                        <div
+                          className="absolute left-[10px] top-[22px] w-px bg-border/50"
+                          style={{ height: 'calc(100% + 8px)' }}
+                        />
+                      ) : null}
+                      <div className="relative z-10 w-5 h-5 rounded flex items-center justify-center bg-info/10 shrink-0 mt-0.5">
+                        <Globe className="h-3 w-3 text-info/70" />
                       </div>
-                      {/* Content */}
                       <div className="min-w-0 flex-1">
                         <div className="text-foreground mb-0.5 line-clamp-2 text-sm font-medium">
                           {result.title}
                         </div>
-                        <div className="text-muted-foreground truncate font-mono text-xs">
+                        <div className="text-muted-foreground/60 truncate font-mono text-xs">
                           {getHostname(result.url)}
                         </div>
                         {result.snippet ? (
@@ -208,11 +197,11 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="text-xs text-muted-foreground italic">No results found</div>
+              <div className="text-xs text-muted-foreground/60 italic">No results found</div>
             )}
           </div>
-        </>
-      ) : null}
+        </div>
+      </div>
     </div>
   );
 };

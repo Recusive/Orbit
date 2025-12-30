@@ -103,13 +103,18 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
           setIsOpen(!isOpen);
         }}
         className={cn(
-          'h-7 px-2 flex items-center gap-1.5 rounded transition-colors',
-          isOpen ? 'bg-accent opacity-100' : 'hover:bg-accent opacity-70 hover:opacity-100'
+          'h-7 px-2.5 flex items-center gap-1.5 rounded-lg',
+          'bg-transparent text-muted-foreground',
+          'transition-all duration-150',
+          'hover:bg-muted/50 hover:text-foreground',
+          'active:scale-[0.98]',
+          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
+          isOpen && 'bg-muted/50 text-foreground'
         )}
       >
         {selectedModelData ? <selectedModelData.icon /> : null}
-        <span className="text-xs">{selectedModelData?.name ?? 'Select Model'}</span>
-        <ChevronDown className="h-3 w-3" />
+        <span className="text-[11px] font-medium">{selectedModelData?.name ?? 'Select Model'}</span>
+        <ChevronDown className="h-3 w-3 text-muted-foreground/60 transition-transform duration-150" />
       </button>
 
       {/* Popover */}

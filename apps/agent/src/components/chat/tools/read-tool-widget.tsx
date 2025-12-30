@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 interface ReadToolWidgetProps {
   readonly filePath: string;
   readonly isRunning?: boolean;
-  readonly success?: boolean | undefined;
   readonly content?: string | undefined;
   readonly onOpenFile?: (path: string) => void;
 }
@@ -40,45 +39,32 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
   };
 
   return (
-    <div className="group flex w-full min-w-0 items-center justify-between py-2">
-      <div className="flex min-w-0 flex-1 items-center gap-x-1 text-sm">
-        {/* Icon */}
-        <div className="-ml-1 w-6 flex items-center justify-center">
-          <div className="relative flex h-4 w-4 flex-none items-center justify-center rounded-sm">
-            <File className="h-3.5 w-3.5 flex-none opacity-50" />
-          </div>
+    <div>
+      <div className="flex items-center gap-2 py-1.5 px-1 -mx-1 rounded-lg hover:bg-muted/30 transition-colors">
+        {/* Icon container */}
+        <div className="w-5 h-5 rounded flex items-center justify-center bg-info/10">
+          <File className={cn('h-3 w-3 text-info/70', isRunning && 'animate-pulse')} />
         </div>
 
         {/* Content */}
-        <div className="truncate">
-          <div className="flex flex-row items-center gap-1 overflow-hidden whitespace-nowrap">
-            <span className="shrink-0 text-muted-foreground">Read</span>
-            <div className="flex items-center overflow-hidden">
-              <span
-                className="inline-flex items-center gap-0.5 rounded-md align-middle text-sm font-medium transition-[opacity,background-color] cursor-pointer hover:bg-accent select-text px-1"
-                onClick={handleFileClick}
-                title={filePath}
-              >
-                <span className="inline-flex break-all">
-                  <span>{fileName}</span>
-                  {!isRunning && lineCount > 0 ? (
-                    <span className="opacity-50">#L1-{lineCount}</span>
-                  ) : null}
-                </span>
-              </span>
-            </div>
-          </div>
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="text-xs text-muted-foreground">Read</span>
+          <button
+            className="text-xs font-medium text-foreground hover:text-primary transition-colors truncate"
+            onClick={handleFileClick}
+            title={filePath}
+          >
+            {fileName}
+            {!isRunning && lineCount > 0 ? (
+              <span className="text-muted-foreground/60 ml-0.5">#L1-{lineCount}</span>
+            ) : null}
+          </button>
         </div>
 
         {/* Loading spinner */}
-        <div
-          className={cn(
-            'ml-0.5 flex items-center text-sm',
-            isRunning ? 'visible opacity-100' : 'invisible opacity-0'
-          )}
-        >
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-        </div>
+        {isRunning ? (
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
+        ) : null}
       </div>
     </div>
   );

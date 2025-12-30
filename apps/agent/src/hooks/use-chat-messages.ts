@@ -5,6 +5,7 @@ import type { ChatMessage } from '@/components/chat/message-item';
 import type { ExtensionMessage, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/use-tauri';
+import { conversationAddMessage } from '@/lib/backend';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/diff-utils';
 import { useFileStore } from '@/stores/file-store';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
@@ -240,17 +241,25 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
             const lastMsg = prev[prev.length - 1];
             // Only update if still streaming (not already interrupted)
             if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-              return [
-                ...prev.slice(0, -1),
-                {
-                  ...lastMsg,
-                  isStreaming: false,
-                  // Update final thinking duration if we have one
-                  ...(finalThinkingDuration !== undefined && lastMsg.thinking
-                    ? { thinkingDurationMs: finalThinkingDuration }
-                    : {}),
-                },
-              ];
+              const completedMsg = {
+                ...lastMsg,
+                isStreaming: false,
+                // Update final thinking duration if we have one
+                ...(finalThinkingDuration !== undefined && lastMsg.thinking
+                  ? { thinkingDurationMs: finalThinkingDuration }
+                  : {}),
+              };
+
+              // Persist assistant message to backend
+              void conversationAddMessage(message.session_id, {
+                id: completedMsg.id,
+                role: 'assistant',
+                content: completedMsg.content,
+                ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
+                createdAt: Date.now(),
+              });
+
+              return [...prev.slice(0, -1), completedMsg];
             }
             // If message was already marked as interrupted, don't change it
             return prev;
@@ -627,6 +636,14 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setMessages((prev) => [...prev, userMessage]);
       setIsAgentRunning(true);
 
+      // Persist user message to backend
+      void conversationAddMessage(sessionId, {
+        id: userMessage.id,
+        role: 'user',
+        content: text,
+        createdAt: Date.now(),
+      });
+
       // Build context object with files, images, and/or elements
       const hasFiles = contextFiles && contextFiles.length > 0;
       const hasImages = images && images.length > 0;
@@ -733,6 +750,14 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setMessages((prev) => [...prev, userMessage]);
       setIsAgentRunning(true);
 
+      // Persist user message to backend
+      void conversationAddMessage(sessionId, {
+        id: userMessage.id,
+        role: 'user',
+        content: text,
+        createdAt: Date.now(),
+      });
+
       // Build context object with files, images, and/or elements
       const hasFiles = contextFiles && contextFiles.length > 0;
       const hasImages = images && images.length > 0;
@@ -787,7 +812,20 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     setMessages((prev) => {
       const lastMsg = prev[prev.length - 1];
       if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-        return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false, isInterrupted: true }];
+        const interruptedMsg = { ...lastMsg, isStreaming: false, isInterrupted: true };
+
+        // Persist interrupted assistant message to backend (if it has content)
+        if (interruptedMsg.content) {
+          void conversationAddMessage(sessionId, {
+            id: interruptedMsg.id,
+            role: 'assistant',
+            content: interruptedMsg.content,
+            ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
+            createdAt: Date.now(),
+          });
+        }
+
+        return [...prev.slice(0, -1), interruptedMsg];
       }
       // If no assistant message exists yet, create an interrupted placeholder
       if (!lastMsg || lastMsg.role === 'user') {
@@ -869,7 +907,20 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setMessages((prev) => {
         const lastMsg = prev[prev.length - 1];
         if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-          return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false, isInterrupted: true }];
+          const interruptedMsg = { ...lastMsg, isStreaming: false, isInterrupted: true };
+
+          // Persist interrupted assistant message to backend (if it has content)
+          if (interruptedMsg.content) {
+            void conversationAddMessage(sessionId, {
+              id: interruptedMsg.id,
+              role: 'assistant',
+              content: interruptedMsg.content,
+              ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
+              createdAt: Date.now(),
+            });
+          }
+
+          return [...prev.slice(0, -1), interruptedMsg];
         }
         // If no assistant message exists yet, create an interrupted placeholder
         if (!lastMsg || lastMsg.role === 'user') {

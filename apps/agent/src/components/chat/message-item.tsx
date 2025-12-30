@@ -19,7 +19,6 @@ import { WebFetchToolWidget } from '@/components/chat/tools/web-fetch-tool-widge
 import { WebSearchToolWidget } from '@/components/chat/tools/web-search-tool-widget';
 import { WriteToolWidget } from '@/components/chat/tools/write-tool-widget';
 import { FileIcon } from '@/components/files/file-icon';
-import { cn } from '@/lib/utils';
 
 export interface ChatMessage {
   id: string;
@@ -260,26 +259,30 @@ export const MessageItem: FC<MessageItemProps> = ({
 
   return (
     <div className="space-y-2">
-      {/* Message bubble */}
-      <div className={cn('p-3 rounded-lg', message.role === 'user' && 'bg-muted')}>
-        {message.role === 'user' ? (
-          <p className="text-sm whitespace-pre-wrap">{message.displayedContent}</p>
-        ) : (
-          <>
-            {/* Thinking Box - show when thinking content exists */}
-            {message.thinking ? (
-              <ThinkingBox
-                thinking={message.thinking}
-                thinkingDurationMs={message.thinkingDurationMs}
-                isStreaming={message.isStreaming}
-              />
-            ) : null}
+      {/* Message block */}
+      {message.role === 'user' ? (
+        /* User message bubble */
+        <div className="p-3.5 rounded-xl bg-card border border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.displayedContent}</p>
+        </div>
+      ) : (
+        /* Assistant message - no bubble, content flows naturally */
+        <div className="py-1">
+          {/* Thinking Box - show when thinking content exists */}
+          {message.thinking ? (
+            <ThinkingBox
+              thinking={message.thinking}
+              thinkingDurationMs={message.thinkingDurationMs}
+              isStreaming={message.isStreaming}
+            />
+          ) : null}
+          <div className="space-y-2">
             {segments.map((segment) => {
               if (segment.type === 'content') {
                 return (
                   <div
                     key={segment.key}
-                    className="text-sm prose prose-sm dark:prose-invert max-w-none [&_a]:focus:outline-none"
+                    className="chat-markdown prose prose-sm dark:prose-invert max-w-none"
                     onClick={handleContentClick}
                   >
                     <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>
@@ -288,36 +291,40 @@ export const MessageItem: FC<MessageItemProps> = ({
                   </div>
                 );
               }
-              return renderToolWidget(segment.tool);
+              return (
+                <div key={segment.key} className="tool-widget">
+                  {renderToolWidget(segment.tool)}
+                </div>
+              );
             })}
-            {isComplete ? (
-              <MessageActions
-                showDisclaimer={isLastAssistantMessage}
-                rewindDisabled={isLastAssistantMessage}
-                onCopy={() => {
-                  void navigator.clipboard.writeText(message.content);
-                }}
-                onRewind={() => {
-                  onRewind(message.id);
-                }}
-              />
-            ) : null}
-            {/* Interrupt indicator - shown when message was interrupted */}
-            {message.isInterrupted ? <InterruptIndicator onFeedback={onFeedback} /> : null}
-          </>
-        )}
-      </div>
+          </div>
+          {isComplete ? (
+            <MessageActions
+              showDisclaimer={isLastAssistantMessage}
+              rewindDisabled={isLastAssistantMessage}
+              onCopy={() => {
+                void navigator.clipboard.writeText(message.content);
+              }}
+              onRewind={() => {
+                onRewind(message.id);
+              }}
+            />
+          ) : null}
+          {/* Interrupt indicator - shown when message was interrupted */}
+          {message.isInterrupted ? <InterruptIndicator onFeedback={onFeedback} /> : null}
+        </div>
+      )}
 
       {/* Attached context - outside the bubble */}
       {message.role === 'user' && hasAttachments ? (
-        <div className="chat-attached-context flex flex-wrap gap-1.5 px-3">
+        <div className="chat-attached-context flex flex-wrap gap-1.5 px-3.5">
           {/* Attached files */}
           {message.attachedFiles?.map((filePath) => {
             const fileName = filePath.split('/').pop() ?? filePath;
             return (
               <div
                 key={filePath}
-                className="chat-attached-context-attachment flex items-center gap-1.5 px-1.5 py-1 bg-muted/40 rounded border border-border/40 hover:bg-muted/60 transition-colors cursor-pointer"
+                className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md hover:bg-muted/70 transition-colors cursor-pointer"
                 title={filePath}
               >
                 <FileIcon fileName={fileName} className="h-3.5 w-3.5" monochrome={false} />
@@ -329,7 +336,7 @@ export const MessageItem: FC<MessageItemProps> = ({
           {message.attachedImages?.map((image, index) => (
             <div
               key={`${image.name}-${String(index)}`}
-              className="chat-attached-context-attachment flex items-center gap-1.5 px-1.5 py-1 bg-muted/40 rounded border border-border/40 hover:bg-muted/60 transition-colors cursor-pointer"
+              className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md hover:bg-muted/70 transition-colors cursor-pointer"
               title={image.name}
             >
               <img

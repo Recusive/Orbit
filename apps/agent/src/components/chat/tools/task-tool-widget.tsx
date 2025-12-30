@@ -7,16 +7,13 @@ import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
 
-// Content block from SDK output
 interface ContentBlock {
   type: string;
   text?: string;
 }
 
-// Parse SDK output to extract text content
 function parseTaskOutput(output: string): string {
   try {
-    // Try to parse as JSON array of content blocks
     const parsed = JSON.parse(output) as unknown;
     if (Array.isArray(parsed)) {
       return (parsed as ContentBlock[])
@@ -27,10 +24,8 @@ function parseTaskOutput(output: string): string {
         .map((block) => block.text)
         .join('\n\n');
     }
-    // If it's not an array, return as-is
     return output;
   } catch {
-    // If not valid JSON, return as-is (plain text output)
     return output;
   }
 }
@@ -44,9 +39,7 @@ interface TaskToolWidgetProps {
   readonly isRunning?: boolean;
 }
 
-// Format subagent type for display
 function formatSubagentType(type: string): string {
-  // Convert kebab-case or snake_case to Title Case
   return type
     .replace(/[-_]/g, ' ')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -55,7 +48,6 @@ function formatSubagentType(type: string): string {
     .join(' ');
 }
 
-// Truncate long prompts
 function truncatePrompt(prompt: string, maxLength = 200): string {
   if (prompt.length <= maxLength) return prompt;
   return prompt.slice(0, maxLength).trim() + '...';
@@ -74,77 +66,86 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
   const formattedType = formatSubagentType(subagentType);
 
   return (
-    <div className="my-2 rounded-md border border-border bg-card overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+    <div>
+      <div
         className={cn(
-          'w-full flex items-center justify-between bg-muted px-3 py-1.5 hover:bg-accent/50 transition-colors',
-          isExpanded && 'border-b border-border'
+          'rounded-xl bg-card overflow-hidden transition-all duration-200',
+          isExpanded
+            ? 'shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
+            : 'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
         )}
       >
-        <div className="flex items-center gap-2">
-          <Bot
+        {/* Header */}
+        <button
+          onClick={() => {
+            setIsExpanded(!isExpanded);
+          }}
+          className="w-full flex items-center justify-between px-3.5 py-2.5 bg-transparent hover:bg-muted/40 active:bg-muted/50 transition-colors duration-150"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-primary/10">
+              <Bot className={cn('h-3.5 w-3.5 text-primary/70', isRunning && 'animate-pulse')} />
+            </div>
+            <span className="text-[13px] font-medium text-foreground">
+              {isRunning ? 'Running Task' : 'Completed Task'}
+            </span>
+            <span className="text-xs text-muted-foreground/60">{description}</span>
+            {isRunning ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /> : null}
+          </div>
+          <ChevronDown
             className={cn(
-              'h-3.5 w-3.5',
-              isRunning ? 'text-muted-foreground animate-pulse' : 'text-muted-foreground'
+              'h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200',
+              isExpanded && 'rotate-180'
             )}
           />
-          <span className="text-sm font-medium text-foreground">
-            {isRunning ? 'Running Task' : 'Completed Task'}
-          </span>
-          <span className="text-xs text-muted-foreground">{description}</span>
-          {isRunning ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" /> : null}
-        </div>
-        <ChevronDown
-          className={cn(
-            'h-4 w-4 text-muted-foreground transition-transform',
-            isExpanded && 'rotate-180'
-          )}
-        />
-      </button>
+        </button>
 
-      {/* Collapsible content */}
-      {isExpanded ? (
-        <>
+        {/* Collapsible content */}
+        <div
+          className={cn(
+            'overflow-hidden transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
+            isExpanded ? 'opacity-100' : 'max-h-0 opacity-0'
+          )}
+        >
           {/* Task details */}
-          <div className="border-b border-border space-y-1.5 px-3 py-2">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-muted-foreground shrink-0">Agent:</span>
-              <span className="px-1.5 py-0.5 rounded bg-muted text-foreground font-medium">
+          <div className="px-3.5 py-3 bg-muted/30">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="text-[10px] font-medium tracking-wide text-muted-foreground/60 lowercase">
+                agent
+              </div>
+              <span className="px-1.5 py-0.5 rounded-md bg-muted/50 text-xs font-medium text-foreground">
                 {formattedType}
               </span>
-              {model ? <span className="text-muted-foreground">({model})</span> : null}
+              {model ? <span className="text-xs text-muted-foreground/60">({model})</span> : null}
             </div>
-            <div className="flex items-start gap-2 text-xs">
-              <span className="text-muted-foreground shrink-0">Prompt:</span>
-              <span className="text-foreground line-clamp-3" title={prompt}>
-                {truncatePrompt(prompt, 300)}
-              </span>
+            <div className="text-[10px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1.5">
+              prompt
+            </div>
+            <div className="text-xs text-foreground line-clamp-3" title={prompt}>
+              {truncatePrompt(prompt, 300)}
             </div>
           </div>
 
           {/* Output */}
-          <div className="p-3">
+          <div className="h-px bg-border/30 mx-3.5" />
+          <div className="p-3.5">
             {isRunning ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 <span>Agent is working on the task...</span>
               </div>
             ) : output ? (
-              <div className="prose prose-sm dark:prose-invert max-w-none text-sm [&_a]:text-primary [&_a]:underline [&_a]:focus:outline-none">
+              <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none text-sm">
                 <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>
                   {parseTaskOutput(output)}
                 </Streamdown>
               </div>
             ) : (
-              <div className="text-xs text-muted-foreground italic">Task completed</div>
+              <div className="text-xs text-muted-foreground/60 italic">Task completed</div>
             )}
           </div>
-        </>
-      ) : null}
+        </div>
+      </div>
     </div>
   );
 };

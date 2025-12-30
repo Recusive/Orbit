@@ -95,47 +95,66 @@ export const PermissionModal: FC<PermissionModalProps> = ({
   }, [request.requestId, onDeny]);
 
   return (
-    <div className="my-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
-      <div className="flex items-center gap-2">
-        {/* Spinner */}
-        <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />
+    <div>
+      <div className="rounded-xl bg-card overflow-hidden shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]">
+        {/* Header */}
+        <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+          <div className="w-6 h-6 rounded-md flex items-center justify-center bg-primary/10">
+            {isBash ? (
+              <Terminal className="h-3.5 w-3.5 text-primary/70" />
+            ) : (
+              <File className="h-3.5 w-3.5 text-primary/70" />
+            )}
+          </div>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="text-[13px] font-medium text-foreground shrink-0">{confirmLabel}</span>
+            <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+          </div>
+        </div>
 
-        {/* Confirm label */}
-        <span className="text-sm font-medium text-primary shrink-0">{confirmLabel}</span>
-
-        {/* File anchor or terminal icon */}
-        {isFileTool(request.toolName) ? (
-          <button
-            type="button"
-            onClick={handleFileClick}
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted hover:bg-accent transition-colors cursor-pointer min-w-0"
-            title={filePath}
-          >
-            <File className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="text-sm truncate">{fileName}</span>
-          </button>
-        ) : isBash ? (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted">
-            <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
-          </span>
+        {/* File path or command info */}
+        {isFileTool(request.toolName) && filePath ? (
+          <>
+            <div className="h-px bg-border/30 mx-3.5" />
+            <div className="px-3.5 py-2.5 bg-muted/30">
+              <div className="text-[10px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
+                file
+              </div>
+              <button
+                type="button"
+                onClick={handleFileClick}
+                className="inline-flex items-center gap-1.5 group focus:outline-none"
+              >
+                <code className="bg-muted/50 text-foreground rounded-lg px-2 py-1 font-mono text-xs group-hover:bg-muted transition-colors truncate max-w-full">
+                  {fileName}
+                </code>
+              </button>
+              <div
+                className="text-[10px] text-muted-foreground/50 font-mono mt-1 truncate"
+                title={filePath}
+              >
+                {filePath}
+              </div>
+            </div>
+          </>
         ) : null}
 
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Buttons */}
-        <button
-          onClick={handleDeny}
-          className="px-2.5 py-1 text-xs font-medium rounded transition-colors bg-muted hover:bg-accent text-foreground shrink-0"
-        >
-          Reject <span className="opacity-50">⇧⌘⌫</span>
-        </button>
-        <button
-          onClick={handleApprove}
-          className="px-2.5 py-1 text-xs font-medium rounded transition-colors bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
-        >
-          Accept <span className="opacity-50">⌘⏎</span>
-        </button>
+        {/* Action buttons */}
+        <div className="h-px bg-border/30 mx-3.5" />
+        <div className="flex items-center justify-end gap-2 px-3.5 py-2.5">
+          <button
+            onClick={handleDeny}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-muted/50 hover:bg-muted text-foreground shrink-0"
+          >
+            Reject <span className="text-muted-foreground/50 ml-1">⌘⌫</span>
+          </button>
+          <button
+            onClick={handleApprove}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+          >
+            Accept <span className="text-primary-foreground/60 ml-1">⌘⏎</span>
+          </button>
+        </div>
       </div>
     </div>
   );

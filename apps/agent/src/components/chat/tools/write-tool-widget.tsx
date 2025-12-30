@@ -85,89 +85,95 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   };
 
   return (
-    <div className="my-2 rounded-lg border border-border bg-card overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
-        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-accent/50 transition-colors"
-      >
-        {/* File icon */}
-        <FilePlus
-          className={cn(
-            'h-4 w-4 shrink-0',
-            isRunning ? 'text-muted-foreground animate-pulse' : 'text-success'
-          )}
-        />
-
-        {/* File info */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span
-            className="text-sm font-medium text-foreground hover:underline truncate cursor-pointer"
-            onClick={handleFileClick}
-            title={filePath}
-          >
-            {fileName}
-          </span>
-          <span className="text-xs text-muted-foreground shrink-0">(new)</span>
-        </div>
-
-        {/* Status - Diff stat or loading */}
-        <div className="flex items-center gap-2 shrink-0">
-          {isRunning ? (
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span className="text-xs">Writing...</span>
-            </div>
-          ) : (
-            <DiffStat additions={lineCount} deletions={0} />
-          )}
-          <ChevronDown
-            className={cn(
-              'h-4 w-4 text-muted-foreground transition-transform',
-              isExpanded && 'rotate-180'
-            )}
-          />
-        </div>
-      </button>
-
-      {/* Code preview */}
+    <div>
       <div
         className={cn(
-          'border-t border-border overflow-hidden transition-all',
-          isExpanded ? 'max-h-[500px]' : 'max-h-[200px]'
+          'rounded-xl bg-card overflow-hidden transition-all duration-200',
+          isExpanded
+            ? 'shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
+            : 'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
         )}
       >
-        <div className="overflow-auto">
-          {displayLines.map((line, index) => (
-            <div key={index} className="flex font-mono text-xs leading-5 bg-success/5">
-              {/* Gutter */}
-              <div className="w-1 bg-success shrink-0" />
-              {/* Line number */}
-              <div className="w-10 px-2 text-right text-muted-foreground/50 select-none shrink-0 bg-success/10">
-                {index + 1}
-              </div>
-              {/* Content */}
-              <div className="flex-1 px-3 text-foreground whitespace-pre overflow-x-auto">
-                {line || ' '}
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* Header */}
+        <button
+          onClick={() => {
+            setIsExpanded(!isExpanded);
+          }}
+          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-muted/40 transition-colors duration-150"
+        >
+          {/* Icon container */}
+          <div className="w-6 h-6 rounded-md flex items-center justify-center bg-success/10">
+            <FilePlus className={cn('h-3.5 w-3.5 text-success/70', isRunning && 'animate-pulse')} />
+          </div>
 
-        {/* Expand bar */}
-        {hasMore && !isExpanded ? (
-          <button
-            onClick={() => {
-              setIsExpanded(true);
-            }}
-            className="w-full py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors border-t border-border flex items-center justify-center gap-1"
-          >
-            <ChevronDown className="h-3 w-3" />
-            <span>{lines.length - 8} more lines</span>
-          </button>
-        ) : null}
+          {/* File info */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span
+              className="text-[13px] font-medium text-foreground hover:underline truncate cursor-pointer"
+              onClick={handleFileClick}
+              title={filePath}
+            >
+              {fileName}
+            </span>
+            <span className="text-xs text-muted-foreground/60 shrink-0">(new)</span>
+          </div>
+
+          {/* Status - Diff stat or loading */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            {isRunning ? (
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span className="text-xs">Writing...</span>
+              </div>
+            ) : (
+              <DiffStat additions={lineCount} deletions={0} />
+            )}
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200',
+                isExpanded && 'rotate-180'
+              )}
+            />
+          </div>
+        </button>
+
+        {/* Code preview */}
+        <div
+          className={cn(
+            'overflow-hidden transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
+            isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-[200px] opacity-100'
+          )}
+        >
+          <div className="overflow-auto">
+            {displayLines.map((line, index) => (
+              <div key={index} className="flex font-mono text-xs leading-5 bg-success/5">
+                {/* Gutter */}
+                <div className="w-1 bg-success shrink-0" />
+                {/* Line number */}
+                <div className="w-10 px-2 text-right text-muted-foreground/50 select-none shrink-0 bg-success/10">
+                  {index + 1}
+                </div>
+                {/* Content */}
+                <div className="flex-1 px-3 text-foreground whitespace-pre overflow-x-auto">
+                  {line || ' '}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Expand bar */}
+          {hasMore && !isExpanded ? (
+            <button
+              onClick={() => {
+                setIsExpanded(true);
+              }}
+              className="w-full py-1.5 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-1"
+            >
+              <ChevronDown className="h-3 w-3" />
+              <span>{lines.length - 8} more lines</span>
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
