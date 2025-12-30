@@ -1,0 +1,6 @@
+[package]
+name = "snowflake-agent"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

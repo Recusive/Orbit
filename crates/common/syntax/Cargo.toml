@@ -1,0 +1,14 @@
+[package]
+name = "snowflake-syntax"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Syntax highlighting and tree-sitter parsing for Snowflake"
+
+[lints]
+workspace = true
+
+[dependencies]
+snowflake-core = { path = "../core" }

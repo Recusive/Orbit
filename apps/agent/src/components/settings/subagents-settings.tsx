@@ -1,0 +1,614 @@
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Bot, Edit2, Loader2, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import type { ExtensionMessage, SubagentDefinition, WebviewMessage } from '@/types/protocol';
+import type { FC } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useTauri } from '@/hooks/use-tauri';
+import { cn } from '@/lib/utils';
+
+// Available tools that can be selected
+const AVAILABLE_TOOLS = [
+  'Read',
+  'Write',
+  'Edit',
+  'Bash',
+  'Grep',
+  'Glob',
+  'WebFetch',
+  'WebSearch',
+  'Task',
+  'TodoWrite',
+  'AskUserQuestion',
+];
+
+// Section header
+interface SectionHeaderProps {
+  readonly title: string;
+  readonly children?: React.ReactNode;
+}
+
+const SectionHeader: FC<SectionHeaderProps> = ({ title, children }) => (
+  <div className="mb-4">
+    <h3 className="text-sm font-semibold mb-1">{title}</h3>
+    {children !== undefined && <p className="text-xs text-muted-foreground">{children}</p>}
+  </div>
+);
+
+// Agent card component
+interface AgentCardProps {
+  readonly agent: SubagentDefinition;
+  readonly onEdit: () => void;
+  readonly onDelete: () => void;
+}
+
+const AgentCard: FC<AgentCardProps> = ({ agent, onEdit, onDelete }) => (
+  <div className="rounded-lg border border-border p-4 hover:bg-accent/30 transition-colors">
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-3 min-w-0 flex-1">
+        <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+          <Bot className="h-4 w-4 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-sm truncate">{agent.name}</div>
+          <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+            {agent.description || 'No description'}
+          </div>
+          {agent.tools !== undefined && agent.tools.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {agent.tools.slice(0, 4).map((tool) => (
+                <span
+                  key={tool}
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+                >
+                  {tool}
+                </span>
+              ))}
+              {agent.tools.length > 4 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  +{agent.tools.length - 4} more
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
+          <Edit2 className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-destructive hover:text-destructive"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  </div>
+);
+
+// Agent editor dialog
+interface AgentEditorProps {
+  readonly agent: SubagentDefinition | undefined;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onSave: (agent: SubagentDefinition, originalName?: string) => void;
+  readonly postMessage: (message: WebviewMessage) => void;
+  readonly onGeneratedAgent: (callback: (agent: SubagentDefinition) => void) => void;
+}
+
+const AgentEditor: FC<AgentEditorProps> = ({
+  agent,
+  isOpen,
+  onClose,
+  onSave,
+  postMessage,
+  onGeneratedAgent,
+}) => {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [tools, setTools] = useState<string[]>([]);
+  const [model, setModel] = useState<'sonnet' | 'opus' | 'haiku' | 'inherit'>('inherit');
+
+  // AI Generation state
+  const [showGenerateInput, setShowGenerateInput] = useState(false);
+  const [generateDescription, setGenerateDescription] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // Reset form when agent changes or dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setName(agent?.name ?? '');
+      setDescription(agent?.description ?? '');
+      setPrompt(agent?.prompt ?? '');
+      setTools(agent?.tools ?? []);
+      setModel(agent?.model ?? 'inherit');
+      setShowGenerateInput(false);
+      setGenerateDescription('');
+      setIsGenerating(false);
+    }
+  }, [agent, isOpen]);
+
+  // Listen for generated agent response
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleGenerated = (generatedAgent: SubagentDefinition): void => {
+      setName(generatedAgent.name);
+      setDescription(generatedAgent.description);
+      setPrompt(generatedAgent.prompt);
+      setTools(generatedAgent.tools ?? []);
+      setModel(generatedAgent.model ?? 'inherit');
+      setIsGenerating(false);
+      setShowGenerateInput(false);
+      setGenerateDescription('');
+    };
+
+    onGeneratedAgent(handleGenerated);
+  }, [isOpen, onGeneratedAgent]);
+
+  const handleGenerate = (): void => {
+    if (generateDescription.trim() === '') return;
+
+    setIsGenerating(true);
+    postMessage({
+      type: 'subagents:generate',
+      uuid: crypto.randomUUID(),
+      description: generateDescription.trim(),
+    });
+  };
+
+  const handleToolToggle = (tool: string): void => {
+    setTools((prev) => (prev.includes(tool) ? prev.filter((t) => t !== tool) : [...prev, tool]));
+  };
+
+  const handleSave = (): void => {
+    if (name.trim() === '' || prompt.trim() === '') {
+      return;
+    }
+
+    const newAgent: SubagentDefinition = {
+      name: name.trim(),
+      description: description.trim(),
+      prompt: prompt.trim(),
+      tools: tools.length > 0 ? tools : undefined,
+      model: model !== 'inherit' ? model : undefined,
+    };
+
+    onSave(newAgent, agent?.name);
+    onClose();
+  };
+
+  return (
+    <DialogPrimitive.Root
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/50" />
+        <DialogPrimitive.Content
+          className="fixed left-[50%] top-[50%] z-[60] translate-x-[-50%] translate-y-[-50%] w-[600px] max-w-[90vw] max-h-[80vh] bg-background border border-border rounded-lg shadow-xl flex flex-col"
+          onPointerDownOutside={(e) => {
+            e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            e.preventDefault();
+          }}
+        >
+          <DialogPrimitive.Title className="sr-only">
+            {agent !== undefined ? 'Edit Subagent' : 'Create Subagent'}
+          </DialogPrimitive.Title>
+          <DialogPrimitive.Description className="sr-only">
+            {agent !== undefined
+              ? 'Edit an existing subagent configuration'
+              : 'Create a new subagent configuration'}
+          </DialogPrimitive.Description>
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <h2 className="font-semibold text-sm">
+              {agent !== undefined ? 'Edit Subagent' : 'Create Subagent'}
+            </h2>
+            <DialogPrimitive.Close asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogPrimitive.Close>
+          </div>
+
+          {/* Form */}
+          <ScrollArea className="flex-1 py-4 px-5">
+            <div className="space-y-4 px-px">
+              {/* Name */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Name <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                  }}
+                  placeholder="code-reviewer"
+                  className="mt-1 h-8 text-sm"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Used as the filename and identifier. Use lowercase with dashes.
+                </p>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Description</label>
+                <Input
+                  value={description}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                  }}
+                  placeholder="Expert code review specialist for quality and security"
+                  className="mt-1 h-8 text-sm"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Describes when this agent should be used. Claude uses this to decide when to
+                  invoke it.
+                </p>
+              </div>
+
+              {/* Prompt */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">
+                  System Prompt <span className="text-destructive">*</span>
+                </label>
+                <Textarea
+                  value={prompt}
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                  }}
+                  placeholder="You are a code review specialist with expertise in security, performance, and best practices..."
+                  className="mt-1 text-sm min-h-[120px]"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Instructions that define the agent&apos;s behavior and expertise.
+                </p>
+              </div>
+
+              {/* Model */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Model</label>
+                <Select
+                  value={model}
+                  onValueChange={(v) => {
+                    setModel(v as typeof model);
+                  }}
+                >
+                  <SelectTrigger className="mt-1 h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="z-[70]">
+                    <SelectItem value="inherit">Inherit from parent</SelectItem>
+                    <SelectItem value="haiku">Haiku (fast)</SelectItem>
+                    <SelectItem value="sonnet">Sonnet (balanced)</SelectItem>
+                    <SelectItem value="opus">Opus (best)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Tools */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Allowed Tools</label>
+                <p className="text-[10px] text-muted-foreground mb-2">
+                  Select which tools this agent can use. Leave empty to inherit all tools.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {AVAILABLE_TOOLS.map((tool) => (
+                    <button
+                      key={tool}
+                      type="button"
+                      onClick={() => {
+                        handleToolToggle(tool);
+                      }}
+                      className={cn(
+                        'text-xs px-2.5 py-1 rounded-md border transition-colors',
+                        tools.includes(tool)
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background text-foreground border-border hover:bg-accent'
+                      )}
+                    >
+                      {tool}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Generate with AI Input - Only show when creating new agent and generate mode is active */}
+              {agent === undefined && showGenerateInput ? (
+                <div className="p-3 rounded-lg border border-primary/30 bg-primary/5">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      Generate with AI
+                    </div>
+                    <Textarea
+                      value={generateDescription}
+                      onChange={(e) => {
+                        setGenerateDescription(e.target.value);
+                      }}
+                      placeholder="Describe what this agent should do... e.g., 'An expert code reviewer that focuses on security vulnerabilities and best practices'"
+                      className="text-sm min-h-[80px]"
+                      disabled={isGenerating}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </ScrollArea>
+
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
+            {/* Generate with AI button - only show when creating new agent */}
+            {agent === undefined &&
+              (showGenerateInput ? (
+                <Button
+                  variant={generateDescription.trim() !== '' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={handleGenerate}
+                  disabled={generateDescription.trim() === '' || isGenerating}
+                  className="mr-auto gap-1.5"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Generate
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowGenerateInput(true);
+                  }}
+                  className="mr-auto gap-1.5"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Generate with AI
+                </Button>
+              ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (showGenerateInput) {
+                  setShowGenerateInput(false);
+                  setGenerateDescription('');
+                } else {
+                  onClose();
+                }
+              }}
+              disabled={isGenerating}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={name.trim() === '' || prompt.trim() === '' || isGenerating}
+            >
+              {agent !== undefined ? 'Save Changes' : 'Create Agent'}
+            </Button>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+};
+
+// Main SubagentsSettings component
+export const SubagentsSettings: FC = () => {
+  const [agents, setAgents] = useState<SubagentDefinition[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<SubagentDefinition | undefined>(undefined);
+
+  // Use ref for the initial fetch flag to avoid re-fetching
+  const hasFetched = useRef(false);
+
+  // Callback ref for generated agent handler
+  const generatedAgentCallbackRef = useRef<((agent: SubagentDefinition) => void) | null>(null);
+
+  // Message handler for subagent-related messages
+  const handleMessage = useCallback((message: ExtensionMessage): void => {
+    if (message.type === 'subagents:list:response') {
+      setAgents(message.agents);
+      setIsLoading(false);
+      setError(null);
+    } else if (message.type === 'subagents:created') {
+      setAgents((prev) => [...prev, message.agent]);
+      setError(null);
+    } else if (message.type === 'subagents:updated') {
+      setAgents((prev) => prev.map((a) => (a.name === message.agent.name ? message.agent : a)));
+      setError(null);
+    } else if (message.type === 'subagents:deleted') {
+      setAgents((prev) => prev.filter((a) => a.name !== message.name));
+      setError(null);
+    } else if (message.type === 'subagents:error') {
+      setError(message.error);
+      setIsLoading(false);
+    } else if (message.type === 'subagents:generated') {
+      // Call the registered callback with the generated agent
+      if (generatedAgentCallbackRef.current) {
+        generatedAgentCallbackRef.current(message.agent);
+      }
+    }
+    // Ignore other message types
+  }, []);
+
+  // Register callback for generated agent
+  const handleRegisterGeneratedCallback = useCallback(
+    (callback: (agent: SubagentDefinition) => void): void => {
+      generatedAgentCallbackRef.current = callback;
+    },
+    []
+  );
+
+  // Use VS Code API with message handler
+  const { postMessage } = useTauri({ onMessage: handleMessage });
+
+  // Fetch agents on mount
+  useEffect(() => {
+    if (!hasFetched.current) {
+      hasFetched.current = true;
+      postMessage({
+        type: 'subagents:list',
+        uuid: crypto.randomUUID(),
+      });
+    }
+  }, [postMessage]);
+
+  const handleCreateAgent = useCallback((): void => {
+    setEditingAgent(undefined);
+    setEditorOpen(true);
+  }, []);
+
+  const handleEditAgent = useCallback((agent: SubagentDefinition): void => {
+    setEditingAgent(agent);
+    setEditorOpen(true);
+  }, []);
+
+  const handleDeleteAgent = useCallback(
+    (name: string): void => {
+      postMessage({
+        type: 'subagents:delete',
+        uuid: crypto.randomUUID(),
+        name,
+      });
+    },
+    [postMessage]
+  );
+
+  const handleSaveAgent = useCallback(
+    (agent: SubagentDefinition, originalName?: string): void => {
+      if (originalName !== undefined) {
+        // Update existing
+        postMessage({
+          type: 'subagents:update',
+          uuid: crypto.randomUUID(),
+          originalName,
+          agent,
+        });
+      } else {
+        // Create new
+        postMessage({
+          type: 'subagents:create',
+          uuid: crypto.randomUUID(),
+          agent,
+        });
+      }
+    },
+    [postMessage]
+  );
+
+  return (
+    <div>
+      <SectionHeader title="Subagents">
+        Custom agents that can be invoked via the Task tool for specialized tasks. Subagents
+        maintain separate context and can run in parallel.
+      </SectionHeader>
+
+      {error !== null && (
+        <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {/* Create button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full justify-start gap-2"
+          onClick={handleCreateAgent}
+        >
+          <Plus className="h-4 w-4" />
+          Create New Subagent
+        </Button>
+
+        {/* Agent list */}
+        {isLoading ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">Loading subagents...</div>
+        ) : agents.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">
+            <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>No subagents defined yet.</p>
+            <p className="text-xs mt-1">Create a subagent to extend Claude&apos;s capabilities.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {agents.map((agent) => (
+              <AgentCard
+                key={agent.name}
+                agent={agent}
+                onEdit={() => {
+                  handleEditAgent(agent);
+                }}
+                onDelete={() => {
+                  handleDeleteAgent(agent.name);
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Info section */}
+      <div className="mt-6 p-3 rounded-md bg-muted/50 text-xs text-muted-foreground">
+        <p className="font-medium mb-1">How Subagents Work</p>
+        <ul className="list-disc list-inside space-y-0.5">
+          <li>
+            Subagents are stored in <code className="bg-muted px-1 rounded">.claude/agents/</code>
+          </li>
+          <li>Claude automatically invokes them based on the description</li>
+          <li>You can explicitly request them: &quot;Use the code-reviewer agent&quot;</li>
+          <li>Each subagent maintains its own context</li>
+        </ul>
+      </div>
+
+      {/* Editor dialog */}
+      <AgentEditor
+        agent={editingAgent}
+        isOpen={editorOpen}
+        onClose={() => {
+          setEditorOpen(false);
+        }}
+        onSave={handleSaveAgent}
+        postMessage={postMessage}
+        onGeneratedAgent={handleRegisterGeneratedCallback}
+      />
+    </div>
+  );
+};

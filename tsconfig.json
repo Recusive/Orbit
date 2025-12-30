@@ -35,9 +35,9 @@
     /* Paths */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./apps/agent/src/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["apps/*/src/**/*"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

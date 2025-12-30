@@ -10,9 +10,9 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use commands::{
-    agent as agent_cmd, ai, conversations, files, git, lsp, search, settings, terminal, workspace,
-};
+use commands::agent::lifecycle as agent_cmd;
+use commands::agent::{ai, conversations};
+use commands::common::{files, git, lsp, search, settings, terminal, workspace};
 use snowflake_conversations::ConversationManager;
 use snowflake_settings::SettingsManager;
 use tauri_plugin_log::{Target, TargetKind};

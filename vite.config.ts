@@ -6,14 +6,15 @@ import { defineConfig } from 'vite';
 
 // https://vite.dev/config/
 export default defineConfig({
+  root: './apps/agent',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(__dirname, './apps/agent/src'),
     },
   },
   build: {
-    outDir: 'dist',
+    outDir: '../../dist',
     cssCodeSplit: false,
     rollupOptions: {
       output: {

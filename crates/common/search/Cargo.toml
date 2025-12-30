@@ -1,0 +1,15 @@
+[package]
+name = "snowflake-search"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Search functionality for Snowflake"
+
+[lints]
+workspace = true
+
+[dependencies]
+snowflake-core = { path = "../core" }
+ignore = { workspace = true }

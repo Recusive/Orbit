@@ -4,14 +4,14 @@ This file provides guidance to Claude Code when working with the Snowflake codeb
 
 ## Project Overview
 
-Snowflake is a modern AI-powered code editor built with **Tauri 2** (Rust backend) and **React 19** (TypeScript frontend). It features a multi-panel IDE-like interface with chat, terminal, file browser, and code editing capabilities.
+Snowflake is a modern AI-powered code editor built with **Tauri 2** (Rust backend) and **React 19** (TypeScript frontend). It's a monorepo containing three frontend apps (Agent, Canvas, Editor) that share a common Rust backend.
 
 ## Technology Stack
 
 ### Frontend
 
 - **React 19** + TypeScript + Vite
-- **pnpm** for package management
+- **pnpm** workspaces for monorepo management
 - **Tailwind CSS v4** for styling
 - **Zustand + Immer** for state management
 - **CodeMirror 6** for code editing with custom themes
@@ -23,49 +23,91 @@ Snowflake is a modern AI-powered code editor built with **Tauri 2** (Rust backen
 
 - **Tauri 2** for desktop app framework
 - **Rust** workspace with multiple crates
-- Planned: Tree-sitter for syntax parsing, portable-pty for terminal
+- **portable-pty** for terminal emulation
+- Tree-sitter for syntax parsing (planned)
 
 ## Project Structure
 
 ```
 Snowflake-v0/
-├── src/                      # React frontend (TypeScript)
-│   ├── components/           # UI components
-│   │   ├── activity/         # File viewer, changes list
-│   │   ├── chat/             # Chat interface
-│   │   ├── editor/           # CodeMirror editor
-│   │   ├── layout/           # Root layout, panels
-│   │   ├── terminal/         # xterm.js terminal
-│   │   └── ui/               # Radix UI primitives
-│   ├── hooks/                # React hooks (Tauri, chat, terminal)
-│   ├── providers/            # Context providers
-│   ├── stores/               # Zustand state management
-│   ├── types/                # TypeScript types & Zod schemas
-│   └── lib/                  # Utilities (backend API, constants)
+├── apps/                           # Frontend applications
+│   ├── agent/                      # Chat/Agent app (main app)
+│   │   ├── src/
+│   │   │   ├── components/
+│   │   │   │   ├── ui/             # Radix UI primitives
+│   │   │   │   ├── layout/         # Panels, sidebar, header
+│   │   │   │   ├── chat/           # Chat messages, tools
+│   │   │   │   ├── input/          # Chat input, mentions
+│   │   │   │   ├── terminal/       # xterm.js terminal
+│   │   │   │   ├── editor/         # CodeMirror editor
+│   │   │   │   ├── files/          # File explorer, icons
+│   │   │   │   ├── activity/       # Source control, diffs
+│   │   │   │   ├── sidebar/        # Conversation list
+│   │   │   │   ├── settings/       # Settings dialogs
+│   │   │   │   └── shared/         # Common components
+│   │   │   ├── hooks/              # React hooks
+│   │   │   ├── stores/             # Zustand state
+│   │   │   ├── services/           # Business logic
+│   │   │   ├── types/              # TypeScript types
+│   │   │   ├── lib/                # Utilities
+│   │   │   └── providers/          # Context providers
+│   │   └── index.html
+│   │
+│   ├── canvas/                     # Canvas/Design app (stub)
+│   │   └── src/
+│   │
+│   └── editor/                     # Editor app (stub)
+│       └── src/
 │
-├── src-tauri/                # Tauri backend (Rust)
+├── agent-bridge/                   # AI Bridge (Claude Agent SDK sidecar)
+│   ├── src/                        # TypeScript source
+│   ├── dist/                       # Compiled output
+│   └── package.json
+│
+├── crates/                         # Rust library crates
+│   ├── common/                     # Shared crates
+│   │   ├── core/                   # Core types, config, state
+│   │   ├── fs/                     # File system operations
+│   │   ├── terminal/               # PTY management
+│   │   ├── git/                    # Git operations
+│   │   ├── ai/                     # Claude API integration
+│   │   ├── lsp/                    # Language server
+│   │   ├── search/                 # Ripgrep search
+│   │   ├── syntax/                 # Syntax highlighting
+│   │   ├── settings/               # Settings persistence
+│   │   └── conversations/          # Conversation storage
+│   │
+│   ├── agent/                      # Agent-specific Rust (stub)
+│   ├── canvas/                     # Canvas-specific Rust (stub)
+│   └── editor/                     # Editor-specific Rust (stub)
+│
+├── src-tauri/                      # Tauri app entry point
 │   ├── src/
-│   │   ├── commands/         # Tauri command handlers
-│   │   │   ├── files.rs      # File operations
-│   │   │   ├── terminal.rs   # Terminal PTY
-│   │   │   ├── lsp.rs        # Language server
-│   │   │   ├── git.rs        # Git operations
-│   │   │   ├── ai.rs         # Claude API
-│   │   │   └── search.rs     # Ripgrep search
-│   │   ├── lib.rs            # Tauri app setup
-│   │   └── main.rs           # Entry point
-│   └── tauri.conf.json       # Tauri configuration
+│   │   ├── commands/
+│   │   │   ├── common/             # Shared commands
+│   │   │   │   ├── files.rs
+│   │   │   │   ├── terminal.rs
+│   │   │   │   ├── git.rs
+│   │   │   │   ├── lsp.rs
+│   │   │   │   ├── search.rs
+│   │   │   │   ├── settings.rs
+│   │   │   │   └── workspace.rs
+│   │   │   ├── agent/              # Agent-specific commands
+│   │   │   │   ├── agent.rs
+│   │   │   │   ├── ai.rs
+│   │   │   │   └── conversations.rs
+│   │   │   ├── canvas/             # Canvas commands (stub)
+│   │   │   └── editor/             # Editor commands (stub)
+│   │   ├── agent/                  # Agent bridge (Rust side)
+│   │   ├── lib.rs
+│   │   └── main.rs
+│   └── tauri.conf.json
 │
-├── crates/                   # Rust library crates
-│   ├── snowflake-core/       # Core types, config, state
-│   ├── snowflake-fs/         # File system operations
-│   ├── snowflake-terminal/   # PTY management (TODO)
-│   ├── snowflake-ai/         # Claude API integration (TODO)
-│   ├── snowflake-lsp/        # Language server (TODO)
-│   ├── snowflake-git/        # Git operations (TODO)
-│   └── snowflake-search/     # Ripgrep search (TODO)
-│
-└── Cargo.toml                # Rust workspace root
+├── Cargo.toml                      # Rust workspace root
+├── package.json                    # pnpm workspace root
+├── pnpm-workspace.yaml             # Workspace config
+├── vite.config.ts                  # Vite config (root: apps/agent)
+└── tsconfig.json                   # TypeScript config
 ```
 
 ## Commands
@@ -81,7 +123,7 @@ pnpm preview             # Preview production build
 pnpm typecheck           # TypeScript only (tsc --noEmit)
 pnpm lint                # ESLint with zero warnings tolerance
 pnpm lint:fix            # ESLint with auto-fix
-pnpm check               # typecheck + lint + Rust fmt + clippy
+pnpm check               # typecheck + lint
 pnpm ci                  # Full CI: typecheck + lint + build
 
 # Tauri Development (RECOMMENDED)
@@ -90,6 +132,7 @@ pnpm tauri build         # Build production app (.dmg/.exe/.AppImage)
 
 # Rust Only (from project root)
 cargo build              # Build all Rust crates
+cargo check              # Fast type checking
 cargo test               # Run Rust tests
 cargo clippy             # Lint Rust code
 ```
@@ -104,19 +147,20 @@ pnpm tauri dev           # Starts everything: Vite (5176) + Tauri + Rust
 
 This command:
 
-1. Starts Vite dev server on port 5176
-2. Compiles Rust backend
-3. Opens the Tauri desktop window
-4. Enables hot-reload for both frontend and backend
+1. Builds the agent-bridge sidecar
+2. Starts Vite dev server on port 5176
+3. Compiles Rust backend
+4. Opens the Tauri desktop window
+5. Enables hot-reload for both frontend and backend
 
 ### Hot Reload Behavior
 
-| Change Type               | Reload Behavior             |
-| ------------------------- | --------------------------- |
-| React/TypeScript (`src/`) | Instant HMR via Vite        |
-| CSS/Tailwind              | Instant HMR via Vite        |
-| Rust (`src-tauri/`)       | Auto-rebuilds, restarts app |
-| Rust crates (`crates/`)   | Auto-rebuilds, restarts app |
+| Change Type                          | Reload Behavior             |
+| ------------------------------------ | --------------------------- |
+| React/TypeScript (`apps/agent/src/`) | Instant HMR via Vite        |
+| CSS/Tailwind                         | Instant HMR via Vite        |
+| Rust (`src-tauri/`)                  | Auto-rebuilds, restarts app |
+| Rust crates (`crates/`)              | Auto-rebuilds, restarts app |
 
 ### Production Build
 
@@ -145,16 +189,15 @@ Note: Backend features (file system, terminal, etc.) won't work in browser-only 
 | File                        | Purpose                                       |
 | --------------------------- | --------------------------------------------- |
 | `src-tauri/tauri.conf.json` | Tauri app config (window, permissions, build) |
-| `vite.config.ts`            | Vite bundler config (port 5176, aliases)      |
+| `vite.config.ts`            | Vite bundler config (root: apps/agent)        |
 | `Cargo.toml`                | Rust workspace root                           |
-| `src-tauri/Cargo.toml`      | Tauri app dependencies                        |
-| `.npmrc`                    | pnpm settings (strict peers, resolution mode) |
-| `pnpm-lock.yaml`            | pnpm lockfile                                 |
-| `deny.toml`                 | cargo-deny config (licenses, advisories)      |
+| `pnpm-workspace.yaml`       | pnpm workspace packages                       |
+| `tsconfig.json`             | TypeScript config (paths: apps/agent/src)     |
+| `components.json`           | shadcn/ui configuration                       |
 
 ## Frontend-Backend Communication
 
-### Tauri Hook (`src/hooks/use-tauri.ts`)
+### Tauri Hook (`apps/agent/src/hooks/use-tauri.ts`)
 
 ```typescript
 // Send message to backend
@@ -171,7 +214,7 @@ useTauri({
 });
 ```
 
-### Backend API (`src/lib/backend.ts`)
+### Backend API (`apps/agent/src/lib/backend.ts`)
 
 Direct Tauri invoke calls for file operations, LSP, terminal, git, etc:
 
@@ -194,7 +237,7 @@ await writeTerminal(id, data);
 
 ## CodeMirror Editor
 
-The editor (`src/components/editor/CodeMirrorEditor.tsx`) provides:
+The editor (`apps/agent/src/components/editor/CodeMirrorEditor.tsx`) provides:
 
 - Full editing with syntax highlighting
 - Custom dark/light themes matching app colors
@@ -210,7 +253,7 @@ The editor (`src/components/editor/CodeMirrorEditor.tsx`) provides:
 
 ## State Management
 
-Zustand stores in `src/stores/`:
+Zustand stores in `apps/agent/src/stores/`:
 
 | Store               | Purpose                                 |
 | ------------------- | --------------------------------------- |
@@ -220,25 +263,13 @@ Zustand stores in `src/stores/`:
 | `terminal-store`    | xterm sessions                          |
 | `file-store`        | File tree state                         |
 | `file-viewer-store` | Open file tabs, content, modified state |
-
-### File Viewer Store
-
-Tracks open files with edit state:
-
-```typescript
-interface ViewedFile {
-  path: string;
-  content: string;
-  originalContent: string; // For dirty detection
-  language: string;
-  isModified: boolean; // Shows coral dot on tab when true
-  viewMode: 'file' | 'diff';
-}
-```
+| `git-store`         | Git branch, status, ahead/behind        |
+| `tool-store`        | Tool execution & visualization          |
+| `browser-store`     | Browser/webpage viewing state           |
 
 ## Protocol Types
 
-All message types in `src/types/protocol.ts` with Zod schemas:
+All message types in `apps/agent/src/types/protocol.ts` with Zod schemas:
 
 ### Frontend → Backend (WebviewMessage)
 
@@ -278,26 +309,65 @@ All message types in `src/types/protocol.ts` with Zod schemas:
 - Ternary for conditional rendering
 - Props interfaces marked `readonly`
 
+## Monorepo Structure
+
+### Apps (`apps/`)
+
+| App      | Description                | Status |
+| -------- | -------------------------- | ------ |
+| `agent`  | Chat/AI agent interface    | Active |
+| `canvas` | Design canvas (Figma-like) | Stub   |
+| `editor` | Code editor                | Stub   |
+
+### Shared Crates (`crates/common/`)
+
+| Crate      | Description               |
+| ---------- | ------------------------- |
+| `core`     | Core types, config, state |
+| `fs`       | File system operations    |
+| `terminal` | PTY management            |
+| `git`      | Git operations            |
+| `ai`       | Claude API integration    |
+| `lsp`      | Language server protocol  |
+| `search`   | Ripgrep search            |
+
+### App-Specific Crates (`crates/{agent,canvas,editor}/`)
+
+Currently stubs - will contain app-specific Rust code as needed.
+
+### Commands (`src-tauri/src/commands/`)
+
+| Folder    | Description                                  |
+| --------- | -------------------------------------------- |
+| `common/` | Shared commands (files, terminal, git, etc.) |
+| `agent/`  | Agent-specific commands (ai, conversations)  |
+| `canvas/` | Canvas-specific commands (stub)              |
+| `editor/` | Editor-specific commands (stub)              |
+
 ## Implementation Status
 
 ### Completed
 
 - [x] Tauri 2 project setup with Rust workspace
+- [x] Monorepo restructure (apps/, crates/common/, commands/)
 - [x] CodeMirror 6 editor with custom themes
 - [x] File editing with save (Cmd-S)
 - [x] Modified indicator on tabs
 - [x] Theme switching (light/dark)
 - [x] Frontend-backend communication layer
-- [x] pnpm package management migration
-- [x] CI/CD with GitHub Actions (TypeScript, ESLint, Rust checks)
-- [x] cargo-deny for dependency security/license auditing
-- [x] Husky + lint-staged for pre-commit hooks
+- [x] Terminal with xterm.js
+- [x] Git status & operations
+- [x] pnpm workspace management
+- [x] CI/CD with GitHub Actions
 
-### TODO (Rust Backend)
+### In Progress
 
-- [ ] File system operations (snowflake-fs)
-- [ ] Terminal PTY management (snowflake-terminal)
-- [ ] Claude AI integration (snowflake-ai)
-- [ ] Language server protocol (snowflake-lsp)
-- [ ] Git operations (snowflake-git)
-- [ ] Ripgrep search (snowflake-search)
+- [ ] Canvas app implementation
+- [ ] Editor app implementation
+- [ ] Shared packages extraction
+
+### TODO
+
+- [ ] Tree-sitter syntax highlighting
+- [ ] LSP/diagnostics integration
+- [ ] Advanced search features

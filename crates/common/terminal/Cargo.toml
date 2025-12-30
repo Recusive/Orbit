@@ -1,0 +1,22 @@
+[package]
+name = "snowflake-terminal"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Terminal emulation and PTY management for Snowflake"
+
+[lints]
+workspace = true
+
+[dependencies]
+snowflake-core = { path = "../core" }
+serde = { workspace = true }
+tokio = { workspace = true }
+parking_lot = { workspace = true }
+hashbrown = { workspace = true }
+portable-pty = { workspace = true }
+tracing = { workspace = true }
+dirs = { workspace = true }
+sysinfo = { workspace = true }

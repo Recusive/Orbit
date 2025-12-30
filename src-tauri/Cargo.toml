@@ -18,16 +18,16 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { workspace = true }
 
 [dependencies]
-# Workspace crates
-snowflake-core = { path = "../crates/snowflake-core" }
-snowflake-fs = { path = "../crates/snowflake-fs" }
-snowflake-lsp = { path = "../crates/snowflake-lsp" }
-snowflake-terminal = { path = "../crates/snowflake-terminal" }
-snowflake-git = { path = "../crates/snowflake-git" }
-snowflake-ai = { path = "../crates/snowflake-ai" }
-snowflake-search = { path = "../crates/snowflake-search" }
-snowflake-settings = { path = "../crates/snowflake-settings" }
-snowflake-conversations = { path = "../crates/snowflake-conversations" }
+# Workspace crates - common
+snowflake-core = { path = "../crates/common/core" }
+snowflake-fs = { path = "../crates/common/fs" }
+snowflake-lsp = { path = "../crates/common/lsp" }
+snowflake-terminal = { path = "../crates/common/terminal" }
+snowflake-git = { path = "../crates/common/git" }
+snowflake-ai = { path = "../crates/common/ai" }
+snowflake-search = { path = "../crates/common/search" }
+snowflake-settings = { path = "../crates/common/settings" }
+snowflake-conversations = { path = "../crates/common/conversations" }
 
 # Core dependencies
 tokio = { workspace = true }

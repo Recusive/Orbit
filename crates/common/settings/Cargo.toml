@@ -1,0 +1,23 @@
+[package]
+name = "snowflake-settings"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "User settings and configuration for Snowflake"
+
+[lints]
+workspace = true
+
+[dependencies]
+snowflake-core = { path = "../core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+directories = "5.0"
+dirs = "5.0"
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.15"
