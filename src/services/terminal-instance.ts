@@ -8,6 +8,7 @@
  */
 
 import { FitAddon } from '@xterm/addon-fit';
+import { SearchAddon } from '@xterm/addon-search';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 
@@ -39,6 +40,8 @@ export interface TerminalInstanceOptions {
   sessionName: string;
   postMessage: (message: unknown) => void;
   isMockMode?: boolean;
+  /** Enable copy-on-selection (auto-copy selected text to clipboard) */
+  copyOnSelection?: boolean;
   onConnected?: (terminalId: string, pid?: number, shellType?: string, name?: string) => void;
   onDisconnected?: (exitCode?: number) => void;
   onCwdChange?: (cwd: string) => void;
@@ -71,9 +74,13 @@ export class TerminalInstance {
   private isDisposed = false;
   private ptyRequested = false;
 
+  // Copy-on-selection
+  private _copyOnSelection = false;
+
   // xterm.js
   private terminal: Terminal;
   private fitAddon: FitAddon;
+  private searchAddon: SearchAddon;
   private decorationsAddon: CommandDecorationsAddon;
 
   // DOM - VS Code pattern: wrapper element that can be moved between containers
@@ -108,6 +115,7 @@ export class TerminalInstance {
     this.sessionName = options.sessionName;
     this.postMessage = options.postMessage;
     this.isMockMode = options.isMockMode ?? false;
+    this._copyOnSelection = options.copyOnSelection ?? false;
     this.onConnected = options.onConnected;
     this.onDisconnected = options.onDisconnected;
     this.onCwdChange = options.onCwdChange;
@@ -180,6 +188,9 @@ export class TerminalInstance {
     this.fitAddon = new FitAddon();
     this.terminal.loadAddon(this.fitAddon);
 
+    this.searchAddon = new SearchAddon();
+    this.terminal.loadAddon(this.searchAddon);
+
     const webLinksAddon = new WebLinksAddon();
     this.terminal.loadAddon(webLinksAddon);
 
@@ -228,6 +239,9 @@ export class TerminalInstance {
 
     // Set up flow control
     this.setupFlowControl();
+
+    // Set up copy-on-selection
+    this.setupCopyOnSelection();
 
     // Set up resize debouncer (VS Code pattern)
     // This replaces ResizeObserver - container will call layout() instead
@@ -300,7 +314,9 @@ export class TerminalInstance {
       // Flush any pending resize operations when becoming visible
       this.resizeDebouncer.flush();
       // Auto-focus when becoming visible
-      setTimeout(() => { this.terminal.focus(); }, 50);
+      setTimeout(() => {
+        this.terminal.focus();
+      }, 50);
     }
   }
 
@@ -392,9 +408,7 @@ export class TerminalInstance {
 
         // Show exit message
         this.terminal.writeln('');
-        this.terminal.writeln(
-          `\r\n[Process exited with code ${String(message.exit_code ?? 0)}]`
-        );
+        this.terminal.writeln(`\r\n[Process exited with code ${String(message.exit_code ?? 0)}]`);
         break;
       }
 
@@ -493,6 +507,131 @@ export class TerminalInstance {
     }, 100);
   }
 
+  private setupCopyOnSelection(): void {
+    const selectionDisposable = this.terminal.onSelectionChange(() => {
+      if (!this._copyOnSelection) return;
+
+      const selection = this.terminal.getSelection();
+      if (selection) {
+        navigator.clipboard.writeText(selection).catch(() => {
+          // Silently fail if clipboard not available
+        });
+      }
+    });
+    this.disposables.push(selectionDisposable);
+  }
+
+  // ==========================================================================
+  // Clipboard Methods (for context menu)
+  // ==========================================================================
+
+  /**
+   * Get the current text selection from the terminal
+   */
+  getSelection(): string {
+    return this.terminal.getSelection();
+  }
+
+  /**
+   * Check if there is an active selection
+   */
+  hasSelection(): boolean {
+    return this.terminal.hasSelection();
+  }
+
+  /**
+   * Copy the current selection to clipboard
+   */
+  async copySelection(): Promise<void> {
+    const selection = this.terminal.getSelection();
+    if (selection) {
+      await navigator.clipboard.writeText(selection);
+    }
+  }
+
+  /**
+   * Paste text from clipboard into terminal
+   */
+  async paste(): Promise<void> {
+    const text = await navigator.clipboard.readText();
+    if (text && this.terminalId && this.isConnected) {
+      this.postMessage({
+        type: 'terminal:write',
+        uuid: crypto.randomUUID(),
+        terminal_id: this.terminalId,
+        data: text,
+      });
+    }
+  }
+
+  /**
+   * Clear the terminal buffer
+   */
+  clear(): void {
+    this.terminal.clear();
+  }
+
+  /**
+   * Enable or disable copy-on-selection
+   */
+  set copyOnSelection(value: boolean) {
+    this._copyOnSelection = value;
+  }
+
+  get copyOnSelection(): boolean {
+    return this._copyOnSelection;
+  }
+
+  // ==========================================================================
+  // Search Methods
+  // ==========================================================================
+
+  /**
+   * Search for text in the terminal buffer (forward)
+   * @returns true if a match was found
+   */
+  findNext(
+    query: string,
+    options?: {
+      caseSensitive?: boolean;
+      regex?: boolean;
+      wholeWord?: boolean;
+    }
+  ): boolean {
+    if (!query) return false;
+    return this.searchAddon.findNext(query, {
+      caseSensitive: options?.caseSensitive ?? false,
+      regex: options?.regex ?? false,
+      wholeWord: options?.wholeWord ?? false,
+    });
+  }
+
+  /**
+   * Search for text in the terminal buffer (backward)
+   * @returns true if a match was found
+   */
+  findPrevious(
+    query: string,
+    options?: {
+      caseSensitive?: boolean;
+      regex?: boolean;
+      wholeWord?: boolean;
+    }
+  ): boolean {
+    if (!query) return false;
+    return this.searchAddon.findPrevious(query, {
+      caseSensitive: options?.caseSensitive ?? false,
+      regex: options?.regex ?? false,
+      wholeWord: options?.wholeWord ?? false,
+    });
+  }
+
+  /**
+   * Clear the current search highlighting
+   */
+  clearSearch(): void {
+    this.searchAddon.clearDecorations();
+  }
 
   // ==========================================================================
   // Getters & Setters

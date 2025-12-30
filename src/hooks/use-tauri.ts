@@ -14,6 +14,7 @@ import {
   closeTerminal,
   onTerminalOutput,
   onTerminalExit,
+  onTerminalForeground,
   watchPath,
   onFileChange,
   // Agent SDK operations
@@ -110,6 +111,19 @@ async function initTerminalListeners(): Promise<void> {
           uuid: crypto.randomUUID(),
           terminal_id: event.id,
           exit_code: event.code,
+        },
+        '*'
+      );
+    });
+
+    await onTerminalForeground((event) => {
+      window.postMessage(
+        {
+          type: 'terminal:foreground',
+          uuid: crypto.randomUUID(),
+          terminal_id: event.id,
+          process_name: event.process_name,
+          pid: event.pid,
         },
         '*'
       );
@@ -684,7 +698,7 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
           uuid: crypto.randomUUID(),
           session_id: message.session_id,
           terminal_id: info.id,
-          name: message.name ?? info.shell,
+          name: info.shell, // Use actual shell name from backend (e.g., "zsh")
           pid: info.pid,
           cwd: info.cwd,
           shell_type: info.shell,
@@ -1652,7 +1666,7 @@ function handleMockMessage(message: WebviewMessage): void {
             uuid: crypto.randomUUID(),
             session_id: message.session_id,
             terminal_id: terminalId,
-            name: message.name ?? 'zsh',
+            name: 'zsh', // Use shell name, not session name
             pid: 12345,
             cwd: '/mock/workspace',
             shell_type: 'zsh',

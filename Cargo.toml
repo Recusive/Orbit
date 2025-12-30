@@ -43,9 +43,11 @@ indexmap = "2"
 notify = "8"
 walkdir = "2"
 globset = "0.4"
+dirs = "6"
 
 # Terminal
 portable-pty = "0.9"
+sysinfo = "0.35"
 
 # Git
 gix = { version = "0.69", default-features = false, features = ["basic", "status"] }

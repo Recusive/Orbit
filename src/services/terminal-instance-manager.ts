@@ -24,13 +24,20 @@ export interface TerminalInstanceInfo {
 }
 
 export interface TerminalManagerCallbacks {
-  onInstanceConnected?: (sessionId: string, terminalId: string, pid?: number, shellType?: string, name?: string) => void;
+  onInstanceConnected?: (
+    sessionId: string,
+    terminalId: string,
+    pid?: number,
+    shellType?: string,
+    name?: string
+  ) => void;
   onInstanceDisconnected?: (sessionId: string, exitCode?: number) => void;
   onCwdChange?: (sessionId: string, cwd: string) => void;
   onCommandStart?: (sessionId: string, commandLine?: string) => void;
   onCommandEnd?: (sessionId: string, exitCode: number) => void;
   onCapabilitiesChange?: (sessionId: string, capabilities: TerminalCapabilities) => void;
   onTitleChange?: (sessionId: string, title: string) => void;
+  onForegroundChange?: (terminalId: string, processName: string, pid: number) => void;
 }
 
 // ============================================================================
@@ -210,9 +217,7 @@ export class TerminalInstanceManager {
    * Get all active terminal instances.
    */
   getAllInstances(): TerminalInstance[] {
-    return Array.from(this.instances.values()).filter(
-      (instance) => !instance.getIsDisposed()
-    );
+    return Array.from(this.instances.values()).filter((instance) => !instance.getIsDisposed());
   }
 
   /**
@@ -304,6 +309,16 @@ export class TerminalInstanceManager {
     // Route by terminal_id for most messages
     const terminalId = 'terminal_id' in message ? message.terminal_id : undefined;
     const sessionId = 'session_id' in message ? message.session_id : undefined;
+
+    // Handle foreground process change - update store directly
+    if (message.type === 'terminal:foreground' && terminalId) {
+      const processName = 'process_name' in message ? message.process_name : undefined;
+      const pid = 'pid' in message ? message.pid : undefined;
+      if (processName && typeof pid === 'number') {
+        globalCallbacks.onForegroundChange?.(terminalId, processName, pid);
+      }
+      return;
+    }
 
     // For terminal:created, we need to match by session_id
     if (message.type === 'terminal:created' && sessionId) {

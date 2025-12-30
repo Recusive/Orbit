@@ -313,6 +313,22 @@ export async function onTerminalExit(
   return listen<TerminalExitEvent>('terminal:exit', callback);
 }
 
+/** Event emitted when the terminal foreground process changes. */
+export interface TerminalForegroundEvent {
+  /** Terminal ID. */
+  id: string;
+  /** Process name (e.g., "zsh", "node", "python"). */
+  process_name: string;
+  /** Process ID. */
+  pid: number;
+}
+
+export async function onTerminalForeground(
+  callback: (data: TerminalForegroundEvent) => void
+): Promise<() => void> {
+  return listen<TerminalForegroundEvent>('terminal:foreground', callback);
+}
+
 export type TerminalSignal = 'SIGINT' | 'SIGTERM' | 'SIGKILL';
 
 /**

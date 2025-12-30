@@ -18,3 +18,5 @@ parking_lot = { workspace = true }
 hashbrown = { workspace = true }
 portable-pty = { workspace = true }
 tracing = { workspace = true }
+dirs = { workspace = true }
+sysinfo = { workspace = true }

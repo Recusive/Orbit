@@ -784,6 +784,15 @@ export const TerminalExitedSchema = z.object({
   exit_code: z.number().optional(),
 });
 
+// PTY Terminal - Foreground process changed
+export const TerminalForegroundSchema = z.object({
+  type: z.literal('terminal:foreground'),
+  uuid: UUIDSchema,
+  terminal_id: z.string(),
+  process_name: z.string(),
+  pid: z.number(),
+});
+
 // PTY Terminal - CWD changed (from shell integration)
 export const TerminalCwdChangedSchema = z.object({
   type: z.literal('terminal:cwd'),
@@ -1176,6 +1185,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   TerminalDataSchema,
   TerminalCreatedSchema,
   TerminalExitedSchema,
+  TerminalForegroundSchema,
   TerminalCwdChangedSchema,
   TerminalCommandStartSchema,
   TerminalCommandEndSchema,

@@ -5,8 +5,6 @@ import type { ShellType, TerminalCapabilitiesState } from '@/types/protocol';
 
 import { TERMINAL } from '@/lib/constants';
 
-
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -28,14 +26,24 @@ export interface DetectedCommand {
   isRunning: boolean;
 }
 
+/** Foreground process info from the backend */
+export interface ForegroundProcess {
+  /** Process ID */
+  pid: number;
+  /** Process name (e.g., "zsh", "node", "python") */
+  name: string;
+}
+
 /** PTY Terminal Session */
 export interface TerminalSession {
   /** Local session ID (for UI tracking) */
   id: string;
   /** Backend PTY terminal ID (from main process) */
   terminalId?: string;
-  /** Display name */
+  /** Default display name (e.g., "Terminal 1") */
   name: string;
+  /** Custom name set by user (overrides default name) */
+  customName?: string;
   /** Current working directory */
   cwd: string;
   /** Shell type (bash, zsh, fish, etc.) */
@@ -60,6 +68,8 @@ export interface TerminalSession {
   commandHistory: DetectedCommand[];
   /** Flow control: unacknowledged bytes */
   unacknowledgedBytes: number;
+  /** Current foreground process (e.g., "zsh", "node") */
+  foregroundProcess?: ForegroundProcess;
 }
 
 // ============================================================================
@@ -81,15 +91,23 @@ const FLOW_CONTROL = {
 // Store Interface
 // ============================================================================
 
+/** Terminal preferences that can be configured */
+export interface TerminalPreferences {
+  /** Auto-copy selected text to clipboard */
+  copyOnSelection: boolean;
+}
+
 export interface TerminalState {
   sessions: TerminalSession[];
   activeSessionId: string | null;
   maxOutputLines: number;
+  preferences: TerminalPreferences;
 
   // Session Management
   createSession: (name?: string, cwd?: string) => string;
   closeSession: (id: string) => void;
   setActiveSession: (id: string | null) => void;
+  renameSession: (id: string, name: string) => void;
 
   // PTY Connection
   connectSession: (
@@ -110,6 +128,9 @@ export interface TerminalState {
   updateCapabilities: (terminalId: string, capabilities: TerminalCapabilitiesState) => void;
   updateCwd: (terminalId: string, cwd: string) => void;
 
+  // Foreground Process
+  updateForegroundProcess: (terminalId: string, processName: string, pid: number) => void;
+
   // Command Detection
   startCommand: (terminalId: string, commandLine?: string) => void;
   endCommand: (terminalId: string, exitCode?: number) => void;
@@ -121,6 +142,9 @@ export interface TerminalState {
   // Session Updates
   updateSession: (sessionId: string, updates: Partial<TerminalSession>) => void;
   setMaxOutputLines: (lines: number) => void;
+
+  // Preferences
+  setCopyOnSelection: (enabled: boolean) => void;
 
   // Helpers
   getSessionByTerminalId: (terminalId: string) => TerminalSession | undefined;
@@ -136,6 +160,9 @@ export const useTerminalStore = create<TerminalState>()(
     sessions: [],
     activeSessionId: null,
     maxOutputLines: TERMINAL.maxOutputLines,
+    preferences: {
+      copyOnSelection: false,
+    },
 
     // ========================================================================
     // Session Management
@@ -152,8 +179,7 @@ export const useTerminalStore = create<TerminalState>()(
 
       set((state) => {
         const processExists = typeof process !== 'undefined';
-        const defaultCwd =
-          processExists && typeof process.cwd === 'function' ? process.cwd() : '~';
+        const defaultCwd = processExists && typeof process.cwd === 'function' ? process.cwd() : '~';
 
         const newSession: TerminalSession = {
           id,
@@ -201,6 +227,20 @@ export const useTerminalStore = create<TerminalState>()(
     setActiveSession: (id: string | null) => {
       set((state) => {
         state.activeSessionId = id;
+      });
+    },
+
+    renameSession: (id: string, name: string) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.id === id);
+        if (session) {
+          // If name is empty or same as default, clear customName
+          if (!name.trim() || name.trim() === session.name) {
+            delete session.customName;
+          } else {
+            session.customName = name.trim();
+          }
+        }
       });
     },
 
@@ -336,6 +376,19 @@ export const useTerminalStore = create<TerminalState>()(
     },
 
     // ========================================================================
+    // Foreground Process
+    // ========================================================================
+
+    updateForegroundProcess: (terminalId: string, processName: string, pid: number) => {
+      set((state) => {
+        const session = state.sessions.find((s) => s.terminalId === terminalId);
+        if (session) {
+          session.foregroundProcess = { name: processName, pid };
+        }
+      });
+    },
+
+    // ========================================================================
     // Command Detection
     // ========================================================================
 
@@ -429,6 +482,16 @@ export const useTerminalStore = create<TerminalState>()(
             session.output.splice(0, excess);
           }
         });
+      });
+    },
+
+    // ========================================================================
+    // Preferences
+    // ========================================================================
+
+    setCopyOnSelection: (enabled: boolean) => {
+      set((state) => {
+        state.preferences.copyOnSelection = enabled;
       });
     },
 

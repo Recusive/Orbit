@@ -61,6 +61,7 @@ export function useTerminalInstanceManager(): TerminalInstanceManager {
   const updateCapabilities = useTerminalStore((state) => state.updateCapabilities);
   const startCommand = useTerminalStore((state) => state.startCommand);
   const endCommand = useTerminalStore((state) => state.endCommand);
+  const updateForegroundProcess = useTerminalStore((state) => state.updateForegroundProcess);
 
   // Get postMessage from Tauri
   // Pass dummy handler since we use global listener instead
@@ -127,6 +128,9 @@ export function useTerminalInstanceManager(): TerminalInstanceManager {
           const basename = title.split('/').pop() ?? title;
           updateSession(sessionId, { name: basename });
         },
+        onForegroundChange: (terminalId, processName, pid) => {
+          updateForegroundProcess(terminalId, processName, pid);
+        },
       });
     } else {
       // Already initialized - just update the postMessage reference
@@ -181,6 +185,9 @@ export function useTerminalInstanceManager(): TerminalInstanceManager {
           const basename = title.split('/').pop() ?? title;
           updateSession(sessionId, { name: basename });
         },
+        onForegroundChange: (terminalId, processName, pid) => {
+          updateForegroundProcess(terminalId, processName, pid);
+        },
       });
     }
 
@@ -196,6 +203,7 @@ export function useTerminalInstanceManager(): TerminalInstanceManager {
     updateCapabilities,
     startCommand,
     endCommand,
+    updateForegroundProcess,
   ]);
 
   // Clean up orphaned instances when sessions change

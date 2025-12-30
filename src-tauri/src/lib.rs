@@ -294,6 +294,7 @@ pub fn run() {
             terminal::terminal_signal,
             terminal::terminal_acknowledge,
             terminal::terminal_pending_bytes,
+            terminal::terminal_foreground_process,
             terminal::terminal_emit_prompt,
             // Git commands
             git::git_discover,

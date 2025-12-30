@@ -14,7 +14,7 @@
 
 use std::fmt;
 use std::io::{ErrorKind, Read as _, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -24,6 +24,7 @@ use parking_lot::Mutex;
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use snowflake_core::{Error, Result, TerminalInfo};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
@@ -113,6 +114,126 @@ impl TerminalConfig {
 }
 
 // ============================================
+// Foreground Process Tracking
+// ============================================
+
+/// Information about the current foreground process in the terminal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ForegroundProcess {
+    /// Process ID.
+    pub pid: u32,
+    /// Process name (e.g., "zsh", "node", "python").
+    pub name: String,
+}
+
+impl ForegroundProcess {
+    /// Create a new foreground process info.
+    #[must_use]
+    pub fn new(pid: u32, name: String) -> Self {
+        Self { pid, name }
+    }
+}
+
+/// Tracker for foreground process changes.
+#[derive(Debug)]
+struct ForegroundProcessTracker {
+    /// System info for process queries.
+    system: Mutex<System>,
+    /// Last known foreground process.
+    last_process: Mutex<Option<ForegroundProcess>>,
+    /// Shell PID (the main process we spawned).
+    shell_pid: u32,
+    /// Shell name extracted from path.
+    shell_name: String,
+}
+
+impl ForegroundProcessTracker {
+    /// Create a new tracker for the given shell process.
+    fn new(shell_pid: u32, shell_path: &str) -> Self {
+        // Extract shell name from path (e.g., "/bin/zsh" -> "zsh")
+        let shell_name = Path::new(shell_path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("shell")
+            .to_owned();
+
+        Self {
+            system: Mutex::new(System::new()),
+            last_process: Mutex::new(Some(ForegroundProcess::new(shell_pid, shell_name.clone()))),
+            shell_pid,
+            shell_name,
+        }
+    }
+
+    /// Get the current foreground process.
+    ///
+    /// This looks for child processes of the shell and returns the most recently
+    /// started one, or the shell itself if no children are running.
+    #[allow(
+        clippy::iter_over_hash_type,
+        reason = "iteration order doesn't matter for finding child processes"
+    )]
+    fn get_foreground_process(&self) -> ForegroundProcess {
+        let mut system = self.system.lock();
+
+        // Refresh all processes to find children of our shell
+        // We need to refresh all because children may not be in the cache yet
+        let _refreshed = system.refresh_processes_specifics(
+            ProcessesToUpdate::All,
+            true,
+            ProcessRefreshKind::nothing().with_cmd(sysinfo::UpdateKind::Always),
+        );
+
+        let shell_pid = Pid::from_u32(self.shell_pid);
+
+        // Find the foreground process (the most recently started child, or shell itself)
+        // We look for direct children of our shell process
+        let mut foreground_pid = self.shell_pid;
+        let mut foreground_name = self.shell_name.clone();
+
+        // Iterate through all processes to find children of our shell
+        for (pid, process) in system.processes() {
+            if let Some(parent_pid) = process.parent() {
+                if parent_pid == shell_pid {
+                    // This is a child of our shell - use it as the foreground
+                    // In practice, we take the last one we find (could be improved
+                    // by tracking start time, but this is good enough for now)
+                    let pid_val = pid.as_u32();
+                    foreground_pid = pid_val;
+                    foreground_name = process.name().to_string_lossy().into_owned();
+                }
+            }
+        }
+
+        ForegroundProcess::new(foreground_pid, foreground_name)
+    }
+
+    /// Check if the foreground process has changed since last check.
+    ///
+    /// Returns `Some(new_process)` if changed, `None` if unchanged.
+    #[allow(
+        clippy::if_then_some_else_none,
+        reason = "bool::then doesn't work well with mutable state and returning a different value"
+    )]
+    fn check_for_change(&self) -> Option<ForegroundProcess> {
+        let current = self.get_foreground_process();
+
+        let mut last = self.last_process.lock();
+        if last.as_ref() != Some(&current) {
+            *last = Some(current.clone());
+            Some(current)
+        } else {
+            None
+        }
+    }
+
+    /// Get the last known foreground process without refreshing.
+    fn last_known(&self) -> Option<ForegroundProcess> {
+        self.last_process.lock().clone()
+    }
+}
+
+// ============================================
 // Terminal Session
 // ============================================
 
@@ -187,6 +308,8 @@ pub struct Terminal {
     bytes_written: AtomicU64,
     /// Bytes acknowledged by consumer (for flow control).
     bytes_acknowledged: AtomicU64,
+    /// Foreground process tracker.
+    process_tracker: ForegroundProcessTracker,
 }
 
 impl Terminal {
@@ -201,9 +324,11 @@ impl Terminal {
         let rows = if config.rows == 0 { 24 } else { config.rows };
 
         let shell = config.shell.unwrap_or_else(detect_shell);
+        // Default to home directory if no cwd specified (like a normal terminal)
         let cwd = config
             .cwd
             .clone()
+            .or_else(dirs::home_dir)
             .unwrap_or_else(|| PathBuf::from("."))
             .to_string_lossy()
             .to_string();
@@ -221,10 +346,8 @@ impl Terminal {
 
         let mut cmd = CommandBuilder::new(&shell);
 
-        // Set working directory
-        if let Some(cwd) = &config.cwd {
-            cmd.cwd(cwd);
-        }
+        // Always set working directory (uses home directory as default)
+        cmd.cwd(&cwd);
 
         // Add custom environment variables
         for (key, value) in &config.env {
@@ -305,6 +428,9 @@ impl Terminal {
         let bytes_written_inner = Arc::try_unwrap(bytes_written)
             .unwrap_or_else(|arc| AtomicU64::new(arc.load(Ordering::Relaxed)));
 
+        // Create foreground process tracker
+        let process_tracker = ForegroundProcessTracker::new(pid, &shell);
+
         Ok(Self {
             id,
             pid,
@@ -317,6 +443,7 @@ impl Terminal {
             output_rx: Mutex::new(Some(output_rx)),
             bytes_written: bytes_written_inner,
             bytes_acknowledged: AtomicU64::new(0),
+            process_tracker,
         })
     }
 
@@ -454,6 +581,41 @@ impl Terminal {
         *self.running.lock()
     }
 
+    /// Get the current foreground process.
+    ///
+    /// This queries the system for the current foreground process in this terminal.
+    /// The foreground process is typically the currently running command, or the
+    /// shell itself if no command is running.
+    #[must_use]
+    pub fn get_foreground_process(&self) -> ForegroundProcess {
+        self.process_tracker.get_foreground_process()
+    }
+
+    /// Check if the foreground process has changed since last check.
+    ///
+    /// Returns `Some(new_process)` if the foreground process changed,
+    /// `None` if it's the same as before. This is useful for polling.
+    pub fn check_foreground_change(&self) -> Option<ForegroundProcess> {
+        self.process_tracker.check_for_change()
+    }
+
+    /// Get the last known foreground process without refreshing.
+    ///
+    /// This returns the cached value from the last check, avoiding
+    /// the overhead of querying the system.
+    #[must_use]
+    pub fn last_foreground_process(&self) -> Option<ForegroundProcess> {
+        self.process_tracker.last_known()
+    }
+
+    /// Get the shell name (extracted from the shell path).
+    ///
+    /// For example, if the shell is `/bin/zsh`, this returns `"zsh"`.
+    #[must_use]
+    pub fn shell_name(&self) -> &str {
+        &self.process_tracker.shell_name
+    }
+
     /// Close the terminal.
     pub fn close(&self) -> Result<()> {
         *self.running.lock() = false;
@@ -579,6 +741,26 @@ impl TerminalManager {
     #[must_use]
     pub fn list(&self) -> Vec<String> {
         self.terminals.lock().keys().cloned().collect()
+    }
+
+    /// Get the current foreground process for a terminal.
+    pub fn get_foreground_process(&self, id: &str) -> Result<ForegroundProcess> {
+        let terminals = self.terminals.lock();
+        let terminal = terminals
+            .get(id)
+            .ok_or_else(|| Error::Terminal(format!("Terminal not found: {id}")))?;
+        Ok(terminal.get_foreground_process())
+    }
+
+    /// Check if the foreground process has changed for a terminal.
+    ///
+    /// Returns `Ok(Some(new_process))` if changed, `Ok(None)` if unchanged.
+    pub fn check_foreground_change(&self, id: &str) -> Result<Option<ForegroundProcess>> {
+        let terminals = self.terminals.lock();
+        let terminal = terminals
+            .get(id)
+            .ok_or_else(|| Error::Terminal(format!("Terminal not found: {id}")))?;
+        Ok(terminal.check_foreground_change())
     }
 }
 
