@@ -6,10 +6,25 @@
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
+
+    /* Maximum Strictness (adjusted for Claude SDK compatibility) */
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    /* Disabled: Claude SDK types use index signatures extensively */
+    // "exactOptionalPropertyTypes": true,
+    // "noPropertyAccessFromIndexSignature": true,
+    "noImplicitOverride": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Emit */
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

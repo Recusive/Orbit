@@ -163,14 +163,27 @@ function parseCommandFile(
     };
   }
 
-  const [, frontmatter, commandContent] = frontmatterMatch;
+  const frontmatter = frontmatterMatch[1];
+  const commandContent = frontmatterMatch[2];
+
+  if (frontmatter === undefined || commandContent === undefined) {
+    return {
+      name: filename.replace(/\.md$/, ''),
+      content: content.trim(),
+      scope,
+    };
+  }
 
   // Parse YAML frontmatter (simple key: value parsing)
   const metadata = new Map<string, string>();
   for (const line of frontmatter.split('\n')) {
     const match = /^([\w-]+):\s*(.*)$/.exec(line);
     if (match !== null) {
-      metadata.set(match[1], match[2].trim());
+      const key = match[1];
+      const value = match[2];
+      if (key !== undefined && value !== undefined) {
+        metadata.set(key, value.trim());
+      }
     }
   }
 

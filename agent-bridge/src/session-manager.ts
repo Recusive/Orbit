@@ -298,7 +298,7 @@ export class SessionManager extends Disposable {
   /**
    * Create a new agent session
    */
-  createSession(sessionId: string, config?: SessionConfig): void {
+  async createSession(sessionId: string, config?: SessionConfig): Promise<void> {
     if (this.activeSessions.has(sessionId)) {
       return;
     }
@@ -311,7 +311,6 @@ export class SessionManager extends Disposable {
     const permissionCallback = async (
       toolName: string,
       toolInput: Record<string, unknown>,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       context: { signal: AbortSignal; suggestions?: unknown[] }
     ): Promise<{
       decision: 'approve' | 'deny';
@@ -328,13 +327,30 @@ export class SessionManager extends Disposable {
         requestId,
       });
 
-      // Wait for response (no timeout - waits indefinitely)
+      // Wait for response with abort signal support
       const result = await new Promise<{
         decision: 'approve' | 'deny';
         always: boolean;
         answers?: Record<string, string>;
-      }>((resolve) => {
-        this.permissionResolvers.set(requestId, resolve);
+      }>((resolve, reject) => {
+        // Handle abort signal
+        if (context.signal.aborted) {
+          reject(new Error('Permission request aborted'));
+          return;
+        }
+
+        const abortHandler = (): void => {
+          this.permissionResolvers.delete(requestId);
+          reject(new Error('Permission request aborted'));
+        };
+
+        context.signal.addEventListener('abort', abortHandler, { once: true });
+
+        // Store resolver with cleanup
+        this.permissionResolvers.set(requestId, (response) => {
+          context.signal.removeEventListener('abort', abortHandler);
+          resolve(response);
+        });
       });
 
       // If approved, track for race condition handling
@@ -406,11 +422,13 @@ export class SessionManager extends Disposable {
     this.activeSessions.set(sessionId, agent);
 
     try {
-      agent.startSession();
+      await agent.startSession();
       logger.info({ sessionId }, 'Session started successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error({ sessionId, error: errorMessage }, 'Failed to start session');
+      // Remove from active sessions on failure
+      this.activeSessions.delete(sessionId);
       throw error;
     }
 
@@ -589,7 +607,7 @@ export class SessionManager extends Disposable {
                 if (toolInfo !== undefined) {
                   const originalMessage = toolInfo.pendingMessages[0];
                   if (
-                    originalMessage.type === 'tool_use' &&
+                    originalMessage?.type === 'tool_use' &&
                     originalMessage.metadata !== undefined
                   ) {
                     const toolOutput =
@@ -882,7 +900,7 @@ export class SessionManager extends Disposable {
     }
 
     // Create the forked session
-    this.createSession(newSessionId, {
+    await this.createSession(newSessionId, {
       resumeSessionId: currentSDKSessionId,
       forkSession: true,
     });
@@ -991,7 +1009,7 @@ Return ONLY the JSON object with the agent definition.`;
       model: 'sonnet',
     });
 
-    agent.startSession();
+    await agent.startSession();
     agent.queueMessage(prompt);
 
     // Consume responses until we get a result with structured output
@@ -1103,7 +1121,7 @@ Return ONLY the JSON object with the command definition.`;
       model: 'sonnet',
     });
 
-    agent.startSession();
+    await agent.startSession();
     agent.queueMessage(prompt);
 
     // Consume responses until we get a result with structured output

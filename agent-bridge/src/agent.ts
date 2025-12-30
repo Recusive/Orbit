@@ -9,6 +9,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { ClaudeCredentials } from './credentials.js';
 import { createLogger } from './logger.js';
 import { PermissionManager } from './permissions.js';
+import { withRetry, RetryPresets } from './retry.js';
 import { getAllowedToolsForMode } from './session-mode.js';
 import { buildContentBlocks } from './utils/content.js';
 import { formatToolResult } from './utils/formatter.js';
@@ -775,10 +776,11 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     return options;
   }
 
-  startSession(): void {
+  async startSession(): Promise<void> {
     /**
      * Start a persistent streaming session with Claude.
      * Creates a message queue and starts the query with streaming input.
+     * Includes retry logic for reliability.
      *
      * Authentication priority:
      * 1. OAuth token from macOS Keychain (same as Claude Code CLI)
@@ -851,11 +853,24 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     this.messageQueue = new MessageQueue();
     this.sessionActive = true;
 
-    // Start persistent query with streaming input
-    this.currentQuery = query({
-      prompt: this.messageQueue[Symbol.asyncIterator](),
-      options: this._createOptions(),
-    });
+    // Start persistent query with streaming input (with retry for reliability)
+    const messageIterator = this.messageQueue[Symbol.asyncIterator]();
+    const options = this._createOptions();
+
+    this.currentQuery = await withRetry(
+      () => {
+        // query() is synchronous but may throw on initialization errors
+        const q = query({
+          prompt: messageIterator,
+          options,
+        });
+        return Promise.resolve(q);
+      },
+      {
+        ...RetryPresets.aggressive,
+        operationName: 'startSession.query',
+      }
+    );
 
     logger.info('Session started successfully');
   }
@@ -1018,10 +1033,14 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
 
     // Interrupt the query if still running
     if (this.currentQuery) {
+      const currentQuery = this.currentQuery;
       try {
-        await this.currentQuery.interrupt();
+        await withRetry(async () => currentQuery.interrupt(), {
+          ...RetryPresets.quick,
+          operationName: 'stopSession.interrupt',
+        });
       } catch (error) {
-        logger.error({ error }, 'Error interrupting query');
+        logger.error({ error }, 'Error interrupting query after retries');
       }
       this.currentQuery = null;
     }
@@ -1038,8 +1057,13 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       throw new Error('No active query to interrupt.');
     }
 
+    const currentQuery = this.currentQuery;
     logger.info('Interrupting current query');
-    await this.currentQuery.interrupt();
+
+    await withRetry(async () => currentQuery.interrupt(), {
+      ...RetryPresets.quick,
+      operationName: 'interrupt',
+    });
   }
 
   async setPermissionMode(mode: PermissionMode): Promise<void> {
@@ -1050,7 +1074,12 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       throw new Error('No active query.');
     }
 
-    await this.currentQuery.setPermissionMode(mode);
+    const currentQuery = this.currentQuery;
+
+    await withRetry(async () => currentQuery.setPermissionMode(mode), {
+      ...RetryPresets.quick,
+      operationName: 'setPermissionMode',
+    });
   }
 
   isConnected(): boolean {
@@ -1070,7 +1099,12 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Without this, thinking mode changes wouldn't take effect mid-session
     if (this.currentQuery) {
       const budget = enabled && this._thinkingBudget > 0 ? this._thinkingBudget : null;
-      await this.currentQuery.setMaxThinkingTokens(budget);
+      const currentQuery = this.currentQuery;
+
+      await withRetry(async () => currentQuery.setMaxThinkingTokens(budget), {
+        ...RetryPresets.quick,
+        operationName: 'setMaxThinkingTokens',
+      });
 
       const modeName =
         budget === null ? 'off' : budget <= 4096 ? 'think' : budget <= 10240 ? 'hard' : 'ultra';
@@ -1127,7 +1161,13 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
 
     // Update running query if exists - this enables runtime model switching
     if (this.currentQuery) {
-      await this.currentQuery.setModel(model);
+      const currentQuery = this.currentQuery;
+
+      await withRetry(async () => currentQuery.setModel(model), {
+        ...RetryPresets.quick,
+        operationName: 'setModel',
+      });
+
       logger.info({ model }, 'Model updated mid-session via Query.setModel()');
     }
   }

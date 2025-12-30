@@ -226,7 +226,7 @@ async function handleRequest(
 ): Promise<void> {
   switch (request.type) {
     case 'create_session': {
-      sessionManager.createSession(request.sessionId, request.config);
+      await sessionManager.createSession(request.sessionId, request.config);
       sendResponse({ type: 'success', requestType: request.type });
       break;
     }
@@ -416,8 +416,9 @@ async function handleRequest(
       sendResponse({ type: 'success', requestType: request.type });
       sessionManager.dispose();
       process.exit(0);
-      break;
+      // Note: process.exit() never returns, but break needed to satisfy linter
     }
+    // falls through (unreachable after process.exit)
 
     default: {
       const exhaustiveCheck: never = request;
