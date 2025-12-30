@@ -22,7 +22,7 @@ import { HEIGHTS } from '@/lib/constants';
 import { useTerminalStore } from '@/stores/terminal-store';
 import { useUIStore, useTerminalPosition } from '@/stores/ui-store';
 
-interface TerminalPanelProps {
+export interface TerminalPanelProps {
   /**
    * Whether this is a full-width panel (spans chat + activity) or embedded in activity panel
    */

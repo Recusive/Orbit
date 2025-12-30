@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
@@ -59,7 +60,7 @@ type Segment =
   | { type: 'content'; text: string; key: string }
   | { type: 'tool'; tool: ToolExecution; key: string };
 
-export const MessageItem: FC<MessageItemProps> = ({
+export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
   tools,
   isLastAssistantMessage,
@@ -67,7 +68,7 @@ export const MessageItem: FC<MessageItemProps> = ({
   onOpenFile,
   onOpenUrl,
   onFeedback,
-}) => {
+}) {
   const isComplete =
     !message.isStreaming && message.displayedContent.length === message.content.length;
 
@@ -354,4 +355,4 @@ export const MessageItem: FC<MessageItemProps> = ({
       ) : null}
     </div>
   );
-};
+});

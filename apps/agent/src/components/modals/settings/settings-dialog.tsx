@@ -51,7 +51,7 @@ export type SettingsSection =
   | 'account'
   | 'feedback';
 
-interface SettingsDialogProps {
+export interface SettingsDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly defaultSection?: SettingsSection;

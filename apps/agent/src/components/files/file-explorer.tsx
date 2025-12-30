@@ -391,7 +391,7 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
     return (
       <button
         className={cn(
-          'flex items-center w-full text-sm hover:bg-accent/50 transition-colors',
+          'file-tree-item flex items-center w-full text-sm hover:bg-accent/50 transition-colors',
           isSelected && 'bg-accent text-accent-foreground'
         )}
         style={{

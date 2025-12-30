@@ -8,16 +8,16 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef } from 'react';
 
+import type { BrowserPanelProps } from '@/components/browser/browser-panel';
+import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { FileChange } from '@/stores/file-store';
 import type { ViewedFile } from '@/stores/file-viewer-store';
 import type { FC } from 'react';
 
-import { BrowserPanel } from '@/components/browser';
 import { FileIcon, FileViewer } from '@/components/files';
 import { FilesChangedList, SourceControlTab } from '@/components/git';
-import { TerminalPanel } from '@/components/terminal';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { useTauri } from '@/hooks/use-tauri';
 import { lspDidClose, lspDidOpen } from '@/lib/backend';
@@ -31,6 +31,25 @@ import {
 } from '@/stores/file-viewer-store';
 import { useUIStore, useTerminalPosition, useActivityTab } from '@/stores/ui-store';
 import { generateUUID } from '@/types/protocol';
+
+// Lazy load heavy components
+const LazyBrowserPanel = lazy(() =>
+  import('@/components/browser/browser-panel').then((m) => ({ default: m.BrowserPanel }))
+);
+const BrowserPanel: FC<BrowserPanelProps> = (props) => (
+  <Suspense fallback={null}>
+    <LazyBrowserPanel {...props} />
+  </Suspense>
+);
+
+const LazyTerminalPanel = lazy(() =>
+  import('@/components/terminal/terminal-panel').then((m) => ({ default: m.TerminalPanel }))
+);
+const TerminalPanel: FC<TerminalPanelProps> = (props) => (
+  <Suspense fallback={null}>
+    <LazyTerminalPanel {...props} />
+  </Suspense>
+);
 
 interface ActivityPanelProps {
   readonly width: number;

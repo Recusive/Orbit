@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 
 import type { ChatMessage } from '@/components/chat/messages';
+import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { FileEntry } from '@/types/context';
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
@@ -14,7 +15,6 @@ import {
 } from '@/components/chat';
 import { ResizeHandle } from '@/components/layout/resize-handle';
 import { ActivityPanel } from '@/components/panels';
-import { TerminalPanel } from '@/components/terminal';
 import { useChatMessages } from '@/hooks/use-chat-messages';
 import { useTauri } from '@/hooks/use-tauri';
 import {
@@ -26,6 +26,16 @@ import {
   useMaxTokens,
 } from '@/stores/tool-store';
 import { useUIStore, useTerminalPosition } from '@/stores/ui-store';
+
+// Lazy load heavy components
+const LazyTerminalPanel = lazy(() =>
+  import('@/components/terminal/terminal-panel').then((m) => ({ default: m.TerminalPanel }))
+);
+const TerminalPanel: FC<TerminalPanelProps> = (props) => (
+  <Suspense fallback={null}>
+    <LazyTerminalPanel {...props} />
+  </Suspense>
+);
 
 export const ChatArea: FC = () => {
   const { reviewPanelOpen, bottomPanelOpen, reviewPanelWidth } = useUIStore();

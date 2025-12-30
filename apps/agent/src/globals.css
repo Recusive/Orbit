@@ -690,3 +690,45 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ============================================
+   Performance Optimizations
+   ============================================ */
+
+/* Skip rendering off-screen content */
+.content-hidden {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+}
+
+/* For virtualized list items - optimized for smooth scrolling */
+.virtual-item {
+  content-visibility: auto;
+  contain: layout style paint;
+  will-change: transform;
+}
+
+/* For chat message items - larger intrinsic size estimate */
+.message-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 150px;
+  contain: layout style paint;
+}
+
+/* For diff viewer lines - tight containment */
+.diff-line {
+  contain: layout style paint;
+}
+
+/* For file tree items */
+.file-tree-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 24px;
+  contain: layout style paint;
+}
+
+/* Scroll containers - prevent paint bleeding */
+.scroll-container {
+  contain: strict;
+  overflow-anchor: none;
+}

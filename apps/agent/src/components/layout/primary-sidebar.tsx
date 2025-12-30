@@ -7,10 +7,25 @@ import {
   Search,
   Settings,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useState } from 'react';
 
+import type { SettingsDialogProps } from '@/components/modals/settings/settings-dialog';
 import type { ConversationSummary } from '@/stores/ui-store';
 import type { FC } from 'react';
+
+import { FileExplorer } from '@/components/files';
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useTauri } from '@/hooks/use-tauri';
+import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
+import {
+  useUIStore,
+  useIsLeftSidebarCollapsed,
+  useWorkspaceName,
+  useConversations,
+  useActiveConversationId,
+} from '@/stores/ui-store';
 
 // Custom sidebar toggle icon - thicker middle line when expanded
 const SidebarToggleIcon: FC<{ expanded: boolean }> = ({ expanded }) => (
@@ -39,20 +54,17 @@ const SidebarToggleIcon: FC<{ expanded: boolean }> = ({ expanded }) => (
   </svg>
 );
 
-import { FileExplorer } from '@/components/files';
-import { SettingsDialog } from '@/components/modals/settings';
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useTauri } from '@/hooks/use-tauri';
-import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/constants';
-import { cn } from '@/lib/utils';
-import {
-  useUIStore,
-  useIsLeftSidebarCollapsed,
-  useWorkspaceName,
-  useConversations,
-  useActiveConversationId,
-} from '@/stores/ui-store';
+// Lazy load heavy components
+const LazySettingsDialog = lazy(() =>
+  import('@/components/modals/settings/settings-dialog').then((m) => ({
+    default: m.SettingsDialog,
+  }))
+);
+const SettingsDialog: FC<SettingsDialogProps> = (props) => (
+  <Suspense fallback={null}>
+    <LazySettingsDialog {...props} />
+  </Suspense>
+);
 
 type SidebarTab = 'conversations' | 'explorer';
 
