@@ -41,9 +41,11 @@ interface SectionHeaderProps {
 }
 
 const SectionHeader: FC<SectionHeaderProps> = ({ title, children }) => (
-  <div className="mb-4">
-    <h3 className="text-sm font-semibold mb-1">{title}</h3>
-    {children !== undefined && <p className="text-xs text-muted-foreground">{children}</p>}
+  <div className="mb-5">
+    <h3 className="text-[13px] font-semibold mb-1.5">{title}</h3>
+    {children !== undefined && (
+      <p className="text-[11px] text-muted-foreground/70 leading-relaxed">{children}</p>
+    )}
   </div>
 );
 
@@ -55,15 +57,15 @@ interface AgentCardProps {
 }
 
 const AgentCard: FC<AgentCardProps> = ({ agent, onEdit, onDelete }) => (
-  <div className="rounded-lg border border-border p-4 hover:bg-accent/30 transition-colors">
+  <div className="rounded-xl border border-border/40 p-4 hover:bg-muted/40 transition-all duration-150">
     <div className="flex items-start justify-between gap-3">
       <div className="flex items-start gap-3 min-w-0 flex-1">
-        <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-          <Bot className="h-4 w-4 text-primary" />
+        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          <Bot className="h-4 w-4 text-primary/80" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-sm truncate">{agent.name}</div>
-          <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+          <div className="font-medium text-[13px] truncate">{agent.name}</div>
+          <div className="text-[11px] text-muted-foreground/70 line-clamp-2 mt-1">
             {agent.description || 'No description'}
           </div>
           {agent.tools !== undefined && agent.tools.length > 0 && (
@@ -71,13 +73,13 @@ const AgentCard: FC<AgentCardProps> = ({ agent, onEdit, onDelete }) => (
               {agent.tools.slice(0, 4).map((tool) => (
                 <span
                   key={tool}
-                  className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+                  className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/70"
                 >
                   {tool}
                 </span>
               ))}
               {agent.tools.length > 4 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/70">
                   +{agent.tools.length - 4} more
                 </span>
               )}
@@ -203,9 +205,9 @@ const AgentEditor: FC<AgentEditorProps> = ({
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/50" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-[60] translate-x-[-50%] translate-y-[-50%] w-[600px] max-w-[90vw] max-h-[80vh] bg-background border border-border rounded-lg shadow-xl flex flex-col"
+          className="fixed left-[50%] top-[50%] z-[60] translate-x-[-50%] translate-y-[-50%] w-[600px] max-w-[90vw] max-h-[80vh] bg-background/98 backdrop-blur-md border border-border/40 rounded-xl shadow-xl flex flex-col"
           onPointerDownOutside={(e) => {
             e.preventDefault();
           }}
@@ -223,8 +225,8 @@ const AgentEditor: FC<AgentEditorProps> = ({
           </DialogPrimitive.Description>
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <h2 className="font-semibold text-sm">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/40">
+            <h2 className="font-semibold text-[14px]">
               {agent !== undefined ? 'Edit Subagent' : 'Create Subagent'}
             </h2>
             <DialogPrimitive.Close asChild>
@@ -235,12 +237,12 @@ const AgentEditor: FC<AgentEditorProps> = ({
           </div>
 
           {/* Form */}
-          <ScrollArea className="flex-1 py-4 px-5">
-            <div className="space-y-4 px-px">
+          <ScrollArea className="flex-1 py-5 px-6">
+            <div className="space-y-5 px-px">
               {/* Name */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">
-                  Name <span className="text-destructive">*</span>
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  Name <span className="text-red-500/70">*</span>
                 </label>
                 <Input
                   value={name}
@@ -250,14 +252,16 @@ const AgentEditor: FC<AgentEditorProps> = ({
                   placeholder="code-reviewer"
                   className="mt-1 h-8 text-sm"
                 />
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-relaxed">
                   Used as the filename and identifier. Use lowercase with dashes.
                 </p>
               </div>
 
               {/* Description */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Description</label>
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  Description
+                </label>
                 <Input
                   value={description}
                   onChange={(e) => {
@@ -266,7 +270,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
                   placeholder="Expert code review specialist for quality and security"
                   className="mt-1 h-8 text-sm"
                 />
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-relaxed">
                   Describes when this agent should be used. Claude uses this to decide when to
                   invoke it.
                 </p>
@@ -274,8 +278,8 @@ const AgentEditor: FC<AgentEditorProps> = ({
 
               {/* Prompt */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">
-                  System Prompt <span className="text-destructive">*</span>
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  System Prompt <span className="text-red-500/70">*</span>
                 </label>
                 <Textarea
                   value={prompt}
@@ -285,14 +289,16 @@ const AgentEditor: FC<AgentEditorProps> = ({
                   placeholder="You are a code review specialist with expertise in security, performance, and best practices..."
                   className="mt-1 text-sm min-h-[120px]"
                 />
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-relaxed">
                   Instructions that define the agent&apos;s behavior and expertise.
                 </p>
               </div>
 
               {/* Model */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Model</label>
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  Model
+                </label>
                 <Select
                   value={model}
                   onValueChange={(v) => {
@@ -313,8 +319,10 @@ const AgentEditor: FC<AgentEditorProps> = ({
 
               {/* Tools */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Allowed Tools</label>
-                <p className="text-[10px] text-muted-foreground mb-2">
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  Allowed Tools
+                </label>
+                <p className="text-[10px] text-muted-foreground/50 mb-2 mt-1">
                   Select which tools this agent can use. Leave empty to inherit all tools.
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -326,10 +334,10 @@ const AgentEditor: FC<AgentEditorProps> = ({
                         handleToolToggle(tool);
                       }}
                       className={cn(
-                        'text-xs px-2.5 py-1 rounded-md border transition-colors',
+                        'text-[11px] px-2.5 py-1.5 rounded-lg border transition-all duration-150 active:scale-[0.98]',
                         tools.includes(tool)
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background text-foreground border-border hover:bg-accent'
+                          ? 'bg-primary/10 text-foreground border-primary/40 hover:bg-primary/15 hover:border-primary/50'
+                          : 'bg-muted/30 text-foreground border-border/50 hover:bg-muted/50 hover:border-border/60'
                       )}
                     >
                       {tool}
@@ -340,7 +348,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
 
               {/* Generate with AI Input - Only show when creating new agent and generate mode is active */}
               {agent === undefined && showGenerateInput ? (
-                <div className="p-3 rounded-lg border border-primary/30 bg-primary/5">
+                <div className="p-3.5 rounded-xl border border-primary/30 bg-primary/5">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <Sparkles className="h-4 w-4 text-primary" />
@@ -362,7 +370,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
           </ScrollArea>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
+          <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-border/40 bg-muted/10">
             {/* Generate with AI button - only show when creating new agent */}
             {agent === undefined &&
               (showGenerateInput ? (
@@ -394,7 +402,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
                   }}
                   className="mr-auto gap-1.5"
                 >
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500/70" />
                   Generate with AI
                 </Button>
               ))}
@@ -541,7 +549,7 @@ export const SubagentsSettings: FC = () => {
       </SectionHeader>
 
       {error !== null && (
-        <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+        <div className="mb-4 p-3 rounded-xl bg-destructive/10 text-destructive text-[13px]">
           {error}
         </div>
       )}
@@ -560,12 +568,16 @@ export const SubagentsSettings: FC = () => {
 
         {/* Agent list */}
         {isLoading ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">Loading subagents...</div>
+          <div className="text-center py-8 text-muted-foreground/70 text-[13px]">
+            Loading subagents...
+          </div>
         ) : agents.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <div className="text-center py-8 text-muted-foreground/70 text-[13px]">
+            <Bot className="h-8 w-8 mx-auto mb-2 opacity-40" />
             <p>No subagents defined yet.</p>
-            <p className="text-xs mt-1">Create a subagent to extend Claude&apos;s capabilities.</p>
+            <p className="text-[11px] mt-1">
+              Create a subagent to extend Claude&apos;s capabilities.
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -586,11 +598,12 @@ export const SubagentsSettings: FC = () => {
       </div>
 
       {/* Info section */}
-      <div className="mt-6 p-3 rounded-md bg-muted/50 text-xs text-muted-foreground">
-        <p className="font-medium mb-1">How Subagents Work</p>
+      <div className="mt-6 p-3.5 rounded-xl bg-muted/30 border border-border/30 text-[11px] text-muted-foreground/70">
+        <p className="font-medium mb-1.5 text-foreground/80">How Subagents Work</p>
         <ul className="list-disc list-inside space-y-0.5">
           <li>
-            Subagents are stored in <code className="bg-muted px-1 rounded">.claude/agents/</code>
+            Subagents are stored in{' '}
+            <code className="bg-muted/50 px-1 py-0.5 rounded-md">.claude/agents/</code>
           </li>
           <li>Claude automatically invokes them based on the description</li>
           <li>You can explicitly request them: &quot;Use the code-reviewer agent&quot;</li>

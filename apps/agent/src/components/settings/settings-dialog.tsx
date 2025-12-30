@@ -69,13 +69,13 @@ const NavItem: FC<NavItemProps> = ({ icon, label, isActive, onClick }) => (
   <button
     onClick={onClick}
     className={cn(
-      'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+      'flex w-full items-center gap-2 px-2.5 py-2 text-[13px] transition-all duration-150',
       isActive
-        ? 'bg-accent text-accent-foreground'
-        : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+        ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[8px] rounded-r-lg rounded-l-none'
+        : 'text-muted-foreground/70 hover:bg-muted/50 hover:text-foreground rounded-lg'
     )}
   >
-    {icon}
+    <span className={cn('shrink-0', isActive ? 'opacity-100' : 'opacity-70')}>{icon}</span>
     <span>{label}</span>
   </button>
 );
@@ -88,11 +88,11 @@ interface SettingItemProps {
 }
 
 const SettingItem: FC<SettingItemProps> = ({ label, description, children }) => (
-  <div className="flex items-center justify-between py-3">
+  <div className="flex items-center justify-between py-3.5">
     <div className="flex-1 pr-4">
-      <div className="text-sm font-medium">{label}</div>
+      <div className="text-[13px] font-medium">{label}</div>
       {description !== undefined && (
-        <div className="text-xs text-muted-foreground mt-0.5">{description}</div>
+        <div className="text-[11px] text-muted-foreground/60 mt-1">{description}</div>
       )}
     </div>
     <div className="shrink-0">{children}</div>
@@ -106,14 +106,16 @@ interface SectionHeaderProps {
 }
 
 const SectionHeader: FC<SectionHeaderProps> = ({ title, children }) => (
-  <div className="mb-4">
-    <h3 className="text-sm font-semibold mb-1">{title}</h3>
-    {children !== undefined && <p className="text-xs text-muted-foreground">{children}</p>}
+  <div className="mb-5">
+    <h3 className="text-[13px] font-semibold mb-1.5">{title}</h3>
+    {children !== undefined && (
+      <p className="text-[11px] text-muted-foreground/60 leading-relaxed">{children}</p>
+    )}
   </div>
 );
 
 // Section divider
-const SectionDivider: FC = () => <div className="h-px bg-border my-6" />;
+const SectionDivider: FC = () => <div className="h-px bg-border/30 my-7" />;
 
 // Agent settings panel
 const AgentSettings: FC = () => {
@@ -133,7 +135,7 @@ const AgentSettings: FC = () => {
         Control which tools and capabilities the agent can use
       </SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <SettingItem
           label="Allow Bash Tool"
           description="Enable the agent to execute shell commands"
@@ -154,7 +156,7 @@ const AgentSettings: FC = () => {
       {/* Artifact */}
       <SectionHeader title="Artifact">Configure artifact generation and handling</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <SettingItem
           label="Enable Artifacts"
           description="Allow the agent to create visual artifacts"
@@ -168,7 +170,7 @@ const AgentSettings: FC = () => {
       {/* Terminal */}
       <SectionHeader title="Terminal">Configure terminal behavior and appearance</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Terminal Rows" description="Number of rows visible in the terminal">
           <Input
             type="number"
@@ -188,7 +190,7 @@ const AgentSettings: FC = () => {
         Control which files the agent can read and modify
       </SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="File Access Level" description="Define the scope of file system access">
           <Select value={fileAccess} onValueChange={setFileAccess}>
             <SelectTrigger className="w-40 h-8 text-sm">
@@ -208,7 +210,7 @@ const AgentSettings: FC = () => {
       {/* Automation */}
       <SectionHeader title="Automation">Configure autonomous behavior</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Enable Auto Mode" description="Allow the agent to work autonomously">
           <Switch checked={enableAuto} onCheckedChange={setEnableAuto} />
         </SettingItem>
@@ -237,7 +239,7 @@ const AgentSettings: FC = () => {
       {/* General */}
       <SectionHeader title="General">General agent settings</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Custom Instructions" description="Path to custom instructions file">
           <div className="flex items-center gap-2">
             <Input placeholder="CLAUDE.md" className="w-40 h-8 text-sm" />
@@ -260,7 +262,7 @@ const BrowserSettings: FC = () => {
     <div>
       <SectionHeader title="Browser">Configure browser automation settings</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Enable Browser Tool" description="Allow the agent to browse websites">
           <Switch checked={enableBrowser} onCheckedChange={setEnableBrowser} />
         </SettingItem>
@@ -285,7 +287,7 @@ const EditorSettings: FC = () => {
     <div>
       <SectionHeader title="Appearance">Customize the editor appearance</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Theme" description="Choose your preferred color theme">
           <Select value={theme} onValueChange={setTheme}>
             <SelectTrigger className="w-32 h-8 text-sm">
@@ -326,7 +328,7 @@ const EditorSettings: FC = () => {
 
       <SectionHeader title="Features">Toggle editor features</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Word Wrap" description="Wrap long lines to fit the editor width">
           <Switch checked={wordWrap} onCheckedChange={setWordWrap} />
         </SettingItem>
@@ -350,7 +352,7 @@ const NotificationsSettings: FC = () => {
     <div>
       <SectionHeader title="Notifications">Configure notification preferences</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Enable Notifications" description="Show system notifications">
           <Switch checked={enableNotifications} onCheckedChange={setEnableNotifications} />
         </SettingItem>
@@ -381,7 +383,7 @@ const TabsSettings: FC = () => {
     <div>
       <SectionHeader title="Tab Behavior">Configure how tabs work</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Close on Task Complete" description="Auto-close tab when task finishes">
           <Switch checked={closeOnComplete} onCheckedChange={setCloseOnComplete} />
         </SettingItem>
@@ -411,14 +413,14 @@ const AccountSettings: FC = () => {
     <div>
       <SectionHeader title="Account">Manage your account settings</SectionHeader>
 
-      <div className="rounded-lg border border-border p-4 bg-muted/30">
+      <div className="rounded-xl border border-border/40 p-4 bg-muted/20">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <User className="h-5 w-5 text-primary" />
+            <User className="h-5 w-5 text-primary/80" />
           </div>
           <div>
-            <div className="font-medium text-sm">Guest User</div>
-            <div className="text-xs text-muted-foreground">Not signed in</div>
+            <div className="font-medium text-[13px]">Guest User</div>
+            <div className="text-[11px] text-muted-foreground/60">Not signed in</div>
           </div>
         </div>
         <Button variant="outline" className="w-full mt-4" size="sm">
@@ -432,12 +434,14 @@ const AccountSettings: FC = () => {
 
       <div className="space-y-3">
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Anthropic API Key</label>
-          <Input type="password" placeholder="sk-ant-..." className="mt-1 h-8 text-sm" />
+          <label className="text-[11px] font-medium text-muted-foreground/70">
+            Anthropic API Key
+          </label>
+          <Input type="password" placeholder="sk-ant-..." className="mt-1.5 h-8 text-sm" />
         </div>
         <div>
-          <label className="text-xs font-medium text-muted-foreground">OpenAI API Key</label>
-          <Input type="password" placeholder="sk-..." className="mt-1 h-8 text-sm" />
+          <label className="text-[11px] font-medium text-muted-foreground/70">OpenAI API Key</label>
+          <Input type="password" placeholder="sk-..." className="mt-1.5 h-8 text-sm" />
         </div>
       </div>
     </div>
@@ -450,30 +454,30 @@ const FeedbackSettings: FC = () => {
     <div>
       <SectionHeader title="Provide Feedback">Help us improve Orbit</SectionHeader>
 
-      <div className="space-y-4">
-        <div className="rounded-lg border border-border p-4 hover:bg-accent/50 cursor-pointer transition-colors">
+      <div className="space-y-3">
+        <div className="rounded-xl border border-border/40 p-4 hover:bg-muted/40 cursor-pointer transition-all duration-150">
           <div className="flex items-center gap-3">
-            <MessageSquare className="h-5 w-5 text-muted-foreground" />
+            <MessageSquare className="h-5 w-5 text-muted-foreground/70" />
             <div>
-              <div className="font-medium text-sm">Report a Bug</div>
-              <div className="text-xs text-muted-foreground">
+              <div className="font-medium text-[13px]">Report a Bug</div>
+              <div className="text-[11px] text-muted-foreground/60">
                 Found something not working? Let us know
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground" />
+            <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground/50" />
           </div>
         </div>
 
-        <div className="rounded-lg border border-border p-4 hover:bg-accent/50 cursor-pointer transition-colors">
+        <div className="rounded-xl border border-border/40 p-4 hover:bg-muted/40 cursor-pointer transition-all duration-150">
           <div className="flex items-center gap-3">
-            <FileText className="h-5 w-5 text-muted-foreground" />
+            <FileText className="h-5 w-5 text-muted-foreground/70" />
             <div>
-              <div className="font-medium text-sm">Request a Feature</div>
-              <div className="text-xs text-muted-foreground">
+              <div className="font-medium text-[13px]">Request a Feature</div>
+              <div className="text-[11px] text-muted-foreground/60">
                 Have an idea? We&apos;d love to hear it
               </div>
             </div>
-            <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground" />
+            <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground/50" />
           </div>
         </div>
       </div>
@@ -488,8 +492,8 @@ interface ShortcutItemProps {
 }
 
 const ShortcutItem: FC<ShortcutItemProps> = ({ label, keys }) => (
-  <div className="flex items-center justify-between py-2">
-    <span className="text-sm text-muted-foreground">{label}</span>
+  <div className="flex items-center justify-between py-2.5">
+    <span className="text-[13px] text-muted-foreground/70">{label}</span>
     <KbdGroup>
       {keys.map((key, index) => (
         <Kbd key={index}>{key}</Kbd>
@@ -504,7 +508,7 @@ const ShortcutsSettings: FC = () => {
     <div>
       <SectionHeader title="General">Global keyboard shortcuts</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <ShortcutItem label="Command Palette" keys={['⌘', 'P']} />
         <ShortcutItem label="Settings" keys={['⌘', ',']} />
         <ShortcutItem label="New Chat" keys={['⌘', 'N']} />
@@ -515,7 +519,7 @@ const ShortcutsSettings: FC = () => {
 
       <SectionHeader title="Chat">Chat-related shortcuts</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <ShortcutItem label="Send Message" keys={['⌘', '↵']} />
         <ShortcutItem label="Stop Generation" keys={['Esc']} />
         <ShortcutItem label="Add Context" keys={['@']} />
@@ -527,7 +531,7 @@ const ShortcutsSettings: FC = () => {
 
       <SectionHeader title="Editor">Editor shortcuts</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <ShortcutItem label="Save File" keys={['⌘', 'S']} />
         <ShortcutItem label="Find in File" keys={['⌘', 'F']} />
         <ShortcutItem label="Go to Line" keys={['⌘', 'G']} />
@@ -539,7 +543,7 @@ const ShortcutsSettings: FC = () => {
 
       <SectionHeader title="Panels">Panel visibility shortcuts</SectionHeader>
 
-      <div className="space-y-1 divide-y divide-border">
+      <div className="space-y-0 divide-y divide-border/40">
         <ShortcutItem label="Toggle Left Sidebar" keys={['⌘', '.']} />
         <ShortcutItem label="Toggle File Browser" keys={['⌘', 'B']} />
         <ShortcutItem label="Toggle Terminal" keys={['⌘', 'J']} />
@@ -621,9 +625,12 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-background border border-border rounded-lg shadow-xl overflow-hidden flex flex-col"
+          className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-background/98 backdrop-blur-md border border-border/40 rounded-xl overflow-hidden flex flex-col"
+          style={{
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+          }}
           aria-describedby={undefined}
         >
           {/* Accessibility: Hidden title for screen readers */}
@@ -631,12 +638,12 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
             Settings - {getSectionTitle()}
           </DialogPrimitive.Title>
           {/* Title bar */}
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/30">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-muted/20">
             <div className="flex items-center gap-2">
-              <Settings2 className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-sm">Settings - {getSectionTitle()}</span>
+              <Settings2 className="h-4 w-4 text-muted-foreground/70" />
+              <span className="font-medium text-[13px]">Settings - {getSectionTitle()}</span>
             </div>
-            <DialogPrimitive.Close className="rounded-sm opacity-70 hover:opacity-100 transition-opacity">
+            <DialogPrimitive.Close className="rounded-md p-1 opacity-60 hover:opacity-100 hover:bg-muted/50 active:scale-95 transition-all duration-150">
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
@@ -645,7 +652,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
           {/* Content */}
           <div className="flex flex-1 overflow-hidden">
             {/* Sidebar */}
-            <div className="w-48 border-r border-border p-2 bg-muted/20 flex flex-col">
+            <div className="w-48 border-r border-border/40 p-2.5 bg-muted/10 flex flex-col">
               <nav className="space-y-1 flex-1">
                 {navItems.map((item) => (
                   <NavItem
@@ -660,7 +667,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                 ))}
               </nav>
               {/* Feedback at bottom */}
-              <div>
+              <div className="border-t border-border/30 pt-2 mt-2">
                 <NavItem
                   icon={feedbackItem.icon}
                   label={feedbackItem.label}

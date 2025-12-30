@@ -54,9 +54,11 @@ interface SectionHeaderProps {
 }
 
 const SectionHeader: FC<SectionHeaderProps> = ({ title, children }) => (
-  <div className="mb-4">
-    <h3 className="text-sm font-semibold mb-1">{title}</h3>
-    {children !== undefined && <p className="text-xs text-muted-foreground">{children}</p>}
+  <div className="mb-5">
+    <h3 className="text-[13px] font-semibold mb-1.5">{title}</h3>
+    {children !== undefined && (
+      <p className="text-[11px] text-muted-foreground/70 leading-relaxed">{children}</p>
+    )}
   </div>
 );
 
@@ -73,25 +75,25 @@ const CommandCard: FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
   const scopeConfig = SCOPE_CONFIG[command.scope];
 
   return (
-    <div className="rounded-lg border border-border p-4 hover:bg-accent/30 transition-colors">
+    <div className="rounded-xl border border-border/40 p-4 hover:bg-muted/40 transition-all duration-150">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0 flex-1">
-          <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-            <Terminal className="h-4 w-4 text-primary" />
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Terminal className="h-4 w-4 text-primary/80" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-sm truncate">/{command.name}</span>
-              <span className={cn('text-[10px] px-1.5 py-0.5 rounded', scopeConfig.className)}>
+              <span className="font-medium text-[13px] truncate">/{command.name}</span>
+              <span className={cn('text-[10px] px-1.5 py-0.5 rounded-md', scopeConfig.className)}>
                 {scopeConfig.label}
               </span>
-              {isReadonly ? <Lock className="h-3 w-3 text-muted-foreground" /> : null}
+              {isReadonly ? <Lock className="h-3 w-3 text-muted-foreground/60" /> : null}
             </div>
-            <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+            <div className="text-[11px] text-muted-foreground/70 line-clamp-2 mt-1">
               {command.description ?? 'No description'}
             </div>
             {command.argumentHint !== undefined && command.argumentHint !== '' && (
-              <div className="text-[10px] text-muted-foreground mt-1 font-mono">
+              <div className="text-[10px] text-muted-foreground/60 mt-1.5 font-mono">
                 /{command.name} {command.argumentHint}
               </div>
             )}
@@ -100,13 +102,13 @@ const CommandCard: FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
                 {command.allowedTools.slice(0, 4).map((tool) => (
                   <span
                     key={tool}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+                    className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/70"
                   >
                     {tool}
                   </span>
                 ))}
                 {command.allowedTools.length > 4 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/70">
                     +{command.allowedTools.length - 4} more
                   </span>
                 )}
@@ -252,9 +254,9 @@ const CommandEditor: FC<CommandEditorProps> = ({
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/50" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-[60] translate-x-[-50%] translate-y-[-50%] w-[600px] max-w-[90vw] max-h-[80vh] bg-background border border-border rounded-lg shadow-xl flex flex-col"
+          className="fixed left-[50%] top-[50%] z-[60] translate-x-[-50%] translate-y-[-50%] w-[600px] max-w-[90vw] max-h-[80vh] bg-background/98 backdrop-blur-md border border-border/40 rounded-xl shadow-xl flex flex-col"
           onPointerDownOutside={(e) => {
             e.preventDefault();
           }}
@@ -272,8 +274,8 @@ const CommandEditor: FC<CommandEditorProps> = ({
           </DialogPrimitive.Description>
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <h2 className="font-semibold text-sm">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/40">
+            <h2 className="font-semibold text-[14px]">
               {command !== undefined ? 'Edit Slash Command' : 'Create Slash Command'}
             </h2>
             <DialogPrimitive.Close asChild>
@@ -284,15 +286,15 @@ const CommandEditor: FC<CommandEditorProps> = ({
           </div>
 
           {/* Form */}
-          <ScrollArea className="flex-1 py-4 px-5">
-            <div className="space-y-4 px-px">
+          <ScrollArea className="flex-1 py-5 px-6">
+            <div className="space-y-5 px-px">
               {/* Name */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">
-                  Command Name <span className="text-destructive">*</span>
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  Command Name <span className="text-red-500/70">*</span>
                 </label>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-muted-foreground">/</span>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className="text-muted-foreground/50 text-sm font-mono">/</span>
                   <Input
                     value={name}
                     onChange={(e) => {
@@ -302,14 +304,16 @@ const CommandEditor: FC<CommandEditorProps> = ({
                     className="h-8 text-sm"
                   />
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-relaxed">
                   Used as the filename and command identifier. Use lowercase with dashes.
                 </p>
               </div>
 
               {/* Description */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Description</label>
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  Description
+                </label>
                 <Input
                   value={description}
                   onChange={(e) => {
@@ -322,7 +326,9 @@ const CommandEditor: FC<CommandEditorProps> = ({
 
               {/* Argument Hint */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Argument Hint</label>
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  Argument Hint
+                </label>
                 <Input
                   value={argumentHint}
                   onChange={(e) => {
@@ -331,7 +337,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
                   placeholder="[file] [options]"
                   className="mt-1 h-8 text-sm"
                 />
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-relaxed">
                   Shows users what arguments this command accepts, e.g., &quot;[file]
                   [options]&quot;
                 </p>
@@ -339,8 +345,8 @@ const CommandEditor: FC<CommandEditorProps> = ({
 
               {/* Content/Prompt */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">
-                  Command Prompt <span className="text-destructive">*</span>
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  Command Prompt <span className="text-red-500/70">*</span>
                 </label>
                 <Textarea
                   value={content}
@@ -350,15 +356,24 @@ const CommandEditor: FC<CommandEditorProps> = ({
                   placeholder="The prompt that will be sent to Claude when this command is run..."
                   className="mt-1 text-sm min-h-[120px] font-mono"
                 />
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Use <code className="bg-muted px-1 rounded">$ARGUMENTS</code> for user input. Use{' '}
-                  <code className="bg-muted px-1 rounded">@filename</code> to include file contents.
+                <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-relaxed">
+                  Use{' '}
+                  <code className="bg-muted/60 px-1.5 py-0.5 rounded-md font-mono text-[9px] text-foreground/70">
+                    $ARGUMENTS
+                  </code>{' '}
+                  for user input. Use{' '}
+                  <code className="bg-muted/60 px-1.5 py-0.5 rounded-md font-mono text-[9px] text-foreground/70">
+                    @filename
+                  </code>{' '}
+                  to include file contents.
                 </p>
               </div>
 
               {/* Scope */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Scope</label>
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  Scope
+                </label>
                 <Select
                   value={scope}
                   onValueChange={(v) => {
@@ -371,26 +386,28 @@ const CommandEditor: FC<CommandEditorProps> = ({
                   <SelectContent className="z-[70]">
                     <SelectItem value="project">
                       <span className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-green-500" />
+                        <span className="h-2 w-2 rounded-full bg-emerald-500/80" />
                         Project (.claude/commands/)
                       </span>
                     </SelectItem>
                     <SelectItem value="personal">
                       <span className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-orange-500" />
+                        <span className="h-2 w-2 rounded-full bg-orange-500/80" />
                         Personal (~/.claude/commands/)
                       </span>
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-relaxed">
                   Project commands are shared with the team. Personal commands are just for you.
                 </p>
               </div>
 
               {/* Model */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Model</label>
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  Model
+                </label>
                 <Select
                   value={model}
                   onValueChange={(v) => {
@@ -411,8 +428,10 @@ const CommandEditor: FC<CommandEditorProps> = ({
 
               {/* Tools */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Allowed Tools</label>
-                <p className="text-[10px] text-muted-foreground mb-2">
+                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                  Allowed Tools
+                </label>
+                <p className="text-[10px] text-muted-foreground/50 mb-2 mt-1">
                   Restrict which tools this command can use. Leave empty for all tools.
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -424,10 +443,10 @@ const CommandEditor: FC<CommandEditorProps> = ({
                         handleToolToggle(tool);
                       }}
                       className={cn(
-                        'text-xs px-2.5 py-1 rounded-md border transition-colors',
+                        'text-[11px] px-2.5 py-1.5 rounded-lg border transition-all duration-150 active:scale-[0.98]',
                         tools.includes(tool)
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-background text-foreground border-border hover:bg-accent'
+                          ? 'bg-primary/10 text-foreground border-primary/40 hover:bg-primary/15 hover:border-primary/50'
+                          : 'bg-muted/30 text-foreground border-border/50 hover:bg-muted/50 hover:border-border/60'
                       )}
                     >
                       {tool}
@@ -438,7 +457,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
 
               {/* Generate with AI Input - Only show when creating new command and generate mode is active */}
               {command === undefined && showGenerateInput ? (
-                <div className="p-3 rounded-lg border border-primary/30 bg-primary/5">
+                <div className="p-3.5 rounded-xl border border-primary/30 bg-primary/5">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <Sparkles className="h-4 w-4 text-primary" />
@@ -460,7 +479,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
           </ScrollArea>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border">
+          <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-border/40 bg-muted/10">
             {/* Generate with AI button - only show when creating new command */}
             {command === undefined &&
               (showGenerateInput ? (
@@ -492,7 +511,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
                   }}
                   className="mr-auto gap-1.5"
                 >
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500/70" />
                   Generate with AI
                 </Button>
               ))}
@@ -653,7 +672,7 @@ export const SlashCommandsSettings: FC = () => {
       </SectionHeader>
 
       {error !== null && (
-        <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+        <div className="mb-4 p-3 rounded-xl bg-destructive/10 text-destructive text-[13px]">
           {error}
         </div>
       )}
@@ -786,25 +805,28 @@ export const SlashCommandsSettings: FC = () => {
       </div>
 
       {/* Info section */}
-      <div className="mt-6 p-3 rounded-md bg-muted/50 text-xs text-muted-foreground">
-        <p className="font-medium mb-1">How Slash Commands Work</p>
+      <div className="mt-6 p-3.5 rounded-xl bg-muted/30 border border-border/30 text-[11px] text-muted-foreground/70">
+        <p className="font-medium mb-1.5 text-foreground/80">How Slash Commands Work</p>
         <ul className="list-disc list-inside space-y-0.5">
           <li>
             Project commands are stored in{' '}
-            <code className="bg-muted px-1 rounded">.claude/commands/</code>
+            <code className="bg-muted/50 px-1 py-0.5 rounded-md">.claude/commands/</code>
           </li>
           <li>
             Personal commands are stored in{' '}
-            <code className="bg-muted px-1 rounded">~/.claude/commands/</code>
+            <code className="bg-muted/50 px-1 py-0.5 rounded-md">~/.claude/commands/</code>
           </li>
           <li>
-            Type <code className="bg-muted px-1 rounded">/command-name</code> in chat to run
+            Type <code className="bg-muted/50 px-1 py-0.5 rounded-md">/command-name</code> in chat
+            to run
           </li>
           <li>
-            Use <code className="bg-muted px-1 rounded">$ARGUMENTS</code> to pass user input
+            Use <code className="bg-muted/50 px-1 py-0.5 rounded-md">$ARGUMENTS</code> to pass user
+            input
           </li>
           <li>
-            Use <code className="bg-muted px-1 rounded">@filename</code> to include file contents
+            Use <code className="bg-muted/50 px-1 py-0.5 rounded-md">@filename</code> to include
+            file contents
           </li>
         </ul>
       </div>
