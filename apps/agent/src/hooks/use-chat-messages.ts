@@ -388,30 +388,32 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
 
         case 'tool:start': {
           const toolId = message.tool_id;
-          setMessages((prev) => {
-            const msg = prev.find((m) => m.id === message.message_id);
-            const contentOffset = msg?.content.length ?? 0;
-            startTool(
-              toolId,
-              message.message_id,
-              message.tool_name,
-              message.tool_input,
-              contentOffset
-            );
-            if (!msg) {
-              return [
-                ...prev,
-                {
-                  id: message.message_id,
-                  role: 'assistant' as const,
-                  content: '',
-                  displayedContent: '',
-                  isStreaming: true,
-                },
-              ];
-            }
-            return prev;
-          });
+          // Get content offset from current messages (outside of setState to avoid render-time updates)
+          const currentMsg = messagesRef.current.find((m) => m.id === message.message_id);
+          const contentOffset = currentMsg?.content.length ?? 0;
+
+          // Start tool tracking BEFORE updating messages (avoids setState during render)
+          startTool(
+            toolId,
+            message.message_id,
+            message.tool_name,
+            message.tool_input,
+            contentOffset
+          );
+
+          // Only update messages if we need to create a new assistant message
+          if (!currentMsg) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: message.message_id,
+                role: 'assistant' as const,
+                content: '',
+                displayedContent: '',
+                isStreaming: true,
+              },
+            ]);
+          }
           break;
         }
 

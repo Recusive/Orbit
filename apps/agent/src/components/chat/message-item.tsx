@@ -246,6 +246,18 @@ export const MessageItem: FC<MessageItemProps> = ({
   const hasImages = (message.attachedImages?.length ?? 0) > 0;
   const hasAttachments = hasFiles || hasImages;
 
+  // For assistant messages, check if there's anything to render
+  const segments = message.role === 'assistant' ? buildSegments() : [];
+  const hasThinking = Boolean(message.thinking);
+  const hasSegments = segments.length > 0;
+  const hasVisibleContent =
+    message.role === 'user' || hasThinking || hasSegments || isComplete || message.isInterrupted;
+
+  // Don't render empty assistant message bubbles
+  if (!hasVisibleContent) {
+    return null;
+  }
+
   return (
     <div className="space-y-2">
       {/* Message bubble */}
@@ -262,7 +274,7 @@ export const MessageItem: FC<MessageItemProps> = ({
                 isStreaming={message.isStreaming}
               />
             ) : null}
-            {buildSegments().map((segment) => {
+            {segments.map((segment) => {
               if (segment.type === 'content') {
                 return (
                   <div
@@ -282,6 +294,9 @@ export const MessageItem: FC<MessageItemProps> = ({
               <MessageActions
                 showDisclaimer={isLastAssistantMessage}
                 rewindDisabled={isLastAssistantMessage}
+                onCopy={() => {
+                  void navigator.clipboard.writeText(message.content);
+                }}
                 onRewind={() => {
                   onRewind(message.id);
                 }}

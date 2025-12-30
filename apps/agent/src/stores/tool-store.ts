@@ -46,10 +46,12 @@ export interface PermissionRequest {
   createdAt: number;
 }
 
-// Cached usage data per session
-interface CachedUsage {
+// Cached session data (usage + tools)
+interface CachedSessionData {
   usage: UsageData;
-  processedIds: Set<string>;
+  processedIds: string[];
+  activeTools: Record<string, ToolExecution>;
+  completedTools: ToolExecution[];
 }
 
 export interface ToolState {
@@ -80,8 +82,8 @@ export interface ToolState {
   // Track processed message IDs to avoid double-counting (SDK sends same usage for parallel tools)
   processedMessageIds: Set<string>;
 
-  // Cache of usage data per session
-  usageCache: Map<string, CachedUsage>;
+  // Cache of session data per session (plain object for immer compatibility)
+  sessionCache: Record<string, CachedSessionData>;
 
   // Actions
   setInputMode: (mode: InputMode) => void;
@@ -148,7 +150,7 @@ export const useToolStore = create<ToolState>()(
     currentSessionId: null,
     sessionUsage: { ...initialUsage },
     processedMessageIds: new Set<string>(),
-    usageCache: new Map<string, CachedUsage>(),
+    sessionCache: {},
 
     setInputMode: (mode: InputMode) => {
       set((state) => {
@@ -264,24 +266,30 @@ export const useToolStore = create<ToolState>()(
 
     switchSession: (newSessionId: string) => {
       set((state) => {
-        // Save current session's usage to cache (if we have a current session)
+        // Save current session's data to cache (if we have a current session)
         if (state.currentSessionId) {
-          state.usageCache.set(state.currentSessionId, {
+          state.sessionCache[state.currentSessionId] = {
             usage: { ...state.sessionUsage },
-            processedIds: new Set(state.processedMessageIds),
-          });
+            processedIds: Array.from(state.processedMessageIds),
+            activeTools: { ...state.activeTools },
+            completedTools: [...state.completedTools],
+          };
         }
 
-        // Check if we have cached usage for the new session
-        const cached = state.usageCache.get(newSessionId);
+        // Check if we have cached data for the new session
+        const cached = state.sessionCache[newSessionId];
         if (cached) {
-          // Restore cached usage
+          // Restore cached session data
           state.sessionUsage = { ...cached.usage };
           state.processedMessageIds = new Set(cached.processedIds);
+          state.activeTools = { ...cached.activeTools };
+          state.completedTools = [...cached.completedTools];
         } else {
-          // New session - reset to zero
+          // New session - reset everything
           state.sessionUsage = { ...initialUsage };
           state.processedMessageIds = new Set<string>();
+          state.activeTools = {};
+          state.completedTools = [];
         }
 
         state.currentSessionId = newSessionId;
@@ -338,7 +346,7 @@ export const useToolStore = create<ToolState>()(
         state.currentSessionId = null;
         state.sessionUsage = { ...initialUsage };
         state.processedMessageIds = new Set<string>();
-        state.usageCache = new Map<string, CachedUsage>();
+        state.sessionCache = {};
       });
     },
   }))
