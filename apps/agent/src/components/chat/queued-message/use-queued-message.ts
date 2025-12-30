@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 
-import type { ImageAttachment } from '@/components/chat/chat-input';
-import type { ChatMessage } from '@/components/chat/message-item';
+import type { ChatMessage, ImageAttachment } from '@/components/chat';
 import type { ReactElementContext, WebviewMessage } from '@/types/protocol';
 
 import { useQueuedMessageStore, useQueuedMessage } from '@/stores/queued-message-store';

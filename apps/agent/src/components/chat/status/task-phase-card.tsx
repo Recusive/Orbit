@@ -1,4 +1,5 @@
-import { FilesEditedList } from './files-edited-list';
+import { FilesEditedList } from '../files-edited-list';
+
 import { ProgressUpdates } from './progress-updates';
 
 import type { FC } from 'react';

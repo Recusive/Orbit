@@ -1,26 +1,22 @@
+// Messages
+export * from './messages';
+
+// Input
+export * from './input';
+
+// Status indicators
+export * from './status';
+
+// Tool widgets
+export * from './tools';
+
+// Queued message
+export * from './queued-message';
+
+// Top-level chat components
+export { ChatHeader } from './chat-header';
+export { ChatMessages } from './chat-messages';
+export { WelcomeGreeting } from './welcome-greeting';
 export { ConversationHeader } from './conversation-header';
-export { MessageFeed } from './message-feed';
-export { MessageSection } from './message-section';
-export { UserMessage } from './user-message';
-export { AgentMessage } from './agent-message';
-export { TaskPhaseCard } from './task-phase-card';
 export { FilesEditedList } from './files-edited-list';
-export { ProgressUpdates } from './progress-updates';
-export { ProgressStep } from './progress-step';
 export { ToolCallBlock } from './tool-call-block';
-export { NotifyUserCard } from './notify-user-card';
-export { ProceedIndicator } from './proceed-indicator';
-export { MessageFeedback } from './message-feedback';
-export { ContextChips } from './context-chips';
-export { MentionPopover, getFilteredFilesCount, getFileAtIndex } from './mention-popover';
-export {
-  Context,
-  ContextTrigger,
-  ContextContent,
-  ContextContentHeader,
-  ContextContentBody,
-  ContextContentFooter,
-  ContextInputUsage,
-  ContextOutputUsage,
-  ContextTotalUsage,
-} from './context';

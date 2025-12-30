@@ -14,10 +14,10 @@ import { Terminal } from '@xterm/xterm';
 
 import type { IDisposable, ITheme } from '@xterm/xterm';
 
-import { CommandDecorationsAddon } from '@/components/terminal/addons/command-decorations-addon';
-import { MarkNavigationAddon } from '@/components/terminal/addons/mark-navigation-addon';
-import { ShellIntegrationAddon } from '@/components/terminal/addons/shell-integration-addon';
-import { getBestTheme } from '@/components/terminal/utils/theme-sync';
+import { CommandDecorationsAddon } from '@/lib/terminal/addons/command-decorations-addon';
+import { MarkNavigationAddon } from '@/lib/terminal/addons/mark-navigation-addon';
+import { ShellIntegrationAddon } from '@/lib/terminal/addons/shell-integration-addon';
+import { getBestTheme } from '@/lib/terminal/utils/theme-sync';
 import { TerminalResizeDebouncer } from '@/services/terminal-resize-debouncer';
 
 import '@xterm/xterm/css/xterm.css';

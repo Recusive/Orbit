@@ -1,7 +1,25 @@
 import { ArrowUp, AtSign, Coins, Globe, Image, Lightbulb, Square } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { SlashCommand } from '@/components/chat/slash-command-popover';
+import {
+  Context,
+  ContextContent,
+  ContextContentBody,
+  ContextContentHeader,
+  ContextInputUsage,
+  ContextOutputUsage,
+  ContextTrigger,
+} from './context';
+import { ContextChips } from './context-chips';
+import { MentionPopover, getFilteredFilesCount, getFileAtIndex } from './mention-popover';
+import { ModelSelector } from './model-selector';
+import {
+  SlashCommandPopover,
+  getFilteredCommandsCount,
+  getCommandAtIndex,
+} from './slash-command-popover';
+
+import type { SlashCommand } from './slash-command-popover';
 import type { ContextItem, FileEntry } from '@/types/context';
 import type {
   ExtensionMessage,
@@ -13,27 +31,6 @@ import type {
 import type { FC } from 'react';
 
 import { ElementContextList } from '@/components/browser';
-import {
-  Context,
-  ContextContent,
-  ContextContentBody,
-  ContextContentHeader,
-  ContextInputUsage,
-  ContextOutputUsage,
-  ContextTrigger,
-} from '@/components/chat/context';
-import { ContextChips } from '@/components/chat/context-chips';
-import {
-  MentionPopover,
-  getFilteredFilesCount,
-  getFileAtIndex,
-} from '@/components/chat/mention-popover';
-import { ModelSelector } from '@/components/chat/model-selector';
-import {
-  SlashCommandPopover,
-  getFilteredCommandsCount,
-  getCommandAtIndex,
-} from '@/components/chat/slash-command-popover';
 import {
   DropdownMenu,
   DropdownMenuContent,

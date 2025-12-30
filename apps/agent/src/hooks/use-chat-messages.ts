@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ImageAttachment } from '@/components/chat/chat-input';
-import type { ChatMessage } from '@/components/chat/message-item';
+import type { ChatMessage, ImageAttachment } from '@/components/chat';
 import type { ExtensionMessage, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/use-tauri';

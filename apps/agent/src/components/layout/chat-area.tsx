@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { ChatMessage } from '@/components/chat/message-item';
+import type { ChatMessage } from '@/components/chat/messages';
 import type { FileEntry } from '@/types/context';
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
-import { ActivityPanel } from '@/components/activity/activity-panel';
-import { ChatHeader } from '@/components/chat/chat-header';
-import { ChatInput } from '@/components/chat/chat-input';
-import { ChatMessages } from '@/components/chat/chat-messages';
-import { useQueuedMessageHandler } from '@/components/chat/queued-message';
-import { WelcomeGreeting } from '@/components/chat/welcome-greeting';
+import {
+  ChatHeader,
+  ChatInput,
+  ChatMessages,
+  useQueuedMessageHandler,
+  WelcomeGreeting,
+} from '@/components/chat';
 import { ResizeHandle } from '@/components/layout/resize-handle';
-import { TerminalPanel } from '@/components/terminal/terminal-panel';
+import { ActivityPanel } from '@/components/panels';
+import { TerminalPanel } from '@/components/terminal';
 import { useChatMessages } from '@/hooks/use-chat-messages';
 import { useTauri } from '@/hooks/use-tauri';
 import {

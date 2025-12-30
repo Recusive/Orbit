@@ -1,10 +1,9 @@
 import { Bot } from 'lucide-react';
 
+import { NotifyUserCard, ProceedIndicator, TaskPhaseCard } from '../status';
+import { ToolCallBlock } from '../tool-call-block';
+
 import { MessageFeedback } from './message-feedback';
-import { NotifyUserCard } from './notify-user-card';
-import { ProceedIndicator } from './proceed-indicator';
-import { TaskPhaseCard } from './task-phase-card';
-import { ToolCallBlock } from './tool-call-block';
 
 import type { FC } from 'react';
 

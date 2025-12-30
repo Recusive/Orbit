@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import type { ImageAttachment } from '@/components/chat/chat-input';
+import type { ImageAttachment } from '@/components/chat';
 import type { ReactElementContext } from '@/types/protocol';
 
 export interface QueuedMessage {

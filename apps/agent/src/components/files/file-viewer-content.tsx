@@ -4,9 +4,8 @@ import type { OutlineItem } from '@/components/editor/editor-breadcrumbs';
 import type { GotoPosition, ViewedFile } from '@/stores/file-viewer-store';
 import type { FC } from 'react';
 
-import { FileDiffViewer } from '@/components/activity/file-diff-viewer';
-import { CodeMirrorEditor } from '@/components/editor/CodeMirrorEditor';
-import { EditorBreadcrumbs, extractMarkdownOutline } from '@/components/editor/editor-breadcrumbs';
+import { CodeMirrorEditor, EditorBreadcrumbs, extractMarkdownOutline } from '@/components/editor';
+import { FileDiffViewer } from '@/components/git';
 import { writeFile, lspDidChange, lspDidSave } from '@/lib/backend';
 import { useCursorPosition, useFileViewerStore } from '@/stores/file-viewer-store';
 

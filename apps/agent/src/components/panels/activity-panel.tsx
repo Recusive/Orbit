@@ -14,12 +14,10 @@ import type { FileChange } from '@/stores/file-store';
 import type { ViewedFile } from '@/stores/file-viewer-store';
 import type { FC } from 'react';
 
-import { FileViewer } from '@/components/activity/file-viewer';
-import { FilesChangedList } from '@/components/activity/files-changed-list';
-import { SourceControlTab } from '@/components/activity/source-control-tab';
 import { BrowserPanel } from '@/components/browser';
-import { FileIcon } from '@/components/files/file-icon';
-import { TerminalPanel } from '@/components/terminal/terminal-panel';
+import { FileIcon, FileViewer } from '@/components/files';
+import { FilesChangedList, SourceControlTab } from '@/components/git';
+import { TerminalPanel } from '@/components/terminal';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { useTauri } from '@/hooks/use-tauri';
 import { lspDidClose, lspDidOpen } from '@/lib/backend';

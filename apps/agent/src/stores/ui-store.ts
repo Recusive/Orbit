@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
-import type { SettingsSection } from '@/components/settings/settings-dialog';
+import type { SettingsSection } from '@/components/modals/settings';
 
 import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/constants';
 

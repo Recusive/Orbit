@@ -1,9 +1,7 @@
 import React from 'react';
 
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
-
-import { FilesChangedList } from './files-changed-list';
-import { SourceControlTab } from './source-control-tab';
+import { FilesChangedList, SourceControlTab } from '@/components/git';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 export interface ActivityTabsProps {
   className?: string;

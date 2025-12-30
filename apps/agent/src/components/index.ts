@@ -1,8 +1,17 @@
+// Common utilities
+export * from './common';
+
+// Code display
+export * from './code';
+
 // File components
 export * from './files';
 
-// Code components
-export * from './code';
+// Git/Source control
+export * from './git';
 
-// Shared components
-export * from './shared';
+// Panels
+export * from './panels';
+
+// Modals & dialogs
+export * from './modals';

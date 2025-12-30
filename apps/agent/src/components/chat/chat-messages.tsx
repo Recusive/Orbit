@@ -1,14 +1,15 @@
 import { Loader2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
-import type { ChatMessage } from '@/components/chat/message-item';
+import { MessageItem } from './messages';
+import { QueuedMessageBubble } from './queued-message';
+
+import type { ChatMessage } from './messages';
 import type { QueuedMessage } from '@/stores/queued-message-store';
 import type { PermissionRequest, ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
-import { MessageItem } from '@/components/chat/message-item';
-import { PermissionModal } from '@/components/chat/permission-modal';
-import { QueuedMessageBubble } from '@/components/chat/queued-message';
+import { PermissionModal } from '@/components/modals';
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];

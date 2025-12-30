@@ -9,8 +9,7 @@ import { StatusBar } from './status-bar';
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
-import { GoToLineDialog } from '@/components/dialogs';
-import { QuickOpen } from '@/components/quick-open';
+import { GoToLineDialog, QuickOpen } from '@/components/modals';
 import { WelcomePage } from '@/components/welcome';
 import { useDefaultKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { useTauri } from '@/hooks/use-tauri';

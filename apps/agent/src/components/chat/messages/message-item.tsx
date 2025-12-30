@@ -1,24 +1,27 @@
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
-import type { ImageAttachment } from '@/components/chat/chat-input';
+import { InterruptIndicator, ThinkingBox } from '../status';
+import {
+  BashToolWidget,
+  EditToolWidget,
+  GlobToolWidget,
+  GrepToolWidget,
+  ReadToolWidget,
+  TaskToolWidget,
+  TodoToolWidget,
+  WebFetchToolWidget,
+  WebSearchToolWidget,
+  WriteToolWidget,
+} from '../tools';
+
+import { MessageActions } from './message-actions';
+
+import type { ImageAttachment } from '../input/chat-input';
 import type { ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
-import { InterruptIndicator } from '@/components/chat/interrupt-indicator';
-import { MessageActions } from '@/components/chat/message-actions';
-import { ThinkingBox } from '@/components/chat/thinking-box';
-import { BashToolWidget } from '@/components/chat/tools/bash-tool-widget';
-import { EditToolWidget } from '@/components/chat/tools/edit-tool-widget';
-import { GlobToolWidget } from '@/components/chat/tools/glob-tool-widget';
-import { GrepToolWidget } from '@/components/chat/tools/grep-tool-widget';
-import { ReadToolWidget } from '@/components/chat/tools/read-tool-widget';
-import { TaskToolWidget } from '@/components/chat/tools/task-tool-widget';
-import { TodoToolWidget } from '@/components/chat/tools/todo-tool-widget';
-import { WebFetchToolWidget } from '@/components/chat/tools/web-fetch-tool-widget';
-import { WebSearchToolWidget } from '@/components/chat/tools/web-search-tool-widget';
-import { WriteToolWidget } from '@/components/chat/tools/write-tool-widget';
-import { FileIcon } from '@/components/files/file-icon';
+import { FileIcon } from '@/components/files';
 
 export interface ChatMessage {
   id: string;

@@ -39,8 +39,8 @@ const SidebarToggleIcon: FC<{ expanded: boolean }> = ({ expanded }) => (
   </svg>
 );
 
-import { FileExplorer } from '@/components/layout/file-explorer';
-import { SettingsDialog } from '@/components/settings/settings-dialog';
+import { FileExplorer } from '@/components/files';
+import { SettingsDialog } from '@/components/modals/settings';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTauri } from '@/hooks/use-tauri';

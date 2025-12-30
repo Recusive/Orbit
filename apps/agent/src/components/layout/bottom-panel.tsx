@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { Diagnostic } from '@/lib/backend';
 import type { FC } from 'react';
 
-import { DiagnosticsPanel } from '@/components/diagnostics';
+import { DiagnosticsPanel } from '@/components/panels';
 import { Button } from '@/components/ui/button';
 import { useDiagnostics } from '@/hooks/use-diagnostics';
 import { useTerminalInstanceManager } from '@/hooks/use-terminal-instance-manager';
