@@ -99,6 +99,9 @@ export class TerminalInstance {
   // Disposables
   private disposables: IDisposable[] = [];
 
+  // Theme observer
+  private themeObserver: MutationObserver | null = null;
+
   // Callbacks
   private postMessage: (message: unknown) => void;
   private isMockMode: boolean;
@@ -214,6 +217,9 @@ export class TerminalInstance {
         }
       }
     );
+
+    // Set up theme observer to sync with app theme
+    this.setupThemeObserver();
   }
 
   // ==========================================================================
@@ -518,6 +524,40 @@ export class TerminalInstance {
     this.disposables.push(selectionDisposable);
   }
 
+  /**
+   * Set up a MutationObserver to watch for theme changes (dark mode toggle).
+   * Updates the terminal theme when the 'dark' class is added/removed from <html>.
+   */
+  private setupThemeObserver(): void {
+    if (typeof document === 'undefined') return;
+
+    this.themeObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.attributeName === 'class') {
+          // Theme changed, update terminal theme
+          this.updateTheme();
+          break;
+        }
+      }
+    });
+
+    this.themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+  }
+
+  /**
+   * Update the terminal theme by recomputing CSS variable values.
+   * Called when dark mode is toggled.
+   */
+  updateTheme(): void {
+    if (this.isDisposed) return;
+
+    const newTheme = this.buildThemeFromCSSVars();
+    this.terminal.options.theme = newTheme;
+  }
+
   // ==========================================================================
   // Clipboard Methods (for context menu)
   // ==========================================================================
@@ -700,6 +740,12 @@ export class TerminalInstance {
     if (this.ackInterval) {
       clearInterval(this.ackInterval);
       this.ackInterval = null;
+    }
+
+    // Disconnect theme observer
+    if (this.themeObserver) {
+      this.themeObserver.disconnect();
+      this.themeObserver = null;
     }
 
     // Dispose resize debouncer
