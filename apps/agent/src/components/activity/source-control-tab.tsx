@@ -404,16 +404,16 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header with Branch Dropdown */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50">
         <DropdownMenu>
           <DropdownMenuTrigger
             disabled={isCheckingOut || branches.length === 0}
-            className="flex items-center gap-1.5 text-sm min-w-0 hover:bg-accent rounded px-1.5 py-0.5 -ml-1.5 disabled:opacity-50"
+            className="flex items-center gap-1.5 text-sm min-w-0 hover:bg-muted/50 rounded-md px-2 py-1 -ml-2 active:scale-[0.98] transition-all duration-150 disabled:opacity-40"
           >
             {isCheckingOut ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground/70" />
             ) : (
-              <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground/70" />
             )}
             <span
               className={cn(
@@ -456,7 +456,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           <button
             onClick={refresh}
             disabled={isLoading}
-            className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+            className="p-1.5 rounded-md hover:bg-muted/60 text-muted-foreground/70 hover:text-foreground active:scale-95 transition-all duration-150"
             title="Refresh"
           >
             <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
@@ -497,7 +497,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
         ) : null}
 
         {/* Commit Message */}
-        <div className="p-3 border-b border-border">
+        <div className="p-3 border-b border-border/40">
           <textarea
             value={commitMessage}
             onChange={(e) => {
@@ -508,10 +508,11 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
             placeholder="Commit message (Ctrl+Enter to commit)..."
             rows={3}
             className="
-              w-full px-2 py-1.5 rounded-md text-sm
-              bg-background border border-border
-              focus:outline-none focus:ring-1 focus:ring-ring
-              resize-none
+              w-full px-2.5 py-2 rounded-lg text-sm
+              bg-muted/30 border border-border/50
+              placeholder:text-muted-foreground/50
+              focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-border/70 focus:bg-muted/40
+              transition-all duration-200 resize-none
             "
           />
           {commitError ? <p className="text-xs text-destructive mt-1">{commitError}</p> : null}
@@ -566,24 +567,25 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
 
         {/* Clean state */}
         {!hasChanges ? (
-          <div className="p-4 text-center text-sm text-muted-foreground">
-            <Check className="h-5 w-5 mx-auto mb-1 text-green-500" />
+          <div className="p-5 text-center text-[13px] text-muted-foreground/70">
+            <Check className="h-5 w-5 mx-auto mb-1.5 text-emerald-500/80" />
             Working tree clean
           </div>
         ) : null}
       </div>
 
       {/* Footer with Commit/Push/Pull */}
-      <div className="p-3 border-t border-border flex gap-2">
+      <div className="p-3 flex gap-2">
         <button
           onClick={() => void handleCommit()}
           disabled={isCommitting || !commitMessage.trim() || stagedFiles.length === 0}
           className="
             flex-1 flex items-center justify-center gap-2
-            px-3 py-1.5 rounded-md text-sm font-medium
-            bg-primary text-primary-foreground
-            hover:bg-primary/90
-            disabled:opacity-50 disabled:cursor-not-allowed
+            px-3 py-1.5 rounded-lg text-sm font-medium
+            bg-primary/90 text-primary-foreground shadow-sm
+            hover:bg-primary hover:shadow
+            active:scale-[0.98] transition-all duration-200
+            disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none
           "
         >
           {isCommitting ? (
@@ -597,10 +599,11 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           onClick={() => void handlePull()}
           disabled={isPulling || isPushing}
           className="
-            px-3 py-1.5 rounded-md
-            border border-border hover:bg-accent
+            px-3 py-1.5 rounded-lg
+            border border-border/50 hover:bg-muted/50 hover:border-border/70
             text-sm
-            disabled:opacity-50 disabled:cursor-not-allowed
+            active:scale-[0.98] transition-all duration-150
+            disabled:opacity-40 disabled:cursor-not-allowed
           "
           title="Pull"
         >
@@ -614,10 +617,11 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           onClick={() => void handlePush()}
           disabled={isPushing || isPulling}
           className="
-            px-3 py-1.5 rounded-md
-            border border-border hover:bg-accent
+            px-3 py-1.5 rounded-lg
+            border border-border/50 hover:bg-muted/50 hover:border-border/70
             text-sm
-            disabled:opacity-50 disabled:cursor-not-allowed
+            active:scale-[0.98] transition-all duration-150
+            disabled:opacity-40 disabled:cursor-not-allowed
           "
           title="Push"
         >
@@ -689,9 +693,9 @@ const FileSection: React.FC<FileSectionProps> = ({
   if (files.length === 0) return null;
 
   return (
-    <div className="border-b border-border">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+    <div>
+      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/20">
+        <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-[0.05em]">
           {title} ({files.length})
         </span>
         {headerAction}
@@ -700,7 +704,7 @@ const FileSection: React.FC<FileSectionProps> = ({
         {files.map((file) => (
           <div
             key={file.path}
-            className="group flex items-center gap-2 px-3 py-1 hover:bg-accent/50"
+            className="group flex items-center gap-2.5 px-3 py-1.5 hover:bg-muted/40 transition-colors duration-150"
           >
             <span className="w-4 flex justify-center shrink-0">
               {getStatusIcon(file.displayStatus)}
@@ -708,28 +712,28 @@ const FileSection: React.FC<FileSectionProps> = ({
             <div className="flex-1 min-w-0 text-sm">
               {file.oldPath ? (
                 // Renamed file: show "oldName → newName"
-                <span className="truncate block">
-                  <span className="text-muted-foreground">{getFileName(file.oldPath)}</span>
-                  <span className="text-muted-foreground mx-1">→</span>
+                <span className="truncate block text-[13px]">
+                  <span className="text-muted-foreground/70">{getFileName(file.oldPath)}</span>
+                  <span className="text-muted-foreground/50 mx-1">→</span>
                   <span>{getFileName(file.path)}</span>
                 </span>
               ) : (
-                <span className="truncate block">{getFileName(file.path)}</span>
+                <span className="truncate block text-[13px]">{getFileName(file.path)}</span>
               )}
-              <span className="text-xs text-muted-foreground truncate block">
+              <span className="text-[11px] text-muted-foreground/60 truncate block">
                 {file.oldPath && getFileDirectory(file.oldPath) !== getFileDirectory(file.path)
                   ? `${getFileDirectory(file.oldPath)} → ${getFileDirectory(file.path)}`
                   : getFileDirectory(file.path)}
               </span>
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
               {secondaryAction ? (
                 <button
                   onClick={() => {
                     secondaryAction(file.path);
                   }}
                   disabled={isLoading}
-                  className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-destructive"
+                  className="p-1 rounded-md hover:bg-muted/60 text-muted-foreground/70 hover:text-destructive active:scale-95 transition-all duration-150"
                   title={secondaryTitle}
                 >
                   {secondaryIcon}
@@ -738,7 +742,7 @@ const FileSection: React.FC<FileSectionProps> = ({
               <button
                 onClick={() => void onFileAction(file.path)}
                 disabled={isLoading}
-                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                className="p-1 rounded-md hover:bg-muted/60 text-muted-foreground/70 hover:text-foreground active:scale-95 transition-all duration-150"
                 title={actionTitle}
               >
                 {actionIcon}

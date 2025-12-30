@@ -125,12 +125,15 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
                 key={file.path}
                 value={file.path}
                 onSelect={handleSelect}
-                className="flex items-center gap-2"
+                className="flex items-center gap-3"
               >
-                <FileIcon fileName={file.name} className="h-4 w-4 shrink-0" />
+                <FileIcon
+                  fileName={file.name}
+                  className="h-4 w-4 shrink-0 opacity-70 group-data-[selected=true]:opacity-100"
+                />
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className="truncate">{file.name}</span>
-                  <span className="text-xs text-muted-foreground truncate">
+                  <span className="truncate text-[13px] font-medium">{file.name}</span>
+                  <span className="text-[11px] text-muted-foreground/50 group-data-[selected=true]:text-muted-foreground/70 truncate">
                     {getDisplayPath(file.path)}
                   </span>
                 </div>
@@ -147,12 +150,15 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
                 key={file.path}
                 value={file.path}
                 onSelect={handleSelect}
-                className="flex items-center gap-2"
+                className="flex items-center gap-3"
               >
-                <FileIcon fileName={file.name} className="h-4 w-4 shrink-0" />
+                <FileIcon
+                  fileName={file.name}
+                  className="h-4 w-4 shrink-0 opacity-70 group-data-[selected=true]:opacity-100"
+                />
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className="truncate">{file.name}</span>
-                  <span className="text-xs text-muted-foreground truncate">
+                  <span className="truncate text-[13px] font-medium">{file.name}</span>
+                  <span className="text-[11px] text-muted-foreground/50 group-data-[selected=true]:text-muted-foreground/70 truncate">
                     {getDisplayPath(file.path)}
                   </span>
                 </div>

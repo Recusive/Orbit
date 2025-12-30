@@ -57,13 +57,16 @@ const DialogContentTopCenter = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className="bg-black/50" />
+    <DialogOverlay className="bg-black/40 backdrop-blur-sm" />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-[50%] top-[15%] z-50 grid w-full max-w-xl translate-x-[-50%] border bg-background shadow-2xl duration-150 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-top-[2%] data-[state=open]:slide-in-from-top-[2%] rounded-lg',
+        'fixed left-[50%] top-[15%] z-50 grid w-full max-w-xl translate-x-[-50%] border border-border/40 bg-background/98 backdrop-blur-md duration-150 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-top-[2%] data-[state=open]:slide-in-from-top-[2%] rounded-xl',
         className
       )}
+      style={{
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.03)',
+      }}
       {...props}
     >
       {children}
