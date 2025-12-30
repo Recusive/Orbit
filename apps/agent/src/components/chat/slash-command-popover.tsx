@@ -69,7 +69,7 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[280px] p-0"
+        className="w-[280px] p-0 rounded-lg border-border/50 bg-popover/98 backdrop-blur-sm shadow-lg"
         side="top"
         align="start"
         sideOffset={8}
@@ -80,11 +80,14 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
           e.preventDefault();
         }}
       >
-        <Command shouldFilter={false} className="rounded-lg">
+        <Command shouldFilter={false} className="rounded-lg bg-transparent">
           <CommandList className="scroll-py-2">
             {filteredCommands.length === 0 ? <CommandEmpty>No commands found.</CommandEmpty> : null}
 
-            <CommandGroup heading="Commands">
+            <CommandGroup
+              heading="Commands"
+              className="[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.05em] [&_[cmdk-group-heading]]:text-muted-foreground/60"
+            >
               {filteredCommands.map((cmd, idx) => (
                 <CommandItem
                   key={cmd.name}
@@ -170,14 +173,16 @@ const CommandItem: FC<CommandItemProps> = ({ command, isSelected, isFirst, isLas
         onSelect(command);
       }}
       className={cn(
-        'relative flex cursor-pointer gap-2 select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors',
-        isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'
+        'relative flex cursor-pointer gap-2.5 select-none items-center rounded-md px-2.5 py-2 outline-none transition-all duration-150',
+        isSelected
+          ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-2'
+          : 'hover:bg-muted/50 active:scale-[0.99]'
       )}
     >
-      <span className="text-muted-foreground font-mono">/</span>
+      <span className="text-muted-foreground/70 font-mono text-[13px]">/</span>
       <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-sm font-medium">{command.name}</span>
-        <span className="truncate text-xs text-muted-foreground">{command.description}</span>
+        <span className="text-[13px] font-medium">{command.name}</span>
+        <span className="truncate text-[11px] text-muted-foreground/60">{command.description}</span>
       </div>
     </div>
   );

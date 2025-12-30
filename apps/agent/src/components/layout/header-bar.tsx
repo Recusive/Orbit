@@ -37,20 +37,20 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       tabIndex={active ? 0 : -1}
       data-tauri-drag-region={false}
       className={cn(
-        'relative flex items-center justify-center transition-colors h-7 px-3',
-        active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+        'relative flex items-center justify-center h-7 px-3 transition-all duration-200',
+        active ? 'text-foreground' : 'text-muted-foreground/80 hover:text-foreground'
       )}
       onClick={onClick}
     >
       {/* Tab background */}
       <div
         className={cn(
-          'absolute inset-0 rounded-md transition-colors',
-          active ? 'bg-sidebar-accent' : 'hover:bg-muted/50'
+          'absolute inset-0 rounded-md transition-colors duration-200',
+          active ? 'bg-sidebar-accent/70' : 'hover:bg-muted/40'
         )}
       />
       {/* Active indicator */}
-      {active ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary" /> : null}
+      {active ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary/80" /> : null}
       <span className="relative text-xs font-medium">{label}</span>
     </button>
   );
@@ -107,8 +107,8 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
     <header
       data-tauri-drag-region
       className={cn(
-        'h-[35px] flex items-center justify-between pr-4 border-y border-border shrink-0',
-        'bg-sidebar',
+        'h-[35px] flex items-center justify-between pr-4 border-y border-border/60 shrink-0',
+        'bg-card shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),0_4px_12px_-4px_rgba(0,0,0,0.05)]',
         // Left padding for macOS traffic light buttons (about 78px)
         'pl-[78px]',
         className
@@ -147,17 +147,17 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
         {/* Search button - VS Code style command palette */}
         <button
           data-tauri-drag-region={false}
-          className="flex items-center gap-2 h-6 px-2 rounded text-muted-foreground hover:text-foreground transition-all overflow-hidden bg-muted hover:bg-accent border border-border shadow-sm"
+          className="flex items-center gap-2 h-6 px-2 rounded-md text-muted-foreground hover:text-foreground overflow-hidden bg-muted/50 hover:bg-muted/70 border border-border/40 hover:border-border/60 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200"
           title="Search files (⌘P)"
           onClick={handleOpenSearch}
         >
-          <Search className="h-3 w-3 shrink-0 opacity-60" />
-          <span className="text-[11px] whitespace-nowrap overflow-hidden truncate max-w-[120px] opacity-70">
+          <Search className="h-3 w-3 shrink-0 opacity-50" />
+          <span className="text-[11px] whitespace-nowrap overflow-hidden truncate max-w-[120px] opacity-60">
             {searchText}
           </span>
           <KbdGroup>
-            <Kbd>⌘</Kbd>
-            <Kbd>P</Kbd>
+            <Kbd className="border-0 bg-background/60 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">⌘</Kbd>
+            <Kbd className="border-0 bg-background/60 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">P</Kbd>
           </KbdGroup>
         </button>
 
@@ -168,7 +168,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
               <button
                 data-tauri-drag-region={false}
                 onClick={toggleTheme}
-                className="h-7 w-7 flex items-center justify-center rounded opacity-70 hover:opacity-100 hover:bg-accent transition-colors"
+                className="h-7 w-7 flex items-center justify-center rounded-md opacity-60 hover:opacity-100 hover:bg-muted/60 active:scale-95 transition-all duration-150"
               >
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
@@ -183,10 +183,10 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                 data-tauri-drag-region={false}
                 onClick={handleTerminalToggle}
                 className={cn(
-                  'h-7 w-7 flex items-center justify-center rounded transition-colors',
+                  'h-7 w-7 flex items-center justify-center rounded-md active:scale-95 transition-all duration-150',
                   bottomPanelOpen
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    ? 'bg-muted/70 text-foreground'
+                    : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/60'
                 )}
               >
                 <SquareTerminal className="h-4 w-4" />
@@ -202,10 +202,10 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                 data-tauri-drag-region={false}
                 onClick={toggleReviewPanel}
                 className={cn(
-                  'h-7 w-7 flex items-center justify-center rounded transition-colors',
+                  'h-7 w-7 flex items-center justify-center rounded-md active:scale-95 transition-all duration-150',
                   reviewPanelOpen
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    ? 'bg-muted/70 text-foreground'
+                    : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/60'
                 )}
               >
                 <div className="rotate-180">
@@ -243,10 +243,10 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                 data-tauri-drag-region={false}
                 onClick={toggleRightSidebar}
                 className={cn(
-                  'h-7 w-7 flex items-center justify-center rounded transition-colors',
+                  'h-7 w-7 flex items-center justify-center rounded-md active:scale-95 transition-all duration-150',
                   rightSidebarOpen
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    ? 'bg-muted/70 text-foreground'
+                    : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/60'
                 )}
               >
                 <IconCodeInsert size={16} />

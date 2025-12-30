@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 
-import type { FC, ReactNode } from 'react';
+import type { CSSProperties, FC, ReactNode } from 'react';
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { cn } from '@/lib/utils';
@@ -149,7 +149,14 @@ interface ContextContentProps {
 
 export const ContextContent: FC<ContextContentProps> = ({ children, className }) => {
   return (
-    <HoverCardContent side="top" align="end" className={cn('w-56 p-0', className)}>
+    <HoverCardContent
+      side="top"
+      align="end"
+      className={cn(
+        'w-56 p-0 rounded-lg border-border/50 bg-popover/98 backdrop-blur-sm shadow-lg',
+        className
+      )}
+    >
       {children}
     </HoverCardContent>
   );
@@ -165,30 +172,47 @@ export const ContextContentHeader: FC<ContextContentHeaderProps> = ({ children, 
   const { percentage, usedTokens, maxTokens } = useContextData();
 
   if (children !== undefined) {
-    return <div className={cn('p-3 border-b border-border', className)}>{children}</div>;
+    return <div className={cn('p-3 border-b border-border/40', className)}>{children}</div>;
   }
 
+  // Determine progress bar color based on percentage
+  const getProgressStyle = (): CSSProperties => {
+    if (percentage >= 80) {
+      return {
+        background: 'linear-gradient(to right, rgb(239 68 68 / 0.9), rgb(248 113 113 / 0.9))',
+        boxShadow: '0 0 8px rgba(239, 68, 68, 0.3)',
+      };
+    }
+    if (percentage >= 50) {
+      return {
+        background: 'linear-gradient(to right, rgb(245 158 11 / 0.9), rgb(251 191 36 / 0.9))',
+        boxShadow: '0 0 8px rgba(245, 158, 11, 0.3)',
+      };
+    }
+    return {
+      background: 'linear-gradient(to right, rgb(16 185 129 / 0.9), rgb(52 211 153 / 0.9))',
+      boxShadow: '0 0 8px rgba(16, 185, 129, 0.3)',
+    };
+  };
+
   return (
-    <div className={cn('p-3 border-b border-border', className)}>
+    <div className={cn('p-3 border-b border-border/40', className)}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium">Context Window</span>
-        <span className="text-xs text-muted-foreground">{percentage}%</span>
+        <span className="text-[11px] font-medium tracking-[-0.01em]">Context Window</span>
+        <span className="text-[11px] font-medium text-muted-foreground/70 tabular-nums">
+          {percentage}%
+        </span>
       </div>
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 tabular-nums">
         <span>{formatTokens(usedTokens)}</span>
-        <span>/</span>
+        <span className="opacity-50">/</span>
         <span>{formatTokens(maxTokens)} tokens</span>
       </div>
       {/* Progress bar */}
-      <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+      <div className="mt-2.5 h-2 bg-muted/50 rounded-full overflow-hidden shadow-inner">
         <div
-          className={cn(
-            'h-full rounded-full transition-all',
-            percentage < 50 && 'bg-success',
-            percentage >= 50 && percentage < 80 && 'bg-warning',
-            percentage >= 80 && 'bg-destructive'
-          )}
-          style={{ width: `${String(percentage)}%` }}
+          className="h-full rounded-full transition-all duration-300 ease-out"
+          style={{ width: `${String(percentage)}%`, ...getProgressStyle() }}
         />
       </div>
     </div>
@@ -202,7 +226,7 @@ interface ContextContentBodyProps {
 }
 
 export const ContextContentBody: FC<ContextContentBodyProps> = ({ children, className }) => {
-  return <div className={cn('p-3 space-y-2', className)}>{children}</div>;
+  return <div className={cn('p-3 space-y-2.5', className)}>{children}</div>;
 };
 
 // Content Footer
@@ -233,9 +257,9 @@ interface UsageLineProps {
 
 const UsageLine: FC<UsageLineProps> = ({ label, tokens, className }) => {
   return (
-    <div className={cn('flex items-center justify-between text-xs', className)}>
-      <span className="text-muted-foreground">{label}</span>
-      <span>{formatTokens(tokens)}</span>
+    <div className={cn('flex items-center justify-between text-[11px]', className)}>
+      <span className="text-muted-foreground/60">{label}</span>
+      <span className="font-medium tabular-nums text-foreground/90">{formatTokens(tokens)}</span>
     </div>
   );
 };

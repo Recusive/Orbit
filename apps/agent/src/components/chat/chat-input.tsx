@@ -610,13 +610,19 @@ export const ChatInput: FC<ChatInputProps> = ({
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
                 <TooltipContent>Think config</TooltipContent>
-                <DropdownMenuContent align="center" side="top" className="p-2">
-                  <div className="flex items-center justify-between gap-4 mb-2">
-                    <span className="text-xs text-muted-foreground">Think config</span>
+                <DropdownMenuContent
+                  align="center"
+                  side="top"
+                  className="p-2.5 rounded-lg border-border/50 bg-popover/98 backdrop-blur-sm shadow-lg"
+                >
+                  <div className="flex items-center justify-between gap-4 mb-2.5">
+                    <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-[0.05em]">
+                      Think config
+                    </span>
                     {thinkingMode !== 'off' ? (
                       <span
                         className={cn(
-                          'flex items-center gap-1 text-[10px]',
+                          'flex items-center gap-1 text-[10px] font-medium',
                           thinkingMode === 'think' && 'text-mode-think',
                           thinkingMode === 'hard' && 'text-orange-500',
                           thinkingMode === 'ultra' && 'text-red-500'
@@ -629,14 +635,15 @@ export const ChatInput: FC<ChatInputProps> = ({
                       </span>
                     ) : null}
                   </div>
-                  <div className="relative flex gap-1 bg-muted rounded-md p-1 border border-border">
+                  <div className="relative flex gap-1 bg-muted/40 rounded-lg p-1 border border-border/30">
                     {/* Sliding indicator */}
                     <div
-                      className="absolute top-1 bottom-1 left-1 bg-background rounded shadow-sm transition-all duration-200"
+                      className="absolute top-1 bottom-1 left-1 bg-background/90 rounded-md transition-all duration-200"
                       style={{
                         width: 'var(--tab-width)',
                         transform: `translateX(calc(${String(['off', 'think', 'hard', 'ultra'].indexOf(thinkingMode))} * (var(--tab-width) + 4px)))`,
                         transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)',
                         // @ts-expect-error CSS custom property
                         '--tab-width': '38px',
                       }}
@@ -648,10 +655,10 @@ export const ChatInput: FC<ChatInputProps> = ({
                           onThinkingModeChange(mode);
                         }}
                         className={cn(
-                          'relative z-10 w-[38px] py-1 text-xs font-medium rounded transition-colors duration-200 capitalize',
+                          'relative z-10 w-[38px] py-1 text-xs font-medium rounded-md transition-colors duration-150 capitalize',
                           thinkingMode === mode
-                            ? 'text-foreground'
-                            : 'text-muted-foreground hover:text-foreground'
+                            ? 'text-foreground font-semibold'
+                            : 'text-muted-foreground/70 hover:text-foreground/90'
                         )}
                       >
                         {mode}

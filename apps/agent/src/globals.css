@@ -152,8 +152,8 @@
   --chart-4: oklch(0.553 0.195 38.402);
   --chart-5: oklch(0.47 0.157 37.304);
 
-  /* Sidebar - oat tones */
-  --sidebar: oklch(0.95 0.008 70);
+  /* Sidebar - matches card for same look as input box */
+  --sidebar: oklch(0.96 0.008 70);
   --sidebar-foreground: oklch(0.25 0.02 60);
   --sidebar-primary: oklch(0.62 0.18 35);
   --sidebar-primary-foreground: oklch(0.98 0.01 75);
@@ -245,8 +245,8 @@ html.dark {
   --chart-4: oklch(0.553 0.195 38.402);
   --chart-5: oklch(0.47 0.157 37.304);
 
-  /* Sidebar - warm dark */
-  --sidebar: oklch(0.18 0.012 58);
+  /* Sidebar - matches card for same look as input box */
+  --sidebar: oklch(0.20 0.015 58);
   --sidebar-foreground: oklch(0.93 0.01 75);
   --sidebar-primary: oklch(0.68 0.19 40);
   --sidebar-primary-foreground: oklch(0.15 0.01 60);

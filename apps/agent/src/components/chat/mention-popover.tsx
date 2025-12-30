@@ -58,7 +58,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[320px] p-0"
+        className="w-[320px] p-0 rounded-lg border-border/50 bg-popover/98 backdrop-blur-sm shadow-lg"
         side="top"
         align="start"
         sideOffset={8}
@@ -69,13 +69,16 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
           e.preventDefault();
         }}
       >
-        <Command shouldFilter={false} className="rounded-lg">
+        <Command shouldFilter={false} className="rounded-lg bg-transparent">
           <CommandList className="scroll-py-2">
             {allItems.length === 0 ? <CommandEmpty>No files found.</CommandEmpty> : null}
 
             {/* Folders group */}
             {folders.length > 0 ? (
-              <CommandGroup heading="Folders">
+              <CommandGroup
+                heading="Folders"
+                className="[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.05em] [&_[cmdk-group-heading]]:text-muted-foreground/60"
+              >
                 {folders.map((folder, idx) => (
                   <FileItem
                     key={folder.path}
@@ -91,7 +94,10 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
 
             {/* Files group */}
             {regularFiles.length > 0 ? (
-              <CommandGroup heading="Files">
+              <CommandGroup
+                heading="Files"
+                className="[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.05em] [&_[cmdk-group-heading]]:text-muted-foreground/60"
+              >
                 {regularFiles.map((file, idx) => (
                   <FileItem
                     key={file.path}
@@ -181,19 +187,21 @@ const FileItem: FC<FileItemProps> = ({ file, isSelected, isFirst, isLast, onSele
         onSelect(file);
       }}
       className={cn(
-        'relative flex cursor-pointer gap-2 select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors',
-        isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'
+        'relative flex cursor-pointer gap-2.5 select-none items-center rounded-md px-2.5 py-2 outline-none transition-all duration-150',
+        isSelected
+          ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-2'
+          : 'hover:bg-muted/50 active:scale-[0.99]'
       )}
     >
       <FileIcon
         fileName={file.isDirectory ? `${file.name}/` : file.name}
-        className="h-4 w-4"
+        className="h-4 w-4 shrink-0"
         monochrome={false}
       />
       <div className="flex flex-col min-w-0 flex-1">
-        <span className="truncate text-sm">{file.name}</span>
+        <span className="truncate text-[13px] font-medium">{file.name}</span>
         {dirPath ? (
-          <span className={cn('truncate text-xs text-muted-foreground')}>{dirPath}</span>
+          <span className="truncate text-[11px] text-muted-foreground/60">{dirPath}</span>
         ) : null}
       </div>
     </div>

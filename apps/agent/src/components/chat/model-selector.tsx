@@ -11,11 +11,21 @@ import { useModel, useToolStore } from '@/stores/tool-store';
 
 // Wrapper components to match the expected interface
 const ClaudeIcon: FC<{ className?: string }> = ({ className }) => (
-  <SiClaude className={cn('w-3 h-3', className)} />
+  <SiClaude
+    className={cn(
+      'w-3 h-3 opacity-70 group-hover:opacity-100 transition-opacity duration-150',
+      className
+    )}
+  />
 );
 
 const OpenAIIcon: FC<{ className?: string }> = ({ className }) => (
-  <SiOpenai className={cn('w-3 h-3', className)} />
+  <SiOpenai
+    className={cn(
+      'w-3 h-3 opacity-70 group-hover:opacity-100 transition-opacity duration-150',
+      className
+    )}
+  />
 );
 
 interface ModelOption {
@@ -121,13 +131,13 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       {isOpen ? (
         <div
           ref={popoverRef}
-          className="absolute bottom-full left-0 mb-2 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50"
+          className="absolute bottom-full left-0 mb-2 bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50"
           style={{ width: CONTENT_WIDTH.dropdown }}
         >
-          <div className="p-1">
+          <div className="p-1.5">
             {MODEL_GROUPS.map((group) => (
               <div key={group.label} className="mb-1 last:mb-0">
-                <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="px-2 py-1.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-[0.06em]">
                   {group.label}
                 </div>
                 {group.models.map((model) => (
@@ -137,23 +147,25 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                       handleSelectModel(model.id);
                     }}
                     className={cn(
-                      'w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors mt-0.5 first:mt-0',
+                      'w-full flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-all duration-150 mt-0.5 first:mt-0 group',
                       selectedModel === model.id
-                        ? 'bg-accent text-accent-foreground'
-                        : 'hover:bg-accent'
+                        ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px]'
+                        : 'hover:bg-muted/80 active:scale-[0.98]'
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <model.icon />
+                      <model.icon className={selectedModel === model.id ? 'opacity-100' : ''} />
                       <span>{model.name}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       {model.badge ? (
-                        <span className="text-[10px] text-muted-foreground bg-accent px-1 py-0.5 rounded">
+                        <span className="text-[9px] font-medium text-muted-foreground/70 bg-muted/60 px-1.5 py-0.5 rounded-full">
                           {model.badge}
                         </span>
                       ) : null}
-                      {selectedModel === model.id ? <Check className="h-4 w-4" /> : null}
+                      {selectedModel === model.id ? (
+                        <Check className="h-3.5 w-3.5 text-primary/80" />
+                      ) : null}
                     </div>
                   </button>
                 ))}
