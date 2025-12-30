@@ -205,9 +205,9 @@ const AgentEditor: FC<AgentEditorProps> = ({
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-60 bg-black/40 backdrop-blur-sm" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-[60] translate-x-[-50%] translate-y-[-50%] w-[600px] max-w-[90vw] max-h-[80vh] bg-background/98 backdrop-blur-md border border-border/40 rounded-xl shadow-xl flex flex-col"
+          className="fixed left-[50%] top-[50%] z-60 translate-x-[-50%] translate-y-[-50%] w-[600px] max-w-[90vw] max-h-[80vh] bg-background/98 backdrop-blur-md border border-border/40 rounded-xl shadow-xl flex flex-col"
           onPointerDownOutside={(e) => {
             e.preventDefault();
           }}
@@ -308,7 +308,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
                   <SelectTrigger className="mt-1 h-8 text-sm">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="z-[70]">
+                  <SelectContent className="z-70">
                     <SelectItem value="inherit">Inherit from parent</SelectItem>
                     <SelectItem value="haiku">Haiku (fast)</SelectItem>
                     <SelectItem value="sonnet">Sonnet (balanced)</SelectItem>
