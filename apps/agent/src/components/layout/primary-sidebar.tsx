@@ -107,7 +107,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
 
   return (
     <aside
-      className="h-full flex flex-col border-r border-border bg-sidebar transition-[width] duration-150 ease-in-out overflow-hidden"
+      className="h-full flex flex-col border-r border-border/70 bg-sidebar transition-[width] duration-150 ease-in-out overflow-hidden"
       style={{ width }}
     >
       {/* Header */}
@@ -122,7 +122,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleLeftSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-all duration-150 text-muted-foreground hover:text-foreground"
                 >
                   <SidebarToggleIcon expanded={false} />
                 </button>
@@ -139,9 +139,9 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         ) : (
           /* Expanded: text on left, button on right */
           <div className="flex items-center justify-between w-full px-3">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <span className="text-sm font-semibold whitespace-nowrap">Orbit Agent</span>
-              <span className="bg-muted rounded px-1 py-0.5 text-[10px] text-muted-foreground whitespace-nowrap">
+              <span className="bg-primary/8 text-primary/70 rounded-full px-1.5 py-0.5 text-[9px] font-medium tracking-wide whitespace-nowrap">
                 Preview
               </span>
             </div>
@@ -149,7 +149,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleLeftSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-all duration-150 text-muted-foreground hover:text-foreground"
                 >
                   <SidebarToggleIcon expanded={true} />
                 </button>
@@ -176,7 +176,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       >
         <button
           onClick={handleOpenQuickSearch}
-          className="flex items-center h-8 rounded-md text-muted-foreground hover:text-foreground transition-colors overflow-hidden border border-border dark:border-border/50 w-full bg-muted/50 hover:bg-muted"
+          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border border-border/50 w-full bg-muted/40 hover:bg-muted/60 hover:border-border/60 transition-all duration-200"
           title="Search files (⌘P)"
         >
           {/* Fixed-width icon column - never moves */}
@@ -191,10 +191,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
             Search files...
           </span>
           <div className="flex items-center gap-0.5 ml-auto mr-2">
-            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-sm font-mono bg-background/50 rounded">
+            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-sm font-mono bg-background/60 rounded-md shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
               ⌘
             </kbd>
-            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-[11px] font-mono bg-background/50 rounded">
+            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-[11px] font-mono bg-background/60 rounded-md shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
               P
             </kbd>
           </div>
@@ -205,7 +205,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       <div
         className={cn(
           'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-all duration-150 ease-in-out',
-          isCollapsed ? '' : 'border-b border-border'
+          isCollapsed ? '' : 'border-b border-border/60'
         )}
         style={{ height: isCollapsed ? 0 : 40, opacity: isCollapsed ? 0 : 1 }}
       >
@@ -229,7 +229,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {activeTab === 'conversations' ? (
         <div
           className={cn(
-            'flex flex-col border-b border-border shrink-0 transition-all duration-150 ease-in-out',
+            'flex flex-col border-b border-border/50 shrink-0 transition-all duration-150 ease-in-out',
             isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
           )}
         >
@@ -265,10 +265,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
             )}
           >
             <div className="flex items-center justify-between px-3 py-1">
-              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+              <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-[0.04em] whitespace-nowrap">
                 Workspaces
               </span>
-              <button className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground shrink-0">
+              <button className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-90 transition-all duration-150 text-muted-foreground hover:text-foreground shrink-0">
                 <Plus className="h-3 w-3" />
               </button>
             </div>
@@ -288,7 +288,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               {workspaceExpanded && conversations.length > 0 ? (
                 <div className="relative ml-[19px]">
                   {/* Vertical timeline line */}
-                  <div className="absolute left-0 top-0 bottom-2 w-px bg-border" />
+                  <div className="absolute left-0 top-0 bottom-2 w-px bg-border/60" />
                   {/* Conversations */}
                   <div className="flex flex-col gap-0.5">
                     {conversations.map((conv) => (
@@ -320,7 +320,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         )}
       </div>
 
-      <hr className={cn('border-border shrink-0', isCollapsed ? 'my-0' : 'my-2')} />
+      <hr className={cn('border-border/40 shrink-0', isCollapsed ? 'my-0' : 'my-2')} />
 
       {/* Utilities */}
       <div className={cn('flex flex-col shrink-0', isCollapsed ? 'gap-0 py-0' : 'gap-1 py-1.5')}>
@@ -385,7 +385,7 @@ const SidebarItem: FC<SidebarItemProps> = ({
       >
         <button
           className={cn(
-            'h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors',
+            'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-all duration-150',
             active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
           )}
           title={label}
@@ -400,7 +400,7 @@ const SidebarItem: FC<SidebarItemProps> = ({
   return (
     <button
       className={cn(
-        'flex items-center h-8 rounded-md mx-1.5 transition-all overflow-hidden hover:bg-accent/50',
+        'flex items-center h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-muted/50 active:scale-[0.98] transition-all duration-200',
         active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
       )}
       title={collapsed ? label : undefined}
@@ -427,7 +427,9 @@ const SidebarItem: FC<SidebarItemProps> = ({
       {shortcut && !collapsed ? (
         <KbdGroup className="ml-auto mr-2">
           {shortcut.map((key, index) => (
-            <Kbd key={index}>{key}</Kbd>
+            <Kbd key={index} className="border-0 bg-muted/70 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+              {key}
+            </Kbd>
           ))}
         </KbdGroup>
       ) : null}
@@ -451,7 +453,7 @@ const WorkspaceItem: FC<WorkspaceItemProps> = ({
 }) => {
   return (
     <button
-      className="flex items-center h-8 rounded-md mx-1.5 transition-colors overflow-hidden text-muted-foreground hover:text-foreground hover:bg-accent/50"
+      className="flex items-center h-8 rounded-lg mx-1.5 overflow-hidden text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all duration-200"
       onClick={onToggle}
     >
       {/* Fixed-width icon column */}
@@ -460,7 +462,10 @@ const WorkspaceItem: FC<WorkspaceItemProps> = ({
         style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
       >
         <ChevronDown
-          className={cn('h-4 w-4 shrink-0 transition-transform', !expanded && '-rotate-90')}
+          className={cn(
+            'h-4 w-4 shrink-0 transition-transform duration-200',
+            !expanded && '-rotate-90'
+          )}
         />
       </div>
       {/* Text that slides in */}
@@ -504,8 +509,8 @@ const ConversationItem: FC<ConversationItemProps> = ({
     >
       <button
         className={cn(
-          'flex items-center h-7 w-full rounded-md pl-[7px] pr-7 transition-colors overflow-hidden hover:bg-accent/50',
-          active ? 'bg-accent/50 text-foreground' : 'text-muted-foreground hover:text-foreground'
+          'flex items-center h-7 w-full rounded-lg pl-[7px] pr-7 overflow-hidden hover:bg-muted/40 transition-all duration-200',
+          active ? 'bg-muted/50 text-foreground' : 'text-muted-foreground hover:text-foreground'
         )}
         title={conversation.title}
         onClick={onClick}
@@ -531,7 +536,7 @@ const ConversationItem: FC<ConversationItemProps> = ({
       {!collapsed && (
         <button
           className={cn(
-            'absolute right-0.5 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded transition-opacity hover:bg-accent',
+            'absolute right-0.5 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md transition-all duration-150 hover:bg-muted/60 active:scale-90',
             isHovered ? 'opacity-100' : 'opacity-0'
           )}
           onClick={(e) => {
@@ -561,8 +566,8 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
   return (
     <button
       className={cn(
-        'relative flex items-center justify-center transition-colors h-7 px-3 flex-1',
-        active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+        'relative flex items-center justify-center h-7 px-3 flex-1 transition-all duration-200',
+        active ? 'text-foreground' : 'text-muted-foreground/80 hover:text-foreground'
       )}
       onClick={onClick}
       title={label}
@@ -570,12 +575,12 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       {/* Tab background - Orbit style */}
       <div
         className={cn(
-          'absolute inset-0 rounded-t-md transition-colors',
-          active ? 'bg-sidebar-accent' : 'hover:bg-muted/50'
+          'absolute inset-0 rounded-t-md transition-colors duration-200',
+          active ? 'bg-sidebar-accent/70' : 'hover:bg-muted/40'
         )}
       />
       {/* Active indicator */}
-      {active ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary" /> : null}
+      {active ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary/90" /> : null}
       <span className="relative text-xs font-medium truncate">{label}</span>
     </button>
   );
