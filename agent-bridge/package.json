@@ -15,7 +15,9 @@
     "@anthropic-ai/claude-agent-sdk": "^0.1.76",
     "@anthropic-ai/claude-code": "^2.0.76",
     "@anthropic-ai/sdk": "^0.71.2",
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@snowflake/shared-schemas": "workspace:*",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@types/node": "^22.19.3",

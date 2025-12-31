@@ -25,104 +25,122 @@ export enum DiffChangeType {
 /**
  * Diff line schema
  */
-export const DiffLineSchema = z.object({
-  type: z.enum(DiffLineType),
-  content: z.string(),
-  oldLineNumber: z.number().optional(),
-  newLineNumber: z.number().optional(),
-  isTrailingWhitespace: z.boolean().optional(),
-  isNoNewlineAtEndOfFile: z.boolean().optional(),
-});
+export const DiffLineSchema = z
+  .object({
+    type: z.enum(DiffLineType),
+    content: z.string(),
+    oldLineNumber: z.number().optional(),
+    newLineNumber: z.number().optional(),
+    isTrailingWhitespace: z.boolean().optional(),
+    isNoNewlineAtEndOfFile: z.boolean().optional(),
+  })
+  .strict();
 
 /**
  * Diff hunk schema
  */
-export const DiffHunkSchema = z.object({
-  oldStart: z.number(),
-  oldLines: z.number(),
-  newStart: z.number(),
-  newLines: z.number(),
-  header: z.string(),
-  lines: z.array(DiffLineSchema),
-  context: z.string().optional(),
-});
+export const DiffHunkSchema = z
+  .object({
+    oldStart: z.number(),
+    oldLines: z.number(),
+    newStart: z.number(),
+    newLines: z.number(),
+    header: z.string(),
+    lines: z.array(DiffLineSchema),
+    context: z.string().optional(),
+  })
+  .strict();
 
 /**
  * File diff schema
  */
-export const FileDiffSchema = z.object({
-  oldPath: z.string(),
-  newPath: z.string(),
-  changeType: z.enum(DiffChangeType),
-  hunks: z.array(DiffHunkSchema),
-  additions: z.number(),
-  deletions: z.number(),
-  isBinary: z.boolean().optional(),
-  oldMode: z.string().optional(),
-  newMode: z.string().optional(),
-  similarity: z.number().optional(), // For rename/copy operations
-  checksum: z.string().optional(),
-});
+export const FileDiffSchema = z
+  .object({
+    oldPath: z.string(),
+    newPath: z.string(),
+    changeType: z.enum(DiffChangeType),
+    hunks: z.array(DiffHunkSchema),
+    additions: z.number(),
+    deletions: z.number(),
+    isBinary: z.boolean().optional(),
+    oldMode: z.string().optional(),
+    newMode: z.string().optional(),
+    similarity: z.number().optional(), // For rename/copy operations
+    checksum: z.string().optional(),
+  })
+  .strict();
 
 /**
  * Diff summary schema
  */
-export const DiffSummarySchema = z.object({
-  totalFiles: z.number(),
-  additions: z.number(),
-  deletions: z.number(),
-  filesChanged: z.number(),
-  files: z.array(
-    z.object({
-      path: z.string(),
-      additions: z.number(),
-      deletions: z.number(),
-      changeType: z.enum(DiffChangeType),
-    })
-  ),
-});
+export const DiffSummarySchema = z
+  .object({
+    totalFiles: z.number(),
+    additions: z.number(),
+    deletions: z.number(),
+    filesChanged: z.number(),
+    files: z.array(
+      z
+        .object({
+          path: z.string(),
+          additions: z.number(),
+          deletions: z.number(),
+          changeType: z.enum(DiffChangeType),
+        })
+        .strict()
+    ),
+  })
+  .strict();
 
 /**
  * Inline diff schema (for side-by-side view)
  */
-export const InlineDiffSchema = z.object({
-  oldContent: z.string(),
-  newContent: z.string(),
-  changes: z.array(
-    z.object({
-      type: z.enum(['insert', 'delete', 'equal']),
-      value: z.string(),
-      oldIndex: z.number().optional(),
-      newIndex: z.number().optional(),
-    })
-  ),
-});
+export const InlineDiffSchema = z
+  .object({
+    oldContent: z.string(),
+    newContent: z.string(),
+    changes: z.array(
+      z
+        .object({
+          type: z.enum(['insert', 'delete', 'equal']),
+          value: z.string(),
+          oldIndex: z.number().optional(),
+          newIndex: z.number().optional(),
+        })
+        .strict()
+    ),
+  })
+  .strict();
 
 /**
  * Diff conflict schema
  */
-export const DiffConflictSchema = z.object({
-  filePath: z.string(),
-  startLine: z.number(),
-  endLine: z.number(),
-  currentContent: z.string(),
-  incomingContent: z.string(),
-  baseContent: z.string().optional(),
-  resolved: z.boolean(),
-  resolution: z.string().optional(),
-});
+export const DiffConflictSchema = z
+  .object({
+    filePath: z.string(),
+    startLine: z.number(),
+    endLine: z.number(),
+    currentContent: z.string(),
+    incomingContent: z.string(),
+    baseContent: z.string().optional(),
+    resolved: z.boolean(),
+    resolution: z.string().optional(),
+  })
+  .strict();
 
 /**
  * Diff view preferences schema
  */
-export const DiffViewPreferencesSchema = z.object({
-  viewMode: z.enum(['unified', 'split', 'inline']),
-  showLineNumbers: z.boolean(),
-  showWhitespace: z.boolean(),
-  contextLines: z.number().min(0).max(100),
-  highlightSyntax: z.boolean(),
-  wrapLines: z.boolean(),
-});
+export const DiffViewPreferencesSchema = z
+  .object({
+    viewMode: z.enum(['unified', 'split', 'inline']),
+    showLineNumbers: z.boolean(),
+    showWhitespace: z.boolean(),
+    contextLines: z.number().min(0).max(100),
+    highlightSyntax: z.boolean(),
+    wrapLines: z.boolean(),
+  })
+  .strict();
 
 /**
  * TypeScript types inferred from Zod schemas

@@ -5,12 +5,76 @@
 
 import { randomUUID } from 'node:crypto';
 
+import { formatZodError } from '@snowflake/shared-schemas';
+import { z } from 'zod';
+
 import { OrbitAgent } from './agent.js';
 import { Disposable, Emitter } from './events.js';
 import { createLogger } from './logger.js';
 
 import type { OrbitAgentConfig } from './agent.js';
 import type { AttachmentContentBlock } from './messages.js';
+
+// ============================================================================
+// Structured Output Schemas (for AI-generated definitions)
+// ============================================================================
+
+/**
+ * Schema for AI-generated agent definitions
+ */
+const GeneratedAgentSchema = z
+  .object({
+    name: z
+      .string()
+      .describe(
+        'A short, descriptive name for the agent (no spaces, use kebab-case like "code-reviewer" or "test-runner")'
+      ),
+    description: z
+      .string()
+      .describe('A brief description of when to use this agent (1-2 sentences)'),
+    prompt: z
+      .string()
+      .describe(
+        'The system prompt for the agent - detailed instructions on what it should do and how'
+      ),
+    tools: z
+      .array(z.string())
+      .optional()
+      .describe('Optional list of specific tool names this agent should use'),
+    model: z
+      .enum(['sonnet', 'opus', 'haiku', 'inherit'])
+      .optional()
+      .describe('Model to use (default: inherit from parent)'),
+  })
+  .strict();
+
+/**
+ * Schema for AI-generated command definitions
+ */
+const GeneratedCommandSchema = z
+  .object({
+    name: z
+      .string()
+      .describe(
+        'A short, descriptive name for the command (no spaces, use kebab-case like "review-code" or "run-tests")'
+      ),
+    description: z
+      .string()
+      .optional()
+      .describe('A brief description of what the command does (1-2 sentences)'),
+    content: z
+      .string()
+      .describe('The prompt content - what the AI should do when this command is invoked'),
+    argumentHint: z
+      .string()
+      .optional()
+      .describe('Optional hint for command arguments (e.g., "[file] [options]")'),
+    model: z
+      .enum(['sonnet', 'opus', 'haiku'])
+      .optional()
+      .describe('Optional model to use for this command'),
+  })
+  .strict();
 
 const logger = createLogger('SessionManager');
 
@@ -948,46 +1012,13 @@ export class SessionManager extends Disposable {
   /**
    * Generate an agent definition from a natural language description using AI
    */
-  async generateAgentDefinition(description: string): Promise<{
-    name: string;
-    description: string;
-    prompt: string;
-    tools?: string[];
-    disallowedTools?: string[];
-    model?: 'sonnet' | 'opus' | 'haiku' | 'inherit';
-  }> {
-    const agentSchema = {
+  async generateAgentDefinition(
+    description: string
+  ): Promise<z.infer<typeof GeneratedAgentSchema>> {
+    // Convert Zod schema to JSON Schema for structured output
+    const outputFormat = {
       type: 'json_schema' as const,
-      schema: {
-        type: 'object',
-        properties: {
-          name: {
-            type: 'string',
-            description:
-              'A short, descriptive name for the agent (no spaces, use kebab-case like "code-reviewer" or "test-runner")',
-          },
-          description: {
-            type: 'string',
-            description: 'A brief description of when to use this agent (1-2 sentences)',
-          },
-          prompt: {
-            type: 'string',
-            description:
-              'The system prompt for the agent - detailed instructions on what it should do and how',
-          },
-          tools: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Optional list of specific tool names this agent should use',
-          },
-          model: {
-            type: 'string',
-            enum: ['sonnet', 'opus', 'haiku', 'inherit'],
-            description: 'Model to use (default: inherit from parent)',
-          },
-        },
-        required: ['name', 'description', 'prompt'],
-      },
+      schema: z.toJSONSchema(GeneratedAgentSchema),
     };
 
     const prompt = `Generate a subagent definition based on this description:
@@ -1005,7 +1036,7 @@ Return ONLY the JSON object with the agent definition.`;
 
     // Create temporary agent with structured output
     const agent = new OrbitAgent({
-      outputFormat: agentSchema,
+      outputFormat,
       model: 'sonnet',
     });
 
@@ -1013,32 +1044,13 @@ Return ONLY the JSON object with the agent definition.`;
     agent.queueMessage(prompt);
 
     // Consume responses until we get a result with structured output
-    let result:
-      | {
-          name: string;
-          description: string;
-          prompt: string;
-          tools?: string[];
-          model?: 'sonnet' | 'opus' | 'haiku' | 'inherit';
-        }
-      | undefined = undefined;
+    let rawOutput: unknown = undefined;
 
     for await (const rawMessage of agent.receiveResponse()) {
       const sdkMessage = rawMessage as { type: string; structured_output?: unknown };
       if (sdkMessage.type === 'result') {
-        if (
-          sdkMessage.structured_output !== undefined &&
-          sdkMessage.structured_output !== null &&
-          typeof sdkMessage.structured_output === 'object'
-        ) {
-          const output = sdkMessage.structured_output as Record<string, unknown>;
-          result = {
-            name: typeof output.name === 'string' ? output.name : '',
-            description: typeof output.description === 'string' ? output.description : '',
-            prompt: typeof output.prompt === 'string' ? output.prompt : '',
-            tools: Array.isArray(output.tools) ? (output.tools as string[]) : undefined,
-            model: output.model as 'sonnet' | 'opus' | 'haiku' | 'inherit' | undefined,
-          };
+        if (sdkMessage.structured_output !== undefined && sdkMessage.structured_output !== null) {
+          rawOutput = sdkMessage.structured_output;
         }
         break;
       }
@@ -1046,60 +1058,34 @@ Return ONLY the JSON object with the agent definition.`;
 
     await agent.stopSession();
 
-    if (result === undefined) {
+    if (rawOutput === undefined) {
       throw new Error('Failed to generate agent definition - no structured output received');
     }
 
-    if (result.name === '' || result.description === '' || result.prompt === '') {
-      throw new Error('Generated agent definition is missing required fields');
+    // Validate with Zod schema for type-safe result
+    const parseResult = GeneratedAgentSchema.safeParse(rawOutput);
+    if (!parseResult.success) {
+      throw new Error(
+        `Generated agent definition is invalid: ${formatZodError(parseResult.error)}`
+      );
     }
 
-    return result;
+    return parseResult.data;
   }
 
   /**
    * Generate a command definition from a natural language description using AI
    */
-  async generateCommandDefinition(description: string): Promise<{
-    name: string;
-    description?: string;
-    content: string;
-    allowedTools?: string[];
-    argumentHint?: string;
-    model?: 'sonnet' | 'opus' | 'haiku';
-    scope: 'builtin' | 'default' | 'project' | 'personal';
-    readonly?: boolean;
-  }> {
-    const commandSchema = {
+  async generateCommandDefinition(description: string): Promise<
+    z.infer<typeof GeneratedCommandSchema> & {
+      scope: 'builtin' | 'default' | 'project' | 'personal';
+      readonly?: boolean;
+    }
+  > {
+    // Convert Zod schema to JSON Schema for structured output
+    const outputFormat = {
       type: 'json_schema' as const,
-      schema: {
-        type: 'object',
-        properties: {
-          name: {
-            type: 'string',
-            description:
-              'A short, descriptive name for the command (no spaces, use kebab-case like "review-code" or "run-tests")',
-          },
-          description: {
-            type: 'string',
-            description: 'A brief description of what the command does (1-2 sentences)',
-          },
-          content: {
-            type: 'string',
-            description: 'The prompt content - what the AI should do when this command is invoked',
-          },
-          argumentHint: {
-            type: 'string',
-            description: 'Optional hint for command arguments (e.g., "[file] [options]")',
-          },
-          model: {
-            type: 'string',
-            enum: ['sonnet', 'opus', 'haiku'],
-            description: 'Optional model to use for this command',
-          },
-        },
-        required: ['name', 'description', 'content'],
-      },
+      schema: z.toJSONSchema(GeneratedCommandSchema),
     };
 
     const prompt = `Generate a slash command definition based on this description:
@@ -1117,7 +1103,7 @@ Return ONLY the JSON object with the command definition.`;
 
     // Create temporary agent with structured output
     const agent = new OrbitAgent({
-      outputFormat: commandSchema,
+      outputFormat,
       model: 'sonnet',
     });
 
@@ -1125,32 +1111,13 @@ Return ONLY the JSON object with the command definition.`;
     agent.queueMessage(prompt);
 
     // Consume responses until we get a result with structured output
-    let result:
-      | {
-          name: string;
-          description?: string;
-          content: string;
-          argumentHint?: string;
-          model?: 'sonnet' | 'opus' | 'haiku';
-        }
-      | undefined = undefined;
+    let rawOutput: unknown = undefined;
 
     for await (const rawMessage of agent.receiveResponse()) {
       const sdkMessage = rawMessage as { type: string; structured_output?: unknown };
       if (sdkMessage.type === 'result') {
-        if (
-          sdkMessage.structured_output !== undefined &&
-          sdkMessage.structured_output !== null &&
-          typeof sdkMessage.structured_output === 'object'
-        ) {
-          const output = sdkMessage.structured_output as Record<string, unknown>;
-          result = {
-            name: typeof output.name === 'string' ? output.name : '',
-            description: typeof output.description === 'string' ? output.description : undefined,
-            content: typeof output.content === 'string' ? output.content : '',
-            argumentHint: typeof output.argumentHint === 'string' ? output.argumentHint : undefined,
-            model: output.model as 'sonnet' | 'opus' | 'haiku' | undefined,
-          };
+        if (sdkMessage.structured_output !== undefined && sdkMessage.structured_output !== null) {
+          rawOutput = sdkMessage.structured_output;
         }
         break;
       }
@@ -1158,20 +1125,21 @@ Return ONLY the JSON object with the command definition.`;
 
     await agent.stopSession();
 
-    if (result === undefined) {
+    if (rawOutput === undefined) {
       throw new Error('Failed to generate command definition - no structured output received');
     }
 
-    if (result.name === '' || result.content === '') {
-      throw new Error('Generated command definition is missing required fields');
+    // Validate with Zod schema for type-safe result
+    const parseResult = GeneratedCommandSchema.safeParse(rawOutput);
+    if (!parseResult.success) {
+      throw new Error(
+        `Generated command definition is invalid: ${formatZodError(parseResult.error)}`
+      );
     }
 
+    // Add default scope and readonly for user-generated commands
     return {
-      name: result.name,
-      description: result.description,
-      content: result.content,
-      argumentHint: result.argumentHint,
-      model: result.model,
+      ...parseResult.data,
       scope: 'project',
       readonly: false,
     };

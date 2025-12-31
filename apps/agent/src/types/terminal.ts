@@ -1,64 +1,65 @@
+import { ShellTypeSchema, TerminalCapabilitiesSchema } from '@snowflake/shared-schemas';
 import { z } from 'zod';
+
+// Re-export shared terminal schemas for consumers
+export {
+  ShellTypeSchema,
+  TerminalCapabilitiesSchema,
+  type ShellType,
+  type TerminalCapabilities,
+} from '@snowflake/shared-schemas';
 
 // ============================================================================
 // PTY Terminal Types (for real terminal backend)
 // ============================================================================
 
 /**
- * Shell type detected by the backend
- */
-export type ShellType = 'bash' | 'zsh' | 'fish' | 'pwsh' | 'cmd' | 'unknown';
-
-/**
- * Terminal capabilities provided by shell integration
- */
-export interface TerminalCapabilities {
-  cwdDetection: boolean;
-  commandDetection: boolean;
-  shellIntegration: boolean;
-}
-
-/**
  * PTY terminal session (connected to real backend)
  */
-export interface PtyTerminalSession {
-  /** Unique terminal ID from backend */
-  terminalId: string;
-  /** Process ID of the shell */
-  pid: number;
-  /** Current working directory */
-  cwd: string;
-  /** Detected shell type */
-  shellType: ShellType;
-  /** Terminal title (usually process name) */
-  title: string;
-  /** Current capabilities */
-  capabilities: TerminalCapabilities;
-  /** Linked chat session ID if any */
-  sessionId?: string;
-  /** Whether the terminal is still alive */
-  isAlive: boolean;
-  /** Creation timestamp */
-  createdAt: number;
-}
+export const PtyTerminalSessionSchema = z
+  .object({
+    /** Unique terminal ID from backend */
+    terminalId: z.string(),
+    /** Process ID of the shell */
+    pid: z.number(),
+    /** Current working directory */
+    cwd: z.string(),
+    /** Detected shell type */
+    shellType: ShellTypeSchema,
+    /** Terminal title (usually process name) */
+    title: z.string(),
+    /** Current capabilities */
+    capabilities: TerminalCapabilitiesSchema,
+    /** Linked chat session ID if any */
+    sessionId: z.string().optional(),
+    /** Whether the terminal is still alive */
+    isAlive: z.boolean(),
+    /** Creation timestamp */
+    createdAt: z.number(),
+  })
+  .strict();
+export type PtyTerminalSession = z.infer<typeof PtyTerminalSessionSchema>;
 
 /**
  * Command detected by shell integration
  */
-export interface DetectedCommand {
-  /** Command line that was executed */
-  commandLine?: string;
-  /** Exit code when command finished */
-  exitCode?: number;
-  /** Marker position (line number) */
-  marker?: number;
-  /** Whether command is still running */
-  isRunning: boolean;
-  /** Start timestamp */
-  startTime?: number;
-  /** End timestamp */
-  endTime?: number;
-}
+export const DetectedCommandSchema = z
+  .object({
+    /** Command line that was executed */
+    commandLine: z.string().optional(),
+    /** Exit code when command finished */
+    exitCode: z.number().optional(),
+    /** Marker position (line number) */
+    marker: z.number().optional(),
+    /** Whether command is still running */
+    isRunning: z.boolean(),
+    /** Start timestamp */
+    startTime: z.number().optional(),
+    /** End timestamp */
+    endTime: z.number().optional(),
+  })
+  .strict();
+export type DetectedCommand = z.infer<typeof DetectedCommandSchema>;
 
 // ============================================================================
 // Legacy Command Types (for command history)
@@ -87,118 +88,132 @@ export enum TerminalOutputType {
 /**
  * Terminal command schema
  */
-export const TerminalCommandSchema = z.object({
-  id: z.string(),
-  command: z.string(),
-  args: z.array(z.string()).optional(),
-  cwd: z.string().optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  status: z.enum(CommandStatus),
-  startTime: z.number(),
-  endTime: z.number().optional(),
-  exitCode: z.number().optional(),
-  signal: z.string().optional(),
-  pid: z.number().optional(),
-});
+export const TerminalCommandSchema = z
+  .object({
+    id: z.string(),
+    command: z.string(),
+    args: z.array(z.string()).optional(),
+    cwd: z.string().optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    status: z.enum(CommandStatus),
+    startTime: z.number(),
+    endTime: z.number().optional(),
+    exitCode: z.number().optional(),
+    signal: z.string().optional(),
+    pid: z.number().optional(),
+  })
+  .strict();
 
 /**
  * Terminal output schema
  */
-export const TerminalOutputSchema = z.object({
-  id: z.string(),
-  commandId: z.string(),
-  type: z.enum(TerminalOutputType),
-  data: z.string(),
-  timestamp: z.number(),
-  isError: z.boolean().optional(),
-});
+export const TerminalOutputSchema = z
+  .object({
+    id: z.string(),
+    commandId: z.string(),
+    type: z.enum(TerminalOutputType),
+    data: z.string(),
+    timestamp: z.number(),
+    isError: z.boolean().optional(),
+  })
+  .strict();
 
 /**
  * Terminal session schema
  */
-export const TerminalSessionSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  cwd: z.string(),
-  shell: z.string().optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  commands: z.array(TerminalCommandSchema),
-  output: z.array(TerminalOutputSchema),
-  isActive: z.boolean(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  metadata: z
-    .object({
-      totalCommands: z.number().optional(),
-      successfulCommands: z.number().optional(),
-      failedCommands: z.number().optional(),
-      totalDuration: z.number().optional(),
-    })
-    .optional(),
-});
+export const TerminalSessionSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    cwd: z.string(),
+    shell: z.string().optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    commands: z.array(TerminalCommandSchema),
+    output: z.array(TerminalOutputSchema),
+    isActive: z.boolean(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    metadata: z
+      .object({
+        totalCommands: z.number().optional(),
+        successfulCommands: z.number().optional(),
+        failedCommands: z.number().optional(),
+        totalDuration: z.number().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /**
  * Terminal session summary schema
  */
-export const TerminalSessionSummarySchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  cwd: z.string(),
-  isActive: z.boolean(),
-  lastCommandPreview: z.string().optional(),
-  lastCommandStatus: z.enum(CommandStatus).optional(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  commandCount: z.number(),
-});
+export const TerminalSessionSummarySchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    cwd: z.string(),
+    isActive: z.boolean(),
+    lastCommandPreview: z.string().optional(),
+    lastCommandStatus: z.enum(CommandStatus).optional(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    commandCount: z.number(),
+  })
+  .strict();
 
 /**
  * Terminal history entry schema
  */
-export const TerminalHistoryEntrySchema = z.object({
-  command: z.string(),
-  timestamp: z.number(),
-  cwd: z.string(),
-  exitCode: z.number().optional(),
-  duration: z.number().optional(),
-});
+export const TerminalHistoryEntrySchema = z
+  .object({
+    command: z.string(),
+    timestamp: z.number(),
+    cwd: z.string(),
+    exitCode: z.number().optional(),
+    duration: z.number().optional(),
+  })
+  .strict();
 
 /**
  * Terminal settings schema
  */
-export const TerminalSettingsSchema = z.object({
-  shell: z.string().optional(),
-  fontSize: z.number().optional(),
-  fontFamily: z.string().optional(),
-  cursorStyle: z.enum(['block', 'underline', 'bar']).optional(),
-  cursorBlink: z.boolean().optional(),
-  scrollback: z.number().optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  theme: z
-    .object({
-      foreground: z.string().optional(),
-      background: z.string().optional(),
-      cursor: z.string().optional(),
-      selection: z.string().optional(),
-      black: z.string().optional(),
-      red: z.string().optional(),
-      green: z.string().optional(),
-      yellow: z.string().optional(),
-      blue: z.string().optional(),
-      magenta: z.string().optional(),
-      cyan: z.string().optional(),
-      white: z.string().optional(),
-      brightBlack: z.string().optional(),
-      brightRed: z.string().optional(),
-      brightGreen: z.string().optional(),
-      brightYellow: z.string().optional(),
-      brightBlue: z.string().optional(),
-      brightMagenta: z.string().optional(),
-      brightCyan: z.string().optional(),
-      brightWhite: z.string().optional(),
-    })
-    .optional(),
-});
+export const TerminalSettingsSchema = z
+  .object({
+    shell: z.string().optional(),
+    fontSize: z.number().optional(),
+    fontFamily: z.string().optional(),
+    cursorStyle: z.enum(['block', 'underline', 'bar']).optional(),
+    cursorBlink: z.boolean().optional(),
+    scrollback: z.number().optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    theme: z
+      .object({
+        foreground: z.string().optional(),
+        background: z.string().optional(),
+        cursor: z.string().optional(),
+        selection: z.string().optional(),
+        black: z.string().optional(),
+        red: z.string().optional(),
+        green: z.string().optional(),
+        yellow: z.string().optional(),
+        blue: z.string().optional(),
+        magenta: z.string().optional(),
+        cyan: z.string().optional(),
+        white: z.string().optional(),
+        brightBlack: z.string().optional(),
+        brightRed: z.string().optional(),
+        brightGreen: z.string().optional(),
+        brightYellow: z.string().optional(),
+        brightBlue: z.string().optional(),
+        brightMagenta: z.string().optional(),
+        brightCyan: z.string().optional(),
+        brightWhite: z.string().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /**
  * TypeScript types inferred from Zod schemas

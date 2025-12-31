@@ -5,6 +5,7 @@ import type { FC } from 'react';
 import { RootLayout } from '@/components/layout';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useBrowser } from '@/hooks/use-browser';
+import { TauriProvider } from '@/providers/tauri-provider';
 
 /**
  * Syncs system theme preference to the html element.
@@ -42,11 +43,13 @@ const App: FC = () => {
   useBrowser(); // Handle browser messages from Tauri backend
 
   return (
-    <TooltipProvider delayDuration={0}>
-      <div className="h-full">
-        <RootLayout />
-      </div>
-    </TooltipProvider>
+    <TauriProvider>
+      <TooltipProvider delayDuration={0}>
+        <div className="h-full">
+          <RootLayout />
+        </div>
+      </TooltipProvider>
+    </TauriProvider>
   );
 };
 

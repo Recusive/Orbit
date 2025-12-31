@@ -5,54 +5,61 @@ import { MessageSchema } from './message';
 /**
  * Workspace configuration schema
  */
-export const WorkspaceConfigSchema = z.object({
-  name: z.string(),
-  rootPath: z.string(),
-  language: z.string().optional(),
-  framework: z.string().optional(),
-  packageManager: z.string().optional(),
-  gitRepository: z.string().optional(),
-  gitBranch: z.string().optional(),
-  excludePatterns: z.array(z.string()).optional(),
-  includePatterns: z.array(z.string()).optional(),
-  customSettings: z.record(z.string(), z.any()).optional(),
-});
+export const WorkspaceConfigSchema = z
+  .object({
+    name: z.string(),
+    rootPath: z.string(),
+    language: z.string().optional(),
+    framework: z.string().optional(),
+    packageManager: z.string().optional(),
+    gitRepository: z.string().optional(),
+    gitBranch: z.string().optional(),
+    excludePatterns: z.array(z.string()).optional(),
+    includePatterns: z.array(z.string()).optional(),
+    customSettings: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
 
 /**
  * Workspace schema
  */
-export const WorkspaceSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  rootPath: z.string(),
-  config: WorkspaceConfigSchema.optional(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  metadata: z
-    .object({
-      fileCount: z.number().optional(),
-      totalSize: z.number().optional(),
-      languages: z.array(z.string()).optional(),
-      frameworks: z.array(z.string()).optional(),
-    })
-    .optional(),
-});
+export const WorkspaceSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    rootPath: z.string(),
+    config: WorkspaceConfigSchema.optional(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    metadata: z
+      .object({
+        fileCount: z.number().optional(),
+        totalSize: z.number().optional(),
+        languages: z.array(z.string()).optional(),
+        frameworks: z.array(z.string()).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /**
  * Conversation metadata schema
  */
-export const ConversationMetaSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  workspaceId: z.string().optional(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  messageCount: z.number(),
-  lastMessagePreview: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  pinned: z.boolean().optional(),
-  archived: z.boolean().optional(),
-});
+export const ConversationMetaSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    workspaceId: z.string().optional(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    messageCount: z.number(),
+    lastMessagePreview: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    pinned: z.boolean().optional(),
+    archived: z.boolean().optional(),
+  })
+  .strict();
 
 /**
  * Conversation schema
@@ -83,35 +90,39 @@ export const ConversationSchema = ConversationMetaSchema.extend({
 /**
  * Conversation summary schema (for lists)
  */
-export const ConversationSummarySchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  workspaceId: z.string().optional(),
-  workspaceName: z.string().optional(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  messageCount: z.number(),
-  lastMessagePreview: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  pinned: z.boolean().optional(),
-  archived: z.boolean().optional(),
-  unreadCount: z.number().optional(),
-});
+export const ConversationSummarySchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    workspaceId: z.string().optional(),
+    workspaceName: z.string().optional(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    messageCount: z.number(),
+    lastMessagePreview: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    pinned: z.boolean().optional(),
+    archived: z.boolean().optional(),
+    unreadCount: z.number().optional(),
+  })
+  .strict();
 
 /**
  * Conversation filter schema
  */
-export const ConversationFilterSchema = z.object({
-  workspaceId: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  searchQuery: z.string().optional(),
-  pinned: z.boolean().optional(),
-  archived: z.boolean().optional(),
-  dateFrom: z.number().optional(),
-  dateTo: z.number().optional(),
-  sortBy: z.enum(['createdAt', 'updatedAt', 'messageCount', 'title']).optional(),
-  sortOrder: z.enum(['asc', 'desc']).optional(),
-});
+export const ConversationFilterSchema = z
+  .object({
+    workspaceId: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    searchQuery: z.string().optional(),
+    pinned: z.boolean().optional(),
+    archived: z.boolean().optional(),
+    dateFrom: z.number().optional(),
+    dateTo: z.number().optional(),
+    sortBy: z.enum(['createdAt', 'updatedAt', 'messageCount', 'title']).optional(),
+    sortOrder: z.enum(['asc', 'desc']).optional(),
+  })
+  .strict();
 
 /**
  * TypeScript types inferred from Zod schemas

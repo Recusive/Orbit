@@ -2,25 +2,30 @@ import { Bot, ChevronDown, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
+import { z } from 'zod';
 
 import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
 
-interface ContentBlock {
-  type: string;
-  text?: string;
-}
+// Zod schema for task output content blocks
+const ContentBlockSchema = z
+  .object({
+    type: z.string(),
+    text: z.string().optional(),
+  })
+  .strict();
+
+const TaskOutputSchema = z.array(ContentBlockSchema);
 
 function parseTaskOutput(output: string): string {
   try {
-    const parsed = JSON.parse(output) as unknown;
-    if (Array.isArray(parsed)) {
-      return (parsed as ContentBlock[])
-        .filter(
-          (block): block is ContentBlock & { text: string } =>
-            block.type === 'text' && typeof block.text === 'string'
-        )
+    const json: unknown = JSON.parse(output);
+    const result = TaskOutputSchema.safeParse(json);
+    if (result.success) {
+      return result.data
+        .filter((block): block is { type: string; text: string } => block.text !== undefined)
+        .filter((block) => block.type === 'text')
         .map((block) => block.text)
         .join('\n\n');
     }

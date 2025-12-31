@@ -6,35 +6,17 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { formatZodError } from '@snowflake/shared-schemas';
+
 import { createLogger } from './logger.js';
+import { SessionStorageDataSchema } from './schemas.js';
+
+import type { SessionStorageData, StoredSession } from './schemas.js';
 
 const logger = createLogger('SessionStorage');
 
-/**
- * Stored session data
- */
-export interface StoredSession {
-  /** The Snowflake session identifier (e.g., conversation ID) */
-  sessionId: string;
-  /** The SDK session ID (used for resume) */
-  sdkSessionId: string;
-  /** When the session was created */
-  createdAt: number;
-  /** When the session was last active */
-  lastActiveAt: number;
-  /** Optional workspace path this session belongs to */
-  workspacePath?: string;
-  /** Optional display name for the session */
-  displayName?: string;
-}
-
-/**
- * Session storage file structure
- */
-interface SessionStorageData {
-  version: number;
-  sessions: StoredSession[];
-}
+// Re-export StoredSession type for external use
+export type { StoredSession } from './schemas.js';
 
 const STORAGE_VERSION = 1;
 const STORAGE_FILENAME = 'snowflake-sessions.json';
@@ -88,7 +70,19 @@ export function loadSessions(): StoredSession[] {
     }
 
     const data = fs.readFileSync(storagePath, 'utf-8');
-    const parsed = JSON.parse(data) as SessionStorageData;
+    const json: unknown = JSON.parse(data);
+
+    // Validate with Zod schema
+    const result = SessionStorageDataSchema.safeParse(json);
+    if (!result.success) {
+      logger.warn(
+        { error: formatZodError(result.error) },
+        'Session storage validation failed, returning empty'
+      );
+      return [];
+    }
+
+    const parsed = result.data;
 
     // Version check - if incompatible, return empty
     if (parsed.version !== STORAGE_VERSION) {
@@ -96,12 +90,6 @@ export function loadSessions(): StoredSession[] {
         { version: parsed.version, expected: STORAGE_VERSION },
         'Session storage version mismatch, ignoring stored sessions'
       );
-      return [];
-    }
-
-    // Validate sessions array exists and is an array
-    if (!Array.isArray(parsed.sessions)) {
-      logger.warn('Session storage has invalid sessions field, returning empty');
       return [];
     }
 

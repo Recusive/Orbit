@@ -1,35 +1,11 @@
 import { execSync } from 'child_process';
 
+import { formatZodError } from '@snowflake/shared-schemas';
+
 import { createLogger } from './logger.js';
+import { KeychainCredentialsSchema } from './schemas.js';
 
 const logger = createLogger('ClaudeCredentials');
-
-/**
- * Keychain credentials structure from Claude Code CLI
- */
-interface KeychainCredentials {
-  claudeAiOauth?: {
-    accessToken?: string;
-    expiresAt?: string;
-  };
-}
-
-/**
- * Type guard to check if parsed JSON is valid KeychainCredentials
- */
-function isKeychainCredentials(value: unknown): value is KeychainCredentials {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-  const obj = value as Record<string, unknown>;
-  if (obj.claudeAiOauth === undefined) {
-    return true; // claudeAiOauth is optional
-  }
-  if (typeof obj.claudeAiOauth !== 'object' || obj.claudeAiOauth === null) {
-    return false;
-  }
-  return true;
-}
 
 /**
  * Reads OAuth token from macOS Keychain where Claude Code CLI stores credentials
@@ -42,14 +18,18 @@ function getOAuthTokenFromKeychain(): string | null {
       encoding: 'utf-8',
     }).trim();
 
-    // Parse the JSON credentials structure
-    const parsed: unknown = JSON.parse(output);
-    if (!isKeychainCredentials(parsed)) {
-      logger.debug('Invalid credentials structure in Keychain');
+    // Parse and validate the JSON credentials structure with Zod
+    const json: unknown = JSON.parse(output);
+    const result = KeychainCredentialsSchema.safeParse(json);
+    if (!result.success) {
+      logger.debug(
+        { error: formatZodError(result.error) },
+        'Invalid credentials structure in Keychain'
+      );
       return null;
     }
 
-    const claudeAuth = parsed.claudeAiOauth;
+    const claudeAuth = result.data.claudeAiOauth;
     if (claudeAuth === undefined) {
       logger.debug('No Claude OAuth credentials found in Keychain');
       return null;

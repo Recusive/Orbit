@@ -44,143 +44,167 @@ export enum NotificationType {
 /**
  * Panel sizes schema
  */
-export const PanelSizesSchema = z.object({
-  sidebar: z.number().min(0).max(100),
-  main: z.number().min(0).max(100),
-  secondary: z.number().min(0).max(100).optional(),
-  terminal: z.number().min(0).max(100).optional(),
-});
+export const PanelSizesSchema = z
+  .object({
+    sidebar: z.number().min(0).max(100),
+    main: z.number().min(0).max(100),
+    secondary: z.number().min(0).max(100).optional(),
+    terminal: z.number().min(0).max(100).optional(),
+  })
+  .strict();
 
 /**
  * Panel state schema
  */
-export const PanelStateSchema = z.object({
-  type: z.enum(PanelType),
-  visible: z.boolean(),
-  collapsed: z.boolean().optional(),
-  pinned: z.boolean().optional(),
-  width: z.number().optional(),
-  height: z.number().optional(),
-  position: z.enum(['left', 'right', 'top', 'bottom', 'center']).optional(),
-  order: z.number().optional(),
-});
+export const PanelStateSchema = z
+  .object({
+    type: z.enum(PanelType),
+    visible: z.boolean(),
+    collapsed: z.boolean().optional(),
+    pinned: z.boolean().optional(),
+    width: z.number().optional(),
+    height: z.number().optional(),
+    position: z.enum(['left', 'right', 'top', 'bottom', 'center']).optional(),
+    order: z.number().optional(),
+  })
+  .strict();
 
 /**
  * Layout configuration schema
  */
-export const LayoutConfigSchema = z.object({
-  viewMode: z.enum(ViewMode),
-  panels: z.array(PanelStateSchema),
-  sizes: PanelSizesSchema,
-  showSidebar: z.boolean(),
-  sidebarCollapsed: z.boolean().optional(),
-  showTerminal: z.boolean(),
-  terminalCollapsed: z.boolean().optional(),
-});
+export const LayoutConfigSchema = z
+  .object({
+    viewMode: z.enum(ViewMode),
+    panels: z.array(PanelStateSchema),
+    sizes: PanelSizesSchema,
+    showSidebar: z.boolean(),
+    sidebarCollapsed: z.boolean().optional(),
+    showTerminal: z.boolean(),
+    terminalCollapsed: z.boolean().optional(),
+  })
+  .strict();
 
 /**
  * Notification schema
  */
-export const NotificationSchema = z.object({
-  id: z.string(),
-  type: z.enum(NotificationType),
-  title: z.string(),
-  message: z.string().optional(),
-  timestamp: z.number(),
-  duration: z.number().optional(), // Auto-dismiss duration in ms
-  dismissible: z.boolean().optional(),
-  actions: z
-    .array(
-      z.object({
-        label: z.string(),
-        action: z.string(),
-        primary: z.boolean().optional(),
-      })
-    )
-    .optional(),
-});
+export const NotificationSchema = z
+  .object({
+    id: z.string(),
+    type: z.enum(NotificationType),
+    title: z.string(),
+    message: z.string().optional(),
+    timestamp: z.number(),
+    duration: z.number().optional(), // Auto-dismiss duration in ms
+    dismissible: z.boolean().optional(),
+    actions: z
+      .array(
+        z
+          .object({
+            label: z.string(),
+            action: z.string(),
+            primary: z.boolean().optional(),
+          })
+          .strict()
+      )
+      .optional(),
+  })
+  .strict();
 
 /**
  * Modal state schema
  */
-export const ModalStateSchema = z.object({
-  id: z.string(),
-  type: z.string(),
-  visible: z.boolean(),
-  title: z.string().optional(),
-  data: z.any().optional(),
-  closable: z.boolean().optional(),
-  size: z.enum(['small', 'medium', 'large', 'fullscreen']).optional(),
-});
+export const ModalStateSchema = z
+  .object({
+    id: z.string(),
+    type: z.string(),
+    visible: z.boolean(),
+    title: z.string().optional(),
+    data: z.unknown().optional(),
+    closable: z.boolean().optional(),
+    size: z.enum(['small', 'medium', 'large', 'fullscreen']).optional(),
+  })
+  .strict();
 
 /**
  * Loading state schema
  */
-export const LoadingStateSchema = z.object({
-  isLoading: z.boolean(),
-  message: z.string().optional(),
-  progress: z.number().min(0).max(100).optional(),
-});
+export const LoadingStateSchema = z
+  .object({
+    isLoading: z.boolean(),
+    message: z.string().optional(),
+    progress: z.number().min(0).max(100).optional(),
+  })
+  .strict();
 
 /**
  * Scroll state schema
  */
-export const ScrollStateSchema = z.object({
-  scrollTop: z.number(),
-  scrollHeight: z.number(),
-  clientHeight: z.number(),
-  isAtBottom: z.boolean(),
-  isAtTop: z.boolean(),
-});
+export const ScrollStateSchema = z
+  .object({
+    scrollTop: z.number(),
+    scrollHeight: z.number(),
+    clientHeight: z.number(),
+    isAtBottom: z.boolean(),
+    isAtTop: z.boolean(),
+  })
+  .strict();
 
 /**
  * Selection state schema
  */
-export const SelectionStateSchema = z.object({
-  selectedItems: z.array(z.string()),
-  focusedItem: z.string().optional(),
-  selectionMode: z.enum(['single', 'multiple']).optional(),
-});
+export const SelectionStateSchema = z
+  .object({
+    selectedItems: z.array(z.string()),
+    focusedItem: z.string().optional(),
+    selectionMode: z.enum(['single', 'multiple']).optional(),
+  })
+  .strict();
 
 /**
  * Search state schema
  */
-export const SearchStateSchema = z.object({
-  query: z.string(),
-  filters: z.record(z.string(), z.any()).optional(),
-  results: z.array(z.any()).optional(),
-  isSearching: z.boolean(),
-  totalResults: z.number().optional(),
-});
+export const SearchStateSchema = z
+  .object({
+    query: z.string(),
+    filters: z.record(z.string(), z.unknown()).optional(),
+    results: z.array(z.unknown()).optional(),
+    isSearching: z.boolean(),
+    totalResults: z.number().optional(),
+  })
+  .strict();
 
 /**
  * UI preferences schema
  */
-export const UIPreferencesSchema = z.object({
-  theme: z.enum(ThemeMode),
-  fontSize: z.number().min(8).max(32).optional(),
-  fontFamily: z.string().optional(),
-  lineHeight: z.number().min(1).max(3).optional(),
-  compactMode: z.boolean().optional(),
-  showLineNumbers: z.boolean().optional(),
-  wordWrap: z.boolean().optional(),
-  animations: z.boolean().optional(),
-  soundEffects: z.boolean().optional(),
-  autoSave: z.boolean().optional(),
-  autoScroll: z.boolean().optional(),
-});
+export const UIPreferencesSchema = z
+  .object({
+    theme: z.enum(ThemeMode),
+    fontSize: z.number().min(8).max(32).optional(),
+    fontFamily: z.string().optional(),
+    lineHeight: z.number().min(1).max(3).optional(),
+    compactMode: z.boolean().optional(),
+    showLineNumbers: z.boolean().optional(),
+    wordWrap: z.boolean().optional(),
+    animations: z.boolean().optional(),
+    soundEffects: z.boolean().optional(),
+    autoSave: z.boolean().optional(),
+    autoScroll: z.boolean().optional(),
+  })
+  .strict();
 
 /**
  * Keyboard shortcut schema
  */
-export const KeyboardShortcutSchema = z.object({
-  id: z.string(),
-  command: z.string(),
-  keys: z.string(), // e.g., "Ctrl+Shift+P", "Cmd+K Cmd+S"
-  description: z.string().optional(),
-  enabled: z.boolean().optional(),
-  context: z.string().optional(), // When the shortcut is active
-});
+export const KeyboardShortcutSchema = z
+  .object({
+    id: z.string(),
+    command: z.string(),
+    keys: z.string(), // e.g., "Ctrl+Shift+P", "Cmd+K Cmd+S"
+    description: z.string().optional(),
+    enabled: z.boolean().optional(),
+    context: z.string().optional(), // When the shortcut is active
+  })
+  .strict();
 
 /**
  * Context menu item type (for recursive schema)
@@ -201,63 +225,73 @@ export interface ContextMenuItem {
  * Note: Using type assertion to handle recursive Zod schema with optional properties
  */
 export const ContextMenuItemSchema: z.ZodType<ContextMenuItem> = z.lazy(() =>
-  z.object({
-    id: z.string(),
-    label: z.string(),
-    action: z.string(),
-    icon: z.string().optional(),
-    disabled: z.boolean().optional(),
-    separator: z.boolean().optional(),
-    submenu: z.array(ContextMenuItemSchema).optional(),
-    shortcut: z.string().optional(),
-  })
+  z
+    .object({
+      id: z.string(),
+      label: z.string(),
+      action: z.string(),
+      icon: z.string().optional(),
+      disabled: z.boolean().optional(),
+      separator: z.boolean().optional(),
+      submenu: z.array(ContextMenuItemSchema).optional(),
+      shortcut: z.string().optional(),
+    })
+    .strict()
 ) as z.ZodType<ContextMenuItem>;
 
 /**
  * Context menu state schema
  */
-export const ContextMenuStateSchema = z.object({
-  visible: z.boolean(),
-  x: z.number(),
-  y: z.number(),
-  items: z.array(ContextMenuItemSchema),
-  targetId: z.string().optional(),
-});
+export const ContextMenuStateSchema = z
+  .object({
+    visible: z.boolean(),
+    x: z.number(),
+    y: z.number(),
+    items: z.array(ContextMenuItemSchema),
+    targetId: z.string().optional(),
+  })
+  .strict();
 
 /**
  * Tooltip state schema
  */
-export const TooltipStateSchema = z.object({
-  visible: z.boolean(),
-  content: z.string(),
-  x: z.number(),
-  y: z.number(),
-  placement: z.enum(['top', 'bottom', 'left', 'right']).optional(),
-});
+export const TooltipStateSchema = z
+  .object({
+    visible: z.boolean(),
+    content: z.string(),
+    x: z.number(),
+    y: z.number(),
+    placement: z.enum(['top', 'bottom', 'left', 'right']).optional(),
+  })
+  .strict();
 
 /**
  * Drag and drop state schema
  */
-export const DragDropStateSchema = z.object({
-  isDragging: z.boolean(),
-  draggedItem: z.any().optional(),
-  dragOverTarget: z.string().optional(),
-  dropEffect: z.enum(['copy', 'move', 'link', 'none']).optional(),
-});
+export const DragDropStateSchema = z
+  .object({
+    isDragging: z.boolean(),
+    draggedItem: z.unknown().optional(),
+    dragOverTarget: z.string().optional(),
+    dropEffect: z.enum(['copy', 'move', 'link', 'none']).optional(),
+  })
+  .strict();
 
 /**
  * UI state schema (global UI state)
  */
-export const UIStateSchema = z.object({
-  layout: LayoutConfigSchema,
-  preferences: UIPreferencesSchema,
-  notifications: z.array(NotificationSchema),
-  modals: z.array(ModalStateSchema),
-  loading: LoadingStateSchema,
-  contextMenu: ContextMenuStateSchema.optional(),
-  tooltip: TooltipStateSchema.optional(),
-  dragDrop: DragDropStateSchema.optional(),
-});
+export const UIStateSchema = z
+  .object({
+    layout: LayoutConfigSchema,
+    preferences: UIPreferencesSchema,
+    notifications: z.array(NotificationSchema),
+    modals: z.array(ModalStateSchema),
+    loading: LoadingStateSchema,
+    contextMenu: ContextMenuStateSchema.optional(),
+    tooltip: TooltipStateSchema.optional(),
+    dragDrop: DragDropStateSchema.optional(),
+  })
+  .strict();
 
 /**
  * TypeScript types inferred from Zod schemas

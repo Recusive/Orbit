@@ -14,7 +14,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    /* Disabled: Claude SDK types use index signatures extensively */
+    /* Disabled: Claude SDK types don't support these strict settings */
     // "exactOptionalPropertyTypes": true,
     // "noPropertyAccessFromIndexSignature": true,
     "noImplicitOverride": true,

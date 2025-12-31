@@ -61,21 +61,20 @@ export {
 export {
   TerminalCommandSchema as ProtocolTerminalCommandSchema,
   TerminalOutputSchema as ProtocolTerminalOutputSchema,
-  FileContentSchema as ProtocolFileContentSchema,
+  FileContentResponseSchema as ProtocolFileContentSchema,
   type TerminalCommand as ProtocolTerminalCommand,
   type TerminalOutput as ProtocolTerminalOutput,
-  type FileContent as ProtocolFileContent,
+  type FileContentResponse as ProtocolFileContent,
 } from './protocol';
 
 // Message types - Chat messages and content
-// Note: message.ts exports FileContent and FileContentSchema which conflict with file.ts
-// We export message.ts with aliases for the conflicting types
+// Note: message.ts FileAttachmentContentSchema is for message attachments (different from file.ts)
 export {
   MessageStatus,
   MessageContentType,
   TextContentSchema,
   CodeContentSchema,
-  FileContentSchema as MessageFileContentSchema,
+  FileAttachmentContentSchema as MessageFileContentSchema,
   ImageContentSchema,
   DiffContentSchema,
   ToolCallContentSchema,
@@ -88,7 +87,7 @@ export {
   MessageSchema,
   type TextContent,
   type CodeContent,
-  type FileContent as MessageFileContent,
+  type FileAttachmentContent as MessageFileContent,
   type ImageContent,
   type DiffContent,
   type ToolCallContent,

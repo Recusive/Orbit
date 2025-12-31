@@ -2,16 +2,15 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
 import type { SettingsSection } from '@/components/modals/settings';
+import type { StoredConversationSummary } from '@/types/protocol';
 
 import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/constants';
+import { StoredConversationSummaryArraySchema } from '@/types/protocol';
 
-// Conversation summary for sidebar list
-export interface ConversationSummary {
-  sessionId: string;
-  title: string;
-  updatedAt: number;
-  messageCount: number;
-}
+export type { StoredConversationSummary } from '@/types/protocol';
+
+// Re-export for backwards compatibility
+export type ConversationSummary = StoredConversationSummary;
 
 // Terminal position options
 export type TerminalPosition = 'activity' | 'both';
@@ -94,7 +93,15 @@ type UIStore = UIState & UIActions;
 const loadConversationsFromStorage = (): ConversationSummary[] => {
   try {
     const saved = localStorage.getItem('orbit-conversations');
-    return saved ? (JSON.parse(saved) as ConversationSummary[]) : [];
+    if (saved === null) {
+      return [];
+    }
+    const json: unknown = JSON.parse(saved);
+    const result = StoredConversationSummaryArraySchema.safeParse(json);
+    if (!result.success) {
+      return [];
+    }
+    return result.data;
   } catch {
     return [];
   }

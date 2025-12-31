@@ -40,129 +40,146 @@ export enum ToolCallStatus {
 /**
  * Tool call schema
  */
-export const ToolCallSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  status: z.enum(ToolCallStatus),
-  parameters: z.record(z.string(), z.any()),
-  result: z.any().optional(),
-  error: z.string().optional(),
-  startTime: z.number(),
-  endTime: z.number().optional(),
-  metadata: z
-    .object({
-      retryCount: z.number().optional(),
-      duration: z.number().optional(),
-      tokens: z.number().optional(),
-    })
-    .optional(),
-});
+export const ToolCallSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    status: z.enum(ToolCallStatus),
+    parameters: z.record(z.string(), z.unknown()),
+    result: z.unknown().optional(),
+    error: z.string().optional(),
+    startTime: z.number(),
+    endTime: z.number().optional(),
+    metadata: z
+      .object({
+        retryCount: z.number().optional(),
+        duration: z.number().optional(),
+        tokens: z.number().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /**
  * Task progress schema
  */
-export const TaskProgressSchema = z.object({
-  current: z.number().min(0),
-  total: z.number().min(0),
-  percentage: z.number().min(0).max(100),
-  message: z.string().optional(),
-  estimatedTimeRemaining: z.number().optional(),
-});
+export const TaskProgressSchema = z
+  .object({
+    current: z.number().min(0),
+    total: z.number().min(0),
+    percentage: z.number().min(0).max(100),
+    message: z.string().optional(),
+    estimatedTimeRemaining: z.number().optional(),
+  })
+  .strict();
 
 /**
  * Agent task schema
  */
-export const AgentTaskSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  description: z.string().optional(),
-  status: z.enum(TaskStatus),
-  priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
-  parentTaskId: z.string().optional(),
-  dependsOn: z.array(z.string()).optional(),
-  subtasks: z.array(z.string()).optional(),
-  toolCalls: z.array(ToolCallSchema).optional(),
-  progress: TaskProgressSchema.optional(),
-  createdAt: z.number(),
-  startedAt: z.number().optional(),
-  completedAt: z.number().optional(),
-  error: z.string().optional(),
-  metadata: z
-    .object({
-      filesPaths: z.array(z.string()).optional(),
-      commandsRun: z.array(z.string()).optional(),
-      tags: z.array(z.string()).optional(),
-    })
-    .optional(),
-});
+export const AgentTaskSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().optional(),
+    status: z.enum(TaskStatus),
+    priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+    parentTaskId: z.string().optional(),
+    dependsOn: z.array(z.string()).optional(),
+    subtasks: z.array(z.string()).optional(),
+    toolCalls: z.array(ToolCallSchema).optional(),
+    progress: TaskProgressSchema.optional(),
+    createdAt: z.number(),
+    startedAt: z.number().optional(),
+    completedAt: z.number().optional(),
+    error: z.string().optional(),
+    metadata: z
+      .object({
+        filesPaths: z.array(z.string()).optional(),
+        commandsRun: z.array(z.string()).optional(),
+        tags: z.array(z.string()).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /**
  * Agent state schema
  */
-export const AgentStateSchema = z.object({
-  phase: z.enum(AgentPhase),
-  currentTask: AgentTaskSchema.optional(),
-  taskQueue: z.array(AgentTaskSchema),
-  completedTasks: z.array(AgentTaskSchema),
-  thinking: z.string().optional(),
-  isProcessing: z.boolean(),
-  lastActivity: z.number(),
-  error: z.string().optional(),
-  statistics: z
-    .object({
-      totalTasks: z.number(),
-      completedTasks: z.number(),
-      failedTasks: z.number(),
-      totalToolCalls: z.number(),
-      successfulToolCalls: z.number(),
-      failedToolCalls: z.number(),
-      totalDuration: z.number(),
-      averageTaskDuration: z.number(),
-    })
-    .optional(),
-});
+export const AgentStateSchema = z
+  .object({
+    phase: z.enum(AgentPhase),
+    currentTask: AgentTaskSchema.optional(),
+    taskQueue: z.array(AgentTaskSchema),
+    completedTasks: z.array(AgentTaskSchema),
+    thinking: z.string().optional(),
+    isProcessing: z.boolean(),
+    lastActivity: z.number(),
+    error: z.string().optional(),
+    statistics: z
+      .object({
+        totalTasks: z.number(),
+        completedTasks: z.number(),
+        failedTasks: z.number(),
+        totalToolCalls: z.number(),
+        successfulToolCalls: z.number(),
+        failedToolCalls: z.number(),
+        totalDuration: z.number(),
+        averageTaskDuration: z.number(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /**
  * Agent configuration schema
  */
-export const AgentConfigSchema = z.object({
-  model: z.string(),
-  temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().optional(),
-  systemPrompt: z.string().optional(),
-  maxIterations: z.number().optional(),
-  timeout: z.number().optional(),
-  enabledTools: z.array(z.string()).optional(),
-  autoApprove: z.boolean().optional(),
-  verboseLogging: z.boolean().optional(),
-});
+export const AgentConfigSchema = z
+  .object({
+    model: z.string(),
+    temperature: z.number().min(0).max(2).optional(),
+    maxTokens: z.number().optional(),
+    systemPrompt: z.string().optional(),
+    maxIterations: z.number().optional(),
+    timeout: z.number().optional(),
+    enabledTools: z.array(z.string()).optional(),
+    autoApprove: z.boolean().optional(),
+    verboseLogging: z.boolean().optional(),
+  })
+  .strict();
 
 /**
  * Agent capability schema
  */
-export const AgentCapabilitySchema = z.object({
-  name: z.string(),
-  description: z.string(),
-  enabled: z.boolean(),
-  tools: z.array(z.string()),
-  permissions: z.array(z.string()).optional(),
-});
+export const AgentCapabilitySchema = z
+  .object({
+    name: z.string(),
+    description: z.string(),
+    enabled: z.boolean(),
+    tools: z.array(z.string()),
+    permissions: z.array(z.string()).optional(),
+  })
+  .strict();
 
 /**
  * Agent metrics schema
  */
-export const AgentMetricsSchema = z.object({
-  timestamp: z.number(),
-  phase: z.enum(AgentPhase),
-  activeTasks: z.number(),
-  completedTasks: z.number(),
-  failedTasks: z.number(),
-  toolCallsPerMinute: z.number().optional(),
-  tokensUsed: z.number().optional(),
-  cost: z.number().optional(),
-  memoryUsage: z.number().optional(),
-  cpuUsage: z.number().optional(),
-});
+export const AgentMetricsSchema = z
+  .object({
+    timestamp: z.number(),
+    phase: z.enum(AgentPhase),
+    activeTasks: z.number(),
+    completedTasks: z.number(),
+    failedTasks: z.number(),
+    toolCallsPerMinute: z.number().optional(),
+    tokensUsed: z.number().optional(),
+    cost: z.number().optional(),
+    memoryUsage: z.number().optional(),
+    cpuUsage: z.number().optional(),
+  })
+  .strict();
 
 /**
  * TypeScript types inferred from Zod schemas

@@ -27,76 +27,96 @@ export enum MessageContentType {
 /**
  * Text content schema
  */
-export const TextContentSchema = z.object({
-  type: z.literal(MessageContentType.TEXT),
-  text: z.string(),
-});
+export const TextContentSchema = z
+  .object({
+    type: z.literal(MessageContentType.TEXT),
+    text: z.string(),
+  })
+  .strict();
 
 /**
  * Code content schema
  */
-export const CodeContentSchema = z.object({
-  type: z.literal(MessageContentType.CODE),
-  code: z.string(),
-  language: z.string(),
-  filename: z.string().optional(),
-  lineNumbers: z.boolean().optional(),
-});
+export const CodeContentSchema = z
+  .object({
+    type: z.literal(MessageContentType.CODE),
+    code: z.string(),
+    language: z.string(),
+    filename: z.string().optional(),
+    lineNumbers: z.boolean().optional(),
+  })
+  .strict();
 
 /**
- * File content schema (for message attachments)
+ * File attachment content schema (for message attachments)
+ * Note: Different from file.ts FileDataSchema which is for file operations
  */
-export const FileContentSchema = z.object({
-  type: z.literal(MessageContentType.FILE),
-  filePath: z.string(),
-  content: z.string().optional(),
-  size: z.number().optional(),
-  mimeType: z.string().optional(),
-});
+export const FileAttachmentContentSchema = z
+  .object({
+    type: z.literal(MessageContentType.FILE),
+    filePath: z.string(),
+    content: z.string().optional(),
+    size: z.number().optional(),
+    mimeType: z.string().optional(),
+  })
+  .strict();
+
+/**
+ * @deprecated Use FileAttachmentContentSchema instead
+ */
+export const FileContentSchema = FileAttachmentContentSchema;
 
 /**
  * Image content schema
  */
-export const ImageContentSchema = z.object({
-  type: z.literal(MessageContentType.IMAGE),
-  url: z.string(),
-  alt: z.string().optional(),
-  width: z.number().optional(),
-  height: z.number().optional(),
-});
+export const ImageContentSchema = z
+  .object({
+    type: z.literal(MessageContentType.IMAGE),
+    url: z.string(),
+    alt: z.string().optional(),
+    width: z.number().optional(),
+    height: z.number().optional(),
+  })
+  .strict();
 
 /**
  * Diff content schema
  */
-export const DiffContentSchema = z.object({
-  type: z.literal(MessageContentType.DIFF),
-  filePath: z.string(),
-  diff: z.string(),
-  oldContent: z.string().optional(),
-  newContent: z.string().optional(),
-});
+export const DiffContentSchema = z
+  .object({
+    type: z.literal(MessageContentType.DIFF),
+    filePath: z.string(),
+    diff: z.string(),
+    oldContent: z.string().optional(),
+    newContent: z.string().optional(),
+  })
+  .strict();
 
 /**
  * Tool call content schema
  */
-export const ToolCallContentSchema = z.object({
-  type: z.literal(MessageContentType.TOOL_CALL),
-  toolName: z.string(),
-  toolCallId: z.string(),
-  parameters: z.record(z.string(), z.any()),
-});
+export const ToolCallContentSchema = z
+  .object({
+    type: z.literal(MessageContentType.TOOL_CALL),
+    toolName: z.string(),
+    toolCallId: z.string(),
+    parameters: z.record(z.string(), z.unknown()),
+  })
+  .strict();
 
 /**
  * Tool result content schema
  */
-export const ToolResultContentSchema = z.object({
-  type: z.literal(MessageContentType.TOOL_RESULT),
-  toolCallId: z.string(),
-  toolName: z.string(),
-  result: z.any(),
-  error: z.string().optional(),
-  isError: z.boolean().optional(),
-});
+export const ToolResultContentSchema = z
+  .object({
+    type: z.literal(MessageContentType.TOOL_RESULT),
+    toolCallId: z.string(),
+    toolName: z.string(),
+    result: z.unknown(),
+    error: z.string().optional(),
+    isError: z.boolean().optional(),
+  })
+  .strict();
 
 /**
  * Union of all message content types
@@ -104,7 +124,7 @@ export const ToolResultContentSchema = z.object({
 export const MessageContentSchema = z.discriminatedUnion('type', [
   TextContentSchema,
   CodeContentSchema,
-  FileContentSchema,
+  FileAttachmentContentSchema,
   ImageContentSchema,
   DiffContentSchema,
   ToolCallContentSchema,
@@ -114,22 +134,25 @@ export const MessageContentSchema = z.discriminatedUnion('type', [
 /**
  * Base message schema (for chat messages)
  */
-export const ChatBaseMessageSchema = z.object({
-  id: z.string(),
-  conversationId: z.string(),
-  timestamp: z.number(),
-  status: z.enum(MessageStatus),
-  content: z.array(MessageContentSchema),
-  metadata: z
-    .object({
-      model: z.string().optional(),
-      tokens: z.number().optional(),
-      cost: z.number().optional(),
-      duration: z.number().optional(),
-      error: z.string().optional(),
-    })
-    .optional(),
-});
+export const ChatBaseMessageSchema = z
+  .object({
+    id: z.string(),
+    conversationId: z.string(),
+    timestamp: z.number(),
+    status: z.enum(MessageStatus),
+    content: z.array(MessageContentSchema),
+    metadata: z
+      .object({
+        model: z.string().optional(),
+        tokens: z.number().optional(),
+        cost: z.number().optional(),
+        duration: z.number().optional(),
+        error: z.string().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /**
  * User message schema
@@ -193,7 +216,9 @@ export const MessageSchema = z.discriminatedUnion('role', [
  */
 export type TextContent = z.infer<typeof TextContentSchema>;
 export type CodeContent = z.infer<typeof CodeContentSchema>;
-export type FileContent = z.infer<typeof FileContentSchema>;
+export type FileAttachmentContent = z.infer<typeof FileAttachmentContentSchema>;
+/** @deprecated Use FileAttachmentContent instead */
+export type FileContent = FileAttachmentContent;
 export type ImageContent = z.infer<typeof ImageContentSchema>;
 export type DiffContent = z.infer<typeof DiffContentSchema>;
 export type ToolCallContent = z.infer<typeof ToolCallContentSchema>;
@@ -229,7 +254,7 @@ export function isCodeContent(content: MessageContent): content is CodeContent {
   return content.type === MessageContentType.CODE;
 }
 
-export function isFileContent(content: MessageContent): content is FileContent {
+export function isFileContent(content: MessageContent): content is FileAttachmentContent {
   return content.type === MessageContentType.FILE;
 }
 

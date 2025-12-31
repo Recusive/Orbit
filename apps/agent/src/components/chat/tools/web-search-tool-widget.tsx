@@ -1,5 +1,6 @@
 import { ChevronDown, Globe, Loader2, Search } from 'lucide-react';
 import { useState } from 'react';
+import { z } from 'zod';
 
 import type { FC } from 'react';
 
@@ -18,22 +19,25 @@ interface SearchResult {
   snippet?: string | undefined;
 }
 
+// Zod schema for search result items
+const SearchResultItemSchema = z
+  .object({
+    title: z.string(),
+    url: z.string(),
+    snippet: z.string().optional(),
+  })
+  .strict();
+
+const SearchResultsSchema = z.array(SearchResultItemSchema);
+
 function parseSearchResults(output: string | undefined): SearchResult[] {
   if (!output) return [];
 
   try {
-    const parsed: unknown = JSON.parse(output);
-    if (Array.isArray(parsed)) {
-      return parsed
-        .filter(
-          (item): item is Record<string, unknown> => item !== null && typeof item === 'object'
-        )
-        .map((item) => ({
-          title: typeof item['title'] === 'string' ? item['title'] : '',
-          url: typeof item['url'] === 'string' ? item['url'] : '',
-          snippet: typeof item['snippet'] === 'string' ? item['snippet'] : undefined,
-        }))
-        .filter((r) => r.url.length > 0);
+    const json: unknown = JSON.parse(output);
+    const result = SearchResultsSchema.safeParse(json);
+    if (result.success) {
+      return result.data.filter((r) => r.url.length > 0);
     }
   } catch {
     // Not JSON, try parsing as text

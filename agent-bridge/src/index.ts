@@ -30,6 +30,8 @@ process.env.PATH = Array.from(pathSet).join(':');
 
 import * as readline from 'readline';
 
+import { formatZodError } from '@snowflake/shared-schemas';
+
 import {
   createAgent,
   deleteAgent,
@@ -45,6 +47,7 @@ import {
   updateCommand,
 } from './command-definitions.js';
 import { createLogger } from './logger.js';
+import { BridgeRequestSchema } from './schemas.js';
 import { SessionManager } from './session-manager.js';
 import {
   cleanupOldSessions,
@@ -163,9 +166,21 @@ function main(): void {
 
     let request: BridgeRequest;
     try {
-      request = JSON.parse(line) as BridgeRequest;
+      const parsed: unknown = JSON.parse(line);
+      const result = BridgeRequestSchema.safeParse(parsed);
+      if (!result.success) {
+        const errorMessage = formatZodError(result.error);
+        logger.error({ error: errorMessage, line }, 'Invalid request schema');
+        sendResponse({
+          type: 'error',
+          requestType: 'unknown',
+          error: `Invalid request: ${errorMessage}`,
+        });
+        return;
+      }
+      request = result.data;
     } catch (error) {
-      logger.error({ error, line }, 'Failed to parse request');
+      logger.error({ error, line }, 'Failed to parse request JSON');
       sendResponse({
         type: 'error',
         requestType: 'unknown',
