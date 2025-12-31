@@ -1401,6 +1401,72 @@ export interface Settings {
 }
 
 // ============================================
+// Dev-Monitor Operations (dev-only)
+// ============================================
+
+/**
+ * Dev log entry for the monitoring system.
+ * This is only used in development builds.
+ */
+export interface DevLogEntry {
+  timestamp: number;
+  severity: string;
+  category: string;
+  file: string;
+  function?: string;
+  title: string;
+  details?: string;
+  context?: Record<string, unknown>;
+  dedupCount?: number;
+}
+
+/**
+ * Ensure the dev-monitor output directory exists.
+ * Creates the directory and any parent directories if needed.
+ *
+ * @param dirPath - Path to the directory to create
+ */
+export async function devMonitorEnsureDir(dirPath: string): Promise<void> {
+  return invoke('dev_monitor_ensure_dir', { dirPath });
+}
+
+/**
+ * Write a batch of log entries to a JSONL file.
+ * Each entry is written as a single JSON line, appended to the file.
+ *
+ * @param filePath - Path to the JSONL file
+ * @param entries - Array of log entries to write
+ */
+export async function devMonitorWriteBatch(
+  filePath: string,
+  entries: DevLogEntry[]
+): Promise<void> {
+  return invoke('dev_monitor_write_batch', { filePath, entries });
+}
+
+/**
+ * Read recent log entries from a JSONL file.
+ *
+ * @param filePath - Path to the JSONL file
+ * @param limit - Maximum number of entries to return (default: 100)
+ */
+export async function devMonitorReadEntries(
+  filePath: string,
+  limit?: number
+): Promise<DevLogEntry[]> {
+  return invoke<DevLogEntry[]>('dev_monitor_read_entries', { filePath, limit });
+}
+
+/**
+ * Clear all log files in the dev-monitor directory.
+ *
+ * @param dirPath - Path to the dev-monitor directory
+ */
+export async function devMonitorClear(dirPath: string): Promise<void> {
+  return invoke('dev_monitor_clear', { dirPath });
+}
+
+// ============================================
 // Utility: Check if running in Tauri
 // ============================================
 

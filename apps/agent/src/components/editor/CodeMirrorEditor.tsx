@@ -48,6 +48,7 @@ import type { Extension } from '@codemirror/state';
 import type { Tooltip, ViewUpdate } from '@codemirror/view';
 import type { FC } from 'react';
 
+import { trace } from '@/dev-monitor';
 import { useFileDiagnostics } from '@/hooks/use-file-diagnostics';
 import { useLsp } from '@/hooks/use-lsp';
 import { useFileStore } from '@/stores/file-store';
@@ -640,9 +641,12 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
       }),
     ];
 
+    // Wrap extensions with dev-monitor for performance tracking
+    const monitoredExtensions = trace.codemirror(filePath ?? 'CodeMirrorEditor', extensions);
+
     const state = EditorState.create({
       doc: value,
-      extensions,
+      extensions: monitoredExtensions,
     });
 
     const view = new EditorView({

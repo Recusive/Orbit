@@ -14,6 +14,7 @@ import { Terminal } from '@xterm/xterm';
 
 import type { IDisposable, ITheme } from '@xterm/xterm';
 
+import { trace } from '@/dev-monitor';
 import { CommandDecorationsAddon } from '@/lib/terminal/addons/command-decorations-addon';
 import { MarkNavigationAddon } from '@/lib/terminal/addons/mark-navigation-addon';
 import { ShellIntegrationAddon } from '@/lib/terminal/addons/shell-integration-addon';
@@ -136,7 +137,8 @@ export class TerminalInstance {
     // xterm.js requires computed color values, not CSS variable references
     const theme = this.buildThemeFromCSSVars();
 
-    this.terminal = new Terminal({
+    // Create terminal and wrap with dev-monitor for performance tracking
+    const rawTerminal = new Terminal({
       cursorBlink: true,
       cursorStyle: 'bar',
       fontSize: 13,
@@ -146,6 +148,7 @@ export class TerminalInstance {
       theme,
       allowProposedApi: true,
     });
+    this.terminal = trace.xterm(this.sessionName, rawTerminal);
 
     // Load addons
     this.fitAddon = new FitAddon();

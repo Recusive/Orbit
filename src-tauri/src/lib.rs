@@ -6,6 +6,7 @@
 pub mod agent;
 pub mod commands;
 pub mod crash;
+pub mod devmonitor;
 
 use std::env;
 use std::path::PathBuf;
@@ -13,7 +14,9 @@ use std::sync::Arc;
 
 use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
-use commands::common::{diagnostics, files, git, lsp, search, settings, terminal, workspace};
+use commands::common::{
+    dev_monitor, diagnostics, files, git, lsp, search, settings, terminal, workspace,
+};
 use snowflake_conversations::ConversationManager;
 use snowflake_settings::SettingsManager;
 use tauri_plugin_log::{Target, TargetKind};
@@ -351,6 +354,11 @@ pub fn run() {
             conversations::conversation_add_message,
             conversations::conversation_fork,
             conversations::conversation_data_path,
+            // Dev-monitor commands (dev-only)
+            dev_monitor::dev_monitor_ensure_dir,
+            dev_monitor::dev_monitor_write_batch,
+            dev_monitor::dev_monitor_read_entries,
+            dev_monitor::dev_monitor_clear,
         ])
         .run(tauri::generate_context!());
 

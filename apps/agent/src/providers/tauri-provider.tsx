@@ -21,6 +21,7 @@ import {
 import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
 import type { FC, ReactNode } from 'react';
 
+import { trace } from '@/dev-monitor';
 import {
   onAgentError,
   onAgentMessage,
@@ -173,6 +174,14 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
           const content = message.content ?? '';
           const messageId = crypto.randomUUID();
 
+          // Dev-monitor: Track agent message
+          trace.log('info', `sdk:message:${message.type}`, `Agent message: ${message.type}`, {
+            sessionId,
+            messageType: message.type,
+            hasContent: content.length > 0,
+            hasUsage: message.usage !== undefined,
+          });
+
           switch (message.type) {
             case 'text':
               postWindowMessage({
@@ -198,26 +207,38 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
               const meta = message.metadata;
               const toolId = meta?.toolId ?? crypto.randomUUID();
               const status = meta?.status;
+              const toolName = meta?.toolName ?? 'unknown';
 
+              // Dev-monitor: Track tool use
               if (status === 'success' || status === 'error') {
+                trace.log(
+                  status === 'error' ? 'error' : 'info',
+                  'sdk:tool:end',
+                  `Tool ${status}: ${toolName}`,
+                  { sessionId, toolName, success: status === 'success' }
+                );
                 postWindowMessage({
                   type: 'tool:end',
                   uuid: crypto.randomUUID(),
                   session_id: sessionId,
                   message_id: messageId,
                   tool_id: toolId,
-                  tool_name: meta?.toolName ?? 'unknown',
+                  tool_name: toolName,
                   tool_output: meta?.toolOutput ?? '',
                   success: status === 'success',
                 });
               } else {
+                trace.log('info', 'sdk:tool:start', `Tool started: ${toolName}`, {
+                  sessionId,
+                  toolName,
+                });
                 postWindowMessage({
                   type: 'tool:start',
                   uuid: crypto.randomUUID(),
                   session_id: sessionId,
                   message_id: messageId,
                   tool_id: toolId,
-                  tool_name: meta?.toolName ?? 'unknown',
+                  tool_name: toolName,
                   tool_input: meta?.toolInput ?? {},
                 });
               }
@@ -225,25 +246,37 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             }
 
             case 'result':
-            case 'turn_complete':
+            case 'turn_complete': {
+              // Dev-monitor: Track completion with token usage
+              const usage = message.usage;
+              if (usage !== undefined) {
+                trace.log('info', 'sdk:complete', 'Agent turn completed', {
+                  sessionId,
+                  inputTokens: usage.inputTokens,
+                  outputTokens: usage.outputTokens,
+                  totalTokens: usage.inputTokens + usage.outputTokens,
+                });
+              }
               postWindowMessage({
                 type: 'agent:complete',
                 uuid: crypto.randomUUID(),
                 session_id: sessionId,
                 message_id: messageId,
                 // Transform SDK camelCase to protocol snake_case
-                usage: message.usage
+                usage: usage
                   ? {
-                      input_tokens: message.usage.inputTokens,
-                      output_tokens: message.usage.outputTokens,
-                      cache_read_input_tokens: message.usage.cacheReadInputTokens,
-                      cache_creation_input_tokens: message.usage.cacheCreationInputTokens,
+                      input_tokens: usage.inputTokens,
+                      output_tokens: usage.outputTokens,
+                      cache_read_input_tokens: usage.cacheReadInputTokens,
+                      cache_creation_input_tokens: usage.cacheCreationInputTokens,
                     }
                   : undefined,
               });
               break;
+            }
 
             case 'turn_cancel':
+              trace.log('info', 'sdk:cancel', 'Agent turn cancelled', { sessionId });
               postWindowMessage({
                 type: 'agent:complete',
                 uuid: crypto.randomUUID(),
@@ -254,6 +287,9 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
               break;
 
             case 'error':
+              trace.log('error', 'sdk:error', `Agent error: ${content.slice(0, 100)}`, {
+                sessionId,
+              });
               postWindowMessage({
                 type: 'agent:error',
                 uuid: crypto.randomUUID(),
