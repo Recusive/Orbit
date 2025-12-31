@@ -4224,7 +4224,6 @@ name = "snowflake-app"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
- "chrono",
  "crossbeam-channel",
  "futures",
  "hashbrown 0.15.5",

@@ -40,7 +40,6 @@ futures = { workspace = true }
 thiserror = { workspace = true }
 crossbeam-channel = { workspace = true }
 hashbrown = { workspace = true }
-chrono = { workspace = true }
 
 # Tauri
 tauri = { workspace = true, features = ["tray-icon"] }
