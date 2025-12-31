@@ -11,6 +11,7 @@ import { useFileViewerStore } from '@/stores/file-viewer-store';
 import { useQueuedMessageStore } from '@/stores/queued-message-store';
 import { useToolStore } from '@/stores/tool-store';
 import { useUIStore } from '@/stores/ui-store';
+import { StoredChatMessageArraySchema } from '@/types/protocol';
 
 interface UseChatMessagesOptions {
   onSessionCreated?: (sessionId: string, title: string) => void;
@@ -48,7 +49,15 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem('orbit-messages');
-      return saved ? (JSON.parse(saved) as ChatMessage[]) : [];
+      if (saved === null) {
+        return [];
+      }
+      const json: unknown = JSON.parse(saved);
+      const result = StoredChatMessageArraySchema.safeParse(json);
+      if (!result.success) {
+        return [];
+      }
+      return result.data;
     } catch {
       return [];
     }
@@ -529,6 +538,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         case 'file:changed':
         case 'file:written':
         case 'conversation:deleted':
+        case 'agent:plan_mode':
+        case 'agent:accept_mode':
         case 'panel:command':
         case 'panel:visible':
         case 'file:tree:response':

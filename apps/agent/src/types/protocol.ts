@@ -1,525 +1,798 @@
+import {
+  ModelSchema,
+  ThinkingModeSchema,
+  InputModeSchema,
+  CommandScopeSchema,
+  ShellTypeSchema,
+} from '@snowflake/shared-schemas';
 import { z } from 'zod';
+
+// Re-export shared schemas for consumers
+export {
+  ModelSchema,
+  ThinkingModeSchema,
+  InputModeSchema,
+  CommandScopeSchema,
+  ShellTypeSchema,
+  type Model,
+  type ThinkingMode,
+  type InputMode,
+  type CommandScope,
+  type ShellType,
+} from '@snowflake/shared-schemas';
+
+// ═══════════════════════════════════════════════════════════════
+// SCHEMA VALIDATORS (for use in message schemas)
+// ═══════════════════════════════════════════════════════════════
+
+/** UUID validator for schema fields */
+const UUIDSchema = z.uuid();
+
+/** Session ID validator for schema fields */
+const SessionIdSchema = z.string().min(1);
+
+// ═══════════════════════════════════════════════════════════════
+// BRANDED TYPES (Optional Nominal Typing)
+// Use these for compile-time type safety to prevent mixing different IDs
+// ═══════════════════════════════════════════════════════════════
+
+/** Branded schema for maximum type safety */
+const BrandedUUIDSchema = z.uuid().brand<'UUID'>();
+export type UUID = z.infer<typeof BrandedUUIDSchema>;
+
+const BrandedSessionIdSchema = z.string().min(1).brand<'SessionId'>();
+export type SessionId = z.infer<typeof BrandedSessionIdSchema>;
+
+const BrandedMessageIdSchema = z.string().min(1).brand<'MessageId'>();
+export type MessageId = z.infer<typeof BrandedMessageIdSchema>;
+
+const BrandedRequestIdSchema = z.string().min(1).brand<'RequestId'>();
+export type RequestId = z.infer<typeof BrandedRequestIdSchema>;
+
+const BrandedToolIdSchema = z.string().min(1).brand<'ToolId'>();
+export type ToolId = z.infer<typeof BrandedToolIdSchema>;
+
+const BrandedTerminalIdSchema = z.string().min(1).brand<'TerminalId'>();
+export type TerminalId = z.infer<typeof BrandedTerminalIdSchema>;
+
+const BrandedBrowserIdSchema = z.string().min(1).brand<'BrowserId'>();
+export type BrowserId = z.infer<typeof BrandedBrowserIdSchema>;
+
+const BrandedFilePathSchema = z.string().min(1).brand<'FilePath'>();
+export type FilePath = z.infer<typeof BrandedFilePathSchema>;
+
+// ─────────────────────────────────────────────────────────────────
+// BRAND FACTORY FUNCTIONS
+// Create branded types from raw values (validates and casts)
+// ─────────────────────────────────────────────────────────────────
+
+/** Create a branded UUID from a string (validates UUID format) */
+export function createUUID(value: string): UUID {
+  return BrandedUUIDSchema.parse(value);
+}
+
+/** Create a UUID using crypto.randomUUID() */
+export function generateUUID(): UUID {
+  return BrandedUUIDSchema.parse(crypto.randomUUID());
+}
+
+/** Create a branded SessionId from a string */
+export function createSessionId(value: string): SessionId {
+  return BrandedSessionIdSchema.parse(value);
+}
+
+/** Create a branded MessageId from a string */
+export function createMessageId(value: string): MessageId {
+  return BrandedMessageIdSchema.parse(value);
+}
+
+/** Create a branded RequestId from a string */
+export function createRequestId(value: string): RequestId {
+  return BrandedRequestIdSchema.parse(value);
+}
+
+/** Create a branded ToolId from a string */
+export function createToolId(value: string): ToolId {
+  return BrandedToolIdSchema.parse(value);
+}
+
+/** Create a branded TerminalId from a string */
+export function createTerminalId(value: string): TerminalId {
+  return BrandedTerminalIdSchema.parse(value);
+}
+
+/** Create a branded BrowserId from a string */
+export function createBrowserId(value: string): BrowserId {
+  return BrandedBrowserIdSchema.parse(value);
+}
+
+/** Create a branded FilePath from a string */
+export function createFilePath(value: string): FilePath {
+  return BrandedFilePathSchema.parse(value);
+}
 
 // ═══════════════════════════════════════════════════════════════
 // SHARED PRIMITIVES
 // ═══════════════════════════════════════════════════════════════
 
-const UUIDSchema = z.uuid();
-const SessionIdSchema = z.string().min(1);
+// Note: InputModeSchema, ThinkingModeSchema, ModelSchema, CommandScopeSchema
+// are imported and re-exported from @snowflake/shared-schemas above
 
-// Input mode: default (ask permission), accept (auto-approve), plan (read-only)
-export const InputModeSchema = z.enum(['default', 'accept', 'plan']);
+// Minimal conversation summary for sidebar list (stored in localStorage)
+// Note: Different from conversation.ts ConversationSummarySchema which has more fields
+export const StoredConversationSummarySchema = z
+  .object({
+    sessionId: z.string(),
+    title: z.string(),
+    updatedAt: z.number(),
+    messageCount: z.number(),
+  })
+  .strict();
 
-// Thinking mode: off, think (4k), hard (10k), ultra (32k)
-export const ThinkingModeSchema = z.enum(['off', 'think', 'hard', 'ultra']);
+export const StoredConversationSummaryArraySchema = z.array(StoredConversationSummarySchema);
 
-// Model selection: haiku (fast), sonnet (balanced), opus (best)
-export const ModelSchema = z.enum(['haiku', 'sonnet', 'opus']);
+// Image attachment for localStorage (chat messages)
+export const StoredImageAttachmentSchema = z
+  .object({
+    name: z.string(),
+    mimeType: z.string(),
+    data: z.string(), // Base64 encoded
+    previewUrl: z.string(), // Data URL for display
+  })
+  .strict();
+
+// Chat message for localStorage persistence
+export const StoredChatMessageSchema = z
+  .object({
+    id: z.string(),
+    role: z.enum(['user', 'assistant']),
+    content: z.string(),
+    displayedContent: z.string(),
+    isStreaming: z.boolean().optional(),
+    isInterrupted: z.boolean().optional(),
+    thinking: z.string().optional(),
+    thinkingDurationMs: z.number().optional(),
+    attachedFiles: z.array(z.string()).optional(),
+    attachedImages: z.array(StoredImageAttachmentSchema).optional(),
+  })
+  .strict();
+
+export const StoredChatMessageArraySchema = z.array(StoredChatMessageSchema);
 
 // ═══════════════════════════════════════════════════════════════
 // WEBVIEW → EXTENSION (requests)
 // ═══════════════════════════════════════════════════════════════
 
 // Image attachment for message:send
-export const ImageAttachmentSchema = z.object({
-  name: z.string(),
-  mimeType: z.string(),
-  data: z.string(), // Base64 encoded
-});
+export const ImageAttachmentSchema = z
+  .object({
+    name: z.string(),
+    mimeType: z.string(),
+    data: z.string(), // Base64 encoded
+  })
+  .strict();
 
 // Element context for browser-selected React components
-export const ElementContextSchema = z.object({
-  componentName: z.string(),
-  filePath: z.string(),
-  lineNumber: z.number(),
-  props: z.record(z.string(), z.unknown()),
-  componentStack: z.array(z.string()),
-  tagName: z.string(),
-  selector: z.string(),
-  outerHTML: z.string(),
-  displayName: z.string(),
-});
+export const ElementContextSchema = z
+  .object({
+    componentName: z.string(),
+    filePath: z.string(),
+    lineNumber: z.number(),
+    props: z.record(z.string(), z.unknown()),
+    componentStack: z.array(z.string()),
+    tagName: z.string(),
+    selector: z.string(),
+    outerHTML: z.string(),
+    displayName: z.string(),
+  })
+  .strict();
 
 // Chat
-export const SendMessageSchema = z.object({
-  type: z.literal('message:send'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  content: z.string().min(1),
-  context: z
-    .object({
-      files: z.array(z.string()).optional(),
-      images: z.array(ImageAttachmentSchema).optional(),
-      elements: z.array(ElementContextSchema).optional(),
-      selection: z
-        .object({
-          filePath: z.string(),
-          startLine: z.number(),
-          endLine: z.number(),
-          text: z.string(),
-        })
-        .optional(),
-    })
-    .optional(),
-});
+export const SendMessageSchema = z
+  .object({
+    type: z.literal('message:send'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    content: z.string().min(1),
+    context: z
+      .object({
+        files: z.array(z.string()).optional(),
+        images: z.array(ImageAttachmentSchema).optional(),
+        elements: z.array(ElementContextSchema).optional(),
+        selection: z
+          .object({
+            filePath: z.string(),
+            startLine: z.number(),
+            endLine: z.number(),
+            text: z.string(),
+          })
+          .strict()
+          .optional(),
+      })
+      .optional(),
+  })
+  .strict();
 
-export const EditMessageSchema = z.object({
-  type: z.literal('message:edit'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  message_id: z.string(),
-  content: z.string().min(1),
-});
+export const EditMessageSchema = z
+  .object({
+    type: z.literal('message:edit'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    message_id: z.string(),
+    content: z.string().min(1),
+  })
+  .strict();
 
-export const DeleteMessageSchema = z.object({
-  type: z.literal('message:delete'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  message_id: z.string(),
-});
+export const DeleteMessageSchema = z
+  .object({
+    type: z.literal('message:delete'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    message_id: z.string(),
+  })
+  .strict();
 
 // Conversation
-export const CreateConversationSchema = z.object({
-  type: z.literal('conversation:create'),
-  uuid: UUIDSchema,
-  title: z.string().optional(),
-  workspace_id: z.string().optional(),
-});
+export const CreateConversationSchema = z
+  .object({
+    type: z.literal('conversation:create'),
+    uuid: UUIDSchema,
+    title: z.string().optional(),
+    workspace_id: z.string().optional(),
+  })
+  .strict();
 
-export const DeleteConversationSchema = z.object({
-  type: z.literal('conversation:delete'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-});
+export const DeleteConversationSchema = z
+  .object({
+    type: z.literal('conversation:delete'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+  })
+  .strict();
 
-export const GetConversationsSchema = z.object({
-  type: z.literal('conversation:list'),
-  uuid: UUIDSchema,
-});
+export const GetConversationsSchema = z
+  .object({
+    type: z.literal('conversation:list'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
-export const LoadConversationSchema = z.object({
-  type: z.literal('conversation:load'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-});
+export const LoadConversationSchema = z
+  .object({
+    type: z.literal('conversation:load'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+  })
+  .strict();
 
-export const RewindConversationSchema = z.object({
-  type: z.literal('conversation:rewind'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  /** The message ID to rewind to (keep this message, discard all after) */
-  message_id: z.string(),
-});
+export const RewindConversationSchema = z
+  .object({
+    type: z.literal('conversation:rewind'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    /** The message ID to rewind to (keep this message, discard all after) */
+    message_id: z.string(),
+  })
+  .strict();
 
-export const UpdateConversationTitleSchema = z.object({
-  type: z.literal('conversation:updateTitle'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  title: z.string(),
-});
+export const UpdateConversationTitleSchema = z
+  .object({
+    type: z.literal('conversation:updateTitle'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    title: z.string(),
+  })
+  .strict();
 
 // Agent control
-export const AgentStartSchema = z.object({
-  type: z.literal('agent:start'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  task: z.string(),
-  context: z.record(z.string(), z.unknown()).optional(),
-});
+export const AgentStartSchema = z
+  .object({
+    type: z.literal('agent:start'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    task: z.string(),
+    context: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
 
-export const AgentStopSchema = z.object({
-  type: z.literal('agent:stop'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-});
+export const AgentStopSchema = z
+  .object({
+    type: z.literal('agent:stop'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+  })
+  .strict();
 
-export const AgentPauseSchema = z.object({
-  type: z.literal('agent:pause'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-});
+export const AgentPauseSchema = z
+  .object({
+    type: z.literal('agent:pause'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+  })
+  .strict();
 
-export const AgentResumeSchema = z.object({
-  type: z.literal('agent:resume'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-});
+export const AgentResumeSchema = z
+  .object({
+    type: z.literal('agent:resume'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+  })
+  .strict();
 
 // Terminal
-export const TerminalCreateSchema = z.object({
-  type: z.literal('terminal:create'),
-  uuid: UUIDSchema,
-  session_id: z.string(),
-  name: z.string().optional(),
-  cwd: z.string().optional(),
-  cols: z.number().optional(),
-  rows: z.number().optional(),
-  shell_integration: z.boolean().optional(),
-});
+export const TerminalCreateSchema = z
+  .object({
+    type: z.literal('terminal:create'),
+    uuid: UUIDSchema,
+    session_id: z.string(),
+    name: z.string().optional(),
+    cwd: z.string().optional(),
+    cols: z.number().optional(),
+    rows: z.number().optional(),
+    shell_integration: z.boolean().optional(),
+  })
+  .strict();
 
-export const TerminalCloseSchema = z.object({
-  type: z.literal('terminal:close'),
-  uuid: UUIDSchema,
-  session_id: z.string(),
-  terminal_id: z.string(),
-});
+export const TerminalCloseSchema = z
+  .object({
+    type: z.literal('terminal:close'),
+    uuid: UUIDSchema,
+    session_id: z.string(),
+    terminal_id: z.string(),
+  })
+  .strict();
 
-export const TerminalCommandSchema = z.object({
-  type: z.literal('terminal:command'),
-  uuid: UUIDSchema,
-  session_id: z.string(),
-  command: z.string(),
-});
+export const TerminalCommandSchema = z
+  .object({
+    type: z.literal('terminal:command'),
+    uuid: UUIDSchema,
+    session_id: z.string(),
+    command: z.string(),
+  })
+  .strict();
 
-export const TerminalClearSchema = z.object({
-  type: z.literal('terminal:clear'),
-  uuid: UUIDSchema,
-  session_id: z.string(),
-});
+export const TerminalClearSchema = z
+  .object({
+    type: z.literal('terminal:clear'),
+    uuid: UUIDSchema,
+    session_id: z.string(),
+  })
+  .strict();
 
 // PTY Terminal - Raw input write
-export const TerminalWriteSchema = z.object({
-  type: z.literal('terminal:write'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  data: z.string(),
-});
+export const TerminalWriteSchema = z
+  .object({
+    type: z.literal('terminal:write'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    data: z.string(),
+  })
+  .strict();
 
 // PTY Terminal - Resize
-export const TerminalResizeSchema = z.object({
-  type: z.literal('terminal:resize'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  cols: z.number(),
-  rows: z.number(),
-});
+export const TerminalResizeSchema = z
+  .object({
+    type: z.literal('terminal:resize'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    cols: z.number(),
+    rows: z.number(),
+  })
+  .strict();
 
 // PTY Terminal - Send signal
-export const TerminalSignalSchema = z.object({
-  type: z.literal('terminal:signal'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  signal: z.enum(['SIGINT', 'SIGTERM', 'SIGKILL']),
-});
+export const TerminalSignalSchema = z
+  .object({
+    type: z.literal('terminal:signal'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    signal: z.enum(['SIGINT', 'SIGTERM', 'SIGKILL']),
+  })
+  .strict();
 
 // PTY Terminal - Flow control acknowledgment
-export const TerminalAckSchema = z.object({
-  type: z.literal('terminal:ack'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  byte_count: z.number(),
-});
+export const TerminalAckSchema = z
+  .object({
+    type: z.literal('terminal:ack'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    byte_count: z.number(),
+  })
+  .strict();
 
 // Files
-export const FileOpenSchema = z.object({
-  type: z.literal('file:open'),
-  uuid: UUIDSchema,
-  path: z.string(),
-});
+export const FileOpenSchema = z
+  .object({
+    type: z.literal('file:open'),
+    uuid: UUIDSchema,
+    path: z.string(),
+  })
+  .strict();
 
-export const FileReadSchema = z.object({
-  type: z.literal('file:read'),
-  uuid: UUIDSchema,
-  path: z.string(),
-});
+export const FileReadSchema = z
+  .object({
+    type: z.literal('file:read'),
+    uuid: UUIDSchema,
+    path: z.string(),
+  })
+  .strict();
 
-export const FileWriteSchema = z.object({
-  type: z.literal('file:write'),
-  uuid: UUIDSchema,
-  path: z.string(),
-  content: z.string(),
-});
+export const FileWriteSchema = z
+  .object({
+    type: z.literal('file:write'),
+    uuid: UUIDSchema,
+    path: z.string(),
+    content: z.string(),
+  })
+  .strict();
 
-export const FileAcceptSchema = z.object({
-  type: z.literal('file:accept'),
-  uuid: UUIDSchema,
-  path: z.string(),
-});
+export const FileAcceptSchema = z
+  .object({
+    type: z.literal('file:accept'),
+    uuid: UUIDSchema,
+    path: z.string(),
+  })
+  .strict();
 
-export const FileRejectSchema = z.object({
-  type: z.literal('file:reject'),
-  uuid: UUIDSchema,
-  path: z.string(),
-});
+export const FileRejectSchema = z
+  .object({
+    type: z.literal('file:reject'),
+    uuid: UUIDSchema,
+    path: z.string(),
+  })
+  .strict();
 
-export const FileAcceptAllSchema = z.object({
-  type: z.literal('file:accept_all'),
-  uuid: UUIDSchema,
-});
+export const FileAcceptAllSchema = z
+  .object({
+    type: z.literal('file:accept_all'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
-export const FileRejectAllSchema = z.object({
-  type: z.literal('file:reject_all'),
-  uuid: UUIDSchema,
-});
+export const FileRejectAllSchema = z
+  .object({
+    type: z.literal('file:reject_all'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
-export const FileTreeRequestSchema = z.object({
-  type: z.literal('file:tree:request'),
-  uuid: UUIDSchema,
-  /** Path to get children for. If omitted, returns workspace root children */
-  path: z.string().optional(),
-});
+export const FileTreeRequestSchema = z
+  .object({
+    type: z.literal('file:tree:request'),
+    uuid: UUIDSchema,
+    /** Path to get children for. If omitted, returns workspace root children */
+    path: z.string().optional(),
+  })
+  .strict();
 
-export const FileListRequestSchema = z.object({
-  type: z.literal('file:list:request'),
-  uuid: UUIDSchema,
-});
+export const FileListRequestSchema = z
+  .object({
+    type: z.literal('file:list:request'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // Diff
-export const DiffOpenSchema = z.object({
-  type: z.literal('diff:open'),
-  uuid: UUIDSchema,
-  original_path: z.string(),
-  modified_path: z.string(),
-  title: z.string().optional(),
-});
+export const DiffOpenSchema = z
+  .object({
+    type: z.literal('diff:open'),
+    uuid: UUIDSchema,
+    original_path: z.string(),
+    modified_path: z.string(),
+    title: z.string().optional(),
+  })
+  .strict();
 
 // URL (open external links)
-export const UrlOpenSchema = z.object({
-  type: z.literal('url:open'),
-  uuid: UUIDSchema,
-  url: z.url(),
-});
+export const UrlOpenSchema = z
+  .object({
+    type: z.literal('url:open'),
+    uuid: UUIDSchema,
+    url: z.url(),
+  })
+  .strict();
 
 // Permission response (webview → extension)
-export const PermissionResponseSchema = z.object({
-  type: z.literal('permission:response'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  request_id: z.string(),
-  decision: z.enum(['approve', 'deny']),
-  always: z.boolean().optional(),
-});
+export const PermissionResponseSchema = z
+  .object({
+    type: z.literal('permission:response'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    request_id: z.string(),
+    decision: z.enum(['approve', 'deny']),
+    always: z.boolean().optional(),
+  })
+  .strict();
 
 // Set input mode (webview → extension)
-export const SetInputModeSchema = z.object({
-  type: z.literal('inputMode:set'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  mode: InputModeSchema,
-});
+export const SetInputModeSchema = z
+  .object({
+    type: z.literal('inputMode:set'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    mode: InputModeSchema,
+  })
+  .strict();
 
 // Set thinking mode (webview → extension)
-export const SetThinkingModeSchema = z.object({
-  type: z.literal('thinking:set'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  mode: ThinkingModeSchema,
-});
+export const SetThinkingModeSchema = z
+  .object({
+    type: z.literal('thinking:set'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    mode: ThinkingModeSchema,
+  })
+  .strict();
 
 // Set model (webview → extension)
-export const SetModelSchema = z.object({
-  type: z.literal('model:set'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  model: ModelSchema,
-});
+export const SetModelSchema = z
+  .object({
+    type: z.literal('model:set'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    model: ModelSchema,
+  })
+  .strict();
 
 // System
-export const WebviewReadySchema = z.object({
-  type: z.literal('webview:ready'),
-  uuid: UUIDSchema,
-});
+export const WebviewReadySchema = z
+  .object({
+    type: z.literal('webview:ready'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // ═══════════════════════════════════════════════════════════════
 // BROWSER (Webview → Extension)
 // ═══════════════════════════════════════════════════════════════
 
 // Create a browser view
-export const BrowserCreateSchema = z.object({
-  type: z.literal('browser:create'),
-  uuid: UUIDSchema,
-});
+export const BrowserCreateSchema = z
+  .object({
+    type: z.literal('browser:create'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // Navigate to URL
-export const BrowserNavigateSchema = z.object({
-  type: z.literal('browser:navigate'),
-  uuid: UUIDSchema,
-  url: z.string(),
-});
+export const BrowserNavigateSchema = z
+  .object({
+    type: z.literal('browser:navigate'),
+    uuid: UUIDSchema,
+    url: z.string(),
+  })
+  .strict();
 
 // Navigation actions
-export const BrowserBackSchema = z.object({
-  type: z.literal('browser:back'),
-  uuid: UUIDSchema,
-});
+export const BrowserBackSchema = z
+  .object({
+    type: z.literal('browser:back'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
-export const BrowserForwardSchema = z.object({
-  type: z.literal('browser:forward'),
-  uuid: UUIDSchema,
-});
+export const BrowserForwardSchema = z
+  .object({
+    type: z.literal('browser:forward'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
-export const BrowserReloadSchema = z.object({
-  type: z.literal('browser:reload'),
-  uuid: UUIDSchema,
-});
+export const BrowserReloadSchema = z
+  .object({
+    type: z.literal('browser:reload'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
-export const BrowserStopSchema = z.object({
-  type: z.literal('browser:stop'),
-  uuid: UUIDSchema,
-});
+export const BrowserStopSchema = z
+  .object({
+    type: z.literal('browser:stop'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // Element selection (React-grab)
-export const BrowserSelectElementStartSchema = z.object({
-  type: z.literal('browser:select-element:start'),
-  uuid: UUIDSchema,
-});
+export const BrowserSelectElementStartSchema = z
+  .object({
+    type: z.literal('browser:select-element:start'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
-export const BrowserSelectElementCancelSchema = z.object({
-  type: z.literal('browser:select-element:cancel'),
-  uuid: UUIDSchema,
-});
+export const BrowserSelectElementCancelSchema = z
+  .object({
+    type: z.literal('browser:select-element:cancel'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // Update browser view bounds (for positioning over webview)
-export const BrowserBoundsSchema = z.object({
-  type: z.literal('browser:bounds'),
-  uuid: UUIDSchema,
-  bounds: z.object({
-    x: z.number(),
-    y: z.number(),
-    width: z.number(),
-    height: z.number(),
-  }),
-});
+export const BrowserBoundsSchema = z
+  .object({
+    type: z.literal('browser:bounds'),
+    uuid: UUIDSchema,
+    bounds: z
+      .object({
+        x: z.number(),
+        y: z.number(),
+        width: z.number(),
+        height: z.number(),
+      })
+      .strict(),
+  })
+  .strict();
 
 // Destroy browser view
-export const BrowserDestroySchema = z.object({
-  type: z.literal('browser:destroy'),
-  uuid: UUIDSchema,
-});
+export const BrowserDestroySchema = z
+  .object({
+    type: z.literal('browser:destroy'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // Open browser DevTools
-export const BrowserDevToolsSchema = z.object({
-  type: z.literal('browser:devtools'),
-  uuid: UUIDSchema,
-});
+export const BrowserDevToolsSchema = z
+  .object({
+    type: z.literal('browser:devtools'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // Show browser view (when Browser tab becomes visible)
-export const BrowserShowSchema = z.object({
-  type: z.literal('browser:show'),
-  uuid: UUIDSchema,
-});
+export const BrowserShowSchema = z
+  .object({
+    type: z.literal('browser:show'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // Hide browser view (when Browser tab is hidden)
-export const BrowserHideSchema = z.object({
-  type: z.literal('browser:hide'),
-  uuid: UUIDSchema,
-});
+export const BrowserHideSchema = z
+  .object({
+    type: z.literal('browser:hide'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // ═══════════════════════════════════════════════════════════════
 // SUBAGENTS (Webview → Extension)
 // ═══════════════════════════════════════════════════════════════
 
 // Subagent definition
-export const SubagentDefinitionSchema = z.object({
-  name: z.string().min(1),
-  description: z.string(),
-  prompt: z.string(),
-  tools: z.array(z.string()).optional(),
-  disallowedTools: z.array(z.string()).optional(),
-  model: z.enum(['sonnet', 'opus', 'haiku', 'inherit']).optional(),
-});
+export const SubagentDefinitionSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string(),
+    prompt: z.string(),
+    tools: z.array(z.string()).optional(),
+    disallowedTools: z.array(z.string()).optional(),
+    model: z.enum(['sonnet', 'opus', 'haiku', 'inherit']).optional(),
+  })
+  .strict();
 
 export type SubagentDefinition = z.infer<typeof SubagentDefinitionSchema>;
 
 // List all subagents
-export const SubagentsListSchema = z.object({
-  type: z.literal('subagents:list'),
-  uuid: UUIDSchema,
-});
+export const SubagentsListSchema = z
+  .object({
+    type: z.literal('subagents:list'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // Create a new subagent
-export const SubagentCreateSchema = z.object({
-  type: z.literal('subagents:create'),
-  uuid: UUIDSchema,
-  agent: SubagentDefinitionSchema,
-});
+export const SubagentCreateSchema = z
+  .object({
+    type: z.literal('subagents:create'),
+    uuid: UUIDSchema,
+    agent: SubagentDefinitionSchema,
+  })
+  .strict();
 
 // Update an existing subagent
-export const SubagentUpdateSchema = z.object({
-  type: z.literal('subagents:update'),
-  uuid: UUIDSchema,
-  originalName: z.string(),
-  agent: SubagentDefinitionSchema,
-});
+export const SubagentUpdateSchema = z
+  .object({
+    type: z.literal('subagents:update'),
+    uuid: UUIDSchema,
+    originalName: z.string(),
+    agent: SubagentDefinitionSchema,
+  })
+  .strict();
 
 // Delete a subagent
-export const SubagentDeleteSchema = z.object({
-  type: z.literal('subagents:delete'),
-  uuid: UUIDSchema,
-  name: z.string(),
-});
+export const SubagentDeleteSchema = z
+  .object({
+    type: z.literal('subagents:delete'),
+    uuid: UUIDSchema,
+    name: z.string(),
+  })
+  .strict();
 
 // ═══════════════════════════════════════════════════════════════
 // SLASH COMMANDS (Webview → Extension)
 // ═══════════════════════════════════════════════════════════════
 
-// Command scope: where the command comes from
-export const CommandScopeSchema = z.enum(['builtin', 'default', 'project', 'personal']);
+// Note: CommandScopeSchema is imported from @snowflake/shared-schemas
 
 // Slash command definition
-export const SlashCommandDefinitionSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  content: z.string(), // The actual prompt content
-  allowedTools: z.array(z.string()).optional(),
-  argumentHint: z.string().optional(),
-  model: z.enum(['sonnet', 'opus', 'haiku']).optional(),
-  scope: CommandScopeSchema,
-  /** Whether this command is read-only (builtin/default commands) */
-  readonly: z.boolean().optional(),
-});
+export const SlashCommandDefinitionSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    content: z.string(), // The actual prompt content
+    allowedTools: z.array(z.string()).optional(),
+    argumentHint: z.string().optional(),
+    model: z.enum(['sonnet', 'opus', 'haiku']).optional(),
+    scope: CommandScopeSchema,
+    /** Whether this command is read-only (builtin/default commands) */
+    readonly: z.boolean().optional(),
+  })
+  .strict();
 
 export type SlashCommandDefinition = z.infer<typeof SlashCommandDefinitionSchema>;
-export type CommandScope = z.infer<typeof CommandScopeSchema>;
+// Note: CommandScope type is exported from @snowflake/shared-schemas
 
 // List all slash commands
-export const CommandsListSchema = z.object({
-  type: z.literal('commands:list'),
-  uuid: UUIDSchema,
-});
+export const CommandsListSchema = z
+  .object({
+    type: z.literal('commands:list'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // Create a new slash command
-export const CommandCreateSchema = z.object({
-  type: z.literal('commands:create'),
-  uuid: UUIDSchema,
-  command: SlashCommandDefinitionSchema,
-});
+export const CommandCreateSchema = z
+  .object({
+    type: z.literal('commands:create'),
+    uuid: UUIDSchema,
+    command: SlashCommandDefinitionSchema,
+  })
+  .strict();
 
 // Update an existing slash command
-export const CommandUpdateSchema = z.object({
-  type: z.literal('commands:update'),
-  uuid: UUIDSchema,
-  originalName: z.string(),
-  command: SlashCommandDefinitionSchema,
-});
+export const CommandUpdateSchema = z
+  .object({
+    type: z.literal('commands:update'),
+    uuid: UUIDSchema,
+    originalName: z.string(),
+    command: SlashCommandDefinitionSchema,
+  })
+  .strict();
 
 // Delete a slash command
-export const CommandDeleteSchema = z.object({
-  type: z.literal('commands:delete'),
-  uuid: UUIDSchema,
-  name: z.string(),
-  scope: CommandScopeSchema,
-});
+export const CommandDeleteSchema = z
+  .object({
+    type: z.literal('commands:delete'),
+    uuid: UUIDSchema,
+    name: z.string(),
+    scope: CommandScopeSchema,
+  })
+  .strict();
 
 // ───────────────────────────────────────────────────────────────
 // AI Generation (Webview → Extension)
 // ───────────────────────────────────────────────────────────────
 
 // Generate a subagent from natural language description
-export const SubagentGenerateSchema = z.object({
-  type: z.literal('subagents:generate'),
-  uuid: UUIDSchema,
-  /** Natural language description of what the agent should do */
-  description: z.string(),
-});
+export const SubagentGenerateSchema = z
+  .object({
+    type: z.literal('subagents:generate'),
+    uuid: UUIDSchema,
+    /** Natural language description of what the agent should do */
+    description: z.string(),
+  })
+  .strict();
 
 // Generate a slash command from natural language description
-export const CommandGenerateSchema = z.object({
-  type: z.literal('commands:generate'),
-  uuid: UUIDSchema,
-  /** Natural language description of what the command should do */
-  description: z.string(),
-});
+export const CommandGenerateSchema = z
+  .object({
+    type: z.literal('commands:generate'),
+    uuid: UUIDSchema,
+    /** Natural language description of what the command should do */
+    description: z.string(),
+  })
+  .strict();
 
 // Combined webview → extension
 export const WebviewMessageSchema = z.discriminatedUnion('type', [
@@ -605,557 +878,714 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
 // ═══════════════════════════════════════════════════════════════
 
 // System
-export const SystemInitSchema = z.object({
-  type: z.literal('system:init'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  cwd: z.string(),
-  model: z.string(),
-  tools: z.array(z.string()),
-});
+export const SystemInitSchema = z
+  .object({
+    type: z.literal('system:init'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    // Custom fields from Rust SessionManager
+    sdk_session_id: z.string().optional(),
+    is_resumed: z.boolean().optional(),
+    is_forked: z.boolean().optional(),
+    // SDK fields (optional for flexibility)
+    cwd: z.string().optional(),
+    model: z.string().optional(),
+    tools: z.array(z.string()).optional(),
+  })
+  .strict();
 
 // Layout (sent when editor container resizes)
-export const LayoutSchema = z.object({
-  type: z.literal('layout'),
-  width: z.number(),
-  height: z.number(),
-});
+export const LayoutSchema = z
+  .object({
+    type: z.literal('layout'),
+    width: z.number(),
+    height: z.number(),
+  })
+  .strict();
 
 // Agent streaming (matches SDK pattern)
-export const AgentChunkSchema = z.object({
-  type: z.literal('agent:chunk'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  message_id: z.string(),
-  content: z.string(),
-});
+export const AgentChunkSchema = z
+  .object({
+    type: z.literal('agent:chunk'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    message_id: z.string(),
+    content: z.string(),
+  })
+  .strict();
 
 // Agent thinking content (extended thinking)
-export const AgentThinkingSchema = z.object({
-  type: z.literal('agent:thinking'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  message_id: z.string(),
-  thinking: z.string(),
-  thinking_duration_ms: z.number().optional(),
-});
+export const AgentThinkingSchema = z
+  .object({
+    type: z.literal('agent:thinking'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    message_id: z.string(),
+    thinking: z.string(),
+    thinking_duration_ms: z.number().optional(),
+  })
+  .strict();
 
-export const AgentCompleteSchema = z.object({
-  type: z.literal('agent:complete'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  message_id: z.string(),
-  duration_ms: z.number().optional(),
-  total_cost_usd: z.number().optional(),
-  usage: z
-    .object({
-      input_tokens: z.number(),
-      output_tokens: z.number(),
-      cache_read_input_tokens: z.number().optional(),
-      cache_creation_input_tokens: z.number().optional(),
-    })
-    .optional(),
-});
+export const AgentCompleteSchema = z
+  .object({
+    type: z.literal('agent:complete'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    message_id: z.string(),
+    duration_ms: z.number().optional(),
+    total_cost_usd: z.number().optional(),
+    usage: z
+      .object({
+        input_tokens: z.number(),
+        output_tokens: z.number(),
+        cache_read_input_tokens: z.number().optional(),
+        cache_creation_input_tokens: z.number().optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
-export const AgentErrorSchema = z.object({
-  type: z.literal('agent:error'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  message_id: z.string(),
-  error: z.string(),
-  code: z.string().optional(),
-});
+export const AgentErrorSchema = z
+  .object({
+    type: z.literal('agent:error'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    message_id: z.string(),
+    error: z.string(),
+    code: z.string().optional(),
+  })
+  .strict();
+
+// Plan mode changed (from extension to webview)
+export const AgentPlanModeSchema = z
+  .object({
+    type: z.literal('agent:plan_mode'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    enabled: z.boolean(),
+  })
+  .strict();
+
+// Accept mode changed (from extension to webview)
+export const AgentAcceptModeSchema = z
+  .object({
+    type: z.literal('agent:accept_mode'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    enabled: z.boolean(),
+  })
+  .strict();
 
 // Tool events (matches SDK pattern)
-export const ToolStartSchema = z.object({
-  type: z.literal('tool:start'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  message_id: z.string(),
-  tool_id: z.string(),
-  tool_name: z.string(),
-  tool_input: z.record(z.string(), z.unknown()),
-});
+export const ToolStartSchema = z
+  .object({
+    type: z.literal('tool:start'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    message_id: z.string(),
+    tool_id: z.string(),
+    tool_name: z.string(),
+    tool_input: z.record(z.string(), z.unknown()),
+  })
+  .strict();
 
-export const ToolEndSchema = z.object({
-  type: z.literal('tool:end'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  message_id: z.string(),
-  tool_id: z.string(),
-  tool_name: z.string(),
-  tool_output: z.unknown(),
-  success: z.boolean(),
-});
+export const ToolEndSchema = z
+  .object({
+    type: z.literal('tool:end'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    message_id: z.string(),
+    tool_id: z.string(),
+    tool_name: z.string(),
+    tool_output: z.unknown(),
+    success: z.boolean(),
+  })
+  .strict();
 
 // Permission request (from extension to webview)
-export const PermissionRequestSchema = z.object({
-  type: z.literal('permission:request'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  request_id: z.string(),
-  tool_name: z.string(),
-  tool_input: z.record(z.string(), z.unknown()),
-});
+export const PermissionRequestSchema = z
+  .object({
+    type: z.literal('permission:request'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    request_id: z.string(),
+    tool_name: z.string(),
+    tool_input: z.record(z.string(), z.unknown()),
+  })
+  .strict();
 
 // Input mode changed (from extension to webview)
-export const InputModeChangedSchema = z.object({
-  type: z.literal('inputMode:changed'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  mode: InputModeSchema,
-});
+export const InputModeChangedSchema = z
+  .object({
+    type: z.literal('inputMode:changed'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    mode: InputModeSchema,
+  })
+  .strict();
 
 // Thinking mode changed (from extension to webview)
-export const ThinkingModeChangedSchema = z.object({
-  type: z.literal('thinking:changed'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  mode: ThinkingModeSchema,
-});
+export const ThinkingModeChangedSchema = z
+  .object({
+    type: z.literal('thinking:changed'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    mode: ThinkingModeSchema,
+  })
+  .strict();
 
 // Model changed (from extension to webview)
-export const ModelChangedSchema = z.object({
-  type: z.literal('model:changed'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  model: ModelSchema,
-});
+export const ModelChangedSchema = z
+  .object({
+    type: z.literal('model:changed'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    model: ModelSchema,
+  })
+  .strict();
 
 // Panel command (from extension to webview)
 export const PanelCommandTypeSchema = z.enum(['quick-open']);
 
-export const PanelCommandSchema = z.object({
-  type: z.literal('panel:command'),
-  uuid: UUIDSchema,
-  command: PanelCommandTypeSchema,
-});
+export const PanelCommandSchema = z
+  .object({
+    type: z.literal('panel:command'),
+    uuid: UUIDSchema,
+    command: PanelCommandTypeSchema,
+  })
+  .strict();
 
 // Panel visibility (sent when VS Code panel becomes visible after being hidden)
-export const PanelVisibleSchema = z.object({
-  type: z.literal('panel:visible'),
-  uuid: UUIDSchema,
-});
+export const PanelVisibleSchema = z
+  .object({
+    type: z.literal('panel:visible'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
-// Terminal - Shell type enum
-export const ShellTypeSchema = z.enum(['bash', 'zsh', 'fish', 'pwsh', 'cmd', 'unknown']);
+// Note: ShellTypeSchema is imported from @snowflake/shared-schemas
 
 // Terminal - Capabilities state
-export const TerminalCapabilitiesStateSchema = z.object({
-  cwd_detection: z.boolean(),
-  command_detection: z.boolean(),
-  shell_integration: z.boolean(),
-});
+export const TerminalCapabilitiesStateSchema = z
+  .object({
+    cwd_detection: z.boolean(),
+    command_detection: z.boolean(),
+    shell_integration: z.boolean(),
+  })
+  .strict();
 
 // Terminal - Legacy output (for backwards compat)
-export const TerminalOutputSchema = z.object({
-  type: z.literal('terminal:output'),
-  uuid: UUIDSchema,
-  session_id: z.string(),
-  data: z.string(),
-});
+export const TerminalOutputSchema = z
+  .object({
+    type: z.literal('terminal:output'),
+    uuid: UUIDSchema,
+    session_id: z.string(),
+    data: z.string(),
+  })
+  .strict();
 
 // PTY Terminal - Raw data stream
-export const TerminalDataSchema = z.object({
-  type: z.literal('terminal:data'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  data: z.string(),
-});
+export const TerminalDataSchema = z
+  .object({
+    type: z.literal('terminal:data'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    data: z.string(),
+  })
+  .strict();
 
 // PTY Terminal - Created with full PTY info
-export const TerminalCreatedSchema = z.object({
-  type: z.literal('terminal:created'),
-  uuid: UUIDSchema,
-  session_id: z.string(),
-  terminal_id: z.string(),
-  name: z.string(),
-  pid: z.number().optional(),
-  cwd: z.string().optional(),
-  shell_type: ShellTypeSchema.optional(),
-  capabilities: TerminalCapabilitiesStateSchema.optional(),
-});
+export const TerminalCreatedSchema = z
+  .object({
+    type: z.literal('terminal:created'),
+    uuid: UUIDSchema,
+    session_id: z.string(),
+    terminal_id: z.string(),
+    name: z.string(),
+    pid: z.number().optional(),
+    cwd: z.string().optional(),
+    shell_type: ShellTypeSchema.optional(),
+    capabilities: TerminalCapabilitiesStateSchema.optional(),
+  })
+  .strict();
 
 // PTY Terminal - Exited
-export const TerminalExitedSchema = z.object({
-  type: z.literal('terminal:exited'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  exit_code: z.number().optional(),
-});
+export const TerminalExitedSchema = z
+  .object({
+    type: z.literal('terminal:exited'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    exit_code: z.number().optional(),
+  })
+  .strict();
 
 // PTY Terminal - Foreground process changed
-export const TerminalForegroundSchema = z.object({
-  type: z.literal('terminal:foreground'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  process_name: z.string(),
-  pid: z.number(),
-});
+export const TerminalForegroundSchema = z
+  .object({
+    type: z.literal('terminal:foreground'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    process_name: z.string(),
+    pid: z.number(),
+  })
+  .strict();
 
 // PTY Terminal - CWD changed (from shell integration)
-export const TerminalCwdChangedSchema = z.object({
-  type: z.literal('terminal:cwd'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  cwd: z.string(),
-});
+export const TerminalCwdChangedSchema = z
+  .object({
+    type: z.literal('terminal:cwd'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    cwd: z.string(),
+  })
+  .strict();
 
 // PTY Terminal - Command started (from shell integration)
-export const TerminalCommandStartSchema = z.object({
-  type: z.literal('terminal:command:start'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  command_line: z.string().optional(),
-});
+export const TerminalCommandStartSchema = z
+  .object({
+    type: z.literal('terminal:command:start'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    command_line: z.string().optional(),
+  })
+  .strict();
 
 // PTY Terminal - Command ended (from shell integration)
-export const TerminalCommandEndSchema = z.object({
-  type: z.literal('terminal:command:end'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  command_line: z.string().optional(),
-  exit_code: z.number().optional(),
-});
+export const TerminalCommandEndSchema = z
+  .object({
+    type: z.literal('terminal:command:end'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    command_line: z.string().optional(),
+    exit_code: z.number().optional(),
+  })
+  .strict();
 
 // PTY Terminal - Capabilities changed
-export const TerminalCapabilitiesChangedSchema = z.object({
-  type: z.literal('terminal:capabilities'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  capabilities: TerminalCapabilitiesStateSchema,
-});
+export const TerminalCapabilitiesChangedSchema = z
+  .object({
+    type: z.literal('terminal:capabilities'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    capabilities: TerminalCapabilitiesStateSchema,
+  })
+  .strict();
 
 // PTY Terminal - Title/process name changed (from PTY title escape sequence)
-export const TerminalTitleChangedSchema = z.object({
-  type: z.literal('terminal:title'),
-  uuid: UUIDSchema,
-  terminal_id: z.string(),
-  title: z.string(),
-});
+export const TerminalTitleChangedSchema = z
+  .object({
+    type: z.literal('terminal:title'),
+    uuid: UUIDSchema,
+    terminal_id: z.string(),
+    title: z.string(),
+  })
+  .strict();
 
-// Files
-export const FileContentSchema = z.object({
-  type: z.literal('file:content'),
-  uuid: UUIDSchema,
-  request_uuid: z.string(),
-  path: z.string(),
-  content: z.string(),
-});
+// Files - IPC response with file content
+export const FileContentResponseSchema = z
+  .object({
+    type: z.literal('file:content'),
+    uuid: UUIDSchema,
+    request_uuid: z.string(),
+    path: z.string(),
+    content: z.string(),
+  })
+  .strict();
 
-export const FileChangedSchema = z.object({
-  type: z.literal('file:changed'),
-  uuid: UUIDSchema,
-  path: z.string(),
-  change_type: z.enum(['created', 'modified', 'deleted']),
-});
+/**
+ * @deprecated Use FileContentResponseSchema instead
+ * This alias exists for backwards compatibility
+ */
+export const FileContentSchema = FileContentResponseSchema;
 
-export const FileWrittenSchema = z.object({
-  type: z.literal('file:written'),
-  uuid: UUIDSchema,
-  request_uuid: z.string().optional(),
-  path: z.string(),
-  success: z.boolean(),
-});
+export const FileChangedSchema = z
+  .object({
+    type: z.literal('file:changed'),
+    uuid: UUIDSchema,
+    path: z.string(),
+    change_type: z.enum(['created', 'modified', 'deleted']),
+  })
+  .strict();
+
+export const FileWrittenSchema = z
+  .object({
+    type: z.literal('file:written'),
+    uuid: UUIDSchema,
+    request_uuid: z.string().optional(),
+    path: z.string(),
+    success: z.boolean(),
+  })
+  .strict();
 
 /** Node in the file tree */
-export const FileNodeSchema = z.object({
-  name: z.string(),
-  path: z.string(),
-  isDirectory: z.boolean(),
-  isFile: z.boolean(),
-  isSymlink: z.boolean().optional(),
-});
+export const FileNodeSchema = z
+  .object({
+    name: z.string(),
+    path: z.string(),
+    isDirectory: z.boolean(),
+    isFile: z.boolean(),
+    isSymlink: z.boolean().optional(),
+  })
+  .strict();
 
-export const FileTreeResponseSchema = z.object({
-  type: z.literal('file:tree:response'),
-  uuid: UUIDSchema,
-  request_uuid: z.string(),
-  /** The path that was queried */
-  path: z.string(),
-  /** Children of the path */
-  children: z.array(FileNodeSchema),
-});
+export const FileTreeResponseSchema = z
+  .object({
+    type: z.literal('file:tree:response'),
+    uuid: UUIDSchema,
+    request_uuid: z.string(),
+    /** The path that was queried */
+    path: z.string(),
+    /** Children of the path */
+    children: z.array(FileNodeSchema),
+  })
+  .strict();
 
-export const FileTreeErrorSchema = z.object({
-  type: z.literal('file:tree:error'),
-  uuid: UUIDSchema,
-  request_uuid: z.string(),
-  error: z.string(),
-});
+export const FileTreeErrorSchema = z
+  .object({
+    type: z.literal('file:tree:error'),
+    uuid: UUIDSchema,
+    request_uuid: z.string(),
+    error: z.string(),
+  })
+  .strict();
 
 /** Flat list entry for file:list:response */
-export const FileListEntrySchema = z.object({
-  name: z.string(),
-  path: z.string(),
-  isDirectory: z.boolean().optional(),
-});
+export const FileListEntrySchema = z
+  .object({
+    name: z.string(),
+    path: z.string(),
+    isDirectory: z.boolean().optional(),
+  })
+  .strict();
 
-export const FileListResponseSchema = z.object({
-  type: z.literal('file:list:response'),
-  uuid: UUIDSchema,
-  request_uuid: z.string(),
-  /** All files in the workspace (recursively) */
-  files: z.array(FileListEntrySchema),
-});
+export const FileListResponseSchema = z
+  .object({
+    type: z.literal('file:list:response'),
+    uuid: UUIDSchema,
+    request_uuid: z.string(),
+    /** All files in the workspace (recursively) */
+    files: z.array(FileListEntrySchema),
+  })
+  .strict();
 
 // Conversation
-export const ConversationCreatedSchema = z.object({
-  type: z.literal('conversation:created'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  title: z.string(),
-});
+export const ConversationCreatedSchema = z
+  .object({
+    type: z.literal('conversation:created'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    title: z.string(),
+  })
+  .strict();
 
-export const ConversationDeletedSchema = z.object({
-  type: z.literal('conversation:deleted'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-});
+export const ConversationDeletedSchema = z
+  .object({
+    type: z.literal('conversation:deleted'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+  })
+  .strict();
 
-export const ConversationListSchema = z.object({
-  type: z.literal('conversation:list'),
-  uuid: UUIDSchema,
-  conversations: z.array(
-    z.object({
-      session_id: z.string(),
-      title: z.string(),
-      updated_at: z.number(),
-      message_count: z.number(),
-    })
-  ),
-});
+export const ConversationListSchema = z
+  .object({
+    type: z.literal('conversation:list'),
+    uuid: UUIDSchema,
+    conversations: z.array(
+      z
+        .object({
+          session_id: z.string(),
+          title: z.string(),
+          updated_at: z.number(),
+          message_count: z.number(),
+        })
+        .strict()
+    ),
+  })
+  .strict();
 
-export const ConversationLoadedSchema = z.object({
-  type: z.literal('conversation:loaded'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  title: z.string(),
-  messages: z.array(
-    z.object({
-      id: z.string(),
-      role: z.enum(['user', 'assistant']),
-      content: z.string(),
-      timestamp: z.number(),
-    })
-  ),
-});
+export const ConversationLoadedSchema = z
+  .object({
+    type: z.literal('conversation:loaded'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    title: z.string(),
+    messages: z.array(
+      z
+        .object({
+          id: z.string(),
+          role: z.enum(['user', 'assistant']),
+          content: z.string(),
+          timestamp: z.number(),
+        })
+        .strict()
+    ),
+  })
+  .strict();
 
-export const ConversationRewoundSchema = z.object({
-  type: z.literal('conversation:rewound'),
-  uuid: UUIDSchema,
-  session_id: SessionIdSchema,
-  /** New session ID after forking (for future messages) */
-  new_session_id: z.string(),
-  /** The message ID we rewound to */
-  rewind_to_message_id: z.string(),
-  /** Messages remaining after rewind */
-  messages: z.array(
-    z.object({
-      id: z.string(),
-      role: z.enum(['user', 'assistant']),
-      content: z.string(),
-      timestamp: z.number(),
-    })
-  ),
-});
+export const ConversationRewoundSchema = z
+  .object({
+    type: z.literal('conversation:rewound'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    /** New session ID after forking (for future messages) */
+    new_session_id: z.string(),
+    /** The message ID we rewound to */
+    rewind_to_message_id: z.string(),
+    /** Messages remaining after rewind */
+    messages: z.array(
+      z
+        .object({
+          id: z.string(),
+          role: z.enum(['user', 'assistant']),
+          content: z.string(),
+          timestamp: z.number(),
+        })
+        .strict()
+    ),
+  })
+  .strict();
 
 // General error
-export const ErrorSchema = z.object({
-  type: z.literal('error'),
-  uuid: UUIDSchema,
-  request_uuid: z.string().optional(),
-  message: z.string(),
-  code: z.string().optional(),
-});
+export const ErrorSchema = z
+  .object({
+    type: z.literal('error'),
+    uuid: UUIDSchema,
+    request_uuid: z.string().optional(),
+    message: z.string(),
+    code: z.string().optional(),
+  })
+  .strict();
 
 // ═══════════════════════════════════════════════════════════════
 // BROWSER (Extension → Webview)
 // ═══════════════════════════════════════════════════════════════
 
 // React element context (from element selection)
-export const ReactElementContextSchema = z.object({
-  // React component info
-  componentName: z.string(),
-  filePath: z.string(),
-  lineNumber: z.number(),
-  props: z.record(z.string(), z.unknown()),
-  componentStack: z.array(z.string()),
-  // DOM info
-  tagName: z.string(),
-  selector: z.string(),
-  outerHTML: z.string(),
-  // Display helper
-  displayName: z.string(),
-});
+export const ReactElementContextSchema = z
+  .object({
+    // React component info
+    componentName: z.string(),
+    filePath: z.string(),
+    lineNumber: z.number(),
+    props: z.record(z.string(), z.unknown()),
+    componentStack: z.array(z.string()),
+    // DOM info
+    tagName: z.string(),
+    selector: z.string(),
+    outerHTML: z.string(),
+    // Display helper
+    displayName: z.string(),
+  })
+  .strict();
 
 // Browser view created
-export const BrowserCreatedSchema = z.object({
-  type: z.literal('browser:created'),
-  uuid: UUIDSchema,
-  viewId: z.string(),
-});
+export const BrowserCreatedSchema = z
+  .object({
+    type: z.literal('browser:created'),
+    uuid: UUIDSchema,
+    viewId: z.string(),
+  })
+  .strict();
 
 // Navigation state update
-export const BrowserNavigatedSchema = z.object({
-  type: z.literal('browser:navigated'),
-  uuid: UUIDSchema,
-  url: z.string(),
-  title: z.string(),
-  canGoBack: z.boolean(),
-  canGoForward: z.boolean(),
-  isLoading: z.boolean(),
-});
+export const BrowserNavigatedSchema = z
+  .object({
+    type: z.literal('browser:navigated'),
+    uuid: UUIDSchema,
+    url: z.string(),
+    title: z.string(),
+    canGoBack: z.boolean(),
+    canGoForward: z.boolean(),
+    isLoading: z.boolean(),
+  })
+  .strict();
 
 // Element selected via React-grab
-export const BrowserElementSelectedSchema = z.object({
-  type: z.literal('browser:element-selected'),
-  uuid: UUIDSchema,
-  element: ReactElementContextSchema,
-});
+export const BrowserElementSelectedSchema = z
+  .object({
+    type: z.literal('browser:element-selected'),
+    uuid: UUIDSchema,
+    element: ReactElementContextSchema,
+  })
+  .strict();
 
 // Loading state changed
-export const BrowserLoadingSchema = z.object({
-  type: z.literal('browser:loading'),
-  uuid: UUIDSchema,
-  isLoading: z.boolean(),
-});
+export const BrowserLoadingSchema = z
+  .object({
+    type: z.literal('browser:loading'),
+    uuid: UUIDSchema,
+    isLoading: z.boolean(),
+  })
+  .strict();
 
 // Browser error
-export const BrowserErrorSchema = z.object({
-  type: z.literal('browser:error'),
-  uuid: UUIDSchema,
-  error: z.string(),
-  code: z.string().optional(),
-});
+export const BrowserErrorSchema = z
+  .object({
+    type: z.literal('browser:error'),
+    uuid: UUIDSchema,
+    error: z.string(),
+    code: z.string().optional(),
+  })
+  .strict();
 
 // Browser destroyed
-export const BrowserDestroyedSchema = z.object({
-  type: z.literal('browser:destroyed'),
-  uuid: UUIDSchema,
-});
+export const BrowserDestroyedSchema = z
+  .object({
+    type: z.literal('browser:destroyed'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // Browser open command (from extension to open browser panel and navigate)
-export const BrowserOpenSchema = z.object({
-  type: z.literal('browser:open'),
-  uuid: UUIDSchema,
-  /** URL to navigate to (defaults to about:blank if not provided) */
-  url: z.string().optional(),
-});
+export const BrowserOpenSchema = z
+  .object({
+    type: z.literal('browser:open'),
+    uuid: UUIDSchema,
+    /** URL to navigate to (defaults to about:blank if not provided) */
+    url: z.string().optional(),
+  })
+  .strict();
 
 // Browser close command (from extension to close browser panel)
-export const BrowserCloseSchema = z.object({
-  type: z.literal('browser:close'),
-  uuid: UUIDSchema,
-});
+export const BrowserCloseSchema = z
+  .object({
+    type: z.literal('browser:close'),
+    uuid: UUIDSchema,
+  })
+  .strict();
 
 // ═══════════════════════════════════════════════════════════════
 // SUBAGENTS (Extension → Webview)
 // ═══════════════════════════════════════════════════════════════
 
 // Response with list of all subagents
-export const SubagentsListResponseSchema = z.object({
-  type: z.literal('subagents:list:response'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  agents: z.array(SubagentDefinitionSchema),
-});
+export const SubagentsListResponseSchema = z
+  .object({
+    type: z.literal('subagents:list:response'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    agents: z.array(SubagentDefinitionSchema),
+  })
+  .strict();
 
 // Confirmation that a subagent was created
-export const SubagentCreatedSchema = z.object({
-  type: z.literal('subagents:created'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  agent: SubagentDefinitionSchema,
-});
+export const SubagentCreatedSchema = z
+  .object({
+    type: z.literal('subagents:created'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    agent: SubagentDefinitionSchema,
+  })
+  .strict();
 
 // Confirmation that a subagent was updated
-export const SubagentUpdatedSchema = z.object({
-  type: z.literal('subagents:updated'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  agent: SubagentDefinitionSchema,
-});
+export const SubagentUpdatedSchema = z
+  .object({
+    type: z.literal('subagents:updated'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    agent: SubagentDefinitionSchema,
+  })
+  .strict();
 
 // Confirmation that a subagent was deleted
-export const SubagentDeletedSchema = z.object({
-  type: z.literal('subagents:deleted'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  name: z.string(),
-});
+export const SubagentDeletedSchema = z
+  .object({
+    type: z.literal('subagents:deleted'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    name: z.string(),
+  })
+  .strict();
 
 // Error during subagent operation
-export const SubagentErrorSchema = z.object({
-  type: z.literal('subagents:error'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  error: z.string(),
-});
+export const SubagentErrorSchema = z
+  .object({
+    type: z.literal('subagents:error'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    error: z.string(),
+  })
+  .strict();
 
 // ═══════════════════════════════════════════════════════════════
 // SLASH COMMANDS (Extension → Webview)
 // ═══════════════════════════════════════════════════════════════
 
 // Response with list of all slash commands
-export const CommandsListResponseSchema = z.object({
-  type: z.literal('commands:list:response'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  commands: z.array(SlashCommandDefinitionSchema),
-});
+export const CommandsListResponseSchema = z
+  .object({
+    type: z.literal('commands:list:response'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    commands: z.array(SlashCommandDefinitionSchema),
+  })
+  .strict();
 
 // Confirmation that a command was created
-export const CommandCreatedSchema = z.object({
-  type: z.literal('commands:created'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  command: SlashCommandDefinitionSchema,
-});
+export const CommandCreatedSchema = z
+  .object({
+    type: z.literal('commands:created'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    command: SlashCommandDefinitionSchema,
+  })
+  .strict();
 
 // Confirmation that a command was updated
-export const CommandUpdatedSchema = z.object({
-  type: z.literal('commands:updated'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  command: SlashCommandDefinitionSchema,
-});
+export const CommandUpdatedSchema = z
+  .object({
+    type: z.literal('commands:updated'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    command: SlashCommandDefinitionSchema,
+  })
+  .strict();
 
 // Confirmation that a command was deleted
-export const CommandDeletedSchema = z.object({
-  type: z.literal('commands:deleted'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  name: z.string(),
-});
+export const CommandDeletedSchema = z
+  .object({
+    type: z.literal('commands:deleted'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    name: z.string(),
+  })
+  .strict();
 
 // Error during command operation
-export const CommandErrorSchema = z.object({
-  type: z.literal('commands:error'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  error: z.string(),
-});
+export const CommandErrorSchema = z
+  .object({
+    type: z.literal('commands:error'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    error: z.string(),
+  })
+  .strict();
 
 // ═══════════════════════════════════════════════════════════════
 // AI GENERATION (Extension → Webview)
 // ═══════════════════════════════════════════════════════════════
 
 // Generated subagent definition from AI
-export const SubagentGeneratedSchema = z.object({
-  type: z.literal('subagents:generated'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  agent: SubagentDefinitionSchema,
-});
+export const SubagentGeneratedSchema = z
+  .object({
+    type: z.literal('subagents:generated'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    agent: SubagentDefinitionSchema,
+  })
+  .strict();
 
 // Generated slash command definition from AI
-export const CommandGeneratedSchema = z.object({
-  type: z.literal('commands:generated'),
-  uuid: UUIDSchema,
-  request_uuid: UUIDSchema,
-  command: SlashCommandDefinitionSchema,
-});
+export const CommandGeneratedSchema = z
+  .object({
+    type: z.literal('commands:generated'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    command: SlashCommandDefinitionSchema,
+  })
+  .strict();
 
 // Combined extension → webview
 export const ExtensionMessageSchema = z.discriminatedUnion('type', [
@@ -1167,6 +1597,8 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   AgentThinkingSchema,
   AgentCompleteSchema,
   AgentErrorSchema,
+  AgentPlanModeSchema,
+  AgentAcceptModeSchema,
   // Tools
   ToolStartSchema,
   ToolEndSchema,
@@ -1192,7 +1624,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   TerminalCapabilitiesChangedSchema,
   TerminalTitleChangedSchema,
   // Files
-  FileContentSchema,
+  FileContentResponseSchema,
   FileChangedSchema,
   FileWrittenSchema,
   FileTreeResponseSchema,
@@ -1239,6 +1671,9 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
 export type WebviewMessage = z.infer<typeof WebviewMessageSchema>;
 export type ExtensionMessage = z.infer<typeof ExtensionMessageSchema>;
 
+// Shared primitives
+export type StoredConversationSummary = z.infer<typeof StoredConversationSummarySchema>;
+
 // Webview → Extension
 export type SendMessage = z.infer<typeof SendMessageSchema>;
 export type EditMessage = z.infer<typeof EditMessageSchema>;
@@ -1277,7 +1712,7 @@ export type PermissionResponse = z.infer<typeof PermissionResponseSchema>;
 export type SetInputMode = z.infer<typeof SetInputModeSchema>;
 export type SetThinkingMode = z.infer<typeof SetThinkingModeSchema>;
 export type SetModel = z.infer<typeof SetModelSchema>;
-export type Model = z.infer<typeof ModelSchema>;
+// Note: Model type is exported from @snowflake/shared-schemas at file top
 // Browser (Webview → Extension)
 export type BrowserCreate = z.infer<typeof BrowserCreateSchema>;
 export type BrowserNavigate = z.infer<typeof BrowserNavigateSchema>;
@@ -1300,18 +1735,20 @@ export type AgentChunk = z.infer<typeof AgentChunkSchema>;
 export type AgentThinking = z.infer<typeof AgentThinkingSchema>;
 export type AgentComplete = z.infer<typeof AgentCompleteSchema>;
 export type AgentError = z.infer<typeof AgentErrorSchema>;
+export type AgentPlanMode = z.infer<typeof AgentPlanModeSchema>;
+export type AgentAcceptMode = z.infer<typeof AgentAcceptModeSchema>;
 export type ToolStart = z.infer<typeof ToolStartSchema>;
 export type ToolEnd = z.infer<typeof ToolEndSchema>;
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
 export type InputModeChanged = z.infer<typeof InputModeChangedSchema>;
-export type InputMode = z.infer<typeof InputModeSchema>;
+// Note: InputMode type is exported from @snowflake/shared-schemas at file top
 export type ThinkingModeChanged = z.infer<typeof ThinkingModeChangedSchema>;
-export type ThinkingMode = z.infer<typeof ThinkingModeSchema>;
+// Note: ThinkingMode type is exported from @snowflake/shared-schemas at file top
 export type ModelChanged = z.infer<typeof ModelChangedSchema>;
 export type PanelCommandType = z.infer<typeof PanelCommandTypeSchema>;
 export type PanelCommand = z.infer<typeof PanelCommandSchema>;
 export type PanelVisible = z.infer<typeof PanelVisibleSchema>;
-export type ShellType = z.infer<typeof ShellTypeSchema>;
+// Note: ShellType type is exported from @snowflake/shared-schemas at file top
 export type TerminalCapabilitiesState = z.infer<typeof TerminalCapabilitiesStateSchema>;
 export type TerminalOutput = z.infer<typeof TerminalOutputSchema>;
 export type TerminalData = z.infer<typeof TerminalDataSchema>;
@@ -1322,7 +1759,9 @@ export type TerminalCommandStart = z.infer<typeof TerminalCommandStartSchema>;
 export type TerminalCommandEnd = z.infer<typeof TerminalCommandEndSchema>;
 export type TerminalCapabilitiesChanged = z.infer<typeof TerminalCapabilitiesChangedSchema>;
 export type TerminalTitleChanged = z.infer<typeof TerminalTitleChangedSchema>;
-export type FileContent = z.infer<typeof FileContentSchema>;
+export type FileContentResponse = z.infer<typeof FileContentResponseSchema>;
+/** @deprecated Use FileContentResponse instead */
+export type FileContent = FileContentResponse;
 export type FileChanged = z.infer<typeof FileChangedSchema>;
 export type FileWritten = z.infer<typeof FileWrittenSchema>;
 export type FileNode = z.infer<typeof FileNodeSchema>;
@@ -1378,7 +1817,7 @@ export function isProtocolTerminalMessage(
 export function isProtocolFileMessage(
   msg: ExtensionMessage
 ): msg is
-  | FileContent
+  | FileContentResponse
   | FileChanged
   | FileWritten
   | FileTreeResponse
@@ -1399,12 +1838,4 @@ export function isProtocolBrowserMessage(
   | BrowserOpen
   | BrowserClose {
   return msg.type.startsWith('browser:');
-}
-
-// ═══════════════════════════════════════════════════════════════
-// HELPER: Generate UUID
-// ═══════════════════════════════════════════════════════════════
-
-export function generateUUID(): string {
-  return crypto.randomUUID();
 }

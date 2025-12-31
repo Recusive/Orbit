@@ -128,6 +128,8 @@ export function useBrowser(): void {
         case 'agent:thinking':
         case 'agent:complete':
         case 'agent:error':
+        case 'agent:plan_mode':
+        case 'agent:accept_mode':
         case 'tool:start':
         case 'tool:end':
         case 'permission:request':

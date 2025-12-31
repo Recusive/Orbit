@@ -1,3 +1,4 @@
+import { formatZodError } from '@snowflake/shared-schemas';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AttachmentContentBlock, FileEntry, SessionConfig } from '@/lib/backend';
@@ -12,9 +13,6 @@ import {
   writeTerminal,
   resizeTerminal,
   closeTerminal,
-  onTerminalOutput,
-  onTerminalExit,
-  onTerminalForeground,
   watchPath,
   onFileChange,
   // Agent SDK operations
@@ -26,13 +24,6 @@ import {
   agentSetModel,
   agentSetPlanMode,
   agentSetAcceptMode,
-  // Agent event listeners
-  onAgentMessage,
-  onAgentPermissionRequest,
-  onAgentSessionInit,
-  onAgentPlanModeChanged,
-  onAgentAcceptModeChanged,
-  onAgentError,
   // Conversation operations
   conversationCreate,
   conversationList,
@@ -82,62 +73,9 @@ function isTauriEnvironment(): boolean {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Terminal Listener Singleton
-// ═══════════════════════════════════════════════════════════════
-
-let terminalListenersInitialized = false;
-
-async function initTerminalListeners(): Promise<void> {
-  if (terminalListenersInitialized) return;
-  terminalListenersInitialized = true;
-
-  try {
-    await onTerminalOutput((event) => {
-      window.postMessage(
-        {
-          type: 'terminal:data',
-          uuid: crypto.randomUUID(),
-          terminal_id: event.id,
-          data: event.data,
-        },
-        '*'
-      );
-    });
-
-    await onTerminalExit((event) => {
-      window.postMessage(
-        {
-          type: 'terminal:exited',
-          uuid: crypto.randomUUID(),
-          terminal_id: event.id,
-          exit_code: event.code,
-        },
-        '*'
-      );
-    });
-
-    await onTerminalForeground((event) => {
-      window.postMessage(
-        {
-          type: 'terminal:foreground',
-          uuid: crypto.randomUUID(),
-          terminal_id: event.id,
-          process_name: event.process_name,
-          pid: event.pid,
-        },
-        '*'
-      );
-    });
-
-    console.warn('[Snowflake] Terminal event listeners initialized');
-  } catch (err) {
-    console.error('[Snowflake] Failed to set up terminal listeners:', err);
-    terminalListenersInitialized = false;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
 // File Watcher Singleton
+// NOTE: Terminal and agent listeners are now initialized by TauriProvider
+// This ensures proper React lifecycle management and HMR support
 // ═══════════════════════════════════════════════════════════════
 
 let fileWatcherInitialized = false;
@@ -267,21 +205,62 @@ async function initFileWatcher(workspacePath: string): Promise<void> {
 // Agent Listener Singleton
 // ═══════════════════════════════════════════════════════════════
 
-let agentListenersInitialized = false;
-let agentListenerUnlisten: (() => void) | null = null; // Store unlisten function to prevent duplicates
+// Use window-level state to persist across Vite HMR reloads
+// This prevents duplicate listeners when the module is hot-reloaded
+declare global {
+  interface Window {
+    __SNOWFLAKE_AGENT_LISTENERS_INITIALIZED__?: boolean;
+    __SNOWFLAKE_AGENT_LISTENER_UNLISTEN__?: (() => void) | null;
+  }
+}
+
+// Clean up on HMR to prevent listener accumulation
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    if (window.__SNOWFLAKE_AGENT_LISTENER_UNLISTEN__) {
+      window.__SNOWFLAKE_AGENT_LISTENER_UNLISTEN__();
+      window.__SNOWFLAKE_AGENT_LISTENER_UNLISTEN__ = null;
+      window.__SNOWFLAKE_AGENT_LISTENERS_INITIALIZED__ = false;
+      console.warn('[Snowflake] Agent listeners cleaned up for HMR');
+    }
+  });
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Window Message Listener Singleton
 // ═══════════════════════════════════════════════════════════════
 
+// Use window-level state to persist across Vite HMR reloads
+declare global {
+  interface Window {
+    __SNOWFLAKE_MESSAGE_HANDLERS__?: Set<(message: ExtensionMessage) => void>;
+    __SNOWFLAKE_WINDOW_LISTENER_INITIALIZED__?: boolean;
+    __SNOWFLAKE_REMOVE_WINDOW_LISTENER__?: (() => void) | null;
+  }
+}
+
+// Initialize global handler registry if not present
+window.__SNOWFLAKE_MESSAGE_HANDLERS__ ??= new Set();
+
+// Clean up window listener on HMR
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    if (window.__SNOWFLAKE_REMOVE_WINDOW_LISTENER__) {
+      window.__SNOWFLAKE_REMOVE_WINDOW_LISTENER__();
+      window.__SNOWFLAKE_REMOVE_WINDOW_LISTENER__ = null;
+      window.__SNOWFLAKE_WINDOW_LISTENER_INITIALIZED__ = false;
+      console.warn('[Snowflake] Window message listener cleaned up for HMR');
+    }
+  });
+}
+
 // Registry of message handlers - each useTauri hook registers its handler here
-const messageHandlers = new Set<(message: ExtensionMessage) => void>();
-let windowListenerInitialized = false;
+const messageHandlers = window.__SNOWFLAKE_MESSAGE_HANDLERS__;
 
 // Singleton window message listener
 function initWindowMessageListener(): void {
-  if (windowListenerInitialized) return;
-  windowListenerInitialized = true;
+  if (window.__SNOWFLAKE_WINDOW_LISTENER_INITIALIZED__) return;
+  window.__SNOWFLAKE_WINDOW_LISTENER_INITIALIZED__ = true;
 
   // Single global UUID deduplication set
   const processedUuids = new Set<string>();
@@ -290,6 +269,20 @@ function initWindowMessageListener(): void {
     const result = ExtensionMessageSchema.safeParse(event.data);
 
     if (!result.success) {
+      // Log validation failures to help debug schema mismatches
+      if (
+        typeof event.data === 'object' &&
+        event.data !== null &&
+        'type' in event.data &&
+        typeof event.data.type === 'string' &&
+        event.data.type.startsWith('agent:')
+      ) {
+        console.warn(
+          '[Snowflake] Invalid agent message dropped:',
+          event.data.type,
+          result.error.issues
+        );
+      }
       return; // Invalid message, ignore
     }
 
@@ -317,6 +310,12 @@ function initWindowMessageListener(): void {
   };
 
   window.addEventListener('message', handleWindowMessage);
+
+  // Store removal function for HMR cleanup
+  window.__SNOWFLAKE_REMOVE_WINDOW_LISTENER__ = (): void => {
+    window.removeEventListener('message', handleWindowMessage);
+  };
+
   console.warn('[Snowflake] Singleton window message listener initialized');
 }
 
@@ -347,235 +346,6 @@ async function ensureSession(sessionId: string): Promise<void> {
   await agentCreateSession(sessionId, config);
 
   createdSessions.add(sessionId);
-}
-
-// Track last received message to detect duplicates from Tauri events
-// Uses content + type + sessionId to identify duplicates
-interface LastMessage {
-  content: string;
-  type: string;
-  sessionId: string;
-  timestamp: number;
-}
-let lastAgentMessage: LastMessage | null = null;
-const DEDUP_WINDOW_MS = 100; // Ignore duplicates within 100ms
-
-async function initAgentListeners(): Promise<void> {
-  // Guard: only register listeners once (multiple components call useTauri)
-  if (agentListenerUnlisten !== null || agentListenersInitialized) {
-    return;
-  }
-  agentListenersInitialized = true;
-
-  try {
-    // Listen for agent messages and convert to window.postMessage format
-    // Store the unlisten function to prevent duplicate registrations
-    agentListenerUnlisten = await onAgentMessage((event) => {
-      const { sessionId, message } = event;
-      const content = message.content ?? '';
-      const messageId = crypto.randomUUID();
-
-      // Content-based deduplication: if we receive the exact same message
-      // content + type + session within a short window, it's likely a duplicate
-      const now = Date.now();
-      if (
-        lastAgentMessage?.content === content &&
-        lastAgentMessage.type === message.type &&
-        lastAgentMessage.sessionId === sessionId &&
-        now - lastAgentMessage.timestamp < DEDUP_WINDOW_MS
-      ) {
-        console.warn('[Snowflake] Duplicate agent message detected and skipped');
-        return;
-      }
-      lastAgentMessage = { content, type: message.type, sessionId, timestamp: now };
-
-      switch (message.type) {
-        case 'text':
-          window.postMessage(
-            {
-              type: 'agent:chunk',
-              uuid: crypto.randomUUID(),
-              session_id: sessionId,
-              message_id: messageId,
-              content,
-            },
-            '*'
-          );
-          break;
-
-        case 'thinking':
-          window.postMessage(
-            {
-              type: 'agent:thinking',
-              uuid: crypto.randomUUID(),
-              session_id: sessionId,
-              message_id: messageId,
-              thinking: content,
-            },
-            '*'
-          );
-          break;
-
-        case 'tool_use': {
-          const meta = message.metadata;
-          const toolId = meta?.toolId ?? crypto.randomUUID();
-          const status = meta?.status;
-
-          // Handle different tool statuses
-          if (status === 'success' || status === 'error') {
-            // Tool completed - emit tool:end
-            window.postMessage(
-              {
-                type: 'tool:end',
-                uuid: crypto.randomUUID(),
-                session_id: sessionId,
-                message_id: messageId,
-                tool_id: toolId,
-                tool_name: meta?.toolName ?? 'unknown',
-                tool_output: meta?.toolOutput ?? '',
-                success: status === 'success',
-              },
-              '*'
-            );
-          } else {
-            // Tool starting (awaiting-permission or running) - emit tool:start
-            window.postMessage(
-              {
-                type: 'tool:start',
-                uuid: crypto.randomUUID(),
-                session_id: sessionId,
-                message_id: messageId,
-                tool_id: toolId,
-                tool_name: meta?.toolName ?? 'unknown',
-                tool_input: meta?.toolInput ?? {},
-              },
-              '*'
-            );
-          }
-          break;
-        }
-
-        case 'result':
-        case 'turn_complete':
-          window.postMessage(
-            {
-              type: 'agent:complete',
-              uuid: crypto.randomUUID(),
-              session_id: sessionId,
-              message_id: messageId,
-              usage: message.usage
-                ? {
-                    input_tokens: message.usage.inputTokens,
-                    output_tokens: message.usage.outputTokens,
-                  }
-                : undefined,
-            },
-            '*'
-          );
-          break;
-
-        case 'turn_cancel':
-          window.postMessage(
-            {
-              type: 'agent:complete',
-              uuid: crypto.randomUUID(),
-              session_id: sessionId,
-              message_id: messageId,
-              cancelled: true,
-            },
-            '*'
-          );
-          break;
-
-        case 'error':
-          window.postMessage(
-            {
-              type: 'agent:error',
-              uuid: crypto.randomUUID(),
-              session_id: sessionId,
-              message_id: messageId,
-              error: content || 'Unknown error',
-            },
-            '*'
-          );
-          break;
-      }
-    });
-
-    // Listen for permission requests
-    await onAgentPermissionRequest((event) => {
-      window.postMessage(
-        {
-          type: 'permission:request',
-          uuid: crypto.randomUUID(),
-          session_id: event.sessionId,
-          request_id: event.requestId,
-          tool_name: event.toolName,
-          tool_input: event.toolInput,
-        },
-        '*'
-      );
-    });
-
-    // Listen for session init events
-    await onAgentSessionInit((event) => {
-      window.postMessage(
-        {
-          type: 'system:init',
-          uuid: crypto.randomUUID(),
-          session_id: event.sessionId,
-          sdk_session_id: event.sdkSessionId,
-          is_resumed: event.isResumed,
-          is_forked: event.isForked,
-        },
-        '*'
-      );
-    });
-
-    // Listen for plan mode changes
-    await onAgentPlanModeChanged((event) => {
-      window.postMessage(
-        {
-          type: 'inputMode:changed',
-          uuid: crypto.randomUUID(),
-          session_id: event.sessionId,
-          mode: event.enabled ? 'plan' : 'default',
-        },
-        '*'
-      );
-    });
-
-    // Listen for accept mode changes
-    await onAgentAcceptModeChanged((event) => {
-      window.postMessage(
-        {
-          type: 'inputMode:changed',
-          uuid: crypto.randomUUID(),
-          session_id: event.sessionId,
-          mode: event.enabled ? 'accept' : 'default',
-        },
-        '*'
-      );
-    });
-
-    // Listen for agent errors
-    await onAgentError((event) => {
-      window.postMessage(
-        {
-          type: 'error',
-          uuid: crypto.randomUUID(),
-          message: event.message,
-        },
-        '*'
-      );
-    });
-
-    console.warn('[Snowflake] Agent event listeners initialized');
-  } catch (err) {
-    console.error('[Snowflake] Failed to set up agent listeners:', err);
-    agentListenersInitialized = false;
-    agentListenerUnlisten = null;
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1524,27 +1294,8 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
     };
   }, [debug]);
 
-  // Initialize terminal listeners once when connected to Tauri
-  useEffect(() => {
-    if (isConnected && !isMockMode) {
-      if (debug) {
-        console.warn('[Snowflake] Connected to Tauri, initializing terminal listeners');
-      }
-      // Initialize terminal listeners (singleton - only runs once)
-      initTerminalListeners().catch(console.error);
-    }
-  }, [isConnected, isMockMode, debug]);
-
-  // Initialize agent listeners once when connected to Tauri
-  useEffect(() => {
-    if (isConnected && !isMockMode) {
-      if (debug) {
-        console.warn('[Snowflake] Connected to Tauri, initializing agent listeners');
-      }
-      // Initialize agent listeners (singleton - only runs once)
-      initAgentListeners().catch(console.error);
-    }
-  }, [isConnected, isMockMode, debug]);
+  // NOTE: Terminal and agent listeners are now initialized by TauriProvider
+  // This ensures proper React lifecycle management and HMR support
 
   // Send message with validation
   // Uses refs for connection state so this callback reference stays stable
@@ -1552,7 +1303,7 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
     (message: WebviewMessage): void => {
       const result = WebviewMessageSchema.safeParse(message);
       if (!result.success) {
-        console.error('[Snowflake] Invalid outgoing message:', result.error.issues);
+        console.error('[Snowflake] Invalid outgoing message:', formatZodError(result.error));
         return;
       }
 
@@ -1878,6 +1629,8 @@ export function useAgentStream(sessionId: string, callbacks: AgentStreamCallback
         // All other message types with session_id not relevant to agent streaming
         case 'system:init':
         case 'agent:thinking':
+        case 'agent:plan_mode':
+        case 'agent:accept_mode':
         case 'permission:request':
         case 'inputMode:changed':
         case 'thinking:changed':
