@@ -124,9 +124,12 @@ impl Conversation {
         self.messages.len()
     }
 
-    /// Add a message to the conversation
+    /// Add a message to the conversation (deduplicates by ID)
     pub fn add_message(&mut self, message: Message) {
-        self.messages.push(message);
+        // Avoid duplicates - don't add if message with same ID exists
+        if !self.messages.iter().any(|m| m.id == message.id) {
+            self.messages.push(message);
+        }
         self.updated_at = current_timestamp();
     }
 

@@ -1304,6 +1304,14 @@ export const ConversationListSchema = z
   })
   .strict();
 
+export const ConversationLoadingSchema = z
+  .object({
+    type: z.literal('conversation:loading'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+  })
+  .strict();
+
 export const ConversationLoadedSchema = z
   .object({
     type: z.literal('conversation:loaded'),
@@ -1634,6 +1642,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   ConversationCreatedSchema,
   ConversationDeletedSchema,
   ConversationListSchema,
+  ConversationLoadingSchema,
   ConversationLoadedSchema,
   ConversationRewoundSchema,
   // Error
@@ -1772,6 +1781,7 @@ export type FileListResponse = z.infer<typeof FileListResponseSchema>;
 export type ConversationCreated = z.infer<typeof ConversationCreatedSchema>;
 export type ConversationDeleted = z.infer<typeof ConversationDeletedSchema>;
 export type ConversationList = z.infer<typeof ConversationListSchema>;
+export type ConversationLoading = z.infer<typeof ConversationLoadingSchema>;
 export type ConversationLoaded = z.infer<typeof ConversationLoadedSchema>;
 export type ConversationRewound = z.infer<typeof ConversationRewoundSchema>;
 export type ProtocolError = z.infer<typeof ErrorSchema>;

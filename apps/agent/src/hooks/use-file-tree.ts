@@ -200,6 +200,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         case 'file:list:response':
         case 'conversation:created':
         case 'conversation:deleted':
+        case 'conversation:loading':
         case 'conversation:loaded':
         case 'conversation:rewound':
         case 'browser:open':

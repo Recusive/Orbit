@@ -60,3 +60,7 @@ export type { UseLspResult } from './use-lsp';
 // Search
 export { useSearch } from './use-search';
 export type { UseSearchOptions, UseSearchReturn } from './use-search';
+
+// Crash check
+export { useCrashCheck } from './use-crash-check';
+export type { UseCrashCheckReturn } from './use-crash-check';

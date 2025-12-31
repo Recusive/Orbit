@@ -5,6 +5,7 @@
 
 pub mod agent;
 pub mod commands;
+pub mod crash;
 
 use std::env;
 use std::path::PathBuf;
@@ -12,7 +13,7 @@ use std::sync::Arc;
 
 use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
-use commands::common::{files, git, lsp, search, settings, terminal, workspace};
+use commands::common::{diagnostics, files, git, lsp, search, settings, terminal, workspace};
 use snowflake_conversations::ConversationManager;
 use snowflake_settings::SettingsManager;
 use tauri_plugin_log::{Target, TargetKind};
@@ -176,6 +177,10 @@ fn resolve_sidecar_path() -> PathBuf {
     reason = "Tauri app setup requires listing all commands in one invoke_handler"
 )]
 pub fn run() {
+    // Install panic handler FIRST - before any other initialization
+    // This ensures all panics are logged, even during startup
+    crash::init();
+
     // Initialize settings manager and load settings
     let settings_manager = SettingsManager::new();
     if let Err(e) = settings_manager.load() {
@@ -333,6 +338,10 @@ pub fn run() {
             settings::get_recent_projects,
             settings::clear_recent_projects,
             settings::get_settings_path,
+            // Diagnostics commands
+            diagnostics::check_previous_crash,
+            diagnostics::clear_crash_log,
+            diagnostics::get_crash_log_path,
             // Conversation commands
             conversations::conversation_create,
             conversations::conversation_list,

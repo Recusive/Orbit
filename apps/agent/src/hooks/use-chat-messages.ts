@@ -20,6 +20,8 @@ interface UseChatMessagesOptions {
 interface UseChatMessagesReturn {
   messages: ChatMessage[];
   isAgentRunning: boolean;
+  isLoadingConversation: boolean;
+  isConversationTransitioning: boolean;
   sessionId: string;
   isMockMode: boolean;
   postMessage: ReturnType<typeof useTauri>['postMessage'];
@@ -63,6 +65,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     }
   });
   const [isAgentRunning, setIsAgentRunning] = useState(false);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [isConversationTransitioning, setIsConversationTransitioning] = useState(false);
   const [sessionId, setSessionId] = useState<string>(() => {
     try {
       return localStorage.getItem('orbit-sessionId') ?? '';
@@ -314,7 +318,15 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           break;
         }
 
-        case 'conversation:created':
+        case 'conversation:created': {
+          // Save current messages to cache BEFORE switching sessions
+          // This preserves messages when switching away from an existing conversation
+          const oldSessionId = sessionIdRef.current;
+          const oldMessages = messagesRef.current;
+          if (oldSessionId && oldMessages.length > 0) {
+            messagesCache.current.set(oldSessionId, oldMessages);
+          }
+
           setSessionId(message.session_id);
           setActiveConversation(message.session_id, message.title);
           addConversation({
@@ -327,6 +339,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           switchSession(message.session_id); // Switch to new session (resets usage for new conversation)
           onSessionCreated?.(message.session_id, message.title);
           break;
+        }
 
         case 'conversation:list':
           // Only update if backend returns conversations (has persistence)
@@ -343,22 +356,24 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           }
           break;
 
+        case 'conversation:loading':
+          // Set loading state - but DON'T clear messages yet
+          // Keep old messages visible until new ones are ready (prevents flash)
+          setIsLoadingConversation(true);
+          break;
+
         case 'conversation:loaded': {
-          // Save current messages to cache BEFORE switching sessions
-          // This must happen synchronously before setSessionId changes the context
-          setMessages((currentMessages) => {
-            const currentSessionId = sessionIdRef.current;
-            if (currentSessionId && currentMessages.length > 0) {
-              messagesCache.current.set(currentSessionId, currentMessages);
-            }
-            return currentMessages; // Don't modify state yet
-          });
+          // Mark loading complete
+          setIsLoadingConversation(false);
 
-          setSessionId(message.session_id);
-          setActiveConversation(message.session_id, message.title);
-          switchSession(message.session_id); // Switch session (restores cached usage or resets)
+          // Cache current messages BEFORE switching (using refs for synchronous access)
+          const currentSessionId = sessionIdRef.current;
+          const currentMessages = messagesRef.current;
+          if (currentSessionId && currentMessages.length > 0) {
+            messagesCache.current.set(currentSessionId, currentMessages);
+          }
 
-          // Check if we have cached messages for this conversation
+          // Prepare new messages
           const cachedMessages = messagesCache.current.get(message.session_id);
           const backendMessages = message.messages.map((m) => ({
             id: m.id,
@@ -367,17 +382,31 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
             displayedContent: m.content,
           }));
 
-          // Use cached messages if available and backend returns empty or fewer messages
-          // This preserves local state when switching between conversations
+          // Determine which messages to use (prefer cache if it has more messages)
+          let newMessages: typeof backendMessages;
           if (cachedMessages && cachedMessages.length > 0 && backendMessages.length === 0) {
-            setMessages(cachedMessages);
+            newMessages = cachedMessages;
           } else if (cachedMessages && cachedMessages.length > backendMessages.length) {
-            // Cached has more messages - likely backend hasn't synced yet
-            setMessages(cachedMessages);
+            newMessages = cachedMessages;
           } else {
-            // Backend has messages, use those (source of truth when available)
-            setMessages(backendMessages);
+            newMessages = backendMessages;
           }
+
+          // Start transition BEFORE updating messages (hides content during swap)
+          setIsConversationTransitioning(true);
+
+          // Update all state together - React 18 batches these automatically
+          setMessages(newMessages);
+          setSessionId(message.session_id);
+          setActiveConversation(message.session_id, message.title);
+          switchSession(message.session_id);
+
+          // End transition after paint (reveals new content)
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setIsConversationTransitioning(false);
+            });
+          });
           break;
         }
 
@@ -1030,6 +1059,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   return {
     messages,
     isAgentRunning,
+    isLoadingConversation,
+    isConversationTransitioning,
     sessionId,
     isMockMode,
     postMessage,

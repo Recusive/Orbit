@@ -1,5 +1,6 @@
 //! Common commands shared across all apps
 
+pub mod diagnostics;
 pub mod files;
 pub mod git;
 pub mod lsp;

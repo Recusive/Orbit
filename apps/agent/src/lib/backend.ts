@@ -1053,6 +1053,44 @@ export async function getSettingsPath(): Promise<string> {
 }
 
 // ============================================
+// Diagnostics Operations
+// ============================================
+
+/**
+ * Check if the previous session crashed.
+ *
+ * Returns the crash log contents if there was a crash, or null if
+ * the previous session ended normally.
+ *
+ * The crash log is consumed (cleared) after reading, so subsequent calls
+ * will return null until another crash occurs.
+ */
+export async function checkPreviousCrash(): Promise<string | null> {
+  return invoke<string | null>('check_previous_crash');
+}
+
+/**
+ * Clear any pending crash logs without reading them.
+ *
+ * This is useful when the user dismisses a crash notification without
+ * viewing the details.
+ *
+ * Returns true if the log was cleared successfully.
+ */
+export async function clearCrashLog(): Promise<boolean> {
+  return invoke<boolean>('clear_crash_log');
+}
+
+/**
+ * Get the path to the crash log directory.
+ *
+ * Returns null if the directory cannot be determined.
+ */
+export async function getCrashLogPath(): Promise<string | null> {
+  return invoke<string | null>('get_crash_log_path');
+}
+
+// ============================================
 // Types
 // ============================================
 

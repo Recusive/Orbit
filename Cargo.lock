@@ -4224,6 +4224,7 @@ name = "snowflake-app"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "chrono",
  "crossbeam-channel",
  "futures",
  "hashbrown 0.15.5",
@@ -4274,6 +4275,8 @@ dependencies = [
 name = "snowflake-core"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "dirs 6.0.0",
  "lsp-types",
  "ropey",
  "serde",

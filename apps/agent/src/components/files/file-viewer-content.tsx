@@ -1,13 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { OutlineItem } from '@/components/editor/editor-breadcrumbs';
 import type { GotoPosition, ViewedFile } from '@/stores/file-viewer-store';
 import type { FC } from 'react';
 
-import { CodeMirrorEditor, EditorBreadcrumbs, extractMarkdownOutline } from '@/components/editor';
+import { EditorBreadcrumbs, EditorSkeleton, extractMarkdownOutline } from '@/components/editor';
 import { FileDiffViewer } from '@/components/git';
 import { writeFile, lspDidChange, lspDidSave } from '@/lib/backend';
 import { useCursorPosition, useFileViewerStore } from '@/stores/file-viewer-store';
+
+// Lazy load CodeMirror to reduce initial bundle size (~500KB)
+const LazyCodeMirrorEditor = lazy(() =>
+  import('@/components/editor/CodeMirrorEditor').then((m) => ({ default: m.CodeMirrorEditor }))
+);
 
 // Hook to detect theme from DOM
 function useDetectTheme(): 'dark' | 'light' {
@@ -146,16 +151,18 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
 
       {/* Editor */}
       <div className="flex-1 relative min-h-0">
-        <CodeMirrorEditor
-          value={file.content}
-          language={file.language}
-          filePath={file.path}
-          onChange={handleChange}
-          onSave={handleSave}
-          theme={theme}
-          gotoPosition={gotoForThisFile}
-          onGotoComplete={clearPendingGoto}
-        />
+        <Suspense fallback={<EditorSkeleton />}>
+          <LazyCodeMirrorEditor
+            value={file.content}
+            language={file.language}
+            filePath={file.path}
+            onChange={handleChange}
+            onSave={handleSave}
+            theme={theme}
+            gotoPosition={gotoForThisFile}
+            onGotoComplete={clearPendingGoto}
+          />
+        </Suspense>
 
         {/* Search overlay */}
         {searchOpen ? (

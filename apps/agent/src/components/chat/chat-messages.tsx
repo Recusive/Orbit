@@ -16,6 +16,8 @@ interface ChatMessagesProps {
   readonly messages: ChatMessage[];
   readonly pendingPermissions: PermissionRequest[];
   readonly isAgentRunning: boolean;
+  readonly isTransitioning: boolean;
+  readonly sessionId?: string;
   readonly queuedMessage: QueuedMessage | null;
   readonly getToolsForMessage: (messageId: string) => ToolExecution[];
   readonly onRewind: (messageId: string) => void;
@@ -31,6 +33,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   messages,
   pendingPermissions,
   isAgentRunning,
+  isTransitioning,
+  sessionId,
   queuedMessage,
   getToolsForMessage,
   onRewind,
@@ -43,6 +47,18 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 }) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const shouldAutoScroll = useRef(true);
+  const prevSessionIdRef = useRef(sessionId);
+
+  // Reset scroll position when switching conversations
+  useEffect(() => {
+    if (sessionId !== prevSessionIdRef.current) {
+      prevSessionIdRef.current = sessionId;
+      if (parentRef.current) {
+        parentRef.current.scrollTop = 0;
+      }
+      shouldAutoScroll.current = true;
+    }
+  }, [sessionId]);
 
   // Check if any message is still animating
   const isAnimating = messages.some((m) => m.displayedContent.length < m.content.length);
@@ -114,7 +130,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     <div
       ref={parentRef}
       className="flex-1 overflow-y-auto overflow-x-hidden p-4"
-      style={{ scrollbarGutter: 'stable both-edges', contain: 'strict' }}
+      style={{
+        scrollbarGutter: 'stable both-edges',
+        // Instant opacity change to mask content swap (no transition = no flash)
+        opacity: isTransitioning ? 0 : 1,
+        // CSS containment to isolate layout recalculations
+        contain: 'content',
+      }}
     >
       <div className="max-w-3xl mx-auto">
         {/* Virtualized message container */}
@@ -123,6 +145,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             height: `${String(virtualizer.getTotalSize())}px`,
             width: '100%',
             position: 'relative',
+            // Prevent content from affecting parent layout during recalc
+            contain: 'strict',
           }}
         >
           {virtualizer.getVirtualItems().map((virtualItem) => {
@@ -145,6 +169,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                   left: 0,
                   width: '100%',
                   transform: `translateY(${String(virtualItem.start)}px)`,
+                  // GPU acceleration for smoother transitions
+                  willChange: 'transform',
+                  // Isolate each item's layout
+                  contain: 'layout style',
                 }}
               >
                 <MessageItem

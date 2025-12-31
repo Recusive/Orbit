@@ -274,14 +274,22 @@ function initWindowMessageListener(): void {
         typeof event.data === 'object' &&
         event.data !== null &&
         'type' in event.data &&
-        typeof event.data.type === 'string' &&
-        event.data.type.startsWith('agent:')
+        typeof event.data.type === 'string'
       ) {
-        console.warn(
-          '[Snowflake] Invalid agent message dropped:',
-          event.data.type,
-          result.error.issues
-        );
+        // Log validation failures for debugging
+        if (event.data.type.startsWith('conversation:')) {
+          console.error(
+            '[Snowflake] Conversation message validation failed:',
+            event.data.type,
+            result.error.issues
+          );
+        } else if (event.data.type.startsWith('agent:')) {
+          console.warn(
+            '[Snowflake] Invalid agent message dropped:',
+            event.data.type,
+            result.error.issues
+          );
+        }
       }
       return; // Invalid message, ignore
     }
@@ -596,15 +604,7 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
               id: m.id,
               role: m.role,
               content: m.content,
-              thinking: m.thinking,
-              created_at: m.createdAt,
-              tool_uses: m.toolUses?.map((t) => ({
-                id: t.id,
-                name: t.name,
-                input: t.input,
-                output: t.output,
-                success: t.success,
-              })),
+              timestamp: m.createdAt, // Schema expects 'timestamp', not 'created_at'
             })),
           },
           '*'
@@ -623,7 +623,7 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
         );
       }
     } catch (err: unknown) {
-      console.error('[Snowflake] Conversation load error:', err);
+      console.error('Conversation load error:', err);
       window.postMessage(
         {
           type: 'conversation:loaded',
@@ -1639,6 +1639,7 @@ export function useAgentStream(sessionId: string, callbacks: AgentStreamCallback
         case 'terminal:created':
         case 'conversation:created':
         case 'conversation:deleted':
+        case 'conversation:loading':
         case 'conversation:loaded':
         case 'conversation:rewound':
           break;

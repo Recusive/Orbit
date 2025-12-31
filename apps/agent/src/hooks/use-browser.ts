@@ -156,6 +156,7 @@ export function useBrowser(): void {
         case 'conversation:list':
         case 'conversation:created':
         case 'conversation:deleted':
+        case 'conversation:loading':
         case 'conversation:loaded':
         case 'conversation:rewound':
         case 'subagents:list:response':

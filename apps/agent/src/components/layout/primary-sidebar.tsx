@@ -104,6 +104,16 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
 
   const handleLoadConversation = useCallback(
     (sessionId: string): void => {
+      // Emit loading state FIRST to prevent flash of welcome screen
+      window.postMessage(
+        {
+          type: 'conversation:loading',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+        },
+        '*'
+      );
+      // Then request the conversation data
       postMessage({
         type: 'conversation:load',
         uuid: crypto.randomUUID(),

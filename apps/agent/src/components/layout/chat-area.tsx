@@ -51,6 +51,8 @@ export const ChatArea: FC = () => {
   const {
     messages,
     isAgentRunning,
+    isLoadingConversation,
+    isConversationTransitioning,
     sessionId,
     postMessage,
     setMessages,
@@ -127,7 +129,7 @@ export const ChatArea: FC = () => {
 
           {/* Chat Content */}
           <div className="flex-1 flex flex-col min-h-0">
-            {messages.length === 0 ? (
+            {messages.length === 0 && !isLoadingConversation ? (
               /* Empty state: Welcome greeting + Input positioned above center */
               <div className="flex-1 flex flex-col justify-center" style={{ paddingBottom: '40%' }}>
                 <WelcomeGreeting />
@@ -152,6 +154,8 @@ export const ChatArea: FC = () => {
                   messages={messages}
                   pendingPermissions={pendingPermissions}
                   isAgentRunning={isAgentRunning}
+                  isTransitioning={isConversationTransitioning}
+                  sessionId={sessionId}
                   queuedMessage={queuedMessage}
                   getToolsForMessage={getToolsForMessage}
                   onRewind={handleRewind}
