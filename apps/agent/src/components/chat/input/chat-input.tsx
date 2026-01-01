@@ -449,8 +449,12 @@ export const ChatInput: FC<ChatInputProps> = ({
   const getInputBoxClasses = (): string => {
     const base = cn(
       'mx-auto p-1 rounded-[14px] bg-card border transition-all duration-200',
+      // Light mode shadows
       'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),0_4px_12px_-4px_rgba(0,0,0,0.05)]',
-      'focus-within:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.12),0_8px_24px_-8px_rgba(0,0,0,0.08)]'
+      'focus-within:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.12),0_8px_24px_-8px_rgba(0,0,0,0.08)]',
+      // Dark mode - reduced shadows to prevent darkening effect
+      'dark:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.25),0_4px_12px_-4px_rgba(0,0,0,0.15)]',
+      'dark:focus-within:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.35),0_8px_24px_-8px_rgba(0,0,0,0.2)]'
     );
     switch (inputMode) {
       case 'plan':

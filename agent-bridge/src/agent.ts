@@ -792,22 +792,23 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       return;
     }
 
-    // Fix PATH for production Electron apps launched from Finder/Dock
-    // These don't inherit the user's shell PATH, so node/npm won't be found
+    // Fix PATH for production Tauri apps launched from Finder/Dock
+    // These don't inherit the user's shell PATH, so bun/npm won't be found
     const currentPath = process.env.PATH ?? '';
     const homeDir = process.env.HOME ?? '';
     const additionalPaths = [
       '/opt/homebrew/bin', // Homebrew on Apple Silicon
       '/usr/local/bin', // Homebrew on Intel Macs
       '/usr/bin', // System binaries
-      `${homeDir}/.nvm/versions/node/v22.11.0/bin`, // Common nvm path
+      `${homeDir}/.bun/bin`, // Bun installation
+      `${homeDir}/.nvm/versions/node/v22.11.0/bin`, // Common nvm path (for external tools)
       `${homeDir}/.nvm/versions/node/v20.18.0/bin`, // Another common nvm path
       `${homeDir}/.fnm/node-versions/v22.11.0/installation/bin`, // fnm path
     ].filter((p) => !currentPath.includes(p));
 
     if (additionalPaths.length > 0) {
       process.env.PATH = [...additionalPaths, currentPath].join(':');
-      logger.debug({ addedPaths: additionalPaths }, 'Fixed PATH for Electron app');
+      logger.debug({ addedPaths: additionalPaths }, 'Fixed PATH for Tauri app');
     }
 
     // Get credentials with OAuth-first priority

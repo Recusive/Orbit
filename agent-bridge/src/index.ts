@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Agent Bridge Entry Point
  * Bridges Rust/Tauri backend with Claude Agent SDK via stdin/stdout JSON IPC

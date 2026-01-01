@@ -51,7 +51,7 @@ export const PANEL_SIZES = {
  */
 export const CONTENT_WIDTH = {
   inputBox: 800,
-  messageFeed: '48rem', // max-w-3xl
+  messageFeed: 768, // max-w-3xl equivalent for assistant messages
   dropdown: 200,
   fileName: 200,
   expandedContent: 400,

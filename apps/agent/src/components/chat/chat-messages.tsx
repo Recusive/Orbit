@@ -11,6 +11,7 @@ import type { PermissionRequest, ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
 import { PermissionModal } from '@/components/modals';
+import { CONTENT_WIDTH } from '@/lib/constants';
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
@@ -138,7 +139,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         contain: 'content',
       }}
     >
-      <div className="max-w-3xl mx-auto">
+      <div className="mx-auto" style={{ maxWidth: CONTENT_WIDTH.inputBox }}>
         {/* Virtualized message container */}
         <div
           style={{

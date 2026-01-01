@@ -11,7 +11,7 @@
     "build": "pnpm build:sidecar && tauri build",
     "build:debug": "pnpm build:sidecar && tauri build --debug",
     "build:frontend": "tsc --noEmit && vite build",
-    "build:sidecar": "mkdir -p src-tauri/binaries && cd agent-bridge && bun build --compile --minify --target=bun-darwin-arm64 src/index.ts --outfile ../src-tauri/binaries/agent-bridge-aarch64-apple-darwin && node scripts/build-claude-cli.mjs",
+    "build:sidecar": "mkdir -p src-tauri/binaries && cd agent-bridge && bun build --compile --minify --target=bun-darwin-arm64 src/index.ts --outfile ../src-tauri/binaries/agent-bridge-aarch64-apple-darwin && bun scripts/build-claude-cli.mjs",
     "analyze": "vite build && open dist/stats.html",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
