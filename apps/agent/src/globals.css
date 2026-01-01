@@ -725,18 +725,9 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   contain-intrinsic-size: auto 100px;
 }
 
-/* For virtualized list items - optimized for smooth scrolling
-   Note: Using only paint containment to allow ResizeObserver notifications
-   for proper measurement invalidation during window resize */
-.virtual-item {
-  will-change: transform;
-  contain: paint;
-}
-
-/* For chat message items - larger intrinsic size estimate */
+/* For chat message items - layout containment without content-visibility */
+/* Note: content-visibility: auto was causing layout recalculation issues during conversation switches */
 .message-item {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 150px;
   contain: layout style paint;
 }
 

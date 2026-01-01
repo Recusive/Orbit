@@ -31,6 +31,10 @@ interface UIState {
   // Active conversation
   activeConversationId: string | null;
   activeConversationTitle: string | null;
+  // Conversation loading state (synced across components)
+  isLoadingConversation: boolean;
+  // Conversation transitioning state (true from click until content is stable)
+  isConversationTransitioning: boolean;
   // Conversation list
   conversations: ConversationSummary[];
   // Left Sidebar
@@ -59,6 +63,8 @@ interface UIActions {
   setWorkspace: (path: string) => void;
   // Conversation actions
   setActiveConversation: (id: string | null, title: string | null) => void;
+  setLoadingConversation: (loading: boolean) => void;
+  setConversationTransitioning: (transitioning: boolean) => void;
   setConversations: (conversations: ConversationSummary[]) => void;
   addConversation: (conversation: ConversationSummary) => void;
   removeConversation: (sessionId: string) => void;
@@ -124,6 +130,8 @@ export const useUIStore = create<UIStore>()(
     workspaceName: null,
     activeConversationId: null,
     activeConversationTitle: null,
+    isLoadingConversation: false,
+    isConversationTransitioning: false,
     conversations: loadConversationsFromStorage(),
     leftSidebarOpen: DEFAULT_UI_STATE.leftSidebarOpen,
     leftSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
@@ -159,6 +167,18 @@ export const useUIStore = create<UIStore>()(
       set((state) => {
         state.activeConversationId = id;
         state.activeConversationTitle = title;
+      });
+    },
+
+    setLoadingConversation: (loading: boolean): void => {
+      set((state) => {
+        state.isLoadingConversation = loading;
+      });
+    },
+
+    setConversationTransitioning: (transitioning: boolean): void => {
+      set((state) => {
+        state.isConversationTransitioning = transitioning;
       });
     },
 
@@ -354,6 +374,14 @@ export const useActiveConversationId = (): string | null => {
 
 export const useActiveConversationTitle = (): string | null => {
   return useUIStore((state) => state.activeConversationTitle);
+};
+
+export const useIsLoadingConversation = (): boolean => {
+  return useUIStore((state) => state.isLoadingConversation);
+};
+
+export const useIsConversationTransitioning = (): boolean => {
+  return useUIStore((state) => state.isConversationTransitioning);
 };
 
 export const useConversations = (): ConversationSummary[] => {

@@ -1,6 +1,5 @@
-import { useVirtualizer } from '@tanstack/react-virtual';
 import { Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 import { MessageItem } from './messages';
 import { QueuedMessageBubble } from './queued-message';
@@ -28,6 +27,7 @@ interface ChatMessagesProps {
   readonly onPermissionDeny: (requestId: string) => void;
   readonly onCancelQueue: () => void;
   readonly onFeedback: () => void;
+  readonly onStable: () => void;
 }
 
 export const ChatMessages: FC<ChatMessagesProps> = ({
@@ -45,21 +45,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   onPermissionDeny,
   onCancelQueue,
   onFeedback,
+  onStable,
 }) => {
-  const parentRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScroll = useRef(true);
   const prevSessionIdRef = useRef(sessionId);
-
-  // Reset scroll position when switching conversations
-  useEffect(() => {
-    if (sessionId !== prevSessionIdRef.current) {
-      prevSessionIdRef.current = sessionId;
-      if (parentRef.current) {
-        parentRef.current.scrollTop = 0;
-      }
-      shouldAutoScroll.current = true;
-    }
-  }, [sessionId]);
+  const hasResetScrollRef = useRef(false);
 
   // Check if any message is still animating
   const isAnimating = messages.some((m) => m.displayedContent.length < m.content.length);
@@ -67,152 +58,149 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // Track last message content length for auto-scroll dependency
   const lastMessageContentLength = messages[messages.length - 1]?.displayedContent.length ?? 0;
 
-  // Stable callbacks to prevent virtualizer recreation
-  const estimateSize = useCallback(() => 150, []); // Closer to typical message height
-  const getItemKey = useCallback((index: number) => messages[index]?.id ?? index, [messages]);
-
-  // Virtualizer for message list
-  const virtualizer = useVirtualizer({
-    count: messages.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize,
-    // Higher overscan for smoother fast scrolling (renders more items off-screen)
-    overscan: 10,
-    // Use message IDs for stable keys (not indexes)
-    getItemKey,
-    // Smoother resize measurements via requestAnimationFrame
-    useAnimationFrameWithResizeObserver: true,
-    // NOTE: Do NOT use `gap` option - it doesn't work with dynamic heights (GitHub #793)
-  });
-
-  // Auto-scroll to bottom when messages change or during streaming
+  // Auto-scroll to bottom during streaming
   useEffect(() => {
-    if (!shouldAutoScroll.current || !parentRef.current) return;
+    if (!shouldAutoScroll.current || !containerRef.current) return;
+    const el = containerRef.current;
+    el.scrollTop = el.scrollHeight;
+  }, [messages.length, lastMessageContentLength]);
 
-    const element = parentRef.current;
-    const { scrollHeight, clientHeight, scrollTop } = element;
-    const isNearBottom = scrollHeight - clientHeight - scrollTop < 150;
-
-    if (isNearBottom || messages.length === 1) {
-      // Note: Don't use behavior: 'smooth' with dynamic sizes (per TanStack docs)
-      virtualizer.scrollToIndex(messages.length - 1, { align: 'end' });
-    }
-  }, [messages.length, lastMessageContentLength, virtualizer]);
-
-  // Track if user is manually scrolling (disable auto-scroll if scrolled up)
+  // Track manual scrolling - disable auto-scroll if user scrolls up
   useEffect(() => {
-    const element = parentRef.current;
-    if (!element) return;
+    const el = containerRef.current;
+    if (!el) return;
 
     const handleScroll = (): void => {
-      const { scrollHeight, clientHeight, scrollTop } = element;
-      const isAtBottom = scrollHeight - clientHeight - scrollTop < 100;
-      shouldAutoScroll.current = isAtBottom;
+      const { scrollHeight, clientHeight, scrollTop } = el;
+      const isNearBottom = scrollHeight - clientHeight - scrollTop < 100;
+      shouldAutoScroll.current = isNearBottom;
     };
 
-    element.addEventListener('scroll', handleScroll, { passive: true });
+    el.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
-      element.removeEventListener('scroll', handleScroll);
+      el.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
-  // Force virtualizer to re-measure on window resize
-  // This fixes layout issues when text wrapping changes at different widths
-  useEffect(() => {
-    const handleResize = (): void => {
-      virtualizer.measure();
-    };
+  // Detect session change
+  const sessionChanged = prevSessionIdRef.current !== sessionId;
+  if (sessionChanged) {
+    prevSessionIdRef.current = sessionId;
+    hasResetScrollRef.current = false;
+  }
 
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [virtualizer]);
+  // Handle content stabilization - reset scroll after layout is complete, then reveal
+  const handleStable = useCallback(() => {
+    if (sessionChanged && containerRef.current && !hasResetScrollRef.current) {
+      shouldAutoScroll.current = true;
+      containerRef.current.scrollTop = 0;
+      hasResetScrollRef.current = true;
+    }
+    onStable();
+  }, [sessionChanged, onStable]);
+
+  // Wait for layout to stabilize before revealing content
+  // We check if scrollHeight has stopped changing to ensure all content is rendered
+  useLayoutEffect(() => {
+    if (isTransitioning && messages.length > 0) {
+      const container = containerRef.current;
+      if (!container) {
+        handleStable();
+        return undefined;
+      }
+
+      let lastHeight = 0;
+      let stableCount = 0;
+      let frameId: number;
+
+      const checkStable = (): void => {
+        const currentHeight = container.scrollHeight;
+        if (currentHeight === lastHeight) {
+          stableCount++;
+          // Wait for 3 consecutive frames with same height
+          if (stableCount >= 3) {
+            handleStable();
+            return;
+          }
+        } else {
+          stableCount = 0;
+          lastHeight = currentHeight;
+        }
+        frameId = requestAnimationFrame(checkStable);
+      };
+
+      // Start checking after initial frame
+      frameId = requestAnimationFrame(checkStable);
+
+      return () => {
+        cancelAnimationFrame(frameId);
+      };
+    } else if (isTransitioning && messages.length === 0) {
+      // Empty conversation - stabilize immediately
+      handleStable();
+    }
+    return undefined;
+  }, [isTransitioning, messages.length, handleStable]);
+
+  // During transition, hide container with visibility:hidden (not display:none)
+  // This lets messages render and layout happen, but user can't see the shifting
+  // When transition ends, we reveal the already-laid-out content
 
   return (
     <div
-      ref={parentRef}
+      ref={containerRef}
       className="flex-1 overflow-y-auto overflow-x-hidden p-4"
       style={{
         scrollbarGutter: 'stable both-edges',
-        // Fast opacity transition to mask content swap during conversation switch
-        opacity: isTransitioning ? 0 : 1,
-        transition: 'opacity 50ms ease-out',
+        visibility: isTransitioning ? 'hidden' : 'visible',
       }}
     >
       <div
-        className="mx-auto"
+        className="mx-auto flex flex-col gap-3"
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
-        {/* Virtualized message container */}
-        <div
-          style={{
-            height: `${String(virtualizer.getTotalSize())}px`,
-            width: '100%',
-            position: 'relative',
-          }}
-        >
-          {virtualizer.getVirtualItems().map((virtualItem) => {
-            const msg = messages[virtualItem.index];
-            if (!msg) return null;
+        {/* All messages rendered directly - no virtualization needed for chat */}
+        {messages.map((msg, index) => {
+          const isLastAssistantMessage =
+            msg.role === 'assistant' && messages.slice(index + 1).every((m) => m.role === 'user');
 
-            const isLastAssistantMessage =
-              msg.role === 'assistant' &&
-              messages.slice(virtualItem.index + 1).every((m) => m.role === 'user');
-
-            return (
-              <div
-                key={virtualItem.key}
-                data-index={virtualItem.index}
-                ref={virtualizer.measureElement}
-                className="virtual-item"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  transform: `translateY(${String(virtualItem.start)}px)`,
-                  paddingBottom: 12, // Explicit 12px gap - included in getBoundingClientRect measurement
-                }}
-              >
-                <MessageItem
-                  message={msg}
-                  tools={getToolsForMessage(msg.id)}
-                  isLastAssistantMessage={isLastAssistantMessage}
-                  onRewind={onRewind}
-                  onOpenFile={onOpenFile}
-                  onOpenUrl={onOpenUrl}
-                  onFeedback={onFeedback}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Non-virtualized footer items (always at bottom) */}
-        <div className="flex flex-col gap-y-3">
-          {/* Permission modals */}
-          {pendingPermissions.map((request) => (
-            <PermissionModal
-              key={request.requestId}
-              request={request}
-              onApprove={onPermissionApprove}
-              onDeny={onPermissionDeny}
+          return (
+            <MessageItem
+              key={msg.id}
+              message={msg}
+              tools={getToolsForMessage(msg.id)}
+              isLastAssistantMessage={isLastAssistantMessage}
+              onRewind={onRewind}
               onOpenFile={onOpenFile}
+              onOpenUrl={onOpenUrl}
+              onFeedback={onFeedback}
             />
-          ))}
-          {/* Queued message bubble - shows when user typed while agent was running */}
-          {queuedMessage !== null ? (
-            <QueuedMessageBubble message={queuedMessage} onCancel={onCancelQueue} />
-          ) : null}
-          {/* Progress indicator - shows while agent is running OR text is still animating */}
-          {isAgentRunning || isAnimating ? (
-            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Generating...</span>
-            </div>
-          ) : null}
-        </div>
+          );
+        })}
+
+        {/* Permission modals */}
+        {pendingPermissions.map((request) => (
+          <PermissionModal
+            key={request.requestId}
+            request={request}
+            onApprove={onPermissionApprove}
+            onDeny={onPermissionDeny}
+            onOpenFile={onOpenFile}
+          />
+        ))}
+
+        {/* Queued message bubble - shows when user typed while agent was running */}
+        {queuedMessage !== null ? (
+          <QueuedMessageBubble message={queuedMessage} onCancel={onCancelQueue} />
+        ) : null}
+
+        {/* Progress indicator - shows while agent is running OR text is still animating */}
+        {isAgentRunning || isAnimating ? (
+          <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Generating...</span>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -84,6 +84,8 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
     settingsDialogOpen,
     settingsDialogSection,
     setSettingsDialogOpen,
+    setLoadingConversation,
+    setConversationTransitioning,
     openSettings,
   } = useUIStore();
   const isCollapsed = useIsLeftSidebarCollapsed();
@@ -104,15 +106,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
 
   const handleLoadConversation = useCallback(
     (sessionId: string): void => {
-      // Emit loading state FIRST to prevent flash of welcome screen
-      window.postMessage(
-        {
-          type: 'conversation:loading',
-          uuid: crypto.randomUUID(),
-          session_id: sessionId,
-        },
-        '*'
-      );
+      // Set loading and transitioning states SYNCHRONOUSLY before any async work
+      // This ensures opacity-0 is applied before new content renders
+      setLoadingConversation(true);
+      setConversationTransitioning(true);
       // Then request the conversation data
       postMessage({
         type: 'conversation:load',
@@ -120,7 +117,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         session_id: sessionId,
       });
     },
-    [postMessage]
+    [setLoadingConversation, setConversationTransitioning, postMessage]
   );
 
   const handleOpenQuickSearch = useCallback((): void => {

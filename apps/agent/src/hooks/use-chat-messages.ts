@@ -20,8 +20,6 @@ interface UseChatMessagesOptions {
 interface UseChatMessagesReturn {
   messages: ChatMessage[];
   isAgentRunning: boolean;
-  isLoadingConversation: boolean;
-  isConversationTransitioning: boolean;
   sessionId: string;
   isMockMode: boolean;
   postMessage: ReturnType<typeof useTauri>['postMessage'];
@@ -65,8 +63,6 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     }
   });
   const [isAgentRunning, setIsAgentRunning] = useState(false);
-  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
-  const [isConversationTransitioning, setIsConversationTransitioning] = useState(false);
   const [sessionId, setSessionId] = useState<string>(() => {
     try {
       return localStorage.getItem('orbit-sessionId') ?? '';
@@ -96,6 +92,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   const {
     setWorkspace,
     setActiveConversation,
+    setLoadingConversation,
+    setConversationTransitioning,
     setConversations,
     addConversation,
     updateConversationTitle,
@@ -356,23 +354,19 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           }
           break;
 
-        case 'conversation:loading':
-          // Set loading state - but DON'T clear messages yet
-          // Keep old messages visible until new ones are ready (prevents flash)
-          setIsLoadingConversation(true);
-          break;
-
-        case 'conversation:loaded': {
-          // Mark loading complete
-          setIsLoadingConversation(false);
-
-          // Cache current messages BEFORE switching (using refs for synchronous access)
+        case 'conversation:loading': {
+          // Mark as transitioning (content will render invisibly)
+          setConversationTransitioning(true);
+          // Cache current messages BEFORE switching (loading state is set by sidebar synchronously)
           const currentSessionId = sessionIdRef.current;
           const currentMessages = messagesRef.current;
           if (currentSessionId && currentMessages.length > 0) {
             messagesCache.current.set(currentSessionId, currentMessages);
           }
+          break;
+        }
 
+        case 'conversation:loaded': {
           // Prepare new messages
           const cachedMessages = messagesCache.current.get(message.session_id);
           const backendMessages = message.messages.map((m) => ({
@@ -392,27 +386,13 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
             newMessages = backendMessages;
           }
 
-          // Phase 1: Hide current content (set opacity to 0)
-          setIsConversationTransitioning(true);
-
-          // Phase 2: Wait for opacity:0 to paint BEFORE changing content
-          // This ensures the old messages are hidden before we swap
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              // Now update content (invisible to user)
-              setMessages(newMessages);
-              setSessionId(message.session_id);
-              setActiveConversation(message.session_id, message.title);
-              switchSession(message.session_id);
-
-              // Phase 3: Reveal new content after paint
-              requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                  setIsConversationTransitioning(false);
-                });
-              });
-            });
-          });
+          // Set all state atomically - React 18 batches these updates
+          setMessages(newMessages);
+          setSessionId(message.session_id);
+          setActiveConversation(message.session_id, message.title);
+          switchSession(message.session_id);
+          // Reveal content after all state is updated
+          setLoadingConversation(false);
           break;
         }
 
@@ -607,6 +587,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     [
       setWorkspace,
       setActiveConversation,
+      setLoadingConversation,
+      setConversationTransitioning,
       setConversations,
       addConversation,
       setInputMode,
@@ -1065,8 +1047,6 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   return {
     messages,
     isAgentRunning,
-    isLoadingConversation,
-    isConversationTransitioning,
     sessionId,
     isMockMode,
     postMessage,

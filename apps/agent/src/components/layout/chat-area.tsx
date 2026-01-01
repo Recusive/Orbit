@@ -25,7 +25,12 @@ import {
   useSessionUsage,
   useMaxTokens,
 } from '@/stores/tool-store';
-import { useUIStore, useTerminalPosition } from '@/stores/ui-store';
+import {
+  useUIStore,
+  useTerminalPosition,
+  useIsLoadingConversation,
+  useIsConversationTransitioning,
+} from '@/stores/ui-store';
 
 // Lazy load heavy components
 const LazyTerminalPanel = lazy(() =>
@@ -38,8 +43,11 @@ const TerminalPanel: FC<TerminalPanelProps> = (props) => (
 );
 
 export const ChatArea: FC = () => {
-  const { reviewPanelOpen, bottomPanelOpen, reviewPanelWidth } = useUIStore();
+  const { reviewPanelOpen, bottomPanelOpen, reviewPanelWidth, setConversationTransitioning } =
+    useUIStore();
   const terminalPosition = useTerminalPosition();
+  const isLoadingConversation = useIsLoadingConversation();
+  const isTransitioning = useIsConversationTransitioning();
   const inputMode = useInputMode();
   const thinkingMode = useThinkingMode();
   const pendingPermissions = usePendingPermissions();
@@ -51,8 +59,6 @@ export const ChatArea: FC = () => {
   const {
     messages,
     isAgentRunning,
-    isLoadingConversation,
-    isConversationTransitioning,
     sessionId,
     postMessage,
     setMessages,
@@ -118,6 +124,25 @@ export const ChatArea: FC = () => {
     window.dispatchEvent(new CustomEvent('focusChatInput'));
   }, []);
 
+  // Handle content stabilization - called when chat content is ready to reveal
+  const handleContentStable = useCallback((): void => {
+    setConversationTransitioning(false);
+  }, [setConversationTransitioning]);
+
+  // Handle stabilization for empty conversations (welcome screen)
+  useEffect(() => {
+    if (isTransitioning && messages.length === 0 && !isLoadingConversation) {
+      // Empty conversation - stabilize after a frame to ensure layout is complete
+      const frame = requestAnimationFrame(() => {
+        setConversationTransitioning(false);
+      });
+      return () => {
+        cancelAnimationFrame(frame);
+      };
+    }
+    return undefined;
+  }, [isTransitioning, messages.length, isLoadingConversation, setConversationTransitioning]);
+
   return (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-chat-area">
       {/* Main horizontal area: Chat + Activity */}
@@ -129,6 +154,7 @@ export const ChatArea: FC = () => {
 
           {/* Chat Content */}
           <div className="flex-1 flex flex-col min-h-0">
+            {/* Show welcome only when no messages and not loading */}
             {messages.length === 0 && !isLoadingConversation ? (
               /* Empty state: Welcome greeting + Input positioned above center */
               <div className="flex-1 flex flex-col justify-center" style={{ paddingBottom: '40%' }}>
@@ -149,12 +175,12 @@ export const ChatArea: FC = () => {
               </div>
             ) : (
               /* Normal layout: Messages + Input at bottom */
-              <>
+              <div className="flex-1 flex flex-col min-h-0">
                 <ChatMessages
                   messages={messages}
                   pendingPermissions={pendingPermissions}
                   isAgentRunning={isAgentRunning}
-                  isTransitioning={isConversationTransitioning}
+                  isTransitioning={isTransitioning}
                   sessionId={sessionId}
                   queuedMessage={queuedMessage}
                   getToolsForMessage={getToolsForMessage}
@@ -165,6 +191,7 @@ export const ChatArea: FC = () => {
                   onPermissionDeny={handlePermissionDeny}
                   onCancelQueue={cancelQueue}
                   onFeedback={handleFeedback}
+                  onStable={handleContentStable}
                 />
                 <ChatInput
                   inputMode={inputMode}
@@ -179,7 +206,7 @@ export const ChatArea: FC = () => {
                   onThinkingModeChange={handleThinkingModeChange}
                   onModelChange={handleModelChange}
                 />
-              </>
+              </div>
             )}
           </div>
         </div>
