@@ -294,7 +294,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
   );
 
   return (
-    <div className="@container h-full flex flex-col bg-background shrink-0" style={{ width }}>
+    <div className="@container h-full flex flex-col bg-chat-area shrink-0" style={{ width }}>
       {/* Header - different view when on File tab vs other tabs */}
       <div
         className="flex items-center gap-2 px-4 overflow-hidden border-b border-border shrink-0"

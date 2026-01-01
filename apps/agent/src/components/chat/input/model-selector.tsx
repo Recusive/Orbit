@@ -147,10 +147,10 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                       handleSelectModel(model.id);
                     }}
                     className={cn(
-                      'w-full flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition-all duration-150 mt-0.5 first:mt-0 group',
+                      'w-full flex items-center justify-between px-2 py-1.5 text-xs transition-all duration-150 mt-0.5 first:mt-0 group',
                       selectedModel === model.id
-                        ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px]'
-                        : 'hover:bg-muted/80 active:scale-[0.98]'
+                        ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
+                        : 'rounded-md hover:bg-muted/80 active:scale-[0.98]'
                     )}
                   >
                     <div className="flex items-center gap-2">

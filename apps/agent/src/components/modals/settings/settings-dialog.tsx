@@ -627,7 +627,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
       <DialogPortal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-background/98 backdrop-blur-md border border-border/40 rounded-xl overflow-hidden flex flex-col"
+          className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-card border border-border/40 rounded-xl overflow-hidden flex flex-col"
           style={{
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
           }}
@@ -638,7 +638,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
             Settings - {getSectionTitle()}
           </DialogPrimitive.Title>
           {/* Title bar */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-muted/20">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-muted/30">
             <div className="flex items-center gap-2">
               <Settings2 className="h-4 w-4 text-muted-foreground/70" />
               <span className="font-medium text-[13px]">Settings - {getSectionTitle()}</span>
@@ -652,7 +652,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
           {/* Content */}
           <div className="flex flex-1 overflow-hidden">
             {/* Sidebar */}
-            <div className="w-48 border-r border-border/40 p-2.5 bg-muted/10 flex flex-col">
+            <div className="w-48 border-r border-border/40 p-2.5 bg-muted/20 flex flex-col">
               <nav className="space-y-1 flex-1">
                 {navItems.map((item) => (
                   <NavItem

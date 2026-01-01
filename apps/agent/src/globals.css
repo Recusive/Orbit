@@ -33,6 +33,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-chat-area: var(--chat-area);
 
   /* Brand colors as Tailwind utilities */
   --color-brand-oat: var(--brand-oat);
@@ -125,25 +126,27 @@
   --mode-accept: oklch(0.60 0.12 300);       /* Heather purple */
   --mode-think: oklch(0.70 0.14 65);         /* Warm amber/sand */
 
-  /* Shadcn semantic (light) */
-  --background: oklch(0.98 0.005 75);      /* Warm white, hint of oat */
-  --foreground: oklch(0.25 0.02 60);       /* Dark brown for text */
-  --card: oklch(0.96 0.008 70);            /* Slightly warmer than bg */
-  --card-foreground: oklch(0.25 0.02 60);
-  --popover: oklch(0.98 0.005 75);
-  --popover-foreground: oklch(0.25 0.02 60);
-  --primary: oklch(0.62 0.18 35);          /* Coral #E07A6B */
+  /* Shadcn semantic (light) - following brand palette */
+  /* 70% Oat/Sand (backgrounds), 20% Clay (secondary), 10% Coral (accents) */
+  --background: oklch(0.95 0.01 75);       /* Warm off-white, main chat area */
+  --foreground: oklch(0.24 0.02 55);       /* Headline #3D3630 */
+  --card: oklch(0.90 0.02 75);             /* Oat #E8E0D5 - sidebar/header/input */
+  --card-foreground: oklch(0.24 0.02 55);
+  --popover: oklch(0.92 0.015 75);         /* Between bg and card */
+  --popover-foreground: oklch(0.24 0.02 55);
+  --primary: oklch(0.56 0.18 35);          /* Coral - darker for better contrast */
   --primary-foreground: oklch(0.98 0.01 75);
-  --secondary: oklch(0.80 0.05 65);        /* Clay-ish */
-  --secondary-foreground: oklch(0.30 0.02 60);
-  --muted: oklch(0.92 0.01 70);            /* Sand */
-  --muted-foreground: oklch(0.50 0.03 60); /* Brown */
-  --accent: oklch(0.85 0.04 65);           /* Sand/Clay blend */
-  --accent-foreground: oklch(0.25 0.02 60);
+  --secondary: oklch(0.73 0.06 70);        /* Clay #C4A98B */
+  --secondary-foreground: oklch(0.30 0.02 55);
+  --muted: oklch(0.82 0.03 70);            /* Sand #D4C5B5 */
+  --muted-foreground: oklch(0.55 0.04 60); /* Brown #8B7355 */
+  --accent: oklch(0.82 0.03 70);           /* Sand - same as muted for subtle fills */
+  --accent-foreground: oklch(0.24 0.02 55);
   --destructive: oklch(0.55 0.22 25);
-  --border: oklch(0.88 0.02 70);
-  --input: oklch(0.90 0.015 70);
-  --ring: oklch(0.62 0.18 35);             /* Coral */
+  --border: oklch(0.84 0.025 70);          /* Visible border, sand-toned */
+  --input: oklch(0.87 0.02 70);            /* Input fields */
+  --ring: oklch(0.56 0.18 35);             /* Coral - darker */
+  --chat-area: oklch(0.93 0.015 75);       /* 3% lighter than card (0.90) */
 
   /* Charts - coral gradient */
   --chart-1: oklch(0.837 0.128 66.29);
@@ -155,12 +158,12 @@
   /* Sidebar - matches card for same look as input box */
   --sidebar: oklch(0.96 0.008 70);
   --sidebar-foreground: oklch(0.25 0.02 60);
-  --sidebar-primary: oklch(0.62 0.18 35);
+  --sidebar-primary: oklch(0.56 0.18 35);
   --sidebar-primary-foreground: oklch(0.98 0.01 75);
   --sidebar-accent: oklch(0.90 0.02 70);
   --sidebar-accent-foreground: oklch(0.30 0.02 60);
   --sidebar-border: oklch(0.88 0.02 70);
-  --sidebar-ring: oklch(0.62 0.18 35);
+  --sidebar-ring: oklch(0.56 0.18 35);
 
   /* Status colors */
   --success: oklch(0.65 0.18 155);
@@ -237,6 +240,7 @@ html.dark {
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 12%);
   --ring: oklch(0.55 0.15 38);
+  --chat-area: oklch(0.18 0.012 60);       /* Between background (0.16) and card (0.20) */
 
   /* Charts - same */
   --chart-1: oklch(0.837 0.128 66.29);

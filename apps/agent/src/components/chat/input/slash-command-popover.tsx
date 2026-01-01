@@ -173,10 +173,10 @@ const CommandItem: FC<CommandItemProps> = ({ command, isSelected, isFirst, isLas
         onSelect(command);
       }}
       className={cn(
-        'relative flex cursor-pointer gap-2.5 select-none items-center rounded-md px-2.5 py-2 outline-none transition-all duration-150',
+        'relative flex cursor-pointer gap-2.5 select-none items-center px-2.5 py-2 outline-none transition-all duration-150',
         isSelected
-          ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-2'
-          : 'hover:bg-muted/50 active:scale-[0.99]'
+          ? 'rounded-r-md bg-primary/10 text-foreground border-l-2 border-primary/60 pl-2'
+          : 'rounded-md hover:bg-muted/50 active:scale-[0.99]'
       )}
     >
       <span className="text-muted-foreground/70 font-mono text-[13px]">/</span>

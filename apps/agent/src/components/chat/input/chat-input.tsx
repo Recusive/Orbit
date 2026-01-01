@@ -1,4 +1,5 @@
-import { ArrowUp, AtSign, Coins, Globe, Image, Lightbulb, Square } from 'lucide-react';
+import { IconImagine } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconImagine';
+import { ArrowUp, AtSign, Coins, Globe, Image, Square } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
@@ -31,11 +32,7 @@ import type {
 import type { FC } from 'react';
 
 import { ElementContextList } from '@/components/browser';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTauri } from '@/hooks/use-tauri';
 import { CONTENT_WIDTH, INPUT_SIZES } from '@/lib/constants';
@@ -132,6 +129,7 @@ export const ChatInput: FC<ChatInputProps> = ({
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+  const [thinkingHoverOpen, setThinkingHoverOpen] = useState(false);
   const inputRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -446,15 +444,49 @@ export const ChatInput: FC<ChatInputProps> = ({
     onModeChange(nextMode);
   }, [inputMode, onModeChange]);
 
+  const cycleThinkingMode = useCallback((): void => {
+    const modes: readonly ThinkingMode[] = ['off', 'think', 'hard', 'ultra'] as const;
+    const currentIndex = modes.indexOf(thinkingMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    const nextMode = modes[nextIndex] ?? 'off';
+    onThinkingModeChange(nextMode);
+  }, [thinkingMode, onThinkingModeChange]);
+
+  // Get thinking mode info for display
+  const getThinkingInfo = (): { level: string; tokens: string } => {
+    switch (thinkingMode) {
+      case 'off':
+        return { level: 'Off', tokens: '0' };
+      case 'think':
+        return { level: 'Think', tokens: '4k' };
+      case 'hard':
+        return { level: 'Hard', tokens: '10k' };
+      case 'ultra':
+        return { level: 'Ultra', tokens: '32k' };
+    }
+  };
+
+  // Get number of active dots (0-3)
+  const getActiveDots = (): number => {
+    switch (thinkingMode) {
+      case 'off':
+        return 0;
+      case 'think':
+        return 1;
+      case 'hard':
+        return 2;
+      case 'ultra':
+        return 3;
+    }
+  };
+
   const getInputBoxClasses = (): string => {
     const base = cn(
       'mx-auto p-1 rounded-[14px] bg-card border transition-all duration-200',
-      // Light mode shadows
+      // Light mode shadows only
       'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),0_4px_12px_-4px_rgba(0,0,0,0.05)]',
       'focus-within:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.12),0_8px_24px_-8px_rgba(0,0,0,0.08)]',
-      // Dark mode - reduced shadows to prevent darkening effect
-      'dark:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.25),0_4px_12px_-4px_rgba(0,0,0,0.15)]',
-      'dark:focus-within:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.35),0_8px_24px_-8px_rgba(0,0,0,0.2)]'
+      'dark:shadow-none dark:focus-within:shadow-none'
     );
     switch (inputMode) {
       case 'plan':
@@ -462,7 +494,7 @@ export const ChatInput: FC<ChatInputProps> = ({
       case 'accept':
         return `${base} border-2 border-dotted border-mode-accept`;
       case 'default':
-        return `${base} border-transparent focus-within:border-border/40`;
+        return `${base} border-border/50 focus-within:border-border/70`;
     }
   };
 
@@ -582,93 +614,86 @@ export const ChatInput: FC<ChatInputProps> = ({
               </TooltipTrigger>
               <TooltipContent>Add context (@)</TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <DropdownMenu>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <button
+            {/* Thinking Mode Button with HoverCard */}
+            <HoverCard open={thinkingHoverOpen}>
+              <div
+                onMouseEnter={() => {
+                  setThinkingHoverOpen(true);
+                }}
+                onMouseLeave={() => {
+                  setThinkingHoverOpen(false);
+                }}
+              >
+                <HoverCardTrigger asChild>
+                  <button
+                    onClick={cycleThinkingMode}
+                    className={cn(
+                      'h-7 flex items-center justify-center gap-1 px-1.5 rounded-lg',
+                      'transition-all duration-150',
+                      'hover:bg-muted/50 hover:scale-[1.02]',
+                      'active:scale-95',
+                      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
+                      thinkingMode === 'off' && 'text-muted-foreground/70 hover:text-foreground'
+                    )}
+                  >
+                    <IconImagine
+                      size={16}
                       className={cn(
-                        'h-7 w-7 flex items-center justify-center rounded-lg',
-                        'transition-all duration-150',
-                        'hover:bg-muted/50 hover:scale-[1.08]',
-                        'active:scale-95',
-                        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
-                        thinkingMode === 'off' && 'text-muted-foreground/70 hover:text-foreground',
-                        thinkingMode === 'think' && 'text-mode-think',
-                        thinkingMode === 'hard' && 'text-orange-500',
-                        thinkingMode === 'ultra' && 'text-red-500'
+                        'transition-colors duration-150',
+                        thinkingMode !== 'off' && 'text-primary'
                       )}
-                    >
-                      <Lightbulb
-                        className={cn(
-                          'h-4 w-4',
-                          thinkingMode === 'think' && 'fill-mode-think',
-                          thinkingMode === 'hard' && 'fill-orange-500',
-                          thinkingMode === 'ultra' && 'fill-red-500'
-                        )}
-                      />
-                    </button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent>Think config</TooltipContent>
-                <DropdownMenuContent
-                  align="center"
-                  side="top"
-                  className="p-2.5 rounded-lg border-border/50 bg-popover/98 backdrop-blur-sm shadow-lg"
-                >
-                  <div className="flex items-center justify-between gap-4 mb-2.5">
-                    <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-[0.05em]">
-                      Think config
-                    </span>
-                    {thinkingMode !== 'off' ? (
-                      <span
-                        className={cn(
-                          'flex items-center gap-1 text-[10px] font-medium',
-                          thinkingMode === 'think' && 'text-mode-think',
-                          thinkingMode === 'hard' && 'text-orange-500',
-                          thinkingMode === 'ultra' && 'text-red-500'
-                        )}
-                      >
-                        {thinkingMode === 'think' && '4k'}
-                        {thinkingMode === 'hard' && '10k'}
-                        {thinkingMode === 'ultra' && '32k'}
-                        <Coins className="h-3 w-3" />
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="relative flex gap-1 bg-muted/40 rounded-lg p-1 border border-border/30">
-                    {/* Sliding indicator */}
-                    <div
-                      className="absolute top-1 bottom-1 left-1 bg-background/90 rounded-md transition-all duration-200"
-                      style={{
-                        width: 'var(--tab-width)',
-                        transform: `translateX(calc(${String(['off', 'think', 'hard', 'ultra'].indexOf(thinkingMode))} * (var(--tab-width) + 4px)))`,
-                        transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)',
-                        // @ts-expect-error CSS custom property
-                        '--tab-width': '38px',
-                      }}
                     />
-                    {(['off', 'think', 'hard', 'ultra'] as const).map((mode) => (
-                      <button
-                        key={mode}
-                        onClick={() => {
-                          onThinkingModeChange(mode);
-                        }}
-                        className={cn(
-                          'relative z-10 w-[38px] py-1 text-xs font-medium rounded-md transition-colors duration-150 capitalize',
-                          thinkingMode === mode
-                            ? 'text-foreground font-semibold'
-                            : 'text-muted-foreground/70 hover:text-foreground/90'
-                        )}
-                      >
-                        {mode}
-                      </button>
-                    ))}
+                    {/* Vertical dots indicator */}
+                    <div className="flex flex-col gap-[2px]">
+                      {[2, 1, 0].map((dotIndex) => {
+                        const activeDots = getActiveDots();
+                        const isActive = dotIndex < activeDots;
+                        return (
+                          <div
+                            key={dotIndex}
+                            className={cn(
+                              'w-[4px] h-[4px] rounded-full transition-all duration-200',
+                              isActive
+                                ? 'bg-black dark:bg-white shadow-[0_0_6px_rgba(0,0,0,0.4)] dark:shadow-[0_0_6px_rgba(255,255,255,0.8)]'
+                                : 'bg-muted-foreground/30'
+                            )}
+                          />
+                        );
+                      })}
+                    </div>
+                  </button>
+                </HoverCardTrigger>
+              </div>
+              <HoverCardContent
+                side="top"
+                align="center"
+                className="w-auto p-2.5 rounded-lg border-border/50 bg-popover/98 backdrop-blur-sm"
+                onMouseEnter={() => {
+                  setThinkingHoverOpen(true);
+                }}
+                onMouseLeave={() => {
+                  setThinkingHoverOpen(false);
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <IconImagine
+                      size={16}
+                      className={cn(
+                        thinkingMode !== 'off' ? 'text-primary' : 'text-muted-foreground'
+                      )}
+                    />
+                    <span className="text-xs font-medium">{getThinkingInfo().level}</span>
                   </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </Tooltip>
+                  {thinkingMode !== 'off' ? (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Coins className="h-3 w-3" />
+                      <span>{getThinkingInfo().tokens} tokens</span>
+                    </div>
+                  ) : null}
+                </div>
+              </HoverCardContent>
+            </HoverCard>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button

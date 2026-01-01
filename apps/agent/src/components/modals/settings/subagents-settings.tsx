@@ -65,7 +65,7 @@ const AgentCard: FC<AgentCardProps> = ({ agent, onEdit, onDelete }) => (
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-medium text-[13px] truncate">{agent.name}</div>
-          <div className="text-[11px] text-muted-foreground/70 line-clamp-2 mt-1">
+          <div className="text-[11px] text-muted-foreground/70 line-clamp-2 mt-1 break-words">
             {agent.description || 'No description'}
           </div>
           {agent.tools !== undefined && agent.tools.length > 0 && (
@@ -207,7 +207,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-60 bg-black/40 backdrop-blur-sm" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-60 translate-x-[-50%] translate-y-[-50%] w-[600px] max-w-[90vw] max-h-[80vh] bg-background/98 backdrop-blur-md border border-border/40 rounded-xl shadow-xl flex flex-col"
+          className="fixed left-[50%] top-[50%] z-60 translate-x-[-50%] translate-y-[-50%] w-[600px] max-w-[90vw] max-h-[80vh] bg-card border border-border/40 rounded-xl shadow-xl flex flex-col"
           onPointerDownOutside={(e) => {
             e.preventDefault();
           }}
@@ -370,7 +370,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
           </ScrollArea>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-border/40 bg-muted/10">
+          <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-border/40 bg-muted/20">
             {/* Generate with AI button - only show when creating new agent */}
             {agent === undefined &&
               (showGenerateInput ? (

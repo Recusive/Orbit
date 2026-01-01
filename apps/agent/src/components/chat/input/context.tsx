@@ -209,7 +209,7 @@ export const ContextContentHeader: FC<ContextContentHeaderProps> = ({ children, 
         <span>{formatTokens(maxTokens)} tokens</span>
       </div>
       {/* Progress bar */}
-      <div className="mt-2.5 h-2 bg-muted/50 rounded-full overflow-hidden shadow-inner">
+      <div className="mt-2.5 h-2 bg-muted rounded-full overflow-hidden shadow-inner">
         <div
           className="h-full rounded-full transition-all duration-300 ease-out"
           style={{ width: `${String(percentage)}%`, ...getProgressStyle() }}

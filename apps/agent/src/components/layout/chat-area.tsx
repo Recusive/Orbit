@@ -119,7 +119,7 @@ export const ChatArea: FC = () => {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
+    <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-chat-area">
       {/* Main horizontal area: Chat + Activity */}
       <div className="flex-1 flex min-h-0">
         {/* Chat Section (Header + Content) */}

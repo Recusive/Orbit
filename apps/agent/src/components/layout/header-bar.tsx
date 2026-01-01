@@ -46,7 +46,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       <div
         className={cn(
           'absolute inset-0 rounded-md transition-colors duration-200',
-          active ? 'bg-sidebar-accent/70' : 'hover:bg-muted/40'
+          active ? 'bg-muted/70' : 'hover:bg-muted/40'
         )}
       />
       {/* Active indicator */}
@@ -147,7 +147,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
         {/* Search button - VS Code style command palette */}
         <button
           data-tauri-drag-region={false}
-          className="flex items-center gap-2 h-6 px-2 rounded-md text-muted-foreground hover:text-foreground overflow-hidden bg-muted/50 hover:bg-muted/70 border border-border/40 hover:border-border/60 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200"
+          className="flex items-center gap-2 h-6 px-2 rounded-md text-foreground hover:text-foreground overflow-hidden bg-muted hover:bg-muted/80 transition-all duration-200"
           title="Search files (⌘P)"
           onClick={handleOpenSearch}
         >

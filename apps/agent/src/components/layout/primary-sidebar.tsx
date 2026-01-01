@@ -152,8 +152,8 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipContent side="right" className="flex items-center gap-2">
                 <span>Expand sidebar</span>
                 <KbdGroup>
-                  <Kbd className="bg-background/15 text-background border-background/25">⌘</Kbd>
-                  <Kbd className="bg-background/15 text-background border-background/25">.</Kbd>
+                  <Kbd className="bg-white/15 text-inherit border-white/20">⌘</Kbd>
+                  <Kbd className="bg-white/15 text-inherit border-white/20">.</Kbd>
                 </KbdGroup>
               </TooltipContent>
             </Tooltip>
@@ -179,8 +179,8 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipContent side="right" className="flex items-center gap-2">
                 <span>Collapse sidebar</span>
                 <KbdGroup>
-                  <Kbd className="bg-background/15 text-background border-background/25">⌘</Kbd>
-                  <Kbd className="bg-background/15 text-background border-background/25">.</Kbd>
+                  <Kbd className="bg-white/15 text-inherit border-white/20">⌘</Kbd>
+                  <Kbd className="bg-white/15 text-inherit border-white/20">.</Kbd>
                 </KbdGroup>
               </TooltipContent>
             </Tooltip>
@@ -598,7 +598,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       <div
         className={cn(
           'absolute inset-0 rounded-t-md transition-colors duration-200',
-          active ? 'bg-sidebar-accent/70' : 'hover:bg-muted/40'
+          active ? 'bg-muted/70' : 'hover:bg-muted/40'
         )}
       />
       {/* Active indicator */}
