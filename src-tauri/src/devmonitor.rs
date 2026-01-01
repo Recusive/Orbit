@@ -36,6 +36,10 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter as _};
 
 /// Global span ID counter
+#[cfg_attr(
+    not(debug_assertions),
+    expect(dead_code, reason = "Only used in debug builds")
+)]
 static SPAN_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Tracing event payload sent to frontend
@@ -77,6 +81,10 @@ pub struct SpanEvent {
 }
 
 /// Get current timestamp in milliseconds
+#[cfg_attr(
+    not(debug_assertions),
+    expect(dead_code, reason = "Only used in debug builds")
+)]
 #[expect(
     clippy::cast_possible_truncation,
     reason = "Milliseconds since epoch fits in u64 for foreseeable future"
@@ -89,6 +97,10 @@ fn now_ms() -> u64 {
 }
 
 /// Generate a unique span ID
+#[cfg_attr(
+    not(debug_assertions),
+    expect(dead_code, reason = "Only used in debug builds")
+)]
 fn next_span_id() -> u64 {
     SPAN_ID_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
