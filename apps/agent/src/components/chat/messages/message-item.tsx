@@ -23,7 +23,7 @@ import type { ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files';
-import { CONTENT_WIDTH } from '@/lib/constants';
+import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/constants';
 
 export interface ChatMessage {
   id: string;
@@ -269,13 +269,18 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
         /* User message bubble */
         <div
           className="p-2 mx-auto rounded-xl bg-card border border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
-          style={{ maxWidth: CONTENT_WIDTH.inputBox }}
+          style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
         >
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.displayedContent}</p>
         </div>
       ) : (
         /* Assistant message - no bubble, content flows naturally */
-        <div className="py-1 mx-auto" style={{ maxWidth: CONTENT_WIDTH.messageFeed }}>
+        <div
+          className="py-1 mx-auto"
+          style={{
+            maxWidth: `var(${CHAT_WIDTH_VAR.secondary}, ${String(CHAT_WIDTH.secondary)}px)`,
+          }}
+        >
           {/* Thinking Box - show when thinking content exists */}
           {message.thinking ? (
             <ThinkingBox

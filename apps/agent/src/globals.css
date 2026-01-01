@@ -199,6 +199,26 @@
   --terminal-bg: oklch(0.15 0.01 60);
   --terminal-fg: oklch(0.85 0.01 75);
   --terminal-cursor: oklch(0.85 0.01 75);
+
+  /* Chat Layout Width System
+     Primary = input box, user message bubbles (full width)
+     Secondary = assistant content, tools (slightly narrower for visual hierarchy) */
+  --chat-max-width: 800px;
+  --chat-width-primary: var(--chat-max-width);
+  --chat-width-secondary: calc(var(--chat-max-width) - 32px);
+}
+
+/* Responsive chat widths - scales down on smaller screens */
+@media (max-width: 900px) {
+  :root {
+    --chat-max-width: calc(100vw - 64px);
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --chat-max-width: calc(100vw - 32px);
+  }
 }
 
 /* Dark theme */
@@ -705,11 +725,12 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   contain-intrinsic-size: auto 100px;
 }
 
-/* For virtualized list items - optimized for smooth scrolling */
+/* For virtualized list items - optimized for smooth scrolling
+   Note: Using only paint containment to allow ResizeObserver notifications
+   for proper measurement invalidation during window resize */
 .virtual-item {
-  content-visibility: auto;
-  contain: layout style paint;
   will-change: transform;
+  contain: paint;
 }
 
 /* For chat message items - larger intrinsic size estimate */

@@ -11,7 +11,7 @@ import type { PermissionRequest, ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
 import { PermissionModal } from '@/components/modals';
-import { CONTENT_WIDTH } from '@/lib/constants';
+import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/constants';
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
@@ -68,7 +68,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const lastMessageContentLength = messages[messages.length - 1]?.displayedContent.length ?? 0;
 
   // Stable callbacks to prevent virtualizer recreation
-  const estimateSize = useCallback(() => 200, []); // Estimate HIGH for streaming messages
+  const estimateSize = useCallback(() => 150, []); // Closer to typical message height
   const getItemKey = useCallback((index: number) => messages[index]?.id ?? index, [messages]);
 
   // Virtualizer for message list
@@ -76,25 +76,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     count: messages.length,
     getScrollElement: () => parentRef.current,
     estimateSize,
-    overscan: 5,
+    // Higher overscan for smoother fast scrolling (renders more items off-screen)
+    overscan: 10,
     // Use message IDs for stable keys (not indexes)
     getItemKey,
     // Smoother resize measurements via requestAnimationFrame
     useAnimationFrameWithResizeObserver: true,
+    // NOTE: Do NOT use `gap` option - it doesn't work with dynamic heights (GitHub #793)
   });
-
-  // Prevent scroll jumping when scrolling backward with dynamic sizes
-  // This is a property on the instance, not an initialization option
-  // See: packages/virtual-core/src/index.ts lines 373-379, 900-912
-  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
-    // Don't adjust scroll position when actively scrolling backward (up)
-    // This prevents content jumping when viewing older messages while new ones stream
-    if (instance.scrollDirection === 'backward') {
-      return false;
-    }
-    // Otherwise use default behavior: adjust if item is above current scroll position
-    return item.start < (instance.scrollOffset ?? 0);
-  };
 
   // Auto-scroll to bottom when messages change or during streaming
   useEffect(() => {
@@ -127,27 +116,40 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     };
   }, []);
 
+  // Force virtualizer to re-measure on window resize
+  // This fixes layout issues when text wrapping changes at different widths
+  useEffect(() => {
+    const handleResize = (): void => {
+      virtualizer.measure();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [virtualizer]);
+
   return (
     <div
       ref={parentRef}
       className="flex-1 overflow-y-auto overflow-x-hidden p-4"
       style={{
         scrollbarGutter: 'stable both-edges',
-        // Instant opacity change to mask content swap (no transition = no flash)
+        // Fast opacity transition to mask content swap during conversation switch
         opacity: isTransitioning ? 0 : 1,
-        // CSS containment to isolate layout recalculations
-        contain: 'content',
+        transition: 'opacity 50ms ease-out',
       }}
     >
-      <div className="mx-auto" style={{ maxWidth: CONTENT_WIDTH.inputBox }}>
+      <div
+        className="mx-auto"
+        style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
+      >
         {/* Virtualized message container */}
         <div
           style={{
             height: `${String(virtualizer.getTotalSize())}px`,
             width: '100%',
             position: 'relative',
-            // Prevent content from affecting parent layout during recalc
-            contain: 'strict',
           }}
         >
           {virtualizer.getVirtualItems().map((virtualItem) => {
@@ -163,17 +165,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                 key={virtualItem.key}
                 data-index={virtualItem.index}
                 ref={virtualizer.measureElement}
-                className="virtual-item pb-3"
+                className="virtual-item"
                 style={{
                   position: 'absolute',
                   top: 0,
                   left: 0,
                   width: '100%',
                   transform: `translateY(${String(virtualItem.start)}px)`,
-                  // GPU acceleration for smoother transitions
-                  willChange: 'transform',
-                  // Isolate each item's layout
-                  contain: 'layout style',
+                  paddingBottom: 12, // Explicit 12px gap - included in getBoundingClientRect measurement
                 }}
               >
                 <MessageItem

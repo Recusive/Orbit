@@ -5,7 +5,7 @@ import { SiClaude, SiOpenai } from 'react-icons/si';
 import type { Model } from '@/types/protocol';
 import type { FC } from 'react';
 
-import { CONTENT_WIDTH } from '@/lib/constants';
+import { CHAT_WIDTH } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useModel, useToolStore } from '@/stores/tool-store';
 
@@ -132,7 +132,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         <div
           ref={popoverRef}
           className="absolute bottom-full left-0 mb-2 bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50"
-          style={{ width: CONTENT_WIDTH.dropdown }}
+          style={{ width: CHAT_WIDTH.dropdown }}
         >
           <div className="p-1.5">
             {MODEL_GROUPS.map((group) => (

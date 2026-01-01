@@ -47,13 +47,49 @@ export const PANEL_SIZES = {
 } as const;
 
 /**
- * Content width constraints
+ * Chat Layout Width System
+ *
+ * Width hierarchy:
+ * - Primary (800px): Input box, user message bubbles
+ * - Secondary (768px): Assistant messages, tool widgets
+ *
+ * Uses CSS custom properties for responsive behavior.
+ * Components should use CHAT_WIDTH_VAR with fallbacks.
+ */
+export const CHAT_WIDTH = {
+  /** Base max-width for all chat content */
+  base: 800,
+  /** Input box and user message bubbles */
+  primary: 800,
+  /** Assistant messages, tool widgets, markdown content (32px narrower) */
+  secondary: 768,
+  /** Dropdown menus */
+  dropdown: 200,
+  /** File name truncation */
+  fileName: 200,
+} as const;
+
+/**
+ * CSS variable names for chat widths
+ * Use these with var() in style props for responsive behavior
+ *
+ * @example
+ * style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${CHAT_WIDTH.primary}px)` }}
+ */
+export const CHAT_WIDTH_VAR = {
+  primary: '--chat-width-primary',
+  secondary: '--chat-width-secondary',
+} as const;
+
+/**
+ * @deprecated Use CHAT_WIDTH instead
+ * Legacy export for backwards compatibility
  */
 export const CONTENT_WIDTH = {
-  inputBox: 800,
-  messageFeed: 768, // max-w-3xl equivalent for assistant messages
-  dropdown: 200,
-  fileName: 200,
+  inputBox: CHAT_WIDTH.primary,
+  messageFeed: CHAT_WIDTH.secondary,
+  dropdown: CHAT_WIDTH.dropdown,
+  fileName: CHAT_WIDTH.fileName,
   expandedContent: 400,
 } as const;
 

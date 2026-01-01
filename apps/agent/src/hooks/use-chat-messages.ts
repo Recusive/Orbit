@@ -392,19 +392,25 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
             newMessages = backendMessages;
           }
 
-          // Start transition BEFORE updating messages (hides content during swap)
+          // Phase 1: Hide current content (set opacity to 0)
           setIsConversationTransitioning(true);
 
-          // Update all state together - React 18 batches these automatically
-          setMessages(newMessages);
-          setSessionId(message.session_id);
-          setActiveConversation(message.session_id, message.title);
-          switchSession(message.session_id);
-
-          // End transition after paint (reveals new content)
+          // Phase 2: Wait for opacity:0 to paint BEFORE changing content
+          // This ensures the old messages are hidden before we swap
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              setIsConversationTransitioning(false);
+              // Now update content (invisible to user)
+              setMessages(newMessages);
+              setSessionId(message.session_id);
+              setActiveConversation(message.session_id, message.title);
+              switchSession(message.session_id);
+
+              // Phase 3: Reveal new content after paint
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  setIsConversationTransitioning(false);
+                });
+              });
             });
           });
           break;
