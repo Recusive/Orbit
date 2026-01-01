@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { spawnSync } from 'child_process';
 
 import { formatZodError } from '@snowflake/shared-schemas';
 
@@ -13,23 +13,43 @@ const logger = createLogger('ClaudeCredentials');
  */
 function getOAuthTokenFromKeychain(): string | null {
   try {
-    // Execute macOS security command to read from Keychain
-    const output = execSync('security find-generic-password -s "Claude Code-credentials" -w', {
-      encoding: 'utf-8',
-    }).trim();
+    // Use spawnSync for better error capture than execSync
+    const spawnResult = spawnSync(
+      'security',
+      ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
+      {
+        encoding: 'utf-8',
+        timeout: 10000, // 10 second timeout
+      }
+    );
+
+    if (spawnResult.error) {
+      logger.error({ error: spawnResult.error.message }, 'Failed to spawn security command');
+      return null;
+    }
+
+    if (spawnResult.status !== 0) {
+      logger.warn(
+        { status: spawnResult.status, stderr: spawnResult.stderr.trim() },
+        'Security command failed'
+      );
+      return null;
+    }
+
+    const output = spawnResult.stdout.trim();
 
     // Parse and validate the JSON credentials structure with Zod
     const json: unknown = JSON.parse(output);
-    const result = KeychainCredentialsSchema.safeParse(json);
-    if (!result.success) {
+    const parseResult = KeychainCredentialsSchema.safeParse(json);
+    if (!parseResult.success) {
       logger.debug(
-        { error: formatZodError(result.error) },
+        { error: formatZodError(parseResult.error) },
         'Invalid credentials structure in Keychain'
       );
       return null;
     }
 
-    const claudeAuth = result.data.claudeAiOauth;
+    const claudeAuth = parseResult.data.claudeAiOauth;
     if (claudeAuth === undefined) {
       logger.debug('No Claude OAuth credentials found in Keychain');
       return null;
@@ -43,9 +63,10 @@ function getOAuthTokenFromKeychain(): string | null {
       return null;
     }
 
-    // Validate token expiration
+    // Validate token expiration (expiresAt can be number or string)
     if (expiresAt !== undefined && expiresAt !== '') {
-      const expiryMs = parseInt(expiresAt, 10);
+      // Handle both number (timestamp) and string (may need parsing)
+      const expiryMs = typeof expiresAt === 'number' ? expiresAt : parseInt(expiresAt, 10);
       const expiryDate = new Date(expiryMs);
       const now = new Date();
 
@@ -59,12 +80,15 @@ function getOAuthTokenFromKeychain(): string | null {
 
     return accessToken;
   } catch (error) {
-    // Token not found in Keychain or parsing error
-    if (error instanceof Error && error.message.includes('could not be found')) {
-      logger.debug('Claude Code credentials not found in Keychain');
-    } else {
-      logger.error({ error }, 'Error reading OAuth token from Keychain');
-    }
+    // JSON parsing or other unexpected errors
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(
+      {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      'Unexpected error reading OAuth token from Keychain'
+    );
     return null;
   }
 }

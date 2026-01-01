@@ -371,3 +371,38 @@ Currently stubs - will contain app-specific Rust code as needed.
 - [ ] Tree-sitter syntax highlighting
 - [ ] LSP/diagnostics integration
 - [ ] Advanced search features
+
+## Troubleshooting
+
+### Zod Schema Validation Errors
+
+**IMPORTANT:** If you encounter runtime errors or unexpected behavior with data parsing/validation, **check the Zod schemas first** before debugging elsewhere.
+
+Common symptoms:
+
+- "Invalid credentials" or "No credentials found" errors
+- Data parsing silently returning `null`
+- "Unrecognized keys" or "Invalid input: expected X, received Y" in logs
+
+**Root cause:** Schemas using `.strict()` will reject data with extra fields, and type mismatches (e.g., `number` vs `string`) cause validation failures.
+
+**Where to look:**
+
+- `agent-bridge/src/schemas.ts` - Bridge IPC schemas
+- `packages/shared-schemas/` - Shared validation schemas
+
+**Quick fix pattern:**
+
+- For **external data** (APIs, Keychain, SDK responses): Use `.loose()` instead of `.strict()`
+- For **type mismatches**: Use `z.union([z.number(), z.string()])` for flexible types
+- For **internal data** (your own code): `.strict()` is fine
+
+**Example fix (from KeychainCredentialsSchema):**
+
+```typescript
+// BAD: Too strict for external data
+.object({ expiresAt: z.string() }).strict()
+
+// GOOD: Flexible for external data that may change
+.object({ expiresAt: z.union([z.number(), z.string()]) }).loose()
+```

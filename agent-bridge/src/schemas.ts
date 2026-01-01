@@ -472,17 +472,24 @@ export type SessionStorageData = z.infer<typeof SessionStorageDataSchema>;
 // Credentials Schemas
 // ============================================================================
 
+// OAuth token schema - allows additional fields from Claude CLI (refreshToken, scopes, etc.)
+// expiresAt can be number (timestamp) or string (ISO date or stringified timestamp)
 export const OAuthTokenSchema = z
   .object({
     accessToken: z.string().optional(),
-    expiresAt: z.string().optional(),
+    expiresAt: z.union([z.number(), z.string()]).optional(),
+    // Additional fields that may be present (not strictly required)
+    refreshToken: z.string().optional(),
+    scopes: z.array(z.string()).optional(),
+    subscriptionType: z.string().optional(),
+    rateLimitTier: z.string().optional(),
   })
-  .strict();
+  .loose(); // Allow any additional fields we don't know about
 export type OAuthToken = z.infer<typeof OAuthTokenSchema>;
 
 export const KeychainCredentialsSchema = z
   .object({
     claudeAiOauth: OAuthTokenSchema.optional(),
   })
-  .strict();
+  .loose(); // Allow any additional fields
 export type KeychainCredentials = z.infer<typeof KeychainCredentialsSchema>;
