@@ -10,8 +10,12 @@
 //!
 //! # Usage
 //!
-//! ```rust
-//! use crate::devmonitor::{emit_trace, emit_span_enter, emit_span_exit};
+//! ```rust,no_run
+//! use snowflake_app_lib::devmonitor::{emit_trace, emit_span_enter, emit_span_exit};
+//! use serde_json::json;
+//! use tauri::AppHandle;
+//!
+//! fn example(app: &AppHandle) {
 //!
 //! // Simple trace event
 //! emit_trace(&app, "info", "snowflake::fs", "File saved successfully", None);
@@ -19,7 +23,9 @@
 //! // Span tracking
 //! let span_id = emit_span_enter(&app, "read_file", "snowflake::fs", Some(json!({"path": "/foo"})));
 //! // ... do work ...
+//! let duration_us = 1000u64;
 //! emit_span_exit(&app, span_id, "read_file", "snowflake::fs", duration_us);
+//! }
 //! ```
 
 use std::fmt::{Debug, Formatter, Result as FmtResult};
@@ -184,9 +190,16 @@ pub fn emit_span_exit(app: &AppHandle, span_id: u64, name: &str, target: &str, d
 ///
 /// # Example
 ///
-/// ```rust
-/// trace_info!(app, "File saved successfully");
-/// trace_info!(app, "File saved", json!({"path": path}));
+/// ```rust,no_run
+/// use snowflake_app_lib::trace_info;
+/// use serde_json::json;
+/// use tauri::AppHandle;
+///
+/// fn example(app: &AppHandle) {
+///     let path = "/foo/bar";
+///     trace_info!(app, "File saved successfully");
+///     trace_info!(app, "File saved", json!({"path": path}));
+/// }
 /// ```
 #[macro_export]
 macro_rules! trace_info {
@@ -235,9 +248,12 @@ macro_rules! trace_debug {
 ///
 /// # Example
 ///
-/// ```rust
-/// {
-///     let _span = SpanGuard::new(&app, "read_file", module_path!());
+/// ```rust,no_run
+/// use snowflake_app_lib::devmonitor::SpanGuard;
+/// use tauri::AppHandle;
+///
+/// fn example(app: &AppHandle) {
+///     let _span = SpanGuard::new(app, "read_file", module_path!());
 ///     // ... do work ...
 /// } // Span automatically exits here with duration
 /// ```
@@ -346,8 +362,11 @@ impl Drop for SpanGuard {
 ///
 /// # Example
 ///
-/// ```rust
-/// {
+/// ```rust,no_run
+/// use snowflake_app_lib::span;
+/// use tauri::AppHandle;
+///
+/// fn example(app: &AppHandle) {
 ///     let _span = span!(app, "read_file");
 ///     // ... do work ...
 /// } // Span automatically exits here
