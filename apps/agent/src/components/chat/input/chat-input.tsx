@@ -760,47 +760,38 @@ export const ChatInput: FC<ChatInputProps> = ({
                 </ContextContentBody>
               </ContextContent>
             </Context>
-            {/* Send/Stop Button */}
-            {isAgentRunning && isInputEmpty ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={onStop}
-                    className={cn(
-                      'h-7 w-7 flex items-center justify-center rounded-full',
-                      'bg-destructive text-destructive-foreground',
-                      'transition-all duration-150',
-                      'hover:bg-destructive/90 hover:scale-105',
-                      'active:scale-95',
-                      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
-                    )}
-                  >
-                    <Square className="h-3 w-3 fill-current" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>Stop (Esc)</TooltipContent>
-              </Tooltip>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={handleSend}
-                    disabled={isInputEmpty}
-                    className={cn(
-                      'h-7 w-7 flex items-center justify-center rounded-full',
-                      'transition-all duration-150',
-                      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
-                      isInputEmpty
+            {/* Send/Stop Button - Single button with state-based styling */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={isAgentRunning && isInputEmpty ? onStop : handleSend}
+                  disabled={!isAgentRunning && isInputEmpty}
+                  className={cn(
+                    'h-7 w-7 flex items-center justify-center rounded-full',
+                    'transition-all duration-200 ease-out',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
+                    isAgentRunning && isInputEmpty
+                      ? 'bg-red-400/80 text-white dark:bg-red-400/70 hover:bg-red-400/90 dark:hover:bg-red-400/80'
+                      : isInputEmpty
                         ? 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed'
                         : 'bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 hover:shadow-[0_0_16px_-2px_var(--primary)] active:scale-95'
-                    )}
-                  >
+                  )}
+                >
+                  {isAgentRunning && isInputEmpty ? (
+                    <Square className="h-2.5 w-2.5 fill-current" strokeWidth={0} />
+                  ) : (
                     <ArrowUp className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{isAgentRunning ? 'Queue message' : 'Send message'}</TooltipContent>
-              </Tooltip>
-            )}
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isAgentRunning && isInputEmpty
+                  ? 'Stop (Esc)'
+                  : isAgentRunning
+                    ? 'Queue message'
+                    : 'Send message'}
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </div>

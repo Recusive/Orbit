@@ -97,15 +97,24 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
 
   const handleStartConversation = useCallback((): void => {
+    // Skip if current conversation is empty (title still "Untitled" means no message sent)
+    const activeConv = conversations.find((c) => c.sessionId === activeConversationId);
+    if (activeConv?.title === 'Untitled') {
+      return;
+    }
     postMessage({
       type: 'conversation:create',
       uuid: crypto.randomUUID(),
       title: 'Untitled',
     });
-  }, [postMessage]);
+  }, [conversations, activeConversationId, postMessage]);
 
   const handleLoadConversation = useCallback(
     (sessionId: string): void => {
+      // Skip if already viewing this conversation
+      if (sessionId === activeConversationId) {
+        return;
+      }
       // Set loading and transitioning states SYNCHRONOUSLY before any async work
       // This ensures opacity-0 is applied before new content renders
       setLoadingConversation(true);
@@ -117,7 +126,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         session_id: sessionId,
       });
     },
-    [setLoadingConversation, setConversationTransitioning, postMessage]
+    [activeConversationId, setLoadingConversation, setConversationTransitioning, postMessage]
   );
 
   const handleOpenQuickSearch = useCallback((): void => {

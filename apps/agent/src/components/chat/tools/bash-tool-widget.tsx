@@ -19,7 +19,8 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   output,
   isRunning = false,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  // Start collapsed to prevent layout flash from async Shiki highlighting
+  const [isExpanded, setIsExpanded] = useState(false);
   const [highlightedCommand, setHighlightedCommand] = useState<string>('');
 
   // Syntax highlight the command

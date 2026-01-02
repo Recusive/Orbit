@@ -125,7 +125,7 @@ export type SlashCommandDefinition = z.infer<typeof SlashCommandDefinitionSchema
 
 export const PermissionResponseSchema = z
   .object({
-    sessionId: z.string(),
+    sessionId: z.string().optional(), // Optional - permission lookup uses requestId only
     requestId: z.string(),
     decision: DecisionSchema,
     always: z.boolean(),

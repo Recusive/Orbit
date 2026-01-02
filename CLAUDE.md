@@ -161,6 +161,30 @@ This command:
 | CSS/Tailwind                         | Instant HMR via Vite        |
 | Rust (`src-tauri/`)                  | Auto-rebuilds, restarts app |
 | Rust crates (`crates/`)              | Auto-rebuilds, restarts app |
+| agent-bridge (`agent-bridge/`)       | **Manual rebuild required** |
+
+### Agent Bridge Sidecar (IMPORTANT)
+
+The agent-bridge is a **compiled Bun binary** that Tauri spawns as a sidecar process. Unlike other code, **changes to agent-bridge require manual rebuilding**:
+
+```bash
+cd agent-bridge
+npm run build:dev    # Compiles to target/debug/agent-bridge
+```
+
+Then restart the Tauri app (`Cmd+C` → `pnpm tauri dev`).
+
+**Why manual rebuild?**
+
+- Tauri watches Rust code, not the agent-bridge TypeScript
+- The sidecar is a standalone binary (58MB) with embedded Bun runtime
+- Located at `target/debug/agent-bridge` in dev mode
+
+**Two build outputs:**
+| Script | Output | Purpose |
+|--------|--------|---------|
+| `npm run build` | `dist/index.js` | JS bundle (requires Bun to run) |
+| `npm run build:dev` | `target/debug/agent-bridge` | Standalone binary for Tauri |
 
 ### Production Build
 

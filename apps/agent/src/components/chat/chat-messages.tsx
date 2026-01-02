@@ -149,7 +149,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto overflow-x-hidden p-4"
+      className={`flex-1 overflow-y-auto overflow-x-hidden p-4${isTransitioning ? ' no-transitions' : ''}`}
       style={{
         scrollbarGutter: 'stable both-edges',
         visibility: isTransitioning ? 'hidden' : 'visible',

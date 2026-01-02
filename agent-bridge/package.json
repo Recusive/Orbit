@@ -7,6 +7,7 @@
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target bun --sourcemap=external",
     "build:bundle": "bun build src/index.ts --outdir dist --target bun --minify",
+    "build:dev": "bun build --compile --target=bun-darwin-arm64 src/index.ts --outfile ../target/debug/agent-bridge",
     "dev": "bun --watch src/index.ts",
     "typecheck": "tsc --noEmit",
     "start": "bun src/index.ts"

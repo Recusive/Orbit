@@ -664,6 +664,7 @@ html.dark [data-streamdown="code-block-container"] {
       opacity: 0.5;
     }
   }
+
 }
 
 /* Scrollbar styling for WKWebView */
@@ -733,6 +734,12 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 /* For diff viewer lines - tight containment */
 .diff-line {
   contain: layout style paint;
+}
+
+/* Disable all transitions during conversation switching to prevent layout flash */
+.no-transitions,
+.no-transitions * {
+  transition: none !important;
 }
 
 /* For file tree items */
