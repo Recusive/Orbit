@@ -23,7 +23,7 @@ import type { ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files';
-import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/constants';
+import { CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/constants';
 
 export interface ChatMessage {
   id: string;
@@ -268,7 +268,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
       {message.role === 'user' ? (
         /* User message bubble */
         <div
-          className="p-2 mx-auto rounded-xl bg-card border border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
+          className="p-2 rounded-xl bg-card border border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
           style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
         >
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.displayedContent}</p>
@@ -276,9 +276,10 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
       ) : (
         /* Assistant message - no bubble, content flows naturally */
         <div
-          className="py-1 mx-auto"
+          className="py-1"
           style={{
-            maxWidth: `var(${CHAT_WIDTH_VAR.secondary}, ${String(CHAT_WIDTH.secondary)}px)`,
+            paddingLeft: CHAT_SPACING.assistantPadding,
+            paddingRight: CHAT_SPACING.assistantPadding,
           }}
         >
           {/* Thinking Box - show when thinking content exists */}

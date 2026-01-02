@@ -49,24 +49,31 @@ export const PANEL_SIZES = {
 /**
  * Chat Layout Width System
  *
- * Width hierarchy:
- * - Primary (800px): Input box, user message bubbles
- * - Secondary (768px): Assistant messages, tool widgets
+ * Layout approach:
+ * - Primary (650px max-width): Input box, user message bubbles, content wrapper
+ * - Assistant messages: Use padding for consistent narrower width at all screen sizes
  *
- * Uses CSS custom properties for responsive behavior.
- * Components should use CHAT_WIDTH_VAR with fallbacks.
+ * Uses CSS custom properties (--chat-width-primary) for responsive behavior.
+ * The responsive breakpoints in globals.css scale --chat-max-width on smaller screens.
  */
 export const CHAT_WIDTH = {
   /** Base max-width for all chat content */
-  base: 800,
-  /** Input box and user message bubbles */
-  primary: 800,
-  /** Assistant messages, tool widgets, markdown content (32px narrower) */
-  secondary: 768,
+  base: 650,
+  /** Input box, user message bubbles, content wrapper */
+  primary: 650,
   /** Dropdown menus */
   dropdown: 200,
   /** File name truncation */
   fileName: 200,
+} as const;
+
+/**
+ * Chat layout spacing
+ * Used for consistent margins/padding in chat messages
+ */
+export const CHAT_SPACING = {
+  /** Horizontal padding for assistant messages (9px each side = 18px narrower than user bubble) */
+  assistantPadding: 9,
 } as const;
 
 /**
@@ -78,19 +85,6 @@ export const CHAT_WIDTH = {
  */
 export const CHAT_WIDTH_VAR = {
   primary: '--chat-width-primary',
-  secondary: '--chat-width-secondary',
-} as const;
-
-/**
- * @deprecated Use CHAT_WIDTH instead
- * Legacy export for backwards compatibility
- */
-export const CONTENT_WIDTH = {
-  inputBox: CHAT_WIDTH.primary,
-  messageFeed: CHAT_WIDTH.secondary,
-  dropdown: CHAT_WIDTH.dropdown,
-  fileName: CHAT_WIDTH.fileName,
-  expandedContent: 400,
 } as const;
 
 /**

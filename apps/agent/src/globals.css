@@ -201,11 +201,10 @@
   --terminal-cursor: oklch(0.85 0.01 75);
 
   /* Chat Layout Width System
-     Primary = input box, user message bubbles (full width)
-     Secondary = assistant content, tools (slightly narrower for visual hierarchy) */
-  --chat-max-width: 800px;
+     Primary = input box, user message bubbles, content wrapper
+     Assistant messages use padding for consistent narrower width at all screen sizes */
+  --chat-max-width: 650px;
   --chat-width-primary: var(--chat-max-width);
-  --chat-width-secondary: calc(var(--chat-max-width) - 32px);
 }
 
 /* Responsive chat widths - scales down on smaller screens */
