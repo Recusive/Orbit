@@ -1,13 +1,4 @@
-import {
-  ArrowLeft,
-  ArrowRight,
-  FileCode,
-  GitBranch,
-  GitCompareArrows,
-  Globe,
-  Search,
-  X,
-} from 'lucide-react';
+import { Ellipsis, SplitSquareHorizontal, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef } from 'react';
 
 import type { BrowserPanelProps } from '@/components/browser/browser-panel';
@@ -18,7 +9,6 @@ import type { FC } from 'react';
 
 import { FileIcon, FileViewer } from '@/components/files';
 import { FilesChangedList, SourceControlTab } from '@/components/git';
-import { ButtonGroup } from '@/components/ui/button-group';
 import { useTauri } from '@/hooks/use-tauri';
 import { lspDidClose, lspDidOpen } from '@/lib/backend';
 import { cn } from '@/lib/utils';
@@ -55,56 +45,19 @@ interface ActivityPanelProps {
   readonly width: number;
 }
 
-interface TabButtonProps {
-  readonly active: boolean;
-  readonly onClick: () => void;
-  readonly icon: FC<{ className?: string }>;
-  readonly label: string;
-  readonly compact?: boolean;
-}
-
-const TabButton: FC<TabButtonProps> = ({ active, onClick, icon: Icon, label, compact = false }) => {
-  return (
-    <button
-      onClick={active ? undefined : onClick}
-      disabled={active}
-      className={cn(
-        'relative flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-colors select-none shrink-0',
-        active ? 'text-foreground cursor-default' : 'text-muted-foreground hover:text-foreground'
-      )}
-      title={label}
-    >
-      {/* Tab background - Orbit style */}
-      <div
-        className={cn(
-          'absolute inset-0 rounded-t-md transition-colors',
-          active ? 'bg-sidebar-accent' : 'hover:bg-muted/50'
-        )}
-      />
-      {/* Active indicator - bottom border accent */}
-      {active ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary" /> : null}
-      <Icon className="relative h-3.5 w-3.5 shrink-0" />
-      <span
-        className={cn(
-          'relative truncate',
-          compact ? 'hidden @[500px]:inline' : 'hidden @[440px]:inline'
-        )}
-      >
-        {label}
-      </span>
-    </button>
-  );
-};
-
-interface InlineFileTabProps {
+interface EditorTabProps {
   readonly file: ViewedFile;
   readonly isActive: boolean;
   readonly onSelect: () => void;
   readonly onClose: () => void;
 }
 
-const InlineFileTab: FC<InlineFileTabProps> = ({ file, isActive, onSelect, onClose }) => {
+/**
+ * VS Code-style editor tab with border styling and close button
+ */
+const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) => {
   const fileName = file.path.split('/').pop() ?? file.path;
+  const isModified = file.isModified;
 
   const handleCloseClick = (e: React.MouseEvent): void => {
     e.stopPropagation();
@@ -114,27 +67,59 @@ const InlineFileTab: FC<InlineFileTabProps> = ({ file, isActive, onSelect, onClo
   return (
     <div
       onClick={onSelect}
+      role="tab"
+      aria-selected={isActive}
+      aria-label={fileName}
+      tabIndex={isActive ? 0 : -1}
       className={cn(
-        'relative group flex items-center gap-1.5 px-2 py-1 text-xs cursor-pointer rounded-t transition-colors max-w-[160px]',
+        'group relative flex items-center h-full px-3 text-[13px] cursor-pointer select-none shrink-0',
+        'border-r border-border/50',
         isActive
-          ? 'bg-accent text-foreground'
-          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+          ? 'bg-background text-foreground'
+          : 'bg-sidebar text-muted-foreground hover:text-foreground'
       )}
+      style={{ maxWidth: 180 }}
     >
-      {isActive ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary" /> : null}
-      <FileIcon fileName={fileName} className="h-4 w-4" />
-      <span className="truncate">{fileName}</span>
-      <button
-        onClick={handleCloseClick}
+      {/* Top border accent for active tab */}
+      <div
         className={cn(
-          'h-4 w-4 flex items-center justify-center rounded transition-opacity',
-          isActive
-            ? 'opacity-70 hover:opacity-100'
-            : 'opacity-0 group-hover:opacity-70 hover:opacity-100'
+          'absolute top-0 inset-x-0 h-0.5 transition-colors',
+          isActive ? 'bg-primary' : 'bg-transparent'
         )}
-      >
-        <X className="h-3 w-3" />
-      </button>
+      />
+
+      {/* Bottom border - hide for active tab (connects to content) */}
+      <div
+        className={cn(
+          'absolute bottom-0 inset-x-0 h-px',
+          isActive ? 'bg-background' : 'bg-border/50'
+        )}
+      />
+
+      {/* File icon */}
+      <FileIcon fileName={fileName} className="h-4 w-4 shrink-0" />
+
+      {/* File name */}
+      <span className={cn('ml-2 truncate', isModified && 'italic')}>{fileName}</span>
+
+      {/* Modified indicator or close button */}
+      <div className="ml-2 w-4 h-4 flex items-center justify-center shrink-0">
+        {isModified && !isActive ? (
+          <div className="w-2 h-2 rounded-full bg-foreground/50 group-hover:hidden" />
+        ) : null}
+        <button
+          onClick={handleCloseClick}
+          className={cn(
+            'w-4 h-4 flex items-center justify-center rounded transition-all hover:bg-muted',
+            isActive || isModified
+              ? 'opacity-70 hover:opacity-100'
+              : 'opacity-0 group-hover:opacity-70'
+          )}
+          aria-label={`Close ${fileName}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   );
 };
@@ -145,10 +130,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
   const activeTabPath = useFileViewerStore((state) => state.activeTabPath);
   const setActiveFileTab = useFileViewerStore((state) => state.setActiveTab);
   const closeTab = useFileViewerStore((state) => state.closeTab);
-  const toggleSearch = useFileViewerStore((state) => state.toggleSearch);
   const openFileWithDiff = useFileViewerStore((state) => state.openFileWithDiff);
-  const goBack = useFileViewerStore((state) => state.goBack);
-  const goForward = useFileViewerStore((state) => state.goForward);
   const activeTab = useActivityTab();
   const setActiveTab = useUIStore((state) => state.setActivityTab);
   const { bottomPanelOpen } = useUIStore();
@@ -295,133 +277,56 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
 
   return (
     <div className="@container h-full flex flex-col bg-chat-area shrink-0" style={{ width }}>
-      {/* Header - different view when on File tab vs other tabs */}
-      <div
-        className="flex items-center gap-2 px-4 overflow-hidden border-b border-border shrink-0"
-        style={{ height: 35 }}
-      >
-        {activeTab === 'file' && hasOpenFiles ? (
-          <>
-            {/* File view header: "File:" label + navigation + inline file tabs + exit */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">File:</span>
-            </div>
+      {/* Header - Only show VS Code style tabs when files are open */}
+      {activeTab === 'file' && hasOpenFiles ? (
+        <div
+          className="flex items-center overflow-hidden shrink-0 bg-sidebar border-b border-border/50"
+          style={{ height: 35 }}
+        >
+          {/* VS Code-style tabs container */}
+          <div
+            className="flex items-center flex-1 min-w-0 h-full overflow-x-auto scrollbar-hide"
+            role="tablist"
+            aria-label="Open files"
+          >
+            {openTabs.map((tab) => (
+              <EditorTab
+                key={tab.path}
+                file={tab}
+                isActive={tab.path === activeTabPath}
+                onSelect={() => {
+                  setActiveFileTab(tab.path);
+                }}
+                onClose={() => {
+                  handleCloseTab(tab.path);
+                }}
+              />
+            ))}
+          </div>
 
-            {/* Navigation buttons - only show when there are multiple tabs */}
-            {openTabs.length > 1 ? (
-              <div className="flex items-center gap-0.5 shrink-0">
-                <button
-                  onClick={goBack}
-                  className="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-accent opacity-70 hover:opacity-100"
-                  title="Previous tab"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={goForward}
-                  className="h-6 w-6 flex items-center justify-center rounded transition-colors hover:bg-accent opacity-70 hover:opacity-100"
-                  title="Next tab"
-                >
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ) : null}
-
-            {/* Inline file tabs */}
-            <div className="flex items-center overflow-x-auto scrollbar-hide flex-1 min-w-0">
-              {openTabs.map((tab) => (
-                <InlineFileTab
-                  key={tab.path}
-                  file={tab}
-                  isActive={tab.path === activeTabPath}
-                  onSelect={() => {
-                    setActiveFileTab(tab.path);
-                  }}
-                  onClose={() => {
-                    handleCloseTab(tab.path);
-                  }}
-                />
-              ))}
-            </div>
-
-            {/* Back to normal tabs button */}
+          {/* Editor actions - VS Code style */}
+          <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-border/50 bg-sidebar">
             <button
               onClick={() => {
-                setActiveTab('files');
+                // TODO: Implement split editor
               }}
-              className="h-7 px-2 flex items-center justify-center gap-1 rounded-md border border-border bg-muted/50 hover:bg-accent transition-colors shrink-0 text-xs text-muted-foreground hover:text-foreground"
-              title="Back to tabs"
+              className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+              title="Split Editor (⌘\)"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden @[500px]:inline">Back</span>
+              <SplitSquareHorizontal className="h-4 w-4" />
             </button>
-          </>
-        ) : (
-          <>
-            {/* Normal tabs view */}
-            <div className="flex gap-1 min-w-0">
-              {hasOpenFiles ? (
-                <TabButton
-                  active={false}
-                  onClick={() => {
-                    setActiveTab('file');
-                  }}
-                  icon={FileCode}
-                  label="File"
-                  compact
-                />
-              ) : null}
-              <TabButton
-                active={activeTab === 'files'}
-                onClick={() => {
-                  setActiveTab('files');
-                }}
-                icon={GitCompareArrows}
-                label="Changed"
-                compact={hasOpenFiles}
-              />
-              <TabButton
-                active={activeTab === 'source'}
-                onClick={() => {
-                  setActiveTab('source');
-                }}
-                icon={GitBranch}
-                label="Source"
-                compact={hasOpenFiles}
-              />
-              <TabButton
-                active={activeTab === 'browser'}
-                onClick={() => {
-                  setActiveTab('browser');
-                }}
-                icon={Globe}
-                label="Browser"
-                compact={hasOpenFiles}
-              />
-            </div>
-
-            {/* Spacer */}
-            <div className="flex-1" />
-
-            {/* Search bar */}
-            <ButtonGroup className="h-7 shrink-0">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="h-7 w-28 min-w-0 rounded-md rounded-r-none border border-border bg-muted/50 px-2 text-xs outline-none placeholder:text-muted-foreground focus:bg-muted focus:ring-1 focus:ring-inset focus:ring-ring"
-              />
-              <button
-                onClick={toggleSearch}
-                className="h-7 w-7 flex items-center justify-center rounded-md rounded-l-none border border-l-0 border-border bg-muted/50 hover:bg-accent transition-colors"
-                title="Search"
-              >
-                <Search className="h-3.5 w-3.5" />
-              </button>
-            </ButtonGroup>
-          </>
-        )}
-      </div>
+            <button
+              onClick={() => {
+                // TODO: Show more actions menu
+              }}
+              className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+              title="More Actions..."
+            >
+              <Ellipsis className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">

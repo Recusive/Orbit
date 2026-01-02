@@ -81,7 +81,10 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
   }, [isSelectingElement, onSelectElement, onCancelSelectElement]);
 
   return (
-    <div className="h-10 flex items-center gap-1 px-2 border-b border-border bg-background">
+    <div
+      className="flex items-center gap-1 px-2 border-b border-border bg-background shrink-0"
+      style={{ height: 35 }}
+    >
       {/* Navigation buttons */}
       <button
         onClick={onBack}

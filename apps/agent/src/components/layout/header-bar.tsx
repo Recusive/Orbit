@@ -1,4 +1,3 @@
-import { IconCodeInsert } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconCodeInsert';
 import { Moon, Search, SquareTerminal, Sun } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -195,7 +194,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
             <TooltipContent>Terminal</TooltipContent>
           </Tooltip>
 
-          {/* Activity Button */}
+          {/* Activity Panel Toggle */}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -233,10 +232,12 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                 </div>
               </button>
             </TooltipTrigger>
-            <TooltipContent>Editor</TooltipContent>
+            <TooltipContent>
+              {reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}
+            </TooltipContent>
           </Tooltip>
 
-          {/* Right Sidebar Button */}
+          {/* Actions Bar Toggle */}
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -249,10 +250,27 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                     : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/60'
                 )}
               >
-                <IconCodeInsert size={16} />
+                <svg
+                  aria-hidden="true"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 5H4C3.44772 5 3 5.44772 3 6V18C3 18.5523 3.44772 19 4 19H12M16 5H20C20.5523 5 21 5.44772 21 6V18C21 18.5523 20.5523 19 20 19H16M16 5V2.5M16 5V19M16 19V21.5M8 9.5L10.5 12L8 14.5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </button>
             </TooltipTrigger>
-            <TooltipContent>{rightSidebarOpen ? 'Hide sessions' : 'Show sessions'}</TooltipContent>
+            <TooltipContent>
+              {rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
+            </TooltipContent>
           </Tooltip>
         </div>
       </div>

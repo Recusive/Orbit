@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { ActionsBar } from './actions-bar';
 import { ChatArea } from './chat-area';
 import { HeaderBar } from './header-bar';
 import { PrimarySidebar } from './primary-sidebar';
-import { SecondaryPanel } from './secondary-panel';
 import { StatusBar } from './status-bar';
 
 import type { ExtensionMessage } from '@/types/protocol';
@@ -115,8 +115,8 @@ export const RootLayout: FC = () => {
         {/* Chat Area - Main chat interface with Activity panel */}
         <ChatArea />
 
-        {/* Secondary Panel - Sessions list */}
-        {rightSidebarOpen ? <SecondaryPanel /> : null}
+        {/* Actions Bar - Activity Panel tab switcher */}
+        {rightSidebarOpen ? <ActionsBar /> : null}
       </div>
 
       {/* Status Bar - Git branch, sync status */}

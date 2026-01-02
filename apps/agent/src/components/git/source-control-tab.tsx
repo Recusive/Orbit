@@ -404,7 +404,10 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header with Branch Dropdown */}
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50">
+      <div
+        className="flex items-center justify-between px-4 border-b border-border shrink-0"
+        style={{ height: 35 }}
+      >
         <DropdownMenu>
           <DropdownMenuTrigger
             disabled={isCheckingOut || branches.length === 0}
