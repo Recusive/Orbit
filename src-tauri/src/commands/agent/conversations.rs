@@ -163,6 +163,9 @@ pub struct ConversationSummaryDto {
     pub updated_at: u64,
     /// Message count
     pub message_count: usize,
+    /// Workspace path
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_path: Option<String>,
 }
 
 impl From<ConversationSummary> for ConversationSummaryDto {
@@ -172,6 +175,7 @@ impl From<ConversationSummary> for ConversationSummaryDto {
             title: summary.title,
             updated_at: summary.updated_at,
             message_count: summary.message_count,
+            workspace_path: summary.workspace_path,
         }
     }
 }
@@ -185,18 +189,20 @@ impl From<ConversationSummary> for ConversationSummaryDto {
 pub fn conversation_create(
     session_id: String,
     title: String,
+    workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<ConversationDto> {
-    let conv = manager.create(session_id, title)?;
+    let conv = manager.create(session_id, title, workspace_path)?;
     Ok(ConversationDto::from(conv))
 }
 
-/// List all conversations (summaries only)
+/// List conversations for a workspace (summaries only)
 #[tauri::command]
 pub fn conversation_list(
+    workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<Vec<ConversationSummaryDto>> {
-    let summaries = manager.load_summaries()?;
+    let summaries = manager.load_summaries_for_workspace(workspace_path.as_deref())?;
     Ok(summaries
         .into_iter()
         .map(ConversationSummaryDto::from)
@@ -237,9 +243,14 @@ pub fn conversation_update_title(
 pub fn conversation_add_message(
     session_id: String,
     message: MessageDto,
+    workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<()> {
-    manager.add_message(&session_id, Message::from(message))
+    manager.add_message(
+        &session_id,
+        Message::from(message),
+        workspace_path.as_deref(),
+    )
 }
 
 /// Fork (rewind) a conversation
@@ -258,4 +269,10 @@ pub fn conversation_fork(
 #[tauri::command]
 pub fn conversation_data_path(manager: State<'_, ConversationManager>) -> String {
     manager.data_dir().to_string_lossy().to_string()
+}
+
+/// Delete all conversations without a workspace path (orphaned)
+#[tauri::command]
+pub fn conversation_cleanup_orphaned(manager: State<'_, ConversationManager>) -> Result<usize> {
+    manager.cleanup_orphaned_conversations()
 }

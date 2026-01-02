@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
@@ -386,6 +387,22 @@ export const useIsConversationTransitioning = (): boolean => {
 
 export const useConversations = (): ConversationSummary[] => {
   return useUIStore((state) => state.conversations);
+};
+
+export const useWorkspaceConversations = (): ConversationSummary[] => {
+  // Get raw state values with stable selectors
+  const workspacePath = useUIStore((state) => state.workspacePath);
+  const conversations = useUIStore((state) => state.conversations);
+
+  // Memoize the filtered result to prevent unnecessary re-renders
+  return useMemo(() => {
+    if (!workspacePath) {
+      // No workspace set - return empty list (user should open a folder first)
+      return [];
+    }
+    // Filter to only show conversations for the current workspace
+    return conversations.filter((c) => c.workspacePath === workspacePath);
+  }, [workspacePath, conversations]);
 };
 
 export const useTerminalPosition = (): TerminalPosition => {

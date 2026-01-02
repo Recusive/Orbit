@@ -126,6 +126,7 @@ export const StoredConversationSummarySchema = z
     title: z.string(),
     updatedAt: z.number(),
     messageCount: z.number(),
+    workspacePath: z.string().optional(),
   })
   .strict();
 
@@ -238,7 +239,7 @@ export const CreateConversationSchema = z
     type: z.literal('conversation:create'),
     uuid: UUIDSchema,
     title: z.string().optional(),
-    workspace_id: z.string().optional(),
+    workspace_path: z.string().optional(),
   })
   .strict();
 
@@ -254,6 +255,7 @@ export const GetConversationsSchema = z
   .object({
     type: z.literal('conversation:list'),
     uuid: UUIDSchema,
+    workspace_path: z.string().optional(),
   })
   .strict();
 
@@ -1276,6 +1278,7 @@ export const ConversationCreatedSchema = z
     uuid: UUIDSchema,
     session_id: SessionIdSchema,
     title: z.string(),
+    workspace_path: z.string().optional(),
   })
   .strict();
 
@@ -1298,6 +1301,7 @@ export const ConversationListSchema = z
           title: z.string(),
           updated_at: z.number(),
           message_count: z.number(),
+          workspace_path: z.string().optional(),
         })
         .strict()
     ),

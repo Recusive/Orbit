@@ -105,7 +105,7 @@ pub struct Conversation {
 impl Conversation {
     /// Create a new empty conversation
     #[must_use]
-    pub fn new(session_id: String, title: String) -> Self {
+    pub fn new(session_id: String, title: String, workspace_path: Option<String>) -> Self {
         let now = current_timestamp();
         Self {
             session_id,
@@ -113,7 +113,7 @@ impl Conversation {
             created_at: now,
             updated_at: now,
             messages: Vec::new(),
-            workspace_path: None,
+            workspace_path,
             forked_from: None,
         }
     }
@@ -180,6 +180,9 @@ pub struct ConversationSummary {
     pub updated_at: u64,
     /// Number of messages
     pub message_count: usize,
+    /// Optional workspace path associated with this conversation
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_path: Option<String>,
 }
 
 impl From<&Conversation> for ConversationSummary {
@@ -189,6 +192,7 @@ impl From<&Conversation> for ConversationSummary {
             title: conv.title.clone(),
             updated_at: conv.updated_at,
             message_count: conv.messages.len(),
+            workspace_path: conv.workspace_path.clone(),
         }
     }
 }
@@ -319,13 +323,67 @@ impl ConversationManager {
         self.summaries.read().clone()
     }
 
+    /// Load all conversation summaries filtered by workspace path
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be read.
+    pub fn load_summaries_for_workspace(
+        &self,
+        workspace_path: Option<&str>,
+    ) -> Result<Vec<ConversationSummary>> {
+        let all_summaries = self.load_summaries()?;
+
+        match workspace_path {
+            Some(path) => {
+                // Filter to only conversations for this workspace
+                Ok(all_summaries
+                    .into_iter()
+                    .filter(|s| s.workspace_path.as_deref() == Some(path))
+                    .collect())
+            },
+            None => {
+                // No workspace specified - return only orphaned conversations
+                Ok(all_summaries
+                    .into_iter()
+                    .filter(|s| s.workspace_path.is_none())
+                    .collect())
+            },
+        }
+    }
+
+    /// Delete all conversations without a workspace path (orphaned)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any conversation cannot be deleted.
+    pub fn cleanup_orphaned_conversations(&self) -> Result<usize> {
+        let summaries = self.load_summaries()?;
+        let mut removed = 0;
+
+        for summary in summaries {
+            if summary.workspace_path.is_none() {
+                self.delete(&summary.session_id)?;
+                removed += 1;
+            }
+        }
+
+        tracing::info!("Cleaned up {} orphaned conversations", removed);
+        Ok(removed)
+    }
+
     /// Create a new conversation
     ///
     /// # Errors
     ///
     /// Returns an error if the conversation cannot be saved.
-    pub fn create(&self, session_id: String, title: String) -> Result<Conversation> {
-        let conversation = Conversation::new(session_id, title);
+    pub fn create(
+        &self,
+        session_id: String,
+        title: String,
+        workspace_path: Option<String>,
+    ) -> Result<Conversation> {
+        let conversation = Conversation::new(session_id, title, workspace_path);
         self.save(&conversation)?;
 
         // Update summaries cache
@@ -458,10 +516,19 @@ impl ConversationManager {
     /// # Errors
     ///
     /// Returns an error if the message cannot be added.
-    pub fn add_message(&self, session_id: &str, message: Message) -> Result<()> {
-        let mut conversation = self
-            .load(session_id)?
-            .unwrap_or_else(|| Conversation::new(session_id.to_owned(), String::from("New Chat")));
+    pub fn add_message(
+        &self,
+        session_id: &str,
+        message: Message,
+        workspace_path: Option<&str>,
+    ) -> Result<()> {
+        let mut conversation = self.load(session_id)?.unwrap_or_else(|| {
+            Conversation::new(
+                session_id.to_owned(),
+                String::from("New Chat"),
+                workspace_path.map(str::to_owned),
+            )
+        });
 
         conversation.add_message(message);
         self.save(&conversation)?;
@@ -582,7 +649,7 @@ mod tests {
         let (manager, _temp) = create_test_manager();
 
         let conv = manager
-            .create("session-1".to_owned(), "Test Chat".to_owned())
+            .create("session-1".to_owned(), "Test Chat".to_owned(), None)
             .expect("Failed to create conversation");
 
         assert_eq!(conv.session_id, "session-1");
@@ -594,7 +661,7 @@ mod tests {
     fn test_save_and_load() {
         let (manager, _temp) = create_test_manager();
 
-        let mut conv = Conversation::new("session-1".to_owned(), "Test Chat".to_owned());
+        let mut conv = Conversation::new("session-1".to_owned(), "Test Chat".to_owned(), None);
         conv.add_message(create_test_message(MessageRole::User, "Hello"));
         conv.add_message(create_test_message(MessageRole::Assistant, "Hi there!"));
 
@@ -625,7 +692,7 @@ mod tests {
         let (manager, _temp) = create_test_manager();
 
         let _ = manager
-            .create("session-1".to_owned(), "Test".to_owned())
+            .create("session-1".to_owned(), "Test".to_owned(), None)
             .expect("Failed to create");
 
         assert!(manager.load("session-1").expect("Failed to load").is_some());
@@ -640,7 +707,7 @@ mod tests {
         let (manager, _temp) = create_test_manager();
 
         let _ = manager
-            .create("session-1".to_owned(), "Old Title".to_owned())
+            .create("session-1".to_owned(), "Old Title".to_owned(), None)
             .expect("Failed to create");
 
         manager
@@ -660,12 +727,12 @@ mod tests {
         let (manager, _temp) = create_test_manager();
 
         let _ = manager
-            .create("session-1".to_owned(), "Test".to_owned())
+            .create("session-1".to_owned(), "Test".to_owned(), None)
             .expect("Failed to create");
 
         let msg = create_test_message(MessageRole::User, "Hello");
         manager
-            .add_message("session-1", msg)
+            .add_message("session-1", msg, None)
             .expect("Failed to add message");
 
         let loaded = manager
@@ -682,13 +749,13 @@ mod tests {
         let (manager, _temp) = create_test_manager();
 
         let _ = manager
-            .create("session-1".to_owned(), "Chat 1".to_owned())
+            .create("session-1".to_owned(), "Chat 1".to_owned(), None)
             .expect("Failed to create");
         let _ = manager
-            .create("session-2".to_owned(), "Chat 2".to_owned())
+            .create("session-2".to_owned(), "Chat 2".to_owned(), None)
             .expect("Failed to create");
         let _ = manager
-            .create("session-3".to_owned(), "Chat 3".to_owned())
+            .create("session-3".to_owned(), "Chat 3".to_owned(), None)
             .expect("Failed to create");
 
         let summaries = manager.load_summaries().expect("Failed to load summaries");
@@ -702,7 +769,7 @@ mod tests {
     fn test_fork_conversation() {
         let (manager, _temp) = create_test_manager();
 
-        let mut conv = Conversation::new("session-1".to_owned(), "Original".to_owned());
+        let mut conv = Conversation::new("session-1".to_owned(), "Original".to_owned(), None);
         conv.add_message(create_test_message(MessageRole::User, "Message 1"));
         conv.add_message(create_test_message(MessageRole::Assistant, "Response 1"));
         conv.add_message(create_test_message(MessageRole::User, "Message 2"));

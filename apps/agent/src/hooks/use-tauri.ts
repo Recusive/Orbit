@@ -530,13 +530,15 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
     try {
       const sessionId = crypto.randomUUID();
       const title = message.title ?? 'New Conversation';
-      await conversationCreate(sessionId, title);
+      const workspacePath = message.workspace_path;
+      await conversationCreate(sessionId, title, workspacePath);
       window.postMessage(
         {
           type: 'conversation:created',
           uuid: crypto.randomUUID(),
           session_id: sessionId,
           title,
+          workspace_path: workspacePath,
         },
         '*'
       );
@@ -550,6 +552,7 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
           uuid: crypto.randomUUID(),
           session_id: sessionId,
           title: message.title ?? 'New Conversation',
+          workspace_path: message.workspace_path,
         },
         '*'
       );
@@ -560,7 +563,8 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
   // Handle conversation list request
   if (message.type === 'conversation:list') {
     try {
-      const conversations = await conversationList();
+      const workspacePath = message.workspace_path;
+      const conversations = await conversationList(workspacePath);
       window.postMessage(
         {
           type: 'conversation:list',
@@ -570,6 +574,7 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
             title: c.title,
             updated_at: c.updatedAt,
             message_count: c.messageCount,
+            workspace_path: c.workspacePath,
           })),
         },
         '*'

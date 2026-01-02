@@ -840,17 +840,19 @@ export interface ConversationSummaryDto {
   title: string;
   updatedAt: number;
   messageCount: number;
+  workspacePath?: string;
 }
 
 export async function conversationCreate(
   sessionId: string,
-  title: string
+  title: string,
+  workspacePath?: string
 ): Promise<ConversationDto> {
-  return invoke<ConversationDto>('conversation_create', { sessionId, title });
+  return invoke<ConversationDto>('conversation_create', { sessionId, title, workspacePath });
 }
 
-export async function conversationList(): Promise<ConversationSummaryDto[]> {
-  return invoke<ConversationSummaryDto[]>('conversation_list');
+export async function conversationList(workspacePath?: string): Promise<ConversationSummaryDto[]> {
+  return invoke<ConversationSummaryDto[]>('conversation_list', { workspacePath });
 }
 
 export async function conversationLoad(sessionId: string): Promise<ConversationDto | null> {
@@ -867,9 +869,10 @@ export async function conversationUpdateTitle(sessionId: string, title: string):
 
 export async function conversationAddMessage(
   sessionId: string,
-  message: ConversationMessageDto
+  message: ConversationMessageDto,
+  workspacePath?: string
 ): Promise<void> {
-  return invoke('conversation_add_message', { sessionId, message });
+  return invoke('conversation_add_message', { sessionId, message, workspacePath });
 }
 
 export async function conversationFork(
@@ -886,6 +889,10 @@ export async function conversationFork(
 
 export async function conversationDataPath(): Promise<string> {
   return invoke<string>('conversation_data_path');
+}
+
+export async function conversationCleanupOrphaned(): Promise<number> {
+  return invoke<number>('conversation_cleanup_orphaned');
 }
 
 // ============================================

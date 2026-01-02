@@ -354,6 +354,7 @@ pub fn run() {
             conversations::conversation_add_message,
             conversations::conversation_fork,
             conversations::conversation_data_path,
+            conversations::conversation_cleanup_orphaned,
             // Dev-monitor commands (dev-only)
             dev_monitor::dev_monitor_ensure_dir,
             dev_monitor::dev_monitor_write_batch,

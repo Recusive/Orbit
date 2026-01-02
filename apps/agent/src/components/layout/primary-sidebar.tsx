@@ -23,7 +23,8 @@ import {
   useUIStore,
   useIsLeftSidebarCollapsed,
   useWorkspaceName,
-  useConversations,
+  useWorkspacePath,
+  useWorkspaceConversations,
   useActiveConversationId,
 } from '@/stores/ui-store';
 
@@ -90,7 +91,8 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   } = useUIStore();
   const isCollapsed = useIsLeftSidebarCollapsed();
   const workspaceName = useWorkspaceName();
-  const conversations = useConversations();
+  const workspacePath = useWorkspacePath();
+  const conversations = useWorkspaceConversations();
   const activeConversationId = useActiveConversationId();
   const { postMessage } = useTauri();
   const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
@@ -106,8 +108,9 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       type: 'conversation:create',
       uuid: crypto.randomUUID(),
       title: 'Untitled',
+      workspace_path: workspacePath ?? undefined,
     });
-  }, [conversations, activeConversationId, postMessage]);
+  }, [conversations, activeConversationId, workspacePath, postMessage]);
 
   const handleLoadConversation = useCallback(
     (sessionId: string): void => {

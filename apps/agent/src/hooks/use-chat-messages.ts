@@ -98,6 +98,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     addConversation,
     updateConversationTitle,
     conversations,
+    workspacePath,
   } = useUIStore();
   const {
     setInputMode,
@@ -338,6 +339,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
             title: message.title,
             updatedAt: Date.now(),
             messageCount: 0,
+            workspacePath: message.workspace_path,
           });
           setMessages([]);
           switchSession(message.session_id); // Switch to new session (resets usage for new conversation)
@@ -355,6 +357,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
                 title: c.title,
                 updatedAt: c.updated_at,
                 messageCount: c.message_count,
+                workspacePath: c.workspace_path,
               }))
             );
           }
@@ -610,15 +613,16 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
 
   const { postMessage, isMockMode } = useTauri({ onMessage: handleMessage });
 
-  // Request conversation list when session is ready
+  // Request conversation list when session is ready or workspace changes
   useEffect(() => {
-    if (sessionId) {
+    if (sessionId || workspacePath) {
       postMessage({
         type: 'conversation:list',
         uuid: crypto.randomUUID(),
+        workspace_path: workspacePath ?? undefined,
       });
     }
-  }, [sessionId, postMessage]);
+  }, [sessionId, workspacePath, postMessage]);
 
   // Request file list for @ mentions
   useEffect(() => {
@@ -740,6 +744,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           type: 'conversation:create',
           uuid: crypto.randomUUID(),
           title: text,
+          workspace_path: workspacePath ?? undefined,
         });
         return;
       }
@@ -819,6 +824,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       isAgentRunning,
       messages.length,
       conversations,
+      workspacePath,
       postMessage,
       updateConversationTitle,
       storeQueueMessage,
