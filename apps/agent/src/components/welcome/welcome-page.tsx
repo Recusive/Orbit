@@ -130,7 +130,7 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
       </div>
 
       {/* Recent Projects */}
-      <div className="w-full max-w-[420px]">
+      <div className="w-full max-w-[380px]">
         {/* Header */}
         <div className="flex items-center justify-between px-1 py-0.5 text-[10px] leading-tight mb-0.5">
           <span className="font-normal text-muted-foreground/60">Recent projects</span>
