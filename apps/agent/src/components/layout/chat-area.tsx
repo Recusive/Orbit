@@ -6,13 +6,7 @@ import type { FileEntry } from '@/types/context';
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
-import {
-  ChatHeader,
-  ChatInput,
-  ChatMessages,
-  useQueuedMessageHandler,
-  WelcomeGreeting,
-} from '@/components/chat';
+import { ChatHeader, ChatInput, ChatMessages, useQueuedMessageHandler } from '@/components/chat';
 import { ResizeHandle } from '@/components/layout/resize-handle';
 import { ActivityPanel } from '@/components/panels';
 import { useChatMessages } from '@/hooks/use-chat-messages';
@@ -182,9 +176,8 @@ export const ChatArea: FC = () => {
           >
             {/* Show welcome only when no messages and not loading */}
             {messages.length === 0 && !isLoadingConversation ? (
-              /* Empty state: Welcome greeting + Input positioned above center */
+              /* Empty state: Input positioned above center */
               <div className="flex-1 flex flex-col justify-center" style={{ paddingBottom: '40%' }}>
-                <WelcomeGreeting />
                 <ChatInput
                   inputMode={inputMode}
                   thinkingMode={thinkingMode}

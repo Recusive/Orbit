@@ -33,7 +33,7 @@ export const FileViewer: FC = () => {
   }, [toggleSearch]);
 
   return (
-    <div className="flex flex-col h-full bg-background relative">
+    <div className="flex flex-col h-full bg-chat-area relative">
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
         {isLoading ? (

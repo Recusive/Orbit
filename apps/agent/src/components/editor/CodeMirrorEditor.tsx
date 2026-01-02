@@ -23,7 +23,7 @@ import {
   indentUnit,
   syntaxHighlighting,
 } from '@codemirror/language';
-import { linter, lintGutter, lintKeymap, setDiagnostics } from '@codemirror/lint';
+import { linter, lintKeymap, setDiagnostics } from '@codemirror/lint';
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState } from '@codemirror/state';
 import {
@@ -88,13 +88,13 @@ const languages: Record<string, LanguageFactory> = {
 };
 
 // ============================================
-// Custom dark theme (matches app background)
+// Custom dark theme (matches chat-area background)
 // ============================================
 
 const darkTheme = EditorView.theme(
   {
     '&': {
-      backgroundColor: 'oklch(0.16 0.012 60)', // Same as --background in dark mode
+      backgroundColor: 'oklch(0.18 0.012 60)', // Same as --chat-area in dark mode
       color: '#e1e1e1',
     },
     '.cm-scroller': {
@@ -113,12 +113,12 @@ const darkTheme = EditorView.theme(
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
     '.cm-gutters': {
-      backgroundColor: 'transparent',
+      backgroundColor: 'oklch(0.18 0.012 60)', // Same as editor bg for horizontal scroll
       color: 'oklch(0.55 0.03 60)', // Warm brown matching --muted-foreground
       border: 'none',
     },
     '.cm-activeLineGutter': {
-      backgroundColor: 'transparent',
+      backgroundColor: 'inherit',
     },
     '.cm-activeLine': {
       backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -205,7 +205,7 @@ const darkHighlightStyle = HighlightStyle.define([
 
 const lightTheme = EditorView.theme({
   '&': {
-    backgroundColor: 'oklch(0.98 0.005 75)', // Same as --background in light mode
+    backgroundColor: 'oklch(0.93 0.015 75)', // Same as --chat-area in light mode
     color: '#24292f',
   },
   '.cm-scroller': {
@@ -224,12 +224,12 @@ const lightTheme = EditorView.theme({
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   '.cm-gutters': {
-    backgroundColor: 'transparent',
+    backgroundColor: 'oklch(0.93 0.015 75)', // Same as editor bg for horizontal scroll
     color: 'oklch(0.50 0.03 60)', // Warm brown matching --muted-foreground
     border: 'none',
   },
   '.cm-activeLineGutter': {
-    backgroundColor: 'transparent',
+    backgroundColor: 'inherit',
   },
   '.cm-activeLine': {
     backgroundColor: 'rgba(0, 0, 0, 0.04)',
@@ -537,7 +537,6 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
 
       // Diagnostics (squiggles) - using external setDiagnostics, linter just enables display
       linter(() => [], { delay: 0 }),
-      lintGutter(),
 
       // Keymaps
       keymap.of([
