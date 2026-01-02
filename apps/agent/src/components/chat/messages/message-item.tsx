@@ -61,6 +61,34 @@ type Segment =
   | { type: 'content'; text: string; key: string }
   | { type: 'tool'; tool: ToolExecution; key: string };
 
+// Custom comparison for memo - compares tools by content, not reference
+const arePropsEqual = (prev: MessageItemProps, next: MessageItemProps): boolean => {
+  // Fast path: same references
+  if (prev === next) return true;
+
+  // Compare simple props
+  if (prev.message !== next.message) return false;
+  if (prev.isLastAssistantMessage !== next.isLastAssistantMessage) return false;
+  if (prev.onRewind !== next.onRewind) return false;
+  if (prev.onOpenFile !== next.onOpenFile) return false;
+  if (prev.onOpenUrl !== next.onOpenUrl) return false;
+  if (prev.onFeedback !== next.onFeedback) return false;
+
+  // Compare tools array by content (the main optimization)
+  if (prev.tools.length !== next.tools.length) return false;
+  for (let i = 0; i < prev.tools.length; i++) {
+    const prevTool = prev.tools[i];
+    const nextTool = next.tools[i];
+    if (prevTool === undefined || nextTool === undefined) return false;
+    // Compare by ID and status - if these match, tool is the same
+    if (prevTool.id !== nextTool.id) return false;
+    if (prevTool.status !== nextTool.status) return false;
+    if (prevTool.toolOutput !== nextTool.toolOutput) return false;
+  }
+
+  return true;
+};
+
 export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
   tools,
@@ -263,7 +291,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="message-item space-y-2">
       {/* Message block */}
       {message.role === 'user' ? (
         /* User message bubble */
@@ -365,4 +393,4 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
       ) : null}
     </div>
   );
-});
+}, arePropsEqual);

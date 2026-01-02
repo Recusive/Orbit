@@ -138,8 +138,14 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     }
   }, [sessionId]);
 
+  // Track if we have pending animations - only run interval when needed
+  const hasAnimatingMessage = messages.some((m) => m.displayedContent.length < m.content.length);
+
   // Streaming animation - use interval to reveal content progressively
+  // Only runs when there's actually content to animate
   useEffect(() => {
+    if (!hasAnimatingMessage) return;
+
     const intervalId = window.setInterval(() => {
       setMessages((prev) => {
         const pendingIdx = prev.findIndex((m) => m.displayedContent.length < m.content.length);
@@ -158,7 +164,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     return () => {
       clearInterval(intervalId);
     };
-  }, []);
+  }, [hasAnimatingMessage]);
 
   // Handle messages from extension
   const handleMessage = useCallback(

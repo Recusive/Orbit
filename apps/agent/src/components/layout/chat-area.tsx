@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type { ChatMessage } from '@/components/chat/messages';
 import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
@@ -18,7 +18,7 @@ import { ActivityPanel } from '@/components/panels';
 import { useChatMessages } from '@/hooks/use-chat-messages';
 import { useTauri } from '@/hooks/use-tauri';
 import {
-  useToolStore,
+  useGetToolsForMessage,
   usePendingPermissions,
   useInputMode,
   useThinkingMode,
@@ -53,7 +53,7 @@ export const ChatArea: FC = () => {
   const pendingPermissions = usePendingPermissions();
   const sessionUsage = useSessionUsage();
   const maxTokens = useMaxTokens();
-  const { getToolsForMessage } = useToolStore();
+  const getToolsForMessage = useGetToolsForMessage();
   const [fileList, setFileList] = useState<FileEntry[]>([]);
 
   const {
@@ -124,24 +124,46 @@ export const ChatArea: FC = () => {
     window.dispatchEvent(new CustomEvent('focusChatInput'));
   }, []);
 
-  // Handle content stabilization - called when chat content is ready to reveal
-  const handleContentStable = useCallback((): void => {
-    setConversationTransitioning(false);
-  }, [setConversationTransitioning]);
+  // Ref for content container - used for unified stabilization
+  const contentRef = useRef<HTMLDivElement>(null);
 
-  // Handle stabilization for empty conversations (welcome screen)
-  useEffect(() => {
-    if (isTransitioning && messages.length === 0 && !isLoadingConversation) {
-      // Empty conversation - stabilize after a frame to ensure layout is complete
-      const frame = requestAnimationFrame(() => {
-        setConversationTransitioning(false);
-      });
-      return () => {
-        cancelAnimationFrame(frame);
-      };
+  // Unified stabilization for both empty and message states
+  // This ensures the entire content area (welcome OR messages) is hidden until layout is stable
+  useLayoutEffect(() => {
+    if (!isTransitioning) return undefined;
+
+    const container = contentRef.current;
+    if (!container) {
+      setConversationTransitioning(false);
+      return undefined;
     }
-    return undefined;
-  }, [isTransitioning, messages.length, isLoadingConversation, setConversationTransitioning]);
+
+    let lastHeight = 0;
+    let stableCount = 0;
+    let frameId: number;
+
+    const checkStable = (): void => {
+      const currentHeight = container.scrollHeight;
+      if (currentHeight === lastHeight) {
+        stableCount++;
+        // Wait for 3 consecutive frames with same height to ensure layout is complete
+        if (stableCount >= 3) {
+          setConversationTransitioning(false);
+          return;
+        }
+      } else {
+        stableCount = 0;
+        lastHeight = currentHeight;
+      }
+      frameId = requestAnimationFrame(checkStable);
+    };
+
+    frameId = requestAnimationFrame(checkStable);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [isTransitioning, messages.length, setConversationTransitioning]);
 
   return (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-chat-area">
@@ -152,8 +174,12 @@ export const ChatArea: FC = () => {
           {/* Chat Header - only for chat */}
           <ChatHeader />
 
-          {/* Chat Content */}
-          <div className="flex-1 flex flex-col min-h-0">
+          {/* Chat Content - unified container with parent-level visibility control */}
+          <div
+            ref={contentRef}
+            className={`flex-1 flex flex-col min-h-0${isTransitioning ? ' no-transitions' : ''}`}
+            style={isTransitioning ? { visibility: 'hidden' } : undefined}
+          >
             {/* Show welcome only when no messages and not loading */}
             {messages.length === 0 && !isLoadingConversation ? (
               /* Empty state: Welcome greeting + Input positioned above center */
@@ -180,7 +206,6 @@ export const ChatArea: FC = () => {
                   messages={messages}
                   pendingPermissions={pendingPermissions}
                   isAgentRunning={isAgentRunning}
-                  isTransitioning={isTransitioning}
                   sessionId={sessionId}
                   queuedMessage={queuedMessage}
                   getToolsForMessage={getToolsForMessage}
@@ -191,7 +216,6 @@ export const ChatArea: FC = () => {
                   onPermissionDeny={handlePermissionDeny}
                   onCancelQueue={cancelQueue}
                   onFeedback={handleFeedback}
-                  onStable={handleContentStable}
                 />
                 <ChatInput
                   inputMode={inputMode}

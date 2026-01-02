@@ -367,3 +367,7 @@ export const useContextPercentage = (): number =>
   useToolStore((state) => state.getContextPercentage());
 export const useMaxTokens = (): number => useToolStore((state) => state.getMaxTokens());
 export const useUsedTokens = (): number => useToolStore((state) => state.getUsedTokens());
+
+// Tool lookup selector - stable reference to avoid re-renders
+export const useGetToolsForMessage = (): ((messageId: string) => ToolExecution[]) =>
+  useToolStore((state) => state.getToolsForMessage);

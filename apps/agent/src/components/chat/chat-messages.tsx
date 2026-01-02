@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { MessageItem } from './messages';
 import { QueuedMessageBubble } from './queued-message';
@@ -16,7 +16,6 @@ interface ChatMessagesProps {
   readonly messages: ChatMessage[];
   readonly pendingPermissions: PermissionRequest[];
   readonly isAgentRunning: boolean;
-  readonly isTransitioning: boolean;
   readonly sessionId?: string;
   readonly queuedMessage: QueuedMessage | null;
   readonly getToolsForMessage: (messageId: string) => ToolExecution[];
@@ -27,14 +26,12 @@ interface ChatMessagesProps {
   readonly onPermissionDeny: (requestId: string) => void;
   readonly onCancelQueue: () => void;
   readonly onFeedback: () => void;
-  readonly onStable: () => void;
 }
 
 export const ChatMessages: FC<ChatMessagesProps> = ({
   messages,
   pendingPermissions,
   isAgentRunning,
-  isTransitioning,
   sessionId,
   queuedMessage,
   getToolsForMessage,
@@ -45,7 +42,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   onPermissionDeny,
   onCancelQueue,
   onFeedback,
-  onStable,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScroll = useRef(true);
@@ -82,78 +78,27 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     };
   }, []);
 
-  // Detect session change
+  // Detect session change and reset scroll position
   const sessionChanged = prevSessionIdRef.current !== sessionId;
   if (sessionChanged) {
     prevSessionIdRef.current = sessionId;
     hasResetScrollRef.current = false;
   }
 
-  // Handle content stabilization - reset scroll after layout is complete, then reveal
-  const handleStable = useCallback(() => {
+  // Reset scroll to top on session change
+  useEffect(() => {
     if (sessionChanged && containerRef.current && !hasResetScrollRef.current) {
       shouldAutoScroll.current = true;
       containerRef.current.scrollTop = 0;
       hasResetScrollRef.current = true;
     }
-    onStable();
-  }, [sessionChanged, onStable]);
-
-  // Wait for layout to stabilize before revealing content
-  // We check if scrollHeight has stopped changing to ensure all content is rendered
-  useLayoutEffect(() => {
-    if (isTransitioning && messages.length > 0) {
-      const container = containerRef.current;
-      if (!container) {
-        handleStable();
-        return undefined;
-      }
-
-      let lastHeight = 0;
-      let stableCount = 0;
-      let frameId: number;
-
-      const checkStable = (): void => {
-        const currentHeight = container.scrollHeight;
-        if (currentHeight === lastHeight) {
-          stableCount++;
-          // Wait for 3 consecutive frames with same height
-          if (stableCount >= 3) {
-            handleStable();
-            return;
-          }
-        } else {
-          stableCount = 0;
-          lastHeight = currentHeight;
-        }
-        frameId = requestAnimationFrame(checkStable);
-      };
-
-      // Start checking after initial frame
-      frameId = requestAnimationFrame(checkStable);
-
-      return () => {
-        cancelAnimationFrame(frameId);
-      };
-    } else if (isTransitioning && messages.length === 0) {
-      // Empty conversation - stabilize immediately
-      handleStable();
-    }
-    return undefined;
-  }, [isTransitioning, messages.length, handleStable]);
-
-  // During transition, hide container with visibility:hidden (not display:none)
-  // This lets messages render and layout happen, but user can't see the shifting
-  // When transition ends, we reveal the already-laid-out content
+  }, [sessionChanged]);
 
   return (
     <div
       ref={containerRef}
-      className={`flex-1 overflow-y-auto overflow-x-hidden p-4${isTransitioning ? ' no-transitions' : ''}`}
-      style={{
-        scrollbarGutter: 'stable both-edges',
-        visibility: isTransitioning ? 'hidden' : 'visible',
-      }}
+      className="flex-1 overflow-y-auto overflow-x-hidden p-4"
+      style={{ scrollbarGutter: 'stable both-edges' }}
     >
       <div
         className="mx-auto flex flex-col gap-3"

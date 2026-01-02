@@ -725,8 +725,7 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   contain-intrinsic-size: auto 100px;
 }
 
-/* For chat message items - layout containment without content-visibility */
-/* Note: content-visibility: auto was causing layout recalculation issues during conversation switches */
+/* For chat message items - layout containment */
 .message-item {
   contain: layout style paint;
 }
@@ -749,8 +748,9 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   contain: layout style paint;
 }
 
-/* Scroll containers - prevent paint bleeding */
+/* Scroll containers - prevent paint bleeding and optimize for fast scroll */
 .scroll-container {
   contain: strict;
   overflow-anchor: none;
 }
+
