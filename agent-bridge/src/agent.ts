@@ -542,9 +542,16 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
                   });
                 }
 
-                // Return empty object to continue SDK permission flow
-                // SDK will check Deny Rules → Allow Rules → Ask Rules → Permission Mode → canUseTool
-                return Promise.resolve({});
+                // Return 'ask' to force ALL tools through canUseTool callback
+                // This bypasses SDK's built-in Allow Rules that auto-approve read-only tools
+                // (Read, Glob, Grep, WebSearch, etc.)
+                return Promise.resolve({
+                  hookSpecificOutput: {
+                    hookEventName: 'PreToolUse' as const,
+                    permissionDecision: 'ask' as const,
+                    updatedInput: toolInput,
+                  },
+                });
               },
             ],
           },
