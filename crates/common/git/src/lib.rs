@@ -5,13 +5,14 @@
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use git2::{
     BlameOptions, Delta, DiffOptions, IndexAddOption, Repository, StatusOptions, StatusShow,
 };
 use serde::{Deserialize, Serialize};
 use snowflake_core::{Error, FileStatus, GitBranch, GitCommit, GitStatus, Result, StatusEntry};
-use tracing::debug;
+use tracing::{debug, error, info};
 
 // ============================================
 // Additional Types (not in snowflake-core)
@@ -790,218 +791,161 @@ pub fn blame(path: &Path, file: &Path) -> Result<Vec<BlameLine>> {
 
 /// Push commits to the remote repository.
 ///
-/// Pushes the current branch to its upstream remote. If no upstream is set,
-/// pushes to origin.
+/// Uses the git CLI to push, which automatically handles authentication
+/// via the system's credential helpers (macOS Keychain, Windows Credential Manager, etc.)
+///
+/// Behavior (matches VS Code):
+/// 1. First tries `git push` (uses configured upstream)
+/// 2. If no upstream configured, auto-publishes with `git push -u origin HEAD`
 ///
 /// # Errors
 /// Returns an error if push fails (auth issues, no remote, conflicts, etc.)
 pub fn push(path: &Path, remote_name: Option<&str>) -> Result<()> {
-    let repo = open(path)?;
+    let remote = remote_name.unwrap_or("origin");
 
-    // Get current branch
-    let head = repo
-        .head()
-        .map_err(|e| Error::Git(format!("Failed to get HEAD: {e}")))?;
+    info!(path = %path.display(), remote = remote, "Starting git push");
 
-    if !head.is_branch() {
-        return Err(Error::Git("Cannot push: HEAD is detached".to_owned()));
-    }
-
-    let branch_name = head
-        .shorthand()
-        .ok_or_else(|| Error::Git("Failed to get branch name".to_owned()))?;
-
-    // Get the remote
-    let remote_name = remote_name.unwrap_or("origin");
-    let mut remote = repo
-        .find_remote(remote_name)
-        .map_err(|e| Error::Git(format!("Remote '{remote_name}' not found: {e}")))?;
-
-    // Build refspec for push
-    let refspec = format!("refs/heads/{branch_name}:refs/heads/{branch_name}");
-
-    // Set up callbacks for authentication
-    let mut callbacks = git2::RemoteCallbacks::new();
-
-    // Use credential helper from git config or SSH agent
-    let _self = callbacks.credentials(|_url, username_from_url, allowed_types| {
-        if allowed_types.contains(git2::CredentialType::SSH_KEY) {
-            // Try SSH agent first
-            git2::Cred::ssh_key_from_agent(username_from_url.unwrap_or("git"))
-        } else if allowed_types.contains(git2::CredentialType::DEFAULT) {
-            git2::Cred::default()
-        } else {
-            Err(git2::Error::from_str(
-                "Authentication failed. Please ensure SSH agent is running or use SSH keys.",
-            ))
-        }
-    });
-
-    // Set up push options
-    let mut push_options = git2::PushOptions::new();
-    let _self = push_options.remote_callbacks(callbacks);
-
-    // Push
-    remote
-        .push(&[&refspec], Some(&mut push_options))
+    // First, try a simple `git push` which uses the configured upstream
+    let output = Command::new("git")
+        .args(["push"])
+        .current_dir(path)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .output()
         .map_err(|e| {
-            let msg = e.to_string();
-            if msg.contains("non-fast-forward") {
-                Error::Git(
-                    "Push rejected: remote has changes you don't have. Pull first.".to_owned(),
-                )
-            } else if msg.contains("authentication") || msg.contains("credential") {
-                Error::Git(
-                    "Authentication failed. Please ensure SSH agent is running or use SSH keys."
-                        .to_owned(),
-                )
-            } else {
-                Error::Git(format!("Push failed: {e}"))
-            }
+            error!(error = %e, "Failed to execute git command");
+            Error::Git(format!("Failed to run git push: {e}"))
         })?;
 
-    debug!(
-        branch = branch_name,
-        remote = remote_name,
-        "Pushed to remote"
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // If push failed because there's no upstream, auto-publish the branch (like VS Code)
+    if !output.status.success()
+        && (stderr.contains("no upstream branch")
+            || stderr.contains("has no upstream")
+            || stderr.contains("set the remote as upstream"))
+    {
+        info!("No upstream configured, publishing branch with -u flag");
+
+        let publish_output = Command::new("git")
+            .args(["push", "-u", remote, "HEAD"])
+            .current_dir(path)
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .output()
+            .map_err(|e| Error::Git(format!("Failed to run git push: {e}")))?;
+
+        let publish_stderr = String::from_utf8_lossy(&publish_output.stderr);
+
+        info!(
+            status = %publish_output.status,
+            stderr = %publish_stderr.trim(),
+            "Git push -u completed"
+        );
+
+        if !publish_output.status.success() {
+            let msg = publish_stderr.trim();
+            return Err(Error::Git(format!("Push failed: {msg}")));
+        }
+
+        info!(remote = remote, "Branch published and pushed successfully");
+        return Ok(());
+    }
+
+    info!(
+        status = %output.status,
+        stderr = %stderr.trim(),
+        "Git push completed"
     );
+
+    if !output.status.success() {
+        let msg = stderr.trim();
+
+        // Provide user-friendly error messages for common cases
+        if msg.contains("non-fast-forward") || msg.contains("rejected") {
+            return Err(Error::Git(
+                "Push rejected: remote has changes you don't have. Pull first.".to_owned(),
+            ));
+        }
+        if msg.contains("Authentication failed") || msg.contains("could not read Username") {
+            return Err(Error::Git(
+                "Authentication failed. Please run 'git push' in terminal first to cache credentials.".to_owned(),
+            ));
+        }
+
+        return Err(Error::Git(format!("Push failed: {msg}")));
+    }
+
+    info!(remote = remote, "Push successful");
     Ok(())
 }
 
 /// Pull changes from the remote repository.
 ///
-/// Fetches and merges changes from the upstream remote into the current branch.
-/// Uses fast-forward only strategy - fails if merge is required.
+/// Uses the git CLI to pull, which automatically handles authentication
+/// via the system's credential helpers (macOS Keychain, Windows Credential Manager, etc.)
+///
+/// Behavior (matches VS Code):
+/// - Runs `git pull` without specifying remote (uses configured upstream)
+/// - If remote is explicitly provided, uses that remote
 ///
 /// # Errors
 /// Returns an error if pull fails (auth issues, no remote, merge conflicts,
 /// uncommitted changes, etc.)
 pub fn pull(path: &Path, remote_name: Option<&str>) -> Result<()> {
-    let repo = open(path)?;
+    info!(path = %path.display(), remote = ?remote_name, "Starting git pull");
 
-    // Check for uncommitted changes first
-    let statuses = repo
-        .statuses(None)
-        .map_err(|e| Error::Git(format!("Failed to get status: {e}")))?;
+    // Build args - only specify remote if explicitly provided
+    let args: Vec<&str> = remote_name.map_or_else(|| vec!["pull"], |remote| vec!["pull", remote]);
 
-    let has_changes = statuses.iter().any(|s| {
-        let status = s.status();
-        status.is_wt_modified()
-            || status.is_wt_deleted()
-            || status.is_wt_renamed()
-            || status.is_index_new()
-            || status.is_index_modified()
-            || status.is_index_deleted()
-    });
-
-    if has_changes {
-        return Err(Error::Git(
-            "Cannot pull: you have uncommitted changes. Please commit or stash them first."
-                .to_owned(),
-        ));
-    }
-
-    // Get current branch
-    let head = repo
-        .head()
-        .map_err(|e| Error::Git(format!("Failed to get HEAD: {e}")))?;
-
-    if !head.is_branch() {
-        return Err(Error::Git("Cannot pull: HEAD is detached".to_owned()));
-    }
-
-    let branch_name = head
-        .shorthand()
-        .ok_or_else(|| Error::Git("Failed to get branch name".to_owned()))?;
-
-    // Get the remote
-    let remote_name = remote_name.unwrap_or("origin");
-    let mut remote = repo
-        .find_remote(remote_name)
-        .map_err(|e| Error::Git(format!("Remote '{remote_name}' not found: {e}")))?;
-
-    // Set up callbacks for authentication
-    let mut callbacks = git2::RemoteCallbacks::new();
-    let _self = callbacks.credentials(|_url, username_from_url, allowed_types| {
-        if allowed_types.contains(git2::CredentialType::SSH_KEY) {
-            git2::Cred::ssh_key_from_agent(username_from_url.unwrap_or("git"))
-        } else if allowed_types.contains(git2::CredentialType::DEFAULT) {
-            git2::Cred::default()
-        } else {
-            Err(git2::Error::from_str(
-                "Authentication failed. Please ensure SSH agent is running or use SSH keys.",
-            ))
-        }
-    });
-
-    // Fetch
-    let mut fetch_options = git2::FetchOptions::new();
-    let _self = fetch_options.remote_callbacks(callbacks);
-
-    let refspec = format!("refs/heads/{branch_name}:refs/remotes/{remote_name}/{branch_name}");
-    remote
-        .fetch(&[&refspec], Some(&mut fetch_options), None)
-        .map_err(|e| Error::Git(format!("Fetch failed: {e}")))?;
-
-    // Get the fetch head - might not exist if branch doesn't exist on remote
-    let fetch_head = repo
-        .find_reference(&format!("refs/remotes/{remote_name}/{branch_name}"))
-        .map_err(|_e| {
-            Error::Git(format!(
-                "Branch '{branch_name}' does not exist on remote '{remote_name}'"
-            ))
+    let output = Command::new("git")
+        .args(&args)
+        .current_dir(path)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .output()
+        .map_err(|e| {
+            error!(error = %e, "Failed to execute git command");
+            Error::Git(format!("Failed to run git pull: {e}"))
         })?;
 
-    let fetch_commit = fetch_head
-        .peel_to_commit()
-        .map_err(|e| Error::Git(format!("Failed to get fetch commit: {e}")))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
 
-    // Get local HEAD commit
-    let local_commit = head
-        .peel_to_commit()
-        .map_err(|e| Error::Git(format!("Failed to get local commit: {e}")))?;
-
-    // Check if fast-forward is possible
-    let (ahead, behind) = repo
-        .graph_ahead_behind(local_commit.id(), fetch_commit.id())
-        .map_err(|e| Error::Git(format!("Failed to compare commits: {e}")))?;
-
-    if ahead > 0 && behind > 0 {
-        return Err(Error::Git(
-            "Cannot pull: branches have diverged. Please merge or rebase manually.".to_owned(),
-        ));
-    }
-
-    if behind == 0 {
-        debug!("Already up to date");
-        return Ok(());
-    }
-
-    // Fast-forward merge
-    let refname = format!("refs/heads/{branch_name}");
-    let mut reference = repo
-        .find_reference(&refname)
-        .map_err(|e| Error::Git(format!("Failed to find branch reference: {e}")))?;
-
-    let _ref = reference
-        .set_target(fetch_commit.id(), "pull: fast-forward")
-        .map_err(|e| Error::Git(format!("Failed to update reference: {e}")))?;
-
-    // Checkout the new HEAD (safe mode since we checked for changes above)
-    repo.set_head(&refname)
-        .map_err(|e| Error::Git(format!("Failed to set HEAD: {e}")))?;
-
-    let mut checkout_opts = git2::build::CheckoutBuilder::new();
-    let _self = checkout_opts.safe(); // Safe checkout - won't overwrite uncommitted changes
-    repo.checkout_head(Some(&mut checkout_opts))
-        .map_err(|e| Error::Git(format!("Failed to checkout: {e}")))?;
-
-    debug!(
-        branch = branch_name,
-        remote = remote_name,
-        commits = behind,
-        "Pulled from remote"
+    info!(
+        status = %output.status,
+        stdout = %stdout.trim(),
+        stderr = %stderr.trim(),
+        "Git pull completed"
     );
+
+    if !output.status.success() {
+        let msg = stderr.trim();
+
+        // Provide user-friendly error messages for common cases
+        if msg.contains("uncommitted changes") || msg.contains("would be overwritten") {
+            return Err(Error::Git(
+                "Cannot pull: you have uncommitted changes. Please commit or stash them first."
+                    .to_owned(),
+            ));
+        }
+        if msg.contains("diverged") || msg.contains("CONFLICT") {
+            return Err(Error::Git(
+                "Cannot pull: branches have diverged or there are conflicts. Please merge or rebase manually.".to_owned(),
+            ));
+        }
+        if msg.contains("Authentication failed") || msg.contains("could not read Username") {
+            return Err(Error::Git(
+                "Authentication failed. Please run 'git pull' in terminal first to cache credentials.".to_owned(),
+            ));
+        }
+        if msg.contains("no tracking information") || msg.contains("no upstream") {
+            return Err(Error::Git(
+                "No upstream branch configured. Push first to set up tracking.".to_owned(),
+            ));
+        }
+
+        return Err(Error::Git(format!("Pull failed: {msg}")));
+    }
+
+    info!("Pull successful");
     Ok(())
 }
 
