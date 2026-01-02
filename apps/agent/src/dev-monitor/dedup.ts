@@ -163,6 +163,7 @@ function flushDedupEntry(dedup: DedupEntry): DevLogEntry {
  * Flush all pending dedup entries with counts > 1.
  *
  * Call on shutdown or periodic flush to ensure counts are written.
+ * After flushing, resets the count to 1 so entries aren't re-flushed.
  */
 export function flushAllDedup(): DevLogEntry[] {
   const entries: DevLogEntry[] = [];
@@ -170,6 +171,9 @@ export function flushAllDedup(): DevLogEntry[] {
   for (const dedup of dedupMap.values()) {
     if (dedup.count > 1) {
       entries.push(flushDedupEntry(dedup));
+      // Reset count so we don't flush the same summary again
+      dedup.count = 1;
+      dedup.firstSeen = dedup.lastSeen;
     }
   }
 

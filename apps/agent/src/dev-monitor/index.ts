@@ -78,6 +78,8 @@ export async function initDevMonitor(options?: InitOptions): Promise<void> {
   // Production: do nothing (tree-shaken)
   if (import.meta.env.PROD) return;
 
+  console.warn('[DevMonitor] Starting initialization...');
+
   try {
     // Dynamic import only happens in dev
     const { devTrace, init } = await import('./dev-trace');
@@ -87,6 +89,8 @@ export async function initDevMonitor(options?: InitOptions): Promise<void> {
 
     // Initialize auto-capture, storage, etc.
     await init(options);
+
+    console.warn('[DevMonitor] ✓ Ready - trace methods are now active');
   } catch (err: unknown) {
     // Init failed - stay on noop, log error
     console.error('[DevMonitor] Initialization failed:', err);

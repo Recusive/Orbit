@@ -63,6 +63,10 @@ export async function initStorage(options: InitOptions = {}): Promise<void> {
     }, config.flushInterval);
 
     initialized = true;
+
+    // Log success to console so user knows it's working
+    const outputPath = workspacePath ? `${workspacePath}/${config.outputDir}` : '(no workspace)';
+    console.warn(`[DevMonitor] ✓ Initialized - output: ${outputPath}`);
   } catch (err: unknown) {
     console.error('[DevMonitor] Storage init failed:', err);
   }
