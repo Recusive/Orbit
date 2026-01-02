@@ -665,6 +665,31 @@ html.dark [data-streamdown="code-block-container"] {
     }
   }
 
+  /* Text shimmer animation */
+  .animate-shimmer {
+    animation: shimmer var(--duration, 2s) linear infinite;
+  }
+
+  @keyframes shimmer {
+    from {
+      background-position: 100% center;
+    }
+    to {
+      background-position: 0% center;
+    }
+  }
+
+}
+
+/* Accessibility: respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer {
+    animation: none;
+    /* Show text in base color without animation */
+    background-image: none !important;
+    color: var(--muted-foreground);
+    -webkit-text-fill-color: var(--muted-foreground);
+  }
 }
 
 /* Scrollbar styling for WKWebView */

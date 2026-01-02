@@ -39,33 +39,54 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
   };
 
   return (
-    <div>
-      <div className="flex items-center gap-2 py-1.5 px-1 -mx-1 rounded-lg hover:bg-muted/30 transition-colors">
-        {/* Icon container */}
-        <div className="w-5 h-5 rounded flex items-center justify-center bg-info/10">
-          <File className={cn('h-3 w-3 text-info/70', isRunning && 'animate-pulse')} />
-        </div>
-
-        {/* Content */}
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span className="text-xs text-muted-foreground">Read</span>
-          <button
-            className="text-xs font-medium text-foreground hover:text-primary transition-colors truncate"
-            onClick={handleFileClick}
-            title={filePath}
-          >
-            {fileName}
-            {!isRunning && lineCount > 0 ? (
-              <span className="text-muted-foreground/60 ml-0.5">#L1-{lineCount}</span>
-            ) : null}
-          </button>
-        </div>
-
-        {/* Loading spinner */}
-        {isRunning ? (
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
-        ) : null}
+    <div
+      className={cn(
+        'flex items-center gap-2 py-2 px-2 -mx-2',
+        'rounded-xl hover:bg-muted/20',
+        'transition-all duration-150 group'
+      )}
+    >
+      {/* Icon container */}
+      <div
+        className={cn(
+          'w-6 h-6 rounded-lg flex items-center justify-center',
+          'bg-sky-500/8 group-hover:bg-sky-500/12',
+          'transition-colors duration-150'
+        )}
+      >
+        <File
+          className={cn(
+            'h-3.5 w-3.5 text-sky-500/60 group-hover:text-sky-500/80',
+            'transition-colors duration-150',
+            isRunning && 'animate-pulse'
+          )}
+        />
       </div>
+
+      {/* Content */}
+      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <span className="text-[11px] text-muted-foreground/50 font-medium">Read</span>
+        <button
+          className={cn(
+            'text-[12px] font-medium text-foreground/90',
+            'hover:text-primary/80 transition-colors duration-150 truncate'
+          )}
+          onClick={handleFileClick}
+          title={filePath}
+        >
+          {fileName}
+          {!isRunning && lineCount > 0 ? (
+            <span className="text-muted-foreground/40 ml-1 font-mono text-[10px]">
+              #L1-{lineCount}
+            </span>
+          ) : null}
+        </button>
+      </div>
+
+      {/* Loading spinner */}
+      {isRunning ? (
+        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
+      ) : null}
     </div>
   );
 };

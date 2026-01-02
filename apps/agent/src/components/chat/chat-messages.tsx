@@ -1,5 +1,4 @@
-import { Loader2 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { MessageItem } from './messages';
 import { QueuedMessageBubble } from './queued-message';
@@ -10,7 +9,48 @@ import type { PermissionRequest, ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
 import { PermissionModal } from '@/components/modals';
+import { TextShimmer } from '@/components/ui/text-shimmer';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/constants';
+
+// Rotating loading messages - fun tech-themed phrases
+const LOADING_MESSAGES = [
+  'Thinking...',
+  'Generating...',
+  'Computing...',
+  'Brewing code...',
+  'Crunching bits...',
+  'Parsing thoughts...',
+  'Compiling ideas...',
+  'Downloading wisdom...',
+  'Summoning bytes...',
+  'Consulting the cloud...',
+  'Reticulating splines...',
+  'Feeding the hamsters...',
+  'Warming up GPUs...',
+  'Juggling tensors...',
+  'Wrangling tokens...',
+] as const;
+
+function useRotatingMessage(isActive: boolean, intervalMs = 2500): string {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (!isActive) {
+      setIndex(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+    }, intervalMs);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [isActive, intervalMs]);
+
+  return LOADING_MESSAGES[index] ?? 'Thinking...';
+}
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
@@ -50,6 +90,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   // Check if any message is still animating
   const isAnimating = messages.some((m) => m.displayedContent.length < m.content.length);
+  const isLoading = isAgentRunning || isAnimating;
+
+  // Rotating loading message for a bit of personality
+  const loadingMessage = useRotatingMessage(isLoading);
 
   // Track last message content length for auto-scroll dependency
   const lastMessageContentLength = messages[messages.length - 1]?.displayedContent.length ?? 0;
@@ -140,10 +184,11 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         ) : null}
 
         {/* Progress indicator - shows while agent is running OR text is still animating */}
-        {isAgentRunning || isAnimating ? (
-          <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Generating...</span>
+        {isLoading ? (
+          <div className="px-3 py-2">
+            <TextShimmer className="text-sm" duration={1.2}>
+              {loadingMessage}
+            </TextShimmer>
           </div>
         ) : null}
       </div>
