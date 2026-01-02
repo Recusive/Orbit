@@ -49,16 +49,55 @@ export {
   type ToolCallStatus,
 } from './agent';
 
-// SDK boundary handling
+// SDK boundary handling - comprehensive schemas validated against real SDK data
 export {
-  SDKMessageSchema,
-  SDKToolResultSchema,
+  // Base schemas
   SDKUsageSchema,
+  SDKModelUsageEntrySchema,
+  SDKModelUsageSchema,
+  // Content block schemas
+  SDKTextBlockSchema,
+  SDKThinkingBlockSchema,
+  SDKToolUseBlockSchema,
+  SDKContentBlockSchema,
+  // Stream event schemas
+  SDKStreamDeltaSchema,
+  SDKStreamMessageSchema,
+  SDKStreamContentBlockSchema,
+  SDKStreamEventPayloadSchema,
+  // Top-level message schemas
+  SDKSystemMessageSchema,
+  SDKStreamEventMessageSchema,
+  SDKAssistantMessageSchema,
+  SDKUserMessageSchema,
+  SDKResultMessageSchema,
+  // Permissive base schema
+  SDKMessageSchema,
+  // Tool result
+  SDKToolResultSchema,
+  // Utilities
   processSDKResponse,
+  getSDKMessageSchema,
+  // Types
   type SafeParseResult,
+  type SDKUsage,
+  type SDKModelUsageEntry,
+  type SDKModelUsage,
+  type SDKTextBlock,
+  type SDKThinkingBlock,
+  type SDKToolUseBlock,
+  type SDKContentBlock,
+  type SDKStreamDelta,
+  type SDKStreamMessage,
+  type SDKStreamContentBlock,
+  type SDKStreamEventPayload,
+  type SDKSystemMessage,
+  type SDKStreamEventMessage,
+  type SDKAssistantMessage,
+  type SDKUserMessage,
+  type SDKResultMessage,
   type SDKMessage,
   type SDKToolResult,
-  type SDKUsage,
 } from './sdk';
 
 // Settings schemas with coercion

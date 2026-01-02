@@ -7,6 +7,7 @@ import { DiffViewer } from './diff-viewer';
 import type { FileChange } from '../../stores/file-store';
 
 import { FileIcon } from '@/components/files/file-icon';
+import { HEIGHTS } from '@/lib/constants';
 
 export interface FileChangeItemProps {
   readonly file: FileChange;
@@ -37,11 +38,14 @@ export const FileChangeItem: React.FC<FileChangeItemProps> = ({
   return (
     <div className="bg-background">
       {/* File Header */}
-      <div className="w-full flex items-center gap-2 px-3 py-2">
+      <div
+        className="w-full flex items-center gap-2 px-3 border-b border-border"
+        style={{ height: HEIGHTS.headerBar }}
+      >
         {/* File Button - Clickable with border, takes full width */}
         <button
           onClick={handleFileClick}
-          className="flex items-center gap-2 px-2 py-1 rounded-md border border-border bg-muted/50 hover:bg-accent hover:border-accent transition-colors flex-1 min-w-0"
+          className="flex items-center gap-2 px-2 py-0.5 rounded-md border border-border bg-muted/50 hover:bg-accent hover:border-accent transition-colors flex-1 min-w-0"
         >
           <FileIcon fileName={fileName} className="h-4 w-4 shrink-0" />
           <span className="text-sm font-medium text-foreground truncate flex-1 text-left">
