@@ -29,17 +29,19 @@
 //! ```
 
 use std::fmt::{Debug, Formatter, Result as FmtResult};
+#[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+#[cfg(debug_assertions)]
+use std::time::Instant;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter as _};
+use tauri::AppHandle;
+#[cfg(debug_assertions)]
+use tauri::Emitter as _;
 
 /// Global span ID counter
-#[cfg_attr(
-    not(debug_assertions),
-    expect(dead_code, reason = "Only used in debug builds")
-)]
+#[cfg(debug_assertions)]
 static SPAN_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Tracing event payload sent to frontend
@@ -97,10 +99,7 @@ fn now_ms() -> u64 {
 }
 
 /// Generate a unique span ID
-#[cfg_attr(
-    not(debug_assertions),
-    expect(dead_code, reason = "Only used in debug builds")
-)]
+#[cfg(debug_assertions)]
 fn next_span_id() -> u64 {
     SPAN_ID_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
