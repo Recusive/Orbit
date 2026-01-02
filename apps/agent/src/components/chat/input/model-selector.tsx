@@ -1,5 +1,5 @@
 import { Check, ChevronDown } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SiClaude, SiOpenai } from 'react-icons/si';
 
 import type { Model } from '@/types/protocol';
@@ -8,6 +8,10 @@ import type { FC } from 'react';
 import { CHAT_WIDTH } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useModel, useToolStore } from '@/stores/tool-store';
+
+// Animation duration - keep synced with CSS
+const ANIMATION_DURATION_MS = 150;
+const ANIMATION_DURATION = `${String(ANIMATION_DURATION_MS)}ms`;
 
 // Wrapper components to match the expected interface
 const ClaudeIcon: FC<{ className?: string }> = ({ className }) => (
@@ -65,10 +69,21 @@ interface ModelSelectorProps {
 
 export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isAnimatingOut, setIsAnimatingOut] = useState(false);
   const selectedModel = useModel();
   const setModel = useToolStore((s) => s.setModel);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Handle closing with exit animation
+  const handleClose = useCallback((): void => {
+    if (!isOpen || isAnimatingOut) return;
+    setIsAnimatingOut(true);
+    setTimeout(() => {
+      setIsOpen(false);
+      setIsAnimatingOut(false);
+    }, ANIMATION_DURATION_MS);
+  }, [isOpen, isAnimatingOut]);
 
   // Close popover when clicking outside
   useEffect(() => {
@@ -79,7 +94,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         !popoverRef.current.contains(e.target as Node) &&
         !triggerRef.current.contains(e.target as Node)
       ) {
-        setIsOpen(false);
+        handleClose();
       }
     };
 
@@ -89,7 +104,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen]);
+  }, [isOpen, handleClose]);
 
   const selectedModelData = MODEL_GROUPS.flatMap((g) => g.models).find(
     (m) => m.id === selectedModel
@@ -101,7 +116,15 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       setModel(modelId);
       onModelChange?.(modelId);
     }
-    setIsOpen(false);
+    handleClose();
+  };
+
+  const handleToggle = (): void => {
+    if (isOpen) {
+      handleClose();
+    } else {
+      setIsOpen(true);
+    }
   };
 
   return (
@@ -109,9 +132,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       {/* Trigger Button */}
       <button
         ref={triggerRef}
-        onClick={() => {
-          setIsOpen(!isOpen);
-        }}
+        onClick={handleToggle}
         className={cn(
           'h-7 px-2.5 flex items-center gap-1.5 rounded-lg',
           'bg-transparent text-muted-foreground',
@@ -124,15 +145,32 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       >
         {selectedModelData ? <selectedModelData.icon /> : null}
         <span className="text-[11px] font-medium">{selectedModelData?.name ?? 'Select Model'}</span>
-        <ChevronDown className="h-3 w-3 text-muted-foreground/60 transition-transform duration-150" />
+        <ChevronDown
+          className={cn(
+            'h-3 w-3 text-muted-foreground/60 transition-transform duration-150',
+            isOpen && 'rotate-180'
+          )}
+        />
       </button>
 
       {/* Popover */}
       {isOpen ? (
         <div
           ref={popoverRef}
-          className="absolute bottom-full left-0 mb-2 bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50"
-          style={{ width: CHAT_WIDTH.dropdown }}
+          className={cn(
+            'absolute bottom-full left-0 mb-2 bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50',
+            'origin-bottom-left',
+            // Enter animation: scale from 97% + fade in, ease-out for responsiveness
+            !isAnimatingOut && 'animate-in fade-in-0 zoom-in-[0.97] slide-in-from-bottom-1',
+            // Exit animation: scale to 97% + fade out, ease-out for smooth deceleration
+            isAnimatingOut && 'animate-out fade-out-0 zoom-out-[0.97] slide-out-to-bottom-1'
+          )}
+          style={{
+            width: CHAT_WIDTH.dropdown,
+            // Custom ease-out curve for more responsiveness (faster start, gentle end)
+            animationTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+            animationDuration: ANIMATION_DURATION,
+          }}
         >
           <div className="p-1.5">
             {MODEL_GROUPS.map((group) => (
