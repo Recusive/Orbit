@@ -531,16 +531,19 @@ export const ChatInput: FC<ChatInputProps> = ({
           onKeyDown={handleKeyDown}
           onPaste={(e) => {
             e.preventDefault();
-            const text = e.clipboardData.getData('text/plain');
+            const pastedText = e.clipboardData.getData('text/plain');
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) {
               const range = selection.getRangeAt(0);
               range.deleteContents();
-              range.insertNode(document.createTextNode(text));
+              range.insertNode(document.createTextNode(pastedText));
               range.collapse(false);
               selection.removeAllRanges();
               selection.addRange(range);
             }
+            // Update state to match DOM content
+            const newText = inputRef.current?.textContent ?? '';
+            setInputText(newText);
           }}
         />
 
