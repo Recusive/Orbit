@@ -47,15 +47,11 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   const theme = useDetectTheme();
   const cursorPosition = useCursorPosition();
   const searchOpen = useFileViewerStore((state) => state.searchOpen);
-  const searchQuery = useFileViewerStore((state) => state.searchQuery);
-  const setSearchQuery = useFileViewerStore((state) => state.setSearchQuery);
-  const closeSearch = useFileViewerStore((state) => state.closeSearch);
   const updateContent = useFileViewerStore((state) => state.updateContent);
   const markSaved = useFileViewerStore((state) => state.markSaved);
   const pendingGoto = useFileViewerStore((state) => state.pendingGoto);
   const clearPendingGoto = useFileViewerStore((state) => state.clearPendingGoto);
   const gotoPosition = useFileViewerStore((state) => state.gotoPosition);
-  const inputRef = useRef<HTMLInputElement>(null);
   const documentVersionRef = useRef(1); // Track document version for LSP
 
   // Only apply goto if it's for the current file
@@ -97,13 +93,6 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
     },
     [gotoPosition, file.path]
   );
-
-  // Focus search input when opened
-  useEffect(() => {
-    if (searchOpen && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [searchOpen]);
 
   // Handle content changes from editor
   const handleChange = useCallback(
@@ -161,30 +150,9 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
             theme={theme}
             gotoPosition={gotoForThisFile}
             onGotoComplete={clearPendingGoto}
+            searchOpen={searchOpen}
           />
         </Suspense>
-
-        {/* Search overlay */}
-        {searchOpen ? (
-          <div className="absolute top-2 right-4 flex items-center gap-2 bg-card border border-border rounded-md px-2 py-1 shadow-lg z-10">
-            <input
-              ref={inputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e): void => {
-                setSearchQuery(e.target.value);
-              }}
-              onKeyDown={(e): void => {
-                if (e.key === 'Escape') closeSearch();
-              }}
-              placeholder="Search..."
-              className="w-48 text-sm bg-transparent border-none outline-none"
-            />
-            <span className="text-xs text-muted-foreground">
-              {searchQuery.length > 0 ? 'Esc to close' : ''}
-            </span>
-          </div>
-        ) : null}
       </div>
     </div>
   );

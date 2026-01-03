@@ -1,4 +1,4 @@
-import { Ellipsis, SplitSquareHorizontal, X } from 'lucide-react';
+import { Ellipsis, Search, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef } from 'react';
 
 import type { BrowserPanelProps } from '@/components/browser/browser-panel';
@@ -131,6 +131,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
   const setActiveFileTab = useFileViewerStore((state) => state.setActiveTab);
   const closeTab = useFileViewerStore((state) => state.closeTab);
   const openFileWithDiff = useFileViewerStore((state) => state.openFileWithDiff);
+  const toggleSearch = useFileViewerStore((state) => state.toggleSearch);
   const activeTab = useActivityTab();
   const setActiveTab = useUIStore((state) => state.setActivityTab);
   const { bottomPanelOpen } = useUIStore();
@@ -307,13 +308,11 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
           {/* Editor actions - VS Code style */}
           <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-border/50 bg-sidebar">
             <button
-              onClick={() => {
-                // TODO: Implement split editor
-              }}
+              onClick={toggleSearch}
               className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
-              title="Split Editor (⌘\)"
+              title="Search (⌘F)"
             >
-              <SplitSquareHorizontal className="h-4 w-4" />
+              <Search className="h-4 w-4" />
             </button>
             <button
               onClick={() => {

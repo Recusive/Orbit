@@ -24,7 +24,7 @@ import {
   syntaxHighlighting,
 } from '@codemirror/language';
 import { linter, lintKeymap, setDiagnostics } from '@codemirror/lint';
-import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
+import { highlightSelectionMatches, openSearchPanel, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState } from '@codemirror/state';
 import {
   crosshairCursor,
@@ -165,6 +165,155 @@ const darkTheme = EditorView.theme(
       content: '"●"',
       color: '#fbbf24',
     },
+    // Search panel styling - Soft UI Design
+    '.cm-panels': {
+      backgroundColor: 'transparent',
+      border: 'none',
+    },
+    '.cm-search.cm-panel': {
+      position: 'relative',
+      backgroundColor: 'oklch(0.20 0.012 60 / 0.95)',
+      backdropFilter: 'blur(12px)',
+      borderRadius: '12px',
+      border: 'none',
+      boxShadow: '0 8px 32px -8px rgba(0,0,0,0.4), 0 4px 16px -4px rgba(0,0,0,0.2)',
+      padding: '12px',
+      paddingRight: '40px',
+      margin: '8px',
+      display: 'flex',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: '8px',
+    },
+    // Input fields
+    '.cm-search.cm-panel input.cm-textfield': {
+      backgroundColor: 'oklch(0.16 0.012 60 / 0.6)',
+      border: '1px solid oklch(0.30 0.012 60 / 0.4)',
+      borderRadius: '8px',
+      color: '#e1e1e1',
+      padding: '0 10px',
+      fontSize: '12px',
+      outline: 'none',
+      height: '32px',
+      minWidth: '140px',
+      boxSizing: 'border-box',
+      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+    },
+    '.cm-search.cm-panel input.cm-textfield:focus': {
+      backgroundColor: 'oklch(0.18 0.012 60 / 0.8)',
+      borderColor: 'oklch(0.40 0.012 60 / 0.6)',
+      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.15), 0 0 0 1px oklch(0.40 0.012 60 / 0.3)',
+    },
+    '.cm-search.cm-panel input.cm-textfield::placeholder': {
+      color: 'oklch(0.50 0.02 60 / 0.5)',
+    },
+    // All buttons base styling - coral/brown theme
+    '.cm-search.cm-panel .cm-button': {
+      backgroundColor: 'oklch(0.28 0.04 50 / 0.5)',
+      backgroundImage: 'none',
+      border: '1px solid oklch(0.40 0.06 50 / 0.3)',
+      borderRadius: '6px',
+      color: 'oklch(0.80 0.06 50)',
+      padding: '0 10px',
+      fontSize: '11px',
+      fontWeight: '500',
+      cursor: 'pointer',
+      height: '28px',
+      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+      boxShadow: 'none',
+    },
+    '.cm-search.cm-panel .cm-button:hover': {
+      backgroundColor: 'oklch(0.35 0.08 45 / 0.6)',
+      backgroundImage: 'none',
+      borderColor: 'oklch(0.50 0.10 45 / 0.5)',
+      color: 'oklch(0.90 0.08 45)',
+      transform: 'scale(1.02)',
+    },
+    '.cm-search.cm-panel .cm-button:active': {
+      backgroundColor: 'oklch(0.30 0.06 50 / 0.7)',
+      backgroundImage: 'none',
+      transform: 'scale(0.98)',
+    },
+    // Close button - positioned top right
+    '.cm-search.cm-panel button[name="close"]': {
+      position: 'absolute',
+      top: '10px',
+      right: '10px',
+      backgroundColor: 'transparent',
+      border: 'none',
+      borderRadius: '6px',
+      color: 'oklch(0.50 0.02 60 / 0.5)',
+      fontSize: '16px',
+      width: '24px',
+      height: '24px',
+      padding: '0',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+      lineHeight: '1',
+    },
+    '.cm-search.cm-panel button[name="close"]:hover': {
+      backgroundColor: 'oklch(0.25 0.012 60 / 0.6)',
+      color: '#e1e1e1',
+      transform: 'scale(1.1)',
+    },
+    '.cm-search.cm-panel button[name="close"]:active': {
+      transform: 'scale(0.95)',
+    },
+    // Checkbox labels as pill toggles
+    '.cm-search.cm-panel label': {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '4px',
+      height: '24px',
+      padding: '0 8px',
+      borderRadius: '12px',
+      fontSize: '10px',
+      fontWeight: '500',
+      letterSpacing: '0.02em',
+      color: 'oklch(0.55 0.02 60 / 0.6)',
+      backgroundColor: 'transparent',
+      border: '1px solid transparent',
+      cursor: 'pointer',
+      userSelect: 'none',
+      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+    },
+    '.cm-search.cm-panel label:hover': {
+      backgroundColor: 'oklch(0.25 0.012 60 / 0.5)',
+      color: 'oklch(0.70 0.02 60)',
+    },
+    '.cm-search.cm-panel label:has(input:checked)': {
+      backgroundColor: 'oklch(0.55 0.15 250 / 0.15)',
+      color: 'oklch(0.75 0.12 250)',
+      borderColor: 'oklch(0.45 0.10 250 / 0.4)',
+    },
+    // Hide native checkbox inside labels
+    '.cm-search.cm-panel label input[type="checkbox"]': {
+      width: '0',
+      height: '0',
+      opacity: '0',
+      position: 'absolute',
+    },
+    // Hide <br> - use margin on replace input instead
+    '.cm-search.cm-panel br': {
+      display: 'none',
+    },
+    // Make replace input start a new row via full width
+    '.cm-search.cm-panel input[name="replace"]': {
+      marginTop: '4px',
+    },
+    // Search match highlighting
+    '.cm-searchMatch': {
+      backgroundColor: 'oklch(0.50 0.15 85 / 0.35)',
+      borderRadius: '3px',
+      boxShadow: '0 0 0 1px oklch(0.55 0.15 85 / 0.3)',
+    },
+    '.cm-searchMatch-selected': {
+      backgroundColor: 'oklch(0.60 0.18 85 / 0.5)',
+      boxShadow: '0 0 0 2px oklch(0.65 0.18 85 / 0.4)',
+    },
   },
   { dark: true }
 );
@@ -277,6 +426,155 @@ const lightTheme = EditorView.theme({
     content: '"●"',
     color: '#d97706',
   },
+  // Search panel styling - Soft UI Design (light mode)
+  '.cm-panels': {
+    backgroundColor: 'transparent',
+    border: 'none',
+  },
+  '.cm-search.cm-panel': {
+    position: 'relative',
+    backgroundColor: 'oklch(0.98 0.005 75 / 0.95)',
+    backdropFilter: 'blur(12px)',
+    borderRadius: '12px',
+    border: 'none',
+    boxShadow: '0 8px 32px -8px rgba(0,0,0,0.12), 0 4px 16px -4px rgba(0,0,0,0.06)',
+    padding: '12px',
+    paddingRight: '40px',
+    margin: '8px',
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  // Input fields
+  '.cm-search.cm-panel input.cm-textfield': {
+    backgroundColor: 'oklch(0.96 0.005 75 / 0.5)',
+    border: '1px solid oklch(0.88 0.005 75 / 0.4)',
+    borderRadius: '8px',
+    color: '#24292f',
+    padding: '0 10px',
+    fontSize: '12px',
+    outline: 'none',
+    height: '32px',
+    minWidth: '140px',
+    boxSizing: 'border-box',
+    transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+  },
+  '.cm-search.cm-panel input.cm-textfield:focus': {
+    backgroundColor: '#ffffff',
+    borderColor: 'oklch(0.80 0.005 75 / 0.6)',
+    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05), 0 0 0 1px oklch(0.80 0.005 75 / 0.3)',
+  },
+  '.cm-search.cm-panel input.cm-textfield::placeholder': {
+    color: 'oklch(0.60 0.02 60 / 0.5)',
+  },
+  // All buttons base styling - coral/brown theme
+  '.cm-search.cm-panel .cm-button': {
+    backgroundColor: 'oklch(0.92 0.04 50 / 0.5)',
+    backgroundImage: 'none',
+    border: '1px solid oklch(0.80 0.06 50 / 0.3)',
+    borderRadius: '6px',
+    color: 'oklch(0.45 0.08 50)',
+    padding: '0 10px',
+    fontSize: '11px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    height: '28px',
+    transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+    boxShadow: 'none',
+  },
+  '.cm-search.cm-panel .cm-button:hover': {
+    backgroundColor: 'oklch(0.88 0.06 45 / 0.6)',
+    backgroundImage: 'none',
+    borderColor: 'oklch(0.70 0.10 45 / 0.5)',
+    color: 'oklch(0.35 0.10 45)',
+    transform: 'scale(1.02)',
+  },
+  '.cm-search.cm-panel .cm-button:active': {
+    backgroundColor: 'oklch(0.85 0.05 50 / 0.7)',
+    backgroundImage: 'none',
+    transform: 'scale(0.98)',
+  },
+  // Close button - positioned top right
+  '.cm-search.cm-panel button[name="close"]': {
+    position: 'absolute',
+    top: '10px',
+    right: '10px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    borderRadius: '6px',
+    color: 'oklch(0.60 0.02 60 / 0.5)',
+    fontSize: '16px',
+    width: '24px',
+    height: '24px',
+    padding: '0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+    lineHeight: '1',
+  },
+  '.cm-search.cm-panel button[name="close"]:hover': {
+    backgroundColor: 'oklch(0.92 0.005 75 / 0.6)',
+    color: '#24292f',
+    transform: 'scale(1.1)',
+  },
+  '.cm-search.cm-panel button[name="close"]:active': {
+    transform: 'scale(0.95)',
+  },
+  // Checkbox labels as pill toggles
+  '.cm-search.cm-panel label': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+    height: '24px',
+    padding: '0 8px',
+    borderRadius: '12px',
+    fontSize: '10px',
+    fontWeight: '500',
+    letterSpacing: '0.02em',
+    color: 'oklch(0.55 0.02 60 / 0.6)',
+    backgroundColor: 'transparent',
+    border: '1px solid transparent',
+    cursor: 'pointer',
+    userSelect: 'none',
+    transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+  },
+  '.cm-search.cm-panel label:hover': {
+    backgroundColor: 'oklch(0.94 0.005 75 / 0.5)',
+    color: 'oklch(0.40 0.02 60)',
+  },
+  '.cm-search.cm-panel label:has(input:checked)': {
+    backgroundColor: 'oklch(0.55 0.15 250 / 0.12)',
+    color: 'oklch(0.45 0.15 250)',
+    borderColor: 'oklch(0.55 0.12 250 / 0.3)',
+  },
+  // Hide native checkbox inside labels
+  '.cm-search.cm-panel label input[type="checkbox"]': {
+    width: '0',
+    height: '0',
+    opacity: '0',
+    position: 'absolute',
+  },
+  // Hide <br> - use margin on replace input instead
+  '.cm-search.cm-panel br': {
+    display: 'none',
+  },
+  // Make replace input start a new row via margin
+  '.cm-search.cm-panel input[name="replace"]': {
+    marginTop: '4px',
+  },
+  // Search match highlighting - Soft UI (light mode)
+  '.cm-searchMatch': {
+    backgroundColor: 'oklch(0.75 0.12 85 / 0.35)',
+    borderRadius: '3px',
+    boxShadow: '0 0 0 1px oklch(0.70 0.12 85 / 0.25)',
+  },
+  '.cm-searchMatch-selected': {
+    backgroundColor: 'oklch(0.65 0.15 85 / 0.5)',
+    boxShadow: '0 0 0 2px oklch(0.60 0.15 85 / 0.35)',
+  },
 });
 
 // Light syntax highlighting (github-light style)
@@ -333,6 +631,8 @@ interface CodeMirrorEditorProps {
   readonly gotoPosition?: GotoPosition | null;
   /** Called after scrolling to the position */
   readonly onGotoComplete?: () => void;
+  /** When true, opens the search panel */
+  readonly searchOpen?: boolean;
 }
 
 // ============================================
@@ -350,6 +650,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
   className,
   gotoPosition,
   onGotoComplete,
+  searchOpen,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -738,6 +1039,14 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
       effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly)),
     });
   }, [readOnly]);
+
+  // Open search panel when searchOpen prop is true
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !searchOpen) return;
+
+    openSearchPanel(view);
+  }, [searchOpen]);
 
   // Update diagnostics (squiggles)
   useEffect(() => {
