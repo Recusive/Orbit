@@ -103,8 +103,10 @@ impl AgentBridge {
 
         // Spawn the compiled sidecar binary directly
         // Pass CLAUDE_CLI_PATH env var so the sidecar can find the bundled claude binary
+        // Pass CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING to enable file checkpointing for rewind
         let mut child = Command::new(sidecar_path)
             .env("CLAUDE_CLI_PATH", &claude_path)
+            .env("CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit()) // Let stderr go to parent's stderr for debugging

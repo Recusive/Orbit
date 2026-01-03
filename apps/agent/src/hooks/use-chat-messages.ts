@@ -582,19 +582,31 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           break;
         }
 
-        case 'conversation:rewound':
-          if (message.new_session_id !== message.session_id) {
-            setSessionId(message.new_session_id);
+        case 'conversation:rewound': {
+          // Prepare new messages - no filter needed as schema already ensures role is 'user' | 'assistant'
+          const rewoundMessages = message.messages.map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            displayedContent: m.content,
+          }));
+
+          // Switch to new session FIRST (clears old tool state)
+          switchSession(message.new_session_id);
+
+          // Set all state atomically - React 18 batches these updates
+          setMessages(rewoundMessages);
+          setSessionId(message.new_session_id);
+          setActiveConversation(message.new_session_id, `Rewind`);
+
+          // Restore tool executions from persisted messages (for tool widget display)
+          for (const m of message.messages) {
+            if (m.toolUses && m.toolUses.length > 0) {
+              restoreToolsForMessage(m.id, m.toolUses);
+            }
           }
-          setMessages(
-            message.messages.map((m) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              displayedContent: m.content,
-            }))
-          );
           break;
+        }
 
         case 'inputMode:changed':
           setInputMode(message.mode);
@@ -744,6 +756,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         case 'commands:deleted':
         case 'commands:error':
         case 'commands:generated':
+        case 'agent:checkpoint':
           break;
       }
     },

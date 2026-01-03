@@ -4,6 +4,10 @@
  * Bridges Rust/Tauri backend with Claude Agent SDK via stdin/stdout JSON IPC
  */
 
+// CRITICAL: Set file checkpointing env var BEFORE any SDK imports
+// The SDK may read this at import time to enable its checkpoint storage mechanism
+process.env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING = '1';
+
 // Ensure common binary paths are in PATH (important for production apps launched from Finder)
 const homeDir = process.env.HOME ?? '';
 const commonPaths = [
@@ -149,6 +153,16 @@ function main(): void {
     sendEvent({
       type: 'error_event',
       error,
+    });
+  });
+
+  // Emit checkpoint events when user messages with UUIDs are received
+  // These UUIDs can be used to rewind files to that checkpoint
+  sessionManager.onCheckpoint((data) => {
+    sendEvent({
+      type: 'checkpoint',
+      sessionId: data.sessionId,
+      checkpointId: data.checkpointId,
     });
   });
 
@@ -411,6 +425,12 @@ async function handleRequest(
     case 'fork_session': {
       const result = await sessionManager.forkSession(request.sessionId, request.options);
       sendResponse({ type: 'fork_result', requestType: request.type, result });
+      break;
+    }
+
+    case 'rewind_files': {
+      await sessionManager.rewindFiles(request.sessionId, request.checkpointId);
+      sendResponse({ type: 'success', requestType: request.type });
       break;
     }
 

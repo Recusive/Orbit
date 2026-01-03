@@ -269,6 +269,17 @@ export interface ForkSessionRequest {
 }
 
 /**
+ * Rewind files to a specific checkpoint.
+ * Restores all files modified by Write, Edit, NotebookEdit tools
+ * to their state at the given checkpoint UUID.
+ */
+export interface RewindFilesRequest {
+  type: 'rewind_files';
+  sessionId: string;
+  checkpointId: string;
+}
+
+/**
  * Fork session result
  */
 export interface ForkSessionResult {
@@ -330,6 +341,7 @@ export type BridgeRequest =
   | UpdateCommandRequest
   | DeleteCommandRequest
   | ForkSessionRequest
+  | RewindFilesRequest
   | GenerateAgentDefinitionRequest
   | GenerateCommandDefinitionRequest
   | ShutdownRequest;
@@ -505,6 +517,16 @@ export interface ReadyEvent {
 }
 
 /**
+ * Checkpoint event - emitted when a user message with a UUID is received.
+ * The UUID can be used to rewind files to that checkpoint.
+ */
+export interface CheckpointEvent {
+  type: 'checkpoint';
+  sessionId: string;
+  checkpointId: string;
+}
+
+/**
  * All possible events from Node.js
  */
 export type BridgeEvent =
@@ -514,7 +536,8 @@ export type BridgeEvent =
   | PlanModeChangedEvent
   | AcceptModeChangedEvent
   | ErrorEvent
-  | ReadyEvent;
+  | ReadyEvent
+  | CheckpointEvent;
 
 /**
  * All possible messages from Node.js to Rust

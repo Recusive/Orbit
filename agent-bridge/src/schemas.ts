@@ -68,6 +68,8 @@ export const SessionConfigSchema = z
     acceptEnabled: z.boolean().optional(),
     resumeSessionId: z.string().optional(),
     forkSession: z.boolean().optional(),
+    /** Resume session at a specific message UUID (for rewinding to a specific point) */
+    resumeSessionAt: z.string().optional(),
     model: ModelSchema.optional(),
   })
   .strict();
@@ -383,6 +385,15 @@ export const ForkSessionRequestSchema = z
   .strict();
 export type ForkSessionRequest = z.infer<typeof ForkSessionRequestSchema>;
 
+export const RewindFilesRequestSchema = z
+  .object({
+    type: z.literal('rewind_files'),
+    sessionId: z.string(),
+    checkpointId: z.string(),
+  })
+  .strict();
+export type RewindFilesRequest = z.infer<typeof RewindFilesRequestSchema>;
+
 export const GenerateAgentDefinitionRequestSchema = z
   .object({
     type: z.literal('generate_agent_definition'),
@@ -437,6 +448,7 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   UpdateCommandRequestSchema,
   DeleteCommandRequestSchema,
   ForkSessionRequestSchema,
+  RewindFilesRequestSchema,
   GenerateAgentDefinitionRequestSchema,
   GenerateCommandDefinitionRequestSchema,
   ShutdownRequestSchema,

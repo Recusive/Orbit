@@ -113,6 +113,8 @@ export interface OrbitAgentConfig {
   snapshotCallback?: SnapshotCallback;
   resumeSessionId?: string;
   forkSession?: boolean;
+  /** Resume session at a specific message UUID (for rewinding to a specific point) */
+  resumeSessionAt?: string;
   model?: string;
   /** Fallback model to use if primary model fails */
   fallbackModel?: string;
@@ -239,6 +241,7 @@ export class OrbitAgent {
   // Session resume/fork fields
   private _resumeSessionId?: string;
   private _forkSession: boolean;
+  private _resumeSessionAt?: string;
   private _currentSessionId?: string;
 
   // Streaming input mode fields
@@ -269,6 +272,7 @@ export class OrbitAgent {
     this._sessionMode = config.sessionMode ?? 'agent';
     this._resumeSessionId = config.resumeSessionId;
     this._forkSession = config.forkSession ?? false;
+    this._resumeSessionAt = config.resumeSessionAt;
     if (config.model !== undefined) {
       this.model = config.model;
     }
@@ -759,10 +763,19 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       if (this._forkSession) {
         options.forkSession = true;
       }
-      logger.info(
-        { resumeFrom: this._resumeSessionId, fork: this._forkSession },
-        'Session resume/fork configured'
-      );
+      // Resume at specific message UUID (for rewinding to a specific point in conversation)
+      if (this._resumeSessionAt) {
+        options.resumeSessionAt = this._resumeSessionAt;
+        logger.info(
+          { resumeFrom: this._resumeSessionId, fork: this._forkSession, at: this._resumeSessionAt },
+          'Session resume/fork at specific message configured'
+        );
+      } else {
+        logger.info(
+          { resumeFrom: this._resumeSessionId, fork: this._forkSession },
+          'Session resume/fork configured'
+        );
+      }
     }
 
     // MCP servers (DevTools, custom tools, etc.)
@@ -782,6 +795,33 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       options.agents = this._agents;
       logger.info({ agents: Object.keys(this._agents) }, 'Custom subagents configured');
     }
+
+    // Enable file checkpointing for rewind functionality
+    // This tracks file changes made through Write, Edit, NotebookEdit tools
+    // and allows rewinding to any previous checkpoint
+    options.enableFileCheckpointing = true;
+
+    // Required to receive checkpoint UUIDs in user messages
+    // These UUIDs are used as restore points for file rewinding
+    options.extraArgs = {
+      ...options.extraArgs,
+      'replay-user-messages': null,
+    };
+
+    // CRITICAL: Pass the env variable through options.env (not just process.env)
+    // The SDK requires this to enable file checkpointing storage
+    // Also verify process.env already has it (set at index.ts entry point)
+    options.env = {
+      ...process.env,
+      CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1',
+    };
+    logger.info(
+      {
+        processEnvValue: process.env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING,
+        optionsEnvValue: options.env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING,
+      },
+      'File checkpointing enabled for rewind support'
+    );
 
     return options;
   }
@@ -854,6 +894,9 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Default is 60s which causes reconnects when user doesn't respond to permission prompts
     // Set to 24 hours (in milliseconds) - like Claude Code CLI, user can wait indefinitely
     process.env.CLAUDE_CODE_STREAM_CLOSE_TIMEOUT = '86400000';
+
+    // Enable SDK file checkpointing - required for rewindFiles() to work
+    process.env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING = '1';
 
     logger.debug(
       { thinkingMode: this._thinkingMode, thinkingBudget: this._thinkingBudget },
@@ -1192,6 +1235,119 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
    */
   getCurrentSessionId(): string | undefined {
     return this._currentSessionId;
+  }
+
+  /**
+   * Rewind files to a specific checkpoint from INSIDE the message loop.
+   * This method must be called from within the for-await loop that iterates
+   * over the Query's messages, as per SDK requirements.
+   *
+   * IMPORTANT: This is the method that should be used by the session manager's
+   * message loop. It calls rewindFiles() directly on the current Query object.
+   *
+   * @param checkpointId - The UUID of the checkpoint (from a user message)
+   */
+  async rewindFilesInLoop(checkpointId: string): Promise<void> {
+    logger.info(
+      { checkpointId, hasCurrentQuery: !!this.currentQuery },
+      '🔄 rewindFilesInLoop called (from inside message loop)'
+    );
+
+    if (!this.currentQuery) {
+      logger.error({ checkpointId }, 'No active query for rewindFilesInLoop');
+      throw new Error(
+        'No active query - rewindFilesInLoop must be called from inside the message loop'
+      );
+    }
+
+    // Call rewindFiles directly on the current Query object
+    // This works because we're being called from inside the for-await loop
+    const currentQuery = this.currentQuery;
+    await withRetry(async () => currentQuery.rewindFiles(checkpointId), {
+      ...RetryPresets.quick,
+      operationName: 'rewindFilesInLoop',
+    });
+
+    logger.info({ checkpointId }, '✅ rewindFilesInLoop completed successfully');
+  }
+
+  /**
+   * Rewind files to a specific checkpoint by creating a resumed query.
+   * This method interrupts the current query, creates a new one that resumes
+   * the session, and calls rewindFiles on that resumed query.
+   *
+   * Use this method when calling from outside the message loop (e.g., from session-manager).
+   * For calls from inside the message loop, use rewindFilesInLoop() instead.
+   *
+   * @param checkpointId - The UUID of the checkpoint (from a user message)
+   */
+  async rewindFiles(checkpointId: string): Promise<void> {
+    const sdkSessionId = this._currentSessionId;
+    logger.info(
+      { checkpointId, sdkSessionId, hasCurrentQuery: !!this.currentQuery },
+      '🔄 rewindFiles called'
+    );
+
+    if (!sdkSessionId) {
+      logger.error({ checkpointId }, 'No SDK session ID available for rewindFiles');
+      throw new Error('No SDK session ID available - session may not have been started');
+    }
+
+    // Step 1: Interrupt the current query to "complete" the session
+    // The SDK requires the session to finish before checkpoint data is accessible
+    if (this.currentQuery) {
+      logger.info({ checkpointId }, 'Interrupting current query before rewind');
+      try {
+        await this.currentQuery.interrupt();
+        // Give the SDK a moment to finalize the session and flush checkpoint data
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      } catch (interruptErr) {
+        logger.warn(
+          { checkpointId, err: interruptErr },
+          'Error interrupting query (continuing anyway)'
+        );
+      }
+    }
+
+    logger.info({ checkpointId, sdkSessionId }, 'Resuming session for file rewind');
+
+    // Step 2: Build options for the rewind query - must resume the session
+    // Important: Include the CLI path since bundled Bun environments need it
+    // Also include env with the checkpointing flag
+    const rewindOptions: Options = {
+      enableFileCheckpointing: true,
+      resume: sdkSessionId,
+      cwd: this.cwd,
+      pathToClaudeCodeExecutable: this._findClaudeExecutable(),
+      env: {
+        ...process.env,
+        CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1',
+      },
+    };
+
+    // Step 3: Create a new query that resumes the session with an empty prompt
+    const rewindQuery = query({
+      prompt: '', // Empty prompt to open the connection
+      options: rewindOptions,
+    });
+
+    try {
+      // Step 4: Iterate through the resumed query and call rewindFiles
+      // We need to enter the async iterator once to establish the connection
+      for await (const msg of rewindQuery) {
+        // Log the message type we received (for debugging replay issues)
+        logger.info({ checkpointId, msgType: msg.type }, 'Calling rewindFiles on resumed query');
+        await withRetry(async () => rewindQuery.rewindFiles(checkpointId), {
+          ...RetryPresets.quick,
+          operationName: 'rewindFiles',
+        });
+        logger.info({ checkpointId }, 'Files rewound successfully');
+        break; // Exit after rewinding
+      }
+    } catch (err) {
+      logger.error({ checkpointId, err }, 'Error during file rewind');
+      throw err;
+    }
   }
 }
 

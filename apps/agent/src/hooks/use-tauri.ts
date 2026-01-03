@@ -24,6 +24,8 @@ import {
   agentSetModel,
   agentSetPlanMode,
   agentSetAcceptMode,
+  agentRewindFiles,
+  agentGetSdkSessionId,
   // Conversation operations
   conversationCreate,
   conversationList,
@@ -44,6 +46,7 @@ import {
   deleteCommand,
   generateCommandDefinition,
 } from '@/lib/backend';
+import { useCheckpointStore } from '@/stores/checkpoint-store';
 import { useUIStore } from '@/stores/ui-store';
 import { ExtensionMessageSchema, WebviewMessageSchema } from '@/types/protocol';
 
@@ -311,6 +314,27 @@ function initWindowMessageListener(): void {
       }
     }
 
+    // Handle checkpoint events for file rewind functionality
+    // Uses "delayed association" - each message gets the checkpoint from the NEXT user message
+    // This ensures rewinding to a message restores files to the state AFTER that message completed
+    if (result.data.type === 'agent:checkpoint') {
+      const { session_id, checkpoint_id } = result.data;
+      console.warn('[Snowflake] 🔖 Received checkpoint event:', { session_id, checkpoint_id });
+      // This will associate the checkpoint with any pending message from the previous turn
+      useCheckpointStore.getState().onCheckpointReceived(session_id, checkpoint_id);
+    }
+
+    // When agent completes, mark this message as waiting for its checkpoint
+    // The next checkpoint that arrives (from the next user message) will be associated with it
+    if (result.data.type === 'agent:complete') {
+      const { session_id, message_id } = result.data;
+      console.warn('[Snowflake] 📝 Message complete, waiting for next checkpoint:', {
+        session_id,
+        message_id,
+      });
+      useCheckpointStore.getState().onMessageComplete(session_id, message_id);
+    }
+
     // Dispatch to all registered handlers
     for (const handler of messageHandlers) {
       handler(result.data);
@@ -329,6 +353,33 @@ function initWindowMessageListener(): void {
 
 /** Track created sessions to ensure we create before sending */
 const createdSessions = new Set<string>();
+
+/**
+ * Track forked sessions that should resume from an SDK session.
+ * Key: new (forked) session ID
+ * Value: { sdkSessionId, resumeSessionAt } for session resume configuration
+ */
+const forkedSessionResumeMap = new Map<
+  string,
+  { sdkSessionId: string; resumeSessionAt?: string }
+>();
+
+/** Mark a session as forked from another SDK session */
+export function markSessionAsForked(
+  newSessionId: string,
+  resumeFromSdkSessionId: string,
+  resumeSessionAt?: string
+): void {
+  forkedSessionResumeMap.set(newSessionId, {
+    sdkSessionId: resumeFromSdkSessionId,
+    resumeSessionAt,
+  });
+  console.warn('[Snowflake] 🔀 Marked session as forked:', {
+    newSessionId,
+    resumeFromSdkSessionId,
+    resumeSessionAt,
+  });
+}
 
 /** Ensure a session exists before sending messages */
 async function ensureSession(sessionId: string): Promise<void> {
@@ -349,6 +400,24 @@ async function ensureSession(sessionId: string): Promise<void> {
   };
   if (cwd) {
     config.cwd = cwd;
+  }
+
+  // Check if this is a forked session that should resume from an SDK session
+  const resumeConfig = forkedSessionResumeMap.get(sessionId);
+  if (resumeConfig) {
+    config.resumeSessionId = resumeConfig.sdkSessionId;
+    config.forkSession = true;
+    // Pass the resumeSessionAt (message UUID) to fork at a specific point
+    if (resumeConfig.resumeSessionAt) {
+      config.resumeSessionAt = resumeConfig.resumeSessionAt;
+    }
+    console.warn('[Snowflake] 🔀 Creating forked session with resume:', {
+      sessionId,
+      resumeFromSdkSession: resumeConfig.sdkSessionId,
+      resumeSessionAt: resumeConfig.resumeSessionAt,
+    });
+    // Clean up the mapping since we only need it once
+    forkedSessionResumeMap.delete(sessionId);
   }
 
   await agentCreateSession(sessionId, config);
@@ -678,7 +747,64 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
   // Handle conversation rewind request (fork)
   if (message.type === 'conversation:rewind') {
     try {
+      // Step 1: Get the checkpoint for this message (if any)
+      // The checkpoint represents the file state AFTER this message's turn completed
+      // (using delayed association - each message gets the checkpoint from the NEXT user message)
+      const checkpointStore = useCheckpointStore.getState();
+      let checkpointId = checkpointStore.getCheckpoint(message.session_id, message.message_id);
+
+      // If no checkpoint for exact message (e.g., user clicked on a user message),
+      // fall back to the first checkpoint for the session.
+      // This restores files to the state before ANY agent work.
+      checkpointId ??= checkpointStore.getFirstCheckpoint(message.session_id);
+
+      // Debug: Log all checkpoints for this session
+      const allCheckpoints = checkpointStore.checkpoints[message.session_id];
+      console.warn('[Snowflake] 🔄 Rewind requested:', {
+        session_id: message.session_id,
+        message_id: message.message_id,
+        checkpointId,
+        allCheckpointsForSession: allCheckpoints,
+      });
+
+      // Step 2: Get SDK session ID BEFORE forking so we can resume from it
+      let sdkSessionId: string | null = null;
+      try {
+        sdkSessionId = await agentGetSdkSessionId(message.session_id);
+        console.warn('[Snowflake] 🔀 Got SDK session ID for resume:', sdkSessionId);
+      } catch (sdkErr) {
+        console.error('[Snowflake] ⚠️ Could not get SDK session ID:', sdkErr);
+      }
+
+      // Step 3: Rewind files to the checkpoint state if available
+      // This restores all Write/Edit/NotebookEdit changes made after this point
+      if (checkpointId) {
+        try {
+          console.warn('[Snowflake] 🔄 Calling agentRewindFiles...');
+          await agentRewindFiles(message.session_id, checkpointId);
+          console.warn('[Snowflake] ✅ Files rewound to checkpoint:', checkpointId);
+        } catch (rewindErr) {
+          // Log but continue with conversation fork even if file rewind fails
+          console.error('[Snowflake] ❌ File rewind failed:', rewindErr);
+        }
+      } else {
+        console.warn('[Snowflake] ⚠️ No checkpoints found for session, skipping file rewind');
+      }
+
+      // Step 4: Fork the conversation to this point
       const newSessionId = crypto.randomUUID();
+
+      // Mark the new session as forked so it resumes from the original SDK session
+      // Pass the checkpoint ID as resumeSessionAt - this is the message UUID to fork at
+      if (sdkSessionId) {
+        markSessionAsForked(newSessionId, sdkSessionId, checkpointId ?? undefined);
+        console.warn('[Snowflake] 🔀 Marking forked session with resumeSessionAt:', {
+          newSessionId,
+          sdkSessionId,
+          resumeSessionAt: checkpointId,
+        });
+      }
+
       const forked = await conversationFork(message.session_id, newSessionId, message.message_id);
       if (forked) {
         window.postMessage(
@@ -690,10 +816,10 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
             rewind_to_message_id: message.message_id,
             messages: forked.messages.map((m) => ({
               id: m.id,
-              role: m.role,
+              role: m.role as 'user' | 'assistant',
               content: m.content,
-              thinking: m.thinking,
-              created_at: m.createdAt,
+              timestamp: m.createdAt,
+              toolUses: m.toolUses,
             })),
           },
           '*'
@@ -1651,6 +1777,7 @@ export function useAgentStream(sessionId: string, callbacks: AgentStreamCallback
         case 'conversation:loading':
         case 'conversation:loaded':
         case 'conversation:rewound':
+        case 'agent:checkpoint':
           break;
       }
     },

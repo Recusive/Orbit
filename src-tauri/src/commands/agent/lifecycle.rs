@@ -384,6 +384,20 @@ pub async fn agent_fork_session(
     state.fork_session(&session_id, options).map_err(to_error)
 }
 
+/// Rewind files to a specific checkpoint.
+/// This restores all files modified by Write, Edit, NotebookEdit tools
+/// to their state at the given checkpoint UUID.
+#[tauri::command]
+pub async fn agent_rewind_files(
+    session_id: String,
+    checkpoint_id: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<()> {
+    state
+        .rewind_files(&session_id, &checkpoint_id)
+        .map_err(to_error)
+}
+
 /// Generate an agent definition from a natural language description
 #[tauri::command]
 pub async fn agent_generate_agent_definition(
@@ -486,6 +500,18 @@ pub fn setup_event_callbacks(app: &AppHandle, session_manager: &Arc<SessionManag
         },
         BridgeEvent::Ready => {
             drop(app_handle.emit("agent:ready", ()));
+        },
+        BridgeEvent::Checkpoint {
+            session_id,
+            checkpoint_id,
+        } => {
+            drop(app_handle.emit(
+                "agent:checkpoint",
+                serde_json::json!({
+                    "sessionId": session_id,
+                    "checkpointId": checkpoint_id,
+                }),
+            ));
         },
     }));
 }

@@ -172,6 +172,8 @@ export interface SessionConfig {
   sessionMode?: 'chat' | 'agent';
   resumeSessionId?: string;
   forkSession?: boolean;
+  /** Resume session at a specific message UUID (for rewinding to a specific point) */
+  resumeSessionAt?: string;
 }
 
 /**
@@ -255,6 +257,7 @@ interface SDKAssistantMessage {
 
 interface SDKUserMessage {
   type: 'user';
+  uuid?: string; // Checkpoint UUID - available when replay-user-messages is enabled
   message?: {
     content?: unknown[];
   };
@@ -335,9 +338,19 @@ export class SessionManager extends Disposable {
   private readonly _onSessionInit = this._register(new Emitter<SessionInitEvent>());
   readonly onSessionInit = this._onSessionInit.event;
 
+  // Checkpoint event - fired when we receive a user message with a UUID
+  // The UUID can be used to rewind files to that point
+  private readonly _onCheckpoint = this._register(
+    new Emitter<{ sessionId: string; checkpointId: string }>()
+  );
+  readonly onCheckpoint = this._onCheckpoint.event;
+
   // Session tracking
   private activeSessions = new Map<string, OrbitAgent>();
-  private sessionConsumers = new Map<string, { cancel: () => void }>();
+  private sessionConsumers = new Map<
+    string,
+    { cancel: () => void; state: { cancelled: boolean; pendingRewindCheckpointId?: string } }
+  >();
   private permissionResolvers = new Map<string, PermissionResolver>();
   private modePreferences = new Map<
     string,
@@ -477,6 +490,7 @@ export class SessionManager extends Disposable {
       permissionRequestCallback: permissionCallback,
       resumeSessionId: config?.resumeSessionId,
       forkSession: config?.forkSession,
+      resumeSessionAt: config?.resumeSessionAt,
     };
 
     logger.info({ sessionId, sessionMode: finalConfig.sessionMode }, 'Creating session');
@@ -509,13 +523,13 @@ export class SessionManager extends Disposable {
    * Start a background consumer for streaming messages
    */
   private _startBackgroundConsumer(sessionId: string, agent: OrbitAgent): void {
-    const state = { cancelled: false };
+    const state: { cancelled: boolean; pendingRewindCheckpointId?: string } = { cancelled: false };
 
     const cancel = (): void => {
       state.cancelled = true;
     };
 
-    this.sessionConsumers.set(sessionId, { cancel });
+    this.sessionConsumers.set(sessionId, { cancel, state });
 
     // Run consumer in background
     void (async () => {
@@ -664,6 +678,23 @@ export class SessionManager extends Disposable {
               this._onAgentMessage.fire({ sessionId, message: toolMessage });
             }
           } else if (sdkMessage.type === 'user') {
+            // Emit checkpoint event if user message has a UUID
+            // This UUID can be used to rewind files to this point
+            logger.debug(
+              { hasUuid: !!sdkMessage.uuid, uuid: sdkMessage.uuid },
+              'Received user message from SDK'
+            );
+            if (sdkMessage.uuid) {
+              logger.info(
+                { sessionId, checkpointId: sdkMessage.uuid },
+                '🔖 Emitting checkpoint event'
+              );
+              this._onCheckpoint.fire({
+                sessionId,
+                checkpointId: sdkMessage.uuid,
+              });
+            }
+
             // Tool results
             const content = sdkMessage.message?.content;
             if (!Array.isArray(content)) continue;
@@ -740,6 +771,28 @@ export class SessionManager extends Disposable {
             });
             // Reset streaming flag for next turn
             textWasStreamed = false;
+          }
+
+          // Check for pending rewind after processing each message
+          // This must be called from INSIDE the for-await loop on the SAME Query object
+          if (state.pendingRewindCheckpointId) {
+            const checkpointId = state.pendingRewindCheckpointId;
+            state.pendingRewindCheckpointId = undefined;
+
+            logger.info(
+              { sessionId, checkpointId },
+              '🔄 Executing pending rewind inside message loop'
+            );
+            try {
+              await agent.rewindFilesInLoop(checkpointId);
+              logger.info({ sessionId, checkpointId }, '✅ Rewind completed from inside loop');
+            } catch (rewindErr) {
+              logger.error(
+                { sessionId, checkpointId, err: rewindErr },
+                '❌ Rewind failed inside loop'
+              );
+            }
+            break; // Exit loop after rewind as per SDK pattern
           }
         }
       } catch (error) {
@@ -940,6 +993,38 @@ export class SessionManager extends Disposable {
       return prefs?.acceptEnabled ?? false;
     }
     return agent.getAcceptMode();
+  }
+
+  /**
+   * Rewind files to a specific checkpoint.
+   * This restores all files modified by Write, Edit, NotebookEdit tools
+   * to their state at the given checkpoint UUID.
+   *
+   * This method calls the agent's rewindFiles() directly, which:
+   * 1. Creates a new query that resumes the session
+   * 2. Calls rewindFiles on that resumed query
+   *
+   * @param sessionId - The session ID
+   * @param checkpointId - The UUID of the checkpoint (from a user message)
+   */
+  async rewindFiles(sessionId: string, checkpointId: string): Promise<void> {
+    logger.info({ sessionId, checkpointId }, '🔄 Rewinding files to checkpoint');
+
+    const agent = this.activeSessions.get(sessionId);
+    if (agent === undefined) {
+      logger.error({ sessionId }, 'Session not found for rewindFiles');
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    // Call the agent's rewindFiles method directly
+    // This creates a new query that resumes the session and calls rewindFiles
+    try {
+      await agent.rewindFiles(checkpointId);
+      logger.info({ sessionId, checkpointId }, '✅ Files rewound successfully');
+    } catch (err) {
+      logger.error({ sessionId, checkpointId, err }, '❌ File rewind failed');
+      throw err;
+    }
   }
 
   /**

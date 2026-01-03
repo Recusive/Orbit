@@ -610,6 +610,22 @@ impl SessionManager {
         Self::check_response_fork_result(response)
     }
 
+    /// Rewind files to a specific checkpoint.
+    /// This restores all files modified by Write, Edit, NotebookEdit tools
+    /// to their state at the given checkpoint UUID.
+    pub fn rewind_files(&self, session_id: &str, checkpoint_id: &str) -> Result<()> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::RewindFiles {
+            session_id: session_id.to_owned(),
+            checkpoint_id: checkpoint_id.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response(response)
+    }
+
     /// Generate an agent definition from a natural language description
     pub fn generate_agent_definition(&self, description: &str) -> Result<SubagentDefinition> {
         self.ensure_running()?;

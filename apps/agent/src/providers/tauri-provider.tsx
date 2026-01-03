@@ -23,6 +23,7 @@ import type { FC, ReactNode } from 'react';
 
 import { trace } from '@/dev-monitor';
 import {
+  onAgentCheckpoint,
   onAgentError,
   onAgentMessage,
   onAgentAcceptModeChanged,
@@ -378,6 +379,20 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             session_id: '',
             message_id: crypto.randomUUID(),
             error: event.message,
+          });
+        }).then((unlisten) => {
+          controller.addUnlisten(unlisten);
+        })
+      );
+
+      // Checkpoint events (for file rewind functionality)
+      listenerPromises.push(
+        onAgentCheckpoint((event) => {
+          postWindowMessage({
+            type: 'agent:checkpoint',
+            uuid: crypto.randomUUID(),
+            session_id: event.sessionId,
+            checkpoint_id: event.checkpointId,
           });
         }).then((unlisten) => {
           controller.addUnlisten(unlisten);

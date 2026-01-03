@@ -979,6 +979,16 @@ export const AgentAcceptModeSchema = z
   })
   .strict();
 
+// Checkpoint event (for file rewind functionality)
+export const AgentCheckpointSchema = z
+  .object({
+    type: z.literal('agent:checkpoint'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    checkpoint_id: z.string(),
+  })
+  .strict();
+
 // Tool events (matches SDK pattern)
 export const ToolStartSchema = z
   .object({
@@ -1392,6 +1402,18 @@ export const ConversationRewoundSchema = z
           role: z.enum(['user', 'assistant']),
           content: z.string(),
           timestamp: z.number(),
+          /** Tool uses for this message (for restoring tool widgets) */
+          toolUses: z
+            .array(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+                input: z.record(z.string(), z.unknown()),
+                output: z.string().optional(),
+                success: z.boolean(),
+              })
+            )
+            .optional(),
         })
         .strict()
     ),
@@ -1651,6 +1673,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   AgentErrorSchema,
   AgentPlanModeSchema,
   AgentAcceptModeSchema,
+  AgentCheckpointSchema,
   // Tools
   ToolStartSchema,
   ToolEndSchema,
@@ -1790,6 +1813,7 @@ export type AgentComplete = z.infer<typeof AgentCompleteSchema>;
 export type AgentError = z.infer<typeof AgentErrorSchema>;
 export type AgentPlanMode = z.infer<typeof AgentPlanModeSchema>;
 export type AgentAcceptMode = z.infer<typeof AgentAcceptModeSchema>;
+export type AgentCheckpoint = z.infer<typeof AgentCheckpointSchema>;
 export type ToolStart = z.infer<typeof ToolStartSchema>;
 export type ToolEnd = z.infer<typeof ToolEndSchema>;
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;

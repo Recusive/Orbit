@@ -473,6 +473,12 @@ export interface SessionConfig {
   thinkingTokens?: number;
   acceptEnabled?: boolean;
   planEnabled?: boolean;
+  /** SDK session ID to resume from (for forked/rewound sessions) */
+  resumeSessionId?: string;
+  /** Whether to fork the session (create new branch) vs continue original */
+  forkSession?: boolean;
+  /** Resume session at a specific message UUID (for rewinding to a specific point) */
+  resumeSessionAt?: string;
 }
 
 export interface AttachmentContentBlock {
@@ -541,6 +547,11 @@ export interface ModeChangedEvent {
 export interface AgentErrorEvent {
   message: string;
   stack?: string;
+}
+
+export interface CheckpointEvent {
+  sessionId: string;
+  checkpointId: string;
 }
 
 export async function agentCreateSession(sessionId: string, config?: SessionConfig): Promise<void> {
@@ -653,6 +664,12 @@ export async function onAgentError(
   return listen<AgentErrorEvent>('agent:error', callback);
 }
 
+export async function onAgentCheckpoint(
+  callback: (event: CheckpointEvent) => void
+): Promise<() => void> {
+  return listen<CheckpointEvent>('agent:checkpoint', callback);
+}
+
 export async function onAgentReady(callback: () => void): Promise<() => void> {
   return listen<undefined>('agent:ready', () => {
     callback();
@@ -669,6 +686,18 @@ export async function agentGetStoredSession(sessionId: string): Promise<string |
 
 export async function agentCleanupSessions(maxAgeDays?: number): Promise<number> {
   return invoke<number>('agent_cleanup_sessions', { maxAgeDays });
+}
+
+/**
+ * Rewind files to a specific checkpoint.
+ * This restores all files modified by Write, Edit, NotebookEdit tools
+ * to their state at the given checkpoint UUID.
+ *
+ * @param sessionId - The session ID
+ * @param checkpointId - The checkpoint UUID (from a user message)
+ */
+export async function agentRewindFiles(sessionId: string, checkpointId: string): Promise<void> {
+  await invoke('agent_rewind_files', { sessionId, checkpointId });
 }
 
 // ============================================

@@ -83,6 +83,9 @@ pub struct SessionConfig {
     pub resume_session_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fork_session: Option<bool>,
+    /// Resume session at a specific message UUID (for rewinding to a specific point)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resume_session_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -399,6 +402,12 @@ pub enum BridgeRequest {
         #[serde(skip_serializing_if = "Option::is_none")]
         options: Option<ForkSessionOptions>,
     },
+    RewindFiles {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        #[serde(rename = "checkpointId")]
+        checkpoint_id: String,
+    },
     GenerateAgentDefinition {
         description: String,
     },
@@ -499,6 +508,12 @@ pub enum BridgeEvent {
         error: SerializableError,
     },
     Ready,
+    Checkpoint {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        #[serde(rename = "checkpointId")]
+        checkpoint_id: String,
+    },
 }
 
 /// All possible messages from Node.js
