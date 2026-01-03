@@ -153,6 +153,11 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   const renderToolWidget = (tool: ToolExecution): React.ReactNode => {
     const toolName = tool.toolName.toLowerCase();
 
+    // Debug: Log tool name for debugging widget mismatch issues
+    console.warn(
+      `[MessageItem] Rendering widget: toolName="${tool.toolName}" (lowercased="${toolName}"), id="${tool.id}"`
+    );
+
     if (toolName === 'write') {
       return (
         <WriteToolWidget
@@ -160,6 +165,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           filePath={getStringInput(tool, 'file_path', 'unknown')}
           content={getStringInput(tool, 'content', '')}
           isRunning={tool.status === 'running'}
+          success={tool.status === 'error' ? false : tool.success}
           onOpenFile={onOpenFile}
         />
       );
@@ -172,6 +178,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           oldString={getStringInput(tool, 'old_string', '')}
           newString={getStringInput(tool, 'new_string', '')}
           isRunning={tool.status === 'running'}
+          success={tool.status === 'error' ? false : tool.success}
           onOpenFile={onOpenFile}
         />
       );
@@ -182,6 +189,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           key={tool.id}
           filePath={getStringInput(tool, 'file_path', 'unknown')}
           isRunning={tool.status === 'running'}
+          success={tool.status === 'error' ? false : tool.success}
           content={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
           onOpenFile={onOpenFile}
         />
@@ -195,6 +203,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           description={getStringInput(tool, 'description', '')}
           output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
           isRunning={tool.status === 'running'}
+          success={tool.status === 'error' ? false : tool.success}
         />
       );
     }
@@ -206,6 +215,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           path={getStringInput(tool, 'path', '') || undefined}
           output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
           isRunning={tool.status === 'running'}
+          success={tool.status === 'error' ? false : tool.success}
           onOpenFile={onOpenFile}
         />
       );
@@ -221,6 +231,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           fileType={getStringInput(tool, 'type', '') || undefined}
           output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
           isRunning={tool.status === 'running'}
+          success={tool.status === 'error' ? false : tool.success}
           onOpenFile={onOpenFile}
         />
       );
@@ -232,6 +243,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           key={tool.id}
           todos={Array.isArray(todosInput) ? todosInput : undefined}
           isRunning={tool.status === 'running'}
+          success={tool.status === 'error' ? false : tool.success}
         />
       );
     }
@@ -242,6 +254,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           query={getStringInput(tool, 'query', '')}
           output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
           isRunning={tool.status === 'running'}
+          success={tool.status === 'error' ? false : tool.success}
           onOpenUrl={onOpenUrl}
         />
       );
@@ -254,6 +267,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           prompt={getStringInput(tool, 'prompt', '')}
           output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
           isRunning={tool.status === 'running'}
+          success={tool.status === 'error' ? false : tool.success}
           onOpenUrl={onOpenUrl}
         />
       );
@@ -268,6 +282,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           model={getStringInput(tool, 'model', '') || undefined}
           output={typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined}
           isRunning={tool.status === 'running'}
+          success={tool.status === 'error' ? false : tool.success}
         />
       );
     }

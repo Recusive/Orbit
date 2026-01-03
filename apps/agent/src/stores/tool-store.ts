@@ -128,6 +128,18 @@ export interface ToolState {
   // Get tools for a specific message
   getToolsForMessage: (messageId: string) => ToolExecution[];
 
+  // Restore tools from persisted data (for conversation reload)
+  restoreToolsForMessage: (
+    messageId: string,
+    tools: {
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+      output?: string | undefined;
+      success: boolean;
+    }[]
+  ) => void;
+
   // Reset
   reset: () => void;
 }
@@ -356,6 +368,41 @@ export const useToolStore = create<ToolState>()(
       }
 
       return Array.from(toolMap.values()).sort((a, b) => a.startedAt - b.startedAt);
+    },
+
+    restoreToolsForMessage: (
+      messageId: string,
+      tools: {
+        id: string;
+        name: string;
+        input: Record<string, unknown>;
+        output?: string | undefined;
+        success: boolean;
+      }[]
+    ) => {
+      set((state) => {
+        // Convert persisted tool data to ToolExecution format
+        for (const tool of tools) {
+          // Skip if we already have this tool (avoid duplicates on multiple loads)
+          const exists = state.completedTools.some((t) => t.id === tool.id);
+          if (exists) {
+            continue;
+          }
+
+          const toolExecution: ToolExecution = {
+            id: tool.id,
+            messageId,
+            toolName: tool.name,
+            toolInput: tool.input,
+            toolOutput: tool.output,
+            status: tool.success ? 'success' : 'error',
+            startedAt: 0, // Not available from persisted data
+            completedAt: 0, // Not available from persisted data
+            success: tool.success,
+          };
+          state.completedTools.push(toolExecution);
+        }
+      });
     },
 
     reset: () => {

@@ -209,6 +209,11 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
               const status = meta?.status;
               const toolName = meta?.toolName ?? 'unknown';
 
+              // Debug: Log tool name for debugging widget mismatch issues
+              console.warn(
+                `[TauriProvider] Tool event: name="${toolName}", status="${String(status)}", id="${toolId}"`
+              );
+
               // Dev-monitor: Track tool use
               if (status === 'success' || status === 'error') {
                 trace.log(

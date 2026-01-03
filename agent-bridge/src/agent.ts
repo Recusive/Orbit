@@ -500,7 +500,6 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       // canUseTool callback fires when SDK would show a permission prompt
       // (i.e., hooks return 'continue' and rules don't cover it)
       options.canUseTool = async (toolName, toolInput, canUseToolOptions) => {
-        logger.debug({ toolName }, 'canUseTool callback invoked');
         try {
           const result = await permissionCallback(toolName, toolInput, {
             signal: canUseToolOptions.signal,
@@ -508,7 +507,11 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           });
           return result;
         } catch (error) {
-          logger.error({ toolName, error }, 'canUseTool callback error');
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          logger.error(
+            { toolName, error: errorMessage, signalAborted: canUseToolOptions.signal.aborted },
+            `❌ canUseTool error for ${toolName}`
+          );
           return {
             behavior: 'deny' as const,
             message: 'Permission request failed',
@@ -948,7 +951,6 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     try {
       for await (const message of this.currentQuery) {
         messageCount++;
-        logger.info({ messageCount, type: message.type }, 'Received SDK message');
         // Capture session ID from system:init message
         if (message.type === 'system' && (message as { subtype?: string }).subtype === 'init') {
           const initMessage = message as { session_id?: string };

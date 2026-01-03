@@ -399,11 +399,16 @@ export class SessionManager extends Disposable {
       }>((resolve, reject) => {
         // Handle abort signal
         if (context.signal.aborted) {
+          logger.warn(
+            { toolName, requestId },
+            `⚠️ Permission signal ALREADY ABORTED for ${toolName}`
+          );
           reject(new Error('Permission request aborted'));
           return;
         }
 
         const abortHandler = (): void => {
+          logger.warn({ toolName, requestId }, `⚠️ Permission ABORTED via signal for ${toolName}`);
           this.permissionResolvers.delete(requestId);
           reject(new Error('Permission request aborted'));
         };

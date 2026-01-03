@@ -112,6 +112,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     addUsage,
     switchSession,
     restoreSessionUsage,
+    restoreToolsForMessage,
   } = useToolStore();
   const { queueMessage: storeQueueMessage } = useQueuedMessageStore();
 
@@ -197,16 +198,29 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           }
         );
 
+        // Use getState() to avoid stale closures
+        const {
+          restoreSessionUsage: restore,
+          switchSession: sw,
+          restoreToolsForMessage: restoreTools,
+        } = useToolStore.getState();
+
         // Restore usage if we found any
         if (processedMessageIds.length > 0) {
-          // Use getState() to avoid stale closures
-          const { restoreSessionUsage: restore, switchSession: sw } = useToolStore.getState();
           restore(sid, cumulativeUsage, processedMessageIds);
           // Also update current session if it matches
           const toolState = useToolStore.getState();
           if (toolState.currentSessionId === sid) {
             // Re-trigger switch to apply the restored usage
             sw(sid);
+          }
+        }
+
+        // Restore tool executions from persisted messages (for tool widget display on reload)
+        // This runs regardless of usage data since tools might exist without usage
+        for (const m of conversation.messages) {
+          if (m.toolUses !== undefined && m.toolUses.length > 0) {
+            restoreTools(m.id, m.toolUses);
           }
         }
       } catch {
@@ -361,6 +375,28 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
                   }
                 : undefined;
 
+              // Get completed tools for this message to persist alongside the message
+              const toolState = useToolStore.getState();
+              const messageTools = toolState.getToolsForMessage(completedMsg.id);
+              const toolUsesDto =
+                messageTools.length > 0
+                  ? messageTools.map((tool) => ({
+                      id: tool.id,
+                      name: tool.toolName,
+                      input: tool.toolInput,
+                      // Convert output to string if it's not already
+                      ...(tool.toolOutput !== undefined
+                        ? {
+                            output:
+                              typeof tool.toolOutput === 'string'
+                                ? tool.toolOutput
+                                : JSON.stringify(tool.toolOutput),
+                          }
+                        : {}),
+                      success: tool.success ?? true,
+                    }))
+                  : undefined;
+
               void conversationAddMessage(message.session_id, {
                 id: completedMsg.id,
                 role: 'assistant',
@@ -368,6 +404,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
                 ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
                 createdAt: Date.now(),
                 ...(usageDto ? { usage: usageDto } : {}),
+                ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
               });
 
               return [...prev.slice(0, -1), completedMsg];
@@ -532,6 +569,14 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           setSessionId(message.session_id);
           setActiveConversation(message.session_id, message.title);
           switchSession(message.session_id);
+
+          // Restore tool executions from persisted messages (for tool widget display)
+          for (const m of message.messages) {
+            if (m.toolUses.length > 0) {
+              restoreToolsForMessage(m.id, m.toolUses);
+            }
+          }
+
           // Reveal content after all state is updated
           setLoadingConversation(false);
           break;
@@ -717,6 +762,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       addUsage,
       switchSession,
       restoreSessionUsage,
+      restoreToolsForMessage,
       onSessionCreated,
     ]
   );

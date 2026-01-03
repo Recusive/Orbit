@@ -98,8 +98,6 @@ export class PermissionManager {
         suggestions?: unknown[];
       }
     ): Promise<PermissionResult> => {
-      logger.debug({ toolName, toolInput }, 'Permission callback invoked');
-
       try {
         // Check Accept mode FIRST - auto-approve ALL tools when active
         // This allows dynamic mode switching without session restart
@@ -176,7 +174,11 @@ export class PermissionManager {
             };
           } catch (error) {
             // If permission request fails, deny to avoid silent auto-approval
-            logger.error({ toolName, error }, 'Permission request failed - DENYING');
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error(
+              { toolName, error: errorMessage, signalAborted: options.signal.aborted },
+              `❌ Permission request failed for ${toolName} - DENYING`
+            );
             return {
               behavior: 'deny',
               message: localize(

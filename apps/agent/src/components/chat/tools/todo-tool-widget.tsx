@@ -14,6 +14,7 @@ interface TodoItem {
 interface TodoToolWidgetProps {
   readonly todos?: unknown[] | undefined;
   readonly isRunning?: boolean;
+  readonly success?: boolean | undefined;
 }
 
 function parseTodos(todos: unknown): TodoItem[] {
@@ -94,9 +95,14 @@ function StatusIcon({ status }: { readonly status: TodoItem['status'] }): ReactE
   }
 }
 
-export const TodoToolWidget: FC<TodoToolWidgetProps> = ({ todos: rawTodos, isRunning = false }) => {
+export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
+  todos: rawTodos,
+  isRunning = false,
+  success,
+}) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const wasRunningRef = useRef(isRunning);
+  const isFailed = success === false;
 
   // Auto-collapse when tool finishes
   useEffect(() => {
@@ -115,7 +121,10 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({ todos: rawTodos, isRun
     <div>
       <div
         className={cn(
-          'bg-card border border-border/50 overflow-hidden transition-all duration-200',
+          'bg-card overflow-hidden transition-all duration-200',
+          isFailed
+            ? 'border-2 border-dashed border-destructive/40 opacity-60'
+            : 'border border-border/50',
           isExpanded
             ? 'rounded-xl shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
             : 'rounded-lg shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
@@ -129,13 +138,29 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({ todos: rawTodos, isRun
           className="w-full flex items-center justify-between px-2.5 py-1.5 bg-transparent hover:bg-muted/40 active:bg-muted/50 transition-colors duration-150"
         >
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded flex items-center justify-center bg-primary/10">
-              <ListTodo className={cn('h-3 w-3 text-primary/70', isRunning && 'animate-pulse')} />
+            <div
+              className={cn(
+                'w-5 h-5 rounded flex items-center justify-center',
+                isFailed ? 'bg-destructive/10' : 'bg-primary/10'
+              )}
+            >
+              <ListTodo
+                className={cn(
+                  'h-3 w-3',
+                  isFailed ? 'text-destructive/70' : 'text-primary/70',
+                  isRunning && 'animate-pulse'
+                )}
+              />
             </div>
-            <span className="text-xs font-medium text-foreground">
-              {isRunning ? 'Updating tasks' : 'Task list'}
+            <span
+              className={cn(
+                'text-xs font-medium',
+                isFailed ? 'text-muted-foreground line-through' : 'text-foreground'
+              )}
+            >
+              {isRunning ? 'Updating tasks' : isFailed ? 'Task update failed' : 'Task list'}
             </span>
-            {!isRunning && totalCount > 0 ? (
+            {!isRunning && !isFailed && totalCount > 0 ? (
               <span className="text-[11px] text-muted-foreground/60">
                 ({String(completedCount)}/{String(totalCount)}
                 {inProgressCount > 0 ? `, ${String(inProgressCount)} active` : ''})
@@ -143,6 +168,8 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({ todos: rawTodos, isRun
             ) : null}
             {isRunning ? (
               <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
+            ) : isFailed ? (
+              <span className="text-[10px] text-destructive/60">Failed</span>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
