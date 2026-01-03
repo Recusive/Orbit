@@ -511,11 +511,7 @@ export const ChatInput: FC<ChatInputProps> = ({
 
         {/* Context Chips Row - shown when items attached */}
         {attachedContext.length > 0 ? (
-          <ContextChips
-            items={attachedContext}
-            onRemove={handleRemoveContext}
-            className="border-b border-border/50"
-          />
+          <ContextChips items={attachedContext} onRemove={handleRemoveContext} />
         ) : null}
 
         {/* Input Area */}
