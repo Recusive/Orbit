@@ -88,7 +88,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
   success,
   onOpenFile,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(isRunning);
   const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
 

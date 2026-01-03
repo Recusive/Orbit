@@ -22,8 +22,8 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   success,
 }) => {
   const isFailed = success === false;
-  // Start expanded, collapse when tool completes
-  const [isExpanded, setIsExpanded] = useState(true);
+  // Start expanded if running, collapsed if already completed (restored from persistence)
+  const [isExpanded, setIsExpanded] = useState(isRunning);
   const [highlightedCommand, setHighlightedCommand] = useState<string>('');
   const wasRunningRef = useRef(isRunning);
 

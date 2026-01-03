@@ -94,7 +94,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
   success,
   onOpenUrl,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(isRunning);
   const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
 
