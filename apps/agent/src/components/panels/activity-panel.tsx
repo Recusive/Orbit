@@ -330,7 +330,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === 'file' && hasOpenFiles ? (
+        {activeTab === 'file' ? (
           <FileViewer />
         ) : activeTab === 'files' ? (
           <div className="h-full overflow-y-auto">
