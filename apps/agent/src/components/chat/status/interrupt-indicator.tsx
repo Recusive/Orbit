@@ -21,7 +21,7 @@ export const InterruptIndicator: FC<InterruptIndicatorProps> = ({ onFeedback }) 
       </button>
 
       {/* Divider line */}
-      <div className="flex-1 h-px bg-destructive/30" />
+      <div className="flex-1 border-t border-dashed border-destructive/30" />
     </div>
   );
 };

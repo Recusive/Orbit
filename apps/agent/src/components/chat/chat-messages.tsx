@@ -5,10 +5,9 @@ import { QueuedMessageBubble } from './queued-message';
 
 import type { ChatMessage } from './messages';
 import type { QueuedMessage } from '@/stores/queued-message-store';
-import type { PermissionRequest, ToolExecution } from '@/stores/tool-store';
+import type { ToolExecution } from '@/stores/tool-store';
 import type { FC } from 'react';
 
-import { PermissionModal } from '@/components/modals';
 import { TextShimmer } from '@/components/ui/text-shimmer';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/constants';
 
@@ -54,7 +53,6 @@ function useRotatingMessage(isActive: boolean, intervalMs = 2500): string {
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
-  readonly pendingPermissions: PermissionRequest[];
   readonly isAgentRunning: boolean;
   readonly sessionId?: string;
   readonly queuedMessage: QueuedMessage | null;
@@ -62,15 +60,12 @@ interface ChatMessagesProps {
   readonly onRewind: (messageId: string) => void;
   readonly onOpenFile: (path: string) => void;
   readonly onOpenUrl: (url: string) => void;
-  readonly onPermissionApprove: (requestId: string, always?: boolean) => void;
-  readonly onPermissionDeny: (requestId: string) => void;
   readonly onCancelQueue: () => void;
   readonly onFeedback: () => void;
 }
 
 export const ChatMessages: FC<ChatMessagesProps> = ({
   messages,
-  pendingPermissions,
   isAgentRunning,
   sessionId,
   queuedMessage,
@@ -78,8 +73,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   onRewind,
   onOpenFile,
   onOpenUrl,
-  onPermissionApprove,
-  onPermissionDeny,
   onCancelQueue,
   onFeedback,
 }) => {
@@ -166,17 +159,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             />
           );
         })}
-
-        {/* Permission modals */}
-        {pendingPermissions.map((request) => (
-          <PermissionModal
-            key={request.requestId}
-            request={request}
-            onApprove={onPermissionApprove}
-            onDeny={onPermissionDeny}
-            onOpenFile={onOpenFile}
-          />
-        ))}
 
         {/* Queued message bubble - shows when user typed while agent was running */}
         {queuedMessage !== null ? (

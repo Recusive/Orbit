@@ -1,99 +1,89 @@
 import { z } from 'zod';
 
 /**
- * SDK Boundary Schemas
+ * SDK Boundary Schemas - Corrected to match Claude Agent SDK documentation
  *
- * Comprehensive schemas for Claude Agent SDK messages.
- * All schemas use .looseObject() to allow SDK evolution without breaking.
- *
- * Validated against 51 real SDK messages captured from production.
- * See: agent-bridge/src/__tests__/fixtures/
+ * Uses .looseObject() for forward compatibility, but fields match SDK types exactly.
+ * Reference: https://docs.anthropic.com/en/docs/agent-sdk/typescript
  */
 
 // ============================================================================
-// Base/Shared Schemas
+// Enums from SDK
+// ============================================================================
+
+export const ApiKeySourceSchema = z.enum(['user', 'project', 'org', 'temporary']);
+export type ApiKeySource = z.infer<typeof ApiKeySourceSchema>;
+
+export const PermissionModeSchema = z.enum(['default', 'acceptEdits', 'bypassPermissions', 'plan']);
+export type PermissionMode = z.infer<typeof PermissionModeSchema>;
+
+// ============================================================================
+// Usage Schemas (matches SDK NonNullableUsage)
 // ============================================================================
 
 /**
- * Usage statistics from SDK - appears in multiple message types
+ * Usage statistics - SDK sends these as required (non-nullable) in result messages
  */
 export const SDKUsageSchema = z.looseObject({
-  input_tokens: z.number().optional(),
-  output_tokens: z.number().optional(),
+  input_tokens: z.number(),
+  output_tokens: z.number(),
   cache_creation_input_tokens: z.number().optional(),
   cache_read_input_tokens: z.number().optional(),
-  service_tier: z.string().optional(),
-  cache_creation: z
-    .looseObject({
-      ephemeral_5m_input_tokens: z.number().optional(),
-      ephemeral_1h_input_tokens: z.number().optional(),
-    })
-    .optional(),
-  server_tool_use: z
-    .looseObject({
-      web_search_requests: z.number().optional(),
-      web_fetch_requests: z.number().optional(),
-    })
-    .optional(),
 });
 export type SDKUsage = z.infer<typeof SDKUsageSchema>;
 
 /**
- * Per-model usage breakdown in result messages
+ * Per-model usage breakdown - all fields required per SDK docs
  */
 export const SDKModelUsageEntrySchema = z.looseObject({
-  inputTokens: z.number().optional(),
-  outputTokens: z.number().optional(),
-  cacheReadInputTokens: z.number().optional(),
-  cacheCreationInputTokens: z.number().optional(),
-  webSearchRequests: z.number().optional(),
-  costUSD: z.number().optional(),
-  contextWindow: z.number().optional(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cacheReadInputTokens: z.number(),
+  cacheCreationInputTokens: z.number(),
+  webSearchRequests: z.number(),
+  costUSD: z.number(),
+  contextWindow: z.number(),
 });
 export type SDKModelUsageEntry = z.infer<typeof SDKModelUsageEntrySchema>;
 
-/**
- * Model usage map - keyed by model ID
- */
 export const SDKModelUsageSchema = z.record(z.string(), SDKModelUsageEntrySchema);
 export type SDKModelUsage = z.infer<typeof SDKModelUsageSchema>;
 
 // ============================================================================
-// Content Block Schemas
+// Permission Denial Schema
 // ============================================================================
 
-/**
- * Text content block
- */
+export const SDKPermissionDenialSchema = z.looseObject({
+  tool_name: z.string(),
+  tool_use_id: z.string(),
+  tool_input: z.record(z.string(), z.unknown()),
+});
+export type SDKPermissionDenial = z.infer<typeof SDKPermissionDenialSchema>;
+
+// ============================================================================
+// Content Block Schemas (from Anthropic SDK)
+// ============================================================================
+
 export const SDKTextBlockSchema = z.looseObject({
   type: z.literal('text'),
-  text: z.string().optional(),
+  text: z.string(),
 });
 export type SDKTextBlock = z.infer<typeof SDKTextBlockSchema>;
 
-/**
- * Thinking content block (extended thinking)
- */
 export const SDKThinkingBlockSchema = z.looseObject({
   type: z.literal('thinking'),
-  thinking: z.string().optional(),
+  thinking: z.string(),
 });
 export type SDKThinkingBlock = z.infer<typeof SDKThinkingBlockSchema>;
 
-/**
- * Tool use content block
- */
 export const SDKToolUseBlockSchema = z.looseObject({
   type: z.literal('tool_use'),
-  id: z.string().optional(),
-  name: z.string().optional(),
-  input: z.record(z.string(), z.unknown()).optional(),
+  id: z.string(),
+  name: z.string(),
+  input: z.record(z.string(), z.unknown()),
 });
 export type SDKToolUseBlock = z.infer<typeof SDKToolUseBlockSchema>;
 
-/**
- * Union of all content block types
- */
 export const SDKContentBlockSchema = z.union([
   SDKTextBlockSchema,
   SDKThinkingBlockSchema,
@@ -102,15 +92,19 @@ export const SDKContentBlockSchema = z.union([
 export type SDKContentBlock = z.infer<typeof SDKContentBlockSchema>;
 
 // ============================================================================
-// Stream Event Schemas
+// MCP Server Status
 // ============================================================================
 
-/**
- * Stream delta - varies by event type
- * - text_delta: has text
- * - thinking_delta: has thinking
- * - message_delta: has stop_reason/stop_sequence (no type field)
- */
+export const SDKMcpServerStatusSchema = z.looseObject({
+  name: z.string(),
+  status: z.string(),
+});
+export type SDKMcpServerStatus = z.infer<typeof SDKMcpServerStatusSchema>;
+
+// ============================================================================
+// Stream Event Schemas (from Anthropic SDK RawMessageStreamEvent)
+// ============================================================================
+
 export const SDKStreamDeltaSchema = z.looseObject({
   type: z.string().optional(), // Not present on message_delta
   text: z.string().optional(),
@@ -120,9 +114,16 @@ export const SDKStreamDeltaSchema = z.looseObject({
 });
 export type SDKStreamDelta = z.infer<typeof SDKStreamDeltaSchema>;
 
-/**
- * Message in stream event (for message_start)
- */
+export const SDKStreamContentBlockSchema = z.looseObject({
+  type: z.string(),
+  text: z.string().optional(),
+  thinking: z.string().optional(),
+  id: z.string().optional(),
+  name: z.string().optional(),
+  input: z.record(z.string(), z.unknown()).optional(),
+});
+export type SDKStreamContentBlock = z.infer<typeof SDKStreamContentBlockSchema>;
+
 export const SDKStreamMessageSchema = z.looseObject({
   model: z.string().optional(),
   id: z.string().optional(),
@@ -132,27 +133,9 @@ export const SDKStreamMessageSchema = z.looseObject({
   stop_reason: z.string().nullable().optional(),
   stop_sequence: z.string().nullable().optional(),
   usage: SDKUsageSchema.optional(),
-  context_management: z.unknown().nullable().optional(),
 });
 export type SDKStreamMessage = z.infer<typeof SDKStreamMessageSchema>;
 
-/**
- * Content block in stream event (for content_block_start)
- */
-export const SDKStreamContentBlockSchema = z.looseObject({
-  type: z.string().optional(),
-  text: z.string().optional(),
-  thinking: z.string().optional(),
-  id: z.string().optional(),
-  name: z.string().optional(),
-  input: z.record(z.string(), z.unknown()).optional(),
-});
-export type SDKStreamContentBlock = z.infer<typeof SDKStreamContentBlockSchema>;
-
-/**
- * Stream event payload - the "event" field in stream_event messages
- * Types: message_start, content_block_start, content_block_delta, content_block_stop, message_delta, message_stop
- */
 export const SDKStreamEventPayloadSchema = z.looseObject({
   type: z.string(),
   index: z.number().optional(),
@@ -164,129 +147,166 @@ export const SDKStreamEventPayloadSchema = z.looseObject({
 export type SDKStreamEventPayload = z.infer<typeof SDKStreamEventPayloadSchema>;
 
 // ============================================================================
-// Top-Level Message Schemas
+// Top-Level Message Schemas (matches SDK exactly)
 // ============================================================================
 
 /**
- * Common session fields present on most SDK messages
- */
-const sessionFields = {
-  session_id: z.string().optional(),
-  parent_tool_use_id: z.string().nullable().optional(),
-  uuid: z.string().optional(),
-};
-
-/**
- * System message - initialization and status
+ * System message - initialization
+ * SDK docs: All fields required except where noted
  */
 export const SDKSystemMessageSchema = z.looseObject({
   type: z.literal('system'),
-  subtype: z.string().optional(), // "init", etc.
-  cwd: z.string().optional(),
-  tools: z.array(z.string()).optional(),
-  mcp_servers: z.array(z.unknown()).optional(),
-  model: z.string().optional(),
-  permissionMode: z.string().optional(),
-  slash_commands: z.array(z.string()).optional(),
-  apiKeySource: z.string().optional(),
-  claude_code_version: z.string().optional(),
-  output_style: z.string().optional(),
-  agents: z.array(z.string()).optional(),
-  oauth_account_email: z.string().optional(),
-  conversation_id: z.string().optional(),
-  ...sessionFields,
+  subtype: z.literal('init'),
+  uuid: z.string(),
+  session_id: z.string(),
+  apiKeySource: ApiKeySourceSchema,
+  cwd: z.string(),
+  tools: z.array(z.string()),
+  mcp_servers: z.array(SDKMcpServerStatusSchema),
+  model: z.string(),
+  permissionMode: PermissionModeSchema,
+  slash_commands: z.array(z.string()),
+  output_style: z.string(),
+  parent_tool_use_id: z.string().nullable().optional(),
 });
 export type SDKSystemMessage = z.infer<typeof SDKSystemMessageSchema>;
 
 /**
- * Stream event message - streaming response chunks
+ * Compact boundary message (system subtype)
+ */
+export const SDKCompactBoundaryMessageSchema = z.looseObject({
+  type: z.literal('system'),
+  subtype: z.literal('compact_boundary'),
+  uuid: z.string(),
+  session_id: z.string(),
+  compact_metadata: z.looseObject({
+    trigger: z.enum(['manual', 'auto']),
+    pre_tokens: z.number(),
+  }),
+});
+export type SDKCompactBoundaryMessage = z.infer<typeof SDKCompactBoundaryMessageSchema>;
+
+/**
+ * Stream event message - partial assistant response
  */
 export const SDKStreamEventMessageSchema = z.looseObject({
   type: z.literal('stream_event'),
-  event: SDKStreamEventPayloadSchema.optional(),
-  ...sessionFields,
+  event: SDKStreamEventPayloadSchema,
+  parent_tool_use_id: z.string().nullable(),
+  uuid: z.string(),
+  session_id: z.string(),
 });
 export type SDKStreamEventMessage = z.infer<typeof SDKStreamEventMessageSchema>;
 
 /**
- * Assistant message - complete assistant response
+ * Assistant message - complete response
  */
 export const SDKAssistantMessageSchema = z.looseObject({
   type: z.literal('assistant'),
-  message: z
-    .looseObject({
-      model: z.string().optional(),
-      id: z.string().optional(),
-      type: z.string().optional(),
-      role: z.string().optional(),
-      content: z.array(SDKContentBlockSchema).optional(),
-      stop_reason: z.string().nullable().optional(),
-      stop_sequence: z.string().nullable().optional(),
-      usage: SDKUsageSchema.optional(),
-      context_management: z.unknown().nullable().optional(),
-    })
-    .optional(),
-  ...sessionFields,
+  uuid: z.string(),
+  session_id: z.string(),
+  message: z.looseObject({
+    model: z.string().optional(),
+    id: z.string().optional(),
+    type: z.string().optional(),
+    role: z.string().optional(),
+    content: z.array(SDKContentBlockSchema).optional(),
+    stop_reason: z.string().nullable().optional(),
+    stop_sequence: z.string().nullable().optional(),
+    usage: SDKUsageSchema.optional(),
+  }),
+  parent_tool_use_id: z.string().nullable(),
 });
 export type SDKAssistantMessage = z.infer<typeof SDKAssistantMessageSchema>;
 
 /**
- * User message - user input
+ * User message - user input or tool results
  */
 export const SDKUserMessageSchema = z.looseObject({
   type: z.literal('user'),
-  message: z
-    .looseObject({
-      role: z.literal('user').optional(),
-      content: z.union([z.string(), z.array(z.unknown())]).optional(),
-    })
-    .optional(),
-  ...sessionFields,
+  uuid: z.string().optional(), // Optional per SDK docs
+  session_id: z.string(),
+  message: z.looseObject({
+    role: z.literal('user'),
+    content: z.union([z.string(), z.array(z.unknown())]),
+  }),
+  parent_tool_use_id: z.string().nullable(),
 });
 export type SDKUserMessage = z.infer<typeof SDKUserMessageSchema>;
 
 /**
- * Result message - turn completion with usage stats
+ * Result message - success variant
  */
-export const SDKResultMessageSchema = z.looseObject({
+export const SDKResultSuccessMessageSchema = z.looseObject({
   type: z.literal('result'),
-  subtype: z.string().optional(), // "success", "error", etc.
-  is_error: z.boolean().optional(),
-  result: z.string().optional(), // Final response text
-  duration_ms: z.number().nullable().optional(),
-  duration_api_ms: z.number().nullable().optional(),
-  num_turns: z.number().optional(),
-  total_cost_usd: z.number().nullable().optional(),
-  usage: SDKUsageSchema.optional(),
-  modelUsage: SDKModelUsageSchema.optional(),
-  permission_denials: z.array(z.unknown()).optional(),
-  ...sessionFields,
+  subtype: z.literal('success'),
+  uuid: z.string(),
+  session_id: z.string(),
+  duration_ms: z.number(),
+  duration_api_ms: z.number(),
+  is_error: z.boolean(),
+  num_turns: z.number(),
+  result: z.string(),
+  total_cost_usd: z.number(),
+  usage: SDKUsageSchema,
+  modelUsage: SDKModelUsageSchema,
+  permission_denials: z.array(SDKPermissionDenialSchema),
+  structured_output: z.unknown().optional(), // Only on success
 });
+export type SDKResultSuccessMessage = z.infer<typeof SDKResultSuccessMessageSchema>;
+
+/**
+ * Result message - error variant
+ */
+export const SDKResultErrorMessageSchema = z.looseObject({
+  type: z.literal('result'),
+  subtype: z.enum([
+    'error_max_turns',
+    'error_during_execution',
+    'error_max_budget_usd',
+    'error_max_structured_output_retries',
+  ]),
+  uuid: z.string(),
+  session_id: z.string(),
+  duration_ms: z.number(),
+  duration_api_ms: z.number(),
+  is_error: z.boolean(),
+  num_turns: z.number(),
+  total_cost_usd: z.number(),
+  usage: SDKUsageSchema,
+  modelUsage: SDKModelUsageSchema,
+  permission_denials: z.array(SDKPermissionDenialSchema),
+  errors: z.array(z.string()), // Only on error subtypes
+});
+export type SDKResultErrorMessage = z.infer<typeof SDKResultErrorMessageSchema>;
+
+/**
+ * Combined result message (discriminated union)
+ */
+export const SDKResultMessageSchema = z.discriminatedUnion('subtype', [
+  SDKResultSuccessMessageSchema,
+  SDKResultErrorMessageSchema,
+]);
 export type SDKResultMessage = z.infer<typeof SDKResultMessageSchema>;
 
 // ============================================================================
-// Permissive Base Schema
+// Union of all SDK message types
 // ============================================================================
 
-/**
- * Permissive message schema for unknown SDK message types
- * Use specific schemas above when type is known
- */
-export const SDKMessageSchema = z.looseObject({
-  type: z.string(),
-  subtype: z.string().optional(),
-  content: z.unknown().optional(),
-  ...sessionFields,
-});
+export const SDKMessageSchema = z.union([
+  SDKSystemMessageSchema,
+  SDKCompactBoundaryMessageSchema,
+  SDKStreamEventMessageSchema,
+  SDKAssistantMessageSchema,
+  SDKUserMessageSchema,
+  SDKResultMessageSchema,
+]);
 export type SDKMessage = z.infer<typeof SDKMessageSchema>;
 
 // ============================================================================
-// Tool Result Schema
+// Tool Result Schema (for user messages containing tool results)
 // ============================================================================
 
-/**
- * Tool result for SDK tool execution
- */
 export const SDKToolResultSchema = z.looseObject({
   tool_use_id: z.string(),
   content: z.unknown(),
@@ -329,9 +349,12 @@ export function processSDKResponse<T>(
 /**
  * Get the appropriate schema for a message type
  */
-export function getSDKMessageSchema(type: string): z.ZodType {
+export function getSDKMessageSchema(type: string, subtype?: string): z.ZodType {
   switch (type) {
     case 'system':
+      if (subtype === 'compact_boundary') {
+        return SDKCompactBoundaryMessageSchema;
+      }
       return SDKSystemMessageSchema;
     case 'stream_event':
       return SDKStreamEventMessageSchema;

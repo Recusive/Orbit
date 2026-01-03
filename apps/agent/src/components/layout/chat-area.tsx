@@ -8,9 +8,11 @@ import type { FC } from 'react';
 
 import { ChatHeader, ChatInput, ChatMessages, useQueuedMessageHandler } from '@/components/chat';
 import { ResizeHandle } from '@/components/layout/resize-handle';
+import { PermissionModal } from '@/components/modals';
 import { ActivityPanel } from '@/components/panels';
 import { useChatMessages } from '@/hooks/use-chat-messages';
 import { useTauri } from '@/hooks/use-tauri';
+import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/constants';
 import {
   useGetToolsForMessage,
   usePendingPermissions,
@@ -178,6 +180,26 @@ export const ChatArea: FC = () => {
             {messages.length === 0 && !isLoadingConversation ? (
               /* Empty state: Input positioned above center */
               <div className="flex-1 flex flex-col justify-center" style={{ paddingBottom: '40%' }}>
+                {/* Permission bar - connected to input below */}
+                {pendingPermissions.length > 0 ? (
+                  <div className="px-4 shrink-0">
+                    <div
+                      className="mx-auto"
+                      style={{
+                        maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)`,
+                      }}
+                    >
+                      {pendingPermissions.map((request) => (
+                        <PermissionModal
+                          key={request.requestId}
+                          request={request}
+                          onApprove={handlePermissionApprove}
+                          onDeny={handlePermissionDeny}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <ChatInput
                   inputMode={inputMode}
                   thinkingMode={thinkingMode}
@@ -185,6 +207,7 @@ export const ChatArea: FC = () => {
                   fileList={fileList}
                   usage={sessionUsage}
                   maxTokens={maxTokens}
+                  hasPermissionPending={pendingPermissions.length > 0}
                   onSend={handleSend}
                   onStop={handleStop}
                   onModeChange={handleModeChange}
@@ -197,7 +220,6 @@ export const ChatArea: FC = () => {
               <div className="flex-1 flex flex-col min-h-0">
                 <ChatMessages
                   messages={messages}
-                  pendingPermissions={pendingPermissions}
                   isAgentRunning={isAgentRunning}
                   sessionId={sessionId}
                   queuedMessage={queuedMessage}
@@ -205,11 +227,29 @@ export const ChatArea: FC = () => {
                   onRewind={handleRewind}
                   onOpenFile={handleOpenFile}
                   onOpenUrl={handleOpenUrl}
-                  onPermissionApprove={handlePermissionApprove}
-                  onPermissionDeny={handlePermissionDeny}
                   onCancelQueue={cancelQueue}
                   onFeedback={handleFeedback}
                 />
+                {/* Permission bar - connected to input below */}
+                {pendingPermissions.length > 0 ? (
+                  <div className="px-4 shrink-0">
+                    <div
+                      className="mx-auto"
+                      style={{
+                        maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)`,
+                      }}
+                    >
+                      {pendingPermissions.map((request) => (
+                        <PermissionModal
+                          key={request.requestId}
+                          request={request}
+                          onApprove={handlePermissionApprove}
+                          onDeny={handlePermissionDeny}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <ChatInput
                   inputMode={inputMode}
                   thinkingMode={thinkingMode}
@@ -217,6 +257,7 @@ export const ChatArea: FC = () => {
                   fileList={fileList}
                   usage={sessionUsage}
                   maxTokens={maxTokens}
+                  hasPermissionPending={pendingPermissions.length > 0}
                   onSend={handleSend}
                   onStop={handleStop}
                   onModeChange={handleModeChange}

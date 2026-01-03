@@ -1,5 +1,5 @@
 import { ChevronDown, FilePlus, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { FC } from 'react';
 
@@ -42,22 +42,25 @@ const DiffStat: FC<DiffStatProps> = ({ additions, deletions }) => {
   }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1">
       {additions > 0 ? (
-        <span className="text-xs font-semibold text-success">+{additions}</span>
+        <span className="text-[10px] font-semibold text-success">+{additions}</span>
       ) : null}
       {deletions > 0 ? (
-        <span className="text-xs font-semibold text-destructive">-{deletions}</span>
+        <span className="text-[10px] font-semibold text-destructive">-{deletions}</span>
       ) : null}
       <div className="flex gap-px">
         {Array.from({ length: addSquares }).map((_, i) => (
-          <div key={`add-${String(i)}`} className="w-2 h-2 rounded-sm bg-success" />
+          <div key={`add-${String(i)}`} className="w-1.5 h-1.5 rounded-sm bg-success" />
         ))}
         {Array.from({ length: delSquares }).map((_, i) => (
-          <div key={`del-${String(i)}`} className="w-2 h-2 rounded-sm bg-destructive" />
+          <div key={`del-${String(i)}`} className="w-1.5 h-1.5 rounded-sm bg-destructive" />
         ))}
         {Array.from({ length: neutralSquares }).map((_, i) => (
-          <div key={`neutral-${String(i)}`} className="w-2 h-2 rounded-sm bg-muted-foreground/30" />
+          <div
+            key={`neutral-${String(i)}`}
+            className="w-1.5 h-1.5 rounded-sm bg-muted-foreground/30"
+          />
         ))}
       </div>
     </div>
@@ -70,7 +73,16 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   isRunning = false,
   onOpenFile,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
+  const wasRunningRef = useRef(isRunning);
+
+  // Auto-collapse when tool finishes
+  useEffect(() => {
+    if (wasRunningRef.current && !isRunning) {
+      setIsExpanded(false);
+    }
+    wasRunningRef.current = isRunning;
+  }, [isRunning]);
 
   const fileName = filePath.split('/').pop() ?? filePath;
   const lines = content.split('\n');
@@ -88,10 +100,10 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
     <div>
       <div
         className={cn(
-          'rounded-xl bg-card overflow-hidden transition-all duration-200',
+          'bg-card border border-border/50 overflow-hidden transition-all duration-200',
           isExpanded
-            ? 'shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
-            : 'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
+            ? 'rounded-xl shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
+            : 'rounded-lg shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
         )}
       >
         {/* Header */}
@@ -99,38 +111,38 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
           onClick={() => {
             setIsExpanded(!isExpanded);
           }}
-          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-muted/40 transition-colors duration-150"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-muted/40 transition-colors duration-150"
         >
           {/* Icon container */}
-          <div className="w-6 h-6 rounded-md flex items-center justify-center bg-success/10">
-            <FilePlus className={cn('h-3.5 w-3.5 text-success/70', isRunning && 'animate-pulse')} />
+          <div className="w-5 h-5 rounded flex items-center justify-center bg-success/10">
+            <FilePlus className={cn('h-3 w-3 text-success/70', isRunning && 'animate-pulse')} />
           </div>
 
           {/* File info */}
-          <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <span
-              className="text-[13px] font-medium text-foreground hover:underline truncate cursor-pointer"
+              className="text-xs font-medium text-foreground hover:underline truncate cursor-pointer"
               onClick={handleFileClick}
               title={filePath}
             >
               {fileName}
             </span>
-            <span className="text-xs text-muted-foreground/60 shrink-0">(new)</span>
+            <span className="text-[10px] text-muted-foreground/60 shrink-0">(new)</span>
           </div>
 
           {/* Status - Diff stat or loading */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {isRunning ? (
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span className="text-xs">Writing...</span>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                <span className="text-[11px]">Writing...</span>
               </div>
             ) : (
               <DiffStat additions={lineCount} deletions={0} />
             )}
             <ChevronDown
               className={cn(
-                'h-3.5 w-3.5 text-muted-foreground/60 transition-transform duration-200',
+                'h-3 w-3 text-muted-foreground/60 transition-transform duration-200',
                 isExpanded && 'rotate-180'
               )}
             />
@@ -140,39 +152,41 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
         {/* Code preview */}
         <div
           className={cn(
-            'overflow-hidden transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
-            isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-[200px] opacity-100'
+            'grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
+            isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
           )}
         >
-          <div className="overflow-auto">
-            {displayLines.map((line, index) => (
-              <div key={index} className="flex font-mono text-xs leading-5 bg-success/5">
-                {/* Gutter */}
-                <div className="w-1 bg-success shrink-0" />
-                {/* Line number */}
-                <div className="w-10 px-2 text-right text-muted-foreground/50 select-none shrink-0 bg-success/10">
-                  {index + 1}
+          <div className="overflow-hidden min-h-0">
+            <div className="overflow-auto max-h-[300px]">
+              {displayLines.map((line, index) => (
+                <div key={index} className="flex font-mono text-[11px] leading-4 bg-success/5">
+                  {/* Gutter */}
+                  <div className="w-0.5 bg-success shrink-0" />
+                  {/* Line number */}
+                  <div className="w-8 px-1.5 text-right text-muted-foreground/50 select-none shrink-0 bg-success/10">
+                    {index + 1}
+                  </div>
+                  {/* Content */}
+                  <div className="flex-1 px-2 text-foreground whitespace-pre overflow-x-auto">
+                    {line || ' '}
+                  </div>
                 </div>
-                {/* Content */}
-                <div className="flex-1 px-3 text-foreground whitespace-pre overflow-x-auto">
-                  {line || ' '}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          {/* Expand bar */}
-          {hasMore && !isExpanded ? (
-            <button
-              onClick={() => {
-                setIsExpanded(true);
-              }}
-              className="w-full py-1.5 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-1"
-            >
-              <ChevronDown className="h-3 w-3" />
-              <span>{lines.length - 8} more lines</span>
-            </button>
-          ) : null}
+            {/* Expand bar */}
+            {hasMore && !isExpanded ? (
+              <button
+                onClick={() => {
+                  setIsExpanded(true);
+                }}
+                className="w-full py-1 text-[10px] text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-0.5"
+              >
+                <ChevronDown className="h-2.5 w-2.5" />
+                <span>{lines.length - 8} more lines</span>
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
