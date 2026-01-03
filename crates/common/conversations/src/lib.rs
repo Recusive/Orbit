@@ -56,6 +56,9 @@ pub struct Message {
     /// Tool uses in this message
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_uses: Vec<ToolUse>,
+    /// Token usage for this message (assistant messages only)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<TokenUsage>,
 }
 
 /// A tool use within a message
@@ -74,6 +77,27 @@ pub struct ToolUse {
     /// Whether the tool execution was successful
     #[serde(default = "default_true")]
     pub success: bool,
+}
+
+/// Token usage statistics for a message
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenUsage {
+    /// Input tokens consumed
+    #[serde(default)]
+    pub input_tokens: u32,
+    /// Output tokens generated
+    #[serde(default)]
+    pub output_tokens: u32,
+    /// Tokens read from cache
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read_input_tokens: Option<u32>,
+    /// Tokens used to create cache
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_creation_input_tokens: Option<u32>,
+    /// Total cost in USD
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_cost_usd: Option<f64>,
 }
 
 // ============================================
@@ -641,6 +665,7 @@ mod tests {
             thinking: None,
             created_at: current_timestamp(),
             tool_uses: Vec::new(),
+            usage: None,
         }
     }
 

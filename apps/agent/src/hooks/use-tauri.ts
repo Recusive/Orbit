@@ -609,7 +609,11 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
               id: m.id,
               role: m.role,
               content: m.content,
-              timestamp: m.createdAt, // Schema expects 'timestamp', not 'created_at'
+              createdAt: m.createdAt,
+              // Include all optional fields for backwards compatibility and usage tracking
+              ...(m.thinking ? { thinking: m.thinking } : {}),
+              ...(m.toolUses && m.toolUses.length > 0 ? { toolUses: m.toolUses } : {}),
+              ...(m.usage ? { usage: m.usage } : {}),
             })),
           },
           '*'

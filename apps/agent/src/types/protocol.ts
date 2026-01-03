@@ -1316,22 +1316,62 @@ export const ConversationLoadingSchema = z
   })
   .strict();
 
+// Tool use schema for persisted messages (matches Rust ToolUseDto)
+const PersistedToolUseSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    input: z.record(z.string(), z.unknown()),
+    output: z.string().optional(),
+    success: z.boolean().default(true),
+  })
+  .strict();
+
+// Token usage schema for persisted messages (matches Rust TokenUsageDto)
+const PersistedTokenUsageSchema = z
+  .object({
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    cacheReadInputTokens: z.number().optional(),
+    cacheCreationInputTokens: z.number().optional(),
+    totalCostUsd: z.number().optional(),
+  })
+  .strict();
+
+// Message schema for conversation:loaded (matches Rust MessageDto)
+// Uses transform to handle backwards compatibility with old data that may have
+// 'timestamp' instead of 'createdAt', or missing fields
+const PersistedMessageSchema = z
+  .object({
+    id: z.string(),
+    role: z.enum(['user', 'assistant', 'system']),
+    content: z.string(),
+    thinking: z.string().optional(),
+    // Support both old 'timestamp' and new 'createdAt' field names
+    createdAt: z.number().optional(),
+    timestamp: z.number().optional(),
+    toolUses: z.array(PersistedToolUseSchema).optional(),
+    usage: PersistedTokenUsageSchema.optional(),
+  })
+  .strip() // Remove extra fields from old data instead of rejecting
+  .transform((msg) => ({
+    id: msg.id,
+    role: msg.role,
+    content: msg.content,
+    thinking: msg.thinking,
+    // Prefer createdAt, fall back to timestamp, default to 0
+    createdAt: msg.createdAt ?? msg.timestamp ?? 0,
+    toolUses: msg.toolUses ?? [],
+    usage: msg.usage,
+  }));
+
 export const ConversationLoadedSchema = z
   .object({
     type: z.literal('conversation:loaded'),
     uuid: UUIDSchema,
     session_id: SessionIdSchema,
     title: z.string(),
-    messages: z.array(
-      z
-        .object({
-          id: z.string(),
-          role: z.enum(['user', 'assistant']),
-          content: z.string(),
-          timestamp: z.number(),
-        })
-        .strict()
-    ),
+    messages: z.array(PersistedMessageSchema),
   })
   .strict();
 

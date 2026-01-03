@@ -118,6 +118,7 @@ export interface ToolState {
   ) => void;
   resetUsage: () => void;
   switchSession: (newSessionId: string) => void;
+  restoreSessionUsage: (sessionId: string, usage: UsageData, processedIds?: string[]) => void;
 
   // Computed values
   getContextPercentage: () => number;
@@ -293,6 +294,28 @@ export const useToolStore = create<ToolState>()(
         }
 
         state.currentSessionId = newSessionId;
+      });
+    },
+
+    restoreSessionUsage: (sessionId: string, usage: UsageData, processedIds?: string[]) => {
+      set((state) => {
+        // Pre-populate the session cache with usage from persisted data
+        // This is called when loading a conversation from disk
+        const existingCache = state.sessionCache[sessionId];
+        state.sessionCache[sessionId] = {
+          usage: { ...usage },
+          processedIds: processedIds ?? existingCache?.processedIds ?? [],
+          activeTools: existingCache?.activeTools ?? {},
+          completedTools: existingCache?.completedTools ?? [],
+        };
+
+        // If this is the current session, also update the active usage
+        if (state.currentSessionId === sessionId) {
+          state.sessionUsage = { ...usage };
+          if (processedIds) {
+            state.processedMessageIds = new Set(processedIds);
+          }
+        }
       });
     },
 

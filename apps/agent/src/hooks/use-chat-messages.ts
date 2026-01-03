@@ -4,7 +4,7 @@ import type { ChatMessage, ImageAttachment } from '@/components/chat';
 import type { ExtensionMessage, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/use-tauri';
-import { conversationAddMessage } from '@/lib/backend';
+import { conversationAddMessage, conversationLoad } from '@/lib/backend';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/diff-utils';
 import { useFileStore } from '@/stores/file-store';
 import { useFileViewerStore } from '@/stores/file-viewer-store';
@@ -111,6 +111,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     clearPermissions,
     addUsage,
     switchSession,
+    restoreSessionUsage,
   } = useToolStore();
   const { queueMessage: storeQueueMessage } = useQueuedMessageStore();
 
@@ -138,6 +139,81 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       // Ignore storage errors
     }
   }, [sessionId]);
+
+  // Sync tool store's currentSessionId when React sessionId changes
+  // This is critical for usage tracking - without this, usage accumulated before the first
+  // switchSession call (e.g., from localStorage restore or system:init) won't be cached
+  // when switching conversations, causing token counts to reset to 0.
+  useEffect(() => {
+    if (sessionId) {
+      const toolState = useToolStore.getState();
+      if (toolState.currentSessionId !== sessionId) {
+        switchSession(sessionId);
+      }
+    }
+  }, [sessionId, switchSession]);
+
+  // Restore usage from backend on initial mount (when sessionId comes from localStorage)
+  // This ensures token counts persist across window reloads
+  const hasRestoredUsage = useRef(false);
+  const initialSessionId = useRef(sessionId); // Capture initial sessionId
+  useEffect(() => {
+    const sid = initialSessionId.current;
+    if (!sid || hasRestoredUsage.current) return;
+
+    // Only run once on mount with initial sessionId
+    hasRestoredUsage.current = true;
+
+    // Load conversation from backend to get persisted usage data
+    void (async (): Promise<void> => {
+      try {
+        const conversation = await conversationLoad(sid);
+        if (!conversation?.messages) return;
+
+        // Calculate cumulative usage from all persisted messages
+        const processedMessageIds: string[] = [];
+        const cumulativeUsage = conversation.messages.reduce(
+          (acc, m) => {
+            if (m.usage) {
+              processedMessageIds.push(m.id);
+              return {
+                inputTokens: acc.inputTokens + m.usage.inputTokens,
+                outputTokens: acc.outputTokens + m.usage.outputTokens,
+                cacheReadInputTokens:
+                  acc.cacheReadInputTokens + (m.usage.cacheReadInputTokens ?? 0),
+                cacheCreationInputTokens:
+                  acc.cacheCreationInputTokens + (m.usage.cacheCreationInputTokens ?? 0),
+                totalCostUsd: acc.totalCostUsd + (m.usage.totalCostUsd ?? 0),
+              };
+            }
+            return acc;
+          },
+          {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheReadInputTokens: 0,
+            cacheCreationInputTokens: 0,
+            totalCostUsd: 0,
+          }
+        );
+
+        // Restore usage if we found any
+        if (processedMessageIds.length > 0) {
+          // Use getState() to avoid stale closures
+          const { restoreSessionUsage: restore, switchSession: sw } = useToolStore.getState();
+          restore(sid, cumulativeUsage, processedMessageIds);
+          // Also update current session if it matches
+          const toolState = useToolStore.getState();
+          if (toolState.currentSessionId === sid) {
+            // Re-trigger switch to apply the restored usage
+            sw(sid);
+          }
+        }
+      } catch {
+        // Ignore errors - conversation may not exist yet
+      }
+    })();
+  }, []); // Empty deps - only run on mount, uses refs for values
 
   // Track if we have pending animations - only run interval when needed
   const hasAnimatingMessage = messages.some((m) => m.displayedContent.length < m.content.length);
@@ -267,13 +343,31 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
                   : {}),
               };
 
-              // Persist assistant message to backend
+              // Persist assistant message to backend (including usage for token tracking)
+              // Build usage object conditionally to satisfy exactOptionalPropertyTypes
+              const usageDto = message.usage
+                ? {
+                    inputTokens: message.usage.input_tokens,
+                    outputTokens: message.usage.output_tokens,
+                    ...(message.usage.cache_read_input_tokens !== undefined
+                      ? { cacheReadInputTokens: message.usage.cache_read_input_tokens }
+                      : {}),
+                    ...(message.usage.cache_creation_input_tokens !== undefined
+                      ? { cacheCreationInputTokens: message.usage.cache_creation_input_tokens }
+                      : {}),
+                    ...(message.total_cost_usd !== undefined
+                      ? { totalCostUsd: message.total_cost_usd }
+                      : {}),
+                  }
+                : undefined;
+
               void conversationAddMessage(message.session_id, {
                 id: completedMsg.id,
                 role: 'assistant',
                 content: completedMsg.content,
                 ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
                 createdAt: Date.now(),
+                ...(usageDto ? { usage: usageDto } : {}),
               });
 
               return [...prev.slice(0, -1), completedMsg];
@@ -376,14 +470,19 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         }
 
         case 'conversation:loaded': {
-          // Prepare new messages
+          // Prepare new messages (filter out system messages as they're not displayed)
           const cachedMessages = messagesCache.current.get(message.session_id);
-          const backendMessages = message.messages.map((m) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            displayedContent: m.content,
-          }));
+          const backendMessages = message.messages
+            .filter(
+              (m): m is typeof m & { role: 'user' | 'assistant' } =>
+                m.role === 'user' || m.role === 'assistant'
+            )
+            .map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              displayedContent: m.content,
+            }));
 
           // Determine which messages to use (prefer cache if it has more messages)
           let newMessages: typeof backendMessages;
@@ -393,6 +492,39 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
             newMessages = cachedMessages;
           } else {
             newMessages = backendMessages;
+          }
+
+          // Calculate cumulative usage from persisted messages (for token tracking persistence)
+          const processedMessageIds: string[] = [];
+          const cumulativeUsage = message.messages.reduce(
+            (acc, m) => {
+              if (m.usage) {
+                processedMessageIds.push(m.id);
+                return {
+                  inputTokens: acc.inputTokens + m.usage.inputTokens,
+                  outputTokens: acc.outputTokens + m.usage.outputTokens,
+                  cacheReadInputTokens:
+                    acc.cacheReadInputTokens + (m.usage.cacheReadInputTokens ?? 0),
+                  cacheCreationInputTokens:
+                    acc.cacheCreationInputTokens + (m.usage.cacheCreationInputTokens ?? 0),
+                  totalCostUsd: acc.totalCostUsd + (m.usage.totalCostUsd ?? 0),
+                };
+              }
+              return acc;
+            },
+            {
+              inputTokens: 0,
+              outputTokens: 0,
+              cacheReadInputTokens: 0,
+              cacheCreationInputTokens: 0,
+              totalCostUsd: 0,
+            }
+          );
+
+          // Restore usage from persisted data BEFORE switching session
+          // This ensures the session cache is pre-populated with correct usage
+          if (processedMessageIds.length > 0) {
+            restoreSessionUsage(message.session_id, cumulativeUsage, processedMessageIds);
           }
 
           // Set all state atomically - React 18 batches these updates
@@ -607,6 +739,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       addPermissionRequest,
       addUsage,
       switchSession,
+      restoreSessionUsage,
       onSessionCreated,
     ]
   );

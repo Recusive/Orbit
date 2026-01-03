@@ -8,7 +8,8 @@
 )]
 
 use snowflake_conversations::{
-    Conversation, ConversationManager, ConversationSummary, Message, MessageRole, ToolUse,
+    Conversation, ConversationManager, ConversationSummary, Message, MessageRole, TokenUsage,
+    ToolUse,
 };
 use snowflake_core::Result;
 use tauri::State;
@@ -31,6 +32,9 @@ pub struct MessageDto {
     /// Tool uses
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_uses: Vec<ToolUseDto>,
+    /// Token usage for this message (assistant messages only)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<TokenUsageDto>,
 }
 
 /// Serializable tool use for frontend
@@ -49,6 +53,51 @@ pub struct ToolUseDto {
     /// Success status
     #[serde(default = "default_true")]
     pub success: bool,
+}
+
+/// Serializable token usage for frontend
+#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenUsageDto {
+    /// Input tokens consumed
+    #[serde(default)]
+    pub input_tokens: u32,
+    /// Output tokens generated
+    #[serde(default)]
+    pub output_tokens: u32,
+    /// Tokens read from cache
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read_input_tokens: Option<u32>,
+    /// Tokens used to create cache
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_creation_input_tokens: Option<u32>,
+    /// Total cost in USD
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_cost_usd: Option<f64>,
+}
+
+impl From<TokenUsage> for TokenUsageDto {
+    fn from(usage: TokenUsage) -> Self {
+        Self {
+            input_tokens: usage.input_tokens,
+            output_tokens: usage.output_tokens,
+            cache_read_input_tokens: usage.cache_read_input_tokens,
+            cache_creation_input_tokens: usage.cache_creation_input_tokens,
+            total_cost_usd: usage.total_cost_usd,
+        }
+    }
+}
+
+impl From<TokenUsageDto> for TokenUsage {
+    fn from(dto: TokenUsageDto) -> Self {
+        Self {
+            input_tokens: dto.input_tokens,
+            output_tokens: dto.output_tokens,
+            cache_read_input_tokens: dto.cache_read_input_tokens,
+            cache_creation_input_tokens: dto.cache_creation_input_tokens,
+            total_cost_usd: dto.total_cost_usd,
+        }
+    }
 }
 
 const fn default_true() -> bool {
@@ -70,6 +119,7 @@ impl From<Message> for MessageDto {
             thinking: msg.thinking,
             created_at: msg.created_at,
             tool_uses: msg.tool_uses.into_iter().map(ToolUseDto::from).collect(),
+            usage: msg.usage.map(TokenUsageDto::from),
         }
     }
 }
@@ -99,6 +149,7 @@ impl From<MessageDto> for Message {
             thinking: dto.thinking,
             created_at: dto.created_at,
             tool_uses: dto.tool_uses.into_iter().map(ToolUse::from).collect(),
+            usage: dto.usage.map(TokenUsage::from),
         }
     }
 }

@@ -815,6 +815,7 @@ export interface ConversationMessageDto {
   thinking?: string;
   createdAt: number;
   toolUses?: ToolUseDto[];
+  usage?: TokenUsageDto;
 }
 
 export interface ToolUseDto {
@@ -823,6 +824,14 @@ export interface ToolUseDto {
   input: Record<string, unknown>;
   output?: string;
   success: boolean;
+}
+
+export interface TokenUsageDto {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+  totalCostUsd?: number;
 }
 
 export interface ConversationDto {
