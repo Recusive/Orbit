@@ -255,14 +255,27 @@ export function isCodeFile(path: string): boolean {
 
 export function getLanguageFromExtension(extension: string): string | undefined {
   const languageMap: Record<string, string> = {
+    // JavaScript variants
     js: 'javascript',
-    jsx: 'javascript',
+    jsx: 'javascriptreact',
+    mjs: 'javascript',
+    cjs: 'javascript',
+    // TypeScript variants
     ts: 'typescript',
-    tsx: 'typescript',
+    tsx: 'typescriptreact',
+    mts: 'typescript',
+    cts: 'typescript',
+    // Languages
     py: 'python',
+    pyw: 'python',
+    pyi: 'python',
     java: 'java',
     c: 'c',
     cpp: 'cpp',
+    cc: 'cpp',
+    cxx: 'cpp',
+    h: 'c',
+    hpp: 'cpp',
     cs: 'csharp',
     go: 'go',
     rs: 'rust',
@@ -270,20 +283,32 @@ export function getLanguageFromExtension(extension: string): string | undefined 
     php: 'php',
     swift: 'swift',
     kt: 'kotlin',
+    kts: 'kotlin',
     scala: 'scala',
+    // Web
     html: 'html',
+    htm: 'html',
+    // Styles
     css: 'css',
     scss: 'scss',
-    sass: 'sass',
+    sass: 'scss',
     less: 'less',
+    // Data formats
     json: 'json',
+    jsonc: 'json',
     xml: 'xml',
+    svg: 'xml',
     yaml: 'yaml',
     yml: 'yaml',
+    toml: 'toml',
+    // Docs
     md: 'markdown',
+    mdx: 'markdown',
+    // Shell
     sh: 'bash',
     bash: 'bash',
     zsh: 'bash',
+    fish: 'bash',
   };
 
   return languageMap[extension.toLowerCase()];

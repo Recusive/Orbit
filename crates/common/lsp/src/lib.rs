@@ -311,7 +311,7 @@ pub fn language_from_path(path: &Path) -> Option<&'static str> {
         // Rust
         Some("rs") => Some("rust"),
         // TypeScript/JavaScript
-        Some("ts") => Some("typescript"),
+        Some("ts" | "mts" | "cts") => Some("typescript"),
         Some("tsx") => Some("typescriptreact"),
         Some("js" | "mjs" | "cjs") => Some("javascript"),
         Some("jsx") => Some("javascriptreact"),

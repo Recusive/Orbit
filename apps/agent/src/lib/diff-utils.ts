@@ -53,43 +53,65 @@ export function getLanguageFromPath(filePath: string): string {
   const extension = filePath.split('.').pop()?.toLowerCase() ?? '';
 
   const languageMap: Record<string, string> = {
+    // TypeScript variants
     ts: 'typescript',
-    tsx: 'typescript',
+    tsx: 'typescriptreact',
+    mts: 'typescript',
+    cts: 'typescript',
+    // JavaScript variants
     js: 'javascript',
-    jsx: 'javascript',
+    jsx: 'javascriptreact',
     mjs: 'javascript',
     cjs: 'javascript',
+    // Languages
     py: 'python',
+    pyw: 'python',
+    pyi: 'python',
     rb: 'ruby',
     go: 'go',
     rs: 'rust',
     java: 'java',
     kt: 'kotlin',
+    kts: 'kotlin',
     c: 'c',
     cpp: 'cpp',
+    cc: 'cpp',
+    cxx: 'cpp',
     h: 'c',
     hpp: 'cpp',
+    hxx: 'cpp',
     cs: 'csharp',
     php: 'php',
     swift: 'swift',
     scala: 'scala',
     r: 'r',
     sql: 'sql',
+    // Data formats
     json: 'json',
+    jsonc: 'json',
     yaml: 'yaml',
     yml: 'yaml',
     xml: 'xml',
+    svg: 'xml',
+    // Web
     html: 'html',
     htm: 'html',
+    // Styles
     css: 'css',
     scss: 'scss',
+    sass: 'scss',
     less: 'less',
+    // Docs
     md: 'markdown',
+    mdx: 'markdown',
     markdown: 'markdown',
+    // Shell
     sh: 'shell',
     bash: 'shell',
     zsh: 'shell',
+    fish: 'shell',
     ps1: 'powershell',
+    // Config
     dockerfile: 'dockerfile',
     makefile: 'makefile',
     toml: 'toml',

@@ -110,41 +110,69 @@ type FileViewerStore = FileViewerState & FileViewerActions;
 export function getLanguageFromPath(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
   const languageMap: Record<string, string> = {
+    // TypeScript variants
     ts: 'typescript',
-    tsx: 'tsx',
+    tsx: 'typescriptreact',
+    mts: 'typescript',
+    cts: 'typescript',
+    // JavaScript variants
     js: 'javascript',
-    jsx: 'jsx',
+    jsx: 'javascriptreact',
+    mjs: 'javascript',
+    cjs: 'javascript',
+    // Data formats
     json: 'json',
+    jsonc: 'json',
+    json5: 'json',
+    // Markup & docs
     md: 'markdown',
+    mdx: 'markdown',
+    // Styles
     css: 'css',
     scss: 'scss',
+    sass: 'scss',
     less: 'less',
+    // Web
     html: 'html',
+    htm: 'html',
     xml: 'xml',
+    svg: 'xml',
+    // Config
     yaml: 'yaml',
     yml: 'yaml',
+    toml: 'toml',
+    ini: 'ini',
+    // Languages
     py: 'python',
+    pyw: 'python',
+    pyi: 'python',
     rb: 'ruby',
     go: 'go',
     rs: 'rust',
     java: 'java',
     c: 'c',
     cpp: 'cpp',
+    cc: 'cpp',
+    cxx: 'cpp',
     h: 'c',
     hpp: 'cpp',
+    hxx: 'cpp',
     cs: 'csharp',
     php: 'php',
     swift: 'swift',
     kt: 'kotlin',
+    kts: 'kotlin',
+    // Shell
     sh: 'bash',
     bash: 'bash',
     zsh: 'bash',
+    fish: 'bash',
+    // Other
     sql: 'sql',
     graphql: 'graphql',
+    gql: 'graphql',
     vue: 'vue',
     svelte: 'svelte',
-    toml: 'toml',
-    ini: 'ini',
     dockerfile: 'dockerfile',
     makefile: 'makefile',
   };
@@ -178,9 +206,11 @@ export const useFileViewerStore = create<FileViewerStore>()(
         const existingTab = state.openTabs.find((tab) => tab.path === path);
 
         if (existingTab) {
-          // Just switch to existing tab, reset to file view mode
+          // Switch to existing tab, reset to file view mode
           state.activeTabPath = path;
           existingTab.viewMode = 'file';
+          // Update language in case detection was improved
+          existingTab.language = getLanguageFromPath(path);
         } else {
           // Create new tab
           const fileContent = content ?? '';

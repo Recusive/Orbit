@@ -44,18 +44,33 @@ function truncateBranch(branch: string, maxLength: number = MAX_BRANCH_LENGTH): 
  */
 function getLanguageDisplayName(language: string): string {
   const displayNames: Record<string, string> = {
+    // TypeScript/JavaScript
     typescript: 'TypeScript',
+    typescriptreact: 'TypeScript JSX',
     tsx: 'TypeScript JSX',
     javascript: 'JavaScript',
+    javascriptreact: 'JavaScript JSX',
     jsx: 'JavaScript JSX',
+    // Data formats
     json: 'JSON',
+    jsonc: 'JSON',
+    // Markup
     markdown: 'Markdown',
-    css: 'CSS',
-    scss: 'SCSS',
-    less: 'Less',
+    mdx: 'Markdown',
     html: 'HTML',
     xml: 'XML',
+    svg: 'SVG',
+    // Styles
+    css: 'CSS',
+    scss: 'SCSS',
+    sass: 'SCSS',
+    less: 'Less',
+    // Config
     yaml: 'YAML',
+    yml: 'YAML',
+    toml: 'TOML',
+    ini: 'INI',
+    // Languages
     python: 'Python',
     ruby: 'Ruby',
     go: 'Go',
@@ -67,19 +82,25 @@ function getLanguageDisplayName(language: string): string {
     php: 'PHP',
     swift: 'Swift',
     kotlin: 'Kotlin',
+    scala: 'Scala',
+    // Shell
     bash: 'Shell Script',
+    shell: 'Shell Script',
+    sh: 'Shell Script',
+    zsh: 'Shell Script',
+    // Other
     sql: 'SQL',
     graphql: 'GraphQL',
     vue: 'Vue',
     svelte: 'Svelte',
-    toml: 'TOML',
-    ini: 'INI',
     dockerfile: 'Dockerfile',
     makefile: 'Makefile',
     dotenv: 'Environment',
+    // Plain text variants
     plaintext: 'Plain Text',
+    text: 'Plain Text',
   };
-  return displayNames[language] ?? language;
+  return displayNames[language.toLowerCase()] ?? language;
 }
 
 /**

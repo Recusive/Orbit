@@ -648,31 +648,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           break;
 
         case 'file:content': {
-          const ext = message.path.split('.').pop()?.toLowerCase() ?? '';
-          const langMap: Record<string, string> = {
-            ts: 'typescript',
-            tsx: 'tsx',
-            js: 'javascript',
-            jsx: 'jsx',
-            css: 'css',
-            scss: 'scss',
-            less: 'less',
-            html: 'html',
-            json: 'json',
-            md: 'markdown',
-            py: 'python',
-            rs: 'rust',
-            go: 'go',
-            java: 'java',
-            c: 'c',
-            cpp: 'cpp',
-            h: 'c',
-            sh: 'bash',
-            yml: 'yaml',
-            yaml: 'yaml',
-            xml: 'xml',
-          };
-          const language = langMap[ext] ?? 'text';
+          // Use shared language detection (supports mjs, cjs, mts, cts, etc.)
+          const language = getLanguageFromPath(message.path);
           const fileViewerStore = useFileViewerStore.getState();
           fileViewerStore.setFileContent(message.path, message.content, language);
           break;

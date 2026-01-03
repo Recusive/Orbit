@@ -69,22 +69,51 @@ const readOnlyCompartment = new Compartment();
 type LanguageFactory = () => Extension;
 
 const languages: Record<string, LanguageFactory> = {
+  // JavaScript variants (including ES modules .mjs/.cjs)
   javascript: () => javascript(),
+  js: () => javascript(),
   javascriptreact: () => javascript({ jsx: true }),
   jsx: () => javascript({ jsx: true }),
+
+  // TypeScript variants (including .mts/.cts)
   typescript: () => javascript({ typescript: true }),
+  ts: () => javascript({ typescript: true }),
   typescriptreact: () => javascript({ typescript: true, jsx: true }),
   tsx: () => javascript({ typescript: true, jsx: true }),
+
+  // Python
   python: () => python(),
+  py: () => python(),
+
+  // Systems languages
   rust: () => rust(),
+  rs: () => rust(),
   go: () => go(),
+
+  // Data formats
   json: () => json(),
+  jsonc: () => json(),
+
+  // Web markup
   html: () => html(),
+  htm: () => html(),
+  xml: () => html(), // HTML parser handles XML reasonably
+
+  // Styles
   css: () => css(),
   scss: () => css(),
+  sass: () => css(),
   less: () => css(),
+
+  // Documentation
   markdown: () => markdown(),
   md: () => markdown(),
+  mdx: () => markdown(),
+
+  // Config files (use JSON for similar syntax or markdown for readable configs)
+  yaml: () => markdown(), // YAML is readable like markdown
+  yml: () => markdown(),
+  toml: () => markdown(),
 };
 
 // ============================================
