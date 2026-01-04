@@ -431,6 +431,12 @@ function consumeRewindContext(sessionId: string): RewindContextMessage[] | undef
 /**
  * Format conversation messages as context for Claude.
  * Uses XML-style tags for clear structure.
+ *
+ * ⚠️  TESTED: This function's format is verified by integration tests.
+ *     If you modify the XML format, update the tests to match!
+ *     Run: cd agent-bridge && bun test
+ *     Test files: src/__tests__/conversation-rewind.test.ts
+ *                 src/__tests__/combined-rewind.test.ts
  */
 function formatConversationContext(messages: RewindContextMessage[]): string {
   if (messages.length === 0) return '';
@@ -825,6 +831,9 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
   }
 
   // Handle conversation rewind request (fork)
+  // ⚠️  TESTED: This rewind flow is covered by integration tests.
+  //     If you modify this, run: cd agent-bridge && bun test
+  //     Test file: src/__tests__/combined-rewind.test.ts
   if (message.type === 'conversation:rewind') {
     try {
       // We receive TWO message IDs:

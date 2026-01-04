@@ -1300,6 +1300,10 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
    * For calls from inside the message loop, use rewindFilesInLoop() instead.
    *
    * @param checkpointId - The UUID of the checkpoint (from a user message)
+   *
+   * ⚠️  TESTED: This function is covered by integration tests.
+   *     If you modify this, run: cd agent-bridge && bun test
+   *     Test file: src/__tests__/file-rewind.test.ts
    */
   async rewindFiles(checkpointId: string): Promise<void> {
     const sdkSessionId = this._currentSessionId;

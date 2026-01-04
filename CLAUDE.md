@@ -430,3 +430,29 @@ Common symptoms:
 // GOOD: Flexible for external data that may change
 .object({ expiresAt: z.union([z.number(), z.string()]) }).loose()
 ```
+
+### Integration Test Coverage
+
+**IMPORTANT:** When creating integration tests for a function or feature, always add a warning comment to the source file being tested. This ensures future developers know to run and update tests when modifying the code.
+
+**Comment format:**
+
+```typescript
+/**
+ * [existing docstring...]
+ *
+ * ⚠️  TESTED: This function is covered by integration tests.
+ *     If you modify this, run: cd agent-bridge && bun test
+ *     Test file: src/__tests__/[test-file-name].test.ts
+ */
+```
+
+**Currently tested features:**
+
+| Feature                     | Source File                                                     | Test File                                                |
+| --------------------------- | --------------------------------------------------------------- | -------------------------------------------------------- |
+| File Rewind                 | `agent-bridge/src/agent.ts:rewindFiles()`                       | `agent-bridge/src/__tests__/file-rewind.test.ts`         |
+| Conversation Context Format | `apps/agent/src/hooks/use-tauri.ts:formatConversationContext()` | `agent-bridge/src/__tests__/conversation-rewind.test.ts` |
+| Combined Rewind Flow        | `apps/agent/src/hooks/use-tauri.ts:conversation:rewind handler` | `agent-bridge/src/__tests__/combined-rewind.test.ts`     |
+
+**When adding new tests:** Always add the ⚠️ TESTED comment to the source function/handler being tested.

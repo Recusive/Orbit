@@ -153,11 +153,6 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   const renderToolWidget = (tool: ToolExecution): React.ReactNode => {
     const toolName = tool.toolName.toLowerCase();
 
-    // Debug: Log tool name for debugging widget mismatch issues
-    console.warn(
-      `[MessageItem] Rendering widget: toolName="${tool.toolName}" (lowercased="${toolName}"), id="${tool.id}"`
-    );
-
     if (toolName === 'write') {
       return (
         <WriteToolWidget
