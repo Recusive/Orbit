@@ -64,9 +64,10 @@ export function useChat(): UseChatReturn {
 
       try {
         // Send to VS Code extension
+        // IMPORTANT: Use tempId (the user message ID) so checkpoints are associated correctly
         postMessage({
           type: 'message:send',
-          uuid: generateUUID(),
+          uuid: tempId,
           session_id: activeConversationId,
           content,
         } satisfies SendMessage);

@@ -272,8 +272,10 @@ export const RewindConversationSchema = z
     type: z.literal('conversation:rewind'),
     uuid: UUIDSchema,
     session_id: SessionIdSchema,
-    /** The message ID to rewind to (keep this message, discard all after) */
+    /** The message ID to rewind to (keep this message, discard all after in UI) */
     message_id: z.string(),
+    /** The user message ID for checkpoint lookup (checkpoints are stored by user message) */
+    user_message_id: z.string(),
   })
   .strict();
 

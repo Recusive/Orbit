@@ -801,12 +801,22 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // and allows rewinding to any previous checkpoint
     options.enableFileCheckpointing = true;
 
-    // Required to receive checkpoint UUIDs in user messages
-    // These UUIDs are used as restore points for file rewinding
-    options.extraArgs = {
-      ...options.extraArgs,
-      'replay-user-messages': null,
-    };
+    // Only enable replay-user-messages for NEW sessions (not forked/resumed)
+    // This flag causes the SDK to replay user messages from the resumed session.
+    // For forked sessions, this would cause Claude to see BOTH the replayed message
+    // AND the new message, creating a "replay bug" where Claude responds to both.
+    //
+    // For new sessions: We need checkpoint UUIDs for the rewind feature
+    // For forked sessions: We already have checkpoints from the original session
+    if (!this._resumeSessionId) {
+      options.extraArgs = {
+        ...options.extraArgs,
+        'replay-user-messages': null,
+      };
+      logger.info('replay-user-messages enabled for new session (checkpoint tracking)');
+    } else {
+      logger.info('replay-user-messages DISABLED for forked session (prevents replay bug)');
+    }
 
     // CRITICAL: Pass the env variable through options.env (not just process.env)
     // The SDK requires this to enable file checkpointing storage
@@ -994,6 +1004,20 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     try {
       for await (const message of this.currentQuery) {
         messageCount++;
+
+        // Debug: Log every message from SDK with details
+        const msgSubtype =
+          message.type === 'system' ? (message as { subtype?: string }).subtype : undefined;
+        logger.debug(
+          {
+            messageCount,
+            type: message.type,
+            subtype: msgSubtype,
+            hasResumeSessionAt: !!this._resumeSessionAt,
+          },
+          '📩 Agent received SDK message'
+        );
+
         // Capture session ID from system:init message
         if (message.type === 'system' && (message as { subtype?: string }).subtype === 'init') {
           const initMessage = message as { session_id?: string };

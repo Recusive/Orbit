@@ -130,6 +130,7 @@ export function useBrowser(): void {
         case 'agent:error':
         case 'agent:plan_mode':
         case 'agent:accept_mode':
+        case 'agent:checkpoint':
         case 'tool:start':
         case 'tool:end':
         case 'permission:request':

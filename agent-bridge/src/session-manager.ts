@@ -493,7 +493,16 @@ export class SessionManager extends Disposable {
       resumeSessionAt: config?.resumeSessionAt,
     };
 
-    logger.info({ sessionId, sessionMode: finalConfig.sessionMode }, 'Creating session');
+    logger.info(
+      {
+        sessionId,
+        sessionMode: finalConfig.sessionMode,
+        resumeSessionId: finalConfig.resumeSessionId,
+        forkSession: finalConfig.forkSession,
+        resumeSessionAt: finalConfig.resumeSessionAt,
+      },
+      '🔧 Creating session with config'
+    );
     const agent = new OrbitAgent(finalConfig);
 
     // Track resume/fork state
@@ -543,6 +552,7 @@ export class SessionManager extends Disposable {
         // If not streamed, we need to emit text from the assistant message
         let textWasStreamed = false;
 
+        let messageIndex = 0;
         for await (const rawMessage of agent.receiveResponse()) {
           if (state.cancelled) {
             break;
@@ -550,6 +560,18 @@ export class SessionManager extends Disposable {
 
           // Cast to typed SDK message
           const sdkMessage = rawMessage as SDKMessage;
+
+          // Debug: Log every message received from SDK
+          logger.debug(
+            {
+              sessionId,
+              messageIndex,
+              messageType: sdkMessage.type,
+              subtype: sdkMessage.type === 'system' ? sdkMessage.subtype : undefined,
+            },
+            '📨 SDK message received'
+          );
+          messageIndex++;
 
           // Handle system messages
           if (sdkMessage.type === 'system') {
@@ -637,6 +659,17 @@ export class SessionManager extends Disposable {
               const toolName = getString(block.name, 'unknown');
               const toolId = getString(block.id) || generateToolId();
               const toolInput = block.input ?? {};
+
+              // Debug: Log tool_use block received
+              logger.info(
+                {
+                  sessionId,
+                  toolName,
+                  toolId,
+                  toolInputKeys: Object.keys(toolInput),
+                },
+                '🔧 Tool use block received from SDK'
+              );
 
               const approvedTools = this.approvedToolNames.get(sessionId);
               const wasAlreadyApproved = approvedTools?.has(toolName) ?? false;

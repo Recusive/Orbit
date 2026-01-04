@@ -865,9 +865,10 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
             }
           : undefined;
 
+      // IMPORTANT: Use userMessage.id so checkpoints are associated correctly with the rewind target
       postMessage({
         type: 'message:send',
-        uuid: crypto.randomUUID(),
+        uuid: userMessage.id,
         session_id: sessionId,
         content: text,
         context,
@@ -980,9 +981,10 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
             }
           : undefined;
 
+      // IMPORTANT: Use userMessage.id so checkpoints are associated correctly with the rewind target
       postMessage({
         type: 'message:send',
-        uuid: crypto.randomUUID(),
+        uuid: userMessage.id,
         session_id: sessionId,
         content: text,
         context,
@@ -1057,14 +1059,38 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     (messageId: string): void => {
       if (!sessionId || isAgentRunning) return;
 
+      // Find the clicked message
+      const clickedMessage = messages.find((m) => m.id === messageId);
+      if (!clickedMessage) return;
+
+      // We need TWO message IDs:
+      // 1. message_id: The clicked message (for UI fork - includes up to this message)
+      // 2. user_message_id: The user message (for checkpoint lookup - checkpoints stored by user msg)
+      //
+      // If clicked on assistant message: message_id = assistant, user_message_id = preceding user
+      // If clicked on user message: message_id = user_message_id = same
+      let userMessageId = messageId;
+      if (clickedMessage.role === 'assistant') {
+        const messageIndex = messages.findIndex((m) => m.id === messageId);
+        // Look backwards for the preceding user message
+        for (let i = messageIndex - 1; i >= 0; i--) {
+          const prevMessage = messages[i];
+          if (prevMessage?.role === 'user') {
+            userMessageId = prevMessage.id;
+            break;
+          }
+        }
+      }
+
       postMessage({
         type: 'conversation:rewind',
         uuid: crypto.randomUUID(),
         session_id: sessionId,
-        message_id: messageId,
+        message_id: messageId, // Original clicked message (for UI fork)
+        user_message_id: userMessageId, // User message (for checkpoint lookup)
       });
     },
-    [sessionId, isAgentRunning, postMessage]
+    [sessionId, isAgentRunning, messages, postMessage]
   );
 
   const handlePermissionApprove = useCallback(

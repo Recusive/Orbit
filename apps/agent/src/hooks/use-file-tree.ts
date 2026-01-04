@@ -178,6 +178,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         case 'agent:error':
         case 'agent:plan_mode':
         case 'agent:accept_mode':
+        case 'agent:checkpoint':
         case 'tool:start':
         case 'tool:end':
         case 'permission:request':

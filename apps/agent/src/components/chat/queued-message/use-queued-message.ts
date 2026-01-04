@@ -80,9 +80,10 @@ export function useQueuedMessageHandler(options: UseQueuedMessageOptions): UseQu
             }
           : undefined;
 
+      // IMPORTANT: Use userMessage.id so checkpoints are associated correctly with the rewind target
       postMessage({
         type: 'message:send',
-        uuid: crypto.randomUUID(),
+        uuid: userMessage.id,
         session_id: sessionId,
         content: text,
         context,
