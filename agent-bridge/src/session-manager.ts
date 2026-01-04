@@ -170,10 +170,13 @@ export interface SessionConfig {
   critiqueEnabled?: boolean;
   model?: 'haiku' | 'sonnet' | 'opus';
   sessionMode?: 'chat' | 'agent';
+  /** SDK session ID to resume from (for programmatic forking) */
   resumeSessionId?: string;
+  /** Whether to fork the session (create new branch) vs continue original */
   forkSession?: boolean;
-  /** Resume session at a specific message UUID (for rewinding to a specific point) */
-  resumeSessionAt?: string;
+  // NOTE: resumeSessionAt was removed. For rewind scenarios, we DON'T use SDK's resume
+  // because it loads ALL messages. Instead, we prepend truncated conversation history
+  // to the first message. This matches how Claude Code handles rewind.
 }
 
 /**
@@ -488,9 +491,10 @@ export class SessionManager extends Disposable {
       cwd: config?.cwd,
       sessionMode: config?.sessionMode ?? 'agent',
       permissionRequestCallback: permissionCallback,
+      // NOTE: resumeSessionId and forkSession are only used for programmatic forking,
+      // NOT for rewind scenarios. Rewind uses context-prepend approach instead.
       resumeSessionId: config?.resumeSessionId,
       forkSession: config?.forkSession,
-      resumeSessionAt: config?.resumeSessionAt,
     };
 
     logger.info(
@@ -499,7 +503,6 @@ export class SessionManager extends Disposable {
         sessionMode: finalConfig.sessionMode,
         resumeSessionId: finalConfig.resumeSessionId,
         forkSession: finalConfig.forkSession,
-        resumeSessionAt: finalConfig.resumeSessionAt,
       },
       '🔧 Creating session with config'
     );

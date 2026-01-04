@@ -473,12 +473,10 @@ export interface SessionConfig {
   thinkingTokens?: number;
   acceptEnabled?: boolean;
   planEnabled?: boolean;
-  /** SDK session ID to resume from (for forked/rewound sessions) */
-  resumeSessionId?: string;
-  /** Whether to fork the session (create new branch) vs continue original */
-  forkSession?: boolean;
-  /** Resume session at a specific message UUID (for rewinding to a specific point) */
-  resumeSessionAt?: string;
+  // NOTE: We intentionally removed resumeSessionId, forkSession, and resumeSessionAt.
+  // For rewind scenarios, we DON'T use SDK's resume because it loads ALL messages.
+  // Instead, we prepend the truncated conversation history to the first message.
+  // This matches how Claude Code handles rewind - they slice messages BEFORE passing to SDK.
 }
 
 export interface AttachmentContentBlock {

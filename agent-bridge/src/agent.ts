@@ -111,10 +111,13 @@ function getMessageContentArray(message: SDKMessage): unknown[] | null {
 export interface OrbitAgentConfig {
   permissionRequestCallback?: PermissionRequestCallback;
   snapshotCallback?: SnapshotCallback;
+  /** SDK session ID to resume from (for programmatic forking only) */
   resumeSessionId?: string;
+  /** Whether to fork the session (for programmatic forking only) */
   forkSession?: boolean;
-  /** Resume session at a specific message UUID (for rewinding to a specific point) */
-  resumeSessionAt?: string;
+  // NOTE: resumeSessionAt was removed. For rewind scenarios, we DON'T use SDK's resume
+  // because it loads ALL messages. Instead, the frontend prepends truncated conversation
+  // history to the first message. This matches how Claude Code handles rewind.
   model?: string;
   /** Fallback model to use if primary model fails */
   fallbackModel?: string;
@@ -238,10 +241,9 @@ export class OrbitAgent {
   private _fallbackModel?: string;
   private _sessionMode: OrbitSessionMode;
 
-  // Session resume/fork fields
+  // Session resume/fork fields (for programmatic forking only, NOT rewind)
   private _resumeSessionId?: string;
   private _forkSession: boolean;
-  private _resumeSessionAt?: string;
   private _currentSessionId?: string;
 
   // Streaming input mode fields
@@ -270,9 +272,10 @@ export class OrbitAgent {
     this._acceptMode = config.acceptEnabled ?? false;
     this._critiqueMode = config.critiqueEnabled ?? false;
     this._sessionMode = config.sessionMode ?? 'agent';
+    // NOTE: resumeSessionId and forkSession are for programmatic forking only.
+    // For rewind scenarios, we don't use SDK resume - the frontend prepends context instead.
     this._resumeSessionId = config.resumeSessionId;
     this._forkSession = config.forkSession ?? false;
-    this._resumeSessionAt = config.resumeSessionAt;
     if (config.model !== undefined) {
       this.model = config.model;
     }
@@ -757,25 +760,19 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Enable streaming partial messages for real-time text streaming
     options.includePartialMessages = true;
 
-    // Session resume/fork options
+    // Session resume/fork options (for programmatic forking only)
+    // NOTE: For rewind scenarios, we DON'T use SDK resume because it loads ALL messages.
+    // Instead, the frontend prepends truncated conversation history to the first message.
+    // This matches how Claude Code handles rewind - they slice messages BEFORE passing to SDK.
     if (this._resumeSessionId) {
       options.resume = this._resumeSessionId;
       if (this._forkSession) {
         options.forkSession = true;
       }
-      // Resume at specific message UUID (for rewinding to a specific point in conversation)
-      if (this._resumeSessionAt) {
-        options.resumeSessionAt = this._resumeSessionAt;
-        logger.info(
-          { resumeFrom: this._resumeSessionId, fork: this._forkSession, at: this._resumeSessionAt },
-          'Session resume/fork at specific message configured'
-        );
-      } else {
-        logger.info(
-          { resumeFrom: this._resumeSessionId, fork: this._forkSession },
-          'Session resume/fork configured'
-        );
-      }
+      logger.info(
+        { resumeFrom: this._resumeSessionId, fork: this._forkSession },
+        'Session resume/fork configured (programmatic fork)'
+      );
     }
 
     // MCP servers (DevTools, custom tools, etc.)
@@ -1013,7 +1010,6 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             messageCount,
             type: message.type,
             subtype: msgSubtype,
-            hasResumeSessionAt: !!this._resumeSessionAt,
           },
           '📩 Agent received SDK message'
         );

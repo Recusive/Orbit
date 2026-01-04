@@ -359,12 +359,30 @@ const createdSessions = new Set<string>();
 /**
  * Track forked sessions that should resume from an SDK session.
  * Key: new (forked) session ID
- * Value: { sdkSessionId, resumeSessionAt } for session resume configuration
+ * Value: { sdkSessionId } for file checkpoint access (NOT for message resume)
+ *
+ * IMPORTANT: For rewind scenarios, we DON'T use SDK's resume for messages.
+ * The SDK's resume loads ALL messages from the previous session. Instead,
+ * we use rewindContextMap to store truncated messages and prepend
+ * them to the first message (like Claude Code does).
  */
-const forkedSessionResumeMap = new Map<
-  string,
-  { sdkSessionId: string; resumeSessionAt?: string }
->();
+const forkedSessionResumeMap = new Map<string, { sdkSessionId: string }>();
+
+/**
+ * Store conversation context for rewind scenarios.
+ * Key: new (forked) session ID
+ * Value: { messages } - conversation history to prepend to first message
+ *
+ * This is the key fix: Instead of using SDK's resume (which loads ALL messages),
+ * we truncate locally and prepend the context to the first message.
+ * This matches how Claude Code handles rewind - they slice messages BEFORE
+ * passing to the SDK.
+ */
+interface RewindContextMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+const rewindContextMap = new Map<string, RewindContextMessage[]>();
 
 // NOTE: We don't need to wait for system:init or use delays for forked sessions.
 // The SDK's MessageQueue iterator blocks until the first message is added.
@@ -372,25 +390,64 @@ const forkedSessionResumeMap = new Map<
 // messages via queueMessage(). The first message we send unblocks the iterator,
 // and the SDK then processes everything (including emitting system:init).
 
-/** Mark a session as forked from another SDK session */
-export function markSessionAsForked(
-  newSessionId: string,
-  resumeFromSdkSessionId: string,
-  resumeSessionAt?: string
-): void {
-  // Build object conditionally to satisfy exactOptionalPropertyTypes
-  const entry: { sdkSessionId: string; resumeSessionAt?: string } = {
-    sdkSessionId: resumeFromSdkSessionId,
-  };
-  if (resumeSessionAt !== undefined) {
-    entry.resumeSessionAt = resumeSessionAt;
-  }
-  forkedSessionResumeMap.set(newSessionId, entry);
-  console.warn('[Snowflake] 🔀 Marked session as forked:', {
+/** Mark a session as forked from another SDK session (for file checkpointing only) */
+export function markSessionAsForked(newSessionId: string, resumeFromSdkSessionId: string): void {
+  forkedSessionResumeMap.set(newSessionId, { sdkSessionId: resumeFromSdkSessionId });
+  console.warn('[Snowflake] 🔀 Marked session as forked (for checkpointing):', {
     newSessionId,
     resumeFromSdkSessionId,
-    resumeSessionAt,
   });
+}
+
+/**
+ * Store conversation context for a rewind fork.
+ * This context will be prepended to the first message sent to this session.
+ */
+export function setRewindContext(sessionId: string, messages: RewindContextMessage[]): void {
+  rewindContextMap.set(sessionId, messages);
+  console.warn('[Snowflake] 📝 Stored rewind context:', {
+    sessionId,
+    messageCount: messages.length,
+  });
+}
+
+/**
+ * Get and consume rewind context for a session.
+ * Returns undefined if no context exists.
+ * Context is deleted after retrieval (one-time use).
+ */
+function consumeRewindContext(sessionId: string): RewindContextMessage[] | undefined {
+  const context = rewindContextMap.get(sessionId);
+  if (context) {
+    rewindContextMap.delete(sessionId);
+    console.warn('[Snowflake] 📤 Consuming rewind context:', {
+      sessionId,
+      messageCount: context.length,
+    });
+  }
+  return context;
+}
+
+/**
+ * Format conversation messages as context for Claude.
+ * Uses XML-style tags for clear structure.
+ */
+function formatConversationContext(messages: RewindContextMessage[]): string {
+  if (messages.length === 0) return '';
+
+  const formattedMessages = messages
+    .map((m) => `<message role="${m.role}">\n${m.content}\n</message>`)
+    .join('\n\n');
+
+  return `<previous_conversation>
+This is a continuation of a previous conversation. Here is the conversation history:
+
+${formattedMessages}
+</previous_conversation>
+
+Continue from where we left off. The user's new message follows:
+
+`;
 }
 
 /** Ensure a session exists before sending messages */
@@ -415,22 +472,26 @@ async function ensureSession(sessionId: string): Promise<void> {
     config.cwd = cwd;
   }
 
-  // Check if this is a forked session that should resume from an SDK session
+  // Check if this is a forked session (from rewind)
+  // NOTE: We intentionally DON'T use SDK's resume for rewind sessions.
+  // The SDK's resume loads ALL messages from the previous session, which breaks rewind.
+  // Instead, we:
+  // 1. Store the truncated messages in rewindContextMap
+  // 2. Create a fresh session (no resume)
+  // 3. Prepend the context to the first message
+  // This matches how Claude Code handles rewind - they slice messages BEFORE passing to SDK.
   const resumeConfig = forkedSessionResumeMap.get(sessionId);
 
   if (resumeConfig) {
-    config.resumeSessionId = resumeConfig.sdkSessionId;
-    config.forkSession = true;
-    // Pass the resumeSessionAt (message UUID) to fork at a specific point
-    if (resumeConfig.resumeSessionAt) {
-      config.resumeSessionAt = resumeConfig.resumeSessionAt;
-    }
-    console.warn('[Snowflake] 🔀 Creating forked session with resume:', {
+    // For rewind forks, we create a FRESH session (no SDK resume)
+    // The conversation context is handled by prepending to the first message
+    // File checkpoints were already rewound before the fork was created
+    console.warn('[Snowflake] 🔀 Creating fresh session for rewind fork:', {
       sessionId,
-      resumeFromSdkSession: resumeConfig.sdkSessionId,
-      resumeSessionAt: resumeConfig.resumeSessionAt,
+      originalSdkSession: resumeConfig.sdkSessionId,
+      note: 'NOT using SDK resume - context will be prepended to first message',
     });
-    // Clean up the mapping since we only need it once
+    // Clean up the mapping
     forkedSessionResumeMap.delete(sessionId);
   }
 
@@ -819,32 +880,36 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
       // Step 4: Fork the conversation to this point
       const newSessionId = crypto.randomUUID();
 
-      // Mark the new session as forked so it resumes from the original SDK session
-      // Use resumeSessionAt from the turn START checkpoint
-      // This ensures Claude sees up to and including this message, ready for the next
-      if (sdkSessionId && rewindCheckpoints?.resumeSessionAt) {
-        markSessionAsForked(newSessionId, sdkSessionId, rewindCheckpoints.resumeSessionAt);
-        console.warn('[Snowflake] 🔀 Marking forked session with resumeSessionAt:', {
-          newSessionId,
-          sdkSessionId,
-          resumeSessionAt: rewindCheckpoints.resumeSessionAt,
-          rewindFilesCheckpoint: rewindCheckpoints.rewindFiles,
-        });
-      } else if (sdkSessionId) {
-        // No checkpoint - fork without resumeSessionAt (fresh start)
-        markSessionAsForked(newSessionId, sdkSessionId);
-        console.warn(
-          '[Snowflake] 🔀 Marking forked session WITHOUT resumeSessionAt (fresh start):',
-          {
-            newSessionId,
-            sdkSessionId,
-          }
-        );
-      }
-
       // Step 5: Fork the conversation using the CLICKED message ID
       // This ensures we include up to and including the clicked message (user OR assistant)
       const forked = await conversationFork(message.session_id, newSessionId, message_id);
+
+      // Step 6: Store rewind context and mark session as forked
+      // NOTE: We DON'T use SDK's resume for message history anymore.
+      // The SDK's resume loads ALL messages which breaks rewind.
+      // Instead, we store the truncated messages and prepend them to the first message.
+      if (forked && forked.messages.length > 0) {
+        // Store the truncated messages as context for the first message
+        const contextMessages: RewindContextMessage[] = forked.messages.map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }));
+        setRewindContext(forked.sessionId, contextMessages);
+        console.warn('[Snowflake] 📝 Stored rewind context for forked session:', {
+          sessionId: forked.sessionId,
+          messageCount: contextMessages.length,
+        });
+      }
+
+      // Mark session as forked (for file checkpoint tracking, NOT for SDK resume)
+      if (sdkSessionId) {
+        markSessionAsForked(newSessionId, sdkSessionId);
+        console.warn('[Snowflake] 🔀 Marked forked session (context-based, no SDK resume):', {
+          newSessionId,
+          sdkSessionId,
+        });
+      }
+
       if (forked) {
         window.postMessage(
           {
@@ -979,10 +1044,26 @@ async function handleTauriMessage(message: WebviewMessage): Promise<void> {
         }
       }
 
+      // Check if this session has rewind context (from a rewind fork)
+      // If so, prepend the conversation history to the first message
+      // This is the key fix: we pass truncated history as context, NOT via SDK resume
+      let contentToSend = message.content;
+      const rewindContext = consumeRewindContext(message.session_id);
+      if (rewindContext && rewindContext.length > 0) {
+        const contextPrefix = formatConversationContext(rewindContext);
+        contentToSend = contextPrefix + message.content;
+        console.warn('[Snowflake] 📤 Prepended rewind context to message:', {
+          sessionId: message.session_id,
+          contextMessageCount: rewindContext.length,
+          originalLength: message.content.length,
+          newLength: contentToSend.length,
+        });
+      }
+
       // Send message to agent
       await agentSendMessage(
         message.session_id,
-        message.content,
+        contentToSend,
         attachments.length > 0 ? attachments : undefined
       );
     } catch (err: unknown) {
