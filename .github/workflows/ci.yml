@@ -369,12 +369,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       # Upload DMG artifact
+      # Note: Native builds output to target/release/, not target/<triple>/release/
       - name: Upload DMG
         uses: actions/upload-artifact@v6
         with:
           name: Snowflake-macOS-arm64-${{ github.sha }}
-          path: |
-            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          path: src-tauri/target/release/bundle/dmg/*.dmg
           retention-days: 7
 
   # ============================================
