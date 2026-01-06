@@ -359,9 +359,8 @@ jobs:
       - name: Install Claude Code CLI
         run: |
           curl -fsSL https://claude.ai/install.sh | bash
-          # Add to PATH and copy binary
-          export PATH="$HOME/.claude/local/bin:$PATH"
-          cp "$HOME/.claude/local/bin/claude" src-tauri/binaries/claude-aarch64-apple-darwin
+          # Copy from the installed location
+          cp "$HOME/.local/bin/claude" src-tauri/binaries/claude-aarch64-apple-darwin
           chmod +x src-tauri/binaries/claude-aarch64-apple-darwin
           ls -la src-tauri/binaries/
 
