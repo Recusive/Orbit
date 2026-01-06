@@ -26,6 +26,36 @@ Snowflake is a modern AI-powered code editor built with **Tauri 2** (Rust backen
 - **portable-pty** for terminal emulation
 - Tree-sitter for syntax parsing (planned)
 
+### Package Manager Policy
+
+**IMPORTANT:** This project uses **Bun** as the primary package manager/runtime wherever possible.
+
+| Context         | Use      | Why                                                          |
+| --------------- | -------- | ------------------------------------------------------------ |
+| `agent-bridge/` | **Bun**  | Claude Agent SDK sidecar - compiles to standalone Bun binary |
+| Root monorepo   | **pnpm** | Tauri requires pnpm for workspace management                 |
+| `apps/*`        | **pnpm** | Part of pnpm workspace                                       |
+
+**Rules:**
+
+1. **Never use `npm`** - Always use `bun` or `pnpm`
+2. **Prefer `bun`** for standalone packages (agent-bridge, scripts, tests)
+3. **Use `pnpm`** for monorepo workspace commands (`pnpm dev`, `pnpm tauri dev`)
+4. **Run tests with `bun test`** in agent-bridge
+
+```bash
+# ✅ CORRECT
+bun run build:dev           # In agent-bridge
+bun test                    # In agent-bridge
+pnpm dev                    # At monorepo root
+pnpm tauri dev              # At monorepo root
+
+# ❌ WRONG - Never use npm
+npm run build               # NO!
+npm install                 # NO!
+npm test                    # NO!
+```
+
 ## Project Structure
 
 ```
@@ -169,7 +199,7 @@ The agent-bridge is a **compiled Bun binary** that Tauri spawns as a sidecar pro
 
 ```bash
 cd agent-bridge
-npm run build:dev    # Compiles to target/debug/agent-bridge
+bun run build:dev    # Compiles to target/debug/agent-bridge
 ```
 
 Then restart the Tauri app (`Cmd+C` → `pnpm tauri dev`).
@@ -183,8 +213,8 @@ Then restart the Tauri app (`Cmd+C` → `pnpm tauri dev`).
 **Two build outputs:**
 | Script | Output | Purpose |
 |--------|--------|---------|
-| `npm run build` | `dist/index.js` | JS bundle (requires Bun to run) |
-| `npm run build:dev` | `target/debug/agent-bridge` | Standalone binary for Tauri |
+| `bun run build` | `dist/index.js` | JS bundle (requires Bun to run) |
+| `bun run build:dev` | `target/debug/agent-bridge` | Standalone binary for Tauri |
 
 ### Production Build
 
@@ -658,3 +688,96 @@ The following CSS properties trigger GPU compositing issues that result in momen
 3. **Check CSS differences** - Look for `backdrop-filter`, `color-mix()`, `transition`, `animation`
 4. **Remove one property at a time** - Isolate which property causes the blur
 5. **Replace with solid alternatives** - Use CSS variables and remove transitions
+
+## CSS Architecture
+
+**IMPORTANT:** The app uses a unified color system with agent as the source of truth.
+
+### File Structure
+
+```
+apps/
+├── agent/src/globals.css     ← SOURCE OF TRUTH for all colors
+└── canvas/src/globals.css    ← Canvas-specific styles only (NO color definitions)
+```
+
+### Import Order (apps/agent/src/main.tsx)
+
+```typescript
+import '@xyflow/react/dist/style.css'; // ReactFlow base styles
+import './globals.css'; // Agent colors (source of truth)
+import '@canvas/globals.css'; // Canvas styles (no color overrides)
+```
+
+### Color Variables
+
+All color variables are defined in `apps/agent/src/globals.css`:
+
+| Variable       | Light Mode        | Dark Mode         | Purpose               |
+| -------------- | ----------------- | ----------------- | --------------------- |
+| `--background` | `oklch(0.95 ...)` | `oklch(0.16 ...)` | Main app background   |
+| `--chat-area`  | `oklch(0.93 ...)` | `oklch(0.18 ...)` | Chat messages area    |
+| `--card`       | `oklch(0.90 ...)` | `oklch(0.20 ...)` | Cards, headers, input |
+| `--sidebar`    | `oklch(0.96 ...)` | `oklch(0.20 ...)` | Sidebar background    |
+| `--primary`    | `oklch(0.56 ...)` | `oklch(0.68 ...)` | Coral accent          |
+
+### Rules
+
+1. **NEVER define `:root` color variables in canvas globals.css** - They will override agent colors
+2. **Canvas uses agent's variables** - e.g., `var(--background)`, `var(--card)`, `var(--primary)`
+3. **Canvas globals.css contains only:**
+   - Tailwind `@theme` mappings (pointing to agent's variables)
+   - ReactFlow style overrides (`.react-flow__*`)
+   - Scrollbar styling
+   - Base layout (html, body, #root)
+
+### Adding New Colors
+
+1. Add the variable to `apps/agent/src/globals.css` in both `:root` and `html.dark` sections
+2. Add the Tailwind mapping in `@theme inline { }` block
+3. Canvas will automatically have access to the new variable
+
+## Canvas App
+
+The Canvas app is embedded within the Agent app as a mode/tab (not a separate Tauri window).
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  Snowflake App (Single Tauri Window)            │
+│  ┌───────────────────────────────────────────┐  │
+│  │  HeaderBar [Agent] [Canvas] [Editor]      │  │
+│  └───────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────┐  │
+│  │  activeTab === 'agent'  → RootLayout      │  │
+│  │  activeTab === 'canvas' → CanvasApp       │  │
+│  │  activeTab === 'editor' → EditorMode      │  │
+│  └───────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────┐  │
+│  │  StatusBar                                │  │
+│  └───────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────┘
+```
+
+### Canvas Libraries
+
+- **@xyflow/react** (ReactFlow) - Node-based canvas
+- **@codesandbox/sandpack-react** - Code playground integration
+- **Zustand** - State management (`apps/canvas/src/stores/`)
+
+### Canvas Directory Structure
+
+```
+apps/canvas/src/
+├── components/          # React components (nodes, panels, toolbars)
+├── hooks/               # Custom React hooks
+├── lib/                 # Utilities and design tokens
+├── types/               # TypeScript type definitions
+├── config/              # Configuration files
+├── sandpack/            # Sandpack integration
+├── stores/              # Zustand stores
+├── main.tsx             # Entry point (standalone mode only)
+├── globals.css          # Canvas styles (no colors!)
+└── CanvasApp.tsx        # Root component (imported by agent)
+```

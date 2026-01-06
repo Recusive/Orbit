@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop, feat/pranit]
+    branches: [main, develop, port, feat/pranit]
   pull_request:
-    branches: [main, develop, feat/pranit]
+    branches: [main, develop, port, feat/pranit]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -308,6 +308,74 @@ jobs:
         with:
           cache-on-failure: false
       - run: cargo check --all-features
+
+  # ============================================
+  # macOS DMG Build (Apple Silicon)
+  # ============================================
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+
+      # Select Xcode 16.2 for macOS SDK 15.5
+      - name: Select Xcode 16.2
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+          xcodebuild -version
+          xcrun --show-sdk-path
+          xcrun --show-sdk-version
+
+      # Setup Node.js + pnpm for frontend build
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+
+      # Setup Bun for agent-bridge sidecar
+      - uses: oven-sh/setup-bun@v2
+
+      # Setup Rust
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: false
+
+      # Build agent-bridge sidecar (Bun standalone binary)
+      - name: Build agent-bridge sidecar
+        run: |
+          cd agent-bridge
+          bun install
+          bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile=../src-tauri/binaries/agent-bridge-aarch64-apple-darwin
+          chmod +x ../src-tauri/binaries/agent-bridge-aarch64-apple-darwin
+
+      # Create placeholder for claude binary (not built in CI)
+      - name: Create claude placeholder
+        run: |
+          touch src-tauri/binaries/claude-aarch64-apple-darwin
+          chmod +x src-tauri/binaries/claude-aarch64-apple-darwin
+
+      # Build Tauri app (includes frontend build via beforeBuildCommand)
+      - name: Build Tauri macOS app
+        run: pnpm tauri build --target aarch64-apple-darwin
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      # Upload DMG artifact
+      - name: Upload DMG
+        uses: actions/upload-artifact@v6
+        with:
+          name: Snowflake-macOS-arm64-${{ github.sha }}
+          path: |
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          retention-days: 7
 
   # ============================================
   # QUALITY GATE - Required status check
