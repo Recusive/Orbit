@@ -355,16 +355,15 @@ jobs:
           bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile=../src-tauri/binaries/agent-bridge-aarch64-apple-darwin
           chmod +x ../src-tauri/binaries/agent-bridge-aarch64-apple-darwin
 
-      # Create a valid stub binary for claude (not built in CI)
-      # Must be a real executable, not an empty file, or macOS reports app as "damaged"
-      - name: Create claude stub binary
+      # Install Claude Code CLI and copy the binary
+      - name: Install Claude Code CLI
         run: |
-          cat > src-tauri/binaries/claude-aarch64-apple-darwin << 'STUB'
-          #!/bin/bash
-          echo "Claude CLI stub - install the real binary for full functionality"
-          exit 0
-          STUB
+          curl -fsSL https://claude.ai/install.sh | bash
+          # Add to PATH and copy binary
+          export PATH="$HOME/.claude/local/bin:$PATH"
+          cp "$HOME/.claude/local/bin/claude" src-tauri/binaries/claude-aarch64-apple-darwin
           chmod +x src-tauri/binaries/claude-aarch64-apple-darwin
+          ls -la src-tauri/binaries/
 
       # Build Tauri app (includes frontend build via beforeBuildCommand)
       - name: Build Tauri macOS app
