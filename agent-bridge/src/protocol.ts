@@ -4,6 +4,13 @@
  */
 
 import type { SubagentDefinition } from './agent-definitions.js';
+import type {
+  CanvasSessionConfig,
+  CanvasState,
+  McpToolRequest,
+  McpToolResponse,
+  SDKMessage,
+} from './canvas/types.js';
 import type { CommandScope, SlashCommandDefinition } from './command-definitions.js';
 import type { AttachmentContentBlock } from './messages.js';
 import type {
@@ -310,6 +317,54 @@ export interface ShutdownRequest {
   type: 'shutdown';
 }
 
+// ============================================================================
+// Canvas Request Types
+// ============================================================================
+
+/**
+ * Create a new canvas session
+ */
+export interface CanvasCreateSessionRequest {
+  type: 'canvas:create_session';
+  sessionId: string;
+  config?: CanvasSessionConfig;
+}
+
+/**
+ * Delete a canvas session
+ */
+export interface CanvasDeleteSessionRequest {
+  type: 'canvas:delete_session';
+  sessionId: string;
+}
+
+/**
+ * Send a message to a canvas session with current canvas state
+ */
+export interface CanvasSendMessageRequest {
+  type: 'canvas:send_message';
+  sessionId: string;
+  message: string;
+  state: CanvasState;
+}
+
+/**
+ * Interrupt a canvas session
+ */
+export interface CanvasInterruptRequest {
+  type: 'canvas:interrupt';
+  sessionId: string;
+}
+
+/**
+ * Send a tool response back to a canvas session
+ */
+export interface CanvasToolResponseRequest {
+  type: 'canvas:tool_response';
+  sessionId: string;
+  response: McpToolResponse;
+}
+
 /**
  * All possible requests from Rust
  */
@@ -344,7 +399,12 @@ export type BridgeRequest =
   | RewindFilesRequest
   | GenerateAgentDefinitionRequest
   | GenerateCommandDefinitionRequest
-  | ShutdownRequest;
+  | ShutdownRequest
+  | CanvasCreateSessionRequest
+  | CanvasDeleteSessionRequest
+  | CanvasSendMessageRequest
+  | CanvasInterruptRequest
+  | CanvasToolResponseRequest;
 
 // ============================================================================
 // Response Types (Node.js → Rust)
@@ -526,6 +586,37 @@ export interface CheckpointEvent {
   checkpointId: string;
 }
 
+// ============================================================================
+// Canvas Event Types
+// ============================================================================
+
+/**
+ * Canvas message event - agent response for canvas session
+ */
+export interface CanvasMessageEvent {
+  type: 'canvas:message';
+  sessionId: string;
+  message: SDKMessage;
+}
+
+/**
+ * Canvas tool request event - agent requesting tool execution in webview
+ */
+export interface CanvasToolRequestEvent {
+  type: 'canvas:tool_request';
+  sessionId: string;
+  request: McpToolRequest;
+}
+
+/**
+ * Canvas error event
+ */
+export interface CanvasErrorEvent {
+  type: 'canvas:error';
+  sessionId: string;
+  error: string;
+}
+
 /**
  * All possible events from Node.js
  */
@@ -537,7 +628,10 @@ export type BridgeEvent =
   | AcceptModeChangedEvent
   | ErrorEvent
   | ReadyEvent
-  | CheckpointEvent;
+  | CheckpointEvent
+  | CanvasMessageEvent
+  | CanvasToolRequestEvent
+  | CanvasErrorEvent;
 
 /**
  * All possible messages from Node.js to Rust

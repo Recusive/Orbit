@@ -1,0 +1,145 @@
+/**
+ * SandpackNode styles
+ * Consistent styling for live component nodes on the canvas
+ * Uses CSS variables from globals.css
+ */
+
+.sandpack-node {
+	background-color: var(--card);
+	border-radius: 8px;
+	border: 1px solid var(--border);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	overflow: hidden;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sandpack-node:hover {
+	border-color: var(--primary);
+}
+
+.sandpack-node--selected {
+	border-color: var(--primary);
+	box-shadow: 0 0 0 2px var(--selection);
+}
+
+/* Header */
+.sandpack-node__header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 8px 10px;
+	background-color: var(--muted);
+	border-bottom: 1px solid var(--border);
+}
+
+.sandpack-node__header-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.sandpack-node__header-right {
+	display: flex;
+	align-items: center;
+}
+
+.sandpack-node__icon-wrapper {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	background-color: var(--primary);
+	border-radius: 4px;
+	color: var(--primary-foreground);
+}
+
+.sandpack-node__icon-wrapper svg {
+	width: 12px;
+	height: 12px;
+}
+
+.sandpack-node__label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--foreground);
+}
+
+/* Code Preview */
+.sandpack-node__code-preview {
+	position: relative;
+	background-color: #1a1a1a;
+	padding: 8px 10px;
+	min-height: 80px;
+	max-height: 100px;
+	overflow: hidden;
+}
+
+.sandpack-node__code {
+	margin: 0;
+	font-size: 9px;
+	font-family: "SF Mono", "Monaco", "Consolas", monospace;
+	color: #a0a0a0;
+	line-height: 1.5;
+	white-space: pre;
+	overflow: hidden;
+}
+
+.sandpack-node__fade-overlay {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 32px;
+	background: linear-gradient(transparent, #1a1a1a);
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	padding-bottom: 4px;
+}
+
+.sandpack-node__more-lines {
+	font-size: 9px;
+	color: var(--muted-foreground);
+}
+
+/* Footer */
+.sandpack-node__footer {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 6px 10px;
+	background-color: var(--card);
+	border-top: 1px solid var(--border);
+}
+
+.sandpack-node__footer-text {
+	font-size: 9px;
+	color: var(--muted-foreground);
+}
+
+.sandpack-node__viewport-badge {
+	font-size: 9px;
+	font-weight: 500;
+	padding: 2px 6px;
+	background-color: var(--muted);
+	color: var(--muted-foreground);
+	border-radius: 4px;
+	text-transform: capitalize;
+}
+
+/* Connection Handles - hidden by default, shown on hover */
+.sandpack-node__handle {
+	width: 8px !important;
+	height: 8px !important;
+	background-color: var(--primary) !important;
+	border: 2px solid var(--card) !important;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+/* Show handles on node hover or selection (using ReactFlow wrapper) */
+.react-flow__node:hover .sandpack-node__handle,
+.react-flow__node.selected .sandpack-node__handle {
+	opacity: 1;
+}

@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
+use commands::canvas::lifecycle as canvas_cmd;
 use commands::common::{
     dev_monitor, diagnostics, files, git, lsp, search, settings, terminal, workspace,
 };
@@ -260,6 +261,12 @@ pub fn run() {
             agent_cmd::agent_rewind_files,
             agent_cmd::agent_generate_agent_definition,
             agent_cmd::agent_generate_command_definition,
+            // Canvas commands
+            canvas_cmd::canvas_create_session,
+            canvas_cmd::canvas_delete_session,
+            canvas_cmd::canvas_send_message,
+            canvas_cmd::canvas_interrupt,
+            canvas_cmd::canvas_tool_response,
             // File commands
             files::read_file,
             files::read_file_bytes,

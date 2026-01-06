@@ -35,7 +35,8 @@
     /* Paths */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./apps/agent/src/*"]
+      "@/*": ["./apps/agent/src/*"],
+      "@canvas/*": ["./apps/canvas/src/*"]
     }
   },
   "include": ["apps/*/src/**/*"],

@@ -6,7 +6,7 @@ import type { FC } from 'react';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { useUIStore, useWorkspaceName, useTerminalPosition } from '@/stores/ui-store';
+import { useUIStore, useWorkspaceName, useTerminalPosition, useActiveTab } from '@/stores/ui-store';
 
 type Theme = 'light' | 'dark';
 
@@ -15,7 +15,8 @@ const getInitialTheme = (): Theme => {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 };
 
-export type HeaderTab = 'agent' | 'editor' | 'canvas';
+// Re-export for backwards compatibility
+export type { HeaderTab } from '@/stores/ui-store';
 
 export interface HeaderBarProps {
   className?: string;
@@ -60,10 +61,11 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
  * Matches the sidebar background color.
  */
 export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
-  const [activeTab, setActiveTab] = useState<HeaderTab>('agent');
+  const activeTab = useActiveTab();
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const workspaceName = useWorkspaceName();
   const {
+    setActiveTab,
     toggleReviewPanel,
     toggleBottomPanel,
     toggleRightSidebar,

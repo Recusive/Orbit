@@ -1,12 +1,263 @@
-@import 'tailwindcss';
+/**
+ * Orbit Canvas Global Styles
+ * Brand colors and design tokens from orbit-agent
+ */
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *, .vscode-dark *, .vscode-high-contrast *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Brand colors as Tailwind utilities */
+  --color-brand-oat: var(--brand-oat);
+  --color-brand-clay: var(--brand-clay);
+  --color-brand-sand: var(--brand-sand);
+  --color-brand-coral: var(--brand-coral);
+  --color-brand-brown: var(--brand-brown);
+  --color-brand-heather: var(--brand-heather);
+  --color-brand-olive: var(--brand-olive);
+  --color-brand-fig: var(--brand-fig);
+
+  /* Status colors */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  /* Canvas-specific */
+  --color-canvas-bg: var(--canvas-bg);
+  --color-canvas-grid: var(--canvas-grid);
+  --color-selection: var(--selection);
+  --color-selection-border: var(--selection-border);
 }
 
-html, body, #root {
-  height: 100%;
-  width: 100%;
+:root {
+  --radius: 0.65rem;
+
+  /* Brand palette */
+  --brand-oat: #E8E0D5;
+  --brand-clay: #C4A98B;
+  --brand-sand: #D4C5B5;
+  --brand-coral: #E07A6B;
+  --brand-brown: #8B7355;
+  --brand-dark-brown: #5C4F3D;
+  --brand-headline: #3D3630;
+  --brand-heather: #9B8AA6;
+  --brand-olive: #8B9B7A;
+  --brand-fig: #7A6B8A;
+
+  /* Shadcn semantic (light) */
+  --background: oklch(0.98 0.005 75);
+  --foreground: oklch(0.25 0.02 60);
+  --card: oklch(0.96 0.008 70);
+  --card-foreground: oklch(0.25 0.02 60);
+  --popover: oklch(0.98 0.005 75);
+  --popover-foreground: oklch(0.25 0.02 60);
+  --primary: oklch(0.62 0.18 35);          /* Coral */
+  --primary-foreground: oklch(0.98 0.01 75);
+  --secondary: oklch(0.80 0.05 65);
+  --secondary-foreground: oklch(0.30 0.02 60);
+  --muted: oklch(0.92 0.01 70);
+  --muted-foreground: oklch(0.50 0.03 60);
+  --accent: oklch(0.85 0.04 65);
+  --accent-foreground: oklch(0.25 0.02 60);
+  --destructive: oklch(0.55 0.22 25);
+  --border: oklch(0.88 0.02 70);
+  --input: oklch(0.90 0.015 70);
+  --ring: oklch(0.62 0.18 35 / 30%);  /* Subtle primary at 30% opacity */
+
+  /* Status colors */
+  --success: oklch(0.65 0.18 155);
+  --success-foreground: oklch(0.25 0.08 155);
+  --warning: oklch(0.75 0.18 85);
+  --warning-foreground: oklch(0.30 0.08 85);
+  --info: oklch(0.65 0.15 240);
+  --info-foreground: oklch(0.25 0.08 240);
+
+  /* Canvas-specific (light) */
+  --canvas-bg: oklch(0.97 0.005 70);
+  --canvas-grid: oklch(0.90 0.01 70);
+  --selection: oklch(0.62 0.18 35 / 20%);
+  --selection-border: oklch(0.62 0.18 35);
+}
+
+/* Dark mode - support VS Code webview and standalone */
+body.vscode-dark,
+body.vscode-high-contrast,
+html.dark,
+:root.dark {
+  /* Brand palette - adjusted for dark */
+  --brand-oat: oklch(0.35 0.015 60);
+  --brand-clay: oklch(0.55 0.08 55);
+  --brand-sand: oklch(0.40 0.02 60);
+  --brand-coral: #E07A6B;
+  --brand-brown: oklch(0.65 0.06 55);
+  --brand-heather: oklch(0.60 0.08 300);
+  --brand-olive: oklch(0.58 0.06 130);
+  --brand-fig: oklch(0.50 0.10 310);
+
+  /* Shadcn semantic (dark) */
+  --background: oklch(0.16 0.012 60);
+  --foreground: oklch(0.93 0.01 75);
+  --card: oklch(0.20 0.015 58);
+  --card-foreground: oklch(0.93 0.01 75);
+  --popover: oklch(0.22 0.015 58);
+  --popover-foreground: oklch(0.93 0.01 75);
+  --primary: oklch(0.68 0.19 40);
+  --primary-foreground: oklch(0.15 0.01 60);
+  --secondary: oklch(0.28 0.02 58);
+  --secondary-foreground: oklch(0.90 0.01 75);
+  --muted: oklch(0.25 0.015 58);
+  --muted-foreground: oklch(0.65 0.03 60);
+  --accent: oklch(0.30 0.02 55);
+  --accent-foreground: oklch(0.93 0.01 75);
+  --destructive: oklch(0.65 0.20 25);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.68 0.19 40 / 30%);  /* Subtle primary at 30% opacity */
+
+  /* Status colors (dark) */
+  --success: oklch(0.70 0.18 155);
+  --success-foreground: oklch(0.90 0.04 155);
+  --warning: oklch(0.80 0.18 85);
+  --warning-foreground: oklch(0.95 0.04 85);
+  --info: oklch(0.70 0.15 240);
+  --info-foreground: oklch(0.95 0.04 240);
+
+  /* Canvas-specific (dark) */
+  --canvas-bg: oklch(0.14 0.01 60);
+  --canvas-grid: oklch(0.22 0.012 58);
+  --selection: oklch(0.68 0.19 40 / 25%);
+  --selection-border: oklch(0.68 0.19 40);
+}
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* ReactFlow overrides with brand colors */
+.react-flow__background {
+  background-color: var(--canvas-bg) !important;
+}
+
+.react-flow__background pattern line {
+  stroke: var(--canvas-grid) !important;
+}
+
+.react-flow__selection {
+  background: var(--selection) !important;
+  border: 1px solid var(--selection-border) !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--primary) !important;
+}
+
+/* Handle styling using brand colors */
+.react-flow__handle {
+  /* Brown - visible but not popping */
+  background: #8B7355 !important;
+  /* Dark Brown border */
+  border: 2px solid #5C4F3D !important;
+}
+
+.react-flow__handle:hover {
+  /* Clay color on hover - slightly lighter */
+  background: #C4A98B !important;
+  border-color: #8B7355 !important;
+}
+
+.react-flow__handle.connectingfrom,
+.react-flow__handle.connectingto {
+  /* Headline color when connecting - darker */
+  background: #3D3630 !important;
+}
+
+.react-flow__minimap {
+  background-color: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+}
+
+.react-flow__controls {
+  background-color: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  overflow: hidden !important;
+}
+
+.react-flow__controls-button {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: var(--accent) !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--muted-foreground) 40%, transparent);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--muted-foreground) 60%, transparent);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 40%, transparent) transparent;
 }

@@ -22,6 +22,9 @@ export type ActivityTab = 'file' | 'files' | 'source' | 'browser';
 // Bottom panel tabs
 export type BottomPanelTab = 'terminal' | 'problems';
 
+// Header tabs (main app view)
+export type HeaderTab = 'agent' | 'editor' | 'canvas';
+
 interface UIState {
   // Container dimensions (from VS Code editor layout)
   containerWidth: number | null;
@@ -53,6 +56,8 @@ interface UIState {
   terminalPosition: TerminalPosition;
   // Activity Panel Tab
   activityTab: ActivityTab;
+  // Header Tab (main app view)
+  activeTab: HeaderTab;
   // Dialogs
   goToLineDialogOpen: boolean;
   settingsDialogOpen: boolean;
@@ -84,6 +89,8 @@ interface UIActions {
   // Activity panel actions
   setActivityTab: (tab: ActivityTab) => void;
   openBrowserTab: () => void;
+  // Header tab actions
+  setActiveTab: (tab: HeaderTab) => void;
   // Bottom panel actions
   setBottomPanelTab: (tab: BottomPanelTab) => void;
   openProblemsPanel: () => void;
@@ -144,6 +151,7 @@ export const useUIStore = create<UIStore>()(
     bottomPanelTab: 'terminal' as BottomPanelTab,
     terminalPosition: 'activity' as TerminalPosition,
     activityTab: 'files' as ActivityTab,
+    activeTab: 'agent' as HeaderTab,
     goToLineDialogOpen: false,
     settingsDialogOpen: false,
     settingsDialogSection: 'agent' as const,
@@ -312,6 +320,12 @@ export const useUIStore = create<UIStore>()(
       });
     },
 
+    setActiveTab: (tab: HeaderTab): void => {
+      set((state) => {
+        state.activeTab = tab;
+      });
+    },
+
     setBottomPanelTab: (tab: BottomPanelTab): void => {
       set((state) => {
         state.bottomPanelTab = tab;
@@ -415,4 +429,8 @@ export const useActivityTab = (): ActivityTab => {
 
 export const useBottomPanelTab = (): BottomPanelTab => {
   return useUIStore((state) => state.bottomPanelTab);
+};
+
+export const useActiveTab = (): HeaderTab => {
+  return useUIStore((state) => state.activeTab);
 };

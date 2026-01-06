@@ -18,10 +18,10 @@ env:
 
 jobs:
   # ============================================
-  # Frontend - TypeScript/React
+  # Frontend - Agent (TypeScript/React)
   # ============================================
   typecheck:
-    name: TypeScript
+    name: TypeScript (Agent)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -36,7 +36,7 @@ jobs:
       - run: pnpm typecheck
 
   lint:
-    name: ESLint
+    name: ESLint (Agent)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -51,7 +51,7 @@ jobs:
       - run: pnpm lint
 
   test:
-    name: Test
+    name: Test (Agent)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -66,7 +66,7 @@ jobs:
       - run: pnpm test --if-present
 
   build:
-    name: Build
+    name: Build (Agent)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -87,8 +87,85 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v6
         with:
-          name: dist-${{ github.sha }}
+          name: dist-agent-${{ github.sha }}
           path: dist/
+          retention-days: 3
+
+  # ============================================
+  # Frontend - Canvas (TypeScript/React + Bun)
+  # ============================================
+  canvas-typecheck:
+    name: TypeScript (Canvas)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: bun run canvas:typecheck
+
+  canvas-lint:
+    name: ESLint (Canvas)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: bun run canvas:lint
+
+  canvas-test:
+    name: Test (Canvas)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: bun run canvas:test
+
+  canvas-build:
+    name: Build (Canvas)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: bun run canvas:build
+
+      # Only upload artifacts on main branch to save storage
+      - name: Upload build
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: dist-canvas-${{ github.sha }}
+          path: dist/canvas/
           retention-days: 3
 
   # ============================================
@@ -244,6 +321,10 @@ jobs:
         lint,
         test,
         build,
+        canvas-typecheck,
+        canvas-lint,
+        canvas-test,
+        canvas-build,
         rust-fmt,
         rust-clippy,
         rust-test,
@@ -256,16 +337,19 @@ jobs:
     steps:
       - name: Check results
         run: |
-          # Frontend checks
-          frontend="${{ needs.typecheck.result }} ${{ needs.lint.result }} ${{ needs.build.result }}"
+          # Agent frontend checks
+          agent="${{ needs.typecheck.result }} ${{ needs.lint.result }} ${{ needs.build.result }}"
+          # Canvas frontend checks
+          canvas="${{ needs.canvas-typecheck.result }} ${{ needs.canvas-lint.result }} ${{ needs.canvas-build.result }}"
           # Rust checks (required)
           rust="${{ needs.rust-fmt.result }} ${{ needs.rust-clippy.result }} ${{ needs.rust-test.result }}"
           rust+=" ${{ needs.rust-deny.result }} ${{ needs.rust-doc.result }} ${{ needs.rust-msrv.result }}"
           # Optional checks
-          test_result="${{ needs.test.result }}"
+          agent_test_result="${{ needs.test.result }}"
+          canvas_test_result="${{ needs.canvas-test.result }}"
           machete_result="${{ needs.rust-machete.result }}"
 
-          for result in $frontend $rust; do
+          for result in $agent $canvas $rust; do
             if [[ "$result" != "success" ]]; then
               echo "❌ CI failed"
               exit 1
@@ -273,8 +357,13 @@ jobs:
           done
 
           # Allow skipped tests (if no test script)
-          if [[ "$test_result" != "success" && "$test_result" != "skipped" ]]; then
-            echo "❌ Tests failed"
+          if [[ "$agent_test_result" != "success" && "$agent_test_result" != "skipped" ]]; then
+            echo "❌ Agent tests failed"
+            exit 1
+          fi
+
+          if [[ "$canvas_test_result" != "success" && "$canvas_test_result" != "skipped" ]]; then
+            echo "❌ Canvas tests failed"
             exit 1
           fi
 

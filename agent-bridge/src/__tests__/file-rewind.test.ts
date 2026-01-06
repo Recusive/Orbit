@@ -138,7 +138,9 @@ describe('File Rewind (SDK rewindFiles)', () => {
 
     try {
       // Queue first message
-      agent.queueMessage(prompts[promptIndex]);
+      const firstPrompt = prompts[promptIndex];
+      if (!firstPrompt) throw new Error('First prompt not found');
+      agent.queueMessage(firstPrompt);
       promptIndex++;
 
       // Collect responses in a single loop
@@ -170,7 +172,9 @@ describe('File Rewind (SDK rewindFiles)', () => {
         if (sdkMessage.type === 'result') {
           if (promptIndex < prompts.length) {
             log('[TEST] Queuing next message:', promptIndex);
-            agent.queueMessage(prompts[promptIndex]);
+            const nextPrompt = prompts[promptIndex];
+            if (!nextPrompt) throw new Error('Next prompt not found');
+            agent.queueMessage(nextPrompt);
             promptIndex++;
             capturedCheckpointForCurrentPrompt = false; // Reset for next prompt
           } else {
@@ -258,8 +262,10 @@ describe('File Rewind (SDK rewindFiles)', () => {
 
       // Rewind to checkpoint 2 (before "overwrite v2" was processed)
       // This restores the file to "v1"
-      await agent.rewindFiles(checkpoints[1]);
-      log('[TEST] Rewound to checkpoint:', checkpoints[1]);
+      const checkpoint1a = checkpoints[1];
+      if (!checkpoint1a) throw new Error('Checkpoint not found');
+      await agent.rewindFiles(checkpoint1a);
+      log('[TEST] Rewound to checkpoint:', checkpoint1a);
 
       expect(readFileSync(testFile, 'utf-8').trim()).toBe('v1');
       log('[TEST] File after rewind:', readFileSync(testFile, 'utf-8'));
@@ -293,8 +299,10 @@ describe('File Rewind (SDK rewindFiles)', () => {
 
       // Rewind to checkpoint 2 (before "delete" was processed)
       // File should be restored to its pre-delete state
-      await agent.rewindFiles(checkpoints[1]);
-      log('[TEST] Rewound to checkpoint:', checkpoints[1]);
+      const checkpoint1b = checkpoints[1];
+      if (!checkpoint1b) throw new Error('Checkpoint not found');
+      await agent.rewindFiles(checkpoint1b);
+      log('[TEST] Rewound to checkpoint:', checkpoint1b);
 
       expect(existsSync(testFile)).toBe(true);
       expect(readFileSync(testFile, 'utf-8').trim()).toBe('original');
@@ -327,7 +335,9 @@ describe('File Rewind (SDK rewindFiles)', () => {
       expect(readFileSync(fileB, 'utf-8').trim()).toBe('b2');
 
       // Rewind to checkpoint 2 (before modify) - files should have a1/b1
-      await agent.rewindFiles(checkpoints[1]);
+      const checkpoint1c = checkpoints[1];
+      if (!checkpoint1c) throw new Error('Checkpoint not found');
+      await agent.rewindFiles(checkpoint1c);
 
       expect(readFileSync(fileA, 'utf-8').trim()).toBe('a1');
       expect(readFileSync(fileB, 'utf-8').trim()).toBe('b1');
@@ -359,7 +369,9 @@ describe('File Rewind (SDK rewindFiles)', () => {
       expect(readFileSync(testFile, 'utf-8').trim()).toBe('v3');
 
       // Rewind to checkpoint 2 (before v2 was written, so file has v1)
-      await agent.rewindFiles(checkpoints[1]);
+      const checkpoint1d = checkpoints[1];
+      if (!checkpoint1d) throw new Error('Checkpoint not found');
+      await agent.rewindFiles(checkpoint1d);
 
       expect(readFileSync(testFile, 'utf-8').trim()).toBe('v1');
     },

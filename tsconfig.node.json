@@ -8,5 +8,5 @@
     "strict": true,
     "noEmit": false
   },
-  "include": ["vite.config.ts", "eslint.config.ts"]
+  "include": ["vite.config.ts", "vite.config.canvas.ts", "eslint.config.ts"]
 }

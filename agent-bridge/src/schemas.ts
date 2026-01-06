@@ -419,6 +419,88 @@ export const ShutdownRequestSchema = z
   .strict();
 export type ShutdownRequest = z.infer<typeof ShutdownRequestSchema>;
 
+// ============================================================================
+// Canvas Schemas
+// ============================================================================
+
+export const CanvasSessionConfigSchema = z
+  .object({
+    sessionId: z.string().optional(),
+    cwd: z.string().optional(),
+    model: z.string().optional(),
+    thinkingEnabled: z.boolean().optional(),
+  })
+  .strict();
+export type CanvasSessionConfig = z.infer<typeof CanvasSessionConfigSchema>;
+
+export const CanvasStateSchema = z
+  .object({
+    nodes: z.array(z.any()),
+    edges: z.array(z.any()),
+    selectedNodeId: z.string().nullable().optional(),
+    selectedNodeType: z.enum(['sandpack', 'page']).optional(),
+  })
+  .strict();
+export type CanvasState = z.infer<typeof CanvasStateSchema>;
+
+export const McpToolResponseSchema = z
+  .object({
+    requestId: z.string(),
+    success: z.boolean(),
+    result: z.unknown().optional(),
+    error: z.string().optional(),
+  })
+  .strict();
+export type McpToolResponse = z.infer<typeof McpToolResponseSchema>;
+
+// ============================================================================
+// Canvas Request Schemas
+// ============================================================================
+
+export const CanvasCreateSessionRequestSchema = z
+  .object({
+    type: z.literal('canvas:create_session'),
+    sessionId: z.string(),
+    config: CanvasSessionConfigSchema.optional(),
+  })
+  .strict();
+export type CanvasCreateSessionRequest = z.infer<typeof CanvasCreateSessionRequestSchema>;
+
+export const CanvasDeleteSessionRequestSchema = z
+  .object({
+    type: z.literal('canvas:delete_session'),
+    sessionId: z.string(),
+  })
+  .strict();
+export type CanvasDeleteSessionRequest = z.infer<typeof CanvasDeleteSessionRequestSchema>;
+
+export const CanvasSendMessageRequestSchema = z
+  .object({
+    type: z.literal('canvas:send_message'),
+    sessionId: z.string(),
+    message: z.string(),
+    state: CanvasStateSchema,
+  })
+  .strict();
+export type CanvasSendMessageRequest = z.infer<typeof CanvasSendMessageRequestSchema>;
+
+export const CanvasInterruptRequestSchema = z
+  .object({
+    type: z.literal('canvas:interrupt'),
+    sessionId: z.string(),
+  })
+  .strict();
+export type CanvasInterruptRequest = z.infer<typeof CanvasInterruptRequestSchema>;
+
+export const CanvasToolResponseRequestSchema = z
+  .object({
+    type: z.literal('canvas:tool_response'),
+    sessionId: z.string(),
+    response: McpToolResponseSchema,
+  })
+  .strict();
+export type CanvasToolResponseRequest = z.infer<typeof CanvasToolResponseRequestSchema>;
+
 // Combined discriminated union for all requests
 export const BridgeRequestSchema = z.discriminatedUnion('type', [
   CreateSessionRequestSchema,
@@ -452,6 +534,11 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   GenerateAgentDefinitionRequestSchema,
   GenerateCommandDefinitionRequestSchema,
   ShutdownRequestSchema,
+  CanvasCreateSessionRequestSchema,
+  CanvasDeleteSessionRequestSchema,
+  CanvasSendMessageRequestSchema,
+  CanvasInterruptRequestSchema,
+  CanvasToolResponseRequestSchema,
 ]);
 export type BridgeRequest = z.infer<typeof BridgeRequestSchema>;
 

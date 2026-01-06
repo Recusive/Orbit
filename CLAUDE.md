@@ -456,3 +456,205 @@ Common symptoms:
 | Combined Rewind Flow        | `apps/agent/src/hooks/use-tauri.ts:conversation:rewind handler` | `agent-bridge/src/__tests__/combined-rewind.test.ts`     |
 
 **When adding new tests:** Always add the ⚠️ TESTED comment to the source function/handler being tested.
+
+### Mandatory Test Requirements
+
+**CRITICAL:** Tests are not optional. We follow **real integration testing**, not unit testing with mocks.
+
+#### Testing Philosophy
+
+1. **NO MOCK DATA** - Tests must use real systems, real API calls, real data flows
+2. **NO FAKE PASSES** - A test that just "passes" without exercising real code paths is worthless
+3. **FULL INTEGRATION** - Test the entire system flow, not isolated files
+4. **INDUSTRY STANDARD** - Follow proper integration testing practices used in production systems
+
+#### What We Test
+
+| ❌ DO NOT                        | ✅ DO                                    |
+| -------------------------------- | ---------------------------------------- |
+| Mock the Claude SDK              | Use REAL Claude API calls                |
+| Test single files in isolation   | Test full module integration             |
+| Use fake data that always passes | Use real data through real pipelines     |
+| Skip API calls to "save time"    | Make actual API calls to verify behavior |
+| Test only the happy path         | Test error paths, edge cases, cleanup    |
+
+#### Test Structure
+
+```
+agent-bridge/src/__tests__/
+├── canvas-e2e.test.ts       # Full Canvas integration (REAL SDK, REAL sessions)
+├── canvas-types.test.ts     # Type/schema validation
+└── [feature]-e2e.test.ts    # Each feature gets E2E tests
+```
+
+#### When Adding/Modifying Code
+
+1. **When creating a new file:**
+   - Add tests to the relevant E2E test file (e.g., `canvas-e2e.test.ts`)
+   - Tests must exercise the FULL flow through real systems
+   - Run the complete test suite to verify integration
+   - Add the ⚠️ TESTED comment to the source file
+
+2. **When modifying a file that has existing tests:**
+   - Find the E2E test file for that module
+   - **ADD NEW TESTS** that cover your new functionality
+   - Tests must verify the new code integrates with existing systems
+   - Do NOT just run existing tests - that defeats the purpose
+   - Run the FULL test suite to verify nothing broke
+
+3. **When modifying a file without existing tests:**
+   - Create E2E tests if the module doesn't have them
+   - Tests must cover the full integration path
+
+#### Real Integration Test Example
+
+```typescript
+// ❌ BAD: Mock test that proves nothing
+it('should analyze intent', () => {
+  const mockAnalyzer = { analyze: () => ({ useFastPath: true }) };
+  expect(mockAnalyzer.analyze('test').useFastPath).toBe(true);
+});
+
+// ✅ GOOD: Real integration test
+it('should route simple requests to fast path via real session', async () => {
+  // Create REAL session with REAL Claude SDK
+  const manager = new CanvasSessionManager();
+  await manager.createSession('test-session', {
+    model: 'claude-sonnet-4-20250514',
+  });
+
+  // Verify REAL IntentAnalyzer is initialized
+  const intentAnalyzer = manager['intentAnalyzer'];
+  expect(intentAnalyzer).toBeDefined();
+
+  // Test REAL analysis with REAL routing logic
+  const state: CanvasState = { nodes: [], edges: [] };
+  const snapshot = manager['convertToSnapshot'](state);
+  const analysis = intentAnalyzer.analyze('Create a button', snapshot);
+
+  // Verify REAL routing decision
+  expect(analysis.useFastPath).toBe(true);
+  expect(analysis.fastPathAgent).toBe('component');
+
+  // Cleanup REAL session
+  await manager.deleteSession('test-session');
+});
+```
+
+#### Test Checklist Before PR
+
+- [ ] Added tests for ALL new functionality
+- [ ] Tests use REAL systems (no mocks for core functionality)
+- [ ] Tests verify FULL integration flow
+- [ ] Tests cover error cases and cleanup
+- [ ] Ran complete test suite: `cd agent-bridge && bun test`
+- [ ] All tests pass with real API calls
+
+#### Why This Matters
+
+```
+❌ WRONG: "Tests pass" with mocked data
+   → Deploys to production
+   → Real system fails because mock didn't match reality
+   → Hours of debugging
+
+✅ RIGHT: Tests pass with real integration
+   → Actual API calls verified working
+   → Full data flow tested
+   → Confidence that production will work
+```
+
+**Example - Adding orchestrator to session manager:**
+
+```
+❌ WRONG:
+   - Mocked IntentAnalyzer to return fake results
+   - Mocked Orchestrator to skip real execution
+   - Tests pass but nothing actually works
+
+✅ RIGHT:
+   - Created REAL sessions with REAL Claude SDK
+   - Tested REAL IntentAnalyzer routing decisions
+   - Verified REAL orchestrator lifecycle (create, cleanup)
+   - Tested REAL snapshot conversion with actual canvas state
+   - All 44 tests pass with REAL integration
+```
+
+### Tauri WebView Blur/Rendering Issues
+
+**IMPORTANT:** Tauri's WebView (WKWebView on macOS) has different rendering behavior than Chrome/Electron. Certain CSS properties cause blurry/fuzzy text and elements during interactions (hover, click, transitions).
+
+#### CSS Properties That Cause Blur in Tauri WebView
+
+The following CSS properties trigger GPU compositing issues that result in momentary or persistent blur:
+
+| Property                                       | Effect                                             | Solution                                                  |
+| ---------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------- |
+| `backdrop-filter: blur()`                      | Causes blur on the element and surrounding content | Remove entirely or use solid backgrounds                  |
+| `color-mix()` CSS function                     | Triggers repaints that cause momentary blur        | Replace with solid CSS variables or `rgba()`              |
+| `transition` on hover/click                    | GPU compositing during transition causes blur      | Remove transitions or use only on non-critical elements   |
+| `animation` with `scale()`                     | Scale transforms cause blur during animation       | Remove scale animations or use opacity-only               |
+| `opacity` transitions combined with transforms | Compound effect causes severe blur                 | Avoid combining opacity transitions with other transforms |
+
+#### Example: Fixing Blurry Nodes in ReactFlow
+
+**Problem:** Workflow nodes in Canvas app appeared blurry in Tauri but crisp in browser.
+
+**Root Cause:** The `MarkdownCardNode.css` had these problematic styles:
+
+```css
+/* BAD - causes blur in Tauri WebView */
+.card-action-toolbar {
+  background: color-mix(in oklch, var(--card) 95%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.card-action-toolbar__button:hover {
+  background: color-mix(in oklch, var(--muted) 60%, transparent);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.markdown-card-node {
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+```
+
+**Solution:** Replace with solid values and remove transitions:
+
+```css
+/* GOOD - crisp rendering in Tauri WebView */
+.card-action-toolbar {
+  background: var(--card);
+  /* No backdrop-filter */
+}
+
+.card-action-toolbar__button:hover {
+  background: var(--muted);
+  /* No transition */
+}
+
+.markdown-card-node {
+  /* No transition */
+}
+```
+
+#### Quick Checklist for Tauri-Compatible CSS
+
+- [ ] No `backdrop-filter: blur()` on interactive elements
+- [ ] No `color-mix()` function - use CSS variables or `rgba()` instead
+- [ ] No `transition` on elements inside ReactFlow's transformed viewport
+- [ ] No `animation` on elements inside ReactFlow's transformed viewport
+- [ ] Avoid combining `opacity` transitions with other transforms
+- [ ] Test in Tauri app, not just browser (blur won't appear in browser)
+
+**Note:** `contain: layout style paint` and `will-change: transform` do NOT fix the blur issue. The only solution for elements inside ReactFlow's viewport is to completely remove transitions and animations.
+
+#### Debugging Blur Issues
+
+1. **Identify the blurry element** - Check if it's specific to certain components
+2. **Compare with working components** - Find similar components that render crisp
+3. **Check CSS differences** - Look for `backdrop-filter`, `color-mix()`, `transition`, `animation`
+4. **Remove one property at a time** - Isolate which property causes the blur
+5. **Replace with solid alternatives** - Use CSS variables and remove transitions

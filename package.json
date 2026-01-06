@@ -35,10 +35,28 @@
     "clean": "rm -rf dist node_modules/.vite target/debug target/release",
     "clean:rust": "cargo clean",
     "ci": "pnpm typecheck && pnpm lint && pnpm rust:fmt && pnpm rust:lint && pnpm rust:test",
-    "prepare": "husky"
+    "prepare": "husky",
+    "canvas:dev": "vite --config vite.config.canvas.ts",
+    "canvas:build": "tsc -p tsconfig.canvas.json --noEmit && vite build --config vite.config.canvas.ts",
+    "canvas:build:skip-lint": "vite build --config vite.config.canvas.ts",
+    "canvas:preview": "vite preview --config vite.config.canvas.ts",
+    "canvas:typecheck": "tsc -p tsconfig.canvas.json --noEmit",
+    "canvas:lint": "eslint apps/canvas/src --max-warnings=0",
+    "canvas:lint:fix": "eslint apps/canvas/src --fix",
+    "canvas:check": "pnpm canvas:typecheck && pnpm canvas:lint",
+    "canvas:test": "bun test apps/canvas",
+    "canvas:test:watch": "bun test apps/canvas --watch"
   },
   "dependencies": {
+    "@babel/generator": "^7.28.5",
+    "@babel/parser": "^7.28.5",
+    "@babel/traverse": "^7.28.5",
+    "@babel/types": "^7.28.5",
+    "@central-icons-react/all": "^1.1.83",
     "@central-icons-react/round-outlined-radius-1-stroke-2": "^1.1.83",
+    "@codesandbox/sandpack-client": "^2.19.8",
+    "@codesandbox/sandpack-react": "^2.20.0",
+    "@xyflow/react": "^12.10.0",
     "@codemirror/autocomplete": "^6.18.0",
     "@codemirror/commands": "^6.6.0",
     "@codemirror/lang-css": "^6.3.0",
@@ -91,12 +109,14 @@
     "immer": "^11.1.3",
     "lexical": "^0.39.0",
     "lucide-react": "^0.562.0",
+    "mermaid": "^11.12.2",
     "next-themes": "^0.4.6",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-icons": "^5.5.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.1.0",
+    "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.0",
     "shiki": "^3.20.0",
     "sonner": "^2.0.7",
@@ -110,6 +130,9 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@types/bun": "^1.3.5",
+    "@types/babel__generator": "^7.27.0",
+    "@types/babel__traverse": "^7.28.0",
     "@eslint/js": "^9.39.2",
     "@tauri-apps/cli": "^2.0.0",
     "@types/node": "^22.19.3",
@@ -129,6 +152,8 @@
     "rollup-plugin-visualizer": "^6.0.5",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.51.0",
-    "vite": "^7.3.0"
+    "vite": "^7.3.0",
+    "vitest": "^4.0.16",
+    "@vitest/ui": "^4.0.16"
   }
 }

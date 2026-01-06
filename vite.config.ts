@@ -26,6 +26,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './apps/agent/src'),
+      '@canvas': path.resolve(__dirname, './apps/canvas/src'),
     },
   },
   build: {

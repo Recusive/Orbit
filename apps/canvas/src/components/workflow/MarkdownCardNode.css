@@ -1,0 +1,526 @@
+/* MarkdownCardNode.css - Workflow node styling (matching target design) */
+
+/* Hide all resize controls */
+.react-flow__node-markdownCard .react-flow__resize-control {
+  display: none !important;
+}
+
+/* Node wrapper - modern rounded design */
+.markdown-card-node {
+  --node-border-shadow-color: var(--border);
+  --output-port-count: 1;
+
+  position: relative;
+  background: var(--card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  min-width: 200px;
+  max-width: 320px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 0 0 0 var(--node-border-shadow-color);
+}
+
+.markdown-card-node[data-selected="true"] {
+  border-color: var(--node-border-shadow-color);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 0 0 2px var(--node-border-shadow-color);
+}
+
+.markdown-card-node:hover {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.12),
+    0 0 0 0 var(--node-border-shadow-color);
+}
+
+.markdown-card-node[data-selected="true"]:hover {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.12),
+    0 0 0 2px var(--node-border-shadow-color);
+}
+
+/* Header section - compact single row */
+.markdown-card-node__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  user-select: none;
+}
+
+/* Icon container with colored background */
+.markdown-card-node__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--icon-background, var(--muted));
+  color: var(--icon-color, var(--foreground));
+  flex-shrink: 0;
+}
+
+.markdown-card-node__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Title area - simplified, single line */
+.markdown-card-node__title-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Hide type label by default - only show title */
+.markdown-card-node__type-label {
+  display: none;
+}
+
+.markdown-card-node__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.markdown-card-node__title-input {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  width: 100%;
+}
+
+/* Header actions - just chevron */
+.markdown-card-node__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.markdown-card-node__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.markdown-card-node__action-btn:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+/* Chevron rotation for expanded state */
+.markdown-card-node__action-btn[data-collapsed="false"] svg {
+  transform: rotate(90deg);
+}
+
+/* Content wrapper - CSS Grid for height collapse */
+.markdown-card-node__content-wrapper {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.markdown-card-node__content-wrapper[data-collapsed="true"] {
+  grid-template-rows: 0fr;
+}
+
+/* Content section */
+.markdown-card-node__content {
+  padding: 0 12px 12px 12px;
+  max-height: 300px;
+  overflow: hidden;
+}
+
+.markdown-card-node__content-wrapper[data-collapsed="true"] .markdown-card-node__content {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* Content rows - for displaying previews like ifElse */
+.markdown-card-node__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.markdown-card-node__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--muted);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
+}
+
+.markdown-card-node__row-label {
+  color: var(--muted-foreground);
+  font-weight: 500;
+  min-width: 60px;
+}
+
+.markdown-card-node__row-value {
+  color: var(--foreground);
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Preview row - single styled row showing content preview */
+.markdown-card-node__preview-row {
+  padding: 8px 10px;
+  background: var(--muted);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
+}
+
+/* Full content - shows all content when expanded */
+.markdown-card-node__full-content {
+  padding: 8px 10px;
+  background: var(--muted);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+/* Collapsed preview - hidden in new design */
+.markdown-card-node__preview {
+  display: none;
+}
+
+/* Markdown content styling */
+.markdown-card-node__markdown {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--foreground);
+}
+
+/* Tags wrapper - CSS Grid for collapse */
+.markdown-card-node__tags-wrapper {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.markdown-card-node__tags-wrapper[data-collapsed="true"] {
+  grid-template-rows: 0fr;
+}
+
+/* Tags section */
+.markdown-card-node__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 12px 12px;
+  overflow: hidden;
+}
+
+.markdown-card-node__tags-wrapper[data-collapsed="true"] .markdown-card-node__tags {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.markdown-card-node__tag {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+/* Locked indicator - repositioned */
+.markdown-card-node__locked {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: 2px solid var(--card);
+  color: var(--muted-foreground);
+  font-size: 10px;
+  z-index: 10;
+}
+
+.markdown-card-node__locked span {
+  display: none;
+}
+
+/* File link indicator */
+.markdown-card-node__file-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.markdown-card-node__file-link[data-conflict="true"] {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+}
+
+/* Handle styling - dots on left and right only */
+/* Using brand colors: Sand for subtle, Clay for hover/connected */
+.markdown-card-node .react-flow__handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  /* Sand color - subtle, not eye-grabbing */
+  background: #D4C5B5;
+  border: 2px solid var(--card);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+/* Hide top and bottom handles */
+.markdown-card-node .react-flow__handle[data-handlepos="top"],
+.markdown-card-node .react-flow__handle[data-handlepos="bottom"] {
+  display: none;
+}
+
+/* Show handles on card hover or when selected */
+.markdown-card-node:hover .react-flow__handle,
+.markdown-card-node[data-selected="true"] .react-flow__handle {
+  opacity: 1;
+}
+
+.markdown-card-node .react-flow__handle:hover {
+  /* Clay color on hover */
+  background: #C4A98B;
+  transform: scale(1.2);
+}
+
+.markdown-card-node .react-flow__handle[data-connected="true"] {
+  opacity: 1;
+  /* Brown when connected - slightly more visible */
+  background: #8B7355;
+}
+
+/* Position handles centered on node border (matching xyflow) */
+.markdown-card-node .react-flow__handle[data-handlepos="left"] {
+  top: 50%;
+  left: 0;
+  transform: translate(-50%, -50%);
+}
+
+.markdown-card-node .react-flow__handle[data-handlepos="left"]:hover {
+  transform: translate(-50%, -50%) scale(1.2);
+}
+
+.markdown-card-node .react-flow__handle[data-handlepos="right"] {
+  top: 50%;
+  right: 0;
+  transform: translate(50%, -50%);
+}
+
+.markdown-card-node .react-flow__handle[data-handlepos="right"]:hover {
+  transform: translate(50%, -50%) scale(1.2);
+}
+
+/* Card type color variants */
+.markdown-card-node[data-type="prompt"] {
+  --node-border-shadow-color: #9665FF;
+  --icon-background: rgba(150, 101, 255, 0.15);
+  --icon-color: #9665FF;
+}
+
+.markdown-card-node[data-type="response"] {
+  --node-border-shadow-color: #22c55e;
+  --icon-background: rgba(34, 197, 94, 0.15);
+  --icon-color: #22c55e;
+}
+
+.markdown-card-node[data-type="decision"] {
+  --node-border-shadow-color: #FFAE2B;
+  --icon-background: rgba(255, 174, 43, 0.15);
+  --icon-color: #FFAE2B;
+}
+
+.markdown-card-node[data-type="diagram"] {
+  --node-border-shadow-color: #a855f7;
+  --icon-background: rgba(168, 85, 247, 0.15);
+  --icon-color: #a855f7;
+}
+
+.markdown-card-node[data-type="code-snippet"] {
+  --node-border-shadow-color: #6b7280;
+  --icon-background: rgba(107, 114, 128, 0.15);
+  --icon-color: #6b7280;
+}
+
+.markdown-card-node[data-type="document"] {
+  --node-border-shadow-color: #14b8a6;
+  --icon-background: rgba(20, 184, 166, 0.15);
+  --icon-color: #14b8a6;
+}
+
+/* Editing state */
+.markdown-card-node__textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: 12px;
+  border: none;
+  outline: none;
+  resize: vertical;
+  background: var(--card);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.markdown-card-node__edit-hint {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+/* ============================================================================
+   Card Action Toolbar - Floating toolbar above selected nodes
+   Modern, soft UI design with premium feel
+   ============================================================================ */
+
+/* Container */
+.card-action-toolbar {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, calc(-100% - 8px));
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--card);
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.15), 0 2px 6px -2px rgba(0, 0, 0, 0.08);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Show toolbar when node is selected */
+.markdown-card-node[data-selected="true"] .card-action-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Base button style */
+.card-action-toolbar__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.card-action-toolbar__button:hover {
+  background: var(--muted);
+  transform: scale(1.02);
+}
+
+.card-action-toolbar__button:active {
+  transform: scale(0.97);
+}
+
+.card-action-toolbar__button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+/* Icon container */
+.card-action-toolbar__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+}
+
+.card-action-toolbar__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* AI button variant - accent/special styling */
+.card-action-toolbar__button--ai {
+  background: var(--accent);
+  color: var(--primary);
+}
+
+.card-action-toolbar__button--ai:hover {
+  background: var(--muted);
+  box-shadow: 0 0 10px -2px var(--primary);
+}
+
+.card-action-toolbar__button--ai .card-action-toolbar__icon {
+  width: 13px;
+  height: 13px;
+}
+
+/* Delete button variant - danger styling */
+.card-action-toolbar__button--delete {
+  color: var(--muted-foreground);
+}
+
+.card-action-toolbar__button--delete:hover {
+  background: var(--muted);
+  color: var(--destructive);
+}
+
+/* Divider */
+.card-action-toolbar__divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
