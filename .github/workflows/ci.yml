@@ -348,10 +348,10 @@ jobs:
           cache-on-failure: false
 
       # Build agent-bridge sidecar (Bun standalone binary)
+      # Note: pnpm install already resolved workspace dependencies (@snowflake/shared-schemas)
       - name: Build agent-bridge sidecar
         run: |
           cd agent-bridge
-          bun install
           bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile=../src-tauri/binaries/agent-bridge-aarch64-apple-darwin
           chmod +x ../src-tauri/binaries/agent-bridge-aarch64-apple-darwin
 
