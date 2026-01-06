@@ -1,11 +1,11 @@
 import { FileCode, GitBranch, GitCompareArrows, Globe } from 'lucide-react';
 
-import type { ActivityTab } from '@/stores/ui-store';
+import type { ActivityTab } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import { useActivityTab, useUIStore } from '@/stores/ui-store';
+import { cn } from '@/lib/utils/utils';
+import { useActivityTab, useUIStore } from '@/stores/ui/ui-store';
 
 interface ActionButtonProps {
   readonly icon: FC<{ className?: string }>;

@@ -4,7 +4,7 @@ import type { FC, KeyboardEvent } from 'react';
 
 import { Dialog, DialogContentTopCenter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { useActiveFile, useFileViewerStore } from '@/stores/file-viewer-store';
+import { useActiveFile, useFileViewerStore } from '@/stores/file/file-viewer-store';
 
 export interface GoToLineDialogProps {
   readonly open: boolean;

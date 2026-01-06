@@ -9,7 +9,7 @@
 
 import React, { useState, useCallback } from 'react';
 
-import { spacing, radii, fontSize, fontWeight, motion } from '../../../lib/designTokens';
+import { spacing, radii, fontSize, fontWeight, motion } from '../../../lib/design/designTokens';
 import { NumberInput } from '../inputs/NumberInput';
 import { AddRemoveControls } from '../shared/AddRemoveControls';
 import { CollapsibleSection } from '../shared/CollapsibleSection';

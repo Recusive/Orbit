@@ -10,18 +10,18 @@ import {
 } from 'lucide-react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 
-import type { FileStatus } from '@/lib/backend';
+import type { FileStatus } from '@/lib/api/backend';
 import type { FileNode } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { FileIcon, FolderIcon } from '@/components/files';
-import { useFileTree } from '@/hooks/use-file-tree';
-import { openFileDialog, setWorkspacePath } from '@/lib/backend';
-import { GIT_STATUS_STYLES } from '@/lib/constants';
-import { cn } from '@/lib/utils';
-import { useFileStore } from '@/stores/file-store';
-import { selectFileStatus, useGitStore } from '@/stores/git-store';
-import { useUIStore } from '@/stores/ui-store';
+import { useFileTree } from '@/hooks/file/use-file-tree';
+import { openFileDialog, setWorkspacePath } from '@/lib/api/backend';
+import { GIT_STATUS_STYLES } from '@/lib/utils/constants';
+import { cn } from '@/lib/utils/utils';
+import { useFileStore } from '@/stores/file/file-store';
+import { selectFileStatus, useGitStore } from '@/stores/git/git-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 // ═══════════════════════════════════════════════════════════════
 // Types

@@ -8,9 +8,9 @@ import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { GoToLineDialog, QuickOpen } from '@/components/modals';
-import { useDefaultKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
-import { useTauri } from '@/hooks/use-tauri';
-import { useUIStore } from '@/stores/ui-store';
+import { useTauri } from '@/hooks/agent/use-tauri';
+import { useDefaultKeyboardShortcuts } from '@/hooks/ui/use-keyboard-shortcuts';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 /**
  * RootLayout is the Agent mode content.

@@ -7,7 +7,7 @@
 
 import React from 'react';
 
-import { ConstraintPicker } from '../../ConstraintPicker';
+import { ConstraintPicker } from '../../shared/ConstraintPicker';
 import { CollapsibleSection } from '../shared/CollapsibleSection';
 
 import type { Constraints } from '../../../types/designNodeTypes';

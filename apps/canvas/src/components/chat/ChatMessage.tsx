@@ -10,7 +10,7 @@
 
 import React from 'react';
 
-import { spacing, radii, fontSize } from '../../lib/designTokens';
+import { spacing, radii, fontSize } from '../../lib/design/designTokens';
 
 export interface Message {
   id: string;

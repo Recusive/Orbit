@@ -3,7 +3,7 @@
 //! These commands allow the frontend to check for crashes from previous
 //! sessions and manage crash logs.
 
-use crate::crash;
+use crate::core::crash;
 
 /// Check if the previous session crashed.
 ///

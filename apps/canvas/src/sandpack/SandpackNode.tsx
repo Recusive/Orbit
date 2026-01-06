@@ -1,8 +1,8 @@
 import { Handle, Position } from '@xyflow/react';
 import React, { useMemo, useCallback } from 'react';
 
-import { LayerAgentToolbar } from '../components/LayerAgentToolbar';
-import { components } from '../lib/designTokens';
+import { LayerAgentToolbar } from '../components/agent/LayerAgentToolbar';
+import { components } from '../lib/design/designTokens';
 
 import type { NodeProps } from '@xyflow/react';
 import './SandpackNode.css';

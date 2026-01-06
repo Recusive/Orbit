@@ -7,9 +7,9 @@
  * - Errors
  */
 
-import { captureEvent } from '../storage';
+import { captureEvent } from '../core/storage';
 
-import type { InvokeOptions } from '../types';
+import type { InvokeOptions } from '../core/types';
 
 // ═══════════════════════════════════════════════════════════════
 // Invoke Wrapper

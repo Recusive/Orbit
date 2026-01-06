@@ -6,7 +6,7 @@
 import mermaid from 'mermaid';
 import React, { useEffect, useRef, useState, useId } from 'react';
 
-import { radii, spacing } from '../../lib/designTokens';
+import { radii, spacing } from '../../lib/design/designTokens';
 
 // ============================================================================
 // Mermaid Configuration

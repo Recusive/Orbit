@@ -1,10 +1,10 @@
 import { Plus, X } from 'lucide-react';
 
-import type { ContextItem } from '@/types/context';
+import type { ContextItem } from '@/types/agent/context';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files/file-icon';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 interface ContextChipsProps {
   readonly items: ContextItem[];

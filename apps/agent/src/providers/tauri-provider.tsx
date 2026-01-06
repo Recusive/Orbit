@@ -36,7 +36,7 @@ import {
   onTerminalOutput,
   watchPath,
   getWorkspacePath,
-} from '@/lib/backend';
+} from '@/lib/api/backend';
 import { WebviewMessageSchema } from '@/types/protocol';
 
 // ============================================================================

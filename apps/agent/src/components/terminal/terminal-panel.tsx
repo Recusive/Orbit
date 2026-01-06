@@ -17,10 +17,10 @@ import { ResizeHandle } from '@/components/layout/resize-handle';
 import { TerminalContextMenu } from '@/components/terminal/terminal-context-menu';
 import { TerminalSearchBar } from '@/components/terminal/terminal-search-bar';
 import { ContextMenuTrigger } from '@/components/ui/context-menu';
-import { useTerminalInstanceManager } from '@/hooks/use-terminal-instance-manager';
-import { HEIGHTS } from '@/lib/constants';
-import { useTerminalStore } from '@/stores/terminal-store';
-import { useUIStore, useTerminalPosition } from '@/stores/ui-store';
+import { useTerminalInstanceManager } from '@/hooks/terminal/use-terminal-instance-manager';
+import { HEIGHTS } from '@/lib/utils/constants';
+import { useTerminalStore } from '@/stores/terminal/terminal-store';
+import { useUIStore, useTerminalPosition } from '@/stores/ui/ui-store';
 
 export interface TerminalPanelProps {
   /**

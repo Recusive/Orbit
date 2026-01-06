@@ -7,9 +7,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useBackendSync } from '../../hooks/useBackendSync';
-import { fontSize, fontWeight, motion, radii } from '../../lib/designTokens';
-import { WORKFLOW_SIDEBAR } from '../../lib/workflowLayoutConstants';
+import { useBackendSync } from '../../hooks/backend/useBackendSync';
+import { fontSize, fontWeight, motion, radii } from '../../lib/design/designTokens';
+import { WORKFLOW_SIDEBAR } from '../../lib/layout/workflowLayoutConstants';
 import {
   useWorkflowStore,
   selectCards,

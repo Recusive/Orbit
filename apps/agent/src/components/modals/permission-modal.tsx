@@ -1,7 +1,7 @@
 import { File, Loader2, Terminal } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
 
-import type { PermissionRequest } from '@/stores/tool-store';
+import type { PermissionRequest } from '@/stores/agent/tool-store';
 import type { FC } from 'react';
 
 interface PermissionModalProps {

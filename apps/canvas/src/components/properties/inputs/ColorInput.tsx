@@ -10,7 +10,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 
-import { spacing, radii, fontSize, fontWeight, motion } from '../../../lib/designTokens';
+import { spacing, radii, fontSize, fontWeight, motion } from '../../../lib/design/designTokens';
 
 export interface ColorInputProps {
   /** Hex color value (e.g., "#FF0000") */

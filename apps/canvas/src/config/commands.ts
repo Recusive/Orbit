@@ -2,7 +2,7 @@
  * Command palette commands configuration
  * Factory functions to create commands with action handlers
  */
-import type { Command } from '../components/CommandPalette';
+import type { Command } from '../components/menus/CommandPalette';
 import type { Node } from '@xyflow/react';
 
 // Detect Mac for keyboard shortcuts

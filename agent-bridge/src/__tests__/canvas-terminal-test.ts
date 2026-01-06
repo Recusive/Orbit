@@ -9,10 +9,10 @@
  * For structured tests, use: bun test src/__tests__/canvas-mcp-server.test.ts
  */
 
-import { createCanvasMcpServer, getCanvasToolNames } from '../canvas/canvas-mcp-server.js';
-import { CanvasToolBridge } from '../canvas/canvas-tool-bridge.js';
-import { CreateComponentResultSchema, getJsonSchema } from '../canvas/schemas.js';
-import { createLogger } from '../logger.js';
+import { createCanvasMcpServer, getCanvasToolNames } from '../canvas/mcp/canvas-mcp-server.js';
+import { CanvasToolBridge } from '../canvas/mcp/canvas-tool-bridge.js';
+import { CreateComponentResultSchema, getJsonSchema } from '../canvas/types/schemas.js';
+import { createLogger } from '../common/logging/logger.js';
 
 // Type for accessing private McpServer internals (for testing only)
 interface McpServerInternal {

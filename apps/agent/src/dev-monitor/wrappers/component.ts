@@ -7,9 +7,9 @@
 
 import { useEffect, useRef } from 'react';
 
-import { captureEvent } from '../storage';
+import { captureEvent } from '../core/storage';
 
-import type { ComponentOptions } from '../types';
+import type { ComponentOptions } from '../core/types';
 import type { FC } from 'react';
 
 // ═══════════════════════════════════════════════════════════════

@@ -12,8 +12,8 @@ import { EventEmitter } from 'node:events';
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
-import { ClaudeCredentials } from '../../../credentials.js';
-import { createLogger } from '../../../logger.js';
+import { ClaudeCredentials } from '../../../common/auth/credentials.js';
+import { createLogger } from '../../../common/logging/logger.js';
 
 import type { AgentType, BlackboardSlice, CanvasChange, Task, TaskOutput } from '../types.js';
 import type {

@@ -352,6 +352,25 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  apps/common:
+    dependencies:
+      '@tauri-apps/api':
+        specifier: ^2.0.0
+        version: 2.9.1
+      react:
+        specifier: ^19.1.0
+        version: 19.2.3
+      zod:
+        specifier: ^4.2.1
+        version: 4.2.1
+    devDependencies:
+      '@types/react':
+        specifier: ^19.1.8
+        version: 19.2.7
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/shared-schemas:
     dependencies:
       zod:

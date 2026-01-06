@@ -8,18 +8,18 @@
 import { Plus, X, Maximize2 } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 
-import type { Diagnostic } from '@/lib/backend';
+import type { Diagnostic } from '@/lib/api/backend';
 import type { FC } from 'react';
 
 import { DiagnosticsPanel } from '@/components/panels';
 import { Button } from '@/components/ui/button';
-import { useDiagnostics } from '@/hooks/use-diagnostics';
-import { useTerminalInstanceManager } from '@/hooks/use-terminal-instance-manager';
-import { readFile } from '@/lib/backend';
-import { HEIGHTS } from '@/lib/constants';
-import { useFileViewerStore } from '@/stores/file-viewer-store';
-import { useTerminalStore } from '@/stores/terminal-store';
-import { useBottomPanelTab, useUIStore } from '@/stores/ui-store';
+import { useDiagnostics } from '@/hooks/lsp/use-diagnostics';
+import { useTerminalInstanceManager } from '@/hooks/terminal/use-terminal-instance-manager';
+import { readFile } from '@/lib/api/backend';
+import { HEIGHTS } from '@/lib/utils/constants';
+import { useFileViewerStore } from '@/stores/file/file-viewer-store';
+import { useTerminalStore } from '@/stores/terminal/terminal-store';
+import { useBottomPanelTab, useUIStore } from '@/stores/ui/ui-store';
 
 interface BottomPanelProps {
   readonly height: number;

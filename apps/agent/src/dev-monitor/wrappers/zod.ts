@@ -5,9 +5,9 @@
  * what failed validation and why.
  */
 
-import { captureEvent } from '../storage';
+import { captureEvent } from '../core/storage';
 
-import type { SafeParseResult } from '../types';
+import type { SafeParseResult } from '../core/types';
 
 // ═══════════════════════════════════════════════════════════════
 // Zod Wrapper

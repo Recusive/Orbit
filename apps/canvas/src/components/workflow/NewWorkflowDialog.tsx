@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { fontWeight, radii, shadows, spacing } from '../../lib/designTokens';
+import { fontWeight, radii, shadows, spacing } from '../../lib/design/designTokens';
 
 // ============================================================================
 // Icons

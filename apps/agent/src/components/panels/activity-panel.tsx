@@ -3,23 +3,23 @@ import { lazy, Suspense, useCallback, useEffect, useRef } from 'react';
 
 import type { BrowserPanelProps } from '@/components/browser/browser-panel';
 import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
-import type { FileChange } from '@/stores/file-store';
-import type { ViewedFile } from '@/stores/file-viewer-store';
+import type { FileChange } from '@/stores/file/file-store';
+import type { ViewedFile } from '@/stores/file/file-viewer-store';
 import type { FC } from 'react';
 
 import { FileIcon, FileViewer } from '@/components/files';
 import { FilesChangedList, SourceControlTab } from '@/components/git';
-import { useTauri } from '@/hooks/use-tauri';
-import { lspDidClose, lspDidOpen } from '@/lib/backend';
-import { cn } from '@/lib/utils';
-import { useBrowserIsActive } from '@/stores/browser-store';
+import { useTauri } from '@/hooks/agent/use-tauri';
+import { lspDidClose, lspDidOpen } from '@/lib/api/backend';
+import { cn } from '@/lib/utils/utils';
+import { useBrowserIsActive } from '@/stores/browser/browser-store';
 import {
   useFileViewerStore,
   useHasOpenFiles,
   useOpenTabs,
   getLanguageFromPath,
-} from '@/stores/file-viewer-store';
-import { useUIStore, useTerminalPosition, useActivityTab } from '@/stores/ui-store';
+} from '@/stores/file/file-viewer-store';
+import { useUIStore, useTerminalPosition, useActivityTab } from '@/stores/ui/ui-store';
 import { generateUUID } from '@/types/protocol';
 
 // Lazy load heavy components

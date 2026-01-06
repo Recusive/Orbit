@@ -13,25 +13,30 @@ import {
 } from '@xyflow/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { AgentChatPanel } from './components/AgentChatPanel';
-import { CanvasFloatingToolbar } from './components/CanvasFloatingToolbar';
-import { CanvasToolbar } from './components/CanvasToolbar';
-import { CommandPalette } from './components/CommandPalette';
-import { ComponentMenu } from './components/ComponentMenu';
-import { ContextMenu } from './components/ContextMenu';
-import { DesignCanvasNode } from './components/DesignCanvasNode';
-import { DesignLeftSidebar } from './components/DesignLeftSidebar';
-import { DrawingPreview } from './components/DrawingPreview';
-import { DrawingToolsPanel } from './components/DrawingToolsPanel';
-import { InlineTextEditor } from './components/InlineTextEditor';
-import { RightSidebar } from './components/RightSidebar';
-import { ShortcutsHelp } from './components/ShortcutsHelp';
-import { SmartGuidesOverlay } from './components/SmartGuidesOverlay';
+import { AgentChatPanel } from './components/agent/AgentChatPanel';
+import { CanvasFloatingToolbar } from './components/canvas/CanvasFloatingToolbar';
+import { CanvasToolbar } from './components/canvas/CanvasToolbar';
+import { DesignCanvasNode } from './components/design/DesignCanvasNode';
+import { DesignLeftSidebar } from './components/design/DesignLeftSidebar';
+import { DrawingPreview } from './components/drawing/DrawingPreview';
+import { DrawingToolsPanel } from './components/drawing/DrawingToolsPanel';
+import { CommandPalette } from './components/menus/CommandPalette';
+import { ComponentMenu } from './components/menus/ComponentMenu';
+import { ContextMenu } from './components/menus/ContextMenu';
+import { SmartGuidesOverlay } from './components/overlays/SmartGuidesOverlay';
+import { InlineTextEditor } from './components/shared/InlineTextEditor';
+import { RightSidebar } from './components/shared/RightSidebar';
+import { ShortcutsHelp } from './components/shared/ShortcutsHelp';
 import { WorkflowCanvas } from './components/workflow/WorkflowCanvas';
 import { WorkflowRightSidebar } from './components/workflow/WorkflowRightSidebar';
 import { WorkflowSidebar } from './components/workflow/WorkflowSidebar';
 import { createCommands, modKey } from './config/commands';
 import { initialEdges, initialNodes } from './config/initialState';
+import { useBackendSync } from './hooks/backend/useBackendSync';
+import { useMcpToolExecution } from './hooks/backend/useMcpToolExecution';
+import { useDesignTree } from './hooks/design/useDesignTree';
+import { useSmartGuides } from './hooks/design/useSmartGuides';
+import { useDrawingTools } from './hooks/drawing/useDrawingTools';
 import {
   useCanvasActions,
   useCanvasPersistence,
@@ -41,11 +46,6 @@ import {
   useTauriCanvas,
   usePerception,
 } from './hooks/index';
-import { useBackendSync } from './hooks/useBackendSync';
-import { useDesignTree } from './hooks/useDesignTree';
-import { useDrawingTools } from './hooks/useDrawingTools';
-import { useMcpToolExecution } from './hooks/useMcpToolExecution';
-import { useSmartGuides } from './hooks/useSmartGuides';
 // Canvas colors now come from CSS variables in globals.css
 import { PageNode, EsmSandpackNode } from './sandpack/index';
 import { selectActiveWorkflow, useWorkflowStore } from './stores/workflowStore';
@@ -58,10 +58,10 @@ import {
 } from './stores/workflowUIStore';
 import { DEFAULT_CANVAS_MODE } from './types/canvasMode';
 
-import type { ContextMenuItem } from './components/ContextMenu';
+import type { ContextMenuItem } from './components/menus/ContextMenu';
+import type { Guide } from './hooks/design/useSmartGuides';
 import type { ContextMenuState } from './hooks/index';
-import type { Guide } from './hooks/useSmartGuides';
-import type { ComponentTemplate } from './lib/componentLibrary';
+import type { ComponentTemplate } from './lib/components/componentLibrary';
 import type { EsmSandpackNodeData } from './sandpack/EsmSandpackNode';
 import type { CanvasMode } from './types/canvasMode';
 import type { DesignNode, TextNode as DesignTextNode } from './types/designNodeTypes';

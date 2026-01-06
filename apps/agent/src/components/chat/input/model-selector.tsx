@@ -5,9 +5,9 @@ import { SiClaude, SiOpenai } from 'react-icons/si';
 import type { Model } from '@/types/protocol';
 import type { FC } from 'react';
 
-import { CHAT_WIDTH } from '@/lib/constants';
-import { cn } from '@/lib/utils';
-import { useModel, useToolStore } from '@/stores/tool-store';
+import { CHAT_WIDTH } from '@/lib/utils/constants';
+import { cn } from '@/lib/utils/utils';
+import { useModel, useToolStore } from '@/stores/agent/tool-store';
 
 // Animation duration - keep synced with CSS
 const ANIMATION_DURATION_MS = 150;

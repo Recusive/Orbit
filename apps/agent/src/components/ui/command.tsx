@@ -5,7 +5,7 @@ import * as React from 'react';
 import type { DialogProps } from '@radix-ui/react-dialog';
 
 import { Dialog, DialogContentTopCenter, DialogTitle } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 const Command = React.forwardRef<
   React.ComponentRef<typeof CommandPrimitive>,

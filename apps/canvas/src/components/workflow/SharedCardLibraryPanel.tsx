@@ -5,7 +5,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 
-import { useBackendSync } from '../../hooks/useBackendSync';
+import { useBackendSync } from '../../hooks/backend/useBackendSync';
 import { useWorkflowStore } from '../../stores/workflowStore';
 
 import type { CardType, SharedCardMetadata } from '../../types/workflowTypes';

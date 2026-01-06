@@ -28,7 +28,7 @@ import {
   createIntegrationAgent,
   // Types
 } from '../canvas/index.js';
-import { ClaudeCredentials } from '../credentials.js';
+import { ClaudeCredentials } from '../common/auth/credentials.js';
 
 import type { CanvasSnapshot, OrchestratorState, TaskOutput } from '../canvas/index.js';
 

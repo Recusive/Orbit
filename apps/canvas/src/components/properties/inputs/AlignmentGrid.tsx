@@ -8,7 +8,7 @@
 
 import React, { useCallback } from 'react';
 
-import { spacing, radii } from '../../../lib/designTokens';
+import { spacing, radii } from '../../../lib/design/designTokens';
 import { IconButton, IconButtonGroup } from '../shared/IconButton';
 
 export type HorizontalAlign = 'left' | 'center' | 'right';

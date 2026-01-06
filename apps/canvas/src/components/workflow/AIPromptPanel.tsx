@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 
-import { buildContextFromSelection, getContextSummary } from '../../lib/aiContextBuilder';
-import { radii, fontWeight, shadows, spacing } from '../../lib/designTokens';
+import { buildContextFromSelection, getContextSummary } from '../../lib/ai/aiContextBuilder';
+import { radii, fontWeight, shadows, spacing } from '../../lib/design/designTokens';
 
-import type { AIContext } from '../../lib/aiContextBuilder';
+import type { AIContext } from '../../lib/ai/aiContextBuilder';
 import type {
   MarkdownCard,
   WorkflowConnection,

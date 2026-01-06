@@ -19,9 +19,9 @@
  * ```
  */
 
-import { noopTrace } from './noop';
+import { noopTrace } from './core/noop';
 
-import type { InitOptions, Trace } from './types';
+import type { InitOptions, Trace } from './core/types';
 
 // ═══════════════════════════════════════════════════════════════
 // Mutable Reference
@@ -82,7 +82,7 @@ export async function initDevMonitor(options?: InitOptions): Promise<void> {
 
   try {
     // Dynamic import only happens in dev
-    const { devTrace, init } = await import('./dev-trace');
+    const { devTrace, init } = await import('./core/dev-trace');
 
     // Switch the implementation
     _trace.current = devTrace;
@@ -119,4 +119,4 @@ export type {
   Trace,
   XtermOptions,
   ZustandOptions,
-} from './types';
+} from './core/types';

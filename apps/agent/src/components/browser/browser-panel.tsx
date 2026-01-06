@@ -5,8 +5,12 @@ import { BrowserToolbar } from './browser-toolbar';
 
 import type { FC } from 'react';
 
-import { useTauri } from '@/hooks/use-tauri';
-import { useBrowserStore, useBrowserIsActive, useBrowserError } from '@/stores/browser-store';
+import { useTauri } from '@/hooks/agent/use-tauri';
+import {
+  useBrowserStore,
+  useBrowserIsActive,
+  useBrowserError,
+} from '@/stores/browser/browser-store';
 import { generateUUID } from '@/types/protocol';
 
 export interface BrowserPanelProps {

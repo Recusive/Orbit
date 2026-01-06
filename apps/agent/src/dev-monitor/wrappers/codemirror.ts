@@ -12,9 +12,9 @@
 
 import { ViewPlugin } from '@codemirror/view';
 
-import { captureEvent } from '../storage';
+import { captureEvent } from '../core/storage';
 
-import type { CodeMirrorOptions } from '../types';
+import type { CodeMirrorOptions } from '../core/types';
 import type { Extension } from '@codemirror/state';
 import type { PluginValue, ViewUpdate } from '@codemirror/view';
 

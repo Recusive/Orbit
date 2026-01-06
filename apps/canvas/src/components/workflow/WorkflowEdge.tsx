@@ -1,7 +1,7 @@
 import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react';
 import React, { memo, useCallback, useState, useEffect, useRef } from 'react';
 
-import { radii, fontWeight } from '../../lib/designTokens';
+import { radii, fontWeight } from '../../lib/design/designTokens';
 
 import type { WorkflowEdgeData, ContextFlowType } from '../../types/workflowTypes';
 import type { EdgeProps, Edge } from '@xyflow/react';

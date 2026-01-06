@@ -19,10 +19,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { z } from 'zod';
 
 import { CanvasSessionManager } from '../canvas/index.js';
-import { ClaudeCredentials } from '../credentials.js';
-import { createLogger } from '../logger.js';
+import { ClaudeCredentials } from '../common/auth/credentials.js';
+import { createLogger } from '../common/logging/logger.js';
 
-import type { CanvasState, SDKMessage, McpToolRequest, McpToolResponse } from '../canvas/types.js';
+import type {
+  CanvasState,
+  SDKMessage,
+  McpToolRequest,
+  McpToolResponse,
+} from '../canvas/types/types.js';
 
 const logger = createLogger('CanvasRealE2ETest');
 
@@ -220,7 +225,7 @@ function createToolResponseHandler(
     // Validate request against schema
     const parseResult = McpToolRequestSchema.safeParse(request);
     if (!parseResult.success) {
-      logger.error('[TEST] Invalid tool request:', parseResult.error);
+      logger.error({ error: parseResult.error }, '[TEST] Invalid tool request');
     }
 
     // Auto-respond with success for testing
@@ -237,7 +242,7 @@ function createToolResponseHandler(
     // Validate response
     const responseResult = McpToolResponseSchema.safeParse(response);
     if (!responseResult.success) {
-      logger.error('[TEST] Invalid tool response:', responseResult.error);
+      logger.error({ error: responseResult.error }, '[TEST] Invalid tool response');
     }
 
     // Send response back to agent
@@ -281,8 +286,7 @@ describe('Canvas REAL E2E - Claude API Integration', () => {
       // Validate each message against schema
       const parseResult = SDKMessageSchema.safeParse(message);
       if (!parseResult.success) {
-        logger.error('[TEST] Invalid SDK message:', parseResult.error);
-        logger.error('[TEST] Message was:', JSON.stringify(message, null, 2));
+        logger.error({ error: parseResult.error, message }, '[TEST] Invalid SDK message');
       }
     });
 
@@ -347,8 +351,7 @@ describe('Canvas REAL E2E - Claude API Integration', () => {
       const result = SDKMessageSchema.safeParse(msg);
       expect(result.success).toBe(true);
       if (!result.success) {
-        logger.error('Schema validation failed for message:', msg);
-        logger.error('Error:', result.error);
+        logger.error({ message: msg, error: result.error }, 'Schema validation failed for message');
       }
     }
 
@@ -554,8 +557,10 @@ describe('Canvas REAL E2E - Claude API Integration', () => {
         if (msg.metadata) {
           const metadataResult = ToolUseMetadataSchema.safeParse(msg.metadata);
           if (!metadataResult.success) {
-            logger.info('  Tool metadata:', JSON.stringify(msg.metadata, null, 2));
-            logger.info('  Validation errors:', metadataResult.error);
+            logger.info(
+              { metadata: msg.metadata, error: metadataResult.error },
+              'Tool metadata validation failed'
+            );
           }
           // Note: We allow this to not be strict since SDK may add fields
           expect(msg.metadata).toHaveProperty('toolName');

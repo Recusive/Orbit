@@ -11,7 +11,7 @@
 
 import React from 'react';
 
-import { spacing, fontSize, fontWeight } from '../../../lib/designTokens';
+import { spacing, fontSize, fontWeight } from '../../../lib/design/designTokens';
 
 export interface PropertyRowProps {
   /** Optional label displayed before inputs */

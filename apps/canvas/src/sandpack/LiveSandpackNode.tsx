@@ -12,7 +12,7 @@ import { SandpackProvider } from '@codesandbox/sandpack-react';
 import { Handle, NodeResizer, Position } from '@xyflow/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { LayerAgentToolbar } from '../components/LayerAgentToolbar';
+import { LayerAgentToolbar } from '../components/agent/LayerAgentToolbar';
 
 import { InlinePreview } from './InlinePreview';
 import { useSandpackInstanceManager } from './SandpackInstanceManager';

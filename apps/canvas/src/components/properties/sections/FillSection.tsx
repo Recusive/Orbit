@@ -10,7 +10,7 @@
 
 import React, { useState, useCallback } from 'react';
 
-import { spacing, radii, fontSize, motion } from '../../../lib/designTokens';
+import { spacing, radii, fontSize, motion } from '../../../lib/design/designTokens';
 import { ColorInput } from '../inputs/ColorInput';
 import { GradientEditor } from '../inputs/GradientEditor';
 import { NumberInput } from '../inputs/NumberInput';

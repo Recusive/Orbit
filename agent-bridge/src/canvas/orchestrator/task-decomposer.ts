@@ -8,7 +8,7 @@
  *  Stage 4 (Blocking): IntegrationAgent merges and validates
  *--------------------------------------------------------------------------------------------*/
 
-import { createLogger } from '../../logger.js';
+import { createLogger } from '../../common/logging/logger.js';
 
 import type {
   AgentType,

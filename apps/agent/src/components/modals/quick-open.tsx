@@ -11,10 +11,10 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { useSearch } from '@/hooks/use-search';
-import { useTauri } from '@/hooks/use-tauri';
-import { useFileStore } from '@/stores/file-store';
-import { useFileViewerStore } from '@/stores/file-viewer-store';
+import { useTauri } from '@/hooks/agent/use-tauri';
+import { useSearch } from '@/hooks/ui/use-search';
+import { useFileStore } from '@/stores/file/file-store';
+import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 
 interface QuickOpenProps {
   readonly open: boolean;

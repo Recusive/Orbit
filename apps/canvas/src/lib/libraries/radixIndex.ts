@@ -3,9 +3,9 @@
  * Pre-indexed unstyled, accessible components
  */
 
-import { LIBRARY_INFO, LIBRARY_SCHEMA_VERSION } from '../componentLibraryTypes';
+import { LIBRARY_INFO, LIBRARY_SCHEMA_VERSION } from '../components/componentLibraryTypes';
 
-import type { LibraryIndex, IndexedComponent } from '../componentLibraryTypes';
+import type { LibraryIndex, IndexedComponent } from '../components/componentLibraryTypes';
 
 const radixLibrary = LIBRARY_INFO['radix'];
 if (radixLibrary === undefined) throw new Error('radix library config missing from LIBRARY_INFO');

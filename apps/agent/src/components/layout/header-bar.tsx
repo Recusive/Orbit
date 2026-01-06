@@ -5,8 +5,13 @@ import type { FC } from 'react';
 
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import { useUIStore, useWorkspaceName, useTerminalPosition, useActiveTab } from '@/stores/ui-store';
+import { cn } from '@/lib/utils/utils';
+import {
+  useUIStore,
+  useWorkspaceName,
+  useTerminalPosition,
+  useActiveTab,
+} from '@/stores/ui/ui-store';
 
 type Theme = 'light' | 'dark';
 
@@ -16,7 +21,7 @@ const getInitialTheme = (): Theme => {
 };
 
 // Re-export for backwards compatibility
-export type { HeaderTab } from '@/stores/ui-store';
+export type { HeaderTab } from '@/stores/ui/ui-store';
 
 export interface HeaderBarProps {
   className?: string;

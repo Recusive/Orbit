@@ -4,9 +4,13 @@
  * Properties panel for Orbit Canvas.
  */
 
-// Main panel
+// Main panels
 export { PropertiesPanel } from './PropertiesPanel';
 export type { PropertiesPanelProps } from './PropertiesPanel';
+
+export { ElementPropertiesPanel } from './ElementPropertiesPanel';
+export { NodePropertiesPanel } from './NodePropertiesPanel';
+export { PagePropertiesPanel } from './PagePropertiesPanel';
 
 // Header
 export { PropertyHeader } from './PropertyHeader';

@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useSta
 
 import type { ChatMessage } from '@/components/chat/messages';
 import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
-import type { FileEntry } from '@/types/context';
+import type { FileEntry } from '@/types/agent/context';
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
@@ -10,9 +10,9 @@ import { ChatHeader, ChatInput, ChatMessages, useQueuedMessageHandler } from '@/
 import { ResizeHandle } from '@/components/layout/resize-handle';
 import { PermissionModal } from '@/components/modals';
 import { ActivityPanel } from '@/components/panels';
-import { useChatMessages } from '@/hooks/use-chat-messages';
-import { useTauri } from '@/hooks/use-tauri';
-import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/constants';
+import { useTauri } from '@/hooks/agent/use-tauri';
+import { useChatMessages } from '@/hooks/chat/use-chat-messages';
+import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils/constants';
 import {
   useGetToolsForMessage,
   usePendingPermissions,
@@ -20,13 +20,13 @@ import {
   useThinkingMode,
   useSessionUsage,
   useMaxTokens,
-} from '@/stores/tool-store';
+} from '@/stores/agent/tool-store';
 import {
   useUIStore,
   useTerminalPosition,
   useIsLoadingConversation,
   useIsConversationTransitioning,
-} from '@/stores/ui-store';
+} from '@/stores/ui/ui-store';
 
 // Lazy load heavy components
 const LazyTerminalPanel = lazy(() =>

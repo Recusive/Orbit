@@ -5,8 +5,7 @@
 
 pub mod agent;
 pub mod commands;
-pub mod crash;
-pub mod devmonitor;
+pub mod core;
 
 use std::env;
 use std::path::PathBuf;
@@ -183,7 +182,7 @@ fn resolve_sidecar_path() -> PathBuf {
 pub fn run() {
     // Install panic handler FIRST - before any other initialization
     // This ensures all panics are logged, even during startup
-    crash::init();
+    core::crash::init();
 
     // Initialize settings manager and load settings
     let settings_manager = SettingsManager::new();

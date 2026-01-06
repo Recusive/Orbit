@@ -7,7 +7,7 @@
 
 import React from 'react';
 
-import { spacing, radii, fontSize, fontWeight, shadows, motion } from '../lib/designTokens';
+import { spacing, radii, fontSize, fontWeight, shadows, motion } from '../lib/design/designTokens';
 
 import type { Conflict, Resolution, ConflictStrategy } from './types';
 

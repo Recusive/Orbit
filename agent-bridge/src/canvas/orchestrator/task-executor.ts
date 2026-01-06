@@ -11,7 +11,7 @@
 
 import { EventEmitter } from 'node:events';
 
-import { createLogger } from '../../logger.js';
+import { createLogger } from '../../common/logging/logger.js';
 
 import { getBlackboard } from './blackboard.js';
 import { getNodeLockManager } from './node-lock-manager.js';

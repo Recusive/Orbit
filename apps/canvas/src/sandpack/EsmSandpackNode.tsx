@@ -10,9 +10,9 @@
 import { Handle, NodeResizer, Position, useReactFlow } from '@xyflow/react';
 import React, { useCallback, useState } from 'react';
 
-import { DeviceFrameSelector } from '../components/DeviceFrameSelector';
-import { LayerAgentToolbar } from '../components/LayerAgentToolbar';
-import { updateClassNameInCode } from '../lib/codeTransformer';
+import { LayerAgentToolbar } from '../components/agent/LayerAgentToolbar';
+import { DeviceFrameSelector } from '../components/shared/DeviceFrameSelector';
+import { updateClassNameInCode } from '../lib/code/codeTransformer';
 
 import { EsmPreview } from './EsmPreview';
 import { DEVICE_PRESETS } from './sandpackConfig';

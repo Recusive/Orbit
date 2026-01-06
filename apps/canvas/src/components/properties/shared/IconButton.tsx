@@ -11,7 +11,7 @@
 
 import React, { useState, useCallback } from 'react';
 
-import { spacing, radii, motion } from '../../../lib/designTokens';
+import { spacing, radii, motion } from '../../../lib/design/designTokens';
 
 export interface IconButtonProps {
   /** Icon content */

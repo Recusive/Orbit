@@ -9,7 +9,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 
-import { spacing, radii, fontSize, fontWeight } from '../../../lib/designTokens';
+import { spacing, radii, fontSize, fontWeight } from '../../../lib/design/designTokens';
 import { IconButton } from '../shared/IconButton';
 
 import { NumberInput } from './NumberInput';

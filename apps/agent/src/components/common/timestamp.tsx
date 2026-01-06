@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 
 import type { FC } from 'react';
 
-import { TIME_MS } from '@/lib/constants';
+import { TIME_MS } from '@/lib/utils/constants';
 
 export interface TimestampProps {
   date: Date | string;

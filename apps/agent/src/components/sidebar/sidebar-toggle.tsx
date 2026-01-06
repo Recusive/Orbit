@@ -2,7 +2,7 @@ import { PanelLeftClose, PanelLeft } from 'lucide-react';
 
 import type { FC } from 'react';
 
-import { useUIStore, useIsLeftSidebarCollapsed } from '@/stores/ui-store';
+import { useUIStore, useIsLeftSidebarCollapsed } from '@/stores/ui/ui-store';
 
 export interface SidebarToggleProps {
   className?: string;

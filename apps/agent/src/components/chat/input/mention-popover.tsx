@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
 
-import type { FileEntry } from '@/types/context';
+import type { FileEntry } from '@/types/agent/context';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files/file-icon';
 import { Command, CommandEmpty, CommandGroup, CommandList } from '@/components/ui/command';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 // Measurable interface expected by Radix Popover
 interface Measurable {

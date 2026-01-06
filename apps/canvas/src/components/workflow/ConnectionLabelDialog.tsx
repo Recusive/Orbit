@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 
-import { radii, fontWeight, shadows, spacing } from '../../lib/designTokens';
+import { radii, fontWeight, shadows, spacing } from '../../lib/design/designTokens';
 
 // ============================================================================
 // Common Labels

@@ -6,7 +6,7 @@ import { IconListSparkle } from '@central-icons-react/round-outlined-radius-1-st
 import { IconMarkdown } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconMarkdown';
 import React, { useCallback, useState, useEffect } from 'react';
 
-import { fontWeight } from '../../lib/designTokens';
+import { fontWeight } from '../../lib/design/designTokens';
 
 import type { MarkdownCard, CardType } from '../../types/workflowTypes';
 

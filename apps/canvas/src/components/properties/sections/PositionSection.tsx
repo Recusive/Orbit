@@ -9,7 +9,7 @@
 
 import React, { useCallback } from 'react';
 
-import { spacing } from '../../../lib/designTokens';
+import { spacing } from '../../../lib/design/designTokens';
 import { AlignmentGrid } from '../inputs/AlignmentGrid';
 import { FlipControls } from '../inputs/FlipControls';
 import { NumberInput } from '../inputs/NumberInput';

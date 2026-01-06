@@ -6,7 +6,7 @@
  *  - Full Orchestration: Complex requests go through TaskDecomposer
  *--------------------------------------------------------------------------------------------*/
 
-import { createLogger } from '../../logger.js';
+import { createLogger } from '../../common/logging/logger.js';
 
 import type {
   AgentType,

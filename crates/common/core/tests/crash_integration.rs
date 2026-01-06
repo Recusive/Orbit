@@ -15,7 +15,7 @@
     reason = "Integration tests use expect() for clear failure messages"
 )]
 
-use snowflake_core::crash::CrashManager;
+use snowflake_core::diagnostics::crash::CrashManager;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write as _;
 use std::path::PathBuf;

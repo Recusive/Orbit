@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
-import { radii, fontWeight, shadows, spacing } from '../../lib/designTokens';
+import { radii, fontWeight, shadows, spacing } from '../../lib/design/designTokens';
 
 // ============================================================================
 // Tag Colors

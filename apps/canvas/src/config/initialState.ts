@@ -2,10 +2,10 @@
  * Initial canvas state configuration
  * Contains default nodes, edges, and node creation utilities
  */
-import { getComponentLabel, getComponentTemplate } from '../lib/componentTemplates';
+import { getComponentLabel, getComponentTemplate } from '../lib/components/componentTemplates';
 import { getDefaultPageNodeData } from '../sandpack/index';
 
-import type { ComponentType } from '../lib/componentTemplates';
+import type { ComponentType } from '../lib/components/componentTemplates';
 import type { SandpackNodeData } from '../sandpack/SandpackNode';
 import type { Edge, Node } from '@xyflow/react';
 

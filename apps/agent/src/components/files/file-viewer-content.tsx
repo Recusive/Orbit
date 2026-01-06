@@ -1,13 +1,13 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { OutlineItem } from '@/components/editor/editor-breadcrumbs';
-import type { GotoPosition, ViewedFile } from '@/stores/file-viewer-store';
+import type { GotoPosition, ViewedFile } from '@/stores/file/file-viewer-store';
 import type { FC } from 'react';
 
 import { EditorBreadcrumbs, EditorSkeleton, extractMarkdownOutline } from '@/components/editor';
 import { FileDiffViewer } from '@/components/git';
-import { writeFile, lspDidChange, lspDidSave } from '@/lib/backend';
-import { useCursorPosition, useFileViewerStore } from '@/stores/file-viewer-store';
+import { writeFile, lspDidChange, lspDidSave } from '@/lib/api/backend';
+import { useCursorPosition, useFileViewerStore } from '@/stores/file/file-viewer-store';
 
 // Lazy load CodeMirror to reduce initial bundle size (~500KB)
 const LazyCodeMirrorEditor = lazy(() =>

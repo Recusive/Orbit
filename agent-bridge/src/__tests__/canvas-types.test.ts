@@ -18,7 +18,7 @@ import type {
   SDKMessage,
   McpToolRequest,
   McpToolResponse,
-} from '../canvas/types.js';
+} from '../canvas/types/types.js';
 
 // =============================================================================
 // ZOD SCHEMAS (must match apps/agent/src/types/canvas.ts)

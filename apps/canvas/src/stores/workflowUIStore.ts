@@ -7,7 +7,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { WORKFLOW_SIDEBAR } from '../lib/workflowLayoutConstants';
+import { WORKFLOW_SIDEBAR } from '../lib/layout/workflowLayoutConstants';
 
 // ============================================================================
 // State Types

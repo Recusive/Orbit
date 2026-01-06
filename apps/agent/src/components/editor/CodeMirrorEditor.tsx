@@ -42,17 +42,17 @@ import {
 import { tags } from '@lezer/highlight';
 import { useCallback, useEffect, useRef } from 'react';
 
-import type { CompletionItem } from '@/lib/backend';
+import type { CompletionItem } from '@/lib/api/backend';
 import type { Diagnostic as CmDiagnostic } from '@codemirror/lint';
 import type { Extension } from '@codemirror/state';
 import type { Tooltip, ViewUpdate } from '@codemirror/view';
 import type { FC } from 'react';
 
 import { trace } from '@/dev-monitor';
-import { useFileDiagnostics } from '@/hooks/use-file-diagnostics';
-import { useLsp } from '@/hooks/use-lsp';
-import { useFileStore } from '@/stores/file-store';
-import { useFileViewerStore } from '@/stores/file-viewer-store';
+import { useFileDiagnostics } from '@/hooks/file/use-file-diagnostics';
+import { useLsp } from '@/hooks/lsp/use-lsp';
+import { useFileStore } from '@/stores/file/file-store';
+import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 
 // ============================================
 // Compartments for runtime reconfiguration

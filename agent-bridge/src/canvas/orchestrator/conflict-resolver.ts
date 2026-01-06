@@ -9,7 +9,7 @@
  *  - Escalates unresolvable conflicts to user
  *--------------------------------------------------------------------------------------------*/
 
-import { createLogger } from '../../logger.js';
+import { createLogger } from '../../common/logging/logger.js';
 
 import type {
   CanvasChange,

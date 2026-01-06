@@ -1,6 +1,6 @@
 import { DiffViewer } from './diff-viewer';
 
-import type { ViewedFileDiff } from '@/stores/file-viewer-store';
+import type { ViewedFileDiff } from '@/stores/file/file-viewer-store';
 import type { FC } from 'react';
 
 export interface FileDiffViewerProps {

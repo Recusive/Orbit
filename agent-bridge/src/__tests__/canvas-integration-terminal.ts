@@ -6,7 +6,7 @@
  */
 
 import { CanvasSessionManager, CanvasToolBridge, createCanvasMcpServer } from '../canvas/index.js';
-import { createLogger } from '../logger.js';
+import { createLogger } from '../common/logging/logger.js';
 
 import type { CanvasState } from '../canvas/index.js';
 

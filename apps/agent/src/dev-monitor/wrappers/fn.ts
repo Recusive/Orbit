@@ -5,9 +5,9 @@
  * Follows the error isolation pattern - monitoring errors never crash the app.
  */
 
-import { captureEvent } from '../storage';
+import { captureEvent } from '../core/storage';
 
-import type { FnOptions } from '../types';
+import type { FnOptions } from '../core/types';
 
 // ═══════════════════════════════════════════════════════════════
 // Function Wrapper

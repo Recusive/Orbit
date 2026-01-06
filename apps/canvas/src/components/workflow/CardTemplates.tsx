@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback } from 'react';
 
-import { radii, fontWeight, shadows, spacing } from '../../lib/designTokens';
+import { radii, fontWeight, shadows, spacing } from '../../lib/design/designTokens';
 
 import type { CardType } from '../../types/workflowTypes';
 

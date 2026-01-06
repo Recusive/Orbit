@@ -11,7 +11,7 @@
 
 import React, { useMemo, useCallback, useState } from 'react';
 
-import { spacing, fontSize, fontWeight } from '../../lib/designTokens';
+import { spacing, fontSize, fontWeight } from '../../lib/design/designTokens';
 
 import { PropertyHeader } from './PropertyHeader';
 import { AppearanceSection } from './sections/AppearanceSection';

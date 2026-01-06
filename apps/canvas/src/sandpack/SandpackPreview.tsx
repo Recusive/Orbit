@@ -1,7 +1,7 @@
 import { SandpackPreview as BaseSandpackPreview, useSandpack } from '@codesandbox/sandpack-react';
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 
-import { radii, motion } from '../lib/designTokens';
+import { radii, motion } from '../lib/design/designTokens';
 
 import { VIEWPORT_PRESETS, ERROR_MESSAGES, SANDBOX_TIMEOUTS } from './sandpackConfig';
 

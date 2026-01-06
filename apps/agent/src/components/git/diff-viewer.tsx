@@ -2,7 +2,7 @@ import React from 'react';
 
 import { DiffLine } from './diff-line';
 
-import type { DiffHunk, DiffLine as DiffLineType } from '../../stores/file-store';
+import type { DiffHunk, DiffLine as DiffLineType } from '@/stores/file/file-store';
 
 export interface DiffViewerProps {
   hunks: DiffHunk[];

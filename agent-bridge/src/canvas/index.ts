@@ -4,11 +4,11 @@
  */
 
 // Canvas Agent
-export { CanvasAgent, createCanvasAgent } from './canvas-agent.js';
-export type { CanvasAgentEvents } from './canvas-agent.js';
+export { CanvasAgent, createCanvasAgent } from './core/index.js';
+export type { CanvasAgentEvents } from './core/index.js';
 
 // Canvas Session Manager
-export { CanvasSessionManager, createCanvasSessionManager } from './canvas-session-manager.js';
+export { CanvasSessionManager, createCanvasSessionManager } from './session/index.js';
 export type {
   SessionMessageEvent,
   SessionToolRequestEvent,
@@ -16,17 +16,14 @@ export type {
   MessageCallback,
   ToolRequestCallback as SessionToolRequestCallback,
   ErrorCallback as SessionErrorCallback,
-} from './canvas-session-manager.js';
+} from './session/index.js';
 
-// Canvas Tool Bridge
-export { CanvasToolBridge } from './canvas-tool-bridge.js';
-export type { ToolRequestCallback, McpToolRequest, McpToolResponse } from './canvas-tool-bridge.js';
-
-// Canvas MCP Server
-export { createCanvasMcpServer, getCanvasToolNames } from './canvas-mcp-server.js';
+// Canvas Tool Bridge & MCP
+export { CanvasToolBridge, createCanvasMcpServer, getCanvasToolNames } from './mcp/index.js';
+export type { ToolRequestCallback, McpToolRequest, McpToolResponse } from './mcp/index.js';
 
 // Canvas System Prompt
-export { getCanvasSystemPrompt } from './system-prompt.js';
+export { getCanvasSystemPrompt } from './prompts/index.js';
 
 // Canvas Types
 export type {
@@ -57,7 +54,7 @@ export type {
   JSONSchema,
   CanvasTool,
   ToolExecutionStatus,
-} from './types.js';
+} from './types/index.js';
 
 // Orchestrator (multi-agent coordination)
 export * from './orchestrator/index.js';

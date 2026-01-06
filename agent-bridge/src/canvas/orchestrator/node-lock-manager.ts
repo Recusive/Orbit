@@ -7,7 +7,7 @@
  *  - Locks can include children (entire subtree)
  *--------------------------------------------------------------------------------------------*/
 
-import { createLogger } from '../../logger.js';
+import { createLogger } from '../../common/logging/logger.js';
 
 import type { NodeLock } from './types.js';
 

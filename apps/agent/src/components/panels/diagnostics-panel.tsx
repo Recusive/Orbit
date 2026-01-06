@@ -8,11 +8,11 @@ import {
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
-import type { Diagnostic } from '@/lib/backend';
+import type { Diagnostic } from '@/lib/api/backend';
 import type { FC } from 'react';
 
-import { useDiagnostics } from '@/hooks/use-diagnostics';
-import { cn } from '@/lib/utils';
+import { useDiagnostics } from '@/hooks/lsp/use-diagnostics';
+import { cn } from '@/lib/utils/utils';
 
 interface DiagnosticsPanelProps {
   /** Called when a diagnostic is clicked (can be async) */

@@ -10,7 +10,7 @@
 
 import React from 'react';
 
-import { spacing, radii, fontSize, fontWeight, motion } from '../lib/designTokens';
+import { spacing, radii, fontSize, fontWeight, motion } from '../lib/design/designTokens';
 
 import { SubAgentStatusBadge } from './SubAgentStatusBadge';
 

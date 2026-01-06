@@ -10,15 +10,15 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 
-import { createCanvasMcpServer, getCanvasToolNames } from '../canvas/canvas-mcp-server.js';
-import { CanvasToolBridge } from '../canvas/canvas-tool-bridge.js';
+import { createCanvasMcpServer, getCanvasToolNames } from '../canvas/mcp/canvas-mcp-server.js';
+import { CanvasToolBridge } from '../canvas/mcp/canvas-tool-bridge.js';
 import {
   CreateComponentResultSchema,
   GetCanvasStateResultSchema,
   VerifyComponentResultSchema,
   GenerateVariantsResultSchema,
   getJsonSchema,
-} from '../canvas/schemas.js';
+} from '../canvas/types/schemas.js';
 
 // Type for accessing private McpServer internals (for testing only)
 interface McpServerInternal {

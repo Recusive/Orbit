@@ -3,9 +3,9 @@
  * Pre-indexed components for the Libraries panel
  */
 
-import { LIBRARY_INFO, LIBRARY_SCHEMA_VERSION } from '../componentLibraryTypes';
+import { LIBRARY_INFO, LIBRARY_SCHEMA_VERSION } from '../components/componentLibraryTypes';
 
-import type { LibraryIndex, IndexedComponent } from '../componentLibraryTypes';
+import type { LibraryIndex, IndexedComponent } from '../components/componentLibraryTypes';
 
 const shadcnLibrary = LIBRARY_INFO['shadcn'];
 if (shadcnLibrary === undefined) throw new Error('shadcn library config missing from LIBRARY_INFO');

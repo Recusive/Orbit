@@ -1,6 +1,6 @@
 import { Clock, X } from 'lucide-react';
 
-import type { QueuedMessage } from '@/stores/queued-message-store';
+import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files/file-icon';

@@ -34,9 +34,9 @@ import { join } from 'path';
 
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'bun:test';
 
-import { createAgent } from '../agent.js';
+import { createAgent } from '../agent/core/agent.js';
 
-import type { OrbitAgent, OrbitAgentConfig } from '../agent.js';
+import type { OrbitAgent, OrbitAgentConfig } from '../agent/core/agent.js';
 
 const TEST_ROOT = join(import.meta.dir, '../../.test-workspace');
 

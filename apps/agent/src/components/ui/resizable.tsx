@@ -5,7 +5,7 @@ import { Group, Panel, Separator } from 'react-resizable-panels';
 
 import type { GroupProps, SeparatorProps } from 'react-resizable-panels';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 const ResizablePanelGroup = ({ className, ...props }: GroupProps): React.JSX.Element => (
   <Group

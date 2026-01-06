@@ -10,7 +10,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 
-import { spacing, radii, fontSize, fontWeight, motion } from '../../../lib/designTokens';
+import { spacing, radii, fontSize, fontWeight, motion } from '../../../lib/design/designTokens';
 import { IconButton, IconButtonGroup } from '../shared/IconButton';
 
 import { ColorInput } from './ColorInput';

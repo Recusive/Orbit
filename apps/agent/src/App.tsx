@@ -9,10 +9,10 @@ import { StatusBar } from '@/components/layout/status-bar';
 import { CrashNotification } from '@/components/modals/crash-notification';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { WelcomePage } from '@/components/welcome';
-import { useBrowser } from '@/hooks/use-browser';
-import { useCrashCheck } from '@/hooks/use-crash-check';
+import { useBrowser } from '@/hooks/browser/use-browser';
+import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { TauriProvider } from '@/providers/tauri-provider';
-import { useHasWorkspace, useUIStore } from '@/stores/ui-store';
+import { useHasWorkspace, useUIStore } from '@/stores/ui/ui-store';
 
 /**
  * Syncs system theme preference to the html element.

@@ -9,7 +9,7 @@
  *  - Sibling output sharing for coordination
  *--------------------------------------------------------------------------------------------*/
 
-import { createLogger } from '../../logger.js';
+import { createLogger } from '../../common/logging/logger.js';
 
 import type {
   BlackboardSlice,

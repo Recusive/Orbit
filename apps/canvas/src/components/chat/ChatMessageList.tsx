@@ -11,13 +11,13 @@
 
 import React, { useRef, useEffect } from 'react';
 
-import { spacing, radii, fontSize, fontWeight, motion } from '../../lib/designTokens';
+import { spacing, radii, fontSize, fontWeight, motion } from '../../lib/design/designTokens';
 
 import { ChatMessage } from './ChatMessage';
 import { ThinkingBubble } from './ThinkingBubble';
 import { ToolUseBubble } from './ToolUseBubble';
 
-import type { ChatMessage as ChatMessageType } from '../../hooks/useAgentChat';
+import type { ChatMessage as ChatMessageType } from '../../hooks/agent/useAgentChat';
 
 export interface ChatMessageListProps {
   messages: ChatMessageType[];

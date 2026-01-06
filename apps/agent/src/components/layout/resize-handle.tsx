@@ -2,8 +2,8 @@ import { useRef } from 'react';
 
 import type { FC } from 'react';
 
-import { cn } from '@/lib/utils';
-import { useUIStore } from '@/stores/ui-store';
+import { cn } from '@/lib/utils/utils';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 interface ResizeHandleProps {
   readonly direction: 'horizontal' | 'vertical';

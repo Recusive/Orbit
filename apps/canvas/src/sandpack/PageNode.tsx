@@ -8,7 +8,7 @@
 import { Handle, Position } from '@xyflow/react';
 import React, { useState, useMemo } from 'react';
 
-import { spacing, radii, fontSize, fontWeight, motion, shadows } from '../lib/designTokens';
+import { spacing, radii, fontSize, fontWeight, motion, shadows } from '../lib/design/designTokens';
 
 import { VIEWPORT_PRESETS } from './sandpackConfig';
 

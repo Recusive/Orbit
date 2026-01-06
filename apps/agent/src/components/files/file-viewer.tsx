@@ -9,7 +9,7 @@ import {
   useActiveFile,
   useFileViewerLoading,
   useFileViewerStore,
-} from '@/stores/file-viewer-store';
+} from '@/stores/file/file-viewer-store';
 
 export const FileViewer: FC = () => {
   const activeFile = useActiveFile();

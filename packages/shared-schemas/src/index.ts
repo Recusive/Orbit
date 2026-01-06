@@ -13,7 +13,7 @@ export {
   type Model,
   type ThinkingMode,
   type InputMode,
-} from './model';
+} from './agent/model';
 
 // Terminal schemas
 export {
@@ -21,7 +21,7 @@ export {
   TerminalCapabilitiesSchema,
   type ShellType,
   type TerminalCapabilities,
-} from './terminal';
+} from './terminal/terminal';
 
 // File schemas with path validation
 export {
@@ -33,7 +33,7 @@ export {
   type FilePath,
   type FileStatus,
   type FileData,
-} from './file';
+} from './file/file';
 
 // Agent schemas
 export {
@@ -47,7 +47,7 @@ export {
   type AgentPhase,
   type TaskStatus,
   type ToolCallStatus,
-} from './agent';
+} from './agent/agent';
 
 // SDK boundary handling - comprehensive schemas validated against real SDK data
 export {
@@ -98,7 +98,7 @@ export {
   type SDKResultMessage,
   type SDKMessage,
   type SDKToolResult,
-} from './sdk';
+} from './sdk/sdk';
 
 // Settings schemas with coercion
 export {
@@ -112,7 +112,12 @@ export {
   type TerminalSettings,
   type UIPreferences,
   type AgentSettings,
-} from './settings';
+} from './settings/settings';
 
 // Error utilities
-export { formatZodError, getFieldErrors, getFirstFieldErrors, hasFieldError } from './errors';
+export {
+  formatZodError,
+  getFieldErrors,
+  getFirstFieldErrors,
+  hasFieldError,
+} from './common/errors';

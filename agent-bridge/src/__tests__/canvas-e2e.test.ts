@@ -25,15 +25,22 @@ import { z } from 'zod';
 
 import { CanvasSessionManager } from '../canvas/index.js';
 import { createIntentAnalyzer } from '../canvas/orchestrator/index.js';
-import { BridgeRequestSchema } from '../schemas.js';
+import { BridgeRequestSchema } from '../protocol/schemas.js';
 
-import type { IntentAnalyzer } from '../canvas/orchestrator/index.js';
+import type { CanvasAgent } from '../canvas/core/canvas-agent.js';
+import type { CanvasToolBridge } from '../canvas/mcp/canvas-tool-bridge.js';
+import type {
+  IntentAnalyzer,
+  CanvasSnapshot,
+  IntentAnalysis,
+  Orchestrator,
+} from '../canvas/orchestrator/index.js';
 import type {
   CanvasState,
   CanvasSessionConfig,
   McpToolRequest,
   McpToolResponse,
-} from '../canvas/types.js';
+} from '../canvas/types/types.js';
 import type {
   CanvasCreateSessionRequest,
   CanvasDeleteSessionRequest,
@@ -44,7 +51,43 @@ import type {
   CanvasToolRequestEvent,
   CanvasErrorEvent,
   BridgeCommandResponse,
-} from '../protocol.js';
+} from '../protocol/protocol.js';
+
+// =============================================================================
+// TYPE HELPERS FOR TEST ACCESS TO PRIVATE MEMBERS
+// =============================================================================
+
+/**
+ * Type helper to access private members of CanvasSessionManager for testing.
+ * This avoids modifying production code access modifiers.
+ */
+interface CanvasSessionManagerPrivate {
+  sessions: Map<string, CanvasAgent>;
+  intentAnalyzer: IntentAnalyzer;
+  orchestrators: Map<string, Orchestrator>;
+  convertToSnapshot: (state: CanvasState) => CanvasSnapshot;
+}
+
+/**
+ * Type helper to access private members of CanvasAgent for testing.
+ */
+interface CanvasAgentPrivate {
+  toolBridge: CanvasToolBridge;
+}
+
+/**
+ * Helper to safely access private members of CanvasSessionManager for testing
+ */
+function getManagerPrivate(obj: unknown): CanvasSessionManagerPrivate {
+  return obj as CanvasSessionManagerPrivate;
+}
+
+/**
+ * Helper to safely access private members of CanvasAgent for testing
+ */
+function getAgentPrivate(obj: unknown): CanvasAgentPrivate {
+  return obj as CanvasAgentPrivate;
+}
 
 // =============================================================================
 // ZOD SCHEMAS FOR VALIDATION (must match apps/agent/src/types/canvas.ts)
@@ -272,7 +315,8 @@ interface CapturedEvents {
  * Simulates the full Tauri ↔ agent-bridge communication flow
  */
 class E2ETestHarness {
-  private readonly manager: CanvasSessionManager;
+  // Public for test access - this is a test utility class
+  readonly manager: CanvasSessionManager;
   private readonly events: CapturedEvents = {
     messages: [],
     toolRequests: [],
@@ -631,9 +675,11 @@ describe('Canvas E2E - Full Tauri → Bridge → SDK Flow', () => {
       });
 
       // Send tool request through bridge
-      const bridge = harness.manager.sessions.get(sessionId);
+      const managerPrivate = getManagerPrivate(harness.manager);
+      const bridge = managerPrivate.sessions.get(sessionId);
       if (bridge) {
-        const toolBridge = bridge.toolBridge;
+        const agentPrivate = getAgentPrivate(bridge);
+        const toolBridge = agentPrivate.toolBridge;
 
         // Simulate agent requesting a tool
         const result = await toolBridge.sendRequest('create_component', {
@@ -1089,8 +1135,8 @@ describe('Canvas E2E - Orchestrator Integration', () => {
       harness.createSession(sessionId);
 
       // Access private intentAnalyzer via manager
-      const manager = harness.manager;
-      const intentAnalyzer = manager.intentAnalyzer;
+      const managerPrivate = getManagerPrivate(harness.manager);
+      const intentAnalyzer = managerPrivate.intentAnalyzer;
 
       expect(intentAnalyzer).toBeDefined();
       expect(typeof intentAnalyzer.analyze).toBe('function');
@@ -1102,8 +1148,8 @@ describe('Canvas E2E - Orchestrator Integration', () => {
       const sessionId = 'e2e-orchestrator-map-test';
       harness.createSession(sessionId);
 
-      const manager = harness.manager;
-      const orchestrators = manager.orchestrators;
+      const managerPrivate = getManagerPrivate(harness.manager);
+      const orchestrators = managerPrivate.orchestrators;
 
       expect(orchestrators).toBeDefined();
       expect(orchestrators instanceof Map).toBe(true);
@@ -1116,8 +1162,8 @@ describe('Canvas E2E - Orchestrator Integration', () => {
       const sessionId = 'e2e-intent-analysis-test';
       harness.createSession(sessionId);
 
-      const manager = harness.manager;
-      const intentAnalyzer = manager.intentAnalyzer;
+      const managerPrivate = getManagerPrivate(harness.manager);
+      const intentAnalyzer = managerPrivate.intentAnalyzer;
 
       // Spy on analyze method
       let analyzeCalled = false;
@@ -1135,7 +1181,7 @@ describe('Canvas E2E - Orchestrator Integration', () => {
 
       // Note: We don't actually send the message to avoid API calls
       // Just verify the routing logic by calling convertToSnapshot
-      const snapshot = manager.convertToSnapshot(state);
+      const snapshot = managerPrivate.convertToSnapshot(state);
       expect(snapshot).toBeDefined();
       expect(snapshot.nodes).toEqual([]);
       expect(snapshot.edges).toEqual([]);
@@ -1156,7 +1202,7 @@ describe('Canvas E2E - Orchestrator Integration', () => {
       const sessionId = 'e2e-snapshot-conversion-test';
       harness.createSession(sessionId);
 
-      const manager = harness.manager;
+      const managerPrivate = getManagerPrivate(harness.manager);
 
       const state: CanvasState = {
         nodes: [
@@ -1178,7 +1224,7 @@ describe('Canvas E2E - Orchestrator Integration', () => {
         selectedNodeType: 'sandpack',
       };
 
-      const snapshot = manager.convertToSnapshot(state);
+      const snapshot = managerPrivate.convertToSnapshot(state);
 
       // Verify nodes converted correctly
       expect(snapshot.nodes).toHaveLength(2);
@@ -1213,7 +1259,7 @@ describe('Canvas E2E - Orchestrator Integration', () => {
       const sessionId = 'e2e-null-selected-test';
       harness.createSession(sessionId);
 
-      const manager = harness.manager;
+      const managerPrivate = getManagerPrivate(harness.manager);
 
       const state: CanvasState = {
         nodes: [],
@@ -1221,7 +1267,7 @@ describe('Canvas E2E - Orchestrator Integration', () => {
         selectedNodeId: null,
       };
 
-      const snapshot = manager.convertToSnapshot(state);
+      const snapshot = managerPrivate.convertToSnapshot(state);
 
       expect(snapshot.selectedNodeId).toBeUndefined();
 
@@ -1234,26 +1280,27 @@ describe('Canvas E2E - Orchestrator Integration', () => {
       const sessionId = 'e2e-orchestrator-cleanup-test';
       harness.createSession(sessionId);
 
-      const manager = harness.manager;
+      const managerPrivate = getManagerPrivate(harness.manager);
 
       // Manually create an orchestrator for this session (simulating a complex request)
       const { createOrchestrator } = await import('../canvas/orchestrator/index.js');
       const orchestrator = createOrchestrator({ enableFastPath: false });
-      manager.orchestrators.set(sessionId, orchestrator);
+      managerPrivate.orchestrators.set(sessionId, orchestrator);
 
-      expect(manager.orchestrators.has(sessionId)).toBe(true);
+      expect(managerPrivate.orchestrators.has(sessionId)).toBe(true);
 
       // Delete session
       await harness.deleteSession(sessionId);
 
       // Orchestrator should be cleaned up
-      expect(manager.orchestrators.has(sessionId)).toBe(false);
+      expect(managerPrivate.orchestrators.has(sessionId)).toBe(false);
     });
 
     it('should clean up all orchestrators on dispose', async () => {
       // Create a fresh manager for this test
       const { CanvasSessionManager } = await import('../canvas/index.js');
       const manager = new CanvasSessionManager();
+      const managerPrivate = getManagerPrivate(manager);
 
       // Create sessions
       manager.createSession('session-1');
@@ -1261,16 +1308,16 @@ describe('Canvas E2E - Orchestrator Integration', () => {
 
       // Add orchestrators
       const { createOrchestrator } = await import('../canvas/orchestrator/index.js');
-      manager.orchestrators.set('session-1', createOrchestrator());
-      manager.orchestrators.set('session-2', createOrchestrator());
+      managerPrivate.orchestrators.set('session-1', createOrchestrator());
+      managerPrivate.orchestrators.set('session-2', createOrchestrator());
 
-      expect(manager.orchestrators.size).toBe(2);
+      expect(managerPrivate.orchestrators.size).toBe(2);
 
       // Dispose manager
       manager.dispose();
 
       // All orchestrators should be cleaned up
-      expect(manager.orchestrators.size).toBe(0);
+      expect(managerPrivate.orchestrators.size).toBe(0);
     });
   });
 });

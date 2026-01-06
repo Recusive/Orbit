@@ -11,7 +11,7 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 
-import { spacing, radii, fontSize, fontWeight, motion } from '../../../lib/designTokens';
+import { spacing, radii, fontSize, fontWeight, motion } from '../../../lib/design/designTokens';
 import { useSectionState } from '../hooks/useSectionState';
 
 export interface CollapsibleSectionProps {

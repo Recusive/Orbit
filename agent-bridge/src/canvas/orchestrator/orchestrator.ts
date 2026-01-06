@@ -7,7 +7,7 @@
 
 import { EventEmitter } from 'node:events';
 
-import { createLogger } from '../../logger.js';
+import { createLogger } from '../../common/logging/logger.js';
 
 import { getBlackboard } from './blackboard.js';
 import { getIntentAnalyzer } from './intent-analyzer.js';

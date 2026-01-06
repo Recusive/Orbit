@@ -3,9 +3,9 @@
  * Popular icons for the Libraries panel
  */
 
-import { LIBRARY_INFO, LIBRARY_SCHEMA_VERSION } from '../componentLibraryTypes';
+import { LIBRARY_INFO, LIBRARY_SCHEMA_VERSION } from '../components/componentLibraryTypes';
 
-import type { LibraryIndex, IndexedComponent } from '../componentLibraryTypes';
+import type { LibraryIndex, IndexedComponent } from '../components/componentLibraryTypes';
 
 const lucideLibrary = LIBRARY_INFO['lucide'];
 if (lucideLibrary === undefined) throw new Error('lucide library config missing from LIBRARY_INFO');

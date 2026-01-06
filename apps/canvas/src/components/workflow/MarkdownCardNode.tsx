@@ -7,12 +7,12 @@ import { IconMarkdown } from '@central-icons-react/round-outlined-radius-1-strok
 import { Handle, Position, NodeResizer } from '@xyflow/react';
 import React, { memo, useCallback, useState, useMemo, useRef, useEffect } from 'react';
 
-import { ContextMenu } from '../ContextMenu';
+import { ContextMenu } from '../menus/ContextMenu';
 
 import './MarkdownCardNode.css';
 
 import type { MarkdownCardNodeData, CardType } from '../../types/workflowTypes';
-import type { ContextMenuState, ContextMenuItem } from '../ContextMenu';
+import type { ContextMenuState, ContextMenuItem } from '../menus/ContextMenu';
 import type { NodeProps, Node } from '@xyflow/react';
 
 // ============================================================================

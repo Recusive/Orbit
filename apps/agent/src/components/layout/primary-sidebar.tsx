@@ -10,15 +10,15 @@ import {
 import { lazy, Suspense, useCallback, useState } from 'react';
 
 import type { SettingsDialogProps } from '@/components/modals/settings/settings-dialog';
-import type { ConversationSummary } from '@/stores/ui-store';
+import type { ConversationSummary } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/files';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useTauri } from '@/hooks/use-tauri';
-import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/constants';
-import { cn } from '@/lib/utils';
+import { useTauri } from '@/hooks/agent/use-tauri';
+import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/utils/constants';
+import { cn } from '@/lib/utils/utils';
 import {
   useUIStore,
   useIsLeftSidebarCollapsed,
@@ -26,7 +26,7 @@ import {
   useWorkspacePath,
   useWorkspaceConversations,
   useActiveConversationId,
-} from '@/stores/ui-store';
+} from '@/stores/ui/ui-store';
 
 // Custom sidebar toggle icon - thicker middle line when expanded
 const SidebarToggleIcon: FC<{ expanded: boolean }> = ({ expanded }) => (

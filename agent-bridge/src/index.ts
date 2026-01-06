@@ -42,32 +42,32 @@ import {
   getAgent,
   listAgents,
   updateAgent,
-} from './agent-definitions.js';
-import { CanvasSessionManager } from './canvas/index.js';
+} from './agent/definitions/agent-definitions.js';
 import {
   createCommand,
   deleteCommand,
   getCommand,
   listCommands,
   updateCommand,
-} from './command-definitions.js';
-import { createLogger } from './logger.js';
-import { BridgeRequestSchema } from './schemas.js';
-import { SessionManager } from './session-manager.js';
+} from './agent/definitions/command-definitions.js';
+import { SessionManager } from './agent/session/session-manager.js';
 import {
   cleanupOldSessions,
   deleteSession as deleteStoredSession,
   getSDKSessionIdForSession,
   saveSession,
   touchSession,
-} from './session-storage.js';
+} from './agent/session/session-storage.js';
+import { CanvasSessionManager } from './canvas/index.js';
+import { createLogger } from './common/logging/logger.js';
+import { BridgeRequestSchema } from './protocol/schemas.js';
 
 import type {
   BridgeCommandResponse,
   BridgeEvent,
   BridgeRequest,
   BridgeResponse,
-} from './protocol.js';
+} from './protocol/protocol.js';
 
 const logger = createLogger('AgentBridge');
 

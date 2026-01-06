@@ -3,9 +3,13 @@
  * Pre-indexed unstyled, accessible components from Tailwind Labs
  */
 
-import { LIBRARY_INFO, LIBRARY_SCHEMA_VERSION } from '../componentLibraryTypes';
+import { LIBRARY_INFO, LIBRARY_SCHEMA_VERSION } from '../components/componentLibraryTypes';
 
-import type { LibraryIndex, IndexedComponent, LibraryInfo } from '../componentLibraryTypes';
+import type {
+  LibraryIndex,
+  IndexedComponent,
+  LibraryInfo,
+} from '../components/componentLibraryTypes';
 
 // Headless UI library info (not yet in LIBRARY_INFO, will be added)
 const headlessLibrary: LibraryInfo = LIBRARY_INFO['headless'] ?? {

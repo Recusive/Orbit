@@ -11,7 +11,7 @@
 
 import React, { useState, useCallback } from 'react';
 
-import { spacing, radii, fontSize, fontWeight } from '../../../lib/designTokens';
+import { spacing, radii, fontSize, fontWeight } from '../../../lib/design/designTokens';
 import { ColorInput } from '../inputs/ColorInput';
 import { NumberInput } from '../inputs/NumberInput';
 import { AddRemoveControls, VisibilityToggle } from '../shared/AddRemoveControls';

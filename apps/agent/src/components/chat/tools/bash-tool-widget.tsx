@@ -4,7 +4,7 @@ import { codeToHtml } from 'shiki';
 
 import type { FC } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 interface BashToolWidgetProps {
   readonly command: string;

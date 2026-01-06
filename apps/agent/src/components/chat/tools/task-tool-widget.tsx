@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 import type { FC } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 // Zod schema for task output content blocks
 const ContentBlockSchema = z
