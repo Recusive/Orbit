@@ -6,9 +6,9 @@
 //!
 //! The [`diagnostics::crash`] module provides panic capture and crash logging:
 //!
-//! - [`crash::setup_panic_hook`] - Install the custom panic handler
-//! - [`crash::CrashManager`] - Manage and read crash logs
-//! - [`crash::CrashReport`] - Structured crash report data
+//! - [`diagnostics::crash::setup_panic_hook`] - Install the custom panic handler
+//! - [`diagnostics::crash::CrashManager`] - Manage and read crash logs
+//! - [`diagnostics::crash::CrashReport`] - Structured crash report data
 //!
 //! # Text Editing
 //!
