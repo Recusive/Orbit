@@ -1,8 +1,9 @@
-import { FolderOpen, GitBranch, Orbit, Terminal } from 'lucide-react';
+import { FolderOpen, GitBranch, Terminal } from 'lucide-react';
 import { useCallback } from 'react';
 
 import type { FC } from 'react';
 
+import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, openFileDialog, setWorkspacePath } from '@/lib/api/backend';
 import { cn } from '@/lib/utils/utils';
@@ -73,59 +74,54 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
         className
       )}
     >
-      {/* Logo/Branding */}
-      <div className="flex gap-3 items-center w-full max-w-[380px]">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Orbit className="h-7 w-7 text-primary" />
-            <span className="text-xl font-semibold text-foreground">Orbit</span>
-          </div>
-          <div className="flex gap-1.5 ml-9">
-            <span className="text-xs text-muted-foreground font-light">Editor</span>
-          </div>
+      {/* Logo/Branding - consistent with onboarding */}
+      <div className="flex items-center gap-4 w-full max-w-[380px]">
+        <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-primary/10">
+          <OrbitLogo size={32} className="text-primary" />
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-2xl font-semibold text-foreground tracking-tight">Orbit</span>
+          <span className="text-sm text-muted-foreground">AI Code Editor</span>
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="grid grid-cols-3 gap-3 w-full max-w-[380px]">
+      <div className="grid grid-cols-3 gap-2.5 w-full max-w-[380px]">
         <button
           type="button"
           onClick={handleOpenProject}
           className={cn(
-            'flex flex-col items-start justify-center gap-1.5 p-3 rounded-md cursor-pointer',
-            'bg-muted/50 border border-border',
-            'hover:bg-muted transition-colors',
-            'shadow-sm'
+            'flex flex-col items-start justify-center gap-1.5 p-3 rounded-lg cursor-pointer',
+            'bg-muted/30 border border-border',
+            'hover:bg-muted/50'
           )}
         >
           <FolderOpen className="h-4 w-4 text-foreground" />
-          <span className="text-xs text-foreground whitespace-nowrap">Open project</span>
+          <span className="text-xs text-foreground">Open project</span>
         </button>
 
         <button
           type="button"
           className={cn(
-            'flex flex-col items-start justify-center gap-1.5 p-3 rounded-md cursor-pointer',
-            'bg-muted/50 border border-border',
-            'hover:bg-muted transition-colors',
-            'shadow-sm'
+            'flex flex-col items-start justify-center gap-1.5 p-3 rounded-lg cursor-pointer',
+            'bg-muted/30 border border-border',
+            'hover:bg-muted/50'
           )}
         >
           <GitBranch className="h-4 w-4 text-foreground" />
-          <span className="text-xs text-foreground whitespace-nowrap">Clone repo</span>
+          <span className="text-xs text-foreground">Clone repo</span>
         </button>
 
         <button
           type="button"
           className={cn(
-            'flex flex-col items-start justify-center gap-1.5 p-3 rounded-md cursor-pointer',
-            'bg-muted/50 border border-border',
-            'hover:bg-muted transition-colors',
-            'shadow-sm'
+            'flex flex-col items-start justify-center gap-1.5 p-3 rounded-lg cursor-pointer',
+            'bg-muted/30 border border-border',
+            'hover:bg-muted/50'
           )}
         >
           <Terminal className="h-4 w-4 text-foreground" />
-          <span className="text-xs text-foreground whitespace-nowrap">Connect via SSH</span>
+          <span className="text-xs text-foreground">SSH</span>
         </button>
       </div>
 
@@ -156,7 +152,7 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
                 onClick={handleRecentProjectClick(project.path)}
                 className={cn(
                   'flex items-center px-1 py-0.5 rounded cursor-pointer',
-                  'hover:bg-accent/50 transition-colors',
+                  'hover:bg-accent/50',
                   'text-left outline-none'
                 )}
               >

@@ -1,10 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
-import { CheckCircle2, Key, Loader2, Terminal, XCircle } from 'lucide-react';
+import { ArrowRight, Check, Key, Loader2, Terminal } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { AuthMethod, ProviderStatus } from '@/stores/onboarding/provider-store';
 import type { FC } from 'react';
 
+import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -168,124 +169,135 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
     <div
       className={cn(
         'flex flex-col items-center justify-center h-full w-full',
+        'min-w-[420px] mx-auto p-12 gap-6 box-border',
         'bg-background',
         className
       )}
     >
-      <div className="flex flex-col gap-8 max-w-lg w-full px-8">
-        {/* Header */}
-        <div className="flex flex-col gap-2 text-center">
-          <h2 className="text-2xl font-semibold text-foreground">Connect an AI Provider</h2>
-          <p className="text-muted-foreground">
-            Orbit requires an AI provider to function. Connect Claude to get started.
-          </p>
+      {/* Logo/Branding - consistent with WelcomeStep */}
+      <div className="flex items-center gap-4 w-full max-w-[380px]">
+        <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-primary/10">
+          <OrbitLogo size={32} className="text-primary" />
         </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-2xl font-semibold text-foreground tracking-tight">Orbit</span>
+          <span className="text-sm text-muted-foreground">Connect Provider</span>
+        </div>
+      </div>
 
-        {/* Detection Status */}
-        {detection.isChecking ? (
-          <div className="flex items-center justify-center gap-3 p-6 rounded-lg border border-border bg-muted/30">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            <span className="text-muted-foreground">Detecting Claude Code CLI...</span>
-          </div>
-        ) : detection.cliInstalled && detection.hasKeychain ? (
-          /* CLI Detected with Keychain */
-          <div className="flex flex-col gap-4 p-6 rounded-lg border border-border bg-muted/30">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
-              <div className="flex flex-col gap-1">
-                <span className="font-medium text-foreground">Claude Code Detected</span>
-                <span className="text-sm text-muted-foreground">
-                  Found credentials in your keychain. Click below to use your existing Claude Code
-                  setup.
-                </span>
-              </div>
+      {/* Detection Status */}
+      {detection.isChecking ? (
+        <div
+          className={cn(
+            'flex flex-col items-center justify-center gap-3 p-6 w-full max-w-[380px]',
+            'rounded-lg border border-border bg-muted/30'
+          )}
+        >
+          <Loader2 className="h-6 w-6 animate-spin text-primary/60" />
+          <span className="text-sm text-muted-foreground">Detecting Claude Code...</span>
+        </div>
+      ) : detection.cliInstalled && detection.hasKeychain ? (
+        /* CLI Detected with Keychain */
+        <div
+          className={cn(
+            'flex flex-col gap-4 p-5 w-full max-w-[380px]',
+            'rounded-lg border border-border bg-muted/30'
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-500/10">
+              <Check className="h-4 w-4 text-green-500" />
             </div>
-            <Button onClick={handleUseKeychain} className="w-full">
-              <Terminal className="h-4 w-4 mr-2" />
-              Use Claude Code
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-foreground">Claude Code Detected</span>
+              <span className="text-xs text-muted-foreground">
+                Ready to use your existing setup
+              </span>
+            </div>
+          </div>
+          <Button
+            onClick={handleUseKeychain}
+            className={cn('w-full h-10 text-sm font-medium', 'bg-primary/90 hover:bg-primary')}
+          >
+            Continue with Claude Code
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+      ) : (
+        /* No CLI or show manual entry */
+        <div className="flex flex-col gap-4 w-full max-w-[380px]">
+          {/* Status message */}
+          <div
+            className={cn(
+              'flex items-center gap-3 px-4 py-3',
+              'rounded-lg border border-border bg-muted/30'
+            )}
+          >
+            <Terminal className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm text-muted-foreground">
+              {detection.cliInstalled && !detection.hasKeychain
+                ? 'CLI found but no credentials. Enter API key below.'
+                : 'Enter your Anthropic API key to continue.'}
+            </span>
+          </div>
+
+          {/* Manual API Key Entry */}
+          <div className="flex flex-col gap-4 p-5 rounded-lg border border-border">
+            <div className="flex items-center gap-2">
+              <Key className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">Anthropic API Key</span>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Input
+                type="password"
+                placeholder="sk-ant-..."
+                value={apiKey}
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  setValidationError(null);
+                }}
+                className={cn(
+                  'h-10',
+                  validationError !== null && 'border-destructive focus-visible:ring-destructive'
+                )}
+              />
+              {validationError !== null ? (
+                <span className="text-xs text-destructive">{validationError}</span>
+              ) : null}
+              <span className="text-xs text-muted-foreground">
+                Get your key from{' '}
+                <a
+                  href="https://console.anthropic.com/settings/keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  console.anthropic.com
+                </a>
+              </span>
+            </div>
+
+            <Button
+              onClick={handleValidateApiKey}
+              disabled={isValidating || apiKey.trim().length === 0}
+              className={cn('w-full h-10 text-sm font-medium', 'bg-primary/90 hover:bg-primary')}
+            >
+              {isValidating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Validating...
+                </>
+              ) : (
+                <>
+                  Continue
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </>
+              )}
             </Button>
           </div>
-        ) : (
-          /* No CLI or show manual entry */
-          <div className="flex flex-col gap-4">
-            {detection.cliInstalled && !detection.hasKeychain ? (
-              <div className="flex items-start gap-3 p-4 rounded-lg border border-border bg-muted/30">
-                <XCircle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium text-foreground">Claude Code Found</span>
-                  <span className="text-sm text-muted-foreground">
-                    CLI is installed but no credentials found. Please enter your API key below.
-                  </span>
-                </div>
-              </div>
-            ) : null}
-
-            {!detection.cliInstalled ? (
-              <div className="flex items-start gap-3 p-4 rounded-lg border border-border bg-muted/30">
-                <Terminal className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium text-foreground">Claude Code Not Found</span>
-                  <span className="text-sm text-muted-foreground">
-                    You can install Claude Code later, or enter your API key manually below.
-                  </span>
-                </div>
-              </div>
-            ) : null}
-
-            {/* Manual API Key Entry */}
-            <div className="flex flex-col gap-4 p-6 rounded-lg border border-border">
-              <div className="flex items-center gap-2">
-                <Key className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-foreground">Enter Anthropic API Key</span>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Input
-                  type="password"
-                  placeholder="sk-ant-..."
-                  value={apiKey}
-                  onChange={(e) => {
-                    setApiKey(e.target.value);
-                    setValidationError(null);
-                  }}
-                  className={cn(
-                    validationError !== null && 'border-destructive focus-visible:ring-destructive'
-                  )}
-                />
-                {validationError !== null ? (
-                  <span className="text-sm text-destructive">{validationError}</span>
-                ) : null}
-                <span className="text-xs text-muted-foreground">
-                  Get your API key from{' '}
-                  <a
-                    href="https://console.anthropic.com/settings/keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    console.anthropic.com
-                  </a>
-                </span>
-              </div>
-
-              <Button
-                onClick={handleValidateApiKey}
-                disabled={isValidating || apiKey.trim().length === 0}
-                className="w-full"
-              >
-                {isValidating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Validating...
-                  </>
-                ) : (
-                  'Continue'
-                )}
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

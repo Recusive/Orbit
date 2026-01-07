@@ -1,7 +1,8 @@
-import { Orbit } from 'lucide-react';
+import { ArrowRight, Sparkles, Zap } from 'lucide-react';
 
 import type { FC } from 'react';
 
+import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -13,35 +14,68 @@ export interface WelcomeStepProps {
 /**
  * Welcome screen shown on first launch.
  * Displays Orbit branding and a "Get Started" button.
+ * Matches the agent UI design system with compact, left-aligned layout.
  */
 export const WelcomeStep: FC<WelcomeStepProps> = ({ onContinue, className }) => {
   return (
     <div
       className={cn(
         'flex flex-col items-center justify-center h-full w-full',
+        'min-w-[420px] mx-auto p-12 gap-6 box-border',
         'bg-background',
         className
       )}
     >
-      <div className="flex flex-col items-center gap-8 max-w-md text-center">
-        {/* Logo */}
-        <div className="flex flex-col items-center gap-4">
-          <div className="p-4 rounded-2xl bg-primary/10">
-            <Orbit className="h-16 w-16 text-primary" />
-          </div>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-semibold text-foreground">Welcome to Orbit</h1>
-            <p className="text-muted-foreground text-base">
-              The AI-powered code editor for modern developers.
-            </p>
-          </div>
+      {/* Logo/Branding */}
+      <div className="flex items-center gap-4 w-full max-w-[380px]">
+        <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-primary/10">
+          <OrbitLogo size={32} className="text-primary" />
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-2xl font-semibold text-foreground tracking-tight">Orbit</span>
+          <span className="text-sm text-muted-foreground">AI Code Editor</span>
+        </div>
+      </div>
+
+      {/* Welcome Card */}
+      <div
+        className={cn(
+          'flex flex-col gap-4 p-5 rounded-lg w-full max-w-[380px]',
+          'bg-muted/30 border border-border'
+        )}
+      >
+        <div className="flex flex-col gap-1.5">
+          <h1 className="text-base font-medium text-foreground">Welcome</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Orbit brings AI-powered coding assistance directly into your editor. Let&apos;s get you
+            set up.
+          </p>
         </div>
 
-        {/* Get Started Button */}
-        <Button size="lg" onClick={onContinue} className="px-8 py-3 text-base font-medium">
-          Get Started
-        </Button>
+        {/* Feature highlights - compact list */}
+        <div className="flex flex-col gap-2 pt-1">
+          <div className="flex items-center gap-2.5 text-sm text-foreground/80">
+            <Sparkles className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+            <span>Intelligent code completion</span>
+          </div>
+          <div className="flex items-center gap-2.5 text-sm text-foreground/80">
+            <Zap className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+            <span>Natural language to code</span>
+          </div>
+        </div>
       </div>
+
+      {/* Get Started Button */}
+      <Button
+        onClick={onContinue}
+        className={cn(
+          'w-full max-w-[380px] h-10 text-sm font-medium',
+          'bg-primary/90 hover:bg-primary'
+        )}
+      >
+        Get Started
+        <ArrowRight className="h-4 w-4 ml-2" />
+      </Button>
     </div>
   );
 };
