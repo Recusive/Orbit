@@ -702,10 +702,24 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
 }) => {
   const [activeSection, setActiveSection] = useState<SettingsSection>(defaultSection);
 
+  // Track which async sections have been visited (so we only mount them once)
+  // Once visited, they stay mounted to preserve fetched data
+  const [visitedSubagents, setVisitedSubagents] = useState(false);
+  const [visitedCommands, setVisitedCommands] = useState(false);
+
+  // Mark async sections as visited when navigating to them
+  useEffect(() => {
+    if (activeSection === 'subagents') setVisitedSubagents(true);
+    if (activeSection === 'commands') setVisitedCommands(true);
+  }, [activeSection]);
+
   // Reset to defaultSection when dialog opens
   useEffect(() => {
     if (open) {
       setActiveSection(defaultSection);
+      // Reset visited state when dialog opens fresh
+      setVisitedSubagents(defaultSection === 'subagents');
+      setVisitedCommands(defaultSection === 'commands');
     }
   }, [open, defaultSection]);
 
@@ -741,7 +755,8 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
     icon: <FlaskConical className="h-4 w-4" />,
   };
 
-  const renderContent = (): ReactNode => {
+  // Render static content (sections without async data) via switch
+  const renderStaticContent = (): ReactNode => {
     switch (activeSection) {
       case 'general':
         return <GeneralSettings />;
@@ -749,10 +764,6 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
         return <AppearanceSettings />;
       case 'agent':
         return <AgentSettings />;
-      case 'subagents':
-        return <SubagentsSettings />;
-      case 'commands':
-        return <SlashCommandsSettings />;
       case 'shortcuts':
         return <ShortcutsSettings />;
       case 'browser':
@@ -767,8 +778,15 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
         return <AccountSettings />;
       case 'feedback':
         return <FeedbackSettings />;
+      case 'subagents':
+      case 'commands':
+        // These are rendered separately (kept mounted to prevent re-fetch flash)
+        return null;
     }
   };
+
+  // Check if we're on an async section (subagents or commands)
+  const isAsyncSection = activeSection === 'subagents' || activeSection === 'commands';
 
   const getSectionTitle = (): string => {
     if (activeSection === 'feedback') return feedbackItem.label;
@@ -835,7 +853,33 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
 
             {/* Main content */}
             <div className="flex-1 overflow-auto bg-card relative">
-              <div className="absolute inset-0 p-6 overflow-auto">{renderContent()}</div>
+              {/* Static sections - render via switch (unmounted when inactive) */}
+              {!isAsyncSection && (
+                <div className="absolute inset-0 p-6 overflow-auto">{renderStaticContent()}</div>
+              )}
+
+              {/* Async sections - kept mounted once visited to prevent re-fetch flash */}
+              {/* These fetch data on mount; once visited, they stay mounted to preserve data */}
+              {visitedSubagents ? (
+                <div
+                  className={cn(
+                    'absolute inset-0 p-6 overflow-auto',
+                    activeSection !== 'subagents' && 'hidden'
+                  )}
+                >
+                  <SubagentsSettings />
+                </div>
+              ) : null}
+              {visitedCommands ? (
+                <div
+                  className={cn(
+                    'absolute inset-0 p-6 overflow-auto',
+                    activeSection !== 'commands' && 'hidden'
+                  )}
+                >
+                  <SlashCommandsSettings />
+                </div>
+              ) : null}
             </div>
           </div>
         </DialogPrimitive.Content>

@@ -9,12 +9,12 @@ import {
 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 
-import type { SettingsDialogProps } from '@/components/modals/settings/settings-dialog';
+import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/files';
-import { CreateWorktreeDialog } from '@/components/modals/create-worktree-dialog';
+import { CreateWorktreeDialog } from '@/components/modals';
 import { WorktreeItem } from '@/components/sidebar/WorktreeItem';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';

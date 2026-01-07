@@ -1,15 +1,16 @@
 import { Ellipsis, Search, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
-import type { BrowserPanelProps } from '@/components/browser/browser-panel';
 import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { FileChange } from '@/stores/file/file-store';
 import type { ViewedFile } from '@/stores/file/file-viewer-store';
+import type { AllotmentHandle } from 'allotment';
 import type { FC } from 'react';
 
 import { FileIcon, FileViewer } from '@/components/files';
 import { FilesChangedList, SourceControlTab } from '@/components/git';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Switch } from '@/components/ui/switch';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { lspDidClose, lspDidOpen } from '@/lib/api/backend';
@@ -29,9 +30,9 @@ import { generateUUID } from '@/types/protocol';
 const LazyBrowserPanel = lazy(() =>
   import('@/components/browser/browser-panel').then((m) => ({ default: m.BrowserPanel }))
 );
-const BrowserPanel: FC<BrowserPanelProps> = (props) => (
+const BrowserPanel: FC = () => (
   <Suspense fallback={null}>
-    <LazyBrowserPanel {...props} />
+    <LazyBrowserPanel />
   </Suspense>
 );
 
@@ -45,7 +46,13 @@ const TerminalPanel: FC<TerminalPanelProps> = (props) => (
 );
 
 interface ActivityPanelProps {
-  readonly width: number;
+  /**
+   * Whether this ActivityPanel instance can render the terminal.
+   * Used to prevent duplicate terminal rendering when ActivityPanel
+   * appears in multiple layout containers (CSS display toggle).
+   * Defaults to true for backwards compatibility.
+   */
+  readonly canRenderTerminal?: boolean;
 }
 
 interface EditorTabProps {
@@ -354,7 +361,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
   );
 };
 
-export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
+export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true }) => {
   const hasOpenFiles = useHasOpenFiles();
   const openTabs = useOpenTabs();
   const activeTabPath = useFileViewerStore((state) => state.activeTabPath);
@@ -366,12 +373,36 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
   const toggleWordWrap = useFileViewerStore((state) => state.toggleWordWrap);
   const activeTab = useActivityTab();
   const setActiveTab = useUIStore((state) => state.setActivityTab);
-  const { bottomPanelOpen } = useUIStore();
+  const { bottomPanelOpen, bottomPanelHeight, setBottomPanelHeight } = useUIStore();
   const terminalPosition = useTerminalPosition();
   const prevHasOpenFiles = useRef(hasOpenFiles);
   const isBrowserActive = useBrowserIsActive();
   const { postMessage } = useTauri({});
   const prevActiveTab = useRef(activeTab);
+
+  // Ref for terminal allotment - used to programmatically resize
+  const terminalAllotmentRef = useRef<AllotmentHandle>(null);
+
+  // Resize terminal when bottomPanelOpen changes
+  useEffect(() => {
+    const allotment = terminalAllotmentRef.current;
+    if (!allotment || terminalPosition !== 'activity') return;
+
+    // Reset to preferred sizes - allotment will respect minSize
+    allotment.reset();
+  }, [bottomPanelOpen, terminalPosition]);
+
+  // Track terminal size when user drags - save to shared store
+  const handleTerminalSizeChange = useCallback(
+    (sizes: number[]): void => {
+      const terminalSize = sizes[1];
+      if (terminalSize !== undefined && terminalSize > 50 && bottomPanelOpen) {
+        // Only save if it's a meaningful size (not collapsed)
+        setBottomPanelHeight(terminalSize);
+      }
+    },
+    [bottomPanelOpen, setBottomPanelHeight]
+  );
 
   // Auto-switch to File tab only when files are first opened
   useEffect(() => {
@@ -508,8 +539,9 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
     [openFileWithDiff, setActiveTab, openTabs]
   );
 
-  return (
-    <div className="@container h-full flex flex-col bg-chat-area shrink-0" style={{ width }}>
+  // Content section - extracted for use in allotment
+  const contentSection = (
+    <>
       {/* Header - Only show VS Code style tabs when files are open */}
       {activeTab === 'file' && hasOpenFiles ? (
         <TabsHeader
@@ -532,18 +564,53 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
             <FilesChangedList onOpenFile={handleOpenChangedFile} />
           </div>
         ) : activeTab === 'browser' ? (
-          <BrowserPanel width={width} />
+          <BrowserPanel />
         ) : (
           <div className="h-full overflow-y-auto">
             <SourceControlTab />
           </div>
         )}
       </div>
+    </>
+  );
 
-      {/* Terminal Panel (bottom of activity panel) - show when position is 'activity' */}
-      {terminalPosition === 'activity' ? (
-        <TerminalPanel variant="embedded" collapsed={!bottomPanelOpen} />
-      ) : null}
+  // Only show terminal if position is 'activity' AND this instance is allowed to render it
+  // (prevents duplicate terminals when ActivityPanel appears in multiple layout containers)
+  const showActivityTerminal = terminalPosition === 'activity' && canRenderTerminal;
+
+  return (
+    <div className="@container h-full w-full flex flex-col bg-chat-area">
+      {/* Terminal in activity layout */}
+      <div
+        className="flex-1 flex flex-col"
+        style={{ display: showActivityTerminal ? 'flex' : 'none' }}
+      >
+        <ResizablePanelGroup
+          ref={terminalAllotmentRef}
+          direction="vertical"
+          className="flex-1"
+          onChange={handleTerminalSizeChange}
+        >
+          <ResizablePanel minSize={0}>
+            <div className="h-full flex flex-col">{contentSection}</div>
+          </ResizablePanel>
+
+          <ResizablePanel preferredSize={bottomPanelOpen ? bottomPanelHeight : 32} minSize={32}>
+            {/* Only render TerminalPanel when this layout is active - xterm can only attach to one container */}
+            {showActivityTerminal ? (
+              <TerminalPanel variant="embedded" collapsed={!bottomPanelOpen} />
+            ) : null}
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+
+      {/* No terminal layout */}
+      <div
+        className="flex-1 h-full flex flex-col"
+        style={{ display: showActivityTerminal ? 'none' : 'flex' }}
+      >
+        {contentSection}
+      </div>
     </div>
   );
 };

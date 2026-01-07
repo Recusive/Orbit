@@ -13,7 +13,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SearchOptions } from '@/components/terminal/terminal-search-bar';
 import type { FC } from 'react';
 
-import { ResizeHandle } from '@/components/layout/resize-handle';
 import { TerminalContextMenu } from '@/components/terminal/terminal-context-menu';
 import { TerminalSearchBar } from '@/components/terminal/terminal-search-bar';
 import { ContextMenuTrigger } from '@/components/ui/context-menu';
@@ -21,6 +20,9 @@ import { useTerminalInstanceManager } from '@/hooks/terminal/use-terminal-instan
 import { HEIGHTS } from '@/lib/utils/constants';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
 import { useUIStore, useTerminalPosition } from '@/stores/ui/ui-store';
+
+// Terminal header uses headerBar height (35px) to match chat header
+const TERMINAL_HEADER_HEIGHT = HEIGHTS.headerBar;
 
 export interface TerminalPanelProps {
   /**
@@ -34,7 +36,7 @@ export interface TerminalPanelProps {
 }
 
 export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = false }) => {
-  const { bottomPanelHeight, toggleBottomPanel, cycleTerminalPosition } = useUIStore();
+  const { toggleBottomPanel, cycleTerminalPosition } = useUIStore();
   const terminalPosition = useTerminalPosition();
   const sessions = useTerminalStore((state) => state.sessions);
   const activeSessionId = useTerminalStore((state) => state.activeSessionId);
@@ -106,6 +108,12 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
         }
       } else {
         terminalContainerRefs.current.delete(sessionId);
+        // Detach terminal when container is removed (component unmount)
+        // This ensures clean re-attachment when switching terminal positions
+        const instance = terminalManager.getInstance(sessionId);
+        if (instance) {
+          instance.detachFromElement();
+        }
       }
     },
     [terminalManager]
@@ -324,163 +332,160 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
   const ToggleIcon = collapsed ? ChevronUp : ChevronDown;
 
   return (
-    <>
-      {!collapsed ? <ResizeHandle direction="horizontal" target="bottom" /> : null}
-      <div
-        ref={panelRef}
-        className={`${panelBackground} relative z-10 flex flex-col shrink-0 ${collapsed ? 'border-t border-border' : ''}`}
-        style={{ height: collapsed ? HEIGHTS.panelHeader : bottomPanelHeight }}
+    <div
+      ref={panelRef}
+      className={`${panelBackground} relative z-10 flex flex-col border-l border-border/50 ${collapsed ? 'shrink-0' : 'h-full'}`}
+      style={collapsed ? { height: TERMINAL_HEADER_HEIGHT } : undefined}
+    >
+      <header
+        className="relative z-10 flex items-center justify-between px-2 shrink-0 border-t border-b border-border bg-sidebar"
+        style={{ height: TERMINAL_HEADER_HEIGHT }}
       >
-        <header
-          className="relative z-10 flex items-center justify-between px-2 shrink-0 border-b border-border bg-sidebar"
-          style={{ height: HEIGHTS.panelHeader }}
-        >
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <SquareTerminal className="h-4 w-4 text-muted-foreground shrink-0" />
-            {/* Terminal tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden flex-1 min-w-0 scrollbar-none pr-4">
-              {sessions.map((session) => {
-                // Priority: custom name > foreground process > default name
-                const displayName =
-                  session.customName ?? session.foregroundProcess?.name ?? session.name;
-                const isEditing = editingSessionId === session.id;
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <SquareTerminal className="h-4 w-4 text-muted-foreground shrink-0" />
+          {/* Terminal tabs */}
+          <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden flex-1 min-w-0 scrollbar-none pr-4">
+            {sessions.map((session) => {
+              // Priority: custom name > foreground process > default name
+              const displayName =
+                session.customName ?? session.foregroundProcess?.name ?? session.name;
+              const isEditing = editingSessionId === session.id;
 
-                return (
-                  <div
-                    key={session.id}
-                    className={`group relative flex items-center px-2 py-0.5 text-xs rounded cursor-pointer shrink-0 ${
-                      session.id === activeSessionId
-                        ? 'bg-accent text-accent-foreground'
-                        : 'text-muted-foreground hover:bg-accent/50'
-                    }`}
-                    onClick={() => {
-                      handleSwitchTerminal(session.id);
-                    }}
-                    onDoubleClick={(e) => {
-                      e.stopPropagation();
-                      handleStartRename(session.id, displayName);
-                    }}
-                  >
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        className="bg-transparent border-none outline-none text-xs w-20 min-w-0"
-                        value={editValue}
-                        onChange={(e) => {
-                          setEditValue(e.target.value);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleFinishRename(session.id);
-                          } else if (e.key === 'Escape') {
-                            handleCancelRename();
-                          }
-                          e.stopPropagation();
-                        }}
-                        onBlur={() => {
+              return (
+                <div
+                  key={session.id}
+                  className={`group relative flex items-center px-2 py-0.5 text-xs rounded cursor-pointer shrink-0 ${
+                    session.id === activeSessionId
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-muted-foreground hover:bg-accent/50'
+                  }`}
+                  onClick={() => {
+                    handleSwitchTerminal(session.id);
+                  }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    handleStartRename(session.id, displayName);
+                  }}
+                >
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      className="bg-transparent border-none outline-none text-xs w-20 min-w-0"
+                      value={editValue}
+                      onChange={(e) => {
+                        setEditValue(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
                           handleFinishRename(session.id);
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                        autoFocus
-                      />
-                    ) : (
-                      <span title="Double-click to rename">{displayName}</span>
-                    )}
-                    <button
-                      className="ml-1 w-0 overflow-hidden opacity-0 group-hover:w-4 group-hover:opacity-100 transition-all duration-150 ease-out flex items-center justify-center hover:text-foreground"
+                        } else if (e.key === 'Escape') {
+                          handleCancelRename();
+                        }
+                        e.stopPropagation();
+                      }}
+                      onBlur={() => {
+                        handleFinishRename(session.id);
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleCloseSession(session.id);
                       }}
-                      title="Close terminal"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                      autoFocus
+                    />
+                  ) : (
+                    <span title="Double-click to rename">{displayName}</span>
+                  )}
+                  <button
+                    className="ml-1 w-0 overflow-hidden opacity-0 group-hover:w-4 group-hover:opacity-100 transition-all duration-150 ease-out flex items-center justify-center hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCloseSession(session.id);
+                    }}
+                    title="Close terminal"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
-          <div className="flex items-center gap-0.5 shrink-0">
-            <button
-              className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-              onClick={handleOpenSearch}
-              title="Find (Cmd+F)"
-            >
-              <Search className="h-4 w-4" />
-            </button>
-            <button
-              className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-              onClick={handleNewSession}
-              title="New Terminal"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-            <button
-              className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-              onClick={cycleTerminalPosition}
-              title={cycleTitle}
-            >
-              <CycleIcon className="h-4 w-4" />
-            </button>
-            <button
-              className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-              onClick={toggleBottomPanel}
-              title={collapsed ? 'Expand terminal' : 'Collapse terminal'}
-            >
-              <ToggleIcon className="h-4 w-4" />
-            </button>
-          </div>
-        </header>
-        {/* Search bar - conditionally rendered */}
-        {!collapsed && showSearch ? (
-          <TerminalSearchBar
-            onFindNext={handleFindNext}
-            onFindPrevious={handleFindPrevious}
-            onClose={handleCloseSearch}
-            onClear={handleClearSearch}
-          />
-        ) : null}
-        {!collapsed ? (
-          <TerminalContextMenu
-            onCopy={handleCopy}
-            onPaste={handlePaste}
-            onClear={handleClear}
-            onFind={handleOpenSearch}
-            onRename={handleRenameFromMenu}
-            onKill={handleKillFromMenu}
-            hasSelection={hasSelection}
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            onClick={handleOpenSearch}
+            title="Find (Cmd+F)"
           >
-            <ContextMenuTrigger asChild>
-              <div className="flex-1 overflow-hidden relative bg-sidebar">
-                {/* Render ALL terminal containers - visibility controlled by manager */}
-                {sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    ref={(el) => {
-                      setTerminalContainerRef(session.id, el);
-                    }}
-                    className="absolute inset-0"
-                    style={{
-                      pointerEvents: session.id === activeSessionId ? 'auto' : 'none',
-                    }}
-                    onClick={() => {
-                      terminalManager.getInstance(session.id)?.focus();
-                    }}
-                  />
-                ))}
-                {sessions.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                    No terminal session
-                  </div>
-                ) : null}
-              </div>
-            </ContextMenuTrigger>
-          </TerminalContextMenu>
-        ) : null}
-      </div>
-    </>
+            <Search className="h-4 w-4" />
+          </button>
+          <button
+            className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            onClick={handleNewSession}
+            title="New Terminal"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            onClick={cycleTerminalPosition}
+            title={cycleTitle}
+          >
+            <CycleIcon className="h-4 w-4" />
+          </button>
+          <button
+            className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            onClick={toggleBottomPanel}
+            title={collapsed ? 'Expand terminal' : 'Collapse terminal'}
+          >
+            <ToggleIcon className="h-4 w-4" />
+          </button>
+        </div>
+      </header>
+      {/* Search bar - conditionally rendered */}
+      {!collapsed && showSearch ? (
+        <TerminalSearchBar
+          onFindNext={handleFindNext}
+          onFindPrevious={handleFindPrevious}
+          onClose={handleCloseSearch}
+          onClear={handleClearSearch}
+        />
+      ) : null}
+      {!collapsed ? (
+        <TerminalContextMenu
+          onCopy={handleCopy}
+          onPaste={handlePaste}
+          onClear={handleClear}
+          onFind={handleOpenSearch}
+          onRename={handleRenameFromMenu}
+          onKill={handleKillFromMenu}
+          hasSelection={hasSelection}
+        >
+          <ContextMenuTrigger asChild>
+            <div className="flex-1 overflow-hidden relative bg-sidebar">
+              {/* Render ALL terminal containers - visibility controlled by manager */}
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  ref={(el) => {
+                    setTerminalContainerRef(session.id, el);
+                  }}
+                  className="absolute inset-0"
+                  style={{
+                    pointerEvents: session.id === activeSessionId ? 'auto' : 'none',
+                  }}
+                  onClick={() => {
+                    terminalManager.getInstance(session.id)?.focus();
+                  }}
+                />
+              ))}
+              {sessions.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  No terminal session
+                </div>
+              ) : null}
+            </div>
+          </ContextMenuTrigger>
+        </TerminalContextMenu>
+      ) : null}
+    </div>
   );
 };

@@ -163,6 +163,13 @@ const AgentEditor: FC<AgentEditorProps> = ({
     };
 
     onGeneratedAgent(handleGenerated);
+
+    // Cleanup: Clear callback when dialog closes to prevent stale updates
+    return () => {
+      onGeneratedAgent(() => {
+        // No-op - dialog is closed
+      });
+    };
   }, [isOpen, onGeneratedAgent]);
 
   const handleGenerate = (): void => {

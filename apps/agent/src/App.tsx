@@ -6,7 +6,7 @@ import type { FC } from 'react';
 import { HeaderBar } from '@/components/layout/header-bar';
 import { RootLayout } from '@/components/layout/root-layout';
 import { StatusBar } from '@/components/layout/status-bar';
-import { CrashNotification } from '@/components/modals/crash-notification';
+import { CrashNotification } from '@/components/modals';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { WelcomePage } from '@/components/welcome';
 import { useBrowser } from '@/hooks/browser/use-browser';

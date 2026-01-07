@@ -829,3 +829,14 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   contain: strict;
   overflow-anchor: none;
 }
+
+/* Allotment (resizable panels) - style the separator border */
+:root {
+  --separator-border: var(--border);
+  --focus-border: var(--primary);
+}
+
+html.dark {
+  --separator-border: rgba(255, 255, 255, 0.1);
+  --focus-border: var(--primary);
+}

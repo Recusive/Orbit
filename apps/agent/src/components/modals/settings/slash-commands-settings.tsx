@@ -207,6 +207,13 @@ const CommandEditor: FC<CommandEditorProps> = ({
     };
 
     onGeneratedCommand(handleGenerated);
+
+    // Cleanup: Clear callback when dialog closes to prevent stale updates
+    return () => {
+      onGeneratedCommand(() => {
+        // No-op - dialog is closed
+      });
+    };
   }, [isOpen, onGeneratedCommand]);
 
   const handleGenerate = (): void => {

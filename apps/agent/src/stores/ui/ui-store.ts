@@ -250,6 +250,14 @@ export const useUIStore = create<UIStore>()(
 
     setWorkspace: (path: string): void => {
       set((state) => {
+        // Enable transition mode BEFORE workspace change takes effect
+        // This ensures ChatArea mounts with visibility: hidden, preventing
+        // the flash when transitioning from WelcomePage → ChatArea.
+        // The useLayoutEffect stabilization in chat-area.tsx will handle
+        // revealing content once layout is stable.
+        state.isLoadingConversation = true;
+        state.isConversationTransitioning = true;
+
         state.workspacePath = path;
         // Extract folder name from path (last segment)
         const segments = path.split(/[/\\]/).filter(Boolean);
@@ -388,6 +396,8 @@ export const useUIStore = create<UIStore>()(
     cycleTerminalPosition: (): void => {
       set((state) => {
         state.terminalPosition = state.terminalPosition === 'activity' ? 'both' : 'activity';
+        // Ensure terminal is open when cycling positions
+        state.bottomPanelOpen = true;
       });
     },
 

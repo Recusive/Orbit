@@ -92,7 +92,6 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   const {
     setWorkspace,
     setActiveConversation,
-    setLoadingConversation,
     setConversationTransitioning,
     setConversations,
     addConversation,
@@ -579,8 +578,10 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
             }
           }
 
-          // Reveal content after all state is updated
-          setLoadingConversation(false);
+          // NOTE: Do NOT call setLoadingConversation(false) here!
+          // The useLayoutEffect in chat-area.tsx will handle revealing content
+          // after the layout has stabilized. This prevents the flash caused by
+          // content becoming visible before React has finished rendering.
           break;
         }
 
@@ -766,7 +767,6 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setWorkspace,
       workspacePath,
       setActiveConversation,
-      setLoadingConversation,
       setConversationTransitioning,
       setConversations,
       addConversation,

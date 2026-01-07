@@ -13,11 +13,7 @@ import {
 } from '@/stores/browser/browser-store';
 import { generateUUID } from '@/types/protocol';
 
-export interface BrowserPanelProps {
-  readonly width: number;
-}
-
-export const BrowserPanel: FC<BrowserPanelProps> = ({ width }) => {
+export const BrowserPanel: FC = () => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const isActive = useBrowserIsActive();
   const error = useBrowserError();
@@ -170,7 +166,7 @@ export const BrowserPanel: FC<BrowserPanelProps> = ({ width }) => {
   }, [postMessage]);
 
   return (
-    <div className="h-full flex flex-col bg-background" style={{ width }}>
+    <div className="h-full w-full flex flex-col bg-background">
       {/* Toolbar */}
       <BrowserToolbar
         onBack={handleBack}

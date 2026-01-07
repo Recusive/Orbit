@@ -1,41 +1,30 @@
 'use client';
 
-import { GripVertical } from 'lucide-react';
-import { Group, Panel, Separator } from 'react-resizable-panels';
+import { Allotment } from 'allotment';
+import { forwardRef } from 'react';
+import 'allotment/dist/style.css';
 
-import type { GroupProps, SeparatorProps } from 'react-resizable-panels';
+import type { AllotmentHandle, AllotmentProps } from 'allotment';
+import type { ReactNode } from 'react';
 
 import { cn } from '@/lib/utils/utils';
 
-const ResizablePanelGroup = ({ className, ...props }: GroupProps): React.JSX.Element => (
-  <Group
-    className={cn('flex h-full w-full data-[orientation=vertical]:flex-col', className)}
-    {...props}
-  />
+interface ResizablePanelGroupProps extends Omit<AllotmentProps, 'vertical'> {
+  direction?: 'horizontal' | 'vertical';
+  children: ReactNode;
+}
+
+export const ResizablePanelGroup = forwardRef<AllotmentHandle, ResizablePanelGroupProps>(
+  ({ direction = 'horizontal', className, children, ...props }, ref) => (
+    <Allotment ref={ref} vertical={direction === 'vertical'} className={cn(className)} {...props}>
+      {children}
+    </Allotment>
+  )
 );
+ResizablePanelGroup.displayName = 'ResizablePanelGroup';
 
-const ResizablePanel = Panel;
+export const ResizablePanel = Allotment.Pane;
 
-const ResizableHandle = ({
-  withHandle,
-  className,
-  ...props
-}: SeparatorProps & {
-  withHandle?: boolean;
-}): React.JSX.Element => (
-  <Separator
-    className={cn(
-      'relative flex w-px items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 data-[orientation=vertical]:h-px data-[orientation=vertical]:w-full data-[orientation=vertical]:after:left-0 data-[orientation=vertical]:after:h-1 data-[orientation=vertical]:after:w-full data-[orientation=vertical]:after:-translate-y-1/2 data-[orientation=vertical]:after:translate-x-0 [&[data-orientation=vertical]>div]:rotate-90',
-      className
-    )}
-    {...props}
-  >
-    {withHandle === true ? (
-      <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-border">
-        <GripVertical className="h-2.5 w-2.5" />
-      </div>
-    ) : null}
-  </Separator>
-);
-
-export { ResizablePanelGroup, ResizablePanel, ResizableHandle };
+// Allotment has built-in handles, but we export this for API compatibility
+// It's essentially a no-op since Allotment handles the resize bars internally
+export const ResizableHandle = (): null => null;
