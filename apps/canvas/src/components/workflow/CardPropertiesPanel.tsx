@@ -195,7 +195,7 @@ function EmptyState(): React.JSX.Element {
 
       {/* Empty State - Welcoming design */}
       <div className="flex flex-1 flex-col items-center justify-center p-10 text-center">
-        <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-muted to-muted/50">
+        <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-lg bg-gradient-to-br from-muted to-muted/50">
           <Layers className="h-9 w-9 text-muted-foreground/60" />
         </div>
         <p className="mb-2 text-[15px] font-medium text-foreground/80">No card selected</p>
@@ -385,7 +385,7 @@ export function CardPropertiesPanel({
               Properties
             </p>
             <div className="mt-2 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-primary/5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-primary/5">
                 <TypeIcon className="h-5 w-5 text-primary" />
               </div>
               <p className="text-[15px] font-medium text-foreground">{card.name}</p>
@@ -456,7 +456,7 @@ export function CardPropertiesPanel({
                       handleTypeChange(ct.type);
                     }}
                     className={cn(
-                      'relative flex flex-col items-center justify-center gap-1.5 rounded-xl p-3 text-xs',
+                      'relative flex flex-col items-center justify-center gap-1.5 rounded-lg p-3 text-xs',
                       'transition-all duration-200 ease-out',
                       'hover:scale-[1.02]',
                       'active:scale-[0.98]',
@@ -528,7 +528,7 @@ export function CardPropertiesPanel({
           <CollapsibleContent className="space-y-4">
             {/* Conflict Warning */}
             {card.fileConflict !== undefined && (
-              <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 text-sm">
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-4 text-sm">
                 <p className="mb-2 font-semibold text-amber-600">File Conflict Detected</p>
                 <p className="mb-3 text-xs text-muted-foreground">
                   The file was modified externally. Choose how to resolve:
@@ -561,7 +561,7 @@ export function CardPropertiesPanel({
             {card.filePath !== undefined ? (
               <>
                 {/* Linked file display */}
-                <div className="flex items-center gap-3 rounded-xl bg-muted/40 px-4 py-3 text-xs">
+                <div className="flex items-center gap-3 rounded-lg bg-muted/40 px-4 py-3 text-xs">
                   <FileText className="h-5 w-5 flex-shrink-0 text-primary/70" />
                   <span className="flex-1 break-all text-foreground/80">{card.filePath}</span>
                 </div>
@@ -699,7 +699,7 @@ export function CardPropertiesPanel({
           <button
             onClick={handleDelete}
             className={cn(
-              'w-full flex items-center justify-center gap-2 rounded-xl py-3',
+              'w-full flex items-center justify-center gap-2 rounded-lg py-3',
               'text-sm font-medium',
               'bg-muted/30 text-muted-foreground',
               'transition-all duration-200 ease-out',

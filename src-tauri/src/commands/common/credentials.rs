@@ -115,9 +115,7 @@ fn get_machine_key() -> [u8; 32] {
         if let Ok(hostname) = hostname::get() {
             hasher.update(hostname.to_string_lossy().as_bytes());
         }
-        if let Ok(user) = std::env::var("USER").or_else(|_| std::env::var("USERNAME")) {
-            hasher.update(user.as_bytes());
-        }
+        hasher.update(whoami::username().as_bytes());
     }
 
     // Finalize and get the key

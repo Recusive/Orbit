@@ -587,22 +587,22 @@ function ColorInput({ label, value, onChange, placeholder }: ColorInputProps): R
 						border: none;
 						padding: 0;
 						cursor: pointer;
-						border-radius: 8px;
+						border-radius: var(--radius-lg);
 						appearance: none;
 						-webkit-appearance: none;
 						background: none;
 					}
 					.color-swatch-input::-webkit-color-swatch-wrapper {
 						padding: 0;
-						border-radius: 8px;
+						border-radius: var(--radius-lg);
 					}
 					.color-swatch-input::-webkit-color-swatch {
 						border: none;
-						border-radius: 8px;
+						border-radius: var(--radius-lg);
 					}
 					.color-swatch-input::-moz-color-swatch {
 						border: none;
-						border-radius: 8px;
+						border-radius: var(--radius-lg);
 					}
 				`}</style>
         <div style={styles.colorSwatch}>

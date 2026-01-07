@@ -56,7 +56,7 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
   return (
     <div
       className={cn(
-        'rounded-xl border border-border/40 overflow-hidden mb-3',
+        'rounded-lg border border-border/40 overflow-hidden mb-3',
         'bg-gradient-to-b from-muted/20 to-muted/30',
         'shadow-sm transition-all duration-200'
       )}

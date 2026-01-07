@@ -10,6 +10,8 @@
 @custom-variant dark (&:is(.dark *, .vscode-dark *, .vscode-high-contrast *));
 
 @theme inline {
+  /* Border radius tokens (base: 8px, matching Cursor)
+     sm: 4px, md: 6px, lg: 8px (default), xl: 12px */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -150,7 +152,7 @@
 
 ::-webkit-scrollbar-thumb {
   background: color-mix(in oklch, var(--muted-foreground) 40%, transparent);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 ::-webkit-scrollbar-thumb:hover {

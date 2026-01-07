@@ -45,7 +45,7 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
     <div
       className={cn(
         'flex items-center gap-2 py-2 px-2 -mx-2',
-        'rounded-xl hover:bg-muted/20',
+        'rounded-lg hover:bg-muted/20',
         'transition-all duration-150 group',
         isFailed && 'border-2 border-dashed border-destructive/40 opacity-60 mx-0'
       )}

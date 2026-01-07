@@ -416,7 +416,7 @@ const AccountSettings: FC = () => {
     <div>
       <SectionHeader title="Account">Manage your account settings</SectionHeader>
 
-      <div className="rounded-xl border border-border/40 p-4 bg-muted/20">
+      <div className="rounded-lg border border-border/40 p-4 bg-muted/20">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
             <User className="h-5 w-5 text-primary/80" />
@@ -458,7 +458,7 @@ const FeedbackSettings: FC = () => {
       <SectionHeader title="Provide Feedback">Help us improve Orbit</SectionHeader>
 
       <div className="space-y-3">
-        <div className="rounded-xl border border-border/40 p-4 hover:bg-muted/40 cursor-pointer transition-all duration-150">
+        <div className="rounded-lg border border-border/40 p-4 hover:bg-muted/40 cursor-pointer transition-all duration-150">
           <div className="flex items-center gap-3">
             <MessageSquare className="h-5 w-5 text-muted-foreground/70" />
             <div>
@@ -471,7 +471,7 @@ const FeedbackSettings: FC = () => {
           </div>
         </div>
 
-        <div className="rounded-xl border border-border/40 p-4 hover:bg-muted/40 cursor-pointer transition-all duration-150">
+        <div className="rounded-lg border border-border/40 p-4 hover:bg-muted/40 cursor-pointer transition-all duration-150">
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-muted-foreground/70" />
             <div>
@@ -799,7 +799,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
       <DialogPortal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-card border border-border/40 rounded-xl overflow-hidden flex flex-col"
+          className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-card border border-border/40 rounded-lg overflow-hidden flex flex-col"
           style={{
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
           }}

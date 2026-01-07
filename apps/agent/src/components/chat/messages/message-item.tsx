@@ -306,7 +306,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
       {message.role === 'user' ? (
         /* User message bubble */
         <div
-          className="p-2 rounded-xl bg-card border border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
+          className="p-2 rounded-lg bg-card border border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
           style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
         >
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.displayedContent}</p>

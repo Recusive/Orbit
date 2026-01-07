@@ -53,3 +53,4 @@ tauri-plugin-fs = { workspace = true }
 tauri-plugin-shell = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
 tauri-plugin-clipboard-manager = { workspace = true }
+whoami = "2.0.0"

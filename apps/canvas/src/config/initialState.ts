@@ -59,7 +59,7 @@ export const initialNodes: Node[] = [
       label: 'Welcome Card',
       code: `export default function App() {
 	return (
-		<div className="p-6 max-w-sm mx-auto bg-white rounded-xl shadow-lg">
+		<div className="p-6 max-w-sm mx-auto bg-white rounded-lg shadow-lg">
 			<div className="flex items-center space-x-4">
 				<div className="shrink-0">
 					<div className="h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-500" />

@@ -176,7 +176,7 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
     >
       {/* Logo/Branding - consistent with WelcomeStep */}
       <div className="flex items-center gap-4 w-full max-w-[380px]">
-        <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-primary/10">
+        <div className="flex items-center justify-center w-14 h-14 rounded-lg bg-primary/10">
           <OrbitLogo size={32} className="text-primary" />
         </div>
         <div className="flex flex-col gap-0.5">

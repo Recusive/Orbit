@@ -57,7 +57,7 @@ interface AgentCardProps {
 }
 
 const AgentCard: FC<AgentCardProps> = ({ agent, onEdit, onDelete }) => (
-  <div className="rounded-xl border border-border/40 p-4 hover:bg-muted/40 transition-all duration-150">
+  <div className="rounded-lg border border-border/40 p-4 hover:bg-muted/40 transition-all duration-150">
     <div className="flex items-start justify-between gap-3">
       <div className="flex items-start gap-3 min-w-0 flex-1">
         <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -214,7 +214,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-60 bg-black/40 backdrop-blur-sm" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-60 translate-x-[-50%] translate-y-[-50%] w-[600px] max-w-[90vw] max-h-[80vh] bg-card border border-border/40 rounded-xl shadow-xl flex flex-col"
+          className="fixed left-[50%] top-[50%] z-60 translate-x-[-50%] translate-y-[-50%] w-[600px] max-w-[90vw] max-h-[80vh] bg-card border border-border/40 rounded-lg shadow-xl flex flex-col"
           onPointerDownOutside={(e) => {
             e.preventDefault();
           }}
@@ -355,7 +355,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
 
               {/* Generate with AI Input - Only show when creating new agent and generate mode is active */}
               {agent === undefined && showGenerateInput ? (
-                <div className="p-3.5 rounded-xl border border-primary/30 bg-primary/5">
+                <div className="p-3.5 rounded-lg border border-primary/30 bg-primary/5">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <Sparkles className="h-4 w-4 text-primary" />
@@ -559,7 +559,7 @@ export const SubagentsSettings: FC = () => {
           <div className="h-9 w-full rounded-md bg-muted/50 animate-pulse" />
           <div className="space-y-2">
             {[1, 2].map((i) => (
-              <div key={i} className="rounded-xl border border-border/40 p-4">
+              <div key={i} className="rounded-lg border border-border/40 p-4">
                 <div className="flex items-start gap-3">
                   <div className="h-8 w-8 rounded-lg bg-muted/50 animate-pulse" />
                   <div className="flex-1 space-y-2">
@@ -583,7 +583,7 @@ export const SubagentsSettings: FC = () => {
       </SectionHeader>
 
       {error !== null && (
-        <div className="mb-4 p-3 rounded-xl bg-destructive/10 text-destructive text-[13px]">
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-[13px]">
           {error}
         </div>
       )}
@@ -628,7 +628,7 @@ export const SubagentsSettings: FC = () => {
       </div>
 
       {/* Info section */}
-      <div className="mt-6 p-3.5 rounded-xl bg-muted/30 border border-border/30 text-[11px] text-muted-foreground/70">
+      <div className="mt-6 p-3.5 rounded-lg bg-muted/30 border border-border/30 text-[11px] text-muted-foreground/70">
         <p className="font-medium mb-1.5 text-foreground/80">How Subagents Work</p>
         <ul className="list-disc list-inside space-y-0.5">
           <li>

@@ -10,10 +10,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Border radius tokens (base: 8px, matching Cursor)
+     sm: 4px, md: 6px, lg: 8px (default), xl: 12px, 2xl: 14px */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 6px);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -107,7 +110,8 @@
   /* Enable system color scheme for proper scrollbar colors in WKWebView */
   color-scheme: light dark;
 
-  --radius: 0.65rem;
+  /* Base border-radius: 8px (0.5rem) - matches Cursor's input box */
+  --radius: 0.5rem;
 
   /* Brand palette */
   --brand-oat: #e8e0d5;
@@ -317,7 +321,7 @@ html.dark {
 /* Streamdown code block overrides - matches tool widget styling */
 [data-streamdown='code-block'] {
   margin: 0.75rem 0 !important;
-  border-radius: 0.75rem !important;
+  border-radius: var(--radius-xl) !important;
   border: 1px solid var(--border) !important;
   background-color: var(--card) !important;
   box-shadow:
@@ -379,7 +383,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 }
 
 [data-streamdown='code-block-container'] {
-  border-radius: 0.75rem;
+  border-radius: var(--radius-xl);
   overflow: hidden;
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
@@ -517,7 +521,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 .chat-markdown code:not(pre code) {
   position: relative;
   padding: 0.125rem 0.25rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   background-color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.75rem;
@@ -529,7 +533,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 .chat-markdown pre {
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
@@ -755,7 +759,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 
 ::-webkit-scrollbar-thumb {
   background: oklch(0.55 0.02 60 / 50%);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 2px solid transparent;
   background-clip: padding-box;
 }

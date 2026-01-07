@@ -173,17 +173,16 @@
        ============================================================ -->
   <border-radius>
     <scale>
-      <radius name="sm" value="rounded-md (6px)" usage="Small elements, badges" />
-      <radius name="default" value="rounded-lg (8px)" usage="Buttons, inputs, cards" />
-      <radius name="large" value="rounded-xl (12px)" usage="Panels, popovers, containers" />
-      <radius name="xlarge" value="rounded-2xl (16px)" usage="Main containers, modals" />
-      <radius name="full" value="rounded-full" usage="Pills, avatars, indicators" />
+      <radius name="sm" value="rounded-sm (4px)" usage="Scrollbars, tiny badges" />
+      <radius name="default" value="rounded-lg (8px)" usage="EVERYTHING - buttons, inputs, cards, panels, modals" />
+      <radius name="full" value="rounded-full" usage="Pills, avatars, circular indicators" />
     </scale>
 
     <guidelines>
-      <guideline>Larger containers = larger radius</guideline>
-      <guideline>Nested elements should have smaller radius than parent</guideline>
-      <guideline>Consistency: all inputs same radius, all buttons same radius</guideline>
+      <guideline>USE 8px (rounded-lg) EVERYWHERE for consistency</guideline>
+      <guideline>Only use rounded-sm for tiny elements like scrollbars</guideline>
+      <guideline>Only use rounded-full for circular/pill elements</guideline>
+      <guideline>Base token: --radius: 0.5rem (8px) in globals.css</guideline>
     </guidelines>
   </border-radius>
 
@@ -352,11 +351,11 @@
       <description>Segmented control / pill-style tab navigation</description>
       <structure>
         <![CDATA[
-<div className="p-1 bg-muted rounded-[10px] flex gap-0.5">
+<div className="p-1 bg-muted rounded-lg flex gap-0.5">
   {tabs.map(tab => (
     <button
       className={cn(
-        'flex-1 px-4 py-2 rounded-[7px] text-sm',
+        'flex-1 px-4 py-2 rounded-lg text-sm',
         'transition-all duration-200',
         isActive
           ? 'bg-card text-foreground font-medium shadow-sm'
@@ -370,7 +369,7 @@
         ]]>
       </structure>
       <key-properties>
-        <property>Container: bg-muted, rounded-[10px], p-1</property>
+        <property>Container: bg-muted, rounded-lg, p-1</property>
         <property>Active tab: bg-card, shadow-sm, font-medium</property>
         <property>Inactive: transparent, muted text</property>
         <property>Inner radius slightly smaller than outer</property>
@@ -492,7 +491,7 @@ active:scale-[0.98]
       <description>Delete buttons - muted until hover</description>
       <classes>
         <![CDATA[
-rounded-xl py-3
+rounded-lg py-3
 bg-muted/30 text-muted-foreground
 transition-all duration-200 ease-out
 hover:bg-destructive/10 hover:text-destructive
@@ -511,7 +510,7 @@ active:scale-[0.98]
   {options.map(option => (
     <button
       className={cn(
-        'flex flex-col items-center justify-center gap-1.5 rounded-xl p-3 text-xs',
+        'flex flex-col items-center justify-center gap-1.5 rounded-lg p-3 text-xs',
         'transition-all duration-200 ease-out',
         'hover:scale-[1.02]',
         'active:scale-[0.98]',
@@ -554,7 +553,7 @@ focus:ring-ring
       </trigger-classes>
       <content-classes>
         <![CDATA[
-rounded-xl
+rounded-lg
 border-none
 bg-popover
 shadow-lg shadow-black/10
@@ -585,7 +584,7 @@ focus:bg-muted/60
         {label}
       </p>
       <div className="mt-2 flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-primary/5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-primary/5">
           <Icon className="h-5 w-5 text-primary" />
         </div>
         <p className="text-[15px] font-medium text-foreground">{title}</p>
@@ -607,7 +606,7 @@ focus:bg-muted/60
       <structure>
         <![CDATA[
 <div className="flex flex-1 flex-col items-center justify-center p-10 text-center">
-  <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-muted to-muted/50">
+  <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-lg bg-gradient-to-br from-muted to-muted/50">
     <Icon className="h-9 w-9 text-muted-foreground/60" />
   </div>
   <p className="mb-2 text-[15px] font-medium text-foreground/80">

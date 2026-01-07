@@ -126,7 +126,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
             : 'border border-border/50',
           isExpanded
-            ? 'rounded-xl shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
+            ? 'rounded-lg shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
             : 'rounded-lg shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
         )}
       >

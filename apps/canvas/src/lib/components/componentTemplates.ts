@@ -246,7 +246,7 @@ export function getComponentTemplate(type: ComponentType): string {
 
     card: `export default function App() {
 	return (
-		<div className="w-full max-w-sm bg-white rounded-xl shadow-lg overflow-hidden">
+		<div className="w-full max-w-sm bg-white rounded-lg shadow-lg overflow-hidden">
 			<div className="h-48 bg-gradient-to-r from-blue-500 to-purple-600" />
 			<div className="p-6">
 				<h3 className="text-xl font-semibold text-gray-900 mb-2">

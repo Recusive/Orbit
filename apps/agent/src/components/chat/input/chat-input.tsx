@@ -485,7 +485,7 @@ export const ChatInput: FC<ChatInputProps> = ({
   const getInputBoxClasses = (): string => {
     const base = cn(
       'mx-auto p-1 bg-card border transition-all duration-200',
-      hasPermissionPending ? 'rounded-b-[14px] rounded-t-none border-t-0' : 'rounded-[14px]',
+      hasPermissionPending ? 'rounded-b-lg rounded-t-none border-t-0' : 'rounded-lg',
       // Light mode shadows only
       'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),0_4px_12px_-4px_rgba(0,0,0,0.05)]',
       'focus-within:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.12),0_8px_24px_-8px_rgba(0,0,0,0.08)]',

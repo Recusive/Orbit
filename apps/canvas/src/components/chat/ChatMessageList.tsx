@@ -47,7 +47,7 @@ const messageListStyles = `
 	}
 	.chat-messages-scroll::-webkit-scrollbar-thumb {
 		background-color: var(--muted-foreground);
-		border-radius: 3px;
+		border-radius: var(--radius-sm);
 	}
 	.chat-messages-scroll::-webkit-scrollbar-thumb:hover {
 		background-color: var(--foreground);
