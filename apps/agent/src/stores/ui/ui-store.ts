@@ -10,6 +10,27 @@ import { StoredConversationSummaryArraySchema } from '@/types/protocol';
 
 export type { StoredConversationSummary } from '@/types/protocol';
 
+// ============================================
+// Worktree Types
+// ============================================
+
+/** Information about a git worktree (mirrors Rust struct) */
+export interface WorktreeInfo {
+  path: string;
+  head: string;
+  shortHead: string;
+  branch: string | null;
+  isMain: boolean;
+  isDetached: boolean;
+  locked: string | null;
+}
+
+/** UI state for a worktree */
+export interface WorktreeUIState {
+  worktree: WorktreeInfo;
+  isExpanded: boolean;
+}
+
 // Re-export for backwards compatibility
 export type ConversationSummary = StoredConversationSummary;
 
@@ -62,6 +83,10 @@ interface UIState {
   goToLineDialogOpen: boolean;
   settingsDialogOpen: boolean;
   settingsDialogSection: SettingsSection;
+  // Worktrees
+  worktrees: WorktreeUIState[];
+  activeWorktreePath: string | null;
+  createWorktreeDialogOpen: boolean;
 }
 
 interface UIActions {
@@ -99,6 +124,13 @@ interface UIActions {
   setGoToLineDialogOpen: (open: boolean) => void;
   setSettingsDialogOpen: (open: boolean) => void;
   openSettings: (section?: SettingsSection) => void;
+  // Worktree actions
+  setWorktrees: (worktrees: WorktreeUIState[]) => void;
+  addWorktree: (worktree: WorktreeInfo) => void;
+  removeWorktree: (path: string) => void;
+  setActiveWorktree: (path: string | null) => void;
+  toggleWorktreeExpanded: (path: string) => void;
+  setCreateWorktreeDialogOpen: (open: boolean) => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -130,6 +162,55 @@ const saveConversationsToStorage = (conversations: ConversationSummary[]): void 
   }
 };
 
+// Helper to load worktrees from localStorage
+const loadWorktreesFromStorage = (): WorktreeUIState[] => {
+  try {
+    const saved = localStorage.getItem('snowflake-worktrees');
+    if (saved === null) {
+      return [];
+    }
+    const json: unknown = JSON.parse(saved);
+    // Basic validation - ensure it's an array
+    if (!Array.isArray(json)) {
+      return [];
+    }
+    return json as WorktreeUIState[];
+  } catch {
+    return [];
+  }
+};
+
+// Helper to save worktrees to localStorage
+const saveWorktreesToStorage = (worktrees: WorktreeUIState[]): void => {
+  try {
+    localStorage.setItem('snowflake-worktrees', JSON.stringify(worktrees));
+  } catch {
+    // Ignore storage errors
+  }
+};
+
+// Helper to load active worktree path from localStorage
+const loadActiveWorktreeFromStorage = (): string | null => {
+  try {
+    return localStorage.getItem('snowflake-active-worktree');
+  } catch {
+    return null;
+  }
+};
+
+// Helper to save active worktree path to localStorage
+const saveActiveWorktreeToStorage = (path: string | null): void => {
+  try {
+    if (path === null) {
+      localStorage.removeItem('snowflake-active-worktree');
+    } else {
+      localStorage.setItem('snowflake-active-worktree', path);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+};
+
 export const useUIStore = create<UIStore>()(
   immer((set) => ({
     containerWidth: null,
@@ -155,6 +236,10 @@ export const useUIStore = create<UIStore>()(
     goToLineDialogOpen: false,
     settingsDialogOpen: false,
     settingsDialogSection: 'agent' as const,
+    // Worktrees
+    worktrees: loadWorktreesFromStorage(),
+    activeWorktreePath: loadActiveWorktreeFromStorage(),
+    createWorktreeDialogOpen: false,
 
     setContainerDimensions: (width: number, height: number): void => {
       set((state) => {
@@ -364,6 +449,64 @@ export const useUIStore = create<UIStore>()(
         state.settingsDialogOpen = true;
       });
     },
+
+    // Worktree actions
+    setWorktrees: (worktrees: WorktreeUIState[]): void => {
+      set((state) => {
+        state.worktrees = worktrees;
+        saveWorktreesToStorage(worktrees);
+      });
+    },
+
+    addWorktree: (worktree: WorktreeInfo): void => {
+      set((state) => {
+        // Check if worktree already exists (prevent duplicates)
+        const exists = state.worktrees.some((w) => w.worktree.path === worktree.path);
+        if (!exists) {
+          const newWorktreeState: WorktreeUIState = {
+            worktree,
+            isExpanded: true, // Start expanded by default
+          };
+          state.worktrees = [...state.worktrees, newWorktreeState];
+          saveWorktreesToStorage(state.worktrees);
+        }
+      });
+    },
+
+    removeWorktree: (path: string): void => {
+      set((state) => {
+        state.worktrees = state.worktrees.filter((w) => w.worktree.path !== path);
+        // Clear active if removed
+        if (state.activeWorktreePath === path) {
+          state.activeWorktreePath = null;
+          saveActiveWorktreeToStorage(null);
+        }
+        saveWorktreesToStorage(state.worktrees);
+      });
+    },
+
+    setActiveWorktree: (path: string | null): void => {
+      set((state) => {
+        state.activeWorktreePath = path;
+        saveActiveWorktreeToStorage(path);
+      });
+    },
+
+    toggleWorktreeExpanded: (path: string): void => {
+      set((state) => {
+        const worktreeState = state.worktrees.find((w) => w.worktree.path === path);
+        if (worktreeState) {
+          worktreeState.isExpanded = !worktreeState.isExpanded;
+          saveWorktreesToStorage(state.worktrees);
+        }
+      });
+    },
+
+    setCreateWorktreeDialogOpen: (open: boolean): void => {
+      set((state) => {
+        state.createWorktreeDialogOpen = open;
+      });
+    },
   }))
 );
 
@@ -433,4 +576,30 @@ export const useBottomPanelTab = (): BottomPanelTab => {
 
 export const useActiveTab = (): HeaderTab => {
   return useUIStore((state) => state.activeTab);
+};
+
+// ============================================
+// Worktree Selectors
+// ============================================
+
+export const useWorktrees = (): WorktreeUIState[] => {
+  return useUIStore((state) => state.worktrees);
+};
+
+export const useActiveWorktreePath = (): string | null => {
+  return useUIStore((state) => state.activeWorktreePath);
+};
+
+export const useActiveWorktree = (): WorktreeUIState | null => {
+  const worktrees = useUIStore((state) => state.worktrees);
+  const activePath = useUIStore((state) => state.activeWorktreePath);
+
+  return useMemo(() => {
+    if (!activePath) return null;
+    return worktrees.find((w) => w.worktree.path === activePath) ?? null;
+  }, [worktrees, activePath]);
+};
+
+export const useCreateWorktreeDialogOpen = (): boolean => {
+  return useUIStore((state) => state.createWorktreeDialogOpen);
 };

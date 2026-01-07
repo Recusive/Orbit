@@ -331,6 +331,9 @@ pub fn run() {
             git::git_blame,
             git::git_push,
             git::git_pull,
+            git::git_worktree_list,
+            git::git_worktree_add,
+            git::git_worktree_remove,
             // AI commands
             ai::ai_chat,
             ai::ai_complete,

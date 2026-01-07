@@ -7,16 +7,20 @@ import {
   Search,
   Settings,
 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 
 import type { SettingsDialogProps } from '@/components/modals/settings/settings-dialog';
-import type { ConversationSummary } from '@/stores/ui/ui-store';
+import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/files';
+import { CreateWorktreeDialog } from '@/components/modals/create-worktree-dialog';
+import { WorktreeItem } from '@/components/sidebar/WorktreeItem';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTauri } from '@/hooks/agent/use-tauri';
+import { gitWorktreeList, gitWorktreeRemove } from '@/lib/api/backend';
+import { createLogger } from '@/lib/logger';
 import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import {
@@ -26,7 +30,12 @@ import {
   useWorkspacePath,
   useWorkspaceConversations,
   useActiveConversationId,
+  useWorktrees,
+  useActiveWorktreePath,
+  useCreateWorktreeDialogOpen,
 } from '@/stores/ui/ui-store';
+
+const logger = createLogger('PrimarySidebar');
 
 // Custom sidebar toggle icon - thicker middle line when expanded
 const SidebarToggleIcon: FC<{ expanded: boolean }> = ({ expanded }) => (
@@ -88,15 +97,52 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
     setLoadingConversation,
     setConversationTransitioning,
     openSettings,
+    setWorktrees,
+    toggleWorktreeExpanded,
+    setActiveWorktree,
+    removeWorktree,
+    setCreateWorktreeDialogOpen,
   } = useUIStore();
   const isCollapsed = useIsLeftSidebarCollapsed();
   const workspaceName = useWorkspaceName();
   const workspacePath = useWorkspacePath();
   const conversations = useWorkspaceConversations();
   const activeConversationId = useActiveConversationId();
+  const worktrees = useWorktrees();
+  const activeWorktreePath = useActiveWorktreePath();
+  const createWorktreeDialogOpen = useCreateWorktreeDialogOpen();
   const { postMessage } = useTauri();
-  const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
+
+  // Load worktrees when workspace changes
+  useEffect(() => {
+    if (!workspacePath) return;
+
+    const loadWorktrees = async (): Promise<void> => {
+      try {
+        const worktreeList = await gitWorktreeList(workspacePath);
+        const worktreeStates: WorktreeUIState[] = worktreeList.map((wt) => ({
+          worktree: wt,
+          isExpanded: true,
+        }));
+        setWorktrees(worktreeStates);
+
+        // Set active worktree to main if not set
+        if (!activeWorktreePath) {
+          const mainWorktree = worktreeList.find((wt) => wt.isMain);
+          if (mainWorktree) {
+            setActiveWorktree(mainWorktree.path);
+          }
+        }
+      } catch {
+        logger.warn('Failed to load worktrees (may not be a git repo)');
+        // Not a git repo or error - clear worktrees
+        setWorktrees([]);
+      }
+    };
+
+    void loadWorktrees();
+  }, [workspacePath, activeWorktreePath, setWorktrees, setActiveWorktree]);
 
   const handleStartConversation = useCallback((): void => {
     // Skip if current conversation is empty (title still "Untitled" means no message sent)
@@ -135,6 +181,31 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   const handleOpenQuickSearch = useCallback((): void => {
     window.dispatchEvent(new CustomEvent('openCommandPalette'));
   }, []);
+
+  const handleOpenCreateWorktree = useCallback((): void => {
+    setCreateWorktreeDialogOpen(true);
+  }, [setCreateWorktreeDialogOpen]);
+
+  const handleRemoveWorktree = useCallback(
+    async (worktreePath: string): Promise<void> => {
+      if (!workspacePath) return;
+
+      try {
+        await gitWorktreeRemove(workspacePath, worktreePath, false);
+        removeWorktree(worktreePath);
+        logger.info('Removed worktree', { path: worktreePath });
+      } catch (err) {
+        logger.error('Failed to remove worktree', err);
+        // TODO: Show error toast
+      }
+    },
+    [workspacePath, removeWorktree]
+  );
+
+  // Get conversations for the active worktree
+  const activeWorktreeConversations = conversations.filter(
+    (c) => c.workspacePath === activeWorktreePath || c.workspacePath === workspacePath
+  );
 
   return (
     <aside
@@ -299,42 +370,96 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-[0.04em] whitespace-nowrap">
                 Workspaces
               </span>
-              <button className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-90 transition-all duration-150 text-muted-foreground hover:text-foreground shrink-0">
-                <Plus className="h-3 w-3" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-90 transition-all duration-150 text-muted-foreground hover:text-foreground shrink-0"
+                    onClick={handleOpenCreateWorktree}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <span>Create worktree</span>
+                </TooltipContent>
+              </Tooltip>
             </div>
             <div className="flex flex-col gap-0.5 mt-1">
-              {workspaceName ? (
-                <WorkspaceItem
-                  name={workspaceName}
-                  active
-                  collapsed={isCollapsed}
-                  expanded={workspaceExpanded}
-                  onToggle={() => {
-                    setWorkspaceExpanded(!workspaceExpanded);
-                  }}
-                />
-              ) : null}
-              {/* Conversation list with timeline */}
-              {workspaceExpanded && conversations.length > 0 ? (
-                <div className="relative ml-[19px]">
-                  {/* Vertical timeline line */}
-                  <div className="absolute left-0 top-0 bottom-2 w-px bg-border/60" />
-                  {/* Conversations */}
-                  <div className="flex flex-col gap-0.5">
-                    {conversations.map((conv) => (
-                      <ConversationItem
-                        key={conv.sessionId}
-                        conversation={conv}
-                        active={conv.sessionId === activeConversationId}
+              {/* Display worktrees if available, otherwise show single workspace */}
+              {worktrees.length > 0 ? (
+                <>
+                  {worktrees.map((wt) => (
+                    <div key={wt.worktree.path}>
+                      <WorktreeItem
+                        worktreeState={wt}
+                        active={wt.worktree.path === activeWorktreePath}
                         collapsed={isCollapsed}
-                        onClick={() => {
-                          handleLoadConversation(conv.sessionId);
+                        onToggle={() => {
+                          toggleWorktreeExpanded(wt.worktree.path);
+                        }}
+                        onRemove={() => {
+                          void handleRemoveWorktree(wt.worktree.path);
                         }}
                       />
-                    ))}
-                  </div>
-                </div>
+                      {/* Conversations for this worktree */}
+                      {wt.isExpanded &&
+                      wt.worktree.path === activeWorktreePath &&
+                      activeWorktreeConversations.length > 0 ? (
+                        <div className="relative ml-[19px] mt-1">
+                          {/* Vertical timeline line */}
+                          <div className="absolute left-0 top-0 bottom-2 w-px bg-border/60" />
+                          {/* Conversations */}
+                          <div className="flex flex-col gap-0.5">
+                            {activeWorktreeConversations.map((conv) => (
+                              <ConversationItem
+                                key={conv.sessionId}
+                                conversation={conv}
+                                active={conv.sessionId === activeConversationId}
+                                collapsed={isCollapsed}
+                                onClick={() => {
+                                  handleLoadConversation(conv.sessionId);
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </>
+              ) : workspaceName ? (
+                <>
+                  <WorkspaceItem
+                    name={workspaceName}
+                    active
+                    collapsed={isCollapsed}
+                    expanded={true}
+                    onToggle={() => {
+                      // No-op for single workspace
+                    }}
+                  />
+                  {/* Conversation list with timeline */}
+                  {conversations.length > 0 ? (
+                    <div className="relative ml-[19px] mt-1">
+                      {/* Vertical timeline line */}
+                      <div className="absolute left-0 top-0 bottom-2 w-px bg-border/60" />
+                      {/* Conversations */}
+                      <div className="flex flex-col gap-0.5">
+                        {conversations.map((conv) => (
+                          <ConversationItem
+                            key={conv.sessionId}
+                            conversation={conv}
+                            active={conv.sessionId === activeConversationId}
+                            collapsed={isCollapsed}
+                            onClick={() => {
+                              handleLoadConversation(conv.sessionId);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </>
               ) : null}
             </div>
           </div>
@@ -381,6 +506,12 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         open={settingsDialogOpen}
         onOpenChange={setSettingsDialogOpen}
         defaultSection={settingsDialogSection}
+      />
+
+      {/* Create Worktree Dialog */}
+      <CreateWorktreeDialog
+        open={createWorktreeDialogOpen}
+        onOpenChange={setCreateWorktreeDialogOpen}
       />
     </aside>
   );
@@ -546,25 +677,32 @@ const ConversationItem: FC<ConversationItemProps> = ({
         title={conversation.title}
         onClick={onClick}
       >
-        {/* Text with gradient fade for overflow */}
+        {/* Text - truncate with ellipsis by default, gradient fade on hover */}
         <span
           className={cn(
-            'text-sm whitespace-nowrap overflow-hidden flex-1 text-left',
-            collapsed ? 'w-0 opacity-0' : ''
+            'text-sm overflow-hidden flex-1 text-left transition-all duration-150',
+            collapsed ? 'w-0 opacity-0 whitespace-nowrap' : '',
+            // When not hovered: truncate with ellipsis
+            // When hovered: allow full text with gradient mask
+            !collapsed && !isHovered && 'truncate',
+            !collapsed && isHovered && 'whitespace-nowrap'
           )}
           style={{
             transition: getCollapseTransition(collapsed),
-            maskImage: 'linear-gradient(to right, black 85%, transparent 98%)',
-            WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 98%)',
-            maskSize: '100% 100%',
-            WebkitMaskSize: '100% 100%',
+            // Only apply gradient mask when hovered
+            ...(isHovered && !collapsed
+              ? {
+                  maskImage: 'linear-gradient(to right, black 85%, transparent 98%)',
+                  WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 98%)',
+                }
+              : {}),
           }}
         >
           {conversation.title}
         </span>
       </button>
       {/* More options button - appears on hover */}
-      {!collapsed && (
+      {!collapsed ? (
         <button
           className={cn(
             'absolute right-0.5 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md transition-all duration-150 hover:bg-muted/60 active:scale-90',
@@ -578,7 +716,7 @@ const ConversationItem: FC<ConversationItemProps> = ({
         >
           <MoreHorizontal className="h-4 w-4" />
         </button>
-      )}
+      ) : null}
     </div>
   );
 };

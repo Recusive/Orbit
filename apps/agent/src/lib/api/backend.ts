@@ -466,6 +466,73 @@ export async function gitPull(repoPath: string, remote?: string): Promise<void> 
 }
 
 // ============================================
+// Git Worktree Operations
+// ============================================
+
+/** Information about a git worktree */
+export interface WorktreeInfo {
+  path: string;
+  head: string;
+  shortHead: string;
+  branch: string | null;
+  isMain: boolean;
+  isDetached: boolean;
+  locked: string | null;
+}
+
+/** Options for creating a new worktree */
+export interface WorktreeAddOptions {
+  /** Create a new branch with this name */
+  newBranch?: string;
+  /** Force create branch even if it exists (reset it) */
+  forceBranch?: boolean;
+  /** Create detached HEAD instead of branch */
+  detach?: boolean;
+  /** Commit/branch to checkout (defaults to HEAD) */
+  commitIsh?: string;
+}
+
+/**
+ * List all worktrees for a repository.
+ * @param repoPath - Path to the repository
+ */
+export async function gitWorktreeList(repoPath: string): Promise<WorktreeInfo[]> {
+  return invoke<WorktreeInfo[]>('git_worktree_list', { repoPath });
+}
+
+/**
+ * Add a new worktree.
+ * @param repoPath - Path to the main repository
+ * @param worktreePath - Path where the new worktree will be created
+ * @param options - Options for creating the worktree
+ */
+export async function gitWorktreeAdd(
+  repoPath: string,
+  worktreePath: string,
+  options?: WorktreeAddOptions
+): Promise<WorktreeInfo> {
+  return invoke<WorktreeInfo>('git_worktree_add', {
+    repoPath,
+    worktreePath,
+    options: options ?? {},
+  });
+}
+
+/**
+ * Remove a worktree.
+ * @param repoPath - Path to the main repository
+ * @param worktreePath - Path to the worktree to remove
+ * @param force - Force removal even if worktree has uncommitted changes
+ */
+export async function gitWorktreeRemove(
+  repoPath: string,
+  worktreePath: string,
+  force?: boolean
+): Promise<void> {
+  return invoke('git_worktree_remove', { repoPath, worktreePath, force: force ?? false });
+}
+
+// ============================================
 // Agent Operations (Claude Agent SDK)
 // ============================================
 
