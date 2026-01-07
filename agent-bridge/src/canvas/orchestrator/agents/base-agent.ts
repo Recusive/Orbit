@@ -350,10 +350,10 @@ export abstract class BaseAgent {
     // Auto-approve canvas tools
     options.canUseTool = (toolName, toolInput) => {
       this.logger.debug({ toolName }, 'Auto-approving tool');
-      return {
+      return Promise.resolve({
         behavior: 'allow' as const,
         updatedInput: toolInput,
-      };
+      });
     };
 
     return options;

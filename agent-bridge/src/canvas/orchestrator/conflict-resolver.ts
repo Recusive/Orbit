@@ -59,11 +59,11 @@ export interface ConflictResolverConfig {
 }
 
 /**
- * Event callback types
+ * Event callback types (internal)
  */
-export type ConflictDetectedCallback = (conflict: Conflict) => void;
-export type ConflictResolvedCallback = (resolution: Resolution) => void;
-export type UserInputRequiredCallback = (data: {
+type ConflictDetectedCallback = (conflict: Conflict) => void;
+type ConflictResolvedCallback = (resolution: Resolution) => void;
+type UserInputRequiredCallback = (data: {
   conflict: Conflict;
   options: ResolutionOption[];
 }) => void;

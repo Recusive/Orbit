@@ -60,9 +60,9 @@ function ensureStorageDir(): void {
 }
 
 /**
- * Load sessions from storage
+ * Load sessions from storage (internal helper)
  */
-export function loadSessions(): StoredSession[] {
+function loadSessions(): StoredSession[] {
   try {
     const storagePath = getStoragePath();
     if (!fs.existsSync(storagePath)) {
@@ -102,9 +102,9 @@ export function loadSessions(): StoredSession[] {
 }
 
 /**
- * Save sessions to storage
+ * Save sessions to storage (internal helper)
  */
-export function saveSessions(sessions: StoredSession[]): void {
+function saveSessions(sessions: StoredSession[]): void {
   try {
     ensureStorageDir();
 
@@ -143,9 +143,9 @@ export function saveSession(session: StoredSession): void {
 }
 
 /**
- * Get a session by session ID
+ * Get a session by session ID (internal helper)
  */
-export function getSession(sessionId: string): StoredSession | undefined {
+function getSession(sessionId: string): StoredSession | undefined {
   const sessions = loadSessions();
   return sessions.find((s) => s.sessionId === sessionId);
 }
@@ -156,16 +156,6 @@ export function getSession(sessionId: string): StoredSession | undefined {
 export function getSDKSessionIdForSession(sessionId: string): string | undefined {
   const session = getSession(sessionId);
   return session?.sdkSessionId;
-}
-
-/**
- * Get sessions for a specific workspace
- */
-export function getSessionsForWorkspace(workspacePath: string): StoredSession[] {
-  const sessions = loadSessions();
-  return sessions
-    .filter((s) => s.workspacePath === workspacePath)
-    .sort((a, b) => b.lastActiveAt - a.lastActiveAt);
 }
 
 /**

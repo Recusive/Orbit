@@ -539,10 +539,10 @@ export class CanvasAgent {
     // Auto-approve all canvas MCP tools (no permission prompts needed)
     options.canUseTool = (toolName, toolInput) => {
       logger.debug({ toolName }, 'Auto-approving canvas tool');
-      return {
+      return Promise.resolve({
         behavior: 'allow' as const,
         updatedInput: toolInput,
-      };
+      });
     };
 
     // Add model if specified

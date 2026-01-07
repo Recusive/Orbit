@@ -484,10 +484,3 @@ export function deleteCommand(workspacePath: string, name: string, scope: Comman
   fs.unlinkSync(filePath);
   logger.info({ name, scope, path: filePath }, 'Deleted command');
 }
-
-/**
- * Get only builtin and default commands (useful for display)
- */
-export function getBuiltinCommands(): SlashCommandDefinition[] {
-  return [...BUILTIN_COMMANDS, ...DEFAULT_COMMANDS];
-}
