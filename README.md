@@ -173,8 +173,8 @@ Orbit/
 │   └── tauri-plugins.md
 │
 ├── Cargo.toml                      # Rust workspace root
-├── package.json                    # pnpm workspace root
-├── pnpm-workspace.yaml             # Workspace config
+├── package.json                    # Bun workspace root
+├── bun.lockb                       # Bun lockfile
 ├── vite.config.ts                  # Vite (agent app)
 ├── vite.config.canvas.ts           # Vite (canvas standalone)
 ├── tsconfig.json                   # TypeScript (main)
@@ -226,17 +226,19 @@ Orbit/
 
 ## Package Manager Policy
 
-| Context         | Use      | Why                                               |
-| --------------- | -------- | ------------------------------------------------- |
-| `agent-bridge/` | **Bun**  | Claude SDK sidecar, compiles to standalone binary |
-| Root monorepo   | **pnpm** | Tauri requires pnpm for workspace management      |
-| `apps/*`        | **pnpm** | Part of pnpm workspace                            |
+> **Note:** This project migrated from pnpm to Bun in January 2026 for faster installs and unified tooling.
+
+| Context         | Use     | Why                                               |
+| --------------- | ------- | ------------------------------------------------- |
+| Root monorepo   | **Bun** | Fast package management with workspace support    |
+| `apps/*`        | **Bun** | Part of Bun workspace                             |
+| `agent-bridge/` | **Bun** | Claude SDK sidecar, compiles to standalone binary |
 
 **Rules:**
 
-- Never use `npm` - always `bun` or `pnpm`
-- Prefer `bun` for standalone packages
-- Use `pnpm` for monorepo workspace commands
+- Never use `npm` or `pnpm` - always use `bun`
+- Use `bun run` for all scripts
+- Use `bun install` for installing dependencies
 
 ---
 
@@ -245,9 +247,8 @@ Orbit/
 ### Prerequisites
 
 - Node.js 22+
-- pnpm 9+
+- Bun 1.1+
 - Rust 1.85+
-- Bun 1.1+ (for agent-bridge)
 
 ### Quick Start
 
@@ -255,24 +256,25 @@ Orbit/
 # Clone and install
 git clone https://github.com/Recusive/Orbit.git
 cd Orbit
-pnpm install
+bun install
 
 # Run the full app (Vite + Tauri + Rust)
-pnpm tauri dev
+bunx tauri dev
 ```
 
 ### Commands
 
-| Command            | Description                       |
-| ------------------ | --------------------------------- |
-| `pnpm tauri dev`   | Start full app with hot-reload    |
-| `pnpm dev`         | Frontend only (port 5176)         |
-| `pnpm build`       | Production build                  |
-| `pnpm typecheck`   | TypeScript check                  |
-| `pnpm lint`        | ESLint (zero warnings)            |
-| `pnpm check`       | TypeScript + ESLint               |
-| `pnpm ci`          | Full CI: typecheck + lint + build |
-| `pnpm tauri build` | Build distributable (.dmg/.exe)   |
+| Command                 | Description                       |
+| ----------------------- | --------------------------------- |
+| `bunx tauri dev`        | Start full app with hot-reload    |
+| `bun run dev`           | Frontend only (port 5176)         |
+| `bun run build`         | Production build                  |
+| `bun run typecheck`     | TypeScript check                  |
+| `bun run lint`          | ESLint (zero warnings)            |
+| `bun run check`         | TypeScript + ESLint + tests       |
+| `bun run ci`            | Full CI: typecheck + lint + tests |
+| `bunx tauri build`      | Build distributable (.dmg/.exe)   |
+| `./scripts/lint-all.sh` | Comprehensive lint (all checks)   |
 
 ### Hot Reload Behavior
 
@@ -292,7 +294,7 @@ cd agent-bridge
 bun run build:dev    # → target/debug/agent-bridge
 ```
 
-Then restart Tauri (`Cmd+C` → `pnpm tauri dev`).
+Then restart Tauri (`Cmd+C` → `bunx tauri dev`).
 
 ---
 
@@ -424,7 +426,7 @@ import '@canvas/globals.css'; // Canvas styles
 ### Development Build
 
 ```bash
-pnpm tauri dev
+bunx tauri dev
 ```
 
 - Vite dev server on port 5176
@@ -434,7 +436,7 @@ pnpm tauri dev
 ### Production Build
 
 ```bash
-pnpm tauri build
+bunx tauri build
 ```
 
 Outputs in `src-tauri/target/release/bundle/`:
@@ -455,7 +457,7 @@ Outputs in `src-tauri/target/release/bundle/`:
 | `tsconfig.json`             | TypeScript (main)        |
 | `tsconfig.canvas.json`      | TypeScript (canvas)      |
 | `Cargo.toml`                | Rust workspace           |
-| `pnpm-workspace.yaml`       | pnpm packages            |
+| `package.json`              | Bun workspace config     |
 | `CLAUDE.md`                 | AI assistant guide       |
 
 ---

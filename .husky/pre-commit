@@ -1,10 +1,10 @@
 # Frontend linting
-pnpm exec lint-staged
+bunx lint-staged
 
 # Rust formatting check
-echo "🦀 Checking Rust formatting..."
+echo "Checking Rust formatting..."
 cargo fmt --all -- --check
 
 # Rust linting
-echo "🦀 Running Rust clippy..."
+echo "Running Rust clippy..."
 cargo clippy --all-targets --all-features -- -D warnings

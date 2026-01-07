@@ -2,32 +2,34 @@
 
 This document covers the development workflow, build system, and debugging tools for Orbit.
 
+> **Note:** This project uses Bun as the package manager (migrated from pnpm in January 2026).
+
 ## Quick Start
 
 ```bash
 # Install dependencies
-pnpm install
+bun install
 
 # Start development server
-pnpm dev
+bunx tauri dev
 ```
 
 ## Development Modes
 
 Orbit supports three development modes with different logging levels:
 
-| Mode      | Command          | Logs                           | Use Case          |
-| --------- | ---------------- | ------------------------------ | ----------------- |
-| **Dev**   | `pnpm dev`       | Debug for orbit, Info for deps | Daily development |
-| **Debug** | `pnpm dev:debug` | Trace for everything           | Debugging issues  |
-| **Quiet** | `pnpm dev:quiet` | Warnings only                  | Minimal noise     |
+| Mode      | Command             | Logs                           | Use Case          |
+| --------- | ------------------- | ------------------------------ | ----------------- |
+| **Dev**   | `bun run dev`       | Debug for orbit, Info for deps | Daily development |
+| **Debug** | `bun run dev:debug` | Trace for everything           | Debugging issues  |
+| **Quiet** | `bun run dev:quiet` | Warnings only                  | Minimal noise     |
 
 ### Mode Details
 
 #### Development Mode (Default)
 
 ```bash
-pnpm dev
+bun run dev
 # or
 make dev
 ```
@@ -40,7 +42,7 @@ make dev
 #### Debug Mode
 
 ```bash
-pnpm dev:debug
+bun run dev:debug
 # or
 make debug
 ```
@@ -52,7 +54,7 @@ make debug
 #### Quiet Mode
 
 ```bash
-pnpm dev:quiet
+bun run dev:quiet
 # or
 make quiet
 ```
@@ -64,7 +66,7 @@ make quiet
 ### Web-Only Development
 
 ```bash
-pnpm dev:web
+bun run dev:web
 # or
 make web
 ```
@@ -78,15 +80,15 @@ make web
 ### Development Builds
 
 ```bash
-pnpm dev           # Full app with hot-reload
-pnpm dev:web       # Frontend only
+bun run dev        # Full app with hot-reload
+bun run dev:web    # Frontend only
 ```
 
 ### Production Builds
 
 ```bash
-pnpm build         # Production app (.dmg/.exe/.AppImage)
-pnpm build:debug   # Debug build (faster, with symbols)
+bun run build         # Production app (.dmg/.exe/.AppImage)
+bun run build:debug   # Debug build (faster, with symbols)
 ```
 
 Production builds output to:
@@ -98,9 +100,9 @@ Production builds output to:
 ### Rust-Only Builds
 
 ```bash
-pnpm rust:build          # Debug build
-pnpm rust:build:release  # Release build
-pnpm rust:check          # Type check only (fastest)
+bun run rust:build          # Debug build
+bun run rust:build:release  # Release build
+bun run rust:check          # Type check only (fastest)
 ```
 
 ## Quality Checks
@@ -108,35 +110,46 @@ pnpm rust:check          # Type check only (fastest)
 ### Quick Checks
 
 ```bash
-pnpm check        # TypeScript + ESLint
-pnpm check:rust   # Rust fmt + clippy + tests
-pnpm check:all    # Everything
+bun run check        # TypeScript + ESLint + tests
+bun run check:rust   # Rust fmt + clippy + tests
+bun run check:all    # Everything
+```
+
+### Comprehensive Lint Script
+
+```bash
+./scripts/lint-all.sh              # Run all checks
+./scripts/lint-all.sh --fix        # With auto-fix
+./scripts/lint-all.sh --no-test    # Skip tests (faster)
+./scripts/lint-all.sh --ts-only    # TypeScript/ESLint only
+./scripts/lint-all.sh --rust-only  # Rust only
 ```
 
 ### Full CI Pipeline
 
 ```bash
-pnpm ci
+bun run ci
 # or
 make ci
 ```
 
-Runs: TypeScript check → ESLint → Rust fmt → Clippy → Rust tests
+Runs: TypeScript check → ESLint → Canvas tests → Rust fmt → Clippy → Rust tests
 
 ### Auto-fix Issues
 
 ```bash
-pnpm fix          # Fix TS + Rust formatting
-pnpm lint:fix     # Fix ESLint only
-pnpm rust:fmt:fix # Fix Rust formatting only
-pnpm rust:lint:fix # Fix Clippy issues
+bun run fix          # Fix TS + Rust formatting
+bun run lint:fix     # Fix ESLint only
+bun run rust:fmt:fix # Fix Rust formatting only
+bun run rust:lint:fix # Fix Clippy issues
 ```
 
 ### Tests
 
 ```bash
-pnpm rust:test         # Run all Rust tests
-pnpm rust:test:verbose # With output (--nocapture)
+bun run rust:test         # Run all Rust tests
+bun run rust:test:verbose # With output (--nocapture)
+bun run canvas:test       # Run Canvas tests
 ```
 
 ## Logging System
@@ -146,9 +159,9 @@ pnpm rust:test:verbose # With output (--nocapture)
 Set `ORBIT_LOG_MODE` to control logging:
 
 ```bash
-ORBIT_LOG_MODE=dev pnpm tauri dev    # Development
-ORBIT_LOG_MODE=debug pnpm tauri dev  # Verbose
-ORBIT_LOG_MODE=prod pnpm tauri dev   # Minimal
+ORBIT_LOG_MODE=dev bunx tauri dev    # Development
+ORBIT_LOG_MODE=debug bunx tauri dev  # Verbose
+ORBIT_LOG_MODE=prod bunx tauri dev   # Minimal
 ```
 
 ### Log Levels by Mode
@@ -230,7 +243,7 @@ make deps      # Show dependency tree
 
 ### Browser DevTools
 
-1. Start the app with `pnpm dev`
+1. Start the app with `bunx tauri dev`
 2. Press `Cmd+Option+I` (macOS) or `Ctrl+Shift+I` (Windows/Linux)
 3. Or go to View → Toggle Developer Tools
 
@@ -238,7 +251,7 @@ make deps      # Show dependency tree
 
 ```bash
 # Build with debug symbols
-pnpm build:debug
+bun run build:debug
 
 # Use lldb (macOS) or gdb (Linux)
 lldb target/debug/orbit-app
@@ -268,9 +281,9 @@ Add to `.vscode/launch.json`:
 ## Clean Up
 
 ```bash
-pnpm clean        # Remove build artifacts
-pnpm clean:rust   # Remove Rust target directory
-make clean-deps   # Remove all deps and reinstall
+bun run clean        # Remove build artifacts
+bun run clean:rust   # Remove Rust target directory
+make clean-deps      # Remove all deps and reinstall
 ```
 
 ## Troubleshooting
@@ -292,7 +305,7 @@ lsof -ti:5176 | xargs kill -9
 ### "Module not found" errors
 
 ```bash
-pnpm install
+bun install
 cargo fetch
 ```
 
@@ -315,7 +328,7 @@ Orbit-v0/
 │   ├── orbit-core/     # Core types
 │   ├── orbit-fs/       # File system
 │   └── ...
-├── package.json            # Node scripts
+├── package.json            # Bun workspace
 ├── Cargo.toml              # Rust workspace
 ├── Makefile                # Make commands
 └── DEVELOPMENT.md          # This file

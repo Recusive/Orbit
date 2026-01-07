@@ -23,12 +23,12 @@ interface SharedCardLibraryPanelProps {
 // ============================================================================
 
 const CARD_TYPE_ICONS: Record<CardType, string> = {
-  prompt: '💬',
-  response: '🤖',
-  decision: '🔀',
-  diagram: '📊',
-  'code-snippet': '💻',
-  document: '📄',
+  prompt: 'P',
+  response: 'R',
+  decision: 'D',
+  diagram: 'G',
+  'code-snippet': 'C',
+  document: 'F',
 };
 
 // ============================================================================

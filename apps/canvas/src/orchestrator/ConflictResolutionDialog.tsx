@@ -32,13 +32,13 @@ const severityColors: Record<string, { bg: string; border: string; text: string;
     bg: 'rgba(239, 68, 68, 0.1)',
     border: 'rgba(239, 68, 68, 0.3)',
     text: '#ef4444',
-    icon: '⚠',
+    icon: '!',
   },
   warning: {
     bg: 'rgba(245, 158, 11, 0.1)',
     border: 'rgba(245, 158, 11, 0.3)',
     text: '#f59e0b',
-    icon: '⚡',
+    icon: '*',
   },
   info: {
     bg: 'rgba(59, 130, 246, 0.1)',

@@ -12,7 +12,7 @@ concurrency:
 
 env:
   NODE_VERSION: '22'
-  PNPM_VERSION: '9'
+  BUN_VERSION: 'latest'
   CARGO_TERM_COLOR: always
   CENTRAL_LICENSE_KEY: '38A7449F-8FCA-45E9-8FA4-E2C656E0F3AE'
 
@@ -25,60 +25,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: ${{ env.PNPM_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
 
   lint:
-    name: ESLint (Agent)
+    name: ESLint (All Frontend)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: ${{ env.PNPM_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
 
-  test:
-    name: Test (Agent)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test --if-present
+  # Note: No "test" job for agent - tests are in canvas:test and bridge:test
+  # Agent app has no unit tests yet (only E2E via Tauri)
 
   build:
     name: Build (Agent)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: ${{ env.PNPM_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build:frontend
+      - run: bun install --frozen-lockfile
+      - run: bun run build:frontend
 
       # Only upload artifacts on main branch to save storage
       # continue-on-error prevents storage quota issues from failing the build
@@ -92,6 +77,40 @@ jobs:
           retention-days: 3
 
   # ============================================
+  # Frontend - Common (Shared Types/Utils)
+  # ============================================
+  common-typecheck:
+    name: TypeScript (Common)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run common:typecheck
+
+  # ============================================
+  # Frontend - Shared Schemas (Zod Schemas)
+  # ============================================
+  schemas-typecheck:
+    name: TypeScript (Schemas)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run schemas:typecheck
+
+  # ============================================
   # Frontend - Canvas (TypeScript/React + Bun)
   # ============================================
   canvas-typecheck:
@@ -100,31 +119,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
-      - uses: pnpm/action-setup@v4
         with:
-          version: ${{ env.PNPM_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --frozen-lockfile
       - run: bun run canvas:typecheck
-
-  canvas-lint:
-    name: ESLint (Canvas)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: bun run canvas:lint
 
   canvas-test:
     name: Test (Canvas)
@@ -132,14 +133,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
-      - uses: pnpm/action-setup@v4
         with:
-          version: ${{ env.PNPM_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --frozen-lockfile
       - run: bun run canvas:test
 
   canvas-build:
@@ -148,14 +147,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
-      - uses: pnpm/action-setup@v4
         with:
-          version: ${{ env.PNPM_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --frozen-lockfile
       - run: bun run canvas:build
 
       # Only upload artifacts on main branch to save storage
@@ -167,6 +164,37 @@ jobs:
           name: dist-canvas-${{ github.sha }}
           path: dist/canvas/
           retention-days: 3
+
+  # ============================================
+  # Agent Bridge (TypeScript/Bun Sidecar)
+  # ============================================
+  bridge-typecheck:
+    name: TypeScript (Bridge)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run bridge:typecheck
+
+  bridge-test:
+    name: Test (Bridge)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run bridge:test
 
   # ============================================
   # Backend - Rust/Tauri
@@ -327,18 +355,14 @@ jobs:
   #         xcrun --show-sdk-path
   #         xcrun --show-sdk-version
   #
-  #     # Setup Node.js + pnpm for frontend build
-  #     - uses: pnpm/action-setup@v4
+  #     # Setup Bun for package management and agent-bridge sidecar
+  #     - uses: oven-sh/setup-bun@v2
   #       with:
-  #         version: ${{ env.PNPM_VERSION }}
+  #         bun-version: ${{ env.BUN_VERSION }}
   #     - uses: actions/setup-node@v6
   #       with:
   #         node-version: ${{ env.NODE_VERSION }}
-  #         cache: 'pnpm'
-  #     - run: pnpm install --frozen-lockfile
-  #
-  #     # Setup Bun for agent-bridge sidecar
-  #     - uses: oven-sh/setup-bun@v2
+  #     - run: bun install --frozen-lockfile
   #
   #     # Setup Rust
   #     - uses: dtolnay/rust-toolchain@stable
@@ -349,7 +373,7 @@ jobs:
   #         cache-on-failure: false
   #
   #     # Build agent-bridge sidecar (Bun standalone binary)
-  #     # Note: pnpm install already resolved workspace dependencies (@orbit/shared-schemas)
+  #     # Note: bun install already resolved workspace dependencies (@orbit/shared-schemas)
   #     - name: Build agent-bridge sidecar
   #       run: |
   #         cd agent-bridge
@@ -367,13 +391,13 @@ jobs:
   #
   #     # Build Tauri app (includes frontend build via beforeBuildCommand)
   #     - name: Build Tauri macOS app
-  #       run: pnpm tauri build --target aarch64-apple-darwin
+  #       run: bunx tauri build --target aarch64-apple-darwin
   #       env:
   #         TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
   #         TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
   #
   #     # Upload DMG artifact
-  #     # Note: pnpm tauri build outputs to ./target/ (project root), not ./src-tauri/target/
+  #     # Note: tauri build outputs to ./target/ (project root), not ./src-tauri/target/
   #     - name: Upload DMG
   #       uses: actions/upload-artifact@v6
   #       with:
@@ -391,12 +415,14 @@ jobs:
       [
         typecheck,
         lint,
-        test,
         build,
+        common-typecheck,
+        schemas-typecheck,
         canvas-typecheck,
-        canvas-lint,
         canvas-test,
         canvas-build,
+        bridge-typecheck,
+        bridge-test,
         rust-fmt,
         rust-clippy,
         rust-test,
@@ -411,37 +437,40 @@ jobs:
         run: |
           # Agent frontend checks
           agent="${{ needs.typecheck.result }} ${{ needs.lint.result }} ${{ needs.build.result }}"
+          # Common/Schemas checks
+          shared="${{ needs.common-typecheck.result }} ${{ needs.schemas-typecheck.result }}"
           # Canvas frontend checks
-          canvas="${{ needs.canvas-typecheck.result }} ${{ needs.canvas-lint.result }} ${{ needs.canvas-build.result }}"
+          canvas="${{ needs.canvas-typecheck.result }} ${{ needs.canvas-build.result }}"
+          # Bridge checks
+          bridge="${{ needs.bridge-typecheck.result }}"
           # Rust checks (required)
           rust="${{ needs.rust-fmt.result }} ${{ needs.rust-clippy.result }} ${{ needs.rust-test.result }}"
           rust+=" ${{ needs.rust-deny.result }} ${{ needs.rust-doc.result }} ${{ needs.rust-msrv.result }}"
-          # Optional checks
-          agent_test_result="${{ needs.test.result }}"
+          # Test checks (allow skipped - bridge tests skip in CI without API key)
           canvas_test_result="${{ needs.canvas-test.result }}"
+          bridge_test_result="${{ needs.bridge-test.result }}"
           machete_result="${{ needs.rust-machete.result }}"
 
-          for result in $agent $canvas $rust; do
+          for result in $agent $shared $canvas $bridge $rust; do
             if [[ "$result" != "success" ]]; then
-              echo "❌ CI failed"
+              echo "[FAIL] CI failed"
               exit 1
             fi
           done
 
-          # Allow skipped tests (if no test script)
-          if [[ "$agent_test_result" != "success" && "$agent_test_result" != "skipped" ]]; then
-            echo "❌ Agent tests failed"
+          if [[ "$canvas_test_result" != "success" && "$canvas_test_result" != "skipped" ]]; then
+            echo "[FAIL] Canvas tests failed"
             exit 1
           fi
 
-          if [[ "$canvas_test_result" != "success" && "$canvas_test_result" != "skipped" ]]; then
-            echo "❌ Canvas tests failed"
+          if [[ "$bridge_test_result" != "success" && "$bridge_test_result" != "skipped" ]]; then
+            echo "[FAIL] Bridge tests failed"
             exit 1
           fi
 
           # Warn but don't fail on unused deps
           if [[ "$machete_result" != "success" ]]; then
-            echo "⚠️ Unused dependencies detected (non-blocking)"
+            echo "[WARN] Unused dependencies detected (non-blocking)"
           fi
 
-          echo "✅ All checks passed"
+          echo "[OK] All checks passed"

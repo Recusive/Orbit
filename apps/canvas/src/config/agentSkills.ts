@@ -19,7 +19,7 @@ export const AGENT_SKILLS: AgentSkill[] = [
   {
     id: 'refine',
     name: 'Refine',
-    icon: '✨',
+    icon: '*',
     description: 'Polish visuals & aesthetics',
     color: '#8b5cf6', // Purple
     prompt: `Analyze this component against the design principles.
@@ -35,7 +35,7 @@ Apply the improvements directly to the code. Make it look more polished and prof
   {
     id: 'accessibility',
     name: 'Fix A11y',
-    icon: '♿',
+    icon: 'A',
     description: 'Improve accessibility',
     color: '#22c55e', // Green
     prompt: `Review this component for accessibility issues.
@@ -51,7 +51,7 @@ Apply fixes directly. Explain what you changed and why.`,
   {
     id: 'interactive',
     name: 'Animate',
-    icon: '⚡',
+    icon: '>',
     description: 'Add interactions & states',
     color: '#f59e0b', // Amber
     prompt: `Make this component feel alive and interactive.
@@ -68,7 +68,7 @@ Use Tailwind classes. Make buttons feel "clickable" and cards feel "liftable".`,
   {
     id: 'variations',
     name: 'Variations',
-    icon: '🔀',
+    icon: '~',
     description: 'Generate style variants',
     color: '#06b6d4', // Cyan
     prompt: `Generate 3 distinct visual variations of this component.

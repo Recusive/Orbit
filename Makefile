@@ -46,19 +46,19 @@ help: ## Show this help message
 
 dev: ## Start development server (balanced logging)
 	@echo "$(CYAN)Starting development server...$(RESET)"
-	@ORBIT_LOG_MODE=dev pnpm tauri dev
+	@ORBIT_LOG_MODE=dev bunx tauri dev
 
 debug: ## Start with verbose logging (all trace logs)
 	@echo "$(YELLOW)Starting debug server (verbose logs)...$(RESET)"
-	@ORBIT_LOG_MODE=debug pnpm tauri dev
+	@ORBIT_LOG_MODE=debug bunx tauri dev
 
 quiet: ## Start with minimal logging (warnings only)
 	@echo "$(GREEN)Starting quiet server (minimal logs)...$(RESET)"
-	@ORBIT_LOG_MODE=prod pnpm tauri dev
+	@ORBIT_LOG_MODE=prod bunx tauri dev
 
 web: ## Start Vite dev server only (no Tauri)
 	@echo "$(CYAN)Starting web-only dev server on http://localhost:5176...$(RESET)"
-	@pnpm vite
+	@bunx vite
 
 #━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # BUILD
@@ -66,18 +66,18 @@ web: ## Start Vite dev server only (no Tauri)
 
 build: ## Build production app (.dmg/.exe/.AppImage)
 	@echo "$(CYAN)Building production app...$(RESET)"
-	@pnpm tauri build
+	@bunx tauri build
 	@echo "$(GREEN)Build complete! Check src-tauri/target/release/bundle/$(RESET)"
 
 release: build ## Alias for build
 
 build-debug: ## Build debug app (faster, with debug symbols)
 	@echo "$(YELLOW)Building debug app...$(RESET)"
-	@pnpm tauri build --debug
+	@bunx tauri build --debug
 
 install: ## Install all dependencies (node + rust)
 	@echo "$(CYAN)Installing dependencies...$(RESET)"
-	@pnpm install
+	@bun install
 	@cargo fetch
 	@echo "$(GREEN)Dependencies installed!$(RESET)"
 
@@ -95,14 +95,14 @@ test-verbose: ## Run tests with output
 
 lint: ## Run all linters (TypeScript + Rust)
 	@echo "$(CYAN)Linting TypeScript...$(RESET)"
-	@pnpm eslint src --max-warnings=0
+	@bun run eslint src --max-warnings=0
 	@echo "$(CYAN)Linting Rust...$(RESET)"
 	@cargo clippy --all-targets --all-features -- -D warnings
 	@echo "$(GREEN)All lints passed!$(RESET)"
 
 fix: ## Auto-fix linting issues
 	@echo "$(CYAN)Fixing TypeScript...$(RESET)"
-	@pnpm eslint src --fix
+	@bun run eslint src --fix
 	@echo "$(CYAN)Fixing Rust formatting...$(RESET)"
 	@cargo fmt --all
 	@echo "$(CYAN)Fixing Rust lints...$(RESET)"
@@ -111,9 +111,9 @@ fix: ## Auto-fix linting issues
 
 check: ## Run all checks (types + lint)
 	@echo "$(CYAN)Running TypeScript check...$(RESET)"
-	@pnpm tsc --noEmit
+	@bun run tsc --noEmit
 	@echo "$(CYAN)Running ESLint...$(RESET)"
-	@pnpm eslint src --max-warnings=0
+	@bun run eslint src --max-warnings=0
 	@echo "$(CYAN)Running Rust format check...$(RESET)"
 	@cargo fmt --all -- --check
 	@echo "$(CYAN)Running Clippy...$(RESET)"
@@ -137,7 +137,7 @@ clean-deps: ## Remove all dependencies and rebuild
 	@echo "$(RED)Removing all dependencies...$(RESET)"
 	@rm -rf node_modules target
 	@echo "$(CYAN)Reinstalling...$(RESET)"
-	@pnpm install
+	@bun install
 	@cargo fetch
 	@echo "$(GREEN)Dependencies reinstalled!$(RESET)"
 
@@ -152,4 +152,4 @@ deps: ## Show dependency tree
 	@cargo tree --depth 1
 	@echo ""
 	@echo "$(CYAN)Node dependencies:$(RESET)"
-	@pnpm list --depth 0
+	@bun pm ls --depth 0

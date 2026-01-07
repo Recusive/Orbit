@@ -16,7 +16,7 @@ export interface PlatformConfig {
 export const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
   cursor: {
     name: 'Cursor',
-    icon: '⚡',
+    icon: '>',
     description: 'AI-powered code editor',
     suffix: `Above is the design implementation. Please use this as a reference to create a similar React component.
 
@@ -30,7 +30,7 @@ Requirements:
 
   windsurf: {
     name: 'Windsurf',
-    icon: '🏄',
+    icon: 'W',
     description: 'AI coding assistant',
     suffix: `Above is the design implementation. Please analyze this design and create a similar UI component.
 
@@ -44,7 +44,7 @@ Technical requirements:
 
   'claude-code': {
     name: 'Claude Code',
-    icon: '🤖',
+    icon: 'C',
     description: 'Anthropic Claude in VS Code',
     suffix: `Above is the design implementation. Please use this as a reference to create a similar component.
 
@@ -58,7 +58,7 @@ Focus on:
 
   lovable: {
     name: 'Lovable',
-    icon: '💜',
+    icon: 'L',
     description: 'AI app builder',
     suffix: `Above is the design implementation. Please recreate this design as a responsive React component.
 
@@ -72,7 +72,7 @@ Key points:
 
   bolt: {
     name: 'Bolt',
-    icon: '⚡',
+    icon: 'B',
     description: 'AI web app generator',
     suffix: `Above is the design implementation. Please create a similar UI using this as reference.
 

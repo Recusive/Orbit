@@ -54,7 +54,7 @@ Download the official signed binary from Anthropic's CDN instead of patching.
 ### Build Process
 
 ```
-pnpm build:sidecar
+bun run build:sidecar
     │
     ├── bun build --compile agent-bridge
     │   └── Output: src-tauri/binaries/agent-bridge-aarch64-apple-darwin

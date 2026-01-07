@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5176",
-    "beforeDevCommand": "pnpm dev:web",
-    "beforeBuildCommand": "pnpm build:frontend"
+    "beforeDevCommand": "bun run dev:web",
+    "beforeBuildCommand": "bun run build:frontend"
   },
   "app": {
     "withGlobalTauri": true,

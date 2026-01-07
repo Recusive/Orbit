@@ -25,14 +25,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: 9
+          bun-version: latest
 
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'pnpm'
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -41,10 +40,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Build Tauri
-        run: pnpm tauri build -- --target ${{ matrix.target }}
+        run: bunx tauri build -- --target ${{ matrix.target }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6

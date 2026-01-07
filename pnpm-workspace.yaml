@@ -1,4 +1,0 @@
-packages:
-  - 'apps/*'
-  - 'agent-bridge'
-  - 'packages/*'

@@ -13,7 +13,7 @@ echo ""
 # Check if directory exists
 if [ ! -d "$DEVMON_DIR" ]; then
     echo "❌ Directory $DEVMON_DIR does not exist"
-    echo "   The app needs to run first with 'pnpm tauri dev'"
+    echo "   The app needs to run first with 'bunx tauri dev'"
     exit 1
 fi
 

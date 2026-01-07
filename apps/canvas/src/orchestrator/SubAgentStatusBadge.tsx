@@ -35,7 +35,7 @@ const agentConfig: Record<AgentType, { icon: string; color: string; bgColor: str
     bgColor: 'rgba(236, 72, 153, 0.15)',
   },
   integration: {
-    icon: '⚡',
+    icon: '+',
     color: '#f59e0b', // amber
     bgColor: 'rgba(245, 158, 11, 0.15)',
   },

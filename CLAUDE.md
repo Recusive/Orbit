@@ -11,7 +11,7 @@ Orbit is a modern AI-powered code editor built with **Tauri 2** (Rust backend) a
 ### Frontend
 
 - **React 19** + TypeScript + Vite
-- **pnpm** workspaces for monorepo management
+- **Bun** workspaces for monorepo management
 - **Tailwind CSS v4** for styling
 - **Zustand + Immer** for state management
 - **CodeMirror 6** for code editing with custom themes
@@ -28,32 +28,38 @@ Orbit is a modern AI-powered code editor built with **Tauri 2** (Rust backend) a
 
 ### Package Manager Policy
 
-**IMPORTANT:** This project uses **Bun** as the primary package manager/runtime wherever possible.
+> **Migration Note (January 2026):** This project migrated from **pnpm** to **Bun** for faster installs,
+> unified tooling (Bun handles both package management and the agent-bridge runtime), and simpler
+> workspace configuration. The `pnpm-workspace.yaml` file was removed - workspaces are now defined
+> directly in `package.json`. If you encounter old documentation or scripts referencing pnpm,
+> replace with the Bun equivalents below.
 
-| Context         | Use      | Why                                                          |
-| --------------- | -------- | ------------------------------------------------------------ |
-| `agent-bridge/` | **Bun**  | Claude Agent SDK sidecar - compiles to standalone Bun binary |
-| Root monorepo   | **pnpm** | Tauri requires pnpm for workspace management                 |
-| `apps/*`        | **pnpm** | Part of pnpm workspace                                       |
+**IMPORTANT:** This project uses **Bun** as the primary package manager/runtime everywhere.
+
+| Context         | Use     | Why                                                          |
+| --------------- | ------- | ------------------------------------------------------------ |
+| Root monorepo   | **Bun** | Fast package management with workspace support               |
+| `apps/*`        | **Bun** | Part of Bun workspace                                        |
+| `agent-bridge/` | **Bun** | Claude Agent SDK sidecar - compiles to standalone Bun binary |
 
 **Rules:**
 
-1. **Never use `npm`** - Always use `bun` or `pnpm`
-2. **Prefer `bun`** for standalone packages (agent-bridge, scripts, tests)
-3. **Use `pnpm`** for monorepo workspace commands (`pnpm dev`, `pnpm tauri dev`)
-4. **Run tests with `bun test`** in agent-bridge
+1. **Never use `npm` or `pnpm`** - Always use `bun`
+2. **Use `bun run`** for all scripts
+3. **Use `bun install`** for installing dependencies
+4. **Run tests with `bun test`**
 
 ```bash
 # ✅ CORRECT
-bun run build:dev           # In agent-bridge
-bun test                    # In agent-bridge
-pnpm dev                    # At monorepo root
-pnpm tauri dev              # At monorepo root
+bun install                 # Install dependencies
+bun run dev                 # Start Vite dev server
+bun run build               # Build the app
+bun test                    # Run tests
 
-# ❌ WRONG - Never use npm
+# ❌ WRONG - Never use npm or pnpm
 npm run build               # NO!
 npm install                 # NO!
-npm test                    # NO!
+pnpm dev                    # NO!
 ```
 
 ## Project Structure
@@ -130,8 +136,8 @@ Orbit/
 │   └── tauri.conf.json
 │
 ├── Cargo.toml                      # Rust workspace root
-├── package.json                    # pnpm workspace root
-├── pnpm-workspace.yaml             # Workspace config
+├── package.json                    # Bun workspace root (workspaces defined here)
+├── bun.lockb                       # Bun lockfile
 ├── vite.config.ts                  # Vite config (root: apps/agent)
 └── tsconfig.json                   # TypeScript config
 ```
@@ -140,21 +146,26 @@ Orbit/
 
 ```bash
 # Frontend Development
-pnpm install             # Install dependencies
-pnpm dev                 # Start Vite dev server only (port 5176)
-pnpm build               # TypeScript check + production build
-pnpm preview             # Preview production build
+bun install              # Install dependencies
+bun run dev              # Start Vite dev server only (port 5176)
+bun run build            # TypeScript check + production build
+bun run preview          # Preview production build
 
 # Quality Checks
-pnpm typecheck           # TypeScript only (tsc --noEmit)
-pnpm lint                # ESLint with zero warnings tolerance
-pnpm lint:fix            # ESLint with auto-fix
-pnpm check               # typecheck + lint
-pnpm ci                  # Full CI: typecheck + lint + build
+bun run typecheck        # TypeScript only (tsc --noEmit)
+bun run lint             # ESLint with zero warnings tolerance
+bun run lint:fix         # ESLint with auto-fix
+bun run check            # typecheck + lint + tests
+bun run ci               # Full CI: typecheck + lint + tests + rust checks
+
+# Comprehensive Linting (all checks in one command)
+./scripts/lint-all.sh              # Run all checks (TypeScript, ESLint, Rust, tests)
+./scripts/lint-all.sh --fix        # Run with auto-fix
+./scripts/lint-all.sh --no-test    # Skip tests for faster checking
 
 # Tauri Development (RECOMMENDED)
-pnpm tauri dev           # Start full app (Vite + Tauri + Rust)
-pnpm tauri build         # Build production app (.dmg/.exe/.AppImage)
+bunx tauri dev           # Start full app (Vite + Tauri + Rust)
+bunx tauri build         # Build production app (.dmg/.exe/.AppImage)
 
 # Rust Only (from project root)
 cargo build              # Build all Rust crates
@@ -168,7 +179,7 @@ cargo clippy             # Lint Rust code
 ### Starting Development
 
 ```bash
-pnpm tauri dev           # Starts everything: Vite (5176) + Tauri + Rust
+bunx tauri dev           # Starts everything: Vite (5176) + Tauri + Rust
 ```
 
 This command:
@@ -198,7 +209,7 @@ cd agent-bridge
 bun run build:dev    # Compiles to target/debug/agent-bridge
 ```
 
-Then restart the Tauri app (`Cmd+C` → `pnpm tauri dev`).
+Then restart the Tauri app (`Cmd+C` → `bunx tauri dev`).
 
 **Why manual rebuild?**
 
@@ -216,7 +227,7 @@ Then restart the Tauri app (`Cmd+C` → `pnpm tauri dev`).
 ### Production Build
 
 ```bash
-pnpm tauri build
+bunx tauri build
 ```
 
 Creates distributable app in `src-tauri/target/release/bundle/`:
@@ -230,7 +241,7 @@ Creates distributable app in `src-tauri/target/release/bundle/`:
 If you only need to work on React/UI without Tauri:
 
 ```bash
-pnpm dev                 # Vite only on port 5176
+bun run dev              # Vite only on port 5176
 ```
 
 Note: Backend features (file system, terminal, etc.) won't work in browser-only mode.
@@ -242,7 +253,7 @@ Note: Backend features (file system, terminal, etc.) won't work in browser-only 
 | `src-tauri/tauri.conf.json` | Tauri app config (window, permissions, build) |
 | `vite.config.ts`            | Vite bundler config (root: apps/agent)        |
 | `Cargo.toml`                | Rust workspace root                           |
-| `pnpm-workspace.yaml`       | pnpm workspace packages                       |
+| `package.json`              | Bun workspace config (workspaces array)       |
 | `tsconfig.json`             | TypeScript config (paths: apps/agent/src)     |
 | `components.json`           | shadcn/ui configuration                       |
 
@@ -427,7 +438,7 @@ logger.error('Error occurred', new Error('fail')); // Always shown with stack
 - [x] Frontend-backend communication layer
 - [x] Terminal with xterm.js
 - [x] Git status & operations
-- [x] pnpm workspace management
+- [x] Bun workspace management
 - [x] CI/CD with GitHub Actions
 
 ### In Progress
@@ -725,13 +736,13 @@ The following CSS properties trigger GPU compositing issues that result in momen
 2. URIs come from our own Claude SDK calls, not untrusted user input
 3. An attacker would need local access to craft malicious URIs
 
-**Mitigation:** We've added a pnpm override for `qs>=6.14.1` to fix a related DoS vulnerability in the transitive dependency chain. The MCP SDK issue requires an upstream fix from Anthropic - update `@modelcontextprotocol/sdk` when a patched version is released.
+**Mitigation:** We've added an override for `qs>=6.14.1` to fix a related DoS vulnerability in the transitive dependency chain. The MCP SDK issue requires an upstream fix from Anthropic - update `@modelcontextprotocol/sdk` when a patched version is released.
 
 **To check for updates:**
 
 ```bash
-pnpm audit                    # Check current vulnerabilities
-pnpm view @modelcontextprotocol/sdk version  # Check latest version
+bun pm audit                  # Check current vulnerabilities (use npm audit if needed)
+bun pm view @modelcontextprotocol/sdk version  # Check latest version
 ```
 
 ## CSS Architecture
@@ -826,3 +837,16 @@ apps/canvas/src/
 ├── globals.css          # Canvas styles (no colors!)
 └── CanvasApp.tsx        # Root component (imported by agent)
 ```
+
+---
+
+## Changelog
+
+### January 2026
+
+- **Migrated from pnpm to Bun** - All package management now uses Bun for faster installs and unified tooling
+  - Removed `pnpm-workspace.yaml` - workspaces defined in `package.json`
+  - Removed `pnpm-lock.yaml` - replaced by `bun.lockb`
+  - Updated all scripts, CI workflows, and husky hooks to use `bun`
+  - Added comprehensive `lint-all.sh` script for running all checks
+- **Added comprehensive audit** - Aligned all linting, TypeScript, and CI checks across the monorepo

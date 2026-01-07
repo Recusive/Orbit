@@ -13,7 +13,7 @@ on:
 
 env:
   NODE_VERSION: '22'
-  PNPM_VERSION: '9'
+  BUN_VERSION: 'latest'
 
 jobs:
   release:
@@ -24,22 +24,21 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: ${{ env.PNPM_VERSION }}
+          bun-version: ${{ env.BUN_VERSION }}
 
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
 
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --frozen-lockfile
 
       # Run all checks
-      - run: pnpm typecheck
-      - run: pnpm lint
-      - run: pnpm test --if-present
-      - run: pnpm build
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun test --if-present
+      - run: bun run build
 
       - name: Get version
         id: version

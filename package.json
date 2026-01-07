@@ -3,20 +3,25 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "agent-bridge",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "pnpm build:sidecar && ORBIT_LOG_MODE=dev tauri dev",
-    "dev:debug": "pnpm build:sidecar && ORBIT_LOG_MODE=debug tauri dev",
-    "dev:quiet": "pnpm build:sidecar && ORBIT_LOG_MODE=prod tauri dev",
+    "dev": "bun run build:sidecar && ORBIT_LOG_MODE=dev tauri dev",
+    "dev:debug": "bun run build:sidecar && ORBIT_LOG_MODE=debug tauri dev",
+    "dev:quiet": "bun run build:sidecar && ORBIT_LOG_MODE=prod tauri dev",
     "dev:web": "vite",
-    "build": "pnpm build:sidecar && tauri build",
-    "build:debug": "pnpm build:sidecar && tauri build --debug",
+    "build": "bun run build:sidecar && tauri build",
+    "build:debug": "bun run build:sidecar && tauri build --debug",
     "build:frontend": "tsc --noEmit && vite build",
     "build:sidecar": "mkdir -p src-tauri/binaries && cd agent-bridge && bun build --compile --minify --target=bun-darwin-arm64 src/index.ts --outfile ../src-tauri/binaries/agent-bridge-aarch64-apple-darwin && bun scripts/build-claude-cli.mjs",
     "analyze": "vite build && open dist/stats.html",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint apps/agent/src agent-bridge/src --max-warnings=0",
-    "lint:fix": "eslint apps/agent/src agent-bridge/src --fix",
+    "lint": "eslint apps/agent/src apps/canvas/src apps/editor/src apps/common/src agent-bridge/src packages/shared-schemas/src --max-warnings=0",
+    "lint:fix": "eslint apps/agent/src apps/canvas/src apps/editor/src apps/common/src agent-bridge/src packages/shared-schemas/src --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "rust:fmt": "cargo fmt --all -- --check",
@@ -28,13 +33,20 @@
     "rust:build": "cargo build --all-features",
     "rust:build:release": "cargo build --all-features --release",
     "rust:check": "cargo check --all-features",
-    "check": "pnpm typecheck && pnpm lint",
-    "check:rust": "pnpm rust:fmt && pnpm rust:lint && pnpm rust:test",
-    "check:all": "pnpm check && pnpm check:rust",
-    "fix": "pnpm lint:fix && pnpm rust:fmt:fix",
+    "bridge:typecheck": "cd agent-bridge && bun run typecheck",
+    "bridge:test": "cd agent-bridge && bun test",
+    "common:typecheck": "cd apps/common && bun run typecheck",
+    "schemas:typecheck": "cd packages/shared-schemas && bun run typecheck",
+    "check": "bun run typecheck && bun run canvas:typecheck && bun run common:typecheck && bun run bridge:typecheck && bun run schemas:typecheck && bun run lint && bun run canvas:test",
+    "check:rust": "bun run rust:fmt && bun run rust:lint && bun run rust:test",
+    "check:all": "bun run check && bun run check:rust",
+    "lint:all": "./scripts/lint-all.sh",
+    "lint:all:fix": "./scripts/lint-all.sh --fix",
+    "lint:all:fast": "./scripts/lint-all.sh --no-test",
+    "fix": "bun run lint:fix && bun run rust:fmt:fix",
     "clean": "rm -rf dist node_modules/.vite target/debug target/release",
     "clean:rust": "cargo clean",
-    "ci": "pnpm typecheck && pnpm lint && pnpm rust:fmt && pnpm rust:lint && pnpm rust:test",
+    "ci": "bun run typecheck && bun run canvas:typecheck && bun run common:typecheck && bun run bridge:typecheck && bun run schemas:typecheck && bun run lint && bun run canvas:test && bun run rust:fmt && bun run rust:lint && bun run rust:test",
     "prepare": "husky",
     "canvas:dev": "vite --config vite.config.canvas.ts",
     "canvas:build": "tsc -p tsconfig.canvas.json --noEmit && vite build --config vite.config.canvas.ts",
@@ -43,7 +55,7 @@
     "canvas:typecheck": "tsc -p tsconfig.canvas.json --noEmit",
     "canvas:lint": "eslint apps/canvas/src --max-warnings=0",
     "canvas:lint:fix": "eslint apps/canvas/src --fix",
-    "canvas:check": "pnpm canvas:typecheck && pnpm canvas:lint",
+    "canvas:check": "bun run canvas:typecheck && bun run canvas:lint",
     "canvas:test": "bun test apps/canvas",
     "canvas:test:watch": "bun test apps/canvas --watch",
     "knip": "knip -W . -W apps/agent -W apps/canvas -W apps/editor -W apps/common -W packages/shared-schemas",
@@ -131,11 +143,6 @@
     "zod": "^4.3.5",
     "zustand": "^5.0.9"
   },
-  "pnpm": {
-    "overrides": {
-      "qs": ">=6.14.1"
-    }
-  },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@tauri-apps/cli": "^2.9.6",
@@ -161,5 +168,8 @@
     "typescript-eslint": "^8.52.0",
     "vite": "^7.3.1",
     "vitest": "^4.0.16"
+  },
+  "overrides": {
+    "qs": ">=6.14.1"
   }
 }

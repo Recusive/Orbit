@@ -7,22 +7,21 @@ Guide for building, installing, and understanding the Orbit macOS application.
 ### Prerequisites
 
 - macOS (Apple Silicon or Intel)
-- Node.js 18+
-- pnpm (`npm install -g pnpm`)
-- Rust (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- Node.js 22+
 - Bun (`curl -fsSL https://bun.sh/install | bash`)
+- Rust (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
 
 ### Build the DMG
 
 ```bash
 # Install dependencies
-pnpm install
+bun install
 
 # Build sidecars (agent-bridge + Claude CLI)
-pnpm build:sidecar
+bun run build:sidecar
 
 # Build the DMG
-pnpm tauri build
+bunx tauri build
 ```
 
 Output: `target/release/bundle/dmg/Orbit_0.1.0_aarch64.dmg`
@@ -103,7 +102,7 @@ Orbit.app/
 
 ## Build Scripts
 
-### `pnpm build:sidecar`
+### `bun run build:sidecar`
 
 Runs two tasks:
 
@@ -119,9 +118,9 @@ Runs two tasks:
    - Verifies SHA256 checksum
    - Saves to `src-tauri/binaries/claude-aarch64-apple-darwin`
 
-### `pnpm tauri build`
+### `bunx tauri build`
 
-1. Builds React frontend (`pnpm build:frontend`)
+1. Builds React frontend (`bun run build:frontend`)
 2. Compiles Rust backend
 3. Bundles binaries from `src-tauri/binaries/`
 4. Creates `.app` bundle and `.dmg` installer
@@ -237,5 +236,5 @@ The build script automatically downloads the latest stable version. To force re-
 
 ```bash
 rm src-tauri/binaries/claude-*
-pnpm build:sidecar
+bun run build:sidecar
 ```

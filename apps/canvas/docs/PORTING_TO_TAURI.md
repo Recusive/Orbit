@@ -261,12 +261,12 @@ Test the canvas integration with Tauri:
 
 1. Build the canvas:
    cd apps/canvas
-   pnpm install  # Install dependencies
-   pnpm build    # Build the canvas
+   bun install   # Install dependencies
+   bun run build # Build the canvas
 
 2. Start the full Tauri app:
    cd ../..      # Back to Orbit root
-   pnpm tauri dev
+   bunx tauri dev
 
 3. Test scenarios:
    a. Canvas should load without errors
@@ -343,7 +343,7 @@ If issues found, check:
 ## Potential Issues & Solutions
 
 1. **Tauri not detected in dev mode**
-   - Solution: `pnpm tauri dev` starts both Vite and Tauri together
+   - Solution: `bunx tauri dev` starts both Vite and Tauri together
 
 2. **Type mismatch errors**
    - Check Rust uses `#[serde(rename_all = "camelCase")]`
