@@ -61,6 +61,7 @@ import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 const languageCompartment = new Compartment();
 const themeCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
+const lineWrappingCompartment = new Compartment();
 
 // ============================================
 // Language support map
@@ -662,6 +663,8 @@ interface CodeMirrorEditorProps {
   readonly onGotoComplete?: () => void;
   /** When true, opens the search panel */
   readonly searchOpen?: boolean;
+  /** Enable line wrapping */
+  readonly wordWrap?: boolean;
 }
 
 // ============================================
@@ -680,6 +683,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
   gotoPosition,
   onGotoComplete,
   searchOpen,
+  wordWrap = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -901,6 +905,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
           : [lightTheme, syntaxHighlighting(lightHighlightStyle)]
       ),
       readOnlyCompartment.of(EditorState.readOnly.of(readOnly)),
+      lineWrappingCompartment.of(wordWrap ? EditorView.lineWrapping : []),
 
       // Update listener
       EditorView.updateListener.of((update: ViewUpdate) => {
@@ -1068,6 +1073,13 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
       effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly)),
     });
   }, [readOnly]);
+
+  // Update line wrapping
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: lineWrappingCompartment.reconfigure(wordWrap ? EditorView.lineWrapping : []),
+    });
+  }, [wordWrap]);
 
   // Open search panel when searchOpen prop is true
   useEffect(() => {

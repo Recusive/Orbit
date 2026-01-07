@@ -7,7 +7,11 @@ import type { FC } from 'react';
 import { EditorBreadcrumbs, EditorSkeleton, extractMarkdownOutline } from '@/components/editor';
 import { FileDiffViewer } from '@/components/git';
 import { writeFile, lspDidChange, lspDidSave } from '@/lib/api/backend';
-import { useCursorPosition, useFileViewerStore } from '@/stores/file/file-viewer-store';
+import {
+  useCursorPosition,
+  useFileViewerStore,
+  useWordWrap,
+} from '@/stores/file/file-viewer-store';
 
 // Lazy load CodeMirror to reduce initial bundle size (~500KB)
 const LazyCodeMirrorEditor = lazy(() =>
@@ -46,6 +50,7 @@ interface FileViewerContentProps {
 export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   const theme = useDetectTheme();
   const cursorPosition = useCursorPosition();
+  const wordWrap = useWordWrap();
   const searchOpen = useFileViewerStore((state) => state.searchOpen);
   const updateContent = useFileViewerStore((state) => state.updateContent);
   const markSaved = useFileViewerStore((state) => state.markSaved);
@@ -151,6 +156,7 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
             gotoPosition={gotoForThisFile}
             onGotoComplete={clearPendingGoto}
             searchOpen={searchOpen}
+            wordWrap={wordWrap}
           />
         </Suspense>
       </div>

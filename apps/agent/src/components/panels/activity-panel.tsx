@@ -9,6 +9,8 @@ import type { FC } from 'react';
 
 import { FileIcon, FileViewer } from '@/components/files';
 import { FilesChangedList, SourceControlTab } from '@/components/git';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { lspDidClose, lspDidOpen } from '@/lib/api/backend';
 import { cn } from '@/lib/utils/utils';
@@ -17,6 +19,7 @@ import {
   useFileViewerStore,
   useHasOpenFiles,
   useOpenTabs,
+  useWordWrap,
   getLanguageFromPath,
 } from '@/stores/file/file-viewer-store';
 import { useUIStore, useTerminalPosition, useActivityTab } from '@/stores/ui/ui-store';
@@ -132,6 +135,8 @@ interface TabsHeaderProps {
   readonly onSelectTab: (path: string) => void;
   readonly onCloseTab: (path: string) => void;
   readonly onToggleSearch: () => void;
+  readonly wordWrap: boolean;
+  readonly onToggleWordWrap: () => void;
 }
 
 /**
@@ -144,6 +149,8 @@ const TabsHeader: FC<TabsHeaderProps> = ({
   onSelectTab,
   onCloseTab,
   onToggleSearch,
+  wordWrap,
+  onToggleWordWrap,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollbarRef = useRef<HTMLDivElement>(null);
@@ -324,15 +331,24 @@ const TabsHeader: FC<TabsHeaderProps> = ({
         >
           <Search className="h-4 w-4" />
         </button>
-        <button
-          onClick={() => {
-            // TODO: Show more actions menu
-          }}
-          className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
-          title="More Actions..."
-        >
-          <Ellipsis className="h-4 w-4" />
-        </button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+              title="More Actions..."
+            >
+              <Ellipsis className="h-4 w-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-48 p-2 border-border/50">
+            <div className="flex items-center justify-between">
+              <label htmlFor="word-wrap-toggle" className="text-sm cursor-pointer">
+                Line Wrap
+              </label>
+              <Switch id="word-wrap-toggle" checked={wordWrap} onCheckedChange={onToggleWordWrap} />
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   );
@@ -346,6 +362,8 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
   const closeTab = useFileViewerStore((state) => state.closeTab);
   const openFileWithDiff = useFileViewerStore((state) => state.openFileWithDiff);
   const toggleSearch = useFileViewerStore((state) => state.toggleSearch);
+  const wordWrap = useWordWrap();
+  const toggleWordWrap = useFileViewerStore((state) => state.toggleWordWrap);
   const activeTab = useActivityTab();
   const setActiveTab = useUIStore((state) => state.setActivityTab);
   const { bottomPanelOpen } = useUIStore();
@@ -500,6 +518,8 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
           onSelectTab={setActiveFileTab}
           onCloseTab={handleCloseTab}
           onToggleSearch={toggleSearch}
+          wordWrap={wordWrap}
+          onToggleWordWrap={toggleWordWrap}
         />
       ) : null}
 

@@ -62,6 +62,9 @@ interface FileViewerState {
 
   // Pending goto position (for diagnostic clicks, etc.)
   pendingGoto: GotoPosition | null;
+
+  // Editor settings
+  wordWrap: boolean;
 }
 
 interface FileViewerActions {
@@ -102,6 +105,9 @@ interface FileViewerActions {
   toggleSearch: () => void;
   setSearchQuery: (query: string) => void;
   closeSearch: () => void;
+
+  // Editor settings
+  toggleWordWrap: () => void;
 }
 
 type FileViewerStore = FileViewerState & FileViewerActions;
@@ -199,6 +205,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
     searchOpen: false,
     searchQuery: '',
     pendingGoto: null,
+    wordWrap: true,
 
     openFile: (path: string, content?: string): void => {
       set((state) => {
@@ -486,6 +493,12 @@ export const useFileViewerStore = create<FileViewerStore>()(
         state.cursorPosition = { line, column };
       });
     },
+
+    toggleWordWrap: (): void => {
+      set((state) => {
+        state.wordWrap = !state.wordWrap;
+      });
+    },
   }))
 );
 
@@ -514,4 +527,8 @@ export const useFileViewerLoading = (): { isLoading: boolean; path: string | nul
 
 export const useCursorPosition = (): CursorPosition => {
   return useFileViewerStore((state) => state.cursorPosition);
+};
+
+export const useWordWrap = (): boolean => {
+  return useFileViewerStore((state) => state.wordWrap);
 };

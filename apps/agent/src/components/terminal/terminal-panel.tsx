@@ -328,11 +328,11 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
       {!collapsed ? <ResizeHandle direction="horizontal" target="bottom" /> : null}
       <div
         ref={panelRef}
-        className={`${panelBackground} flex flex-col shrink-0 ${collapsed ? 'border-t border-border' : ''}`}
+        className={`${panelBackground} relative z-10 flex flex-col shrink-0 ${collapsed ? 'border-t border-border' : ''}`}
         style={{ height: collapsed ? HEIGHTS.panelHeader : bottomPanelHeight }}
       >
         <header
-          className="flex items-center justify-between px-2 shrink-0 border-b border-border"
+          className="relative z-10 flex items-center justify-between px-2 shrink-0 border-b border-border bg-sidebar"
           style={{ height: HEIGHTS.panelHeader }}
         >
           <div className="flex items-center gap-2 flex-1 min-w-0">
