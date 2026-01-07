@@ -80,18 +80,21 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
         }
       }
 
-      // Update UI store with workspace name (for header display)
-      useUIStore.getState().setWorkspace(targetPath);
+      // Only update UI store workspace on initial load (when no specific path was requested)
+      // This prevents subfolder navigation from overwriting the root workspace
+      if (message.path === undefined || message.path === '') {
+        useUIStore.getState().setWorkspace(targetPath);
 
-      // Set workspace for LSP - this initializes language servers for the workspace
-      lspSetWorkspace(targetPath).catch((err: unknown) => {
-        console.warn('[Snowflake] Failed to set LSP workspace:', err);
-      });
+        // Set workspace for LSP - this initializes language servers for the workspace
+        lspSetWorkspace(targetPath).catch((err: unknown) => {
+          console.warn('[Snowflake] Failed to set LSP workspace:', err);
+        });
 
-      // Start watching the workspace for file changes (for auto-refresh)
-      initFileWatcher(targetPath).catch((err: unknown) => {
-        console.warn('[Snowflake] Failed to initialize file watcher:', err);
-      });
+        // Start watching the workspace for file changes (for auto-refresh)
+        initFileWatcher(targetPath).catch((err: unknown) => {
+          console.warn('[Snowflake] Failed to initialize file watcher:', err);
+        });
+      }
 
       const entries = await listDirectory(targetPath, false);
 

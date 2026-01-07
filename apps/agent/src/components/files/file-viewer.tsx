@@ -39,7 +39,7 @@ export const FileViewer: FC = () => {
         {isLoading ? (
           <LoadingState path={loadingPath} />
         ) : activeFile ? (
-          <FileViewerContent file={activeFile} />
+          <FileViewerContent key={activeFile.path} file={activeFile} />
         ) : (
           <EmptyState />
         )}

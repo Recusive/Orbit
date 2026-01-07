@@ -267,7 +267,9 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           if (!sessionIdRef.current || messagesRef.current.length === 0) {
             setSessionId(message.session_id);
           }
-          if (message.cwd) {
+          // Only set workspace if we don't already have one
+          // This prevents file tree operations from overwriting the root workspace
+          if (message.cwd && !workspacePath) {
             setWorkspace(message.cwd);
           }
           break;
@@ -762,6 +764,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     },
     [
       setWorkspace,
+      workspacePath,
       setActiveConversation,
       setLoadingConversation,
       setConversationTransitioning,

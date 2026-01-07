@@ -1,5 +1,5 @@
 import { Ellipsis, Search, X } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
 import type { BrowserPanelProps } from '@/components/browser/browser-panel';
 import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
@@ -75,7 +75,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         'group relative flex items-center h-full px-3 text-[13px] cursor-pointer select-none shrink-0',
         'border-r border-border/50',
         isActive
-          ? 'bg-background text-foreground'
+          ? 'bg-chat-area text-foreground'
           : 'bg-sidebar text-muted-foreground hover:text-foreground'
       )}
       style={{ maxWidth: 180 }}
@@ -83,7 +83,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       {/* Top border accent for active tab */}
       <div
         className={cn(
-          'absolute top-0 inset-x-0 h-0.5 transition-colors',
+          'absolute top-0 inset-x-0 h-px transition-colors',
           isActive ? 'bg-primary' : 'bg-transparent'
         )}
       />
@@ -92,7 +92,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       <div
         className={cn(
           'absolute bottom-0 inset-x-0 h-px',
-          isActive ? 'bg-background' : 'bg-border/50'
+          isActive ? 'bg-chat-area' : 'bg-border/50'
         )}
       />
 
@@ -103,21 +103,235 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       <span className={cn('ml-2 truncate', isModified && 'italic')}>{fileName}</span>
 
       {/* Modified indicator or close button */}
-      <div className="ml-2 w-4 h-4 flex items-center justify-center shrink-0">
+      <div className="ml-2 w-4 h-4 flex items-center justify-center shrink-0 relative">
+        {/* Modified dot - show when modified, inactive, and not hovering */}
         {isModified && !isActive ? (
-          <div className="w-2 h-2 rounded-full bg-foreground/50 group-hover:hidden" />
+          <div className="absolute inset-0 flex items-center justify-center group-hover:hidden">
+            <div className="w-2 h-2 rounded-full bg-foreground/50" />
+          </div>
         ) : null}
+        {/* Close button - show on hover, or always when active */}
         <button
           onClick={handleCloseClick}
           className={cn(
             'w-4 h-4 flex items-center justify-center rounded transition-all hover:bg-muted',
-            isActive || isModified
-              ? 'opacity-70 hover:opacity-100'
-              : 'opacity-0 group-hover:opacity-70'
+            isActive ? 'opacity-70 hover:opacity-100' : 'opacity-0 group-hover:opacity-70'
           )}
           aria-label={`Close ${fileName}`}
         >
           <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+interface TabsHeaderProps {
+  readonly openTabs: ViewedFile[];
+  readonly activeTabPath: string | null;
+  readonly onSelectTab: (path: string) => void;
+  readonly onCloseTab: (path: string) => void;
+  readonly onToggleSearch: () => void;
+}
+
+/**
+ * VS Code-style tabs header with custom scrollbar overlay
+ * Uses overflow:hidden + wheel events + custom scrollbar element
+ */
+const TabsHeader: FC<TabsHeaderProps> = ({
+  openTabs,
+  activeTabPath,
+  onSelectTab,
+  onCloseTab,
+  onToggleSearch,
+}) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollbarRef = useRef<HTMLDivElement>(null);
+  const [scrollState, setScrollState] = useState({ scrollLeft: 0, scrollWidth: 0, clientWidth: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const dragStartRef = useRef({ mouseX: 0, scrollLeft: 0 });
+
+  // Update scroll state when tabs change or on scroll
+  const updateScrollState = useCallback((): void => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      setScrollState({
+        scrollLeft: el.scrollLeft,
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+      });
+    }
+  }, []);
+
+  // Handle wheel scroll
+  const handleWheel = useCallback(
+    (e: React.WheelEvent): void => {
+      const el = scrollContainerRef.current;
+      if (el) {
+        // Scroll horizontally with wheel (both deltaX and deltaY)
+        el.scrollLeft += e.deltaY !== 0 ? e.deltaY : e.deltaX;
+        updateScrollState();
+      }
+    },
+    [updateScrollState]
+  );
+
+  // Update scroll state when tabs change
+  useEffect(() => {
+    updateScrollState();
+  }, [openTabs, updateScrollState]);
+
+  // Calculate scrollbar dimensions
+  const canScroll = scrollState.scrollWidth > scrollState.clientWidth;
+  const scrollbarWidth = canScroll
+    ? Math.max(30, (scrollState.clientWidth / scrollState.scrollWidth) * scrollState.clientWidth)
+    : 0;
+  const scrollbarLeft = canScroll
+    ? (scrollState.scrollLeft / (scrollState.scrollWidth - scrollState.clientWidth)) *
+      (scrollState.clientWidth - scrollbarWidth)
+    : 0;
+
+  // Handle scrollbar drag
+  const handleScrollbarMouseDown = useCallback((e: React.MouseEvent): void => {
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      scrollLeft: scrollContainerRef.current?.scrollLeft ?? 0,
+    };
+  }, []);
+
+  // Handle mouse move during drag
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent): void => {
+      const el = scrollContainerRef.current;
+      if (!el) return;
+
+      const deltaX = e.clientX - dragStartRef.current.mouseX;
+      // Convert scrollbar movement to scroll position
+      const scrollRatio = (el.scrollWidth - el.clientWidth) / (el.clientWidth - scrollbarWidth);
+      el.scrollLeft = dragStartRef.current.scrollLeft + deltaX * scrollRatio;
+      updateScrollState();
+    };
+
+    const handleMouseUp = (): void => {
+      setIsDragging(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, scrollbarWidth, updateScrollState]);
+
+  // Handle click on scrollbar track to jump
+  const handleTrackClick = useCallback(
+    (e: React.MouseEvent): void => {
+      const el = scrollContainerRef.current;
+      const track = scrollbarRef.current;
+      if (!el || !track) return;
+
+      // Don't handle if clicking on thumb
+      if ((e.target as HTMLElement).dataset.thumb) return;
+
+      const rect = track.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickRatio = clickX / rect.width;
+      el.scrollLeft = clickRatio * (el.scrollWidth - el.clientWidth);
+      updateScrollState();
+    },
+    [updateScrollState]
+  );
+
+  // Show scrollbar when hovered or dragging
+  const showScrollbar = isHovered || isDragging;
+
+  return (
+    <div
+      className="flex shrink-0 bg-sidebar"
+      style={{ height: 35 }}
+      onMouseEnter={() => {
+        setIsHovered(true);
+      }}
+      onMouseLeave={() => {
+        setIsHovered(false);
+      }}
+    >
+      {/* Scrollable tabs container */}
+      <div className="relative flex-1 min-w-0">
+        <div
+          ref={scrollContainerRef}
+          className="flex items-center h-full overflow-x-auto scrollbar-hide"
+          onWheel={handleWheel}
+          onScroll={updateScrollState}
+          role="tablist"
+          aria-label="Open files"
+        >
+          {openTabs.map((tab) => (
+            <EditorTab
+              key={tab.path}
+              file={tab}
+              isActive={tab.path === activeTabPath}
+              onSelect={() => {
+                onSelectTab(tab.path);
+              }}
+              onClose={() => {
+                onCloseTab(tab.path);
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Custom scrollbar overlay - VS Code style, hidden until hover */}
+        {canScroll ? (
+          <div
+            ref={scrollbarRef}
+            className={cn(
+              'absolute left-0 bottom-0 h-[6px] cursor-pointer transition-opacity duration-150',
+              showScrollbar ? 'opacity-100' : 'opacity-0'
+            )}
+            style={{ width: scrollState.clientWidth }}
+            onClick={handleTrackClick}
+          >
+            <div
+              data-thumb="true"
+              onMouseDown={handleScrollbarMouseDown}
+              className={cn(
+                'absolute top-[3px] h-[3px] rounded-full cursor-grab transition-colors',
+                isDragging ? 'bg-foreground/60' : 'bg-foreground/30 hover:bg-foreground/50'
+              )}
+              style={{
+                width: scrollbarWidth,
+                left: scrollbarLeft,
+              }}
+            />
+          </div>
+        ) : null}
+      </div>
+
+      {/* Editor actions - VS Code style */}
+      <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-border/50 bg-sidebar">
+        <button
+          onClick={onToggleSearch}
+          className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+          title="Search (⌘F)"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => {
+            // TODO: Show more actions menu
+          }}
+          className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+          title="More Actions..."
+        >
+          <Ellipsis className="h-4 w-4" />
         </button>
       </div>
     </div>
@@ -280,51 +494,13 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ width }) => {
     <div className="@container h-full flex flex-col bg-chat-area shrink-0" style={{ width }}>
       {/* Header - Only show VS Code style tabs when files are open */}
       {activeTab === 'file' && hasOpenFiles ? (
-        <div
-          className="flex items-center overflow-hidden shrink-0 bg-sidebar border-b border-border/50"
-          style={{ height: 35 }}
-        >
-          {/* VS Code-style tabs container */}
-          <div
-            className="flex items-center flex-1 min-w-0 h-full overflow-x-auto scrollbar-hide"
-            role="tablist"
-            aria-label="Open files"
-          >
-            {openTabs.map((tab) => (
-              <EditorTab
-                key={tab.path}
-                file={tab}
-                isActive={tab.path === activeTabPath}
-                onSelect={() => {
-                  setActiveFileTab(tab.path);
-                }}
-                onClose={() => {
-                  handleCloseTab(tab.path);
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Editor actions - VS Code style */}
-          <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-border/50 bg-sidebar">
-            <button
-              onClick={toggleSearch}
-              className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
-              title="Search (⌘F)"
-            >
-              <Search className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => {
-                // TODO: Show more actions menu
-              }}
-              className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
-              title="More Actions..."
-            >
-              <Ellipsis className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+        <TabsHeader
+          openTabs={openTabs}
+          activeTabPath={activeTabPath}
+          onSelectTab={setActiveFileTab}
+          onCloseTab={handleCloseTab}
+          onToggleSearch={toggleSearch}
+        />
       ) : null}
 
       {/* Content */}

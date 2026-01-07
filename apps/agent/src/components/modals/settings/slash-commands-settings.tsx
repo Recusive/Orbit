@@ -547,12 +547,12 @@ const CommandEditor: FC<CommandEditorProps> = ({
 // Main SlashCommandsSettings component
 export const SlashCommandsSettings: FC = () => {
   const [commands, setCommands] = useState<SlashCommandDefinition[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingCommand, setEditingCommand] = useState<SlashCommandDefinition | undefined>(
     undefined
   );
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Use ref for the initial fetch flag to avoid re-fetching
   const hasFetched = useRef(false);
@@ -566,8 +566,8 @@ export const SlashCommandsSettings: FC = () => {
   const handleMessage = useCallback((message: ExtensionMessage): void => {
     if (message.type === 'commands:list:response') {
       setCommands(message.commands);
-      setIsLoading(false);
       setError(null);
+      setIsInitialLoad(false);
     } else if (message.type === 'commands:created') {
       setCommands((prev) => [...prev, message.command]);
       setError(null);
@@ -583,7 +583,6 @@ export const SlashCommandsSettings: FC = () => {
       setError(null);
     } else if (message.type === 'commands:error') {
       setError(message.error);
-      setIsLoading(false);
     } else if (message.type === 'commands:generated') {
       // Call the registered callback with the generated command
       if (generatedCommandCallbackRef.current) {
@@ -665,6 +664,33 @@ export const SlashCommandsSettings: FC = () => {
   const projectCommands = commands.filter((c) => c.scope === 'project');
   const personalCommands = commands.filter((c) => c.scope === 'personal');
 
+  // Skeleton loading state
+  if (isInitialLoad) {
+    return (
+      <div>
+        <SectionHeader title="Slash Commands">
+          Custom commands that expand into prompts. Type / in the chat to see available commands.
+        </SectionHeader>
+        <div className="space-y-3">
+          <div className="h-9 w-full rounded-md bg-muted/50 animate-pulse" />
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="rounded-xl border border-border/40 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-muted/50 animate-pulse" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-32 rounded bg-muted/50 animate-pulse" />
+                    <div className="h-3 w-48 rounded bg-muted/50 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <SectionHeader title="Slash Commands">
@@ -690,118 +716,114 @@ export const SlashCommandsSettings: FC = () => {
         </Button>
 
         {/* Command list */}
-        {isLoading ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">Loading commands...</div>
-        ) : (
-          <div className="space-y-6">
-            {/* Personal Commands */}
-            {personalCommands.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-orange-500" />
-                  Personal Commands
-                </div>
-                <div className="space-y-2">
-                  {personalCommands.map((command) => (
-                    <CommandCard
-                      key={`${command.scope}-${command.name}`}
-                      command={command}
-                      onEdit={() => {
-                        handleEditCommand(command);
-                      }}
-                      onDelete={() => {
-                        handleDeleteCommand(command.name, 'personal');
-                      }}
-                    />
-                  ))}
-                </div>
+        <div className="space-y-6">
+          {/* Personal Commands */}
+          {personalCommands.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-orange-500" />
+                Personal Commands
               </div>
-            )}
+              <div className="space-y-2">
+                {personalCommands.map((command) => (
+                  <CommandCard
+                    key={`${command.scope}-${command.name}`}
+                    command={command}
+                    onEdit={() => {
+                      handleEditCommand(command);
+                    }}
+                    onDelete={() => {
+                      handleDeleteCommand(command.name, 'personal');
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-            {/* Project Commands */}
-            {projectCommands.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                  Project Commands
-                </div>
-                <div className="space-y-2">
-                  {projectCommands.map((command) => (
-                    <CommandCard
-                      key={`${command.scope}-${command.name}`}
-                      command={command}
-                      onEdit={() => {
-                        handleEditCommand(command);
-                      }}
-                      onDelete={() => {
-                        handleDeleteCommand(command.name, 'project');
-                      }}
-                    />
-                  ))}
-                </div>
+          {/* Project Commands */}
+          {projectCommands.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-green-500" />
+                Project Commands
               </div>
-            )}
+              <div className="space-y-2">
+                {projectCommands.map((command) => (
+                  <CommandCard
+                    key={`${command.scope}-${command.name}`}
+                    command={command}
+                    onEdit={() => {
+                      handleEditCommand(command);
+                    }}
+                    onDelete={() => {
+                      handleDeleteCommand(command.name, 'project');
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-            {/* Default Commands */}
-            {defaultCommands.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-purple-500" />
-                  Default Commands
-                  <Lock className="h-3 w-3" />
-                </div>
-                <div className="space-y-2">
-                  {defaultCommands.map((command) => (
-                    <CommandCard
-                      key={`${command.scope}-${command.name}`}
-                      command={command}
-                      onEdit={() => {
-                        /* readonly */
-                      }}
-                      onDelete={() => {
-                        /* readonly */
-                      }}
-                    />
-                  ))}
-                </div>
+          {/* Default Commands */}
+          {defaultCommands.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-purple-500" />
+                Default Commands
+                <Lock className="h-3 w-3" />
               </div>
-            )}
+              <div className="space-y-2">
+                {defaultCommands.map((command) => (
+                  <CommandCard
+                    key={`${command.scope}-${command.name}`}
+                    command={command}
+                    onEdit={() => {
+                      /* readonly */
+                    }}
+                    onDelete={() => {
+                      /* readonly */
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-            {/* Built-in Commands */}
-            {builtinCommands.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-blue-500" />
-                  Built-in Commands
-                  <Lock className="h-3 w-3" />
-                </div>
-                <div className="space-y-2">
-                  {builtinCommands.map((command) => (
-                    <CommandCard
-                      key={`${command.scope}-${command.name}`}
-                      command={command}
-                      onEdit={() => {
-                        /* readonly */
-                      }}
-                      onDelete={() => {
-                        /* readonly */
-                      }}
-                    />
-                  ))}
-                </div>
+          {/* Built-in Commands */}
+          {builtinCommands.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                Built-in Commands
+                <Lock className="h-3 w-3" />
               </div>
-            )}
+              <div className="space-y-2">
+                {builtinCommands.map((command) => (
+                  <CommandCard
+                    key={`${command.scope}-${command.name}`}
+                    command={command}
+                    onEdit={() => {
+                      /* readonly */
+                    }}
+                    onDelete={() => {
+                      /* readonly */
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-            {/* Empty state */}
-            {commands.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                <Terminal className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No commands available.</p>
-                <p className="text-xs mt-1">Create a command to quickly run common prompts.</p>
-              </div>
-            )}
-          </div>
-        )}
+          {/* Empty state */}
+          {commands.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              <Terminal className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No commands available.</p>
+              <p className="text-xs mt-1">Create a command to quickly run common prompts.</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Info section */}

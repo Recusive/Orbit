@@ -597,7 +597,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
   return (
     <button
       className={cn(
-        'relative flex items-center justify-center h-7 px-3 flex-1 transition-all duration-200',
+        'relative flex items-center justify-center h-full pt-1.5 px-3 flex-1 transition-all duration-200',
         active ? 'text-foreground' : 'text-muted-foreground/80 hover:text-foreground'
       )}
       onClick={onClick}
@@ -606,7 +606,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       {/* Tab background - Orbit style */}
       <div
         className={cn(
-          'absolute inset-0 rounded-t-md transition-colors duration-200',
+          'absolute inset-x-0 top-1.5 bottom-0 rounded-t-md transition-colors duration-200',
           active ? 'bg-muted/70' : 'hover:bg-muted/40'
         )}
       />

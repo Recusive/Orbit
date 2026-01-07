@@ -1,3 +1,5 @@
+import { IconPaintBucket } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconPaintBucket';
+import { IconSettingsKnob } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSettingsKnob';
 import { hexagons7, tab } from '@lucide/lab';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
@@ -28,7 +30,6 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogPortal } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -40,6 +41,8 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils/utils';
 
 export type SettingsSection =
+  | 'general'
+  | 'appearance'
   | 'agent'
   | 'subagents'
   | 'commands'
@@ -69,7 +72,7 @@ const NavItem: FC<NavItemProps> = ({ icon, label, isActive, onClick }) => (
   <button
     onClick={onClick}
     className={cn(
-      'flex w-full items-center gap-2 px-2.5 py-2 text-[13px] transition-all duration-150',
+      'flex w-full items-center gap-2 px-2.5 py-2 text-[13px] transition-colors duration-150',
       isActive
         ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[8px] rounded-r-lg rounded-l-none'
         : 'text-muted-foreground/70 hover:bg-muted/50 hover:text-foreground rounded-lg'
@@ -107,7 +110,7 @@ interface SectionHeaderProps {
 
 const SectionHeader: FC<SectionHeaderProps> = ({ title, children }) => (
   <div className="mb-5">
-    <h3 className="text-[13px] font-semibold mb-1.5">{title}</h3>
+    <h3 className="text-[15px] font-semibold mb-1.5">{title}</h3>
     {children !== undefined && (
       <p className="text-[11px] text-muted-foreground/60 leading-relaxed">{children}</p>
     )}
@@ -485,6 +488,143 @@ const FeedbackSettings: FC = () => {
   );
 };
 
+// General settings panel
+const GeneralSettings: FC = () => {
+  const [language, setLanguage] = useState('en');
+  const [autoUpdate, setAutoUpdate] = useState(true);
+  const [telemetry, setTelemetry] = useState(false);
+
+  return (
+    <div>
+      <SectionHeader title="Application">General application settings</SectionHeader>
+
+      <div className="space-y-0 divide-y divide-border/40">
+        <SettingItem label="Language" description="Choose your preferred language">
+          <Select value={language} onValueChange={setLanguage}>
+            <SelectTrigger className="w-32 h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="es">Español</SelectItem>
+              <SelectItem value="fr">Français</SelectItem>
+              <SelectItem value="de">Deutsch</SelectItem>
+              <SelectItem value="ja">日本語</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingItem>
+
+        <SettingItem label="Auto Update" description="Automatically check for updates">
+          <Switch checked={autoUpdate} onCheckedChange={setAutoUpdate} />
+        </SettingItem>
+
+        <SettingItem
+          label="Telemetry"
+          description="Send anonymous usage data to help improve the app"
+        >
+          <Switch checked={telemetry} onCheckedChange={setTelemetry} />
+        </SettingItem>
+      </div>
+
+      <SectionDivider />
+
+      <SectionHeader title="Data">Manage your data and storage</SectionHeader>
+
+      <div className="space-y-0 divide-y divide-border/40">
+        <SettingItem label="Clear Cache" description="Remove cached data to free up space">
+          <Button variant="outline" size="sm" className="h-8">
+            Clear
+          </Button>
+        </SettingItem>
+
+        <SettingItem label="Export Data" description="Download all your data as a backup">
+          <Button variant="outline" size="sm" className="h-8">
+            Export
+          </Button>
+        </SettingItem>
+      </div>
+    </div>
+  );
+};
+
+// Appearance settings panel
+const AppearanceSettings: FC = () => {
+  const [theme, setTheme] = useState('system');
+  const [accentColor, setAccentColor] = useState('coral');
+  const [fontSize, setFontSize] = useState('medium');
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [compactMode, setCompactMode] = useState(false);
+
+  return (
+    <div>
+      <SectionHeader title="Theme">Customize the look of the application</SectionHeader>
+
+      <div className="space-y-0 divide-y divide-border/40">
+        <SettingItem label="Color Theme" description="Choose your preferred color theme">
+          <Select value={theme} onValueChange={setTheme}>
+            <SelectTrigger className="w-32 h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="light">Light</SelectItem>
+              <SelectItem value="dark">Dark</SelectItem>
+              <SelectItem value="system">System</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingItem>
+
+        <SettingItem label="Accent Color" description="Primary color for buttons and highlights">
+          <Select value={accentColor} onValueChange={setAccentColor}>
+            <SelectTrigger className="w-32 h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="coral">Coral</SelectItem>
+              <SelectItem value="blue">Blue</SelectItem>
+              <SelectItem value="green">Green</SelectItem>
+              <SelectItem value="purple">Purple</SelectItem>
+              <SelectItem value="orange">Orange</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingItem>
+      </div>
+
+      <SectionDivider />
+
+      <SectionHeader title="Text">Customize text appearance</SectionHeader>
+
+      <div className="space-y-0 divide-y divide-border/40">
+        <SettingItem label="Font Size" description="Adjust the interface font size">
+          <Select value={fontSize} onValueChange={setFontSize}>
+            <SelectTrigger className="w-32 h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="small">Small</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="large">Large</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingItem>
+      </div>
+
+      <SectionDivider />
+
+      <SectionHeader title="Accessibility">Accessibility options</SectionHeader>
+
+      <div className="space-y-0 divide-y divide-border/40">
+        <SettingItem label="Reduce Motion" description="Minimize animations and transitions">
+          <Switch checked={reduceMotion} onCheckedChange={setReduceMotion} />
+        </SettingItem>
+
+        <SettingItem label="Compact Mode" description="Use a more compact interface layout">
+          <Switch checked={compactMode} onCheckedChange={setCompactMode} />
+        </SettingItem>
+      </div>
+    </div>
+  );
+};
+
 // Shortcut item component
 interface ShortcutItemProps {
   readonly label: string;
@@ -571,6 +711,16 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
 
   const navItems = [
     {
+      id: 'general' as const,
+      label: 'General',
+      icon: <IconSettingsKnob className="h-4 w-4" />,
+    },
+    {
+      id: 'appearance' as const,
+      label: 'Appearance',
+      icon: <IconPaintBucket className="h-4 w-4" />,
+    },
+    {
       id: 'agent' as const,
       label: 'Agent',
       icon: <Icon iconNode={hexagons7} className="h-4 w-4" />,
@@ -593,6 +743,10 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
 
   const renderContent = (): ReactNode => {
     switch (activeSection) {
+      case 'general':
+        return <GeneralSettings />;
+      case 'appearance':
+        return <AppearanceSettings />;
       case 'agent':
         return <AgentSettings />;
       case 'subagents':
@@ -680,9 +834,9 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
             </div>
 
             {/* Main content */}
-            <ScrollArea className="flex-1">
-              <div className="p-6">{renderContent()}</div>
-            </ScrollArea>
+            <div className="flex-1 overflow-auto bg-card relative">
+              <div className="absolute inset-0 p-6 overflow-auto">{renderContent()}</div>
+            </div>
           </div>
         </DialogPrimitive.Content>
       </DialogPortal>
