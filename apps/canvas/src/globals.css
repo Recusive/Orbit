@@ -5,7 +5,7 @@
  * This file only contains canvas-specific styles (ReactFlow, scrollbars)
  */
 
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *, .vscode-dark *, .vscode-high-contrast *));
 
@@ -57,11 +57,15 @@
 /* NOTE: No :root color definitions - colors come from agent's globals.css */
 
 @layer base {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
   }
 
-  html, body, #root {
+  html,
+  body,
+  #root {
     height: 100%;
     margin: 0;
     padding: 0;
@@ -71,7 +75,9 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
   }
 }
 

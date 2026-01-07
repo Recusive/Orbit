@@ -4,112 +4,114 @@
  */
 
 .live-sandpack-node {
-	background-color: var(--card);
-	border-radius: 8px;
-	border: 1px solid var(--border);
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-	overflow: hidden;
-	transition: border-color 0.15s ease, box-shadow 0.15s ease;
-	display: flex;
-	flex-direction: column;
+  background-color: var(--card);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .live-sandpack-node:hover {
-	border-color: var(--primary);
+  border-color: var(--primary);
 }
 
 .live-sandpack-node--selected {
-	border-color: var(--primary);
-	box-shadow: 0 0 0 2px var(--selection);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--selection);
 }
 
 /* Header */
 .live-sandpack-node__header {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	padding: 8px 10px;
-	background-color: var(--muted);
-	border-bottom: 1px solid var(--border);
-	flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background-color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .live-sandpack-node__header-left {
-	display: flex;
-	align-items: center;
-	gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .live-sandpack-node__header-right {
-	display: flex;
-	align-items: center;
+  display: flex;
+  align-items: center;
 }
 
 .live-sandpack-node__icon-wrapper {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 24px;
-	height: 24px;
-	background-color: var(--primary);
-	border-radius: 4px;
-	color: var(--primary-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background-color: var(--primary);
+  border-radius: 4px;
+  color: var(--primary-foreground);
 }
 
 .live-sandpack-node__icon-wrapper svg {
-	width: 12px;
-	height: 12px;
+  width: 12px;
+  height: 12px;
 }
 
 .live-sandpack-node__label {
-	font-size: 12px;
-	font-weight: 600;
-	color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
 }
 
 .live-sandpack-node__viewport-badge {
-	font-size: 9px;
-	font-weight: 500;
-	padding: 2px 6px;
-	background-color: var(--muted);
-	color: var(--muted-foreground);
-	border-radius: 4px;
-	text-transform: capitalize;
+  font-size: 9px;
+  font-weight: 500;
+  padding: 2px 6px;
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  border-radius: 4px;
+  text-transform: capitalize;
 }
 
 /* Preview area */
 .live-sandpack-node__preview {
-	flex: 1;
-	overflow: hidden;
-	position: relative;
-	background-color: #ffffff;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background-color: #ffffff;
 }
 
 /* Connection Handles - hidden by default, shown on hover */
 .live-sandpack-node__handle {
-	width: 8px !important;
-	height: 8px !important;
-	background-color: var(--primary) !important;
-	border: 2px solid var(--card) !important;
-	opacity: 0;
-	transition: opacity 0.15s ease;
+  width: 8px !important;
+  height: 8px !important;
+  background-color: var(--primary) !important;
+  border: 2px solid var(--card) !important;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
 /* Show handles on node hover or selection */
 .react-flow__node:hover .live-sandpack-node__handle,
 .react-flow__node.selected .live-sandpack-node__handle {
-	opacity: 1;
+  opacity: 1;
 }
 
 /* NodeResizer customization */
 .live-sandpack-node__resizer-line {
-	border-color: var(--primary) !important;
+  border-color: var(--primary) !important;
 }
 
 .live-sandpack-node__resizer-handle {
-	width: 8px !important;
-	height: 8px !important;
-	background-color: var(--primary) !important;
-	border: 2px solid var(--card) !important;
-	border-radius: 2px !important;
+  width: 8px !important;
+  height: 8px !important;
+  background-color: var(--primary) !important;
+  border: 2px solid var(--card) !important;
+  border-radius: 2px !important;
 }
