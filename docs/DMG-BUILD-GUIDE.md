@@ -128,13 +128,72 @@ Runs two tasks:
 
 ## Troubleshooting
 
-### "App is damaged" error
+### "App is damaged" Error (macOS Gatekeeper)
 
-macOS Gatekeeper may block unsigned apps:
+When downloading the DMG from the internet (GitHub Actions, etc.), macOS adds a **quarantine flag** to mark it as untrusted. Since the app is not code-signed with an Apple Developer certificate, Gatekeeper blocks it with a misleading "damaged" error.
+
+**The app is NOT actually damaged** — this is macOS protecting you from unsigned software.
+
+#### Solution 1: Remove Quarantine (Recommended)
+
+```bash
+# 1. Remove any existing installation
+rm -rf /Applications/Snowflake.app
+
+# 2. Mount the DMG
+hdiutil attach ~/Desktop/Snowflake_*.dmg
+
+# 3. Copy to Applications
+cp -R /Volumes/Snowflake/Snowflake.app /Applications/
+
+# 4. Remove the quarantine flag (requires sudo)
+sudo xattr -rd com.apple.quarantine /Applications/Snowflake.app
+
+# 5. Eject the DMG
+hdiutil detach /Volumes/Snowflake
+
+# 6. Launch the app
+open /Applications/Snowflake.app
+```
+
+#### Solution 2: Right-Click → Open
+
+1. Open Finder → Applications
+2. **Right-click** (or Control-click) on Snowflake.app
+3. Select **Open** from the context menu
+4. Click **Open** in the warning dialog
+
+This bypasses Gatekeeper for the first launch only.
+
+#### Solution 3: System Preferences
+
+1. Try to open the app (it will fail)
+2. Go to **System Preferences → Security & Privacy → General**
+3. Click **Open Anyway** next to the Snowflake message
+
+#### Why `xattr -cr` Sometimes Fails
 
 ```bash
 xattr -cr /Applications/Snowflake.app
+# Error: Operation not permitted
 ```
+
+This happens because:
+
+- The `-cr` flag tries to clear ALL extended attributes
+- Some binaries have restricted permissions
+- Use `-rd com.apple.quarantine` instead to target only the quarantine flag
+- Use `sudo` to bypass permission restrictions
+
+#### For Production Distribution
+
+To avoid this issue for end users, the app needs:
+
+1. **Code Signing** — Apple Developer certificate ($99/year)
+2. **Notarization** — Submit to Apple for malware scanning
+3. **Stapling** — Attach the notarization ticket to the DMG
+
+This allows users to open the app normally without terminal commands.
 
 ### Claude CLI not found
 
