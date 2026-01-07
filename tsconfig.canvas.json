@@ -35,7 +35,9 @@
     /* Paths - Canvas specific */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./apps/canvas/src/*"]
+      "@/*": ["./apps/canvas/src/*"],
+      "@snowflake/common": ["./apps/common/src/index.ts"],
+      "@snowflake/common/*": ["./apps/common/src/*"]
     }
   },
   "include": ["apps/canvas/src/**/*"]
