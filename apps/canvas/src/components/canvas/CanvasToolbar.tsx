@@ -194,45 +194,6 @@ const SidebarToggleIcon = ({ expanded }: { expanded: boolean }): React.JSX.Eleme
 );
 
 // Custom sidebar toggle icon for RIGHT sidebar - mirrored version
-// Theme toggle icons
-const SunIcon = (): React.JSX.Element => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="5"></circle>
-    <line x1="12" y1="1" x2="12" y2="3"></line>
-    <line x1="12" y1="21" x2="12" y2="23"></line>
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-    <line x1="1" y1="12" x2="3" y2="12"></line>
-    <line x1="21" y1="12" x2="23" y2="12"></line>
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-  </svg>
-);
-
-const MoonIcon = (): React.JSX.Element => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-  </svg>
-);
-
 const RightSidebarToggleIcon = ({ expanded }: { expanded: boolean }): React.JSX.Element => (
   <svg
     aria-hidden="true"
@@ -525,28 +486,6 @@ const styles = {
   rightSidebarToggleButtonActive: {
     transform: 'scale(0.95)',
   } as React.CSSProperties,
-  themeToggleButton: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 26,
-    height: 26,
-    padding: 0,
-    border: 'none',
-    borderRadius: 6,
-    backgroundColor: 'transparent',
-    color: colorSystem.textMuted,
-    cursor: 'pointer',
-    transition: `all 200ms ${EASE_OUT}`,
-  } as React.CSSProperties,
-  themeToggleButtonHover: {
-    backgroundColor: 'color-mix(in oklch, var(--muted) 80%, transparent)',
-    color: colorSystem.textForeground,
-    transform: 'scale(1.05)',
-  } as React.CSSProperties,
-  themeToggleButtonActive: {
-    transform: 'scale(0.95)',
-  } as React.CSSProperties,
 };
 
 // Interactive button hook for hover/active states
@@ -706,58 +645,6 @@ export function CanvasToolbar({
   const [rightSidebarButtonHovered, setRightSidebarButtonHovered] = useState(false);
   const [rightSidebarButtonActive, setRightSidebarButtonActive] = useState(false);
   const [hoveredMode, setHoveredMode] = useState<CanvasMode | null>(null);
-  const [themeButtonHovered, setThemeButtonHovered] = useState(false);
-  const [themeButtonActive, setThemeButtonActive] = useState(false);
-
-  // Theme state - load from localStorage or detect from document
-  const [isDarkTheme, setIsDarkTheme] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('orbit-canvas-theme');
-      if (stored === 'light') return false;
-      if (stored === 'dark') return true;
-      // Fall back to document class or default dark
-      return (
-        document.documentElement.classList.contains('dark') ||
-        !document.documentElement.classList.contains('light')
-      );
-    }
-    return true;
-  });
-
-  // Apply theme on mount based on stored preference
-  React.useEffect(() => {
-    if (typeof document !== 'undefined') {
-      if (isDarkTheme) {
-        document.documentElement.classList.add('dark');
-        document.documentElement.classList.remove('light');
-      } else {
-        document.documentElement.classList.add('light');
-        document.documentElement.classList.remove('dark');
-      }
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Toggle theme handler
-  const handleToggleTheme = useCallback((): void => {
-    const newIsDark = !isDarkTheme;
-    setIsDarkTheme(newIsDark);
-
-    // Persist to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('orbit-canvas-theme', newIsDark ? 'dark' : 'light');
-    }
-
-    // Update document class for theme
-    if (typeof document !== 'undefined') {
-      if (newIsDark) {
-        document.documentElement.classList.add('dark');
-        document.documentElement.classList.remove('light');
-      } else {
-        document.documentElement.classList.add('light');
-        document.documentElement.classList.remove('dark');
-      }
-    }
-  }, [isDarkTheme]);
 
   const modeOptions: { mode: CanvasMode; icon: React.ReactNode; label: string }[] = [
     { mode: 'design', icon: <DesignIcon />, label: 'Design' },
@@ -857,32 +744,6 @@ export function CanvasToolbar({
 
         {/* Save Status - only in workflow mode, before mode switcher */}
         {canvasMode === 'workflow' && <SaveStatusIndicator />}
-
-        {/* Theme Toggle Button */}
-        <button
-          onClick={handleToggleTheme}
-          onMouseEnter={(): void => {
-            setThemeButtonHovered(true);
-          }}
-          onMouseLeave={(): void => {
-            setThemeButtonHovered(false);
-            setThemeButtonActive(false);
-          }}
-          onMouseDown={(): void => {
-            setThemeButtonActive(true);
-          }}
-          onMouseUp={(): void => {
-            setThemeButtonActive(false);
-          }}
-          style={{
-            ...styles.themeToggleButton,
-            ...(themeButtonHovered ? styles.themeToggleButtonHover : {}),
-            ...(themeButtonActive ? styles.themeToggleButtonActive : {}),
-          }}
-          title={isDarkTheme ? 'Switch to light theme' : 'Switch to dark theme'}
-        >
-          {isDarkTheme ? <SunIcon /> : <MoonIcon />}
-        </button>
 
         {/* Separator between actions/status and mode switcher */}
         {onCanvasModeChange !== undefined && <div style={styles.divider} />}
