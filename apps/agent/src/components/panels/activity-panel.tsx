@@ -238,7 +238,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       if (!el || !track) return;
 
       // Don't handle if clicking on thumb
-      if ((e.target as HTMLElement).dataset.thumb) return;
+      if ((e.target as HTMLElement).dataset['thumb']) return;
 
       const rect = track.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
