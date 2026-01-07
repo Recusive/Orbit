@@ -18,6 +18,9 @@
  * orbit-canvas UI
  *
  * Run with: cd agent-bridge && bun test src/__tests__/canvas-e2e.test.ts
+ *
+ * NOTE: These tests require Claude credentials (OAuth via Claude Code CLI or ANTHROPIC_API_KEY).
+ * They are automatically skipped in CI environments where credentials are not available.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
@@ -52,6 +55,10 @@ import type {
   CanvasErrorEvent,
   BridgeCommandResponse,
 } from '../protocol/protocol.js';
+
+// Skip integration tests in GitHub Actions CI - they require OAuth credentials from Claude Code CLI
+// OAuth is available locally (keychain) but not in CI runners
+const skipIntegrationTests = process.env.GITHUB_ACTIONS === 'true';
 
 // =============================================================================
 // TYPE HELPERS FOR TEST ACCESS TO PRIVATE MEMBERS
@@ -527,7 +534,8 @@ class E2ETestHarness {
 // E2E TESTS
 // =============================================================================
 
-describe('Canvas E2E - Full Tauri → Bridge → SDK Flow', () => {
+// Skip entire suite in CI without credentials
+describe.skipIf(skipIntegrationTests)('Canvas E2E - Full Tauri → Bridge → SDK Flow', () => {
   let harness: E2ETestHarness;
 
   beforeAll(() => {
@@ -841,7 +849,7 @@ describe('Canvas E2E - Protocol Validation', () => {
   });
 });
 
-describe('Canvas E2E - Real Claude SDK Integration', () => {
+describe.skipIf(skipIntegrationTests)('Canvas E2E - Real Claude SDK Integration', () => {
   let harness: E2ETestHarness;
 
   beforeAll(() => {
@@ -1118,7 +1126,7 @@ describe('Canvas E2E - Intent Analyzer Routing', () => {
   });
 });
 
-describe('Canvas E2E - Orchestrator Integration', () => {
+describe.skipIf(skipIntegrationTests)('Canvas E2E - Orchestrator Integration', () => {
   let harness: E2ETestHarness;
 
   beforeAll(() => {

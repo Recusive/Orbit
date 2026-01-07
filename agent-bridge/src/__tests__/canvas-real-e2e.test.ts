@@ -13,6 +13,8 @@
  * ⚠️  REQUIRES AUTH - Needs Claude Code OAuth or ANTHROPIC_API_KEY
  *
  * Run with: cd agent-bridge && bun test src/__tests__/canvas-real-e2e.test.ts
+ *
+ * NOTE: These tests are automatically skipped in CI environments where credentials are not available.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
@@ -28,6 +30,10 @@ import type {
   McpToolRequest,
   McpToolResponse,
 } from '../canvas/types/types.js';
+
+// Skip integration tests in GitHub Actions CI - they require OAuth credentials from Claude Code CLI
+// OAuth is available locally (keychain) but not in CI runners
+const skipIntegrationTests = process.env.GITHUB_ACTIONS === 'true';
 
 const logger = createLogger('CanvasRealE2ETest');
 
@@ -266,7 +272,7 @@ if (!HAS_CREDENTIALS) {
   logger.info('  Running REAL E2E tests with Claude API...\n');
 }
 
-describe('Canvas REAL E2E - Claude API Integration', () => {
+describe.skipIf(skipIntegrationTests)('Canvas REAL E2E - Claude API Integration', () => {
   let manager: CanvasSessionManager;
   let events: CapturedEvents;
   let sessionCounter = 0;
@@ -583,7 +589,7 @@ describe('Canvas REAL E2E - Claude API Integration', () => {
   });
 });
 
-describe('Canvas REAL E2E - Schema Strictness', () => {
+describe.skipIf(skipIntegrationTests)('Canvas REAL E2E - Schema Strictness', () => {
   conditionalTest('should reject messages with invalid type', () => {
     const invalidMessage = {
       type: 'invalid_type',

@@ -9,9 +9,16 @@
  * - Error propagation
  *
  * Run with: bun test src/__tests__/canvas-integration.test.ts
+ *
+ * NOTE: These tests require Claude credentials (OAuth via Claude Code CLI or ANTHROPIC_API_KEY).
+ * They are automatically skipped in CI environments where credentials are not available.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+
+// Skip integration tests in GitHub Actions CI - they require OAuth credentials from Claude Code CLI
+// OAuth is available locally (keychain) but not in CI runners
+const skipIntegrationTests = process.env.GITHUB_ACTIONS === 'true';
 
 import { CanvasSessionManager, CanvasToolBridge, createCanvasMcpServer } from '../canvas/index.js';
 
@@ -35,7 +42,7 @@ function createMockCanvasState(): CanvasState {
   };
 }
 
-describe('Canvas Session Manager - Real Integration', () => {
+describe.skipIf(skipIntegrationTests)('Canvas Session Manager - Real Integration', () => {
   let manager: CanvasSessionManager;
 
   beforeEach(() => {
@@ -201,7 +208,7 @@ describe('Canvas Session Manager - Real Integration', () => {
   });
 });
 
-describe('Canvas Tool Bridge - Request/Response Flow', () => {
+describe.skipIf(skipIntegrationTests)('Canvas Tool Bridge - Request/Response Flow', () => {
   let bridge: CanvasToolBridge;
 
   beforeEach(() => {
@@ -311,7 +318,7 @@ describe('Canvas Tool Bridge - Request/Response Flow', () => {
   });
 });
 
-describe('Canvas MCP Server - Tool Registration', () => {
+describe.skipIf(skipIntegrationTests)('Canvas MCP Server - Tool Registration', () => {
   it('should register all 19 tools with correct categories', () => {
     const bridge = new CanvasToolBridge();
     const server = createCanvasMcpServer(bridge);
@@ -368,7 +375,7 @@ describe('Canvas MCP Server - Tool Registration', () => {
   });
 });
 
-describe('End-to-End Integration Flow', () => {
+describe.skipIf(skipIntegrationTests)('End-to-End Integration Flow', () => {
   it('should simulate complete index.ts event flow', async () => {
     const manager = new CanvasSessionManager();
     const events: { type: string; sessionId: string }[] = [];

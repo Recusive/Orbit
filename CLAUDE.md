@@ -607,6 +607,34 @@ it('should route simple requests to fast path via real session', async () => {
 - [ ] Ran complete test suite: `cd agent-bridge && bun test`
 - [ ] All tests pass with real API calls
 
+#### Running Tests Locally (IMPORTANT)
+
+**Integration tests MUST be run locally** - they will NOT pass in GitHub Actions CI.
+
+**Why?** The integration tests require Claude API credentials, which are provided via OAuth through the Claude Code CLI. OAuth credentials are stored in the macOS Keychain and are only available on local development machines. GitHub Actions runners don't have access to this keychain, so integration tests are automatically skipped in CI.
+
+```bash
+# Run tests locally (OAuth credentials available via Claude Code CLI)
+cd agent-bridge
+bun test
+
+# All integration tests will run with real Claude SDK connections
+# ✅ Pass = Code works with real Claude API
+```
+
+**Test Skip Logic:**
+
+Tests use `describe.skipIf(process.env.GITHUB_ACTIONS === 'true')` to:
+
+- **Run locally**: OAuth from Claude Code CLI keychain is available
+- **Skip in CI**: GitHub Actions has no OAuth access, tests would fail with "No credentials found"
+
+**If tests fail locally with "No credentials found":**
+
+1. Ensure Claude Code CLI is installed and authenticated
+2. Run `claude --version` to verify CLI is working
+3. The CLI stores OAuth tokens in macOS Keychain automatically
+
 #### Why This Matters
 
 ```text

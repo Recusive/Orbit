@@ -44,6 +44,7 @@ rand = { workspace = true }
 dirs = { workspace = true }
 crossbeam-channel = { workspace = true }
 hashbrown = { workspace = true }
+hostname = "0.4"  # For non-macOS device ID generation
 
 # Tauri
 tauri = { workspace = true, features = ["tray-icon"] }

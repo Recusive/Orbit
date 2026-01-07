@@ -5,6 +5,9 @@
  * Uses actual CanvasSessionManager, CanvasToolBridge, and event handlers.
  *
  * Run with: cd agent-bridge && bun test src/__tests__/canvas-types.test.ts
+ *
+ * NOTE: These tests require Claude credentials (OAuth via Claude Code CLI or ANTHROPIC_API_KEY).
+ * They are automatically skipped in CI environments where credentials are not available.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
@@ -19,6 +22,10 @@ import type {
   McpToolRequest,
   McpToolResponse,
 } from '../canvas/types/types.js';
+
+// Skip integration tests in GitHub Actions CI - they require OAuth credentials from Claude Code CLI
+// OAuth is available locally (keychain) but not in CI runners
+const skipIntegrationTests = process.env.GITHUB_ACTIONS === 'true';
 
 // =============================================================================
 // ZOD SCHEMAS (must match apps/agent/src/types/canvas.ts)
@@ -219,7 +226,8 @@ const CanvasErrorPayloadSchema = z
 // INTEGRATION TESTS - Real Data Flow with Schema Validation
 // =============================================================================
 
-describe('Canvas Types Integration - Real Session Manager', () => {
+// Skip integration tests in CI without credentials
+describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Real Session Manager', () => {
   let manager: CanvasSessionManager;
 
   beforeEach(() => {
@@ -344,7 +352,7 @@ describe('Canvas Types Integration - Real Session Manager', () => {
   });
 });
 
-describe('Canvas Types Integration - Real Tool Bridge', () => {
+describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Real Tool Bridge', () => {
   let bridge: CanvasToolBridge;
 
   beforeEach(() => {
@@ -475,7 +483,7 @@ describe('Canvas Types Integration - Real Tool Bridge', () => {
   });
 });
 
-describe('Canvas Types Integration - Real Event Flow', () => {
+describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Real Event Flow', () => {
   it('should validate real event payloads from session manager', async () => {
     const manager = new CanvasSessionManager();
     const capturedMessages: { sessionId: string; message: SDKMessage }[] = [];
@@ -584,7 +592,7 @@ describe('Canvas Types Integration - Real Event Flow', () => {
   });
 });
 
-describe('Canvas Types Integration - Schema Strictness', () => {
+describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Schema Strictness', () => {
   let manager: CanvasSessionManager;
 
   beforeEach(() => {
