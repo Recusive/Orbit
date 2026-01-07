@@ -28,3 +28,40 @@ target/
 
 # pnpm
 .pnpm-store/
+
+# ===========================================
+# Secrets and credentials - NEVER COMMIT
+# ===========================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+secrets.json
+credentials.json
+config.local.json
+**/service-account*.json
+
+# API keys and tokens
+*.secret
+*.secrets
+**/api-key*
+**/apikey*
+
+# Private keys
+id_rsa
+id_ed25519
+*.ppk
+
+# Backup files (may contain secrets)
+*.bak
+*.backup
+*.old
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini

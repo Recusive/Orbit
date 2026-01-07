@@ -2,19 +2,21 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { ActionsBar } from './actions-bar';
 import { ChatArea } from './chat-area';
-import { HeaderBar } from './header-bar';
 import { PrimarySidebar } from './primary-sidebar';
-import { StatusBar } from './status-bar';
 
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { GoToLineDialog, QuickOpen } from '@/components/modals';
-import { WelcomePage } from '@/components/welcome';
-import { useDefaultKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
-import { useTauri } from '@/hooks/use-tauri';
-import { useHasWorkspace, useUIStore } from '@/stores/ui-store';
+import { useTauri } from '@/hooks/agent/use-tauri';
+import { useDefaultKeyboardShortcuts } from '@/hooks/ui/use-keyboard-shortcuts';
+import { useUIStore } from '@/stores/ui/ui-store';
 
+/**
+ * RootLayout is the Agent mode content.
+ * Renders the sidebar, chat area, and actions bar.
+ * HeaderBar and StatusBar are rendered by App.tsx.
+ */
 export const RootLayout: FC = () => {
   const {
     leftSidebarWidth,
@@ -24,7 +26,6 @@ export const RootLayout: FC = () => {
     toggleLeftSidebar,
     openSettings,
   } = useUIStore();
-  const hasWorkspace = useHasWorkspace();
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
 
@@ -85,42 +86,16 @@ export const RootLayout: FC = () => {
     handleOpenSettings,
   ]);
 
-  // Show welcome page when no workspace is open
-  if (!hasWorkspace) {
-    return (
-      <div className="h-full w-full flex flex-col overflow-hidden bg-background text-foreground">
-        {/* Header Bar - minimal, no tabs */}
-        <HeaderBar />
-
-        {/* Welcome Page - centered content */}
-        <div className="flex-1 min-h-0">
-          <WelcomePage />
-        </div>
-
-        {/* Status Bar */}
-        <StatusBar />
-      </div>
-    );
-  }
-
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden bg-background text-foreground">
-      {/* Header Bar - Workspace info, quick actions */}
-      <HeaderBar />
+    <div className="h-full w-full flex overflow-hidden bg-background text-foreground">
+      {/* Primary Sidebar - File explorer, conversations */}
+      <PrimarySidebar width={leftSidebarWidth} />
 
-      <div className="flex-1 flex min-h-0">
-        {/* Primary Sidebar - File explorer, conversations */}
-        <PrimarySidebar width={leftSidebarWidth} />
+      {/* Chat Area - Main chat interface with Activity panel */}
+      <ChatArea />
 
-        {/* Chat Area - Main chat interface with Activity panel */}
-        <ChatArea />
-
-        {/* Actions Bar - Activity Panel tab switcher */}
-        {rightSidebarOpen ? <ActionsBar /> : null}
-      </div>
-
-      {/* Status Bar - Git branch, sync status */}
-      <StatusBar />
+      {/* Actions Bar - Activity Panel tab switcher */}
+      {rightSidebarOpen ? <ActionsBar /> : null}
 
       {/* Quick Open Dialog */}
       <QuickOpen open={quickOpenVisible} onOpenChange={setQuickOpenVisible} />

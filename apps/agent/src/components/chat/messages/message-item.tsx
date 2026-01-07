@@ -19,11 +19,11 @@ import {
 import { MessageActions } from './message-actions';
 
 import type { ImageAttachment } from '../input/chat-input';
-import type { ToolExecution } from '@/stores/tool-store';
+import type { ToolExecution } from '@/stores/agent/tool-store';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files';
-import { CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/constants';
+import { CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils/constants';
 
 export interface ChatMessage {
   id: string;

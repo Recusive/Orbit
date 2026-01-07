@@ -414,6 +414,37 @@ pub enum BridgeRequest {
     GenerateCommandDefinition {
         description: String,
     },
+    // Canvas Operations
+    #[serde(rename = "canvas:create_session")]
+    CanvasCreateSession {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        config: Option<CanvasSessionConfig>,
+    },
+    #[serde(rename = "canvas:delete_session")]
+    CanvasDeleteSession {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+    },
+    #[serde(rename = "canvas:send_message")]
+    CanvasSendMessage {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        message: String,
+        state: CanvasState,
+    },
+    #[serde(rename = "canvas:interrupt")]
+    CanvasInterrupt {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+    },
+    #[serde(rename = "canvas:tool_response")]
+    CanvasToolResponse {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        response: McpToolResponse,
+    },
     Shutdown,
 }
 
@@ -514,6 +545,25 @@ pub enum BridgeEvent {
         #[serde(rename = "checkpointId")]
         checkpoint_id: String,
     },
+    // Canvas Events
+    #[serde(rename = "canvas:message")]
+    CanvasMessage {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        message: SDKMessage,
+    },
+    #[serde(rename = "canvas:tool_request")]
+    CanvasToolRequest {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        request: McpToolRequest,
+    },
+    #[serde(rename = "canvas:error")]
+    CanvasError {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        error: String,
+    },
 }
 
 /// All possible messages from Node.js
@@ -612,4 +662,250 @@ pub struct SlashCommandDefinition {
     pub scope: CommandScope,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub readonly: Option<bool>,
+}
+
+// ============================================================================
+// Canvas Types
+// ============================================================================
+
+/// Position on the canvas
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasPosition {
+    pub x: f64,
+    pub y: f64,
+}
+
+/// Node type discriminator
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CanvasNodeType {
+    Sandpack,
+    Page,
+}
+
+/// Page layout mode
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PageLayout {
+    Flex,
+    Grid,
+    Stack,
+}
+
+/// Page viewport size
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PageViewport {
+    Desktop,
+    Tablet,
+    Mobile,
+}
+
+/// Slot position mode
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SlotPositionMode {
+    Flow,
+    Absolute,
+}
+
+/// Layout options for page nodes
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LayoutOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub direction: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gap: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub padding: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub align_items: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub justify_content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wrap: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grid_columns: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grid_rows: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grid_areas: Option<Vec<String>>,
+}
+
+/// Slot position within a page
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SlotPosition {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<SlotPositionMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grid_area: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flex_grow: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub x: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<String>,
+}
+
+/// A slot in a page that contains a component reference
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageSlot {
+    pub slot_id: String,
+    pub component_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<SlotPosition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub z_index: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visible: Option<bool>,
+}
+
+/// Background options for page nodes
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageBackground {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gradient: Option<String>,
+}
+
+/// Data for sandpack (component) nodes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SandpackNodeData {
+    pub name: String,
+    pub code: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_loading: Option<bool>,
+}
+
+/// Data for page (container) nodes
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageNodeData {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layout: Option<PageLayout>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub layout_options: Option<LayoutOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub viewport: Option<PageViewport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<PageBackground>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slots: Option<Vec<PageSlot>>,
+}
+
+/// Canvas node - tagged enum for type-safe node variants
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum CanvasNode {
+    /// Sandpack node - renders React components
+    Sandpack {
+        id: String,
+        position: CanvasPosition,
+        data: SandpackNodeData,
+    },
+    /// Page node - container for composing multiple components
+    Page {
+        id: String,
+        position: CanvasPosition,
+        data: Box<PageNodeData>,
+    },
+}
+
+/// Edge connecting two nodes on the canvas
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasEdge {
+    pub id: String,
+    pub source: String,
+    pub target: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_handle: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_handle: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
+}
+
+/// Complete canvas state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasState {
+    pub nodes: Vec<CanvasNode>,
+    pub edges: Vec<CanvasEdge>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_node_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selected_node_type: Option<CanvasNodeType>,
+}
+
+/// Canvas session configuration
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasSessionConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking_enabled: Option<bool>,
+}
+
+/// SDK message type discriminator
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SDKMessageType {
+    Text,
+    Thinking,
+    ToolUse,
+    Error,
+    Result,
+}
+
+/// Message from the canvas agent to the UI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SDKMessage {
+    #[serde(rename = "type")]
+    pub message_type: SDKMessageType,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// Tool request sent to webview for execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpToolRequest {
+    pub request_id: String,
+    pub tool_name: String,
+    pub tool_input: serde_json::Value,
+}
+
+/// Tool response from webview after execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpToolResponse {
+    pub request_id: String,
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }

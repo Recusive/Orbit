@@ -424,94 +424,166 @@ pub async fn agent_generate_command_definition(
 // Event Wiring
 // ============================================================================
 
+use crate::agent::protocol::{
+    AgentMessage, BridgeEvent, McpToolRequest, PermissionRequest, SDKMessage, SerializableError,
+    SessionInitEvent,
+};
+
+/// Emit agent message event
+fn emit_agent_message(app: &AppHandle, session_id: &str, message: &AgentMessage) {
+    drop(app.emit(
+        "agent:message",
+        serde_json::json!({
+            "sessionId": session_id,
+            "message": message,
+        }),
+    ));
+}
+
+/// Emit permission request event
+fn emit_permission_request(app: &AppHandle, request: &PermissionRequest) {
+    drop(app.emit(
+        "agent:permission_request",
+        serde_json::json!({
+            "sessionId": request.session_id,
+            "toolName": request.tool_name,
+            "toolInput": request.tool_input,
+            "requestId": request.request_id,
+        }),
+    ));
+}
+
+/// Emit session init event
+fn emit_session_init(app: &AppHandle, init_event: &SessionInitEvent) {
+    drop(app.emit(
+        "agent:session_init",
+        serde_json::json!({
+            "sessionId": init_event.session_id,
+            "sdkSessionId": init_event.sdk_session_id,
+            "isResumed": init_event.is_resumed,
+            "isForked": init_event.is_forked,
+        }),
+    ));
+}
+
+/// Emit plan mode changed event
+fn emit_plan_mode_changed(app: &AppHandle, session_id: &str, enabled: bool) {
+    drop(app.emit(
+        "agent:plan_mode_changed",
+        serde_json::json!({
+            "sessionId": session_id,
+            "enabled": enabled,
+        }),
+    ));
+}
+
+/// Emit accept mode changed event
+fn emit_accept_mode_changed(app: &AppHandle, session_id: &str, enabled: bool) {
+    drop(app.emit(
+        "agent:accept_mode_changed",
+        serde_json::json!({
+            "sessionId": session_id,
+            "enabled": enabled,
+        }),
+    ));
+}
+
+/// Emit error event
+fn emit_error(app: &AppHandle, error: &SerializableError) {
+    drop(app.emit(
+        "agent:error",
+        serde_json::json!({
+            "message": error.message,
+            "stack": error.stack,
+        }),
+    ));
+}
+
+/// Emit checkpoint event
+fn emit_checkpoint(app: &AppHandle, session_id: &str, checkpoint_id: &str) {
+    drop(app.emit(
+        "agent:checkpoint",
+        serde_json::json!({
+            "sessionId": session_id,
+            "checkpointId": checkpoint_id,
+        }),
+    ));
+}
+
+/// Emit canvas message event
+fn emit_canvas_message(app: &AppHandle, session_id: &str, message: &SDKMessage) {
+    drop(app.emit(
+        "canvas:message",
+        serde_json::json!({
+            "sessionId": session_id,
+            "message": message,
+        }),
+    ));
+}
+
+/// Emit canvas tool request event
+fn emit_canvas_tool_request(app: &AppHandle, session_id: &str, request: &McpToolRequest) {
+    drop(app.emit(
+        "canvas:tool_request",
+        serde_json::json!({
+            "sessionId": session_id,
+            "request": request,
+        }),
+    ));
+}
+
+/// Emit canvas error event
+fn emit_canvas_error(app: &AppHandle, session_id: &str, error: &str) {
+    drop(app.emit(
+        "canvas:error",
+        serde_json::json!({
+            "sessionId": session_id,
+            "error": error,
+        }),
+    ));
+}
+
 /// Wire up event callbacks to emit Tauri events
 pub fn setup_event_callbacks(app: &AppHandle, session_manager: &Arc<SessionManager>) {
-    use crate::agent::protocol::BridgeEvent;
-
     let app_handle = app.clone();
 
     session_manager.set_event_callback(Arc::new(move |event: BridgeEvent| match event {
         BridgeEvent::AgentMessage {
             session_id,
             message,
-        } => {
-            drop(app_handle.emit(
-                "agent:message",
-                serde_json::json!({
-                    "sessionId": session_id,
-                    "message": message,
-                }),
-            ));
-        },
+        } => emit_agent_message(&app_handle, &session_id, &message),
         BridgeEvent::PermissionRequest { request } => {
-            drop(app_handle.emit(
-                "agent:permission_request",
-                serde_json::json!({
-                    "sessionId": request.session_id,
-                    "toolName": request.tool_name,
-                    "toolInput": request.tool_input,
-                    "requestId": request.request_id,
-                }),
-            ));
+            emit_permission_request(&app_handle, &request);
         },
         BridgeEvent::SessionInit { event: init_event } => {
-            drop(app_handle.emit(
-                "agent:session_init",
-                serde_json::json!({
-                    "sessionId": init_event.session_id,
-                    "sdkSessionId": init_event.sdk_session_id,
-                    "isResumed": init_event.is_resumed,
-                    "isForked": init_event.is_forked,
-                }),
-            ));
+            emit_session_init(&app_handle, &init_event);
         },
         BridgeEvent::PlanModeChanged {
             session_id,
             enabled,
-        } => {
-            drop(app_handle.emit(
-                "agent:plan_mode_changed",
-                serde_json::json!({
-                    "sessionId": session_id,
-                    "enabled": enabled,
-                }),
-            ));
-        },
+        } => emit_plan_mode_changed(&app_handle, &session_id, enabled),
         BridgeEvent::AcceptModeChanged {
             session_id,
             enabled,
-        } => {
-            drop(app_handle.emit(
-                "agent:accept_mode_changed",
-                serde_json::json!({
-                    "sessionId": session_id,
-                    "enabled": enabled,
-                }),
-            ));
-        },
-        BridgeEvent::ErrorEvent { error } => {
-            drop(app_handle.emit(
-                "agent:error",
-                serde_json::json!({
-                    "message": error.message,
-                    "stack": error.stack,
-                }),
-            ));
-        },
+        } => emit_accept_mode_changed(&app_handle, &session_id, enabled),
+        BridgeEvent::ErrorEvent { error } => emit_error(&app_handle, &error),
         BridgeEvent::Ready => {
             drop(app_handle.emit("agent:ready", ()));
         },
         BridgeEvent::Checkpoint {
             session_id,
             checkpoint_id,
-        } => {
-            drop(app_handle.emit(
-                "agent:checkpoint",
-                serde_json::json!({
-                    "sessionId": session_id,
-                    "checkpointId": checkpoint_id,
-                }),
-            ));
+        } => emit_checkpoint(&app_handle, &session_id, &checkpoint_id),
+        BridgeEvent::CanvasMessage {
+            session_id,
+            message,
+        } => emit_canvas_message(&app_handle, &session_id, &message),
+        BridgeEvent::CanvasToolRequest {
+            session_id,
+            request,
+        } => emit_canvas_tool_request(&app_handle, &session_id, &request),
+        BridgeEvent::CanvasError { session_id, error } => {
+            emit_canvas_error(&app_handle, &session_id, &error);
         },
     }));
 }

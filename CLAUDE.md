@@ -26,6 +26,36 @@ Snowflake is a modern AI-powered code editor built with **Tauri 2** (Rust backen
 - **portable-pty** for terminal emulation
 - Tree-sitter for syntax parsing (planned)
 
+### Package Manager Policy
+
+**IMPORTANT:** This project uses **Bun** as the primary package manager/runtime wherever possible.
+
+| Context         | Use      | Why                                                          |
+| --------------- | -------- | ------------------------------------------------------------ |
+| `agent-bridge/` | **Bun**  | Claude Agent SDK sidecar - compiles to standalone Bun binary |
+| Root monorepo   | **pnpm** | Tauri requires pnpm for workspace management                 |
+| `apps/*`        | **pnpm** | Part of pnpm workspace                                       |
+
+**Rules:**
+
+1. **Never use `npm`** - Always use `bun` or `pnpm`
+2. **Prefer `bun`** for standalone packages (agent-bridge, scripts, tests)
+3. **Use `pnpm`** for monorepo workspace commands (`pnpm dev`, `pnpm tauri dev`)
+4. **Run tests with `bun test`** in agent-bridge
+
+```bash
+# ✅ CORRECT
+bun run build:dev           # In agent-bridge
+bun test                    # In agent-bridge
+pnpm dev                    # At monorepo root
+pnpm tauri dev              # At monorepo root
+
+# ❌ WRONG - Never use npm
+npm run build               # NO!
+npm install                 # NO!
+npm test                    # NO!
+```
+
 ## Project Structure
 
 ```
@@ -65,21 +95,17 @@ Snowflake-v0/
 │   └── package.json
 │
 ├── crates/                         # Rust library crates
-│   ├── common/                     # Shared crates
-│   │   ├── core/                   # Core types, config, state
-│   │   ├── fs/                     # File system operations
-│   │   ├── terminal/               # PTY management
-│   │   ├── git/                    # Git operations
-│   │   ├── ai/                     # Claude API integration
-│   │   ├── lsp/                    # Language server
-│   │   ├── search/                 # Ripgrep search
-│   │   ├── syntax/                 # Syntax highlighting
-│   │   ├── settings/               # Settings persistence
-│   │   └── conversations/          # Conversation storage
-│   │
-│   ├── agent/                      # Agent-specific Rust (stub)
-│   ├── canvas/                     # Canvas-specific Rust (stub)
-│   └── editor/                     # Editor-specific Rust (stub)
+│   └── common/                     # Shared crates
+│       ├── core/                   # Core types, config, state
+│       ├── fs/                     # File system operations
+│       ├── terminal/               # PTY management
+│       ├── git/                    # Git operations
+│       ├── ai/                     # Claude API integration (stub - uses agent-bridge)
+│       ├── lsp/                    # Language server
+│       ├── search/                 # Ripgrep search
+│       ├── syntax/                 # Syntax highlighting (stub - uses frontend Shiki)
+│       ├── settings/               # Settings persistence
+│       └── conversations/          # Conversation storage
 │
 ├── src-tauri/                      # Tauri app entry point
 │   ├── src/
@@ -169,7 +195,7 @@ The agent-bridge is a **compiled Bun binary** that Tauri spawns as a sidecar pro
 
 ```bash
 cd agent-bridge
-npm run build:dev    # Compiles to target/debug/agent-bridge
+bun run build:dev    # Compiles to target/debug/agent-bridge
 ```
 
 Then restart the Tauri app (`Cmd+C` → `pnpm tauri dev`).
@@ -183,8 +209,8 @@ Then restart the Tauri app (`Cmd+C` → `pnpm tauri dev`).
 **Two build outputs:**
 | Script | Output | Purpose |
 |--------|--------|---------|
-| `npm run build` | `dist/index.js` | JS bundle (requires Bun to run) |
-| `npm run build:dev` | `target/debug/agent-bridge` | Standalone binary for Tauri |
+| `bun run build` | `dist/index.js` | JS bundle (requires Bun to run) |
+| `bun run build:dev` | `target/debug/agent-bridge` | Standalone binary for Tauri |
 
 ### Production Build
 
@@ -317,9 +343,32 @@ All message types in `apps/agent/src/types/protocol.ts` with Zod schemas:
 - **Explicit return types** on functions
 - **Consistent type imports** - Use `import type { }` separately
 - **Import order** - External → Internal → Types, alphabetized
-- **No console.log** - Only `warn`/`error` allowed
+- **No console.log** - Use structured logger (see below)
 - **Strict boolean expressions** - No implicit truthy checks
 - **Exhaustive switches** - All cases must be handled
+
+### Structured Logging
+
+**IMPORTANT:** Use the structured logger instead of `console.*` calls:
+
+```typescript
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('MyComponent');
+
+// Log levels
+logger.debug('Dev-only message', { count: 42 }); // Filtered in production
+logger.info('Operational message'); // Always shown
+logger.warn('Potential issue', { userId: '123' }); // Always shown
+logger.error('Error occurred', new Error('fail')); // Always shown with stack
+```
+
+**Benefits:**
+
+- **Context prefix** - Easily identify source: `[MyComponent] message`
+- **Log levels** - Debug messages hidden in production
+- **Structured data** - JSON metadata for log aggregation
+- **Error handling** - Proper error serialization with stack traces
 
 ### Tailwind + Dynamic Styles
 
@@ -354,10 +403,6 @@ All message types in `apps/agent/src/types/protocol.ts` with Zod schemas:
 | `ai`       | Claude API integration    |
 | `lsp`      | Language server protocol  |
 | `search`   | Ripgrep search            |
-
-### App-Specific Crates (`crates/{agent,canvas,editor}/`)
-
-Currently stubs - will contain app-specific Rust code as needed.
 
 ### Commands (`src-tauri/src/commands/`)
 
@@ -456,3 +501,327 @@ Common symptoms:
 | Combined Rewind Flow        | `apps/agent/src/hooks/use-tauri.ts:conversation:rewind handler` | `agent-bridge/src/__tests__/combined-rewind.test.ts`     |
 
 **When adding new tests:** Always add the ⚠️ TESTED comment to the source function/handler being tested.
+
+### Mandatory Test Requirements
+
+**CRITICAL:** Tests are not optional. We follow **real integration testing**, not unit testing with mocks.
+
+#### Testing Philosophy
+
+1. **NO MOCK DATA** - Tests must use real systems, real API calls, real data flows
+2. **NO FAKE PASSES** - A test that just "passes" without exercising real code paths is worthless
+3. **FULL INTEGRATION** - Test the entire system flow, not isolated files
+4. **INDUSTRY STANDARD** - Follow proper integration testing practices used in production systems
+
+#### What We Test
+
+| ❌ DO NOT                        | ✅ DO                                    |
+| -------------------------------- | ---------------------------------------- |
+| Mock the Claude SDK              | Use REAL Claude API calls                |
+| Test single files in isolation   | Test full module integration             |
+| Use fake data that always passes | Use real data through real pipelines     |
+| Skip API calls to "save time"    | Make actual API calls to verify behavior |
+| Test only the happy path         | Test error paths, edge cases, cleanup    |
+
+#### Test Structure
+
+```
+agent-bridge/src/__tests__/
+├── canvas-e2e.test.ts       # Full Canvas integration (REAL SDK, REAL sessions)
+├── canvas-types.test.ts     # Type/schema validation
+└── [feature]-e2e.test.ts    # Each feature gets E2E tests
+```
+
+#### When Adding/Modifying Code
+
+1. **When creating a new file:**
+   - Add tests to the relevant E2E test file (e.g., `canvas-e2e.test.ts`)
+   - Tests must exercise the FULL flow through real systems
+   - Run the complete test suite to verify integration
+   - Add the ⚠️ TESTED comment to the source file
+
+2. **When modifying a file that has existing tests:**
+   - Find the E2E test file for that module
+   - **ADD NEW TESTS** that cover your new functionality
+   - Tests must verify the new code integrates with existing systems
+   - Do NOT just run existing tests - that defeats the purpose
+   - Run the FULL test suite to verify nothing broke
+
+3. **When modifying a file without existing tests:**
+   - Create E2E tests if the module doesn't have them
+   - Tests must cover the full integration path
+
+#### Real Integration Test Example
+
+```typescript
+// ❌ BAD: Mock test that proves nothing
+it('should analyze intent', () => {
+  const mockAnalyzer = { analyze: () => ({ useFastPath: true }) };
+  expect(mockAnalyzer.analyze('test').useFastPath).toBe(true);
+});
+
+// ✅ GOOD: Real integration test
+it('should route simple requests to fast path via real session', async () => {
+  // Create REAL session with REAL Claude SDK
+  const manager = new CanvasSessionManager();
+  await manager.createSession('test-session', {
+    model: 'claude-sonnet-4-20250514',
+  });
+
+  // Verify REAL IntentAnalyzer is initialized
+  const intentAnalyzer = manager['intentAnalyzer'];
+  expect(intentAnalyzer).toBeDefined();
+
+  // Test REAL analysis with REAL routing logic
+  const state: CanvasState = { nodes: [], edges: [] };
+  const snapshot = manager['convertToSnapshot'](state);
+  const analysis = intentAnalyzer.analyze('Create a button', snapshot);
+
+  // Verify REAL routing decision
+  expect(analysis.useFastPath).toBe(true);
+  expect(analysis.fastPathAgent).toBe('component');
+
+  // Cleanup REAL session
+  await manager.deleteSession('test-session');
+});
+```
+
+#### Test Checklist Before PR
+
+- [ ] Added tests for ALL new functionality
+- [ ] Tests use REAL systems (no mocks for core functionality)
+- [ ] Tests verify FULL integration flow
+- [ ] Tests cover error cases and cleanup
+- [ ] Ran complete test suite: `cd agent-bridge && bun test`
+- [ ] All tests pass with real API calls
+
+#### Why This Matters
+
+```
+❌ WRONG: "Tests pass" with mocked data
+   → Deploys to production
+   → Real system fails because mock didn't match reality
+   → Hours of debugging
+
+✅ RIGHT: Tests pass with real integration
+   → Actual API calls verified working
+   → Full data flow tested
+   → Confidence that production will work
+```
+
+**Example - Adding orchestrator to session manager:**
+
+```
+❌ WRONG:
+   - Mocked IntentAnalyzer to return fake results
+   - Mocked Orchestrator to skip real execution
+   - Tests pass but nothing actually works
+
+✅ RIGHT:
+   - Created REAL sessions with REAL Claude SDK
+   - Tested REAL IntentAnalyzer routing decisions
+   - Verified REAL orchestrator lifecycle (create, cleanup)
+   - Tested REAL snapshot conversion with actual canvas state
+   - All 44 tests pass with REAL integration
+```
+
+### Tauri WebView Blur/Rendering Issues
+
+**IMPORTANT:** Tauri's WebView (WKWebView on macOS) has different rendering behavior than Chrome/Electron. Certain CSS properties cause blurry/fuzzy text and elements during interactions (hover, click, transitions).
+
+#### CSS Properties That Cause Blur in Tauri WebView
+
+The following CSS properties trigger GPU compositing issues that result in momentary or persistent blur:
+
+| Property                                       | Effect                                             | Solution                                                  |
+| ---------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------- |
+| `backdrop-filter: blur()`                      | Causes blur on the element and surrounding content | Remove entirely or use solid backgrounds                  |
+| `color-mix()` CSS function                     | Triggers repaints that cause momentary blur        | Replace with solid CSS variables or `rgba()`              |
+| `transition` on hover/click                    | GPU compositing during transition causes blur      | Remove transitions or use only on non-critical elements   |
+| `animation` with `scale()`                     | Scale transforms cause blur during animation       | Remove scale animations or use opacity-only               |
+| `opacity` transitions combined with transforms | Compound effect causes severe blur                 | Avoid combining opacity transitions with other transforms |
+
+#### Example: Fixing Blurry Nodes in ReactFlow
+
+**Problem:** Workflow nodes in Canvas app appeared blurry in Tauri but crisp in browser.
+
+**Root Cause:** The `MarkdownCardNode.css` had these problematic styles:
+
+```css
+/* BAD - causes blur in Tauri WebView */
+.card-action-toolbar {
+  background: color-mix(in oklch, var(--card) 95%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.card-action-toolbar__button:hover {
+  background: color-mix(in oklch, var(--muted) 60%, transparent);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.markdown-card-node {
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+```
+
+**Solution:** Replace with solid values and remove transitions:
+
+```css
+/* GOOD - crisp rendering in Tauri WebView */
+.card-action-toolbar {
+  background: var(--card);
+  /* No backdrop-filter */
+}
+
+.card-action-toolbar__button:hover {
+  background: var(--muted);
+  /* No transition */
+}
+
+.markdown-card-node {
+  /* No transition */
+}
+```
+
+#### Quick Checklist for Tauri-Compatible CSS
+
+- [ ] No `backdrop-filter: blur()` on interactive elements
+- [ ] No `color-mix()` function - use CSS variables or `rgba()` instead
+- [ ] No `transition` on elements inside ReactFlow's transformed viewport
+- [ ] No `animation` on elements inside ReactFlow's transformed viewport
+- [ ] Avoid combining `opacity` transitions with other transforms
+- [ ] Test in Tauri app, not just browser (blur won't appear in browser)
+
+**Note:** `contain: layout style paint` and `will-change: transform` do NOT fix the blur issue. The only solution for elements inside ReactFlow's viewport is to completely remove transitions and animations.
+
+#### Debugging Blur Issues
+
+1. **Identify the blurry element** - Check if it's specific to certain components
+2. **Compare with working components** - Find similar components that render crisp
+3. **Check CSS differences** - Look for `backdrop-filter`, `color-mix()`, `transition`, `animation`
+4. **Remove one property at a time** - Isolate which property causes the blur
+5. **Replace with solid alternatives** - Use CSS variables and remove transitions
+
+### Known Security Vulnerabilities
+
+**Last audited:** January 2025
+
+| Package                     | Severity | CVE           | Status              | Notes                                           |
+| --------------------------- | -------- | ------------- | ------------------- | ----------------------------------------------- |
+| `@modelcontextprotocol/sdk` | High     | CVE-2026-0621 | ⏳ Waiting upstream | ReDoS in UriTemplate class. No patch available. |
+
+#### MCP SDK ReDoS (CVE-2026-0621)
+
+**Advisory:** [GHSA-8r9q-7v3j-jr4g](https://github.com/advisories/GHSA-8r9q-7v3j-jr4g)
+
+**Issue:** The `@modelcontextprotocol/sdk` (versions ≤1.25.1) has a Regular Expression Denial of Service vulnerability in the UriTemplate class. Attackers can craft malicious URIs that trigger catastrophic regex backtracking, causing CPU exhaustion.
+
+**Risk Assessment for Snowflake:** **Low practical risk** because:
+
+1. The agent-bridge runs as a local sidecar, not exposed to the internet
+2. URIs come from our own Claude SDK calls, not untrusted user input
+3. An attacker would need local access to craft malicious URIs
+
+**Mitigation:** We've added a pnpm override for `qs>=6.14.1` to fix a related DoS vulnerability in the transitive dependency chain. The MCP SDK issue requires an upstream fix from Anthropic - update `@modelcontextprotocol/sdk` when a patched version is released.
+
+**To check for updates:**
+
+```bash
+pnpm audit                    # Check current vulnerabilities
+pnpm view @modelcontextprotocol/sdk version  # Check latest version
+```
+
+## CSS Architecture
+
+**IMPORTANT:** The app uses a unified color system with agent as the source of truth.
+
+### File Structure
+
+```
+apps/
+├── agent/src/globals.css     ← SOURCE OF TRUTH for all colors
+└── canvas/src/globals.css    ← Canvas-specific styles only (NO color definitions)
+```
+
+### Import Order (apps/agent/src/main.tsx)
+
+```typescript
+import '@xyflow/react/dist/style.css'; // ReactFlow base styles
+import './globals.css'; // Agent colors (source of truth)
+import '@canvas/globals.css'; // Canvas styles (no color overrides)
+```
+
+### Color Variables
+
+All color variables are defined in `apps/agent/src/globals.css`:
+
+| Variable       | Light Mode        | Dark Mode         | Purpose               |
+| -------------- | ----------------- | ----------------- | --------------------- |
+| `--background` | `oklch(0.95 ...)` | `oklch(0.16 ...)` | Main app background   |
+| `--chat-area`  | `oklch(0.93 ...)` | `oklch(0.18 ...)` | Chat messages area    |
+| `--card`       | `oklch(0.90 ...)` | `oklch(0.20 ...)` | Cards, headers, input |
+| `--sidebar`    | `oklch(0.96 ...)` | `oklch(0.20 ...)` | Sidebar background    |
+| `--primary`    | `oklch(0.56 ...)` | `oklch(0.68 ...)` | Coral accent          |
+
+### Rules
+
+1. **NEVER define `:root` color variables in canvas globals.css** - They will override agent colors
+2. **Canvas uses agent's variables** - e.g., `var(--background)`, `var(--card)`, `var(--primary)`
+3. **Canvas globals.css contains only:**
+   - Tailwind `@theme` mappings (pointing to agent's variables)
+   - ReactFlow style overrides (`.react-flow__*`)
+   - Scrollbar styling
+   - Base layout (html, body, #root)
+
+### Adding New Colors
+
+1. Add the variable to `apps/agent/src/globals.css` in both `:root` and `html.dark` sections
+2. Add the Tailwind mapping in `@theme inline { }` block
+3. Canvas will automatically have access to the new variable
+
+## Canvas App
+
+The Canvas app is embedded within the Agent app as a mode/tab (not a separate Tauri window).
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  Snowflake App (Single Tauri Window)            │
+│  ┌───────────────────────────────────────────┐  │
+│  │  HeaderBar [Agent] [Canvas] [Editor]      │  │
+│  └───────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────┐  │
+│  │  activeTab === 'agent'  → RootLayout      │  │
+│  │  activeTab === 'canvas' → CanvasApp       │  │
+│  │  activeTab === 'editor' → EditorMode      │  │
+│  └───────────────────────────────────────────┘  │
+│  ┌───────────────────────────────────────────┐  │
+│  │  StatusBar                                │  │
+│  └───────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────┘
+```
+
+### Canvas Libraries
+
+- **@xyflow/react** (ReactFlow) - Node-based canvas
+- **@codesandbox/sandpack-react** - Code playground integration
+- **Zustand** - State management (`apps/canvas/src/stores/`)
+
+### Canvas Directory Structure
+
+```
+apps/canvas/src/
+├── components/          # React components (nodes, panels, toolbars)
+├── hooks/               # Custom React hooks
+├── lib/                 # Utilities and design tokens
+├── types/               # TypeScript type definitions
+├── config/              # Configuration files
+├── sandpack/            # Sandpack integration
+├── stores/              # Zustand stores
+├── main.tsx             # Entry point (standalone mode only)
+├── globals.css          # Canvas styles (no colors!)
+└── CanvasApp.tsx        # Root component (imported by agent)
+```

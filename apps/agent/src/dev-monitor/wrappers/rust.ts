@@ -11,9 +11,9 @@
  * Follows the error isolation pattern - monitoring errors never crash the app.
  */
 
-import { captureEvent } from '../storage';
+import { captureEvent } from '../core/storage';
 
-import type { Severity } from '../types';
+import type { Severity } from '../core/types';
 
 // ═══════════════════════════════════════════════════════════════
 // Types

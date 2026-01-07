@@ -4209,10 +4209,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
-name = "snowflake-agent"
-version = "0.1.0"
-
-[[package]]
 name = "snowflake-ai"
 version = "0.1.0"
 dependencies = [
@@ -4252,10 +4248,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snowflake-canvas"
-version = "0.1.0"
-
-[[package]]
 name = "snowflake-conversations"
 version = "0.1.0"
 dependencies = [
@@ -4282,10 +4274,6 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
 ]
-
-[[package]]
-name = "snowflake-editor"
-version = "0.1.0"
 
 [[package]]
 name = "snowflake-fs"

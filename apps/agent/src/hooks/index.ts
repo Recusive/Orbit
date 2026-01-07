@@ -1,66 +1,34 @@
 /**
- * Hooks barrel export
- * Centralized export for all custom React hooks
+ * Hooks barrel file
+ * Organized by domain for clean imports
  */
 
-// Tauri integration
-export { useTauri, useAgentStream } from './use-tauri';
-export type { UseTauriOptions, UseTauriReturn, AgentStreamCallbacks } from './use-tauri';
+// Agent hooks
+export * from './agent';
 
-// Agent operations
-export { useAgent } from './use-agent';
-export type { UseAgentReturn } from './use-agent';
+// Browser hooks (in-app webview)
+export * from './browser';
 
-// Chat operations
-export { useChat } from './use-chat';
-export type { UseChatReturn } from './use-chat';
+// Canvas hooks (from @snowflake/common)
+export * from '@snowflake/common/hooks/canvas';
 
-// Terminal operations
-export { useTerminal } from './use-terminal';
-export type { UseTerminalReturn } from './use-terminal';
+// Chat hooks
+export * from './chat';
 
-// File operations
-export { useFileOperations } from './use-file-operations';
-export type { UseFileOperationsReturn } from './use-file-operations';
-export type { FileChange } from '../stores/file-store';
+// Core hooks
+export * from './core';
 
-// Resizable panels
-export { useResizable } from './use-resizable';
-export type {
-  ResizeDirection,
-  ResizeConstraints,
-  UseResizableOptions,
-  UseResizableReturn,
-} from './use-resizable';
+// File hooks
+export * from './file';
 
-// Keyboard shortcuts
-export {
-  useKeyboardShortcuts,
-  useDefaultKeyboardShortcuts,
-  defaultShortcuts,
-} from './use-keyboard-shortcuts';
-export type {
-  KeyboardShortcut,
-  UseKeyboardShortcutsOptions,
-  UseKeyboardShortcutsReturn,
-} from './use-keyboard-shortcuts';
+// Git hooks
+export * from './git';
 
-// Git status
-export { useGitStatus } from './use-git-status';
-export type { UseGitStatusOptions, UseGitStatusResult } from './use-git-status';
+// LSP hooks
+export * from './lsp';
 
-// File tree
-export { useFileTree, useFileTreeItem } from './use-file-tree';
-export type { UseFileTreeOptions, UseFileTreeResult, UseFileTreeItemResult } from './use-file-tree';
+// Terminal hooks
+export * from './terminal';
 
-// LSP
-export { useLsp } from './use-lsp';
-export type { UseLspResult } from './use-lsp';
-
-// Search
-export { useSearch } from './use-search';
-export type { UseSearchOptions, UseSearchReturn } from './use-search';
-
-// Crash check
-export { useCrashCheck } from './use-crash-check';
-export type { UseCrashCheckReturn } from './use-crash-check';
+// UI hooks
+export * from './ui';

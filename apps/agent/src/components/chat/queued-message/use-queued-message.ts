@@ -3,8 +3,8 @@ import { useEffect } from 'react';
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
 import type { ReactElementContext, WebviewMessage } from '@/types/protocol';
 
-import { useQueuedMessageStore, useQueuedMessage } from '@/stores/queued-message-store';
-import { useToolStore } from '@/stores/tool-store';
+import { useToolStore } from '@/stores/agent/tool-store';
+import { useQueuedMessageStore, useQueuedMessage } from '@/stores/chat/queued-message-store';
 
 interface UseQueuedMessageOptions {
   isAgentRunning: boolean;

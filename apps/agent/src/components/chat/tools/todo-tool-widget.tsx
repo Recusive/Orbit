@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { FC, ReactElement } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 interface TodoItem {
   content: string;

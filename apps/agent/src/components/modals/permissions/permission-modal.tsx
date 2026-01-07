@@ -1,0 +1,104 @@
+import { File, Loader2, Terminal } from 'lucide-react';
+import { useCallback, useEffect } from 'react';
+
+import type { PermissionRequest } from '@/stores/agent/tool-store';
+import type { FC } from 'react';
+
+interface PermissionModalProps {
+  readonly request: PermissionRequest;
+  readonly onApprove: (requestId: string, always?: boolean) => void;
+  readonly onDeny: (requestId: string) => void;
+  readonly onOpenFile?: (path: string) => void;
+}
+
+// Get confirmation action label
+function getConfirmLabel(toolName: string): string {
+  const name = toolName.toLowerCase();
+  switch (name) {
+    case 'bash':
+      return 'Confirm run';
+    case 'read':
+      return 'Confirm read';
+    case 'write':
+      return 'Confirm write';
+    case 'edit':
+      return 'Confirm edit';
+    case 'glob':
+      return 'Confirm search';
+    case 'grep':
+      return 'Confirm search';
+    default:
+      return `Confirm ${toolName.toLowerCase()}`;
+  }
+}
+
+export const PermissionModal: FC<PermissionModalProps> = ({ request, onApprove, onDeny }) => {
+  const confirmLabel = getConfirmLabel(request.toolName);
+  const isBash = request.toolName.toLowerCase() === 'bash';
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onApprove(request.requestId);
+        } else if (e.key === 'Backspace') {
+          e.preventDefault();
+          onDeny(request.requestId);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [request.requestId, onApprove, onDeny]);
+
+  const handleApprove = useCallback(() => {
+    onApprove(request.requestId);
+  }, [request.requestId, onApprove]);
+
+  const handleDeny = useCallback(() => {
+    onDeny(request.requestId);
+  }, [request.requestId, onDeny]);
+
+  return (
+    <div className="rounded-t-xl bg-card border border-border/50 border-b-0 overflow-hidden shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.1),0_-2px_6px_-2px_rgba(0,0,0,0.06)]">
+      {/* Single row: Icon + Label + Loader + Buttons */}
+      <div className="flex items-center gap-2.5 px-3.5 py-2">
+        {/* Icon */}
+        <div className="w-6 h-6 rounded-md flex items-center justify-center bg-primary/10">
+          {isBash ? (
+            <Terminal className="h-3.5 w-3.5 text-primary/70" />
+          ) : (
+            <File className="h-3.5 w-3.5 text-primary/70" />
+          )}
+        </div>
+
+        {/* Label + Loader */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span className="text-[13px] font-medium text-foreground shrink-0">{confirmLabel}</span>
+          <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleDeny}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-muted/50 hover:bg-muted text-foreground"
+          >
+            Reject <span className="text-muted-foreground/50 ml-1">⌘⌫</span>
+          </button>
+          <button
+            onClick={handleApprove}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            Accept <span className="text-primary-foreground/60 ml-1">⌘⏎</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

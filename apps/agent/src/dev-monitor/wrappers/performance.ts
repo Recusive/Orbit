@@ -12,9 +12,9 @@
  * monitoring errors never crash the application.
  */
 
-import { captureEvent } from '../storage';
+import { captureEvent } from '../core/storage';
 
-import type { InitOptions, Severity } from '../types';
+import type { InitOptions, Severity } from '../core/types';
 
 // ═══════════════════════════════════════════════════════════════
 // Types

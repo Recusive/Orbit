@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { ReactElementContext } from '@/types/protocol';
 import type { FC } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 export interface ElementContextChipProps {
   readonly element: ReactElementContext;

@@ -21,7 +21,7 @@ import {
 } from './slash-command-popover';
 
 import type { SlashCommand } from './slash-command-popover';
-import type { ContextItem, FileEntry } from '@/types/context';
+import type { ContextItem, FileEntry } from '@/types/agent/context';
 import type {
   ExtensionMessage,
   InputMode,
@@ -34,11 +34,11 @@ import type { FC } from 'react';
 import { ElementContextList } from '@/components/browser';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useTauri } from '@/hooks/use-tauri';
-import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/constants';
-import { compressImage } from '@/lib/image-utils';
-import { cn } from '@/lib/utils';
-import { useElementContexts, useBrowserStore } from '@/stores/browser-store';
+import { useTauri } from '@/hooks/agent/use-tauri';
+import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils/constants';
+import { compressImage } from '@/lib/utils/image-utils';
+import { cn } from '@/lib/utils/utils';
+import { useElementContexts, useBrowserStore } from '@/stores/browser/browser-store';
 
 const INPUT_MODE_LABELS: Record<InputMode, string> = {
   default: 'Default',

@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 
-import { HEIGHTS } from '@/lib/constants';
-import { useWorkspaceName, useActiveConversationTitle } from '@/stores/ui-store';
+import { HEIGHTS } from '@/lib/utils/constants';
+import { useWorkspaceName, useActiveConversationTitle } from '@/stores/ui/ui-store';
 
 export const ChatHeader: FC = () => {
   const workspaceName = useWorkspaceName();

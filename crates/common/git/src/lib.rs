@@ -100,6 +100,40 @@ pub struct BlameLine {
     pub content: String,
 }
 
+/// Information about a git worktree.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeInfo {
+    /// Absolute path to the worktree directory.
+    pub path: String,
+    /// Full commit hash of HEAD.
+    pub head: String,
+    /// Short commit hash (7 chars).
+    pub short_head: String,
+    /// Branch name (without refs/heads/ prefix), None if detached.
+    pub branch: Option<String>,
+    /// Whether this is the main worktree.
+    pub is_main: bool,
+    /// Whether HEAD is detached.
+    pub is_detached: bool,
+    /// Lock status - None if unlocked, Some(reason) if locked.
+    pub locked: Option<String>,
+}
+
+/// Options for creating a new worktree.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeAddOptions {
+    /// Create a new branch with this name (-b flag).
+    pub new_branch: Option<String>,
+    /// Force create/reset branch (-B flag).
+    pub force_branch: bool,
+    /// Create detached worktree (--detach).
+    pub detach: bool,
+    /// Commit/branch/tag to checkout (defaults to HEAD).
+    pub commit_ish: Option<String>,
+}
+
 // ============================================
 // Repository Operations
 // ============================================
@@ -946,6 +980,265 @@ pub fn pull(path: &Path, remote_name: Option<&str>) -> Result<()> {
     }
 
     info!("Pull successful");
+    Ok(())
+}
+
+// ============================================
+// Worktree Operations
+// ============================================
+
+/// List all worktrees for the repository.
+///
+/// Uses `git worktree list --porcelain` for reliable parsing.
+///
+/// # Errors
+/// Returns an error if the command fails or output cannot be parsed.
+pub fn worktree_list(repo_path: &Path) -> Result<Vec<WorktreeInfo>> {
+    debug!(?repo_path, "Listing worktrees");
+
+    let output = Command::new("git")
+        .args(["worktree", "list", "--porcelain"])
+        .current_dir(repo_path)
+        .output()
+        .map_err(|e| Error::Git(format!("Failed to run git worktree list: {e}")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(Error::Git(format!(
+            "git worktree list failed: {}",
+            stderr.trim()
+        )));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(parse_worktree_porcelain(&stdout))
+}
+
+/// Parse `git worktree list --porcelain` output.
+///
+/// Porcelain format example:
+/// ```text
+/// worktree /path/to/main
+/// HEAD abc123...
+/// branch refs/heads/main
+///
+/// worktree /path/to/feature
+/// HEAD def456...
+/// branch refs/heads/feature
+/// ```
+fn parse_worktree_porcelain(output: &str) -> Vec<WorktreeInfo> {
+    let mut worktrees = Vec::new();
+    let mut current_path: Option<String> = None;
+    let mut current_head: Option<String> = None;
+    let mut current_branch: Option<String> = None;
+    let mut _is_bare = false;
+    let mut is_detached = false;
+    let mut locked: Option<String> = None;
+    let mut is_first = true;
+
+    for line in output.lines() {
+        if line.is_empty() {
+            // End of record - save current worktree
+            if let (Some(path), Some(head)) = (current_path.take(), current_head.take()) {
+                let short_head = head.chars().take(7).collect();
+                worktrees.push(WorktreeInfo {
+                    path,
+                    head,
+                    short_head,
+                    branch: current_branch.take(),
+                    is_main: is_first,
+                    is_detached,
+                    locked: locked.take(),
+                });
+                is_first = false;
+            }
+            _is_bare = false;
+            is_detached = false;
+            continue;
+        }
+
+        if let Some(path) = line.strip_prefix("worktree ") {
+            current_path = Some(path.to_owned());
+        } else if let Some(head) = line.strip_prefix("HEAD ") {
+            current_head = Some(head.to_owned());
+        } else if let Some(branch) = line.strip_prefix("branch ") {
+            // Strip refs/heads/ prefix
+            let branch_name = branch.strip_prefix("refs/heads/").unwrap_or(branch);
+            current_branch = Some(branch_name.to_owned());
+        } else if line == "bare" {
+            _is_bare = true;
+        } else if line == "detached" {
+            is_detached = true;
+        } else if line == "locked" {
+            locked = Some(String::new());
+        } else if let Some(reason) = line.strip_prefix("locked ") {
+            locked = Some(reason.to_owned());
+        }
+    }
+
+    // Handle last record if no trailing newline
+    if let (Some(path), Some(head)) = (current_path, current_head) {
+        let short_head = head.chars().take(7).collect();
+        worktrees.push(WorktreeInfo {
+            path,
+            head,
+            short_head,
+            branch: current_branch,
+            is_main: is_first,
+            is_detached,
+            locked,
+        });
+    }
+
+    debug!(count = worktrees.len(), "Found worktrees");
+    worktrees
+}
+
+/// Add a new worktree.
+///
+/// # Arguments
+/// * `repo_path` - Path to the main repository
+/// * `worktree_path` - Path where the new worktree will be created
+/// * `options` - Configuration options for the worktree
+///
+/// # Errors
+/// Returns an error if:
+/// - The path already exists
+/// - The branch is already checked out elsewhere
+/// - Git command fails
+pub fn worktree_add(
+    repo_path: &Path,
+    worktree_path: &Path,
+    options: &WorktreeAddOptions,
+) -> Result<WorktreeInfo> {
+    info!(?repo_path, ?worktree_path, ?options, "Adding worktree");
+
+    let mut args = vec!["worktree", "add"];
+
+    // Branch options
+    if let Some(branch) = &options.new_branch {
+        if options.force_branch {
+            args.push("-B");
+        } else {
+            args.push("-b");
+        }
+        args.push(branch);
+    }
+
+    if options.detach {
+        args.push("--detach");
+    }
+
+    // Worktree path
+    let worktree_path_str = worktree_path.to_string_lossy();
+    args.push(&worktree_path_str);
+
+    // Commit-ish (branch/tag/commit to checkout)
+    if let Some(commit_ish) = &options.commit_ish {
+        args.push(commit_ish);
+    }
+
+    let output = Command::new("git")
+        .args(&args)
+        .current_dir(repo_path)
+        .output()
+        .map_err(|e| Error::Git(format!("Failed to run git worktree add: {e}")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let msg = stderr.trim();
+
+        // Provide user-friendly error messages
+        if msg.contains("already checked out") {
+            return Err(Error::Git(
+                "Branch is already checked out in another worktree.".to_owned(),
+            ));
+        }
+        if msg.contains("already exists") {
+            return Err(Error::Git(
+                "Path already exists. Choose a different location.".to_owned(),
+            ));
+        }
+        if msg.contains("is locked") {
+            return Err(Error::Git(
+                "Worktree is locked. Unlock it first.".to_owned(),
+            ));
+        }
+
+        return Err(Error::Git(format!("Failed to add worktree: {msg}")));
+    }
+
+    // Find and return the newly created worktree
+    let worktrees = worktree_list(repo_path)?;
+    let worktree_path_canonical = worktree_path
+        .canonicalize()
+        .unwrap_or_else(|_| worktree_path.to_path_buf());
+
+    worktrees
+        .into_iter()
+        .find(|wt| {
+            let wt_path = Path::new(&wt.path);
+            let wt_canonical = wt_path
+                .canonicalize()
+                .unwrap_or_else(|_| wt_path.to_path_buf());
+            wt_canonical == worktree_path_canonical
+        })
+        .ok_or_else(|| Error::Git("Worktree was created but not found in list".to_owned()))
+}
+
+/// Remove a worktree.
+///
+/// # Arguments
+/// * `repo_path` - Path to the main repository
+/// * `worktree_path` - Path to the worktree to remove
+/// * `force` - If true, removes even if dirty/locked
+///
+/// # Errors
+/// Returns an error if:
+/// - The worktree doesn't exist
+/// - The worktree is locked (and force=false)
+/// - The worktree has uncommitted changes (and force=false)
+pub fn worktree_remove(repo_path: &Path, worktree_path: &Path, force: bool) -> Result<()> {
+    info!(?repo_path, ?worktree_path, force, "Removing worktree");
+
+    let mut args = vec!["worktree", "remove"];
+
+    if force {
+        args.push("--force");
+    }
+
+    let worktree_path_str = worktree_path.to_string_lossy();
+    args.push(&worktree_path_str);
+
+    let output = Command::new("git")
+        .args(&args)
+        .current_dir(repo_path)
+        .output()
+        .map_err(|e| Error::Git(format!("Failed to run git worktree remove: {e}")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let msg = stderr.trim();
+
+        // Provide user-friendly error messages
+        if msg.contains("is locked") {
+            return Err(Error::Git(
+                "Worktree is locked. Unlock or use force remove.".to_owned(),
+            ));
+        }
+        if msg.contains("modified or untracked") || msg.contains("uncommitted changes") {
+            return Err(Error::Git(
+                "Worktree has uncommitted changes. Commit, stash, or use force remove.".to_owned(),
+            ));
+        }
+        if msg.contains("not a worktree") || msg.contains("is not a working tree") {
+            return Err(Error::Git("Not a valid worktree path.".to_owned()));
+        }
+
+        return Err(Error::Git(format!("Failed to remove worktree: {msg}")));
+    }
+
+    info!(?worktree_path, "Worktree removed");
     Ok(())
 }
 

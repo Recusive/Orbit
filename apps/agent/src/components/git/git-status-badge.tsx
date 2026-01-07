@@ -1,7 +1,7 @@
-import type { FileStatus } from '@/lib/backend';
+import type { FileStatus } from '@/lib/api/backend';
 import type { FC } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 interface GitStatusBadgeProps {
   /** The file status to display */

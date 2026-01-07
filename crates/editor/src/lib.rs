@@ -1,1 +1,0 @@
-//! Editor-specific functionality

@@ -1,43 +1,25 @@
-// Export all stores
-export { useChatStore } from './chat-store';
-export type { ChatState, Conversation, Message } from './chat-store';
+/**
+ * Stores barrel file
+ * Organized by domain for clean imports
+ */
 
-export { useAgentStore } from './agent-store';
-export type { AgentState, AgentTask, AgentPhase, ToolCall } from './agent-store';
+// Agent stores
+export * from './agent';
 
-export { useFileStore } from './file-store';
-export type {
-  FileState,
-  FileChange,
-  FileChangeType,
-  FileChangeStatus,
-  FileDiff,
-  DiffHunk,
-  DiffLine,
-} from './file-store';
+// Chat stores
+export * from './chat';
 
-export { useTerminalStore } from './terminal-store';
-export type { TerminalState, TerminalSession, TerminalOutput } from './terminal-store';
+// File stores
+export * from './file';
 
-export { useUIStore, useIsLeftSidebarCollapsed } from './ui-store';
+// Terminal store
+export * from './terminal';
 
-export {
-  useGitStore,
-  selectBranch,
-  selectUpstream,
-  selectAhead,
-  selectBehind,
-  selectIsClean,
-  selectHasConflicts,
-  selectTotalChanges,
-  selectFileStatus,
-  selectIsStaged,
-  selectEntriesByStatus,
-  useGitBranch,
-  useGitAhead,
-  useGitBehind,
-  useGitIsClean,
-  useGitTotalChanges,
-  useIsGitRepo,
-} from './git-store';
-export type { FileStatus, GitBranch, GitStatus, StatusEntry } from './git-store';
+// UI store
+export * from './ui';
+
+// Browser store
+export * from './browser';
+
+// Git store
+export * from './git';

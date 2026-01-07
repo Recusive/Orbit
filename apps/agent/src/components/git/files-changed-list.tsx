@@ -1,10 +1,10 @@
 import React from 'react';
 
-import { useFileStore } from '../../stores/file-store';
-
 import { FileChangeItem } from './file-change-item';
 
-import type { FileChange } from '../../stores/file-store';
+import type { FileChange } from '@/stores/file/file-store';
+
+import { useFileStore } from '@/stores/file/file-store';
 
 export interface FilesChangedListProps {
   readonly className?: string;

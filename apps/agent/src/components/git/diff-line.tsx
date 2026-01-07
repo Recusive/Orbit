@@ -1,6 +1,6 @@
 import React from 'react';
 
-import type { DiffLine as DiffLineType } from '../../stores/file-store';
+import type { DiffLine as DiffLineType } from '@/stores/file/file-store';
 
 export interface DiffLineProps {
   line: DiffLineType;

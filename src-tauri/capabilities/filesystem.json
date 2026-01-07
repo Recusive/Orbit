@@ -17,8 +17,40 @@
         { "path": "$HOME/.ssh/**" },
         { "path": "$HOME/.aws/**" },
         { "path": "$HOME/.gnupg/**" },
+        { "path": "$HOME/.config/**" },
+        { "path": "$HOME/.local/share/**" },
+        { "path": "$HOME/.password-store/**" },
+        { "path": "$HOME/Library/Keychains/**" },
+        { "path": "$HOME/Library/Application Support/1Password/**" },
+        { "path": "$HOME/.kube/**" },
+        { "path": "$HOME/.docker/**" },
         { "path": "**/.env" },
-        { "path": "**/.env.*" }
+        { "path": "**/.env.*" },
+        { "path": "**/credentials.json" },
+        { "path": "**/secrets.json" },
+        { "path": "**/*.pem" },
+        { "path": "**/*.key" }
+      ]
+    },
+    {
+      "identifier": "fs:deny-write-text-file",
+      "deny": [
+        { "path": "$HOME/.ssh/**" },
+        { "path": "$HOME/.aws/**" },
+        { "path": "$HOME/.gnupg/**" },
+        { "path": "$HOME/.config/**" },
+        { "path": "$HOME/.local/share/**" },
+        { "path": "$HOME/.password-store/**" },
+        { "path": "$HOME/Library/Keychains/**" },
+        { "path": "$HOME/Library/Application Support/1Password/**" },
+        { "path": "$HOME/.kube/**" },
+        { "path": "$HOME/.docker/**" },
+        { "path": "**/.env" },
+        { "path": "**/.env.*" },
+        { "path": "**/credentials.json" },
+        { "path": "**/secrets.json" },
+        { "path": "**/*.pem" },
+        { "path": "**/*.key" }
       ]
     }
   ]

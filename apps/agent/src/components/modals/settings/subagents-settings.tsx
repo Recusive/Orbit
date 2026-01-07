@@ -16,8 +16,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useTauri } from '@/hooks/use-tauri';
-import { cn } from '@/lib/utils';
+import { useTauri } from '@/hooks/agent/use-tauri';
+import { cn } from '@/lib/utils/utils';
 
 // Available tools that can be selected
 const AVAILABLE_TOOLS = [
@@ -163,6 +163,13 @@ const AgentEditor: FC<AgentEditorProps> = ({
     };
 
     onGeneratedAgent(handleGenerated);
+
+    // Cleanup: Clear callback when dialog closes to prevent stale updates
+    return () => {
+      onGeneratedAgent(() => {
+        // No-op - dialog is closed
+      });
+    };
   }, [isOpen, onGeneratedAgent]);
 
   const handleGenerate = (): void => {
@@ -438,10 +445,10 @@ const AgentEditor: FC<AgentEditorProps> = ({
 // Main SubagentsSettings component
 export const SubagentsSettings: FC = () => {
   const [agents, setAgents] = useState<SubagentDefinition[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<SubagentDefinition | undefined>(undefined);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Use ref for the initial fetch flag to avoid re-fetching
   const hasFetched = useRef(false);
@@ -453,8 +460,8 @@ export const SubagentsSettings: FC = () => {
   const handleMessage = useCallback((message: ExtensionMessage): void => {
     if (message.type === 'subagents:list:response') {
       setAgents(message.agents);
-      setIsLoading(false);
       setError(null);
+      setIsInitialLoad(false);
     } else if (message.type === 'subagents:created') {
       setAgents((prev) => [...prev, message.agent]);
       setError(null);
@@ -466,7 +473,6 @@ export const SubagentsSettings: FC = () => {
       setError(null);
     } else if (message.type === 'subagents:error') {
       setError(message.error);
-      setIsLoading(false);
     } else if (message.type === 'subagents:generated') {
       // Call the registered callback with the generated agent
       if (generatedAgentCallbackRef.current) {
@@ -541,6 +547,34 @@ export const SubagentsSettings: FC = () => {
     [postMessage]
   );
 
+  // Skeleton loading state
+  if (isInitialLoad) {
+    return (
+      <div>
+        <SectionHeader title="Subagents">
+          Custom agents that can be invoked via the Task tool for specialized tasks. Subagents
+          maintain separate context and can run in parallel.
+        </SectionHeader>
+        <div className="space-y-3">
+          <div className="h-9 w-full rounded-md bg-muted/50 animate-pulse" />
+          <div className="space-y-2">
+            {[1, 2].map((i) => (
+              <div key={i} className="rounded-xl border border-border/40 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-muted/50 animate-pulse" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-28 rounded bg-muted/50 animate-pulse" />
+                    <div className="h-3 w-40 rounded bg-muted/50 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <SectionHeader title="Subagents">
@@ -567,11 +601,7 @@ export const SubagentsSettings: FC = () => {
         </Button>
 
         {/* Agent list */}
-        {isLoading ? (
-          <div className="text-center py-8 text-muted-foreground/70 text-[13px]">
-            Loading subagents...
-          </div>
-        ) : agents.length === 0 ? (
+        {agents.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground/70 text-[13px]">
             <Bot className="h-8 w-8 mx-auto mb-2 opacity-40" />
             <p>No subagents defined yet.</p>

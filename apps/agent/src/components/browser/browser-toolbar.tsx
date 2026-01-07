@@ -12,8 +12,8 @@ import { useCallback, useState } from 'react';
 
 import type { FC, KeyboardEvent } from 'react';
 
-import { cn } from '@/lib/utils';
-import { useBrowserNavigation, useIsSelectingElement } from '@/stores/browser-store';
+import { cn } from '@/lib/utils/utils';
+import { useBrowserNavigation, useIsSelectingElement } from '@/stores/browser/browser-store';
 
 export interface BrowserToolbarProps {
   readonly onBack: () => void;

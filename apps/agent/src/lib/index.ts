@@ -1,20 +1,12 @@
 /**
- * Lib utilities barrel export
+ * Lib barrel file
+ * Organized by domain for clean imports
  */
 
-// Utility functions
-export { cn, formatTimestamp, formatFileSize, truncatePath, generateId } from './utils';
+// Backend API
+export * from './api';
 
-// Constants
-export {
-  PANEL_SIZES,
-  ANIMATION_DURATION,
-  KEYBOARD_SHORTCUTS,
-  FILE_ICONS,
-  AGENT_PHASES,
-  MODEL_OPTIONS,
-  type AgentPhase,
-  type ModelOption,
-  type ModelId,
-  type ModelTier,
-} from './constants';
+// Utilities
+export * from './utils';
+
+// Terminal utilities are imported directly from ./terminal/*

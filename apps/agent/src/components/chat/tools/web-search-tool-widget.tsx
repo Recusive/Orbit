@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import type { FC } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 interface WebSearchToolWidgetProps {
   readonly query: string;

@@ -2,8 +2,8 @@ import { MessageSquare } from 'lucide-react';
 
 import type { FC } from 'react';
 
-import { cn } from '@/lib/utils';
-import { useChatStore } from '@/stores/chat-store';
+import { cn } from '@/lib/utils/utils';
+import { useChatStore } from '@/stores/chat/chat-store';
 
 export interface ConversationItemProps {
   id: string;

@@ -10,7 +10,9 @@
 use std::path::Path;
 
 use snowflake_core::{GitBranch, GitCommit, GitStatus, Result};
-use snowflake_git::{BlameLine, BranchInfo, FileDiff, GitManager};
+use snowflake_git::{
+    BlameLine, BranchInfo, FileDiff, GitManager, WorktreeAddOptions, WorktreeInfo,
+};
 
 /// Discover the git repository containing the given path.
 ///
@@ -138,4 +140,26 @@ pub fn git_push(repo_path: String, remote: Option<String>) -> Result<()> {
 #[tauri::command]
 pub fn git_pull(repo_path: String, remote: Option<String>) -> Result<()> {
     snowflake_git::pull(Path::new(&repo_path), remote.as_deref())
+}
+
+/// List all worktrees for the repository.
+#[tauri::command]
+pub fn git_worktree_list(repo_path: String) -> Result<Vec<WorktreeInfo>> {
+    snowflake_git::worktree_list(Path::new(&repo_path))
+}
+
+/// Add a new worktree.
+#[tauri::command]
+pub fn git_worktree_add(
+    repo_path: String,
+    worktree_path: String,
+    options: WorktreeAddOptions,
+) -> Result<WorktreeInfo> {
+    snowflake_git::worktree_add(Path::new(&repo_path), Path::new(&worktree_path), &options)
+}
+
+/// Remove a worktree.
+#[tauri::command]
+pub fn git_worktree_remove(repo_path: String, worktree_path: String, force: bool) -> Result<()> {
+    snowflake_git::worktree_remove(Path::new(&repo_path), Path::new(&worktree_path), force)
 }

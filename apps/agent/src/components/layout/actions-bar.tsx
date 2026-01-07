@@ -1,11 +1,12 @@
 import { FileCode, GitBranch, GitCompareArrows, Globe } from 'lucide-react';
 
-import type { ActivityTab } from '@/stores/ui-store';
+import type { ActivityTab } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import { useActivityTab, useUIStore } from '@/stores/ui-store';
+import { SIDEBAR } from '@/lib/utils/constants';
+import { cn } from '@/lib/utils/utils';
+import { useActivityTab, useUIStore } from '@/stores/ui/ui-store';
 
 interface ActionButtonProps {
   readonly icon: FC<{ className?: string }>;
@@ -77,7 +78,7 @@ export const ActionsBar: FC = () => {
   return (
     <aside
       className="h-full flex flex-col border-l border-border/40 bg-card"
-      style={{ width: 48 }}
+      style={{ width: SIDEBAR.iconColumnWidth }}
       role="tablist"
       aria-label="Actions Bar"
     >

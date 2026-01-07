@@ -60,9 +60,9 @@ import { join } from 'path';
 
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'bun:test';
 
-import { createAgent } from '../agent.js';
+import { createAgent } from '../agent/core/agent.js';
 
-import type { OrbitAgent, OrbitAgentConfig } from '../agent.js';
+import type { OrbitAgent, OrbitAgentConfig } from '../agent/core/agent.js';
 
 const TEST_ROOT = join(import.meta.dir, '../../.test-workspace');
 
@@ -187,7 +187,9 @@ describe('Combined Rewind (Files + Conversation)', () => {
     }, timeout);
 
     try {
-      agent.queueMessage(prompts[promptIndex]);
+      const firstPrompt = prompts[promptIndex];
+      if (!firstPrompt) throw new Error('First prompt not found');
+      agent.queueMessage(firstPrompt);
       promptIndex++;
 
       for await (const sdkMessage of agent.receiveResponse()) {
@@ -228,7 +230,9 @@ describe('Combined Rewind (Files + Conversation)', () => {
           currentResponse = '';
 
           if (promptIndex < prompts.length) {
-            agent.queueMessage(prompts[promptIndex]);
+            const nextPrompt = prompts[promptIndex];
+            if (!nextPrompt) throw new Error('Next prompt not found');
+            agent.queueMessage(nextPrompt);
             promptIndex++;
             capturedCheckpointForCurrentPrompt = false;
           } else {
@@ -329,11 +333,13 @@ describe('Combined Rewind (Files + Conversation)', () => {
           role: 'user',
           content: `Create file ${testFile} with exactly "version-1". Then say "File created with version-1."`,
         },
-        { role: 'assistant', content: responses[0] },
+        { role: 'assistant', content: responses[0] ?? '' },
       ];
 
       // === Phase 2: Rewind files to checkpoint 2 (before v2 was written) ===
-      await agent.rewindFiles(checkpoints[1]);
+      const checkpoint1 = checkpoints[1];
+      if (!checkpoint1) throw new Error('Checkpoint not found');
+      await agent.rewindFiles(checkpoint1);
       expect(readFileSync(testFile, 'utf-8').trim()).toBe('version-1');
       log('[TEST] After file rewind:', readFileSync(testFile, 'utf-8'));
 
@@ -379,7 +385,9 @@ describe('Combined Rewind (Files + Conversation)', () => {
       expect(readFileSync(testFile, 'utf-8').trim()).toBe('modified');
 
       // === Phase 2: Rewind and create new session ===
-      await agent.rewindFiles(checkpoints[1]);
+      const checkpoint1b = checkpoints[1];
+      if (!checkpoint1b) throw new Error('Checkpoint not found');
+      await agent.rewindFiles(checkpoint1b);
       expect(readFileSync(testFile, 'utf-8').trim()).toBe('initial');
       await agent.stopSession();
 
@@ -389,7 +397,7 @@ describe('Combined Rewind (Files + Conversation)', () => {
           role: 'user',
           content: `Create ${testFile} with "initial". Remember: the project name is "Phoenix".`,
         },
-        { role: 'assistant', content: responses[0] },
+        { role: 'assistant', content: responses[0] ?? '' },
       ];
 
       // === Phase 3: New session with context - should remember "Phoenix" ===
@@ -431,7 +439,9 @@ describe('Combined Rewind (Files + Conversation)', () => {
       // === Phase 2: Rewind to FIRST checkpoint (before "count: 1" was written) ===
       // checkpoints[0] = state before turn 1 = file doesn't exist yet
       // We can't rewind to before creation (file didn't exist), so rewind to checkpoints[1]
-      await agent.rewindFiles(checkpoints[1]);
+      const checkpoint1c = checkpoints[1];
+      if (!checkpoint1c) throw new Error('Checkpoint not found');
+      await agent.rewindFiles(checkpoint1c);
       expect(readFileSync(testFile, 'utf-8')).toContain('1');
       log('[TEST] After rewind to checkpoint 1:', readFileSync(testFile, 'utf-8'));
 
@@ -440,7 +450,7 @@ describe('Combined Rewind (Files + Conversation)', () => {
       // Context: only the first turn
       const context: ContextMessage[] = [
         { role: 'user', content: `Create ${testFile} with "count: 1".` },
-        { role: 'assistant', content: responses[0] },
+        { role: 'assistant', content: responses[0] ?? '' },
       ];
 
       // === Phase 3: New session continues from count: 1 ===
@@ -485,7 +495,9 @@ describe('Combined Rewind (Files + Conversation)', () => {
       expect(existsSync(testFile)).toBe(false);
 
       // === Phase 2: Rewind to before deletion ===
-      await agent.rewindFiles(checkpoints[1]);
+      const checkpoint1d = checkpoints[1];
+      if (!checkpoint1d) throw new Error('Checkpoint not found');
+      await agent.rewindFiles(checkpoint1d);
       expect(existsSync(testFile)).toBe(true);
       expect(readFileSync(testFile, 'utf-8').trim()).toBe('exists');
       log('[TEST] File restored after rewind');
@@ -495,7 +507,7 @@ describe('Combined Rewind (Files + Conversation)', () => {
       // Context: only the create turn
       const context: ContextMessage[] = [
         { role: 'user', content: `Create ${testFile} with "exists". Say "created".` },
-        { role: 'assistant', content: responses[0] },
+        { role: 'assistant', content: responses[0] ?? '' },
       ];
 
       // === Phase 3: New session - file should still exist ===

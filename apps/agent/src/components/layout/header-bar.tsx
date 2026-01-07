@@ -1,12 +1,12 @@
-import { Moon, Search, SquareTerminal, Sun } from 'lucide-react';
+import { Moon, Search, Sun } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { FC } from 'react';
 
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import { useUIStore, useWorkspaceName, useTerminalPosition } from '@/stores/ui-store';
+import { cn } from '@/lib/utils/utils';
+import { useUIStore, useWorkspaceName, useActiveTab } from '@/stores/ui/ui-store';
 
 type Theme = 'light' | 'dark';
 
@@ -15,7 +15,8 @@ const getInitialTheme = (): Theme => {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 };
 
-export type HeaderTab = 'agent' | 'editor' | 'canvas';
+// Re-export for backwards compatibility
+export type { HeaderTab } from '@/stores/ui/ui-store';
 
 export interface HeaderBarProps {
   className?: string;
@@ -60,18 +61,11 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
  * Matches the sidebar background color.
  */
 export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
-  const [activeTab, setActiveTab] = useState<HeaderTab>('agent');
+  const activeTab = useActiveTab();
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const workspaceName = useWorkspaceName();
-  const {
-    toggleReviewPanel,
-    toggleBottomPanel,
-    toggleRightSidebar,
-    reviewPanelOpen,
-    bottomPanelOpen,
-    rightSidebarOpen,
-  } = useUIStore();
-  const terminalPosition = useTerminalPosition();
+  const { setActiveTab, toggleReviewPanel, toggleRightSidebar, reviewPanelOpen, rightSidebarOpen } =
+    useUIStore();
 
   // Theme toggle effect
   useEffect(() => {
@@ -87,14 +81,6 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
   const toggleTheme = useCallback((): void => {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
   }, []);
-
-  const handleTerminalToggle = useCallback((): void => {
-    // If terminal is in activity panel and activity panel is closed, open it too
-    if (terminalPosition === 'activity' && !reviewPanelOpen && !bottomPanelOpen) {
-      toggleReviewPanel();
-    }
-    toggleBottomPanel();
-  }, [terminalPosition, reviewPanelOpen, bottomPanelOpen, toggleReviewPanel, toggleBottomPanel]);
 
   const handleOpenSearch = (): void => {
     window.dispatchEvent(new CustomEvent('openCommandPalette'));
@@ -176,25 +162,6 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
               <TooltipContent>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</TooltipContent>
             </Tooltip>
 
-            {/* Terminal Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  data-tauri-drag-region={false}
-                  onClick={handleTerminalToggle}
-                  className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-md active:scale-95 transition-all duration-150',
-                    bottomPanelOpen
-                      ? 'bg-muted/70 text-foreground'
-                      : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/60'
-                  )}
-                >
-                  <SquareTerminal className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Terminal</TooltipContent>
-            </Tooltip>
-
             {/* Activity Panel Toggle */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -202,10 +169,10 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                   data-tauri-drag-region={false}
                   onClick={toggleReviewPanel}
                   className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-md active:scale-95 transition-all duration-150',
+                    'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-all duration-150',
                     reviewPanelOpen
-                      ? 'bg-muted/70 text-foreground'
-                      : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/60'
+                      ? 'text-foreground'
+                      : 'text-muted-foreground/80 hover:text-foreground'
                   )}
                 >
                   <div className="rotate-180">
@@ -245,10 +212,10 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                   data-tauri-drag-region={false}
                   onClick={toggleRightSidebar}
                   className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-md active:scale-95 transition-all duration-150',
+                    'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-all duration-150',
                     rightSidebarOpen
-                      ? 'bg-muted/70 text-foreground'
-                      : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/60'
+                      ? 'text-foreground'
+                      : 'text-muted-foreground/80 hover:text-foreground'
                   )}
                 >
                   <svg

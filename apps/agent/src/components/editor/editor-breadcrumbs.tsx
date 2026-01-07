@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 
 import type { FC } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 // Document symbol/outline item
 export interface OutlineItem {

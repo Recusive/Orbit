@@ -5,8 +5,7 @@
 
 pub mod agent;
 pub mod commands;
-pub mod crash;
-pub mod devmonitor;
+pub mod core;
 
 use std::env;
 use std::path::PathBuf;
@@ -14,6 +13,7 @@ use std::sync::Arc;
 
 use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
+use commands::canvas::lifecycle as canvas_cmd;
 use commands::common::{
     dev_monitor, diagnostics, files, git, lsp, search, settings, terminal, workspace,
 };
@@ -182,7 +182,7 @@ fn resolve_sidecar_path() -> PathBuf {
 pub fn run() {
     // Install panic handler FIRST - before any other initialization
     // This ensures all panics are logged, even during startup
-    crash::init();
+    core::crash::init();
 
     // Initialize settings manager and load settings
     let settings_manager = SettingsManager::new();
@@ -260,6 +260,12 @@ pub fn run() {
             agent_cmd::agent_rewind_files,
             agent_cmd::agent_generate_agent_definition,
             agent_cmd::agent_generate_command_definition,
+            // Canvas commands
+            canvas_cmd::canvas_create_session,
+            canvas_cmd::canvas_delete_session,
+            canvas_cmd::canvas_send_message,
+            canvas_cmd::canvas_interrupt,
+            canvas_cmd::canvas_tool_response,
             // File commands
             files::read_file,
             files::read_file_bytes,
@@ -325,6 +331,9 @@ pub fn run() {
             git::git_blame,
             git::git_push,
             git::git_pull,
+            git::git_worktree_list,
+            git::git_worktree_add,
+            git::git_worktree_remove,
             // AI commands
             ai::ai_chat,
             ai::ai_complete,

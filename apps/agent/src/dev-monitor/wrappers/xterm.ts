@@ -11,9 +11,9 @@
  * Follows the error isolation pattern - monitoring errors never crash the terminal.
  */
 
-import { captureEvent } from '../storage';
+import { captureEvent } from '../core/storage';
 
-import type { XtermOptions } from '../types';
+import type { XtermOptions } from '../core/types';
 import type { Terminal } from '@xterm/xterm';
 
 // ═══════════════════════════════════════════════════════════════

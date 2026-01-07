@@ -4,11 +4,11 @@
 //!
 //! # Crash Handling
 //!
-//! The [`crash`] module provides panic capture and crash logging:
+//! The [`diagnostics::crash`] module provides panic capture and crash logging:
 //!
-//! - [`crash::setup_panic_hook`] - Install the custom panic handler
-//! - [`crash::CrashManager`] - Manage and read crash logs
-//! - [`crash::CrashReport`] - Structured crash report data
+//! - [`diagnostics::crash::setup_panic_hook`] - Install the custom panic handler
+//! - [`diagnostics::crash::CrashManager`] - Manage and read crash logs
+//! - [`diagnostics::crash::CrashReport`] - Structured crash report data
 //!
 //! # Text Editing
 //!
@@ -22,12 +22,11 @@
 //! - [`text::EditHistory`] - Undo/redo history
 //! - [`text::Document`] - A text document with editing capabilities
 
-pub mod crash;
-pub mod error;
+pub mod diagnostics;
 pub mod text;
 pub mod types;
 
-pub use crash::{setup_panic_hook, CrashManager, CrashReport};
-pub use error::{Error, Result};
+pub use diagnostics::crash::{setup_panic_hook, CrashManager, CrashReport};
+pub use diagnostics::error::{Error, Result};
 pub use text::{Buffer, Document, DocumentMeta, Edit, EditHistory, Selection, SelectionDirection};
 pub use types::*;

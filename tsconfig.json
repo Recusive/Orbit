@@ -35,7 +35,10 @@
     /* Paths */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./apps/agent/src/*"]
+      "@/*": ["./apps/agent/src/*"],
+      "@canvas/*": ["./apps/canvas/src/*"],
+      "@snowflake/common": ["./apps/common/src/index.ts"],
+      "@snowflake/common/*": ["./apps/common/src/*"]
     }
   },
   "include": ["apps/*/src/**/*"],

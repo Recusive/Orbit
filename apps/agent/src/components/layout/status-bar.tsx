@@ -11,17 +11,17 @@ import { useCallback } from 'react';
 
 import type { FC } from 'react';
 
-import { useDiagnostics } from '@/hooks/use-diagnostics';
-import { cn } from '@/lib/utils';
-import { useActiveFile, useCursorPosition } from '@/stores/file-viewer-store';
+import { useDiagnostics } from '@/hooks/lsp/use-diagnostics';
+import { cn } from '@/lib/utils/utils';
+import { useActiveFile, useCursorPosition } from '@/stores/file/file-viewer-store';
 import {
   selectAhead,
   selectBehind,
   selectBranch,
   selectTotalChanges,
   useGitStore,
-} from '@/stores/git-store';
-import { useUIStore } from '@/stores/ui-store';
+} from '@/stores/git/git-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 export interface StatusBarProps {
   className?: string;

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testSuite name="agent-bridge" description="Agent Bridge Test Suite">
+
+  <!--
+    Two types of tests:
+    1. File Test - Uses Bun test runner with describe/it/expect
+    2. Terminal Test - Quick inline script for rapid verification
+  -->
+
+  <testType name="file-test">
+    <description>
+      Structured test files using Bun's test runner.
+      Uses describe/it/expect syntax for organized test suites.
+    </description>
+    <command>bun test src/__tests__/</command>
+    <files>
+      <!-- Canvas tests -->
+      <file>canvas-mcp-server.test.ts</file>
+      <file>canvas-tool-bridge.test.ts</file>
+      <file>canvas-schemas.test.ts</file>
+      <!-- Rewind tests -->
+      <file>file-rewind.test.ts</file>
+      <file>conversation-rewind.test.ts</file>
+      <file>combined-rewind.test.ts</file>
+    </files>
+  </testType>
+
+  <testType name="terminal-test">
+    <description>
+      Quick terminal scripts for rapid integration verification.
+      Run directly via Bun for immediate feedback.
+    </description>
+    <command>bun run src/__tests__/canvas-terminal-test.ts</command>
+    <files>
+      <file>canvas-terminal-test.ts</file>
+    </files>
+  </testType>
+
+  <usage>
+    <example name="Run all file tests">
+      <command>cd agent-bridge &amp;&amp; bun test</command>
+    </example>
+    <example name="Run canvas tests only">
+      <command>cd agent-bridge &amp;&amp; bun test src/__tests__/canvas-</command>
+    </example>
+    <example name="Run terminal test">
+      <command>cd agent-bridge &amp;&amp; bun run src/__tests__/canvas-terminal-test.ts</command>
+    </example>
+  </usage>
+
+</testSuite>

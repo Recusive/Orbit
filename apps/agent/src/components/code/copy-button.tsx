@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import type { FC } from 'react';
 
-import { DELAYS } from '@/lib/constants';
+import { DELAYS } from '@/lib/utils/constants';
 
 export interface CopyButtonProps {
   text: string;

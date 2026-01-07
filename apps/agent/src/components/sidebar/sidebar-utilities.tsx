@@ -2,7 +2,7 @@ import { BookOpen, Globe, Settings, MessageSquare } from 'lucide-react';
 
 import type { FC } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 export interface SidebarUtilitiesProps {
   collapsed?: boolean;

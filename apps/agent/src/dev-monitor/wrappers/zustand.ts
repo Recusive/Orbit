@@ -12,9 +12,9 @@
  * ```
  */
 
-import { captureEvent } from '../storage';
+import { captureEvent } from '../core/storage';
 
-import type { ZustandOptions } from '../types';
+import type { ZustandOptions } from '../core/types';
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand';
 
 // ═══════════════════════════════════════════════════════════════

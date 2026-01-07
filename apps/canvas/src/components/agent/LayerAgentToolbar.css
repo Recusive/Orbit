@@ -1,0 +1,111 @@
+/**
+ * LayerAgentToolbar styles
+ * Floating toolbar that appears on selected nodes with AI skill buttons
+ * Uses CSS variables from globals.css
+ */
+
+.layer-agent-toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: toolbar-appear 0.15s ease-out;
+}
+
+@keyframes toolbar-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.layer-agent-toolbar__button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  position: relative;
+}
+
+.layer-agent-toolbar__button:hover {
+  background: var(--accent);
+}
+
+.layer-agent-toolbar__button:active {
+  background: var(--muted);
+}
+
+.layer-agent-toolbar__button--loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.layer-agent-toolbar__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  transition: color 0.15s ease;
+}
+
+.layer-agent-toolbar__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.layer-agent-toolbar__label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.layer-agent-toolbar__button:hover .layer-agent-toolbar__label {
+  color: var(--foreground);
+}
+
+/* Skill-specific hover colors - using brand colors from globals.css */
+.layer-agent-toolbar__button[data-skill='refine']:hover .layer-agent-toolbar__icon {
+  color: var(--brand-fig);
+}
+
+.layer-agent-toolbar__button[data-skill='accessibility']:hover .layer-agent-toolbar__icon {
+  color: var(--success);
+}
+
+.layer-agent-toolbar__button[data-skill='interactive']:hover .layer-agent-toolbar__icon {
+  color: var(--warning);
+}
+
+.layer-agent-toolbar__button[data-skill='variations']:hover .layer-agent-toolbar__icon {
+  color: var(--brand-olive);
+}
+
+/* Loading spinner */
+.layer-agent-toolbar__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

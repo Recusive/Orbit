@@ -42,31 +42,32 @@ import {
   getAgent,
   listAgents,
   updateAgent,
-} from './agent-definitions.js';
+} from './agent/definitions/agent-definitions.js';
 import {
   createCommand,
   deleteCommand,
   getCommand,
   listCommands,
   updateCommand,
-} from './command-definitions.js';
-import { createLogger } from './logger.js';
-import { BridgeRequestSchema } from './schemas.js';
-import { SessionManager } from './session-manager.js';
+} from './agent/definitions/command-definitions.js';
+import { SessionManager } from './agent/session/session-manager.js';
 import {
   cleanupOldSessions,
   deleteSession as deleteStoredSession,
   getSDKSessionIdForSession,
   saveSession,
   touchSession,
-} from './session-storage.js';
+} from './agent/session/session-storage.js';
+import { CanvasSessionManager } from './canvas/index.js';
+import { createLogger } from './common/logging/logger.js';
+import { BridgeRequestSchema } from './protocol/schemas.js';
 
 import type {
   BridgeCommandResponse,
   BridgeEvent,
   BridgeRequest,
   BridgeResponse,
-} from './protocol.js';
+} from './protocol/protocol.js';
 
 const logger = createLogger('AgentBridge');
 
@@ -99,10 +100,11 @@ function sendEvent(event: BridgeEvent): void {
 function main(): void {
   logger.info('Agent Bridge starting...');
 
-  // Create session manager
+  // Create session managers
   const sessionManager = new SessionManager();
+  const canvasSessionManager = new CanvasSessionManager();
 
-  // Wire up event handlers
+  // Wire up agent session event handlers
   sessionManager.onAgentMessage((data) => {
     sendEvent({
       type: 'agent_message',
@@ -166,6 +168,31 @@ function main(): void {
     });
   });
 
+  // Wire up canvas session event handlers
+  canvasSessionManager.onMessage((data) => {
+    sendEvent({
+      type: 'canvas:message',
+      sessionId: data.sessionId,
+      message: data.message,
+    });
+  });
+
+  canvasSessionManager.onToolRequest((data) => {
+    sendEvent({
+      type: 'canvas:tool_request',
+      sessionId: data.sessionId,
+      request: data.request,
+    });
+  });
+
+  canvasSessionManager.onError((data) => {
+    sendEvent({
+      type: 'canvas:error',
+      sessionId: data.sessionId,
+      error: data.error.message,
+    });
+  });
+
   // Handle incoming requests from stdin
   const rl = readline.createInterface({
     input: process.stdin,
@@ -205,7 +232,7 @@ function main(): void {
 
     logger.info({ requestType: request.type }, 'Received request');
 
-    handleRequest(request, sessionManager).catch((error: unknown) => {
+    handleRequest(request, sessionManager, canvasSessionManager).catch((error: unknown) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error({ requestType: request.type, error: errorMessage }, 'Error handling request');
       sendResponse({
@@ -219,6 +246,7 @@ function main(): void {
   rl.on('close', () => {
     logger.info('stdin closed, shutting down...');
     sessionManager.dispose();
+    canvasSessionManager.dispose();
     process.exit(0);
   });
 
@@ -226,12 +254,14 @@ function main(): void {
   process.on('SIGTERM', () => {
     logger.info('SIGTERM received, shutting down...');
     sessionManager.dispose();
+    canvasSessionManager.dispose();
     process.exit(0);
   });
 
   process.on('SIGINT', () => {
     logger.info('SIGINT received, shutting down...');
     sessionManager.dispose();
+    canvasSessionManager.dispose();
     process.exit(0);
   });
 
@@ -251,7 +281,8 @@ function main(): void {
  */
 async function handleRequest(
   request: BridgeRequest,
-  sessionManager: SessionManager
+  sessionManager: SessionManager,
+  canvasSessionManager: CanvasSessionManager
 ): Promise<void> {
   switch (request.type) {
     case 'create_session': {
@@ -446,10 +477,42 @@ async function handleRequest(
       break;
     }
 
+    // Canvas Operations
+    case 'canvas:create_session': {
+      canvasSessionManager.createSession(request.sessionId, request.config);
+      sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
+    case 'canvas:delete_session': {
+      await canvasSessionManager.deleteSession(request.sessionId);
+      sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
+    case 'canvas:send_message': {
+      await canvasSessionManager.sendMessage(request.sessionId, request.message, request.state);
+      sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
+    case 'canvas:interrupt': {
+      await canvasSessionManager.interrupt(request.sessionId);
+      sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
+    case 'canvas:tool_response': {
+      canvasSessionManager.handleToolResponse(request.sessionId, request.response);
+      sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
     case 'shutdown': {
       logger.info('Shutdown requested');
       sendResponse({ type: 'success', requestType: request.type });
       sessionManager.dispose();
+      canvasSessionManager.dispose();
       process.exit(0);
       // Note: process.exit() never returns, but break needed to satisfy linter
     }

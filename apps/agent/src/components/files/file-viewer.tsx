@@ -9,7 +9,7 @@ import {
   useActiveFile,
   useFileViewerLoading,
   useFileViewerStore,
-} from '@/stores/file-viewer-store';
+} from '@/stores/file/file-viewer-store';
 
 export const FileViewer: FC = () => {
   const activeFile = useActiveFile();
@@ -39,7 +39,7 @@ export const FileViewer: FC = () => {
         {isLoading ? (
           <LoadingState path={loadingPath} />
         ) : activeFile ? (
-          <FileViewerContent file={activeFile} />
+          <FileViewerContent key={activeFile.path} file={activeFile} />
         ) : (
           <EmptyState />
         )}

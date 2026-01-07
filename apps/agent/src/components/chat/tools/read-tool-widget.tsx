@@ -2,7 +2,7 @@ import { File, Loader2 } from 'lucide-react';
 
 import type { FC } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/utils/utils';
 
 interface ReadToolWidgetProps {
   readonly filePath: string;

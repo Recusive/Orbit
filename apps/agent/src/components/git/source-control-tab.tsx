@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { FileStatus as BackendFileStatus, GitStatus } from '@/lib/backend';
+import type { FileStatus as BackendFileStatus, GitStatus } from '@/lib/api/backend';
 
 import {
   DropdownMenu,
@@ -24,10 +24,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useGitStatus } from '@/hooks/use-git-status';
-import { GIT_STATUS_STYLES } from '@/lib/constants';
-import { cn } from '@/lib/utils';
-import { useUIStore } from '@/stores/ui-store';
+import { useGitStatus } from '@/hooks/git/use-git-status';
+import { GIT_STATUS_STYLES } from '@/lib/utils/constants';
+import { cn } from '@/lib/utils/utils';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 export interface SourceControlTabProps {
   className?: string;

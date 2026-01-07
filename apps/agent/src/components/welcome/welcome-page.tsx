@@ -3,11 +3,11 @@ import { useCallback } from 'react';
 
 import type { FC } from 'react';
 
-import { useRecentProjects } from '@/hooks/use-recent-projects';
-import { addRecentProject, openFileDialog, setWorkspacePath } from '@/lib/backend';
-import { cn } from '@/lib/utils';
-import { useFileStore } from '@/stores/file-store';
-import { useUIStore } from '@/stores/ui-store';
+import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
+import { addRecentProject, openFileDialog, setWorkspacePath } from '@/lib/api/backend';
+import { cn } from '@/lib/utils/utils';
+import { useFileStore } from '@/stores/file/file-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 export interface WelcomePageProps {
   className?: string;
