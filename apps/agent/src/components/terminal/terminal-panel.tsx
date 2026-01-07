@@ -334,17 +334,17 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
   return (
     <div
       ref={panelRef}
-      className={`${panelBackground} relative z-10 flex flex-col border-l border-border/50 ${collapsed ? 'shrink-0' : 'h-full'}`}
+      className={`${panelBackground} relative z-10 flex flex-col border-l border-border/50 min-h-[35px] ${collapsed ? 'shrink-0' : 'h-full'}`}
       style={collapsed ? { height: TERMINAL_HEADER_HEIGHT } : undefined}
     >
       <header
         className="relative z-10 flex items-center justify-between px-2 shrink-0 border-t border-b border-border bg-sidebar"
         style={{ height: TERMINAL_HEADER_HEIGHT }}
       >
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0 h-full">
           <SquareTerminal className="h-4 w-4 text-muted-foreground shrink-0" />
           {/* Terminal tabs */}
-          <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden flex-1 min-w-0 scrollbar-none pr-4">
+          <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden flex-1 min-w-0 h-full scrollbar-none pr-4">
             {sessions.map((session) => {
               // Priority: custom name > foreground process > default name
               const displayName =

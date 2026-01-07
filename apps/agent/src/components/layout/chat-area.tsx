@@ -342,7 +342,8 @@ export const ChatArea: FC = () => {
             <div className="h-full w-full">{createMainContent(false)}</div>
           </ResizablePanel>
 
-          <ResizablePanel preferredSize={bottomPanelOpen ? bottomPanelHeight : 32} minSize={32}>
+          {/* NOTE: If changing minSize/preferredSize, also update activity-panel.tsx terminal panel */}
+          <ResizablePanel preferredSize={bottomPanelOpen ? bottomPanelHeight : 35} minSize={35}>
             {/* Only render TerminalPanel when this layout is active - xterm can only attach to one container */}
             {showBottomTerminal ? (
               <TerminalPanel variant="full-width" collapsed={!bottomPanelOpen} />

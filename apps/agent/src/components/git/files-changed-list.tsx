@@ -1,3 +1,4 @@
+import { GitCompareArrows } from 'lucide-react';
 import React from 'react';
 
 import { FileChangeItem } from './file-change-item';
@@ -24,8 +25,10 @@ export const FilesChangedList: React.FC<FilesChangedListProps> = ({
 
   if (filteredFiles.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-muted-foreground text-sm">
-        No files changed
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+        <GitCompareArrows className="h-12 w-12 mb-4 opacity-50" />
+        <p className="text-sm">No files changed</p>
+        <p className="text-xs mt-1 opacity-70">Changes will appear here</p>
       </div>
     );
   }

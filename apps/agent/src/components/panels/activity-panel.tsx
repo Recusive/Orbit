@@ -595,7 +595,8 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
             <div className="h-full flex flex-col">{contentSection}</div>
           </ResizablePanel>
 
-          <ResizablePanel preferredSize={bottomPanelOpen ? bottomPanelHeight : 32} minSize={32}>
+          {/* NOTE: If changing minSize/preferredSize, also update chat-area.tsx terminal panel */}
+          <ResizablePanel preferredSize={bottomPanelOpen ? bottomPanelHeight : 35} minSize={35}>
             {/* Only render TerminalPanel when this layout is active - xterm can only attach to one container */}
             {showActivityTerminal ? (
               <TerminalPanel variant="embedded" collapsed={!bottomPanelOpen} />
