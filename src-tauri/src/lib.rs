@@ -20,6 +20,7 @@ use commands::common::{
 };
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
+use tauri::Manager as _;
 use tauri_plugin_log::{Target, TargetKind};
 
 /// Log mode for the application.
@@ -219,9 +220,21 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        // Setup event callbacks for agent
+        .plugin(tauri_plugin_decorum::init())
+        // Setup event callbacks for agent and configure window
         .setup(move |app| {
             agent_cmd::setup_event_callbacks(app.handle(), &session_manager);
+
+            // Set traffic light position on macOS
+            #[cfg(target_os = "macos")]
+            {
+                use tauri_plugin_decorum::WebviewWindowExt as _;
+                if let Some(window) = app.get_webview_window("main") {
+                    // Center vertically in 35px header: (35 - 14) / 2 = 10.5
+                    drop(window.set_traffic_lights_inset(11.0, 10.5));
+                }
+            }
+
             Ok(())
         })
         // Commands

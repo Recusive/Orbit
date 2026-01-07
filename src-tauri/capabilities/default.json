@@ -15,6 +15,7 @@
     "dialog:allow-open",
     "dialog:allow-save",
     "clipboard-manager:allow-read-text",
-    "clipboard-manager:allow-write-text"
+    "clipboard-manager:allow-write-text",
+    "decorum:allow-show-snap-overlay"
   ]
 }
