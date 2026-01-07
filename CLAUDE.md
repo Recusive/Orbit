@@ -95,21 +95,17 @@ Snowflake-v0/
 │   └── package.json
 │
 ├── crates/                         # Rust library crates
-│   ├── common/                     # Shared crates
-│   │   ├── core/                   # Core types, config, state
-│   │   ├── fs/                     # File system operations
-│   │   ├── terminal/               # PTY management
-│   │   ├── git/                    # Git operations
-│   │   ├── ai/                     # Claude API integration
-│   │   ├── lsp/                    # Language server
-│   │   ├── search/                 # Ripgrep search
-│   │   ├── syntax/                 # Syntax highlighting
-│   │   ├── settings/               # Settings persistence
-│   │   └── conversations/          # Conversation storage
-│   │
-│   ├── agent/                      # Agent-specific Rust (stub)
-│   ├── canvas/                     # Canvas-specific Rust (stub)
-│   └── editor/                     # Editor-specific Rust (stub)
+│   └── common/                     # Shared crates
+│       ├── core/                   # Core types, config, state
+│       ├── fs/                     # File system operations
+│       ├── terminal/               # PTY management
+│       ├── git/                    # Git operations
+│       ├── ai/                     # Claude API integration (stub - uses agent-bridge)
+│       ├── lsp/                    # Language server
+│       ├── search/                 # Ripgrep search
+│       ├── syntax/                 # Syntax highlighting (stub - uses frontend Shiki)
+│       ├── settings/               # Settings persistence
+│       └── conversations/          # Conversation storage
 │
 ├── src-tauri/                      # Tauri app entry point
 │   ├── src/
@@ -347,9 +343,32 @@ All message types in `apps/agent/src/types/protocol.ts` with Zod schemas:
 - **Explicit return types** on functions
 - **Consistent type imports** - Use `import type { }` separately
 - **Import order** - External → Internal → Types, alphabetized
-- **No console.log** - Only `warn`/`error` allowed
+- **No console.log** - Use structured logger (see below)
 - **Strict boolean expressions** - No implicit truthy checks
 - **Exhaustive switches** - All cases must be handled
+
+### Structured Logging
+
+**IMPORTANT:** Use the structured logger instead of `console.*` calls:
+
+```typescript
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('MyComponent');
+
+// Log levels
+logger.debug('Dev-only message', { count: 42 }); // Filtered in production
+logger.info('Operational message'); // Always shown
+logger.warn('Potential issue', { userId: '123' }); // Always shown
+logger.error('Error occurred', new Error('fail')); // Always shown with stack
+```
+
+**Benefits:**
+
+- **Context prefix** - Easily identify source: `[MyComponent] message`
+- **Log levels** - Debug messages hidden in production
+- **Structured data** - JSON metadata for log aggregation
+- **Error handling** - Proper error serialization with stack traces
 
 ### Tailwind + Dynamic Styles
 
@@ -384,10 +403,6 @@ All message types in `apps/agent/src/types/protocol.ts` with Zod schemas:
 | `ai`       | Claude API integration    |
 | `lsp`      | Language server protocol  |
 | `search`   | Ripgrep search            |
-
-### App-Specific Crates (`crates/{agent,canvas,editor}/`)
-
-Currently stubs - will contain app-specific Rust code as needed.
 
 ### Commands (`src-tauri/src/commands/`)
 

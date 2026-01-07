@@ -16,7 +16,10 @@ import type {
 } from './types/tauri-types';
 import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
 
+import { createLogger } from '@/lib/logger';
 import { WebviewMessageSchema } from '@/types/protocol';
+
+const logger = createLogger('Tauri');
 
 // Re-export types for consumers
 export type {
@@ -50,7 +53,7 @@ if (import.meta.hot) {
       window.__SNOWFLAKE_AGENT_LISTENER_UNLISTEN__();
       window.__SNOWFLAKE_AGENT_LISTENER_UNLISTEN__ = null;
       window.__SNOWFLAKE_AGENT_LISTENERS_INITIALIZED__ = false;
-      console.warn('[Snowflake] Agent listeners cleaned up for HMR');
+      logger.debug('Agent listeners cleaned up for HMR');
     }
   });
 }
@@ -80,9 +83,9 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
   useEffect(() => {
     if (debug) {
       if (isConnected && !isMockMode) {
-        console.warn('[Snowflake] Connected to Tauri backend');
+        logger.debug('Connected to Tauri backend');
       } else {
-        console.warn('[Snowflake] Mock mode - no Tauri backend');
+        logger.debug('Mock mode - no Tauri backend');
       }
     }
   }, [debug, isConnected, isMockMode]);
@@ -95,7 +98,7 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
     // Create a stable handler wrapper that uses the ref
     const handler = (message: ExtensionMessage): void => {
       if (debug) {
-        console.warn('[Snowflake] Received:', message.type);
+        logger.debug(`Received: ${message.type}`);
       }
       handlerRef.current?.(message);
     };
@@ -118,22 +121,22 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
     (message: WebviewMessage): void => {
       const result = WebviewMessageSchema.safeParse(message);
       if (!result.success) {
-        console.error('[Snowflake] Invalid outgoing message:', formatZodError(result.error));
+        logger.error('Invalid outgoing message', new Error(formatZodError(result.error)));
         return;
       }
 
       if (debug) {
-        console.warn('[Snowflake] Sending:', message.type);
+        logger.debug(`Sending: ${message.type}`);
       }
 
       // Use refs to avoid dependency on state (prevents infinite re-renders)
       if (isConnectedRef.current && !isMockModeRef.current) {
         // Handle message via Tauri commands
         handleTauriMessage(message).catch((err: unknown) => {
-          console.error('[Snowflake] Tauri message error:', err);
+          logger.error('Tauri message error', err instanceof Error ? err : new Error(String(err)));
         });
       } else if (isMockModeRef.current) {
-        if (debug) console.warn('[Snowflake Mock]', message);
+        if (debug) logger.debug('Mock message', message as Record<string, unknown>);
         handleMockMessage(message);
       }
     },

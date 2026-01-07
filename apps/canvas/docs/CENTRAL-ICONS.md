@@ -4,8 +4,12 @@ Documentation for using the Central Icons React icon library in Orbit Canvas.
 
 ## License
 
+The license key is stored securely in the team's password manager.
+**Never commit license keys to the repository.**
+
 ```
-CENTRAL_LICENSE_KEY=38A7449F-8FCA-45E9-8FA4-E2C656E0F3AE
+# Set this environment variable before installing:
+CENTRAL_LICENSE_KEY=<your-license-key>
 ```
 
 ## Installation
@@ -13,11 +17,14 @@ CENTRAL_LICENSE_KEY=38A7449F-8FCA-45E9-8FA4-E2C656E0F3AE
 The license key must be set as an environment variable when installing:
 
 ```bash
+# First, set your license key (get from team password manager)
+export CENTRAL_LICENSE_KEY="<your-license-key>"
+
 # Install the "all" package (contains CentralIcon component with all variants)
-CENTRAL_LICENSE_KEY="38A7449F-8FCA-45E9-8FA4-E2C656E0F3AE" npm i @central-icons-react/all
+CENTRAL_LICENSE_KEY="$CENTRAL_LICENSE_KEY" npm i @central-icons-react/all
 
 # Install a specific variant package (smaller bundle, tree-shakeable)
-CENTRAL_LICENSE_KEY="38A7449F-8FCA-45E9-8FA4-E2C656E0F3AE" npm i @central-icons-react/round-outlined-radius-1-stroke-2
+CENTRAL_LICENSE_KEY="$CENTRAL_LICENSE_KEY" npm i @central-icons-react/round-outlined-radius-1-stroke-2
 ```
 
 ## Usage

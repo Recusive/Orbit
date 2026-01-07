@@ -1,1 +1,0 @@
-//! Canvas-specific functionality

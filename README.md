@@ -1,16 +1,12 @@
-<div align="center">
-
 # Snowflake
 
-**AI-Powered Code Editor Built with Tauri 2 + React 19**
+> AI-Powered Code Editor Built with Tauri 2 + React 19
 
 [![CI](https://github.com/Recusive/Snowflake-V0/actions/workflows/ci.yml/badge.svg)](https://github.com/Recusive/Snowflake-V0/actions/workflows/ci.yml)
 ![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?logo=tauri&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Rust](https://img.shields.io/badge/Rust-1.85-DEA584?logo=rust&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)
-
-</div>
 
 ---
 
@@ -34,7 +30,7 @@ Snowflake is a desktop AI code editor that combines Claude AI with a full-featur
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        Snowflake Desktop App                         │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -80,7 +76,7 @@ Snowflake is a desktop AI code editor that combines Claude AI with a full-featur
 
 ### Communication Flow
 
-```
+```text
 User Input → React UI → Tauri IPC → Rust Backend
                                          │
                                          ├── File ops (snowflake-fs)
@@ -95,7 +91,7 @@ User Input → React UI → Tauri IPC → Rust Backend
 
 ## Project Structure
 
-```
+```text
 Snowflake-v0/
 │
 ├── apps/                           # Frontend applications (React)
@@ -380,7 +376,7 @@ The hook is split into focused modules:
 
 ### CI Pipeline
 
-```
+```text
 Frontend:  TypeScript → ESLint → Build → Canvas Build
 Backend:   Format → Clippy → Test → Doc
                     ↓
@@ -393,7 +389,7 @@ Backend:   Format → Clippy → Test → Doc
 
 The app uses a unified color system with agent as source of truth:
 
-```
+```text
 apps/agent/src/globals.css    ← All color variables defined here
 apps/canvas/src/globals.css   ← Canvas-specific styles only (no colors)
 ```
@@ -425,7 +421,7 @@ import '@canvas/globals.css'; // Canvas styles
 
 ## Build Outputs
 
-### Development
+### Development Build
 
 ```bash
 pnpm tauri dev
@@ -435,7 +431,7 @@ pnpm tauri dev
 - Rust auto-recompiles on changes
 - Agent bridge at `target/debug/agent-bridge`
 
-### Production
+### Production Build
 
 ```bash
 pnpm tauri build
@@ -464,8 +460,4 @@ Outputs in `src-tauri/target/release/bundle/`:
 
 ---
 
-<div align="center">
-
-**Recursive Labs** • Private Repository
-
-</div>
+Built by Recursive Labs • Private Repository

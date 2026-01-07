@@ -3,9 +3,6 @@ resolver = "2"
 members = [
     "src-tauri",
     "crates/common/*",
-    "crates/agent",
-    "crates/canvas",
-    "crates/editor",
 ]
 
 [workspace.package]

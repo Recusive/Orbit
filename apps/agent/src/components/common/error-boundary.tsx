@@ -3,6 +3,10 @@ import { Component } from 'react';
 
 import type { ReactNode, ErrorInfo } from 'react';
 
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('ErrorBoundary');
+
 interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: ReactNode;
@@ -31,7 +35,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    logger.error('Uncaught error in React tree', error, {
+      componentStack: errorInfo.componentStack,
+    });
     this.props.onError?.(error, errorInfo);
   }
 

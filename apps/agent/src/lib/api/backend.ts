@@ -5,16 +5,19 @@
  * All functions use Tauri invoke() for communication with the Rust backend.
  */
 
+import { createLogger } from '@/lib/logger';
+
 // ============================================
 // Tauri Detection & Imports
 // ============================================
 
+const logger = createLogger('Backend');
 const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
 
 async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!IS_TAURI) {
     // Mock mode for browser development
-    console.warn(`[Mock] invoke('${command}')`, args);
+    logger.debug(`Mock invoke: ${command}`, args);
     throw new Error(`Tauri not available. Cannot invoke '${command}'`);
   }
   const { invoke: tauriInvoke } = await import('@tauri-apps/api/core');
@@ -25,7 +28,7 @@ type EventCallback<T> = (payload: T) => void;
 
 async function listen<T>(event: string, callback: EventCallback<T>): Promise<() => void> {
   if (!IS_TAURI) {
-    console.warn(`[Mock] listen('${event}')`);
+    logger.debug(`Mock listen: ${event}`);
     return (): void => {
       // No-op for mock mode
     };
