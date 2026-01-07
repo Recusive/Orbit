@@ -3,6 +3,7 @@
  * Renders Mermaid diagram syntax as SVG
  */
 
+import DOMPurify from 'dompurify';
 import mermaid from 'mermaid';
 import React, { useEffect, useRef, useState, useId } from 'react';
 
@@ -146,7 +147,13 @@ export function MermaidDiagram({ chart, className }: MermaidDiagramProps): React
           <div style={styles.fallback}>{chart}</div>
         </div>
       ) : svg !== null ? (
-        <div ref={containerRef} style={styles.diagram} dangerouslySetInnerHTML={{ __html: svg }} />
+        <div
+          ref={containerRef}
+          style={styles.diagram}
+          dangerouslySetInnerHTML={{
+            __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true } }),
+          }}
+        />
       ) : null}
     </div>
   );

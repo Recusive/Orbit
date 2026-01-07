@@ -3,7 +3,7 @@
  */
 
 // General utilities
-export { cn, formatTimestamp, formatFileSize, truncatePath, generateId } from './utils';
+export { cn, formatTimestamp, formatFileSize, truncatePath } from './utils';
 
 // Diff utilities
 export { computeSimpleDiff, getLanguageFromPath } from './diff-utils';

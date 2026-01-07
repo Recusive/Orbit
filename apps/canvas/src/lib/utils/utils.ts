@@ -1,8 +1,4 @@
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-import type { ClassValue } from 'clsx';
-
-export function cn(...inputs: ClassValue[]): string {
-  return twMerge(clsx(inputs));
-}
+/**
+ * Re-export cn from shared common package
+ */
+export { cn } from '@snowflake/common/utils';

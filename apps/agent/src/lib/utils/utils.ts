@@ -1,13 +1,7 @@
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
 import { TIME_MS } from './constants';
 
-import type { ClassValue } from 'clsx';
-
-export function cn(...inputs: ClassValue[]): string {
-  return twMerge(clsx(inputs));
-}
+// Re-export cn from shared common package
+export { cn } from '@snowflake/common/utils';
 
 /**
  * Format a timestamp into a human-readable string
@@ -84,12 +78,4 @@ export function truncatePath(path: string, maxLength = 40): string {
   }
 
   return '.../' + truncated;
-}
-
-/**
- * Generate a unique ID
- */
-export function generateId(prefix = 'id'): string {
-  const random = Math.random().toString(36);
-  return `${prefix}_${String(Date.now())}_${random.slice(2, 11)}`;
 }

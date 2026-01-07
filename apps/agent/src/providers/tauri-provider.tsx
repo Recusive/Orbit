@@ -305,9 +305,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
               });
               break;
           }
-        }).then((unlisten) => {
-          controller.addUnlisten(unlisten);
         })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            console.error('[TauriProvider] Listener registration failed:', err);
+          })
       );
 
       // Permission requests
@@ -321,9 +325,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             tool_name: event.toolName,
             tool_input: event.toolInput,
           });
-        }).then((unlisten) => {
-          controller.addUnlisten(unlisten);
         })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            console.error('[TauriProvider] Listener registration failed:', err);
+          })
       );
 
       // Session init
@@ -337,9 +345,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             is_resumed: event.isResumed,
             is_forked: event.isForked,
           });
-        }).then((unlisten) => {
-          controller.addUnlisten(unlisten);
         })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            console.error('[TauriProvider] Listener registration failed:', err);
+          })
       );
 
       // Plan mode changes
@@ -351,9 +363,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             session_id: event.sessionId,
             enabled: event.enabled,
           });
-        }).then((unlisten) => {
-          controller.addUnlisten(unlisten);
         })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            console.error('[TauriProvider] Listener registration failed:', err);
+          })
       );
 
       // Accept mode changes
@@ -365,9 +381,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             session_id: event.sessionId,
             enabled: event.enabled,
           });
-        }).then((unlisten) => {
-          controller.addUnlisten(unlisten);
         })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            console.error('[TauriProvider] Listener registration failed:', err);
+          })
       );
 
       // Agent errors
@@ -380,9 +400,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             message_id: crypto.randomUUID(),
             error: event.message,
           });
-        }).then((unlisten) => {
-          controller.addUnlisten(unlisten);
         })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            console.error('[TauriProvider] Listener registration failed:', err);
+          })
       );
 
       // Checkpoint events (for file rewind functionality)
@@ -394,9 +418,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             session_id: event.sessionId,
             checkpoint_id: event.checkpointId,
           });
-        }).then((unlisten) => {
-          controller.addUnlisten(unlisten);
         })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            console.error('[TauriProvider] Listener registration failed:', err);
+          })
       );
 
       // Terminal output
@@ -408,9 +436,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             terminal_id: event.id,
             data: event.data,
           });
-        }).then((unlisten) => {
-          controller.addUnlisten(unlisten);
         })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            console.error('[TauriProvider] Listener registration failed:', err);
+          })
       );
 
       // Terminal exit
@@ -422,9 +454,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             terminal_id: event.id,
             exit_code: event.code,
           });
-        }).then((unlisten) => {
-          controller.addUnlisten(unlisten);
         })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            console.error('[TauriProvider] Listener registration failed:', err);
+          })
       );
 
       // Terminal foreground
@@ -437,9 +473,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             process_name: event.process_name,
             pid: event.pid,
           });
-        }).then((unlisten) => {
-          controller.addUnlisten(unlisten);
         })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            console.error('[TauriProvider] Listener registration failed:', err);
+          })
       );
 
       // Wait for all listeners to be registered

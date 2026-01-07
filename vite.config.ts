@@ -27,6 +27,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './apps/agent/src'),
       '@canvas': path.resolve(__dirname, './apps/canvas/src'),
+      '@snowflake/common': path.resolve(__dirname, './apps/common/src'),
     },
   },
   build: {
@@ -38,12 +39,8 @@ export default defineConfig({
         // Split heavy dependencies into separate lazy-loaded chunks
         manualChunks: (id) => {
           // Mermaid and its dependencies (~900KB total)
-          if (id.includes('node_modules/mermaid') || id.includes('node_modules/dagre-d3')) {
+          if (id.includes('node_modules/mermaid') || id.includes('node_modules/dagre')) {
             return 'vendor-mermaid';
-          }
-          // Cytoscape (~442KB)
-          if (id.includes('node_modules/cytoscape')) {
-            return 'vendor-cytoscape';
           }
           // CodeMirror - all packages must stay together (~500KB)
           if (
@@ -85,10 +82,6 @@ export default defineConfig({
           // Streamdown (uses shiki internally)
           if (id.includes('node_modules/streamdown')) {
             return 'vendor-streamdown';
-          }
-          // Lexical editor (if used)
-          if (id.includes('node_modules/lexical') || id.includes('node_modules/@lexical')) {
-            return 'vendor-lexical';
           }
           // Return undefined for default chunking behavior
           return undefined;
