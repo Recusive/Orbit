@@ -689,6 +689,35 @@ The following CSS properties trigger GPU compositing issues that result in momen
 4. **Remove one property at a time** - Isolate which property causes the blur
 5. **Replace with solid alternatives** - Use CSS variables and remove transitions
 
+### Known Security Vulnerabilities
+
+**Last audited:** January 2025
+
+| Package                     | Severity | CVE           | Status              | Notes                                           |
+| --------------------------- | -------- | ------------- | ------------------- | ----------------------------------------------- |
+| `@modelcontextprotocol/sdk` | High     | CVE-2026-0621 | ⏳ Waiting upstream | ReDoS in UriTemplate class. No patch available. |
+
+#### MCP SDK ReDoS (CVE-2026-0621)
+
+**Advisory:** [GHSA-8r9q-7v3j-jr4g](https://github.com/advisories/GHSA-8r9q-7v3j-jr4g)
+
+**Issue:** The `@modelcontextprotocol/sdk` (versions ≤1.25.1) has a Regular Expression Denial of Service vulnerability in the UriTemplate class. Attackers can craft malicious URIs that trigger catastrophic regex backtracking, causing CPU exhaustion.
+
+**Risk Assessment for Snowflake:** **Low practical risk** because:
+
+1. The agent-bridge runs as a local sidecar, not exposed to the internet
+2. URIs come from our own Claude SDK calls, not untrusted user input
+3. An attacker would need local access to craft malicious URIs
+
+**Mitigation:** We've added a pnpm override for `qs>=6.14.1` to fix a related DoS vulnerability in the transitive dependency chain. The MCP SDK issue requires an upstream fix from Anthropic - update `@modelcontextprotocol/sdk` when a patched version is released.
+
+**To check for updates:**
+
+```bash
+pnpm audit                    # Check current vulnerabilities
+pnpm view @modelcontextprotocol/sdk version  # Check latest version
+```
+
 ## CSS Architecture
 
 **IMPORTANT:** The app uses a unified color system with agent as the source of truth.

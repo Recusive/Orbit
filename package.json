@@ -128,6 +128,11 @@
     "zod": "^4.2.1",
     "zustand": "^5.0.0"
   },
+  "pnpm": {
+    "overrides": {
+      "qs": ">=6.14.1"
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@tauri-apps/cli": "^2.0.0",
