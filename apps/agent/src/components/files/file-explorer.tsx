@@ -242,7 +242,7 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-1.5">
-        <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground min-w-0">
+        <div className="flex items-center gap-1 text-base font-medium text-muted-foreground min-w-0">
           <span className="shrink-0">Explorer</span>
           {rootPath ? (
             <>

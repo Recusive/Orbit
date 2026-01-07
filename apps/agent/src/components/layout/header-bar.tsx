@@ -7,7 +7,7 @@ import type { FC } from 'react';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils/utils';
-import { useUIStore, useWorkspaceName, useActiveTab } from '@/stores/ui/ui-store';
+import { useUIStore, useWorkspaceName, useActiveTab, useHasWorkspace } from '@/stores/ui/ui-store';
 
 type Theme = 'light' | 'dark';
 
@@ -52,7 +52,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       />
       {/* Active indicator */}
       {active ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary/80" /> : null}
-      <span className="relative text-xs font-medium">{label}</span>
+      <span className="relative text-base font-medium">{label}</span>
     </button>
   );
 };
@@ -65,6 +65,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
   const activeTab = useActiveTab();
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const workspaceName = useWorkspaceName();
+  const hasWorkspace = useHasWorkspace();
   const { setActiveTab, toggleReviewPanel, toggleRightSidebar, reviewPanelOpen, rightSidebarOpen } =
     useUIStore();
 
@@ -94,39 +95,43 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
       data-tauri-drag-region
       className={cn(
         'h-[35px] flex items-center justify-between pr-4 border-y border-border/60 shrink-0',
-        'bg-card shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),0_4px_12px_-4px_rgba(0,0,0,0.05)]',
-        // Left padding for macOS traffic light buttons (about 78px)
-        'pl-[78px]',
+        'bg-card shadow-lg',
+        // Left padding for macOS traffic light buttons (matches Cursor: x:11 + ~69px for 3 buttons)
+        'pl-[80px]',
         className
       )}
     >
       {/* Left spacer for balance (reduced since we have traffic light padding) */}
       <div className="w-[122px]" />
 
-      {/* Center tabs */}
-      <div className="flex items-center gap-0.5" role="tablist" aria-orientation="horizontal">
-        <TabButton
-          label="Agent"
-          active={activeTab === 'agent'}
-          onClick={(): void => {
-            setActiveTab('agent');
-          }}
-        />
-        <TabButton
-          label="Editor"
-          active={activeTab === 'editor'}
-          onClick={(): void => {
-            setActiveTab('editor');
-          }}
-        />
-        <TabButton
-          label="Canvas"
-          active={activeTab === 'canvas'}
-          onClick={(): void => {
-            setActiveTab('canvas');
-          }}
-        />
-      </div>
+      {/* Center tabs - only show when workspace is open */}
+      {hasWorkspace ? (
+        <div className="flex items-center gap-0.5" role="tablist" aria-orientation="horizontal">
+          <TabButton
+            label="Agent"
+            active={activeTab === 'agent'}
+            onClick={(): void => {
+              setActiveTab('agent');
+            }}
+          />
+          <TabButton
+            label="Editor"
+            active={activeTab === 'editor'}
+            onClick={(): void => {
+              setActiveTab('editor');
+            }}
+          />
+          <TabButton
+            label="Canvas"
+            active={activeTab === 'canvas'}
+            onClick={(): void => {
+              setActiveTab('canvas');
+            }}
+          />
+        </div>
+      ) : (
+        <div />
+      )}
 
       {/* Right section: Search + Action buttons - only show when workspace is open */}
       {workspaceName ? (
@@ -139,12 +144,12 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
             onClick={handleOpenSearch}
           >
             <Search className="h-3 w-3 shrink-0 opacity-50" />
-            <span className="text-[11px] whitespace-nowrap overflow-hidden truncate max-w-[120px] opacity-60">
+            <span className="text-base whitespace-nowrap overflow-hidden truncate max-w-[120px] opacity-60">
               {searchText}
             </span>
             <KbdGroup>
-              <Kbd className="border-0 bg-background/60 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">⌘</Kbd>
-              <Kbd className="border-0 bg-background/60 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">P</Kbd>
+              <Kbd className="border-0 bg-background/60 shadow-xs">⌘</Kbd>
+              <Kbd className="border-0 bg-background/60 shadow-xs">P</Kbd>
             </KbdGroup>
           </button>
 

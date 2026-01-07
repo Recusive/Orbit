@@ -141,7 +141,7 @@ export const BottomPanel: FC<BottomPanelProps> = ({ height }) => {
               Problems
               {(totalErrors > 0 || totalWarnings > 0) && (
                 <span
-                  className={`text-[10px] px-1 rounded ${totalErrors > 0 ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}
+                  className={`text-xs px-1 rounded ${totalErrors > 0 ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}
                 >
                   {totalErrors + totalWarnings}
                 </span>

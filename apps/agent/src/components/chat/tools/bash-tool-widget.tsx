@@ -77,9 +77,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
           isFailed
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
             : 'border border-border/50',
-          isExpanded
-            ? 'rounded-lg shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
-            : 'rounded-lg shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
+          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
         )}
       >
         {/* Header */}
@@ -115,7 +113,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
             {isRunning ? (
               <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
             ) : isFailed ? (
-              <span className="text-[10px] text-destructive/60">Failed</span>
+              <span className="text-xs text-destructive/60">Failed</span>
             ) : null}
           </div>
           <ChevronDown
@@ -141,11 +139,11 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
               </div>
               {highlightedCommand ? (
                 <div
-                  className="bg-muted/50 rounded-md px-2 py-1 font-mono text-[11px] overflow-x-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent [&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_code]:!bg-transparent"
+                  className="bg-muted/50 rounded-md px-2 py-1 font-mono text-sm overflow-x-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent [&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_code]:!bg-transparent"
                   dangerouslySetInnerHTML={{ __html: highlightedCommand }}
                 />
               ) : (
-                <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-[11px] text-foreground break-all">
+                <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-sm text-foreground break-all">
                   {command}
                 </code>
               )}
@@ -159,7 +157,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                   <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
                     description
                   </div>
-                  <div className="text-[11px] text-muted-foreground">{description}</div>
+                  <div className="text-sm text-muted-foreground">{description}</div>
                 </div>
               </>
             ) : null}
@@ -168,12 +166,12 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
             <div className="h-px bg-border/30 mx-2.5" />
             <div className="p-2.5">
               {isRunning && !output ? (
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Loader2 className="h-2.5 w-2.5 animate-spin" />
                   <span>Running command...</span>
                 </div>
               ) : output ? (
-                <div className="bg-muted/40 rounded-lg p-2 border border-border/30 font-mono text-[11px] leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
+                <div className="bg-muted/40 rounded-lg p-2 border border-border/30 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
                   <pre className="whitespace-pre-wrap break-words m-0">{displayOutput}</pre>
                   {hasMoreLines && !isExpanded ? (
                     <div className="mt-1.5 text-muted-foreground/60">
@@ -182,7 +180,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                   ) : null}
                 </div>
               ) : (
-                <div className="text-[11px] text-muted-foreground/60 italic">No output</div>
+                <div className="text-sm text-muted-foreground/60 italic">No output</div>
               )}
             </div>
           </div>

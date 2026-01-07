@@ -77,7 +77,7 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
       {/* Logo/Branding - consistent with onboarding */}
       <div className="flex items-center gap-4 w-full max-w-[380px]">
         <div className="flex items-center justify-center w-14 h-14 rounded-lg bg-primary/10">
-          <OrbitLogo size={32} className="text-primary" />
+          <OrbitLogo size={40} className="text-primary" />
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-2xl font-semibold text-foreground tracking-tight">Orbit</span>
@@ -128,7 +128,7 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
       {/* Recent Projects */}
       <div className="w-full max-w-[380px]">
         {/* Header */}
-        <div className="flex items-center justify-between px-1 py-0.5 text-[10px] leading-tight mb-0.5">
+        <div className="flex items-center justify-between px-1 py-0.5 text-base leading-tight mb-0.5">
           <span className="font-normal text-muted-foreground/60">Recent projects</span>
           {projects.length > 5 ? (
             <button
@@ -143,7 +143,7 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
         {/* Project List */}
         <div className="flex flex-col gap-0.5">
           {projects.length === 0 ? (
-            <div className="text-xs text-muted-foreground/50 px-1 py-2">No recent projects</div>
+            <div className="text-base text-muted-foreground/50 px-1 py-2">No recent projects</div>
           ) : (
             projects.slice(0, 5).map((project) => (
               <button
@@ -156,8 +156,8 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
                   'text-left outline-none'
                 )}
               >
-                <span className="flex-1 text-xs text-foreground/80 truncate">{project.name}</span>
-                <span className="text-[10px] text-muted-foreground/60 ml-3 truncate max-w-[50%]">
+                <span className="flex-1 text-base text-foreground/80 truncate">{project.name}</span>
+                <span className="text-base text-muted-foreground/60 ml-3 truncate max-w-[50%]">
                   {project.parentPath}
                 </span>
               </button>

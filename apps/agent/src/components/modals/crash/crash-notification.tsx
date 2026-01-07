@@ -135,7 +135,7 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
         {summary ? (
           <div className="rounded-lg border border-border/50 bg-muted/30 p-3 space-y-2">
             <div>
-              <div className="text-[10px] font-medium tracking-wide text-muted-foreground/60 uppercase mb-1">
+              <div className="text-xs font-medium tracking-wide text-muted-foreground/60 uppercase mb-1">
                 Error
               </div>
               <code className="text-sm text-destructive font-mono break-all">
@@ -144,13 +144,13 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
             </div>
             <div className="flex gap-4">
               <div className="flex-1">
-                <div className="text-[10px] font-medium tracking-wide text-muted-foreground/60 uppercase mb-1">
+                <div className="text-xs font-medium tracking-wide text-muted-foreground/60 uppercase mb-1">
                   Location
                 </div>
                 <code className="text-xs text-muted-foreground font-mono">{summary.location}</code>
               </div>
               <div>
-                <div className="text-[10px] font-medium tracking-wide text-muted-foreground/60 uppercase mb-1">
+                <div className="text-xs font-medium tracking-wide text-muted-foreground/60 uppercase mb-1">
                   Time
                 </div>
                 <span className="text-xs text-muted-foreground">
@@ -196,7 +196,7 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
               </button>
 
               {logPath ? (
-                <code className="text-[10px] text-muted-foreground/50 font-mono">{logPath}</code>
+                <code className="text-xs text-muted-foreground/50 font-mono">{logPath}</code>
               ) : (
                 <button
                   type="button"

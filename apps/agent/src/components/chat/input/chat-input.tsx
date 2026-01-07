@@ -487,8 +487,8 @@ export const ChatInput: FC<ChatInputProps> = ({
       'mx-auto p-1 bg-card border transition-all duration-200',
       hasPermissionPending ? 'rounded-b-lg rounded-t-none border-t-0' : 'rounded-lg',
       // Light mode shadows only
-      'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),0_4px_12px_-4px_rgba(0,0,0,0.05)]',
-      'focus-within:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.12),0_8px_24px_-8px_rgba(0,0,0,0.08)]',
+      'shadow-lg',
+      'focus-within:shadow-focus',
       'dark:shadow-none dark:focus-within:shadow-none'
     );
     switch (inputMode) {
@@ -520,7 +520,7 @@ export const ChatInput: FC<ChatInputProps> = ({
         {/* Input Area */}
         <div
           ref={inputRef}
-          className="p-2 text-sm outline-none overflow-y-auto"
+          className="p-2 text-base outline-none overflow-y-auto"
           style={{ minHeight: INPUT_SIZES.textareaMinHeight, maxHeight: 300 }}
           contentEditable
           suppressContentEditableWarning
@@ -590,7 +590,7 @@ export const ChatInput: FC<ChatInputProps> = ({
                       'bg-mode-accept/10 text-mode-accept hover:bg-mode-accept/20'
                   )}
                 >
-                  <span className="text-[11px] font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
+                  <span className="text-sm font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent>Input mode</TooltipContent>

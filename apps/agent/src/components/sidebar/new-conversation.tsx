@@ -31,7 +31,7 @@ export const NewConversation: FC<NewConversationProps> = ({
     <button
       onClick={handleClick}
       className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium',
+        'flex items-center gap-3 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-base font-medium',
         collapsed && 'justify-center',
         className
       )}

@@ -123,9 +123,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
           isFailed
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
             : 'border border-border/50',
-          isExpanded
-            ? 'rounded-lg shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
-            : 'rounded-lg shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
+          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
         )}
       >
         {/* Header */}
@@ -159,7 +157,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
               {isRunning ? 'Searching content' : isFailed ? 'Search failed' : 'Search results'}
             </span>
             {!isRunning && !isFailed && fileCount > 0 ? (
-              <span className="text-[11px] text-muted-foreground/60">
+              <span className="text-sm text-muted-foreground/60">
                 ({fileCount} {fileCount === 1 ? 'file' : 'files'}
                 {isContentMode && matchCount !== fileCount ? `, ${String(matchCount)} matches` : ''}
                 )
@@ -168,7 +166,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
             {isRunning ? (
               <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
             ) : isFailed ? (
-              <span className="text-[10px] text-destructive/60">Failed</span>
+              <span className="text-xs text-destructive/60">Failed</span>
             ) : null}
           </div>
           <ChevronDown
@@ -192,7 +190,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
               <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
                 pattern
               </div>
-              <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-[11px] text-foreground break-all">
+              <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-sm text-foreground break-all">
                 {pattern}
               </code>
               {path ? (
@@ -200,7 +198,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                   <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1 mt-2">
                     in
                   </div>
-                  <span className="text-[11px] text-muted-foreground font-mono truncate block">
+                  <span className="text-sm text-muted-foreground font-mono truncate block">
                     {path}
                   </span>
                 </>
@@ -210,7 +208,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                   <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1 mt-2">
                     glob
                   </div>
-                  <code className="text-[11px] text-muted-foreground font-mono">{glob}</code>
+                  <code className="text-sm text-muted-foreground font-mono">{glob}</code>
                 </>
               ) : null}
               {fileType ? (
@@ -218,7 +216,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                   <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1 mt-2">
                     type
                   </div>
-                  <span className="text-[11px] text-muted-foreground font-mono">{fileType}</span>
+                  <span className="text-sm text-muted-foreground font-mono">{fileType}</span>
                 </>
               ) : null}
             </div>
@@ -227,7 +225,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
             <div className="h-px bg-border/30 mx-2.5" />
             <div className="p-2.5">
               {isRunning ? (
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Loader2 className="h-2.5 w-2.5 animate-spin" />
                   <span>Searching for matches...</span>
                 </div>
@@ -355,7 +353,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                         ))}
                 </div>
               ) : (
-                <div className="text-[11px] text-muted-foreground/60 italic">No matches found</div>
+                <div className="text-sm text-muted-foreground/60 italic">No matches found</div>
               )}
             </div>
           </div>

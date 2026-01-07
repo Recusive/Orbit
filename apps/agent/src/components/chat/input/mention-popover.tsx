@@ -77,7 +77,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
             {folders.length > 0 ? (
               <CommandGroup
                 heading="Folders"
-                className="[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.05em] [&_[cmdk-group-heading]]:text-muted-foreground/60"
+                className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground/60"
               >
                 {folders.map((folder, idx) => (
                   <FileItem
@@ -96,7 +96,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
             {regularFiles.length > 0 ? (
               <CommandGroup
                 heading="Files"
-                className="[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.05em] [&_[cmdk-group-heading]]:text-muted-foreground/60"
+                className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground/60"
               >
                 {regularFiles.map((file, idx) => (
                   <FileItem
@@ -199,9 +199,9 @@ const FileItem: FC<FileItemProps> = ({ file, isSelected, isFirst, isLast, onSele
         monochrome={false}
       />
       <div className="flex flex-col min-w-0 flex-1">
-        <span className="truncate text-[13px] font-medium">{file.name}</span>
+        <span className="truncate text-base font-medium">{file.name}</span>
         {dirPath ? (
-          <span className="truncate text-[11px] text-muted-foreground/60">{dirPath}</span>
+          <span className="truncate text-sm text-muted-foreground/60">{dirPath}</span>
         ) : null}
       </div>
     </div>

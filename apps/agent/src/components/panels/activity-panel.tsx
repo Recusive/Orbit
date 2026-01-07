@@ -82,7 +82,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       aria-label={fileName}
       tabIndex={isActive ? 0 : -1}
       className={cn(
-        'group relative flex items-center h-full px-3 text-[13px] cursor-pointer select-none shrink-0',
+        'group relative flex items-center h-full px-3 text-base cursor-pointer select-none shrink-0',
         'border-r border-border/50',
         isActive
           ? 'bg-chat-area text-foreground'

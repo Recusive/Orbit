@@ -74,10 +74,10 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
 
       {/* Content */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-        <span className="text-[11px] text-muted-foreground/50 font-medium">Read</span>
+        <span className="text-sm text-muted-foreground/50 font-medium">Read</span>
         <button
           className={cn(
-            'text-[12px] font-medium',
+            'text-md font-medium',
             'hover:text-primary/80 transition-colors duration-150 truncate',
             isFailed ? 'text-muted-foreground line-through' : 'text-foreground/90'
           )}
@@ -86,12 +86,10 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
         >
           {fileName}
           {!isRunning && !isFailed && lineCount > 0 ? (
-            <span className="text-muted-foreground/40 ml-1 font-mono text-[10px]">
-              #L1-{lineCount}
-            </span>
+            <span className="text-muted-foreground/40 ml-1 font-mono text-xs">#L1-{lineCount}</span>
           ) : null}
         </button>
-        {isFailed ? <span className="text-[10px] text-destructive/60">Failed</span> : null}
+        {isFailed ? <span className="text-xs text-destructive/60">Failed</span> : null}
       </div>
 
       {/* Loading spinner */}

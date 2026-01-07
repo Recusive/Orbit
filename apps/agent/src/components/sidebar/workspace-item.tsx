@@ -29,7 +29,7 @@ export const WorkspaceItem: FC<WorkspaceItemProps> = ({
     <div className={cn('flex flex-col', className)}>
       <button
         onClick={toggleExpanded}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-sm w-full group"
+        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-base w-full group"
         title={name}
       >
         {isExpanded ? (

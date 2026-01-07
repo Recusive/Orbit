@@ -52,9 +52,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
           isFailed
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
             : 'border border-border/50',
-          isExpanded
-            ? 'rounded-lg shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
-            : 'rounded-lg shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
+          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
         )}
       >
         {/* Header */}
@@ -90,7 +88,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
             {isRunning ? (
               <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
             ) : isFailed ? (
-              <span className="text-[10px] text-destructive/60">Failed</span>
+              <span className="text-xs text-destructive/60">Failed</span>
             ) : null}
           </div>
           <ChevronDown
@@ -121,7 +119,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
                 }}
                 className="flex items-center gap-1 group focus:outline-none"
               >
-                <code className="bg-muted/50 text-foreground rounded-md px-2 py-1 font-mono text-[11px] group-hover:bg-muted transition-colors truncate max-w-full">
+                <code className="bg-muted/50 text-foreground rounded-md px-2 py-1 font-mono text-sm group-hover:bg-muted transition-colors truncate max-w-full">
                   {hostname}
                 </code>
                 <ExternalLink className="h-2.5 w-2.5 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -134,25 +132,23 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
               <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
                 prompt
               </div>
-              <div className="text-[11px] text-foreground line-clamp-2">{prompt}</div>
+              <div className="text-sm text-foreground line-clamp-2">{prompt}</div>
             </div>
 
             {/* Output */}
             <div className="h-px bg-border/30 mx-2.5" />
             <div className="p-2.5">
               {isRunning ? (
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Loader2 className="h-2.5 w-2.5 animate-spin" />
                   <span>Fetching and processing content...</span>
                 </div>
               ) : output ? (
-                <div className="bg-muted/40 rounded-lg p-2 border border-border/30 font-mono text-[11px] leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto">
+                <div className="bg-muted/40 rounded-lg p-2 border border-border/30 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto">
                   <pre className="whitespace-pre-wrap break-words m-0">{output}</pre>
                 </div>
               ) : (
-                <div className="text-[11px] text-muted-foreground/60 italic">
-                  No content fetched
-                </div>
+                <div className="text-sm text-muted-foreground/60 italic">No content fetched</div>
               )}
             </div>
           </div>

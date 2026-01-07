@@ -187,7 +187,7 @@ function EmptyState(): React.JSX.Element {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="px-6 py-5">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+        <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground/70">
           Properties
         </p>
         <p className="mt-0.5 text-sm font-medium text-foreground">Card Inspector</p>
@@ -198,8 +198,8 @@ function EmptyState(): React.JSX.Element {
         <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-lg bg-gradient-to-br from-muted to-muted/50">
           <Layers className="h-9 w-9 text-muted-foreground/60" />
         </div>
-        <p className="mb-2 text-[15px] font-medium text-foreground/80">No card selected</p>
-        <p className="text-[13px] leading-relaxed text-muted-foreground/70">
+        <p className="mb-2 text-xl font-medium text-foreground/80">No card selected</p>
+        <p className="text-base leading-relaxed text-muted-foreground/70">
           Click on a card to view and edit its properties
         </p>
       </div>
@@ -381,14 +381,14 @@ export function CardPropertiesPanel({
       <div className="px-6 py-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground/70">
               Properties
             </p>
             <div className="mt-2 flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/10 to-primary/5">
                 <TypeIcon className="h-5 w-5 text-primary" />
               </div>
-              <p className="text-[15px] font-medium text-foreground">{card.name}</p>
+              <p className="text-xl font-medium text-foreground">{card.name}</p>
             </div>
           </div>
           {/* Lock toggle moved to header as icon */}
@@ -411,9 +411,7 @@ export function CardPropertiesPanel({
       <div className="flex-1 overflow-y-auto">
         {/* Name Section - Clean, spacious */}
         <div className="px-6 pb-2">
-          <Label className="mb-2.5 block text-[11px] font-medium text-muted-foreground/70">
-            Name
-          </Label>
+          <Label className="mb-2.5 block text-sm font-medium text-muted-foreground/70">Name</Label>
           {editingName ? (
             <Input
               type="text"

@@ -65,7 +65,7 @@ function CollapsibleTrigger({
         }}
         className={cn(
           'flex w-full items-center gap-3 rounded-lg px-2 py-2.5',
-          'text-[13px] font-medium text-foreground',
+          'text-base font-medium text-foreground',
           'transition-all duration-200 ease-out',
           'hover:bg-muted/60',
           'active:scale-[0.98]',

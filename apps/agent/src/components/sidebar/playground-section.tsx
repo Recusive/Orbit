@@ -19,7 +19,7 @@ export const PlaygroundSection: FC<PlaygroundSectionProps> = ({
     <button
       onClick={onClick}
       className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-sm border border-dashed border-muted-foreground/30',
+        'flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-base border border-dashed border-muted-foreground/30',
         collapsed && 'justify-center',
         className
       )}

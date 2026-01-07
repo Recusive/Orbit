@@ -60,9 +60,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
           isFailed
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
             : 'border border-border/50',
-          isExpanded
-            ? 'rounded-lg shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
-            : 'rounded-lg shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
+          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
         )}
       >
         {/* Header */}
@@ -96,14 +94,14 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
               {isRunning ? 'Searching files' : isFailed ? 'Search failed' : 'Found files'}
             </span>
             {!isRunning && !isFailed && fileCount > 0 ? (
-              <span className="text-[11px] text-muted-foreground/60">
+              <span className="text-sm text-muted-foreground/60">
                 ({fileCount} {fileCount === 1 ? 'file' : 'files'})
               </span>
             ) : null}
             {isRunning ? (
               <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
             ) : isFailed ? (
-              <span className="text-[10px] text-destructive/60">Failed</span>
+              <span className="text-xs text-destructive/60">Failed</span>
             ) : null}
           </div>
           <ChevronDown
@@ -127,7 +125,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
               <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
                 pattern
               </div>
-              <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-[11px] text-foreground">
+              <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-sm text-foreground">
                 {pattern}
               </code>
               {path ? (
@@ -135,7 +133,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                   <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1 mt-2">
                     in
                   </div>
-                  <span className="text-[11px] text-muted-foreground font-mono">{path}</span>
+                  <span className="text-sm text-muted-foreground font-mono">{path}</span>
                 </>
               ) : null}
             </div>
@@ -144,7 +142,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
             <div className="h-px bg-border/30 mx-2.5" />
             <div className="p-2.5">
               {isRunning ? (
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Loader2 className="h-2.5 w-2.5 animate-spin" />
                   <span>Searching for files...</span>
                 </div>
@@ -157,7 +155,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                       onClick={() => {
                         onOpenFile?.(file);
                       }}
-                      className="w-full flex items-center gap-1.5 text-[11px] py-0.5 hover:bg-muted/40 rounded px-1.5 -mx-1.5 transition-colors overflow-hidden cursor-pointer text-left"
+                      className="w-full flex items-center gap-1.5 text-sm py-0.5 hover:bg-muted/40 rounded px-1.5 -mx-1.5 transition-colors overflow-hidden cursor-pointer text-left"
                     >
                       {file.endsWith('/') ? (
                         <Folder className="h-3 w-3 text-muted-foreground/60 shrink-0" />
@@ -177,7 +175,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="text-[11px] text-muted-foreground/60 italic">No files found</div>
+                <div className="text-sm text-muted-foreground/60 italic">No files found</div>
               )}
             </div>
           </div>

@@ -306,10 +306,12 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
       {message.role === 'user' ? (
         /* User message bubble */
         <div
-          className="p-2 rounded-lg bg-card border border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
+          className="p-2 rounded-lg bg-card border border-border/40 shadow-sm"
           style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
         >
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.displayedContent}</p>
+          <p className="text-base leading-relaxed whitespace-pre-wrap">
+            {message.displayedContent}
+          </p>
         </div>
       ) : (
         /* Assistant message - no bubble, content flows naturally */
@@ -380,7 +382,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                 title={filePath}
               >
                 <FileIcon fileName={fileName} className="h-3.5 w-3.5" monochrome={false} />
-                <span className="text-[11px] text-foreground/70">{fileName}</span>
+                <span className="text-sm text-foreground/70">{fileName}</span>
               </div>
             );
           })}
@@ -396,7 +398,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                 alt={image.name}
                 className="h-4 w-4 object-cover rounded-sm"
               />
-              <span className="text-[11px] text-foreground/70">{image.name}</span>
+              <span className="text-sm text-foreground/70">{image.name}</span>
             </div>
           ))}
         </div>

@@ -24,7 +24,7 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
             {/* Queued indicator */}
             <div className="flex items-center gap-1.5 mb-1.5 text-muted-foreground">
               <Clock className="h-3 w-3" />
-              <span className="text-[10px] font-medium uppercase tracking-wide">Queued</span>
+              <span className="text-xs font-medium uppercase tracking-wide">Queued</span>
             </div>
             {/* Message text */}
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{message.text}</p>
@@ -57,7 +57,7 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
                   className="h-3.5 w-3.5 opacity-50"
                   monochrome={false}
                 />
-                <span className="text-[11px] text-muted-foreground/70">{fileName}</span>
+                <span className="text-sm text-muted-foreground/70">{fileName}</span>
               </div>
             );
           })}
@@ -73,7 +73,7 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
                 alt={image.name}
                 className="h-4 w-4 object-cover rounded-sm opacity-50"
               />
-              <span className="text-[11px] text-muted-foreground/70">{image.name}</span>
+              <span className="text-sm text-muted-foreground/70">{image.name}</span>
             </div>
           ))}
         </div>

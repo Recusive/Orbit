@@ -117,9 +117,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
           isFailed
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
             : 'border border-border/50',
-          isExpanded
-            ? 'rounded-lg shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
-            : 'rounded-lg shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
+          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
         )}
       >
         {/* Header */}
@@ -153,14 +151,14 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
               {isRunning ? 'Searching the web' : isFailed ? 'Web search failed' : 'Web search'}
             </span>
             {!isRunning && !isFailed && resultCount > 0 ? (
-              <span className="text-[11px] text-muted-foreground/60">
+              <span className="text-sm text-muted-foreground/60">
                 ({resultCount} {resultCount === 1 ? 'result' : 'results'})
               </span>
             ) : null}
             {isRunning ? (
               <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
             ) : isFailed ? (
-              <span className="text-[10px] text-destructive/60">Failed</span>
+              <span className="text-xs text-destructive/60">Failed</span>
             ) : null}
           </div>
           <ChevronDown
@@ -184,7 +182,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
               <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
                 query
               </div>
-              <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-[11px] text-foreground">
+              <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-sm text-foreground">
                 {query}
               </code>
             </div>
@@ -193,7 +191,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
             <div className="h-px bg-border/30 mx-2.5" />
             <div className="p-2.5">
               {isRunning ? (
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Loader2 className="h-2.5 w-2.5 animate-spin" />
                   <span>Searching for results...</span>
                 </div>
@@ -220,14 +218,14 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                           <Globe className="h-2.5 w-2.5 text-info/70" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-foreground mb-0.5 line-clamp-2 text-[11px] font-medium">
+                          <div className="text-foreground mb-0.5 line-clamp-2 text-sm font-medium">
                             {result.title}
                           </div>
-                          <div className="text-muted-foreground/60 truncate font-mono text-[10px]">
+                          <div className="text-muted-foreground/60 truncate font-mono text-xs">
                             {getHostname(result.url)}
                           </div>
                           {result.snippet ? (
-                            <div className="text-muted-foreground mt-0.5 line-clamp-2 text-[10px]">
+                            <div className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
                               {result.snippet}
                             </div>
                           ) : null}
@@ -237,7 +235,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="text-[11px] text-muted-foreground/60 italic">No results found</div>
+                <div className="text-sm text-muted-foreground/60 italic">No results found</div>
               )}
             </div>
           </div>

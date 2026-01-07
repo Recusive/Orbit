@@ -570,7 +570,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
 
         {/* Clean state */}
         {!hasChanges ? (
-          <div className="p-5 text-center text-[13px] text-muted-foreground/70">
+          <div className="p-5 text-center text-base text-muted-foreground/70">
             <Check className="h-5 w-5 mx-auto mb-1.5 text-emerald-500/80" />
             Working tree clean
           </div>
@@ -698,7 +698,7 @@ const FileSection: React.FC<FileSectionProps> = ({
   return (
     <div>
       <div className="flex items-center justify-between px-3 py-1.5 bg-muted/20">
-        <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-[0.05em]">
+        <span className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wide">
           {title} ({files.length})
         </span>
         {headerAction}
@@ -715,15 +715,15 @@ const FileSection: React.FC<FileSectionProps> = ({
             <div className="flex-1 min-w-0 text-sm">
               {file.oldPath ? (
                 // Renamed file: show "oldName → newName"
-                <span className="truncate block text-[13px]">
+                <span className="truncate block text-base">
                   <span className="text-muted-foreground/70">{getFileName(file.oldPath)}</span>
                   <span className="text-muted-foreground/50 mx-1">→</span>
                   <span>{getFileName(file.path)}</span>
                 </span>
               ) : (
-                <span className="truncate block text-[13px]">{getFileName(file.path)}</span>
+                <span className="truncate block text-base">{getFileName(file.path)}</span>
               )}
-              <span className="text-[11px] text-muted-foreground/60 truncate block">
+              <span className="text-sm text-muted-foreground/60 truncate block">
                 {file.oldPath && getFileDirectory(file.oldPath) !== getFileDirectory(file.path)
                   ? `${getFileDirectory(file.oldPath)} → ${getFileDirectory(file.path)}`
                   : getFileDirectory(file.path)}

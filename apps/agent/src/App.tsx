@@ -119,7 +119,7 @@ const App: FC = () => {
             )}
           </div>
 
-          {/* Status Bar - always visible */}
+          {/* Status Bar */}
           <StatusBar />
 
           {/* Crash notification dialog */}

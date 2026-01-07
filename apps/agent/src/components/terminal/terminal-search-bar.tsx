@@ -116,7 +116,7 @@ export const TerminalSearchBar: FC<TerminalSearchBarProps> = ({
           onKeyDown={handleKeyDown}
         />
         {hasResults === false && query ? (
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-destructive">
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-destructive">
             No results
           </span>
         ) : null}

@@ -51,7 +51,7 @@ export const SidebarUtilities: FC<SidebarUtilitiesProps> = ({
           key={label}
           onClick={onClick}
           className={cn(
-            'flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-sm',
+            'flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-base',
             collapsed && 'justify-center'
           )}
           title={collapsed ? label : undefined}

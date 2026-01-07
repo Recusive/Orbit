@@ -209,7 +209,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
 
   return (
     <aside
-      className="h-full flex flex-col border-r border-border/40 bg-card transition-[width] duration-150 ease-in-out overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08),0_4px_12px_-4px_rgba(0,0,0,0.05)] dark:shadow-none"
+      className="h-full flex flex-col border-r border-border/40 bg-card transition-[width] duration-150 ease-in-out overflow-hidden shadow-lg dark:shadow-none"
       style={{ width }}
     >
       {/* Header */}
@@ -242,7 +242,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           /* Expanded: text on left, button on right */
           <div className="flex items-center justify-between w-full px-3">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold whitespace-nowrap">Orbit Agent</span>
+              <span className="text-lg font-semibold whitespace-nowrap">Orbit Agent</span>
               <span className="bg-primary/8 text-primary/70 rounded-full px-1.5 py-0.5 text-[9px] font-medium tracking-wide whitespace-nowrap">
                 Preview
               </span>
@@ -293,10 +293,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
             Search files...
           </span>
           <div className="flex items-center gap-0.5 ml-auto mr-2">
-            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-sm font-mono bg-background/60 rounded-md shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-sm font-mono bg-background/60 rounded-md shadow-xs">
               ⌘
             </kbd>
-            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-[11px] font-mono bg-background/60 rounded-md shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-sm font-mono bg-background/60 rounded-md shadow-xs">
               P
             </kbd>
           </div>
@@ -367,7 +367,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
             )}
           >
             <div className="flex items-center justify-between px-3 py-1">
-              <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-[0.04em] whitespace-nowrap">
+              <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-normal whitespace-nowrap">
                 Workspaces
               </span>
               <Tooltip>
@@ -578,7 +578,7 @@ const SidebarItem: FC<SidebarItemProps> = ({
       {/* Text that slides in */}
       <span
         className={cn(
-          'text-sm whitespace-nowrap overflow-hidden',
+          'text-base whitespace-nowrap overflow-hidden',
           collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
         )}
         style={{ transition: getCollapseTransition(collapsed) }}
@@ -589,7 +589,7 @@ const SidebarItem: FC<SidebarItemProps> = ({
       {shortcut && !collapsed ? (
         <KbdGroup className="ml-auto mr-2">
           {shortcut.map((key, index) => (
-            <Kbd key={index} className="border-0 bg-muted/70 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+            <Kbd key={index} className="border-0 bg-muted/70 shadow-xs">
               {key}
             </Kbd>
           ))}
@@ -633,7 +633,7 @@ const WorkspaceItem: FC<WorkspaceItemProps> = ({
       {/* Text that slides in */}
       <span
         className={cn(
-          'text-sm whitespace-nowrap overflow-hidden pr-2',
+          'text-base whitespace-nowrap overflow-hidden pr-2',
           collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
         )}
         style={{ transition: getCollapseTransition(collapsed) }}
@@ -750,7 +750,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       />
       {/* Active indicator */}
       {active ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary/90" /> : null}
-      <span className="relative text-xs font-medium truncate">{label}</span>
+      <span className="relative text-base font-medium truncate">{label}</span>
     </button>
   );
 };

@@ -89,7 +89,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         {/* Workspace name */}
         <span
           className={cn(
-            'text-sm whitespace-nowrap overflow-hidden text-left flex-1',
+            'text-base whitespace-nowrap overflow-hidden text-left flex-1',
             collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
           )}
           style={{
@@ -105,7 +105,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         {!collapsed && (
           <div
             className={cn(
-              'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium mr-7 shrink-0 transition-all duration-200',
+              'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium mr-7 shrink-0 transition-all duration-200',
               worktree.isMain ? 'bg-primary/12 text-primary' : 'bg-muted text-muted-foreground'
             )}
           >

@@ -125,9 +125,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
           isFailed
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
             : 'border border-border/50',
-          isExpanded
-            ? 'rounded-lg shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
-            : 'rounded-lg shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
+          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
         )}
       >
         {/* Header */}
@@ -161,7 +159,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
               {isRunning ? 'Updating tasks' : isFailed ? 'Task update failed' : 'Task list'}
             </span>
             {!isRunning && !isFailed && totalCount > 0 ? (
-              <span className="text-[11px] text-muted-foreground/60">
+              <span className="text-sm text-muted-foreground/60">
                 ({String(completedCount)}/{String(totalCount)}
                 {inProgressCount > 0 ? `, ${String(inProgressCount)} active` : ''})
               </span>
@@ -169,7 +167,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
             {isRunning ? (
               <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
             ) : isFailed ? (
-              <span className="text-[10px] text-destructive/60">Failed</span>
+              <span className="text-xs text-destructive/60">Failed</span>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
@@ -178,7 +176,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                 <ProgressPie
                   percentage={totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0}
                 />
-                <span className="text-[10px] text-muted-foreground/60">
+                <span className="text-xs text-muted-foreground/60">
                   {Math.round((completedCount / totalCount) * 100)}%
                 </span>
               </div>
@@ -202,7 +200,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
           <div className="overflow-hidden min-h-0">
             <div className="p-2.5">
               {isRunning && todos.length === 0 ? (
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Loader2 className="h-2.5 w-2.5 animate-spin" />
                   <span>Updating task list...</span>
                 </div>
@@ -212,7 +210,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                     <div
                       key={`${todo.content}-${String(index)}`}
                       className={cn(
-                        'flex items-center gap-2 text-[11px] py-1 px-1.5 -mx-1.5 rounded transition-colors',
+                        'flex items-center gap-2 text-sm py-1 px-1.5 -mx-1.5 rounded transition-colors',
                         todo.status === 'in_progress' && 'bg-primary/5',
                         todo.status === 'completed' && 'opacity-50'
                       )}
@@ -230,7 +228,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="text-[11px] text-muted-foreground/60 italic">No tasks</div>
+                <div className="text-sm text-muted-foreground/60 italic">No tasks</div>
               )}
 
               {/* Progress bar */}
@@ -243,7 +241,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                         style={{ width: `${String((completedCount / totalCount) * 100)}%` }}
                       />
                     </div>
-                    <span className="text-[10px] text-muted-foreground/60 font-medium">
+                    <span className="text-xs text-muted-foreground/60 font-medium">
                       {Math.round((completedCount / totalCount) * 100)}%
                     </span>
                   </div>

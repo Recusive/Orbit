@@ -86,7 +86,7 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
 
             <CommandGroup
               heading="Commands"
-              className="[&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.05em] [&_[cmdk-group-heading]]:text-muted-foreground/60"
+              className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground/60"
             >
               {filteredCommands.map((cmd, idx) => (
                 <CommandItem
@@ -179,10 +179,10 @@ const CommandItem: FC<CommandItemProps> = ({ command, isSelected, isFirst, isLas
           : 'rounded-md hover:bg-muted/50 active:scale-[0.99]'
       )}
     >
-      <span className="text-muted-foreground/70 font-mono text-[13px]">/</span>
+      <span className="text-muted-foreground/70 font-mono text-base">/</span>
       <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-[13px] font-medium">{command.name}</span>
-        <span className="truncate text-[11px] text-muted-foreground/60">{command.description}</span>
+        <span className="text-base font-medium">{command.name}</span>
+        <span className="truncate text-sm text-muted-foreground/60">{command.description}</span>
       </div>
     </div>
   );

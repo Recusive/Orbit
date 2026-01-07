@@ -98,7 +98,7 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
               fill="currentColor"
             />
           </svg>
-          <span className="text-[11px] font-medium text-muted-foreground/60">
+          <span className="text-sm font-medium text-muted-foreground/60">
             Thought for {durationText}
           </span>
         </span>
@@ -123,7 +123,7 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
 
           {/* Content */}
           <div className="px-3.5 pb-3.5 pt-2.5 max-h-[500px] overflow-y-auto">
-            <div className="text-[13px] text-muted-foreground/60 leading-[1.7] whitespace-pre-wrap font-mono tracking-[-0.01em]">
+            <div className="text-base text-muted-foreground/60 leading-[1.7] whitespace-pre-wrap font-mono tracking-tighter">
               {thinking}
             </div>
           </div>

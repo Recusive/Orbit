@@ -175,35 +175,35 @@ export const ContextContentHeader: FC<ContextContentHeaderProps> = ({ children, 
     return <div className={cn('p-3 border-b border-border/40', className)}>{children}</div>;
   }
 
-  // Determine progress bar color based on percentage
+  // Determine progress bar color based on percentage (uses CSS variables from globals.css)
   const getProgressStyle = (): CSSProperties => {
     if (percentage >= 80) {
       return {
-        background: 'linear-gradient(to right, rgb(239 68 68 / 0.9), rgb(248 113 113 / 0.9))',
-        boxShadow: '0 0 8px rgba(239, 68, 68, 0.3)',
+        background: 'var(--gradient-error)',
+        boxShadow: 'var(--gradient-error-glow)',
       };
     }
     if (percentage >= 50) {
       return {
-        background: 'linear-gradient(to right, rgb(245 158 11 / 0.9), rgb(251 191 36 / 0.9))',
-        boxShadow: '0 0 8px rgba(245, 158, 11, 0.3)',
+        background: 'var(--gradient-warning)',
+        boxShadow: 'var(--gradient-warning-glow)',
       };
     }
     return {
-      background: 'linear-gradient(to right, rgb(16 185 129 / 0.9), rgb(52 211 153 / 0.9))',
-      boxShadow: '0 0 8px rgba(16, 185, 129, 0.3)',
+      background: 'var(--gradient-success)',
+      boxShadow: 'var(--gradient-success-glow)',
     };
   };
 
   return (
     <div className={cn('p-3 border-b border-border/40', className)}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-medium tracking-[-0.01em]">Context Window</span>
-        <span className="text-[11px] font-medium text-muted-foreground/70 tabular-nums">
+        <span className="text-sm font-medium tracking-tighter">Context Window</span>
+        <span className="text-sm font-medium text-muted-foreground/70 tabular-nums">
           {percentage}%
         </span>
       </div>
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 tabular-nums">
+      <div className="flex items-center gap-1.5 text-sm text-muted-foreground/60 tabular-nums">
         <span>{formatTokens(usedTokens)}</span>
         <span className="opacity-50">/</span>
         <span>{formatTokens(maxTokens)} tokens</span>
@@ -257,7 +257,7 @@ interface UsageLineProps {
 
 const UsageLine: FC<UsageLineProps> = ({ label, tokens, className }) => {
   return (
-    <div className={cn('flex items-center justify-between text-[11px]', className)}>
+    <div className={cn('flex items-center justify-between text-sm', className)}>
       <span className="text-muted-foreground/60">{label}</span>
       <span className="font-medium tabular-nums text-foreground/90">{formatTokens(tokens)}</span>
     </div>

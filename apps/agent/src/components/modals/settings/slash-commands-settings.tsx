@@ -55,9 +55,9 @@ interface SectionHeaderProps {
 
 const SectionHeader: FC<SectionHeaderProps> = ({ title, children }) => (
   <div className="mb-5">
-    <h3 className="text-[13px] font-semibold mb-1.5">{title}</h3>
+    <h3 className="text-base font-semibold mb-1.5">{title}</h3>
     {children !== undefined && (
-      <p className="text-[11px] text-muted-foreground/70 leading-relaxed">{children}</p>
+      <p className="text-sm text-muted-foreground/70 leading-relaxed">{children}</p>
     )}
   </div>
 );
@@ -83,17 +83,17 @@ const CommandCard: FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-[13px] truncate">/{command.name}</span>
-              <span className={cn('text-[10px] px-1.5 py-0.5 rounded-md', scopeConfig.className)}>
+              <span className="font-medium text-base truncate">/{command.name}</span>
+              <span className={cn('text-xs px-1.5 py-0.5 rounded-md', scopeConfig.className)}>
                 {scopeConfig.label}
               </span>
               {isReadonly ? <Lock className="h-3 w-3 text-muted-foreground/60" /> : null}
             </div>
-            <div className="text-[11px] text-muted-foreground/70 line-clamp-2 mt-1">
+            <div className="text-sm text-muted-foreground/70 line-clamp-2 mt-1">
               {command.description ?? 'No description'}
             </div>
             {command.argumentHint !== undefined && command.argumentHint !== '' && (
-              <div className="text-[10px] text-muted-foreground/60 mt-1.5 font-mono">
+              <div className="text-xs text-muted-foreground/60 mt-1.5 font-mono">
                 /{command.name} {command.argumentHint}
               </div>
             )}
@@ -102,13 +102,13 @@ const CommandCard: FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
                 {command.allowedTools.slice(0, 4).map((tool) => (
                   <span
                     key={tool}
-                    className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/70"
+                    className="text-xs px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/70"
                   >
                     {tool}
                   </span>
                 ))}
                 {command.allowedTools.length > 4 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/70">
+                  <span className="text-xs px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/70">
                     +{command.allowedTools.length - 4} more
                   </span>
                 )}
@@ -282,7 +282,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
 
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/40">
-            <h2 className="font-semibold text-[14px]">
+            <h2 className="font-semibold text-lg">
               {command !== undefined ? 'Edit Slash Command' : 'Create Slash Command'}
             </h2>
             <DialogPrimitive.Close asChild>
@@ -297,7 +297,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
             <div className="space-y-5 px-px">
               {/* Name */}
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
                   Command Name <span className="text-red-500/70">*</span>
                 </label>
                 <div className="flex items-center gap-1.5 mt-1.5">
@@ -311,14 +311,14 @@ const CommandEditor: FC<CommandEditorProps> = ({
                     className="h-8 text-sm"
                   />
                 </div>
-                <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-relaxed">
+                <p className="text-xs text-muted-foreground/50 mt-1.5 leading-relaxed">
                   Used as the filename and command identifier. Use lowercase with dashes.
                 </p>
               </div>
 
               {/* Description */}
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
                   Description
                 </label>
                 <Input
@@ -333,7 +333,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
 
               {/* Argument Hint */}
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
                   Argument Hint
                 </label>
                 <Input
@@ -344,7 +344,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
                   placeholder="[file] [options]"
                   className="mt-1 h-8 text-sm"
                 />
-                <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-relaxed">
+                <p className="text-xs text-muted-foreground/50 mt-1.5 leading-relaxed">
                   Shows users what arguments this command accepts, e.g., &quot;[file]
                   [options]&quot;
                 </p>
@@ -352,7 +352,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
 
               {/* Content/Prompt */}
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
                   Command Prompt <span className="text-red-500/70">*</span>
                 </label>
                 <Textarea
@@ -363,7 +363,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
                   placeholder="The prompt that will be sent to Claude when this command is run..."
                   className="mt-1 text-sm min-h-[120px] font-mono"
                 />
-                <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-relaxed">
+                <p className="text-xs text-muted-foreground/50 mt-1.5 leading-relaxed">
                   Use{' '}
                   <code className="bg-muted/60 px-1.5 py-0.5 rounded-md font-mono text-[9px] text-foreground/70">
                     $ARGUMENTS
@@ -378,7 +378,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
 
               {/* Scope */}
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
                   Scope
                 </label>
                 <Select
@@ -405,14 +405,14 @@ const CommandEditor: FC<CommandEditorProps> = ({
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-relaxed">
+                <p className="text-xs text-muted-foreground/50 mt-1.5 leading-relaxed">
                   Project commands are shared with the team. Personal commands are just for you.
                 </p>
               </div>
 
               {/* Model */}
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
                   Model
                 </label>
                 <Select
@@ -435,10 +435,10 @@ const CommandEditor: FC<CommandEditorProps> = ({
 
               {/* Tools */}
               <div>
-                <label className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-[0.03em]">
+                <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
                   Allowed Tools
                 </label>
-                <p className="text-[10px] text-muted-foreground/50 mb-2 mt-1">
+                <p className="text-xs text-muted-foreground/50 mb-2 mt-1">
                   Restrict which tools this command can use. Leave empty for all tools.
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -450,7 +450,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
                         handleToolToggle(tool);
                       }}
                       className={cn(
-                        'text-[11px] px-2.5 py-1.5 rounded-lg border transition-all duration-150 active:scale-[0.98]',
+                        'text-sm px-2.5 py-1.5 rounded-lg border transition-all duration-150 active:scale-[0.98]',
                         tools.includes(tool)
                           ? 'bg-primary/10 text-foreground border-primary/40 hover:bg-primary/15 hover:border-primary/50'
                           : 'bg-muted/30 text-foreground border-border/50 hover:bg-muted/50 hover:border-border/60'
@@ -705,7 +705,7 @@ export const SlashCommandsSettings: FC = () => {
       </SectionHeader>
 
       {error !== null && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-[13px]">
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-base">
           {error}
         </div>
       )}
@@ -834,7 +834,7 @@ export const SlashCommandsSettings: FC = () => {
       </div>
 
       {/* Info section */}
-      <div className="mt-6 p-3.5 rounded-lg bg-muted/30 border border-border/30 text-[11px] text-muted-foreground/70">
+      <div className="mt-6 p-3.5 rounded-lg bg-muted/30 border border-border/30 text-sm text-muted-foreground/70">
         <p className="font-medium mb-1.5 text-foreground/80">How Slash Commands Work</p>
         <ul className="list-disc list-inside space-y-0.5">
           <li>

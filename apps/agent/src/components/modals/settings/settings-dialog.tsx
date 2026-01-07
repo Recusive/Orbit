@@ -72,7 +72,7 @@ const NavItem: FC<NavItemProps> = ({ icon, label, isActive, onClick }) => (
   <button
     onClick={onClick}
     className={cn(
-      'flex w-full items-center gap-2 px-2.5 py-2 text-[13px] transition-colors duration-150',
+      'flex w-full items-center gap-2 px-2.5 py-2 text-base transition-colors duration-150',
       isActive
         ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[8px] rounded-r-lg rounded-l-none'
         : 'text-muted-foreground/70 hover:bg-muted/50 hover:text-foreground rounded-lg'
@@ -93,9 +93,9 @@ interface SettingItemProps {
 const SettingItem: FC<SettingItemProps> = ({ label, description, children }) => (
   <div className="flex items-center justify-between py-3.5">
     <div className="flex-1 pr-4">
-      <div className="text-[13px] font-medium">{label}</div>
+      <div className="text-base font-medium">{label}</div>
       {description !== undefined && (
-        <div className="text-[11px] text-muted-foreground/60 mt-1">{description}</div>
+        <div className="text-sm text-muted-foreground/60 mt-1">{description}</div>
       )}
     </div>
     <div className="shrink-0">{children}</div>
@@ -110,9 +110,9 @@ interface SectionHeaderProps {
 
 const SectionHeader: FC<SectionHeaderProps> = ({ title, children }) => (
   <div className="mb-5">
-    <h3 className="text-[15px] font-semibold mb-1.5">{title}</h3>
+    <h3 className="text-xl font-semibold mb-1.5">{title}</h3>
     {children !== undefined && (
-      <p className="text-[11px] text-muted-foreground/60 leading-relaxed">{children}</p>
+      <p className="text-sm text-muted-foreground/60 leading-relaxed">{children}</p>
     )}
   </div>
 );
@@ -422,8 +422,8 @@ const AccountSettings: FC = () => {
             <User className="h-5 w-5 text-primary/80" />
           </div>
           <div>
-            <div className="font-medium text-[13px]">Guest User</div>
-            <div className="text-[11px] text-muted-foreground/60">Not signed in</div>
+            <div className="font-medium text-base">Guest User</div>
+            <div className="text-sm text-muted-foreground/60">Not signed in</div>
           </div>
         </div>
         <Button variant="outline" className="w-full mt-4" size="sm">
@@ -437,13 +437,11 @@ const AccountSettings: FC = () => {
 
       <div className="space-y-3">
         <div>
-          <label className="text-[11px] font-medium text-muted-foreground/70">
-            Anthropic API Key
-          </label>
+          <label className="text-sm font-medium text-muted-foreground/70">Anthropic API Key</label>
           <Input type="password" placeholder="sk-ant-..." className="mt-1.5 h-8 text-sm" />
         </div>
         <div>
-          <label className="text-[11px] font-medium text-muted-foreground/70">OpenAI API Key</label>
+          <label className="text-sm font-medium text-muted-foreground/70">OpenAI API Key</label>
           <Input type="password" placeholder="sk-..." className="mt-1.5 h-8 text-sm" />
         </div>
       </div>
@@ -462,8 +460,8 @@ const FeedbackSettings: FC = () => {
           <div className="flex items-center gap-3">
             <MessageSquare className="h-5 w-5 text-muted-foreground/70" />
             <div>
-              <div className="font-medium text-[13px]">Report a Bug</div>
-              <div className="text-[11px] text-muted-foreground/60">
+              <div className="font-medium text-base">Report a Bug</div>
+              <div className="text-sm text-muted-foreground/60">
                 Found something not working? Let us know
               </div>
             </div>
@@ -475,8 +473,8 @@ const FeedbackSettings: FC = () => {
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-muted-foreground/70" />
             <div>
-              <div className="font-medium text-[13px]">Request a Feature</div>
-              <div className="text-[11px] text-muted-foreground/60">
+              <div className="font-medium text-base">Request a Feature</div>
+              <div className="text-sm text-muted-foreground/60">
                 Have an idea? We&apos;d love to hear it
               </div>
             </div>
@@ -633,7 +631,7 @@ interface ShortcutItemProps {
 
 const ShortcutItem: FC<ShortcutItemProps> = ({ label, keys }) => (
   <div className="flex items-center justify-between py-2.5">
-    <span className="text-[13px] text-muted-foreground/70">{label}</span>
+    <span className="text-base text-muted-foreground/70">{label}</span>
     <KbdGroup>
       {keys.map((key, index) => (
         <Kbd key={index}>{key}</Kbd>
@@ -813,7 +811,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-muted/30">
             <div className="flex items-center gap-2">
               <Settings2 className="h-4 w-4 text-muted-foreground/70" />
-              <span className="font-medium text-[13px]">Settings - {getSectionTitle()}</span>
+              <span className="font-medium text-base">Settings - {getSectionTitle()}</span>
             </div>
             <DialogPrimitive.Close className="rounded-md p-1 opacity-60 hover:opacity-100 hover:bg-muted/50 active:scale-95 transition-all duration-150">
               <X className="h-4 w-4" />

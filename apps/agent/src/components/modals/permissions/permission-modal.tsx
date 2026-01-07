@@ -65,7 +65,7 @@ export const PermissionModal: FC<PermissionModalProps> = ({ request, onApprove, 
   }, [request.requestId, onDeny]);
 
   return (
-    <div className="rounded-t-xl bg-card border border-border/50 border-b-0 overflow-hidden shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.1),0_-2px_6px_-2px_rgba(0,0,0,0.06)]">
+    <div className="rounded-t-xl bg-card border border-border/50 border-b-0 overflow-hidden shadow-up">
       {/* Single row: Icon + Label + Loader + Buttons */}
       <div className="flex items-center gap-2.5 px-3.5 py-2">
         {/* Icon */}
@@ -79,7 +79,7 @@ export const PermissionModal: FC<PermissionModalProps> = ({ request, onApprove, 
 
         {/* Label + Loader */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <span className="text-[13px] font-medium text-foreground shrink-0">{confirmLabel}</span>
+          <span className="text-base font-medium text-foreground shrink-0">{confirmLabel}</span>
           <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
         </div>
 

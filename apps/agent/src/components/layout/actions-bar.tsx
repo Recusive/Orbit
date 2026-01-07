@@ -47,7 +47,7 @@ const ActionButton: FC<ActionButtonProps> = ({
 
           {/* Badge for counts (e.g., pending changes) */}
           {badge !== undefined && badge > 0 ? (
-            <div className="absolute top-1.5 right-1.5 min-w-4 h-4 flex items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground px-1">
+            <div className="absolute top-1.5 right-1.5 min-w-4 h-4 flex items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground px-1">
               {badge > 99 ? '99+' : badge}
             </div>
           ) : null}

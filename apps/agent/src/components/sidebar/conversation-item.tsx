@@ -44,7 +44,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
     <button
       onClick={handleClick}
       className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-sm w-full group',
+        'flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors text-base w-full group',
         isActive && 'bg-accent',
         className
       )}

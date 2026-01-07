@@ -90,9 +90,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
           isFailed
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
             : 'border border-border/50',
-          isExpanded
-            ? 'rounded-lg shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
-            : 'rounded-lg shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
+          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
         )}
       >
         {/* Header */}
@@ -125,11 +123,11 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
             >
               {isRunning ? 'Running Task' : isFailed ? 'Task Failed' : 'Completed Task'}
             </span>
-            <span className="text-[11px] text-muted-foreground/60">{description}</span>
+            <span className="text-sm text-muted-foreground/60">{description}</span>
             {isRunning ? (
               <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
             ) : isFailed ? (
-              <span className="text-[10px] text-destructive/60">Failed</span>
+              <span className="text-xs text-destructive/60">Failed</span>
             ) : null}
           </div>
           <ChevronDown
@@ -154,17 +152,15 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                 <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase">
                   agent
                 </div>
-                <span className="px-1 py-0.5 rounded bg-muted/50 text-[11px] font-medium text-foreground">
+                <span className="px-1 py-0.5 rounded bg-muted/50 text-sm font-medium text-foreground">
                   {formattedType}
                 </span>
-                {model ? (
-                  <span className="text-[11px] text-muted-foreground/60">({model})</span>
-                ) : null}
+                {model ? <span className="text-sm text-muted-foreground/60">({model})</span> : null}
               </div>
               <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
                 prompt
               </div>
-              <div className="text-[11px] text-foreground line-clamp-3" title={prompt}>
+              <div className="text-sm text-foreground line-clamp-3" title={prompt}>
                 {truncatePrompt(prompt, 300)}
               </div>
             </div>
@@ -173,18 +169,18 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
             <div className="h-px bg-border/30 mx-2.5" />
             <div className="p-2.5">
               {isRunning ? (
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Loader2 className="h-2.5 w-2.5 animate-spin" />
                   <span>Agent is working on the task...</span>
                 </div>
               ) : output ? (
-                <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none text-[11px]">
+                <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none text-sm">
                   <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>
                     {parseTaskOutput(output)}
                   </Streamdown>
                 </div>
               ) : (
-                <div className="text-[11px] text-muted-foreground/60 italic">Task completed</div>
+                <div className="text-sm text-muted-foreground/60 italic">Task completed</div>
               )}
             </div>
           </div>

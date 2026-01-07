@@ -42,10 +42,10 @@ const DiffStat: FC<DiffStatProps> = ({ additions, deletions }) => {
   return (
     <div className="flex items-center gap-1">
       {additions > 0 ? (
-        <span className="text-[10px] font-semibold text-success">+{additions}</span>
+        <span className="text-xs font-semibold text-success">+{additions}</span>
       ) : null}
       {deletions > 0 ? (
-        <span className="text-[10px] font-semibold text-destructive">-{deletions}</span>
+        <span className="text-xs font-semibold text-destructive">-{deletions}</span>
       ) : null}
       <div className="flex gap-px">
         {Array.from({ length: addSquares }).map((_, i) => (
@@ -111,9 +111,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
           isFailed
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
             : 'border border-border/50',
-          isExpanded
-            ? 'rounded-lg shadow-[0_4px_12px_-4px_rgba(0,0,0,0.1),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
-            : 'rounded-lg shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06),0_2px_4px_-2px_rgba(0,0,0,0.04)]'
+          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
         )}
       >
         {/* Header */}
@@ -153,7 +151,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
             </span>
             <span
               className={cn(
-                'text-[10px] shrink-0',
+                'text-xs shrink-0',
                 isFailed ? 'text-destructive/60' : 'text-muted-foreground/60'
               )}
             >
@@ -166,10 +164,10 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
             {isRunning ? (
               <div className="flex items-center gap-1 text-muted-foreground">
                 <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                <span className="text-[11px]">Editing...</span>
+                <span className="text-sm">Editing...</span>
               </div>
             ) : isFailed ? (
-              <span className="text-[10px] text-destructive/60">Failed</span>
+              <span className="text-xs text-destructive/60">Failed</span>
             ) : (
               <DiffStat additions={additions} deletions={deletions} />
             )}
@@ -195,7 +193,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
               {displayOldLines.map((line, index) => (
                 <div
                   key={`old-${String(index)}`}
-                  className="flex font-mono text-[11px] leading-4 bg-destructive/10"
+                  className="flex font-mono text-sm leading-4 bg-destructive/10"
                 >
                   {/* Gutter */}
                   <div className="w-0.5 bg-destructive shrink-0" />
@@ -219,7 +217,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
               {displayNewLines.map((line, index) => (
                 <div
                   key={`new-${String(index)}`}
-                  className="flex font-mono text-[11px] leading-4 bg-success/10"
+                  className="flex font-mono text-sm leading-4 bg-success/10"
                 >
                   {/* Gutter */}
                   <div className="w-0.5 bg-success shrink-0" />
@@ -239,7 +237,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                 onClick={() => {
                   setIsExpanded(true);
                 }}
-                className="w-full py-1 text-[10px] text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-0.5"
+                className="w-full py-1 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-0.5"
               >
                 <ChevronDown className="h-2.5 w-2.5" />
                 <span>Show all changes</span>

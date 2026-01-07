@@ -144,7 +144,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         )}
       >
         {selectedModelData ? <selectedModelData.icon /> : null}
-        <span className="text-[11px] font-medium">{selectedModelData?.name ?? 'Select Model'}</span>
+        <span className="text-sm font-medium">{selectedModelData?.name ?? 'Select Model'}</span>
         <ChevronDown
           className={cn(
             'h-3 w-3 text-muted-foreground/60 transition-transform duration-150',
@@ -175,7 +175,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
           <div className="p-1.5">
             {MODEL_GROUPS.map((group) => (
               <div key={group.label} className="mb-1 last:mb-0">
-                <div className="px-2 py-1.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-[0.06em]">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
                   {group.label}
                 </div>
                 {group.models.map((model) => (

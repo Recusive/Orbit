@@ -132,8 +132,8 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
                   className="h-4 w-4 shrink-0 opacity-70 group-data-[selected=true]:opacity-100"
                 />
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className="truncate text-[13px] font-medium">{file.name}</span>
-                  <span className="text-[11px] text-muted-foreground/50 group-data-[selected=true]:text-muted-foreground/70 truncate">
+                  <span className="truncate text-base font-medium">{file.name}</span>
+                  <span className="text-sm text-muted-foreground/50 group-data-[selected=true]:text-muted-foreground/70 truncate">
                     {getDisplayPath(file.path)}
                   </span>
                 </div>
@@ -157,8 +157,8 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
                   className="h-4 w-4 shrink-0 opacity-70 group-data-[selected=true]:opacity-100"
                 />
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className="truncate text-[13px] font-medium">{file.name}</span>
-                  <span className="text-[11px] text-muted-foreground/50 group-data-[selected=true]:text-muted-foreground/70 truncate">
+                  <span className="truncate text-base font-medium">{file.name}</span>
+                  <span className="text-sm text-muted-foreground/50 group-data-[selected=true]:text-muted-foreground/70 truncate">
                     {getDisplayPath(file.path)}
                   </span>
                 </div>

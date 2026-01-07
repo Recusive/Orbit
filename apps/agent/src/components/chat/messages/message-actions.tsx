@@ -50,7 +50,7 @@ export const MessageActions: FC<MessageActionsProps> = ({
           <ThumbsDown className="h-3.5 w-3.5" />
         </button>
         <button
-          className={`h-6 px-2.5 flex items-center rounded-md text-[11px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50 ${
+          className={`h-6 px-2.5 flex items-center rounded-md text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50 ${
             rewindDisabled
               ? 'bg-muted/30 text-muted-foreground/50 cursor-not-allowed'
               : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground hover:scale-[1.02] active:scale-[0.98]'
@@ -63,7 +63,7 @@ export const MessageActions: FC<MessageActionsProps> = ({
         </button>
       </div>
       {showDisclaimer ? (
-        <p className="text-[11px] text-muted-foreground/60">
+        <p className="text-sm text-muted-foreground/60">
           Orbit is AI and can make mistakes. Please double-check responses.
         </p>
       ) : null}

@@ -20,7 +20,7 @@ const TooltipContent = React.forwardRef<
       className={cn(
         'z-50 overflow-hidden rounded-md px-2 py-1 text-xs',
         'bg-foreground text-background',
-        'dark:bg-[oklch(0.30_0.02_60)] dark:text-[oklch(0.90_0.01_75)]',
+        'dark:bg-[var(--tooltip-bg)] dark:text-[var(--tooltip-text)]',
         'animate-in fade-in-0 zoom-in-95',
         'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
         'data-[side=bottom]:slide-in-from-top-2',
@@ -42,7 +42,7 @@ const TooltipArrow = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TooltipPrimitive.Arrow
     ref={ref}
-    className={cn('fill-foreground dark:fill-[oklch(0.30_0.02_60)]', className)}
+    className={cn('fill-foreground dark:fill-[var(--tooltip-bg)]', className)}
     {...props}
   />
 ));
