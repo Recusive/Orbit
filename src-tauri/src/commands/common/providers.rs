@@ -1,6 +1,7 @@
 //! Provider detection commands for Tauri
 //!
-//! Handles AI provider detection (CLI installation check).
+//! Handles credential detection (keychain check).
+//! Note: CLI detection removed - bundled app has its own claude binary.
 //! Note: Keychain reading is handled by agent-bridge TypeScript code.
 
 #![allow(
@@ -11,18 +12,6 @@
 use std::process::Command;
 
 use serde::{Deserialize, Serialize};
-
-/// Result of CLI detection.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CliDetection {
-    /// Whether the CLI is installed.
-    pub installed: bool,
-    /// Path to the CLI executable (if found).
-    pub path: Option<String>,
-    /// Version string (if available).
-    pub version: Option<String>,
-}
 
 /// Result of keychain credential check.
 /// Used by frontend to know if credentials exist (actual reading done in TypeScript).
@@ -37,40 +26,6 @@ pub struct KeychainStatus {
     pub expires_at: Option<i64>,
     /// Error message if check failed.
     pub error: Option<String>,
-}
-
-/// Detect if Claude Code CLI is installed.
-///
-/// Checks for the `claude` command in PATH and retrieves version info.
-#[tauri::command]
-pub async fn detect_claude_cli() -> CliDetection {
-    // Try to find the claude command
-    let which_result = Command::new("which").arg("claude").output();
-
-    match which_result {
-        Ok(output) if output.status.success() => {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-
-            // Try to get version
-            let version = Command::new("claude")
-                .arg("--version")
-                .output()
-                .ok()
-                .filter(|o| o.status.success())
-                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned());
-
-            CliDetection {
-                installed: true,
-                path: Some(path),
-                version,
-            }
-        },
-        _ => CliDetection {
-            installed: false,
-            path: None,
-            version: None,
-        },
-    }
 }
 
 /// Check for Claude Code credentials in the system keychain.

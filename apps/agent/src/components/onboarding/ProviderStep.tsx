@@ -11,13 +11,6 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useProviderStore } from '@/stores/onboarding/provider-store';
 
-/** Result of CLI detection from Rust backend. */
-interface CliDetection {
-  installed: boolean;
-  path: string | null;
-  version: string | null;
-}
-
 /** Result of keychain credential check from Rust backend. */
 interface KeychainStatus {
   hasCredentials: boolean;
@@ -45,14 +38,14 @@ export interface ProviderStepProps {
 
 interface DetectionState {
   isChecking: boolean;
-  cliInstalled: boolean;
   hasKeychain: boolean;
   error: string | null;
 }
 
 /**
  * Provider setup step in onboarding.
- * Detects Claude Code CLI and keychain credentials, or allows manual API key entry.
+ * Checks for existing keychain credentials or allows manual API key entry.
+ * Note: CLI detection removed - bundled app includes its own claude binary.
  */
 export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) => {
   const addProvider = useProviderStore((s) => s.addProvider);
@@ -60,7 +53,6 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
   // Detection state
   const [detection, setDetection] = useState<DetectionState>({
     isChecking: true,
-    cliInstalled: false,
     hasKeychain: false,
     error: null,
   });
@@ -70,42 +62,27 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Check for Claude Code CLI and keychain on mount
+  // Check for keychain credentials on mount
   useEffect(() => {
-    const checkClaudeCode = async (): Promise<void> => {
+    const checkCredentials = async (): Promise<void> => {
       try {
-        // Call Rust backend to detect CLI
-        const cliResult = await invoke<CliDetection>('detect_claude_cli');
-
-        // If CLI is installed, check for keychain credentials
-        let keychainResult: KeychainStatus = {
-          hasCredentials: false,
-          credentialType: null,
-          expiresAt: null,
-          error: null,
-        };
-
-        if (cliResult.installed) {
-          keychainResult = await invoke<KeychainStatus>('check_claude_keychain');
-        }
+        const keychainResult = await invoke<KeychainStatus>('check_claude_keychain');
 
         setDetection({
           isChecking: false,
-          cliInstalled: cliResult.installed,
           hasKeychain: keychainResult.hasCredentials,
           error: keychainResult.error,
         });
       } catch (err) {
         setDetection({
           isChecking: false,
-          cliInstalled: false,
           hasKeychain: false,
-          error: err instanceof Error ? err.message : 'Failed to detect Claude Code',
+          error: err instanceof Error ? err.message : 'Failed to check credentials',
         });
       }
     };
 
-    checkClaudeCode().catch(console.error);
+    checkCredentials().catch(console.error);
   }, []);
 
   // Use detected keychain credentials
@@ -154,7 +131,7 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
         name: 'Claude (API Key)',
         status: 'connected' as ProviderStatus,
         authMethod: 'apikey' as AuthMethod,
-        cliInstalled: detection.cliInstalled,
+        cliInstalled: true, // Bundled app always has CLI
       });
 
       onComplete();
@@ -163,7 +140,7 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
     } finally {
       setIsValidating(false);
     }
-  }, [apiKey, addProvider, onComplete, detection.cliInstalled]);
+  }, [apiKey, addProvider, onComplete]);
 
   return (
     <div
@@ -196,8 +173,8 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
           <Loader2 className="h-6 w-6 animate-spin text-primary/60" />
           <span className="text-sm text-muted-foreground">Detecting Claude Code...</span>
         </div>
-      ) : detection.cliInstalled && detection.hasKeychain ? (
-        /* CLI Detected with Keychain */
+      ) : detection.hasKeychain ? (
+        /* Keychain credentials found (CLI detection is optional - bundled app has its own) */
         <div
           className={cn(
             'flex flex-col gap-4 p-5 w-full max-w-[380px]',
@@ -235,9 +212,8 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
           >
             <Terminal className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-sm text-muted-foreground">
-              {detection.cliInstalled && !detection.hasKeychain
-                ? 'CLI found but no credentials. Enter API key below.'
-                : 'Enter your Anthropic API key to continue.'}
+              No Claude Code credentials found. Run &quot;claude&quot; in terminal to authenticate,
+              or enter your Anthropic API key below.
             </span>
           </div>
 

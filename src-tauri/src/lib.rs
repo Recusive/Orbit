@@ -372,7 +372,6 @@ pub fn run() {
             dev_monitor::dev_monitor_read_entries,
             dev_monitor::dev_monitor_clear,
             // Provider detection commands
-            providers::detect_claude_cli,
             providers::check_claude_keychain,
             // Credentials commands
             credentials::store_api_key,
