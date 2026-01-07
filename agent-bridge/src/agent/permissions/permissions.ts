@@ -1,5 +1,5 @@
 /**
- * Permission system for Snowflake.
+ * Permission system for Orbit.
  */
 
 import { localize } from '../../common/i18n/nls.js';
@@ -173,7 +173,7 @@ export class PermissionManager {
             const errorMessage = error instanceof Error ? error.message : String(error);
             logger.error(
               { toolName, error: errorMessage, signalAborted: options.signal.aborted },
-              `❌ Permission request failed for ${toolName} - DENYING`
+              `[ERROR] Permission request failed for ${toolName} - DENYING`
             );
             return {
               behavior: 'deny',

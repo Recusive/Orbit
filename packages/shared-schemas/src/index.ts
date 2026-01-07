@@ -1,5 +1,5 @@
 /**
- * @snowflake/shared-schemas
+ * @orbit/shared-schemas
  *
  * Centralized Zod schemas shared between agent-bridge and frontend apps.
  * All schemas use .strict() by default for maximum type safety.

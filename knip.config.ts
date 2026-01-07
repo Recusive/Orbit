@@ -1,7 +1,7 @@
 import type { KnipConfig } from 'knip';
 
 /**
- * Knip configuration for Snowflake monorepo
+ * Knip configuration for Orbit monorepo
  *
  * This monorepo has a unique structure:
  * - Root package.json contains ALL dependencies (not per-workspace)
@@ -47,7 +47,7 @@ const config: KnipConfig = {
     // Shared schemas package
     'packages/shared-schemas': {
       // Note: src/index.ts is auto-detected by knip
-      // All module barrel exports are entry points (used by apps via @snowflake/shared-schemas)
+      // All module barrel exports are entry points (used by apps via @orbit/shared-schemas)
       entry: [
         'src/agent/index.ts',
         'src/common/index.ts',
@@ -178,7 +178,7 @@ const config: KnipConfig = {
     'zod',
 
     // Workspace deps
-    '@snowflake/shared-schemas',
+    '@orbit/shared-schemas',
 
     // === Build tools and plugins (not imported, used by bundler) ===
     'tailwindcss',

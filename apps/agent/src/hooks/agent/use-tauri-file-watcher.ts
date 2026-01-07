@@ -68,9 +68,9 @@ export async function initFileWatcher(workspacePath: string): Promise<void> {
     try {
       const { unwatchPath } = await import('@/lib/api/backend');
       await unwatchPath(watchedWorkspacePath);
-      console.warn('[Snowflake] Unwatched old workspace:', watchedWorkspacePath);
+      console.warn('[Orbit] Unwatched old workspace:', watchedWorkspacePath);
     } catch (err) {
-      console.warn('[Snowflake] Failed to unwatch old workspace:', err);
+      console.warn('[Orbit] Failed to unwatch old workspace:', err);
     }
   }
 
@@ -111,9 +111,9 @@ export async function initFileWatcher(workspacePath: string): Promise<void> {
         }
       });
 
-      console.warn('[Snowflake] File change listener initialized');
+      console.warn('[Orbit] File change listener initialized');
     } catch (err) {
-      console.error('[Snowflake] Failed to set up file change listener:', err);
+      console.error('[Orbit] Failed to set up file change listener:', err);
       fileWatcherInitialized = false;
       return;
     }
@@ -123,9 +123,9 @@ export async function initFileWatcher(workspacePath: string): Promise<void> {
   try {
     await watchPath(workspacePath);
     watchedWorkspacePath = workspacePath;
-    console.warn('[Snowflake] Watching workspace:', workspacePath);
+    console.warn('[Orbit] Watching workspace:', workspacePath);
   } catch (err) {
-    console.error('[Snowflake] Failed to watch workspace:', err);
+    console.error('[Orbit] Failed to watch workspace:', err);
   }
 }
 

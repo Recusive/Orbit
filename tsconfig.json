@@ -37,8 +37,8 @@
     "paths": {
       "@/*": ["./apps/agent/src/*"],
       "@canvas/*": ["./apps/canvas/src/*"],
-      "@snowflake/common": ["./apps/common/src/index.ts"],
-      "@snowflake/common/*": ["./apps/common/src/*"]
+      "@orbit/common": ["./apps/common/src/index.ts"],
+      "@orbit/common/*": ["./apps/common/src/*"]
     }
   },
   "include": ["apps/*/src/**/*"],

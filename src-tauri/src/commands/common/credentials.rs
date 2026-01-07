@@ -1,4 +1,4 @@
-//! Encrypted API key storage for Snowflake
+//! Encrypted API key storage for Orbit
 //!
 //! Provides secure storage for user-entered API keys using AES-256-GCM encryption.
 //! Keys are derived from a machine-specific identifier to prevent key portability.
@@ -79,7 +79,7 @@ struct StoredCredentials {
 
 /// Get the path to the credentials file.
 fn get_credentials_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| home.join(".snowflake").join("credentials.enc"))
+    dirs::home_dir().map(|home| home.join(".orbit").join("credentials.enc"))
 }
 
 /// Get a machine-specific key for encryption.
@@ -90,7 +90,7 @@ fn get_machine_key() -> [u8; 32] {
     let mut hasher = Sha256::new();
 
     // Add a static application salt
-    hasher.update(b"snowflake-editor-credentials-v1");
+    hasher.update(b"orbit-editor-credentials-v1");
 
     // Try to get machine-specific data
     // On macOS, we can use the hardware UUID

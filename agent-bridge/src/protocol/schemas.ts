@@ -3,7 +3,7 @@
  * Uses strict mode to reject unknown keys and branded types for type safety
  */
 
-import { ModelSchema, CommandScopeSchema, DecisionSchema } from '@snowflake/shared-schemas';
+import { ModelSchema, CommandScopeSchema, DecisionSchema } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
 // Re-export shared schemas
@@ -14,7 +14,7 @@ export {
   type Model,
   type CommandScope,
   type Decision,
-} from '@snowflake/shared-schemas';
+} from '@orbit/shared-schemas';
 
 // ============================================================================
 // Branded Primitive Types (Nominal Typing)

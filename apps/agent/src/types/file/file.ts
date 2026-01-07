@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Re-export the shared FileDataSchema
-export { FileDataSchema, type FileData } from '@snowflake/shared-schemas';
+export { FileDataSchema, type FileData } from '@orbit/shared-schemas';
 
 /**
  * File status enum

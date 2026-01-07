@@ -11,20 +11,20 @@
 //! # Usage
 //!
 //! ```rust,no_run
-//! use snowflake_app_lib::core::devmonitor::{emit_trace, emit_span_enter, emit_span_exit};
+//! use orbit_app_lib::core::devmonitor::{emit_trace, emit_span_enter, emit_span_exit};
 //! use serde_json::json;
 //! use tauri::AppHandle;
 //!
 //! fn example(app: &AppHandle) {
 //!
 //! // Simple trace event
-//! emit_trace(&app, "info", "snowflake::fs", "File saved successfully", None);
+//! emit_trace(&app, "info", "orbit::fs", "File saved successfully", None);
 //!
 //! // Span tracking
-//! let span_id = emit_span_enter(&app, "read_file", "snowflake::fs", Some(json!({"path": "/foo"})));
+//! let span_id = emit_span_enter(&app, "read_file", "orbit::fs", Some(json!({"path": "/foo"})));
 //! // ... do work ...
 //! let duration_us = 1000u64;
-//! emit_span_exit(&app, span_id, "read_file", "snowflake::fs", duration_us);
+//! emit_span_exit(&app, span_id, "read_file", "orbit::fs", duration_us);
 //! }
 //! ```
 
@@ -49,7 +49,7 @@ static SPAN_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 pub struct TracingEvent {
     /// Tracing level (trace, debug, info, warn, error)
     pub level: String,
-    /// Target module path (e.g., "snowflake::fs::watcher")
+    /// Target module path (e.g., "orbit::fs::watcher")
     pub target: String,
     /// Event message
     pub message: String,
@@ -202,7 +202,7 @@ pub fn emit_span_exit(app: &AppHandle, span_id: u64, name: &str, target: &str, d
 /// # Example
 ///
 /// ```rust,no_run
-/// use snowflake_app_lib::trace_info;
+/// use orbit_app_lib::trace_info;
 /// use serde_json::json;
 /// use tauri::AppHandle;
 ///
@@ -260,7 +260,7 @@ macro_rules! trace_debug {
 /// # Example
 ///
 /// ```rust,no_run
-/// use snowflake_app_lib::core::devmonitor::SpanGuard;
+/// use orbit_app_lib::core::devmonitor::SpanGuard;
 /// use tauri::AppHandle;
 ///
 /// fn example(app: &AppHandle) {
@@ -374,7 +374,7 @@ impl Drop for SpanGuard {
 /// # Example
 ///
 /// ```rust,no_run
-/// use snowflake_app_lib::span;
+/// use orbit_app_lib::span;
 /// use tauri::AppHandle;
 ///
 /// fn example(app: &AppHandle) {

@@ -1,4 +1,4 @@
-# Snowflake Pre-Production Audit Report
+# Orbit Pre-Production Audit Report
 
 **Date:** January 7, 2026
 **Auditor:** Claude Code
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-A comprehensive codebase audit was conducted to prepare Snowflake for production handoff. The audit covered code quality, security, architecture, and production readiness across the Tauri 2 + React 19 monorepo.
+A comprehensive codebase audit was conducted to prepare Orbit for production handoff. The audit covered code quality, security, architecture, and production readiness across the Tauri 2 + React 19 monorepo.
 
 **Key Findings:**
 
@@ -136,7 +136,7 @@ logger.error('Error occurred', new Error('fail'));
 **Key Updates:**
 
 - Aligned Zod version across workspace (4.2.1 → 4.3.5)
-- Updated `@snowflake/shared-schemas` to use Zod 4.3.5
+- Updated `@orbit/shared-schemas` to use Zod 4.3.5
 
 #### 4.2 Version Alignment Fix
 
@@ -173,8 +173,8 @@ All builds pass after changes:
 
 **Build Artifacts:**
 
-- `target/release/bundle/macos/Snowflake.app`
-- `target/release/bundle/dmg/Snowflake_0.1.0_aarch64.dmg`
+- `target/release/bundle/macos/Orbit.app`
+- `target/release/bundle/dmg/Orbit_0.1.0_aarch64.dmg`
 
 ---
 
@@ -289,7 +289,7 @@ crates/editor/
 
 ## Conclusion
 
-Snowflake is now **95% production-ready** with:
+Orbit is now **95% production-ready** with:
 
 - Critical security issues resolved
 - Clean architecture (no dead code)

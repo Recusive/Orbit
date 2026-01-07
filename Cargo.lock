@@ -3057,6 +3057,160 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
+name = "orbit-ai"
+version = "0.1.0"
+dependencies = [
+ "orbit-core",
+]
+
+[[package]]
+name = "orbit-app"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "base64 0.22.1",
+ "crossbeam-channel",
+ "dirs 6.0.0",
+ "futures",
+ "hashbrown 0.15.5",
+ "log",
+ "orbit-ai",
+ "orbit-conversations",
+ "orbit-core",
+ "orbit-fs",
+ "orbit-git",
+ "orbit-lsp",
+ "orbit-search",
+ "orbit-settings",
+ "orbit-terminal",
+ "parking_lot",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-clipboard-manager",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-log",
+ "tauri-plugin-shell",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "orbit-conversations"
+version = "0.1.0"
+dependencies = [
+ "directories",
+ "dirs 5.0.1",
+ "orbit-core",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "orbit-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dirs 6.0.0",
+ "lsp-types",
+ "ropey",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "orbit-fs"
+version = "0.1.0"
+dependencies = [
+ "grep",
+ "ignore",
+ "notify",
+ "orbit-core",
+ "regex",
+ "serde",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "orbit-git"
+version = "0.1.0"
+dependencies = [
+ "git2",
+ "orbit-core",
+ "serde",
+ "tracing",
+]
+
+[[package]]
+name = "orbit-lsp"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "futures",
+ "hashbrown 0.15.5",
+ "orbit-core",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "orbit-search"
+version = "0.1.0"
+dependencies = [
+ "ignore",
+ "orbit-core",
+]
+
+[[package]]
+name = "orbit-settings"
+version = "0.1.0"
+dependencies = [
+ "directories",
+ "dirs 5.0.1",
+ "orbit-core",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
+name = "orbit-syntax"
+version = "0.1.0"
+dependencies = [
+ "orbit-core",
+]
+
+[[package]]
+name = "orbit-terminal"
+version = "0.1.0"
+dependencies = [
+ "dirs 6.0.0",
+ "hashbrown 0.15.5",
+ "orbit-core",
+ "parking_lot",
+ "portable-pty",
+ "serde",
+ "sysinfo",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "ordered-stream"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4299,160 +4453,6 @@ name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
-
-[[package]]
-name = "snowflake-ai"
-version = "0.1.0"
-dependencies = [
- "snowflake-core",
-]
-
-[[package]]
-name = "snowflake-app"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "base64 0.22.1",
- "crossbeam-channel",
- "dirs 6.0.0",
- "futures",
- "hashbrown 0.15.5",
- "log",
- "parking_lot",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "sha2",
- "snowflake-ai",
- "snowflake-conversations",
- "snowflake-core",
- "snowflake-fs",
- "snowflake-git",
- "snowflake-lsp",
- "snowflake-search",
- "snowflake-settings",
- "snowflake-terminal",
- "tauri",
- "tauri-build",
- "tauri-plugin-clipboard-manager",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-log",
- "tauri-plugin-shell",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "snowflake-conversations"
-version = "0.1.0"
-dependencies = [
- "directories",
- "dirs 5.0.1",
- "parking_lot",
- "serde",
- "serde_json",
- "snowflake-core",
- "tempfile",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "snowflake-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dirs 6.0.0",
- "lsp-types",
- "ropey",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "snowflake-fs"
-version = "0.1.0"
-dependencies = [
- "grep",
- "ignore",
- "notify",
- "regex",
- "serde",
- "snowflake-core",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "snowflake-git"
-version = "0.1.0"
-dependencies = [
- "git2",
- "serde",
- "snowflake-core",
- "tracing",
-]
-
-[[package]]
-name = "snowflake-lsp"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "futures",
- "hashbrown 0.15.5",
- "serde",
- "serde_json",
- "snowflake-core",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "snowflake-search"
-version = "0.1.0"
-dependencies = [
- "ignore",
- "snowflake-core",
-]
-
-[[package]]
-name = "snowflake-settings"
-version = "0.1.0"
-dependencies = [
- "directories",
- "dirs 5.0.1",
- "parking_lot",
- "serde",
- "serde_json",
- "snowflake-core",
- "tempfile",
- "tracing",
-]
-
-[[package]]
-name = "snowflake-syntax"
-version = "0.1.0"
-dependencies = [
- "snowflake-core",
-]
-
-[[package]]
-name = "snowflake-terminal"
-version = "0.1.0"
-dependencies = [
- "dirs 6.0.0",
- "hashbrown 0.15.5",
- "parking_lot",
- "portable-pty",
- "serde",
- "snowflake-core",
- "sysinfo",
- "tokio",
- "tracing",
-]
 
 [[package]]
 name = "socket2"

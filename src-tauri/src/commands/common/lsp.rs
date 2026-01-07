@@ -4,9 +4,9 @@
 
 use futures::StreamExt as _;
 use log::{debug, error};
+use orbit_core::{CompletionItem, Diagnostic, HoverInfo, Location, Result, SignatureHelp};
+use orbit_lsp::LspManager;
 use serde::Serialize;
-use snowflake_core::{CompletionItem, Diagnostic, HoverInfo, Location, Result, SignatureHelp};
-use snowflake_lsp::LspManager;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use tauri::{AppHandle, Emitter as _};

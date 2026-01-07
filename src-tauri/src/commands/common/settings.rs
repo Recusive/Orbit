@@ -9,8 +9,8 @@
 
 use std::path::Path;
 
-use snowflake_core::Result;
-use snowflake_settings::{Settings, SettingsManager};
+use orbit_core::Result;
+use orbit_settings::{Settings, SettingsManager};
 use tauri::State;
 
 /// Get all settings.

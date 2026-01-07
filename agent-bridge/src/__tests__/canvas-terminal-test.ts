@@ -42,7 +42,7 @@ const bridge = new CanvasToolBridge();
 const mcpServer = createCanvasMcpServer(bridge);
 
 test('Server type is sdk', mcpServer.type.includes('sdk'));
-test('Server name is snowflake-canvas', mcpServer.name === 'snowflake-canvas');
+test('Server name is orbit-canvas', mcpServer.name === 'orbit-canvas');
 const mcpInternal = mcpServer.instance as unknown as McpServerInternal;
 test('Registered 19 tools', Object.keys(mcpInternal._registeredTools).length === 19);
 

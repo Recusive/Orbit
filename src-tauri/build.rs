@@ -1,4 +1,4 @@
-//! Build script for Snowflake Tauri application.
+//! Build script for Orbit Tauri application.
 //!
 //! This script runs during compilation to generate Tauri bindings.
 

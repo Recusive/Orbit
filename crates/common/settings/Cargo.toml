@@ -1,17 +1,17 @@
 [package]
-name = "snowflake-settings"
+name = "orbit-settings"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "User settings and configuration for Snowflake"
+description = "User settings and configuration for Orbit"
 
 [lints]
 workspace = true
 
 [dependencies]
-snowflake-core = { path = "../core" }
+orbit-core = { path = "../core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 directories = "5.0"

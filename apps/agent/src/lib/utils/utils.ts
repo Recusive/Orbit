@@ -1,7 +1,7 @@
 import { TIME_MS } from './constants';
 
 // Re-export cn from shared common package
-export { cn } from '@snowflake/common/utils';
+export { cn } from '@orbit/common/utils';
 
 /**
  * Format a timestamp into a human-readable string

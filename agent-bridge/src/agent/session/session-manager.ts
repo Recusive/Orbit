@@ -1,11 +1,11 @@
 /**
- * Session Manager for Snowflake Agent Bridge
+ * Session Manager for Orbit Agent Bridge
  * Manages Claude Agent SDK sessions and message streaming
  */
 
 import { randomUUID } from 'node:crypto';
 
-import { formatZodError } from '@snowflake/shared-schemas';
+import { formatZodError } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
 import { Disposable, Emitter } from '../../common/events/events.js';
@@ -417,14 +417,17 @@ export class SessionManager extends Disposable {
         if (context.signal.aborted) {
           logger.warn(
             { toolName, requestId },
-            `⚠️ Permission signal ALREADY ABORTED for ${toolName}`
+            `[WARN] Permission signal ALREADY ABORTED for ${toolName}`
           );
           reject(new Error('Permission request aborted'));
           return;
         }
 
         const abortHandler = (): void => {
-          logger.warn({ toolName, requestId }, `⚠️ Permission ABORTED via signal for ${toolName}`);
+          logger.warn(
+            { toolName, requestId },
+            `[WARN] Permission ABORTED via signal for ${toolName}`
+          );
           this.permissionResolvers.delete(requestId);
           reject(new Error('Permission request aborted'));
         };
@@ -504,7 +507,7 @@ export class SessionManager extends Disposable {
         resumeSessionId: finalConfig.resumeSessionId,
         forkSession: finalConfig.forkSession,
       },
-      '🔧 Creating session with config'
+      'Creating session with config'
     );
     const agent = new OrbitAgent(finalConfig);
 
@@ -572,7 +575,7 @@ export class SessionManager extends Disposable {
               messageType: sdkMessage.type,
               subtype: sdkMessage.type === 'system' ? sdkMessage.subtype : undefined,
             },
-            '📨 SDK message received'
+            'SDK message received'
           );
           messageIndex++;
 
@@ -671,7 +674,7 @@ export class SessionManager extends Disposable {
                   toolId,
                   toolInputKeys: Object.keys(toolInput),
                 },
-                '🔧 Tool use block received from SDK'
+                'Tool use block received from SDK'
               );
 
               const approvedTools = this.approvedToolNames.get(sessionId);
@@ -723,7 +726,7 @@ export class SessionManager extends Disposable {
             if (sdkMessage.uuid) {
               logger.info(
                 { sessionId, checkpointId: sdkMessage.uuid },
-                '🔖 Emitting checkpoint event'
+                'Emitting checkpoint event'
               );
               this._onCheckpoint.fire({
                 sessionId,
@@ -817,15 +820,15 @@ export class SessionManager extends Disposable {
 
             logger.info(
               { sessionId, checkpointId },
-              '🔄 Executing pending rewind inside message loop'
+              'Executing pending rewind inside message loop'
             );
             try {
               await agent.rewindFilesInLoop(checkpointId);
-              logger.info({ sessionId, checkpointId }, '✅ Rewind completed from inside loop');
+              logger.info({ sessionId, checkpointId }, 'Rewind completed from inside loop');
             } catch (rewindErr) {
               logger.error(
                 { sessionId, checkpointId, err: rewindErr },
-                '❌ Rewind failed inside loop'
+                'Rewind failed inside loop'
               );
             }
             break; // Exit loop after rewind as per SDK pattern
@@ -1044,7 +1047,7 @@ export class SessionManager extends Disposable {
    * @param checkpointId - The UUID of the checkpoint (from a user message)
    */
   async rewindFiles(sessionId: string, checkpointId: string): Promise<void> {
-    logger.info({ sessionId, checkpointId }, '🔄 Rewinding files to checkpoint');
+    logger.info({ sessionId, checkpointId }, 'Rewinding files to checkpoint');
 
     const agent = this.activeSessions.get(sessionId);
     if (agent === undefined) {
@@ -1056,9 +1059,9 @@ export class SessionManager extends Disposable {
     // This creates a new query that resumes the session and calls rewindFiles
     try {
       await agent.rewindFiles(checkpointId);
-      logger.info({ sessionId, checkpointId }, '✅ Files rewound successfully');
+      logger.info({ sessionId, checkpointId }, 'Files rewound successfully');
     } catch (err) {
-      logger.error({ sessionId, checkpointId, err }, '❌ File rewind failed');
+      logger.error({ sessionId, checkpointId, err }, 'File rewind failed');
       throw err;
     }
   }

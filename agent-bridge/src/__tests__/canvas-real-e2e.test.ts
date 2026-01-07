@@ -259,7 +259,7 @@ const CREDENTIALS = ClaudeCredentials.getCredentials();
 const HAS_CREDENTIALS = CREDENTIALS.hasCredentials;
 
 if (!HAS_CREDENTIALS) {
-  logger.warn('\n⚠️  SKIPPING REAL E2E TESTS - No credentials found');
+  logger.warn('\n[WARN] SKIPPING REAL E2E TESTS - No credentials found');
   logger.warn('   Run: claude login (Claude Code CLI) or set ANTHROPIC_API_KEY\n');
 } else {
   logger.info(`\n✓ Credentials available (${CREDENTIALS.type})`);

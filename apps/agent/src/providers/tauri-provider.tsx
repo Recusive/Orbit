@@ -7,7 +7,7 @@
  * 3. Never duplicated using abort pattern for async setup
  */
 
-import { formatZodError } from '@snowflake/shared-schemas';
+import { formatZodError } from '@orbit/shared-schemas';
 import {
   createContext,
   useCallback,

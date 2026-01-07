@@ -1,12 +1,12 @@
-//! Crash handling integration for Snowflake.
+//! Crash handling integration for Orbit.
 //!
 //! This module wraps the core crash utilities and provides application-specific
 //! setup and Tauri command integration.
 
-use snowflake_core::diagnostics::crash::{self, CrashManager};
+use orbit_core::diagnostics::crash::{self, CrashManager};
 
 /// The application name used for crash log directories.
-const APP_NAME: &str = "snowflake";
+const APP_NAME: &str = "orbit";
 
 /// Initialize the panic handler.
 ///

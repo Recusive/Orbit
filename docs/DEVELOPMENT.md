@@ -1,6 +1,6 @@
-# Snowflake Development Guide
+# Orbit Development Guide
 
-This document covers the development workflow, build system, and debugging tools for Snowflake.
+This document covers the development workflow, build system, and debugging tools for Orbit.
 
 ## Quick Start
 
@@ -14,13 +14,13 @@ pnpm dev
 
 ## Development Modes
 
-Snowflake supports three development modes with different logging levels:
+Orbit supports three development modes with different logging levels:
 
-| Mode      | Command          | Logs                               | Use Case          |
-| --------- | ---------------- | ---------------------------------- | ----------------- |
-| **Dev**   | `pnpm dev`       | Debug for snowflake, Info for deps | Daily development |
-| **Debug** | `pnpm dev:debug` | Trace for everything               | Debugging issues  |
-| **Quiet** | `pnpm dev:quiet` | Warnings only                      | Minimal noise     |
+| Mode      | Command          | Logs                           | Use Case          |
+| --------- | ---------------- | ------------------------------ | ----------------- |
+| **Dev**   | `pnpm dev`       | Debug for orbit, Info for deps | Daily development |
+| **Debug** | `pnpm dev:debug` | Trace for everything           | Debugging issues  |
+| **Quiet** | `pnpm dev:quiet` | Warnings only                  | Minimal noise     |
 
 ### Mode Details
 
@@ -32,7 +32,7 @@ pnpm dev
 make dev
 ```
 
-- **Snowflake crates**: Debug level
+- **Orbit crates**: Debug level
 - **Tauri**: Info level
 - **tao/wry**: Warn level (hides noisy window events)
 - Hot-reload enabled for both frontend and Rust
@@ -143,31 +143,31 @@ pnpm rust:test:verbose # With output (--nocapture)
 
 ### Environment Variable
 
-Set `SNOWFLAKE_LOG_MODE` to control logging:
+Set `ORBIT_LOG_MODE` to control logging:
 
 ```bash
-SNOWFLAKE_LOG_MODE=dev pnpm tauri dev    # Development
-SNOWFLAKE_LOG_MODE=debug pnpm tauri dev  # Verbose
-SNOWFLAKE_LOG_MODE=prod pnpm tauri dev   # Minimal
+ORBIT_LOG_MODE=dev pnpm tauri dev    # Development
+ORBIT_LOG_MODE=debug pnpm tauri dev  # Verbose
+ORBIT_LOG_MODE=prod pnpm tauri dev   # Minimal
 ```
 
 ### Log Levels by Mode
 
-| Target      | Prod  | Dev   | Debug |
-| ----------- | ----- | ----- | ----- |
-| snowflake\* | Info  | Debug | Trace |
-| tauri       | Warn  | Info  | Debug |
-| tao         | Error | Warn  | Debug |
-| wry         | Error | Warn  | Debug |
-| Others      | Warn  | Info  | Debug |
+| Target  | Prod  | Dev   | Debug |
+| ------- | ----- | ----- | ----- |
+| orbit\* | Info  | Debug | Trace |
+| tauri   | Warn  | Info  | Debug |
+| tao     | Error | Warn  | Debug |
+| wry     | Error | Warn  | Debug |
+| Others  | Warn  | Info  | Debug |
 
 ### Production Log Files
 
 Production builds write logs to:
 
-- **macOS**: `~/Library/Logs/com.snowflake.app/`
-- **Linux**: `~/.config/com.snowflake.app/logs/`
-- **Windows**: `%APPDATA%\com.snowflake.app\logs\`
+- **macOS**: `~/Library/Logs/com.orbit.app/`
+- **Linux**: `~/.config/com.orbit.app/logs/`
+- **Windows**: `%APPDATA%\com.orbit.app\logs\`
 
 ### Adding Logs in Code
 
@@ -241,7 +241,7 @@ make deps      # Show dependency tree
 pnpm build:debug
 
 # Use lldb (macOS) or gdb (Linux)
-lldb target/debug/snowflake-app
+lldb target/debug/orbit-app
 ```
 
 ### VS Code Debugging
@@ -259,7 +259,7 @@ Add to `.vscode/launch.json`:
       "cargo": {
         "args": ["build", "--manifest-path=src-tauri/Cargo.toml"]
       },
-      "program": "${workspaceFolder}/target/debug/snowflake-app"
+      "program": "${workspaceFolder}/target/debug/orbit-app"
     }
   ]
 }
@@ -303,7 +303,7 @@ The dev server must be running on port 5176. Check `vite.config.ts` and `src-tau
 ## Project Structure
 
 ```
-Snowflake-v0/
+Orbit-v0/
 ├── src/                    # React frontend
 ├── src-tauri/              # Tauri app entry
 │   ├── src/
@@ -312,8 +312,8 @@ Snowflake-v0/
 │   │   └── commands/       # Tauri commands
 │   └── tauri.conf.json     # Tauri config
 ├── crates/                 # Rust libraries
-│   ├── snowflake-core/     # Core types
-│   ├── snowflake-fs/       # File system
+│   ├── orbit-core/     # Core types
+│   ├── orbit-fs/       # File system
 │   └── ...
 ├── package.json            # Node scripts
 ├── Cargo.toml              # Rust workspace

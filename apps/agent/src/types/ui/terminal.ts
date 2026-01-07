@@ -1,4 +1,4 @@
-import { ShellTypeSchema, TerminalCapabilitiesSchema } from '@snowflake/shared-schemas';
+import { ShellTypeSchema, TerminalCapabilitiesSchema } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
 // Re-export shared terminal schemas for consumers
@@ -7,7 +7,7 @@ export {
   TerminalCapabilitiesSchema,
   type ShellType,
   type TerminalCapabilities,
-} from '@snowflake/shared-schemas';
+} from '@orbit/shared-schemas';
 
 // ============================================================================
 // PTY Terminal Types (for real terminal backend)

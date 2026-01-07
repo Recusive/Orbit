@@ -15,7 +15,7 @@
     reason = "Integration tests use expect() for clear failure messages"
 )]
 
-use snowflake_core::diagnostics::crash::CrashManager;
+use orbit_core::diagnostics::crash::CrashManager;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write as _;
 use std::path::PathBuf;
@@ -27,7 +27,7 @@ fn unique_test_app(base_name: &str) -> String {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    format!("snowflake_test_{base_name}_{}", ts % 1_000_000_u128)
+    format!("orbit_test_{base_name}_{}", ts % 1_000_000_u128)
 }
 
 /// Helper to get crash log path for a test app.

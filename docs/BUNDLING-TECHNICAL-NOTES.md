@@ -1,6 +1,6 @@
 # Bundling Technical Notes
 
-Internal documentation on how we solved the Claude CLI bundling challenge for Snowflake.
+Internal documentation on how we solved the Claude CLI bundling challenge for Orbit.
 
 ## The Problem
 
@@ -190,7 +190,7 @@ new Claude({
 
 | Component            | Size     | Notes                     |
 | -------------------- | -------- | ------------------------- |
-| snowflake-app        | 13MB     | Tauri main binary         |
+| orbit-app            | 13MB     | Tauri main binary         |
 | agent-bridge         | 58MB     | Bun-compiled sidecar      |
 | claude               | 158MB    | Official Anthropic binary |
 | **DMG (compressed)** | **76MB** | Final distributable       |

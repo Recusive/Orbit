@@ -1,5 +1,5 @@
 /**
- * Claude Agent SDK integration for Snowflake (TypeScript).
+ * Claude Agent SDK integration for Orbit (TypeScript).
  */
 
 import { existsSync } from 'fs';
@@ -517,7 +517,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           const errorMessage = error instanceof Error ? error.message : String(error);
           logger.error(
             { toolName, error: errorMessage, signalAborted: canUseToolOptions.signal.aborted },
-            `❌ canUseTool error for ${toolName}`
+            `[ERROR] canUseTool error for ${toolName}`
           );
           return {
             behavior: 'deny' as const,
@@ -976,7 +976,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         attachmentCount: attachments?.length ?? 0,
       },
       // allow-any-unicode-next-line
-      '📤 Sending message to Claude'
+      'Sending message to Claude'
     );
     this.messageQueue.add(message, attachments);
   }
@@ -1011,7 +1011,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             type: message.type,
             subtype: msgSubtype,
           },
-          '📩 Agent received SDK message'
+          'Agent received SDK message'
         );
 
         // Capture session ID from system:init message
@@ -1270,7 +1270,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
   async rewindFilesInLoop(checkpointId: string): Promise<void> {
     logger.info(
       { checkpointId, hasCurrentQuery: !!this.currentQuery },
-      '🔄 rewindFilesInLoop called (from inside message loop)'
+      'rewindFilesInLoop called (from inside message loop)'
     );
 
     if (!this.currentQuery) {
@@ -1288,7 +1288,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       operationName: 'rewindFilesInLoop',
     });
 
-    logger.info({ checkpointId }, '✅ rewindFilesInLoop completed successfully');
+    logger.info({ checkpointId }, 'rewindFilesInLoop completed successfully');
   }
 
   /**
@@ -1309,7 +1309,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     const sdkSessionId = this._currentSessionId;
     logger.info(
       { checkpointId, sdkSessionId, hasCurrentQuery: !!this.currentQuery },
-      '🔄 rewindFiles called'
+      'rewindFiles called'
     );
 
     if (!sdkSessionId) {

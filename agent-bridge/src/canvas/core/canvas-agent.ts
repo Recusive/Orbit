@@ -532,7 +532,7 @@ export class CanvasAgent {
     // Register Canvas MCP server
     const mcpServer = createCanvasMcpServer(this.toolBridge);
     options.mcpServers = {
-      'snowflake-canvas': mcpServer,
+      'orbit-canvas': mcpServer,
     };
     logger.info('Canvas MCP server registered');
 

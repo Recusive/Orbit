@@ -1,17 +1,17 @@
 [package]
-name = "snowflake-fs"
+name = "orbit-fs"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "File system operations for Snowflake"
+description = "File system operations for Orbit"
 
 [lints]
 workspace = true
 
 [dependencies]
-snowflake-core = { path = "../core" }
+orbit-core = { path = "../core" }
 tokio = { workspace = true }
 serde = { workspace = true }
 

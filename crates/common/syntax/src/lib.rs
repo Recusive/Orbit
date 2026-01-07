@@ -1,9 +1,9 @@
-//! Snowflake Syntax - Syntax highlighting and tree-sitter parsing
+//! Orbit Syntax - Syntax highlighting and tree-sitter parsing
 //!
 //! This crate provides syntax highlighting and parsing capabilities
 //! using tree-sitter for accurate syntax analysis.
 
-use snowflake_core::Result;
+use orbit_core::Result;
 
 /// Supported programming languages
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

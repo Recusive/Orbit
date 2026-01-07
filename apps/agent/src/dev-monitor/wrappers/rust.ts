@@ -23,7 +23,7 @@ import type { Severity } from '../core/types';
 interface RustTracingEvent {
   /** Tracing level (trace, debug, info, warn, error) */
   level: 'trace' | 'debug' | 'info' | 'warn' | 'error';
-  /** Target module path (e.g., "snowflake::fs::watcher") */
+  /** Target module path (e.g., "orbit::fs::watcher") */
   target: string;
   /** Event message */
   message: string;

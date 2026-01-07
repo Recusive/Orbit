@@ -1,11 +1,11 @@
-//! Snowflake AI - Claude API integration
+//! Orbit AI - Claude API integration
 //!
 //! This crate provides AI capabilities using the Claude API.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use snowflake_core::{ChatMessage, ChatResponse, Error, Result};
+use orbit_core::{ChatMessage, ChatResponse, Error, Result};
 
 /// AI manager for Claude API interactions
 #[derive(Debug)]

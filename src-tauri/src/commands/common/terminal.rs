@@ -7,9 +7,9 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use base64::prelude::{Engine as _, BASE64_STANDARD};
+use orbit_core::{Result, TerminalInfo};
+use orbit_terminal::{ForegroundProcess, Signal, TerminalConfig, TerminalManager};
 use serde::{Deserialize, Serialize};
-use snowflake_core::{Result, TerminalInfo};
-use snowflake_terminal::{ForegroundProcess, Signal, TerminalConfig, TerminalManager};
 use tauri::{AppHandle, Emitter as _};
 use tokio::time::sleep;
 
@@ -210,7 +210,7 @@ pub async fn terminal_signal(id: String, signal: String) -> Result<()> {
         "SIGTERM" => Signal::Sigterm,
         "SIGKILL" => Signal::Sigkill,
         _ => {
-            return Err(snowflake_core::Error::Terminal(format!(
+            return Err(orbit_core::Error::Terminal(format!(
                 "Invalid signal: {signal}. Must be SIGINT, SIGTERM, or SIGKILL"
             )))
         },
@@ -260,5 +260,5 @@ pub async fn terminal_emit_prompt(
 ) -> Result<()> {
     let event = TerminalPromptEvent { id, prompt_type };
     app.emit("terminal:prompt", &event)
-        .map_err(|e| snowflake_core::Error::Terminal(format!("Failed to emit prompt event: {e}")))
+        .map_err(|e| orbit_core::Error::Terminal(format!("Failed to emit prompt event: {e}")))
 }

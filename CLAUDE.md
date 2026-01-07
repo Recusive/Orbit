@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working with the Snowflake codebase.
+This file provides guidance to Claude Code when working with the Orbit codebase.
 
 ## Project Overview
 
-Snowflake is a modern AI-powered code editor built with **Tauri 2** (Rust backend) and **React 19** (TypeScript frontend). It's a monorepo containing three frontend apps (Agent, Canvas, Editor) that share a common Rust backend.
+Orbit is a modern AI-powered code editor built with **Tauri 2** (Rust backend) and **React 19** (TypeScript frontend). It's a monorepo containing three frontend apps (Orbit Agent, Orbit Canvas, Orbit Editor) that share a common Rust backend.
 
 ## Technology Stack
 
@@ -58,8 +58,8 @@ npm test                    # NO!
 
 ## Project Structure
 
-```
-Snowflake-v0/
+```text
+Orbit/
 ├── apps/                           # Frontend applications
 │   ├── agent/                      # Chat/Agent app (main app)
 │   │   ├── src/
@@ -207,10 +207,11 @@ Then restart the Tauri app (`Cmd+C` → `pnpm tauri dev`).
 - Located at `target/debug/agent-bridge` in dev mode
 
 **Two build outputs:**
-| Script | Output | Purpose |
-|--------|--------|---------|
-| `bun run build` | `dist/index.js` | JS bundle (requires Bun to run) |
-| `bun run build:dev` | `target/debug/agent-bridge` | Standalone binary for Tauri |
+
+| Script              | Output                      | Purpose                         |
+| ------------------- | --------------------------- | ------------------------------- |
+| `bun run build`     | `dist/index.js`             | JS bundle (requires Bun to run) |
+| `bun run build:dev` | `target/debug/agent-bridge` | Standalone binary for Tauri     |
 
 ### Production Build
 
@@ -525,7 +526,7 @@ Common symptoms:
 
 #### Test Structure
 
-```
+```text
 agent-bridge/src/__tests__/
 ├── canvas-e2e.test.ts       # Full Canvas integration (REAL SDK, REAL sessions)
 ├── canvas-types.test.ts     # Type/schema validation
@@ -597,7 +598,7 @@ it('should route simple requests to fast path via real session', async () => {
 
 #### Why This Matters
 
-```
+```text
 ❌ WRONG: "Tests pass" with mocked data
    → Deploys to production
    → Real system fails because mock didn't match reality
@@ -611,7 +612,7 @@ it('should route simple requests to fast path via real session', async () => {
 
 **Example - Adding orchestrator to session manager:**
 
-```
+```text
 ❌ WRONG:
    - Mocked IntentAnalyzer to return fake results
    - Mocked Orchestrator to skip real execution
@@ -718,7 +719,7 @@ The following CSS properties trigger GPU compositing issues that result in momen
 
 **Issue:** The `@modelcontextprotocol/sdk` (versions ≤1.25.1) has a Regular Expression Denial of Service vulnerability in the UriTemplate class. Attackers can craft malicious URIs that trigger catastrophic regex backtracking, causing CPU exhaustion.
 
-**Risk Assessment for Snowflake:** **Low practical risk** because:
+**Risk Assessment for Orbit:** **Low practical risk** because:
 
 1. The agent-bridge runs as a local sidecar, not exposed to the internet
 2. URIs come from our own Claude SDK calls, not untrusted user input
@@ -739,7 +740,7 @@ pnpm view @modelcontextprotocol/sdk version  # Check latest version
 
 ### File Structure
 
-```
+```text
 apps/
 ├── agent/src/globals.css     ← SOURCE OF TRUTH for all colors
 └── canvas/src/globals.css    ← Canvas-specific styles only (NO color definitions)
@@ -787,9 +788,9 @@ The Canvas app is embedded within the Agent app as a mode/tab (not a separate Ta
 
 ### Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────┐
-│  Snowflake App (Single Tauri Window)            │
+│  Orbit App (Single Tauri Window)                │
 │  ┌───────────────────────────────────────────┐  │
 │  │  HeaderBar [Agent] [Canvas] [Editor]      │  │
 │  └───────────────────────────────────────────┘  │
@@ -812,7 +813,7 @@ The Canvas app is embedded within the Agent app as a mode/tab (not a separate Ta
 
 ### Canvas Directory Structure
 
-```
+```text
 apps/canvas/src/
 ├── components/          # React components (nodes, panels, toolbars)
 ├── hooks/               # Custom React hooks

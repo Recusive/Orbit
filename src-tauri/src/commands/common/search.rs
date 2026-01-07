@@ -1,7 +1,7 @@
 //! Search commands
 
-use snowflake_core::{Result, SearchOptions, SearchResult, TextSearchResult};
-use snowflake_search::SearchManager;
+use orbit_core::{Result, SearchOptions, SearchResult, TextSearchResult};
+use orbit_search::SearchManager;
 use std::sync::OnceLock;
 
 static SEARCH_MANAGER: OnceLock<SearchManager> = OnceLock::new();

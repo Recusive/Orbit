@@ -1,17 +1,17 @@
 [package]
-name = "snowflake-app"
+name = "orbit-app"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Snowflake - Modern AI-powered code editor"
+description = "Orbit - Modern AI-powered code editor"
 
 [lints]
 workspace = true
 
 [lib]
-name = "snowflake_app_lib"
+name = "orbit_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -19,15 +19,15 @@ tauri-build = { workspace = true }
 
 [dependencies]
 # Workspace crates - common
-snowflake-core = { path = "../crates/common/core" }
-snowflake-fs = { path = "../crates/common/fs" }
-snowflake-lsp = { path = "../crates/common/lsp" }
-snowflake-terminal = { path = "../crates/common/terminal" }
-snowflake-git = { path = "../crates/common/git" }
-snowflake-ai = { path = "../crates/common/ai" }
-snowflake-search = { path = "../crates/common/search" }
-snowflake-settings = { path = "../crates/common/settings" }
-snowflake-conversations = { path = "../crates/common/conversations" }
+orbit-core = { path = "../crates/common/core" }
+orbit-fs = { path = "../crates/common/fs" }
+orbit-lsp = { path = "../crates/common/lsp" }
+orbit-terminal = { path = "../crates/common/terminal" }
+orbit-git = { path = "../crates/common/git" }
+orbit-ai = { path = "../crates/common/ai" }
+orbit-search = { path = "../crates/common/search" }
+orbit-settings = { path = "../crates/common/settings" }
+orbit-conversations = { path = "../crates/common/conversations" }
 
 # Core dependencies
 tokio = { workspace = true }

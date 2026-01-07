@@ -47,7 +47,7 @@ export const rewindContextMap = new Map<string, RewindContextMessage[]>();
 /** Mark a session as forked from another SDK session (for file checkpointing only) */
 export function markSessionAsForked(newSessionId: string, resumeFromSdkSessionId: string): void {
   forkedSessionResumeMap.set(newSessionId, { sdkSessionId: resumeFromSdkSessionId });
-  console.warn('[Snowflake] 🔀 Marked session as forked (for checkpointing):', {
+  console.warn('[Orbit] Marked session as forked (for checkpointing):', {
     newSessionId,
     resumeFromSdkSessionId,
   });
@@ -59,7 +59,7 @@ export function markSessionAsForked(newSessionId: string, resumeFromSdkSessionId
  */
 export function setRewindContext(sessionId: string, messages: RewindContextMessage[]): void {
   rewindContextMap.set(sessionId, messages);
-  console.warn('[Snowflake] 📝 Stored rewind context:', {
+  console.warn('[Orbit] Stored rewind context:', {
     sessionId,
     messageCount: messages.length,
   });
@@ -74,7 +74,7 @@ export function consumeRewindContext(sessionId: string): RewindContextMessage[] 
   const context = rewindContextMap.get(sessionId);
   if (context) {
     rewindContextMap.delete(sessionId);
-    console.warn('[Snowflake] 📤 Consuming rewind context:', {
+    console.warn('[Orbit] Consuming rewind context:', {
       sessionId,
       messageCount: context.length,
     });
@@ -118,7 +118,7 @@ export async function ensureSession(sessionId: string): Promise<void> {
     // For rewind forks, we create a FRESH session (no SDK resume)
     // The conversation context is handled by prepending to the first message
     // File checkpoints were already rewound before the fork was created
-    console.warn('[Snowflake] 🔀 Creating fresh session for rewind fork:', {
+    console.warn('[Orbit] Creating fresh session for rewind fork:', {
       sessionId,
       originalSdkSession: resumeConfig.sdkSessionId,
       note: 'NOT using SDK resume - context will be prepended to first message',
@@ -134,5 +134,5 @@ export async function ensureSession(sessionId: string): Promise<void> {
   // Session is immediately ready to receive messages after agentCreateSession() returns.
   // The SDK's MessageQueue is created and waiting for messages. When we send the first
   // message, it unblocks the iterator, and the SDK starts processing (including system:init).
-  console.warn('[Snowflake] ✅ Session created and ready:', sessionId);
+  console.warn('[Orbit] Session created and ready:', sessionId);
 }

@@ -343,7 +343,7 @@ export abstract class BaseAgent {
     // Add MCP server if available
     if (this.mcpServer) {
       options.mcpServers = {
-        'snowflake-canvas': this.mcpServer,
+        'orbit-canvas': this.mcpServer,
       };
     }
 

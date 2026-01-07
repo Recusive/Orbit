@@ -44,11 +44,11 @@ export interface RewindContextMessage {
 
 declare global {
   interface Window {
-    __SNOWFLAKE_AGENT_LISTENERS_INITIALIZED__?: boolean;
-    __SNOWFLAKE_AGENT_LISTENER_UNLISTEN__?: (() => void) | null;
-    __SNOWFLAKE_MESSAGE_HANDLERS__?: Set<(message: ExtensionMessage) => void>;
-    __SNOWFLAKE_WINDOW_LISTENER_INITIALIZED__?: boolean;
-    __SNOWFLAKE_REMOVE_WINDOW_LISTENER__?: (() => void) | null;
+    __ORBIT_AGENT_LISTENERS_INITIALIZED__?: boolean;
+    __ORBIT_AGENT_LISTENER_UNLISTEN__?: (() => void) | null;
+    __ORBIT_MESSAGE_HANDLERS__?: Set<(message: ExtensionMessage) => void>;
+    __ORBIT_WINDOW_LISTENER_INITIALIZED__?: boolean;
+    __ORBIT_REMOVE_WINDOW_LISTENER__?: (() => void) | null;
   }
 }
 

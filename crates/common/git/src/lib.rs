@@ -1,4 +1,4 @@
-//! Snowflake Git - Git operations
+//! Orbit Git - Git operations
 //!
 //! This crate provides git functionality using the git2 library.
 
@@ -10,12 +10,12 @@ use std::process::Command;
 use git2::{
     BlameOptions, Delta, DiffOptions, IndexAddOption, Repository, StatusOptions, StatusShow,
 };
+use orbit_core::{Error, FileStatus, GitBranch, GitCommit, GitStatus, Result, StatusEntry};
 use serde::{Deserialize, Serialize};
-use snowflake_core::{Error, FileStatus, GitBranch, GitCommit, GitStatus, Result, StatusEntry};
 use tracing::{debug, error, info};
 
 // ============================================
-// Additional Types (not in snowflake-core)
+// Additional Types (not in orbit-core)
 // ============================================
 
 /// A single line in a diff.

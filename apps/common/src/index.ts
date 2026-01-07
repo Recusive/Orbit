@@ -1,5 +1,5 @@
 /**
- * @snowflake/common - Shared code across apps
+ * @orbit/common - Shared code across apps
  */
 
 export * from './hooks';

@@ -1,4 +1,4 @@
-//! Snowflake LSP - Language Server Protocol integration
+//! Orbit LSP - Language Server Protocol integration
 //!
 //! This crate manages LSP servers for different languages and provides
 //! IDE features like completion, hover, and go-to-definition.
@@ -59,11 +59,11 @@
 use bytes::BytesMut;
 use futures::channel::mpsc;
 use hashbrown::HashMap;
-use serde::{de::DeserializeOwned, Serialize};
-use snowflake_core::{
+use orbit_core::{
     CompletionItem, Diagnostic, DiagnosticSeverity, Error, HoverInfo, Location, Position, Range,
     Result, SignatureHelp, SignatureInfo,
 };
+use serde::{de::DeserializeOwned, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -696,7 +696,7 @@ impl LspClient {
                 },
             },
             client_info: ClientInfo {
-                name: "Snowflake".into(),
+                name: "Orbit".into(),
                 version: env!("CARGO_PKG_VERSION").into(),
             },
         };
@@ -1453,7 +1453,7 @@ impl LspClient {
                         None
                     }
                 });
-                let parameters: Vec<snowflake_core::ParameterInfo> = sig
+                let parameters: Vec<orbit_core::ParameterInfo> = sig
                     .get("parameters")
                     .and_then(|p| p.as_array())
                     .map(|params| {
@@ -1474,7 +1474,7 @@ impl LspClient {
                                         None
                                     }
                                 });
-                                Some(snowflake_core::ParameterInfo {
+                                Some(orbit_core::ParameterInfo {
                                     label,
                                     documentation,
                                 })

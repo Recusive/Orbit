@@ -1,11 +1,11 @@
-//! Snowflake Search - File and text search
+//! Orbit Search - File and text search
 //!
 //! This crate provides fast search functionality using ripgrep-like capabilities.
 
 use std::fs;
 
 use ignore::WalkBuilder;
-use snowflake_core::{Result, SearchOptions, SearchResult, TextSearchResult};
+use orbit_core::{Result, SearchOptions, SearchResult, TextSearchResult};
 
 /// Search manager for file and text search
 #[derive(Debug, Clone, Copy)]

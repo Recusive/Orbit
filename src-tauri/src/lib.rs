@@ -1,4 +1,4 @@
-//! Snowflake - Modern AI-powered code editor
+//! Orbit - Modern AI-powered code editor
 //!
 //! This is the main Tauri application library that wires together
 //! all the backend functionality.
@@ -18,20 +18,20 @@ use commands::common::{
     credentials, dev_monitor, diagnostics, files, git, lsp, providers, search, settings, terminal,
     workspace,
 };
-use snowflake_conversations::ConversationManager;
-use snowflake_settings::SettingsManager;
+use orbit_conversations::ConversationManager;
+use orbit_settings::SettingsManager;
 use tauri_plugin_log::{Target, TargetKind};
 
 /// Log mode for the application.
 ///
-/// Determined by `SNOWFLAKE_LOG_MODE` env var or defaults based on build type.
+/// Determined by `ORBIT_LOG_MODE` env var or defaults based on build type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LogMode {
     /// Production: minimal logging (warn/error only)
     Prod,
-    /// Development: balanced logging (info for deps, debug for snowflake)
+    /// Development: balanced logging (info for deps, debug for orbit)
     Dev,
-    /// Debug: verbose logging (debug for deps, trace for snowflake)
+    /// Debug: verbose logging (debug for deps, trace for orbit)
     Debug,
 }
 
@@ -44,7 +44,7 @@ impl LogMode {
     fn from_env() -> Self {
         use std::env;
 
-        match env::var("SNOWFLAKE_LOG_MODE")
+        match env::var("ORBIT_LOG_MODE")
             .unwrap_or_default()
             .to_lowercase()
             .as_str()
@@ -74,8 +74,8 @@ fn build_log_plugin() -> tauri_plugin_log::Builder {
             // Production: minimal logging
             builder = builder
                 .level(log::LevelFilter::Warn)
-                .level_for("snowflake", log::LevelFilter::Info)
-                .level_for("snowflake_app", log::LevelFilter::Info)
+                .level_for("orbit", log::LevelFilter::Info)
+                .level_for("orbit_app", log::LevelFilter::Info)
                 .level_for("tao", log::LevelFilter::Error)
                 .level_for("wry", log::LevelFilter::Error);
         },
@@ -83,8 +83,8 @@ fn build_log_plugin() -> tauri_plugin_log::Builder {
             // Development: balanced logging
             builder = builder
                 .level(log::LevelFilter::Info)
-                .level_for("snowflake", log::LevelFilter::Debug)
-                .level_for("snowflake_app", log::LevelFilter::Debug)
+                .level_for("orbit", log::LevelFilter::Debug)
+                .level_for("orbit_app", log::LevelFilter::Debug)
                 .level_for("tao", log::LevelFilter::Warn)
                 .level_for("wry", log::LevelFilter::Warn)
                 .level_for("tauri", log::LevelFilter::Info);
@@ -93,8 +93,8 @@ fn build_log_plugin() -> tauri_plugin_log::Builder {
             // Debug: verbose logging
             builder = builder
                 .level(log::LevelFilter::Debug)
-                .level_for("snowflake", log::LevelFilter::Trace)
-                .level_for("snowflake_app", log::LevelFilter::Trace)
+                .level_for("orbit", log::LevelFilter::Trace)
+                .level_for("orbit_app", log::LevelFilter::Trace)
                 .level_for("tao", log::LevelFilter::Debug)
                 .level_for("wry", log::LevelFilter::Debug)
                 .level_for("tauri", log::LevelFilter::Debug);

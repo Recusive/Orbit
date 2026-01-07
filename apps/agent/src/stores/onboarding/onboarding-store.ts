@@ -64,7 +64,7 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
       },
     })),
     {
-      name: 'snowflake-onboarding',
+      name: 'orbit-onboarding',
       // Only persist the completion status, not the current step
       partialize: (state) => ({
         hasCompletedOnboarding: state.hasCompletedOnboarding,

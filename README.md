@@ -1,8 +1,8 @@
-# Snowflake
+# Orbit
 
 > AI-Powered Code Editor Built with Tauri 2 + React 19
 
-[![CI](https://github.com/Recusive/Snowflake-V0/actions/workflows/ci.yml/badge.svg)](https://github.com/Recusive/Snowflake-V0/actions/workflows/ci.yml)
+[![CI](https://github.com/Recusive/Orbit/actions/workflows/ci.yml/badge.svg)](https://github.com/Recusive/Orbit/actions/workflows/ci.yml)
 ![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?logo=tauri&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Rust](https://img.shields.io/badge/Rust-1.85-DEA584?logo=rust&logoColor=black)
@@ -12,7 +12,7 @@
 
 ## Overview
 
-Snowflake is a desktop AI code editor that combines Claude AI with a full-featured IDE. It's built as a Tauri 2 app with a Rust backend and React 19 frontend, designed for agentic coding workflows.
+Orbit is a desktop AI code editor that combines Claude AI with a full-featured IDE. It's built as a Tauri 2 app with a Rust backend and React 19 frontend, designed for agentic coding workflows.
 
 ### Key Capabilities
 
@@ -32,7 +32,7 @@ Snowflake is a desktop AI code editor that combines Claude AI with a full-featur
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        Snowflake Desktop App                         │
+│                        Orbit Desktop App                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌────────────────────────────────────────────────────────────────┐ │
@@ -79,9 +79,9 @@ Snowflake is a desktop AI code editor that combines Claude AI with a full-featur
 ```text
 User Input → React UI → Tauri IPC → Rust Backend
                                          │
-                                         ├── File ops (snowflake-fs)
-                                         ├── Git ops (snowflake-git)
-                                         ├── Terminal (snowflake-terminal)
+                                         ├── File ops (orbit-fs)
+                                         ├── Git ops (orbit-git)
+                                         ├── Terminal (orbit-terminal)
                                          └── AI → Agent Bridge (sidecar)
                                                       │
                                                       └── Claude API
@@ -92,7 +92,7 @@ User Input → React UI → Tauri IPC → Rust Backend
 ## Project Structure
 
 ```text
-Snowflake-v0/
+Orbit/
 │
 ├── apps/                           # Frontend applications (React)
 │   ├── agent/                      # Main chat/editor app
@@ -253,8 +253,8 @@ Snowflake-v0/
 
 ```bash
 # Clone and install
-git clone https://github.com/Recusive/Snowflake-V0.git
-cd Snowflake-V0
+git clone https://github.com/Recusive/Orbit.git
+cd Orbit
 pnpm install
 
 # Run the full app (Vite + Tauri + Rust)

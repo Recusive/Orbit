@@ -1,4 +1,4 @@
-//! Snowflake Terminal - PTY management and terminal emulation
+//! Orbit Terminal - PTY management and terminal emulation
 //!
 //! This crate provides pseudo-terminal (PTY) support for running shell sessions.
 //! It uses `portable-pty` for cross-platform PTY spawning and management.
@@ -20,10 +20,10 @@ use std::sync::Arc;
 use std::thread;
 
 use hashbrown::HashMap;
+use orbit_core::{Error, Result, TerminalInfo};
 use parking_lot::Mutex;
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
-use snowflake_core::{Error, Result, TerminalInfo};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};

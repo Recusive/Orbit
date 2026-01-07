@@ -27,7 +27,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './apps/agent/src'),
       '@canvas': path.resolve(__dirname, './apps/canvas/src'),
-      '@snowflake/common': path.resolve(__dirname, './apps/common/src'),
+      '@orbit/common': path.resolve(__dirname, './apps/common/src'),
     },
   },
   build: {

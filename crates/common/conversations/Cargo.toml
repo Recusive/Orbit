@@ -1,17 +1,17 @@
 [package]
-name = "snowflake-conversations"
+name = "orbit-conversations"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Conversation persistence for Snowflake AI chat"
+description = "Conversation persistence for Orbit AI chat"
 
 [lints]
 workspace = true
 
 [dependencies]
-snowflake-core = { path = "../core" }
+orbit-core = { path = "../core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 directories = "5.0"

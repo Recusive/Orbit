@@ -9,7 +9,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
-authors = ["Snowflake Team"]
+authors = ["Orbit Team"]
 license = "MIT"
 
 [workspace.dependencies]

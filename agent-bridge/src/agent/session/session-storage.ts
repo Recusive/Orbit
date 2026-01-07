@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { formatZodError } from '@snowflake/shared-schemas';
+import { formatZodError } from '@orbit/shared-schemas';
 
 import { createLogger } from '../../common/logging/logger.js';
 import { SessionStorageDataSchema } from '../../protocol/schemas.js';
@@ -19,7 +19,7 @@ const logger = createLogger('SessionStorage');
 export type { StoredSession } from '../../protocol/schemas.js';
 
 const STORAGE_VERSION = 1;
-const STORAGE_FILENAME = 'snowflake-sessions.json';
+const STORAGE_FILENAME = 'orbit-sessions.json';
 const MAX_SESSIONS = 50; // Limit stored sessions to prevent unbounded growth
 
 /**
@@ -31,15 +31,15 @@ function getStorageDir(): string {
   const platform = process.platform;
 
   if (platform === 'darwin') {
-    return path.join(homeDir, 'Library', 'Application Support', 'Snowflake');
+    return path.join(homeDir, 'Library', 'Application Support', 'Orbit');
   }
 
   if (platform === 'win32') {
-    return path.join(process.env.APPDATA ?? path.join(homeDir, 'AppData', 'Roaming'), 'Snowflake');
+    return path.join(process.env.APPDATA ?? path.join(homeDir, 'AppData', 'Roaming'), 'Orbit');
   }
 
   // Linux and other Unix-like systems
-  return path.join(process.env.XDG_CONFIG_HOME ?? path.join(homeDir, '.config'), 'snowflake');
+  return path.join(process.env.XDG_CONFIG_HOME ?? path.join(homeDir, '.config'), 'orbit');
 }
 
 /**

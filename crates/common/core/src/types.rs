@@ -1,4 +1,4 @@
-//! Shared types for Snowflake
+//! Shared types for Orbit
 
 use std::fmt;
 

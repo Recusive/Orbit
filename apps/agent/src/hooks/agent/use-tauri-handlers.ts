@@ -87,12 +87,12 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
 
         // Set workspace for LSP - this initializes language servers for the workspace
         lspSetWorkspace(targetPath).catch((err: unknown) => {
-          console.warn('[Snowflake] Failed to set LSP workspace:', err);
+          console.warn('[Orbit] Failed to set LSP workspace:', err);
         });
 
         // Start watching the workspace for file changes (for auto-refresh)
         initFileWatcher(targetPath).catch((err: unknown) => {
-          console.warn('[Snowflake] Failed to initialize file watcher:', err);
+          console.warn('[Orbit] Failed to initialize file watcher:', err);
         });
       }
 
@@ -190,7 +190,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
       );
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create terminal';
-      console.error('[Snowflake] Terminal creation error:', errorMessage);
+      console.error('[Orbit] Terminal creation error:', errorMessage);
     }
     return;
   }
@@ -200,7 +200,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
     try {
       await writeTerminal(message.terminal_id, message.data);
     } catch (err: unknown) {
-      console.error('[Snowflake] Terminal write error:', err);
+      console.error('[Orbit] Terminal write error:', err);
     }
     return;
   }
@@ -210,7 +210,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
     try {
       await resizeTerminal(message.terminal_id, message.cols, message.rows);
     } catch (err: unknown) {
-      console.error('[Snowflake] Terminal resize error:', err);
+      console.error('[Orbit] Terminal resize error:', err);
     }
     return;
   }
@@ -220,7 +220,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
     try {
       await closeTerminal(message.terminal_id);
     } catch (err: unknown) {
-      console.error('[Snowflake] Terminal close error:', err);
+      console.error('[Orbit] Terminal close error:', err);
     }
     return;
   }
@@ -243,7 +243,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
         '*'
       );
     } catch (err: unknown) {
-      console.error('[Snowflake] Conversation create error:', err);
+      console.error('[Orbit] Conversation create error:', err);
       // Still emit created event so UI can proceed (will use localStorage fallback)
       const sessionId = crypto.randomUUID();
       window.postMessage(
@@ -280,7 +280,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
         '*'
       );
     } catch (err: unknown) {
-      console.error('[Snowflake] Conversation list error:', err);
+      console.error('[Orbit] Conversation list error:', err);
       // Return empty list on error (localStorage will still have data)
       window.postMessage(
         {
@@ -360,7 +360,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
         '*'
       );
     } catch (err: unknown) {
-      console.error('[Snowflake] Conversation delete error:', err);
+      console.error('[Orbit] Conversation delete error:', err);
     }
     return;
   }
@@ -370,7 +370,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
     try {
       await conversationUpdateTitle(message.session_id, message.title);
     } catch (err: unknown) {
-      console.error('[Snowflake] Conversation title update error:', err);
+      console.error('[Orbit] Conversation title update error:', err);
     }
     return;
   }
@@ -423,7 +423,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
       );
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to list files';
-      console.error('[Snowflake] File list error:', errorMessage);
+      console.error('[Orbit] File list error:', errorMessage);
       window.postMessage(
         {
           type: 'file:list:response',
@@ -452,7 +452,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
     try {
       await agentInterrupt(message.session_id);
     } catch (err: unknown) {
-      console.error('[Snowflake] Agent interrupt error:', err);
+      console.error('[Orbit] Agent interrupt error:', err);
     }
     return;
   }
@@ -462,7 +462,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
     try {
       await agentRespondPermission(message.request_id, message.decision, message.always ?? false);
     } catch (err: unknown) {
-      console.error('[Snowflake] Permission response error:', err);
+      console.error('[Orbit] Permission response error:', err);
     }
     return;
   }
@@ -481,7 +481,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
               : undefined;
       await agentSetThinkingMode(message.session_id, enabled, maxTokens);
     } catch (err: unknown) {
-      console.error('[Snowflake] Set thinking mode error:', err);
+      console.error('[Orbit] Set thinking mode error:', err);
     }
     return;
   }
@@ -491,7 +491,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
     try {
       await agentSetModel(message.session_id, message.model);
     } catch (err: unknown) {
-      console.error('[Snowflake] Set model error:', err);
+      console.error('[Orbit] Set model error:', err);
     }
     return;
   }
@@ -509,7 +509,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
         await agentSetAcceptMode(message.session_id, false);
       }
     } catch (err: unknown) {
-      console.error('[Snowflake] Set input mode error:', err);
+      console.error('[Orbit] Set input mode error:', err);
     }
     return;
   }
@@ -598,7 +598,7 @@ async function handleConversationRewind(
 
     // Debug: Log checkpoint state
     const sessionCheckpoints = checkpointStore.getSessionCheckpoints(message.session_id);
-    console.warn('[Snowflake] 🔄 Rewind requested:', {
+    console.warn('[Orbit] Rewind requested:', {
       session_id: message.session_id,
       message_id,
       user_message_id,
@@ -610,24 +610,24 @@ async function handleConversationRewind(
     let sdkSessionId: string | null = null;
     try {
       sdkSessionId = await agentGetSdkSessionId(message.session_id);
-      console.warn('[Snowflake] 🔀 Got SDK session ID for resume:', sdkSessionId);
+      console.warn('[Orbit] Got SDK session ID for resume:', sdkSessionId);
     } catch (sdkErr) {
-      console.error('[Snowflake] ⚠️ Could not get SDK session ID:', sdkErr);
+      console.error('[Orbit] Could not get SDK session ID:', sdkErr);
     }
 
     // Step 3: Rewind files to the turn END checkpoint (file state after this message completed)
     // This restores all Write/Edit/NotebookEdit changes made after this point
     if (rewindCheckpoints?.rewindFiles) {
       try {
-        console.warn('[Snowflake] 🔄 Calling agentRewindFiles with turnEnd checkpoint...');
+        console.warn('[Orbit] Calling agentRewindFiles with turnEnd checkpoint...');
         await agentRewindFiles(message.session_id, rewindCheckpoints.rewindFiles);
-        console.warn('[Snowflake] ✅ Files rewound to checkpoint:', rewindCheckpoints.rewindFiles);
+        console.warn('[Orbit] Files rewound to checkpoint:', rewindCheckpoints.rewindFiles);
       } catch (rewindErr) {
         // Log but continue with conversation fork even if file rewind fails
-        console.error('[Snowflake] ❌ File rewind failed:', rewindErr);
+        console.error('[Orbit] File rewind failed:', rewindErr);
       }
     } else {
-      console.warn('[Snowflake] ⚠️ No checkpoints found for session, skipping file rewind');
+      console.warn('[Orbit] No checkpoints found for session, skipping file rewind');
     }
 
     // Step 4: Fork the conversation to this point
@@ -648,7 +648,7 @@ async function handleConversationRewind(
         content: m.content,
       }));
       setRewindContext(forked.sessionId, contextMessages);
-      console.warn('[Snowflake] 📝 Stored rewind context for forked session:', {
+      console.warn('[Orbit] Stored rewind context for forked session:', {
         sessionId: forked.sessionId,
         messageCount: contextMessages.length,
       });
@@ -657,7 +657,7 @@ async function handleConversationRewind(
     // Mark session as forked (for file checkpoint tracking, NOT for SDK resume)
     if (sdkSessionId) {
       markSessionAsForked(newSessionId, sdkSessionId);
-      console.warn('[Snowflake] 🔀 Marked forked session (context-based, no SDK resume):', {
+      console.warn('[Orbit] Marked forked session (context-based, no SDK resume):', {
         newSessionId,
         sdkSessionId,
       });
@@ -696,7 +696,7 @@ async function handleConversationRewind(
       );
     }
   } catch (err: unknown) {
-    console.error('[Snowflake] Conversation rewind error:', err);
+    console.error('[Orbit] Conversation rewind error:', err);
     const newSessionId = crypto.randomUUID();
     window.postMessage(
       {
@@ -748,7 +748,7 @@ async function handleMessageSend(
     if (rewindContext && rewindContext.length > 0) {
       const contextPrefix = formatConversationContext(rewindContext);
       contentToSend = contextPrefix + message.content;
-      console.warn('[Snowflake] 📤 Prepended rewind context to message:', {
+      console.warn('[Orbit] Prepended rewind context to message:', {
         sessionId: message.session_id,
         contextMessageCount: rewindContext.length,
         originalLength: message.content.length,
@@ -764,7 +764,7 @@ async function handleMessageSend(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
-    console.error('[Snowflake] Agent send message error:', errorMessage);
+    console.error('[Orbit] Agent send message error:', errorMessage);
     window.postMessage(
       {
         type: 'agent:error',
@@ -799,7 +799,7 @@ async function handleSubagentsList(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to list subagents';
-    console.error('[Snowflake] List subagents error:', errorMessage);
+    console.error('[Orbit] List subagents error:', errorMessage);
     window.postMessage(
       {
         type: 'subagents:error',
@@ -838,7 +838,7 @@ async function handleSubagentsCreate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to create subagent';
-    console.error('[Snowflake] Create subagent error:', errorMessage);
+    console.error('[Orbit] Create subagent error:', errorMessage);
     window.postMessage(
       {
         type: 'subagents:error',
@@ -877,7 +877,7 @@ async function handleSubagentsUpdate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to update subagent';
-    console.error('[Snowflake] Update subagent error:', errorMessage);
+    console.error('[Orbit] Update subagent error:', errorMessage);
     window.postMessage(
       {
         type: 'subagents:error',
@@ -907,7 +907,7 @@ async function handleSubagentsDelete(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to delete subagent';
-    console.error('[Snowflake] Delete subagent error:', errorMessage);
+    console.error('[Orbit] Delete subagent error:', errorMessage);
     window.postMessage(
       {
         type: 'subagents:error',
@@ -936,7 +936,7 @@ async function handleSubagentsGenerate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to generate subagent';
-    console.error('[Snowflake] Generate subagent error:', errorMessage);
+    console.error('[Orbit] Generate subagent error:', errorMessage);
     window.postMessage(
       {
         type: 'subagents:error',
@@ -970,7 +970,7 @@ async function handleCommandsList(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to list commands';
-    console.error('[Snowflake] List commands error:', errorMessage);
+    console.error('[Orbit] List commands error:', errorMessage);
     window.postMessage(
       {
         type: 'commands:error',
@@ -1011,7 +1011,7 @@ async function handleCommandsCreate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to create command';
-    console.error('[Snowflake] Create command error:', errorMessage);
+    console.error('[Orbit] Create command error:', errorMessage);
     window.postMessage(
       {
         type: 'commands:error',
@@ -1052,7 +1052,7 @@ async function handleCommandsUpdate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to update command';
-    console.error('[Snowflake] Update command error:', errorMessage);
+    console.error('[Orbit] Update command error:', errorMessage);
     window.postMessage(
       {
         type: 'commands:error',
@@ -1082,7 +1082,7 @@ async function handleCommandsDelete(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to delete command';
-    console.error('[Snowflake] Delete command error:', errorMessage);
+    console.error('[Orbit] Delete command error:', errorMessage);
     window.postMessage(
       {
         type: 'commands:error',
@@ -1111,7 +1111,7 @@ async function handleCommandsGenerate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to generate command';
-    console.error('[Snowflake] Generate command error:', errorMessage);
+    console.error('[Orbit] Generate command error:', errorMessage);
     window.postMessage(
       {
         type: 'commands:error',

@@ -1,4 +1,4 @@
-import { Snowflake } from 'lucide-react';
+import { Orbit } from 'lucide-react';
 
 import type { FC } from 'react';
 
@@ -12,7 +12,7 @@ export interface WelcomeStepProps {
 
 /**
  * Welcome screen shown on first launch.
- * Displays Snowflake branding and a "Get Started" button.
+ * Displays Orbit branding and a "Get Started" button.
  */
 export const WelcomeStep: FC<WelcomeStepProps> = ({ onContinue, className }) => {
   return (
@@ -27,10 +27,10 @@ export const WelcomeStep: FC<WelcomeStepProps> = ({ onContinue, className }) => 
         {/* Logo */}
         <div className="flex flex-col items-center gap-4">
           <div className="p-4 rounded-2xl bg-primary/10">
-            <Snowflake className="h-16 w-16 text-primary" />
+            <Orbit className="h-16 w-16 text-primary" />
           </div>
           <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-semibold text-foreground">Welcome to Snowflake</h1>
+            <h1 className="text-3xl font-semibold text-foreground">Welcome to Orbit</h1>
             <p className="text-muted-foreground text-base">
               The AI-powered code editor for modern developers.
             </p>

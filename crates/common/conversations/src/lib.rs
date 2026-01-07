@@ -1,13 +1,13 @@
-//! Snowflake Conversations - Chat history persistence
+//! Orbit Conversations - Chat history persistence
 //!
-//! This crate handles saving and loading conversation history for the Snowflake editor.
+//! This crate handles saving and loading conversation history for the Orbit editor.
 //!
 //! # Storage Location
 //!
 //! Conversations are stored in platform-specific data directories:
-//! - macOS: `~/Library/Application Support/snowflake/conversations/`
-//! - Linux: `~/.local/share/snowflake/conversations/`
-//! - Windows: `%APPDATA%/snowflake/conversations/`
+//! - macOS: `~/Library/Application Support/orbit/conversations/`
+//! - Linux: `~/.local/share/orbit/conversations/`
+//! - Windows: `%APPDATA%/orbit/conversations/`
 //!
 //! Each conversation is stored as a separate JSON file named by its session ID.
 
@@ -17,9 +17,9 @@ use std::path::PathBuf;
 use std::process;
 
 use directories::ProjectDirs;
+use orbit_core::{Error, Result};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use snowflake_core::{Error, Result};
 
 // ============================================
 // Message Types
@@ -257,11 +257,11 @@ impl ConversationManager {
     /// Get the default data directory for conversations
     #[must_use]
     pub fn default_data_dir() -> PathBuf {
-        ProjectDirs::from("com", "snowflake", "snowflake").map_or_else(
+        ProjectDirs::from("com", "recursive", "orbit").map_or_else(
             || {
                 dirs::data_local_dir().map_or_else(
-                    || PathBuf::from(".snowflake/conversations"),
-                    |d| d.join("snowflake").join("conversations"),
+                    || PathBuf::from(".orbit/conversations"),
+                    |d| d.join("orbit").join("conversations"),
                 )
             },
             |dirs| dirs.data_dir().join("conversations"),

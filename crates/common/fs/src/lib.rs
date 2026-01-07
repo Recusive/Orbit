@@ -1,4 +1,4 @@
-//! Snowflake File System - File operations and watching
+//! Orbit File System - File operations and watching
 //!
 //! This crate provides async file system operations including:
 //! - Reading and writing files
@@ -19,8 +19,8 @@ use grep::searcher::sinks::UTF8;
 use grep::searcher::Searcher;
 use ignore::WalkBuilder;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher as _};
+use orbit_core::{Error, FileEntry, FileInfo, Result, SearchOptions, TextSearchResult};
 use serde::{Deserialize, Serialize};
-use snowflake_core::{Error, FileEntry, FileInfo, Result, SearchOptions, TextSearchResult};
 use tokio::fs;
 
 // ============================================
@@ -576,14 +576,14 @@ pub fn search_files(
     root: &Path,
     pattern: &str,
     options: &SearchOptions,
-) -> Result<Vec<snowflake_core::SearchResult>> {
+) -> Result<Vec<orbit_core::SearchResult>> {
     let max_results = options.max_results.map(|n| n as usize);
     let case_sensitive = options.case_sensitive.unwrap_or(false);
 
     // Build walker
     let walker = WalkBuilder::new(root).build();
 
-    let mut results: Vec<snowflake_core::SearchResult> = Vec::new();
+    let mut results: Vec<orbit_core::SearchResult> = Vec::new();
 
     // Compile pattern for matching
     let pattern_lower = pattern.to_lowercase();
@@ -607,7 +607,7 @@ pub fn search_files(
         };
 
         if matches {
-            results.push(snowflake_core::SearchResult {
+            results.push(orbit_core::SearchResult {
                 path: path.to_string_lossy().into_owned(),
                 name: name.into_owned(),
                 is_dir: path.is_dir(),
@@ -631,7 +631,7 @@ mod tests {
     #[tokio::test]
     #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
     async fn test_file_operations() -> Result<()> {
-        let temp_dir = env::temp_dir().join("snowflake_fs_test");
+        let temp_dir = env::temp_dir().join("orbit_fs_test");
         fs::create_dir_all(&temp_dir).await?;
 
         let test_file = temp_dir.join("test.txt");
@@ -662,7 +662,7 @@ mod tests {
     #[tokio::test]
     #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
     async fn test_list_directory_hidden() -> Result<()> {
-        let temp_dir = env::temp_dir().join("snowflake_fs_hidden_test");
+        let temp_dir = env::temp_dir().join("orbit_fs_hidden_test");
         fs::create_dir_all(&temp_dir).await?;
 
         // Create files
@@ -694,7 +694,7 @@ mod tests {
     #[tokio::test]
     #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
     async fn test_copy_file() -> Result<()> {
-        let temp_dir = env::temp_dir().join("snowflake_fs_copy_test");
+        let temp_dir = env::temp_dir().join("orbit_fs_copy_test");
         fs::create_dir_all(&temp_dir).await?;
 
         let source = temp_dir.join("source.txt");
@@ -716,7 +716,7 @@ mod tests {
     #[tokio::test]
     #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
     async fn test_bytes_operations() -> Result<()> {
-        let temp_dir = env::temp_dir().join("snowflake_fs_bytes_test");
+        let temp_dir = env::temp_dir().join("orbit_fs_bytes_test");
         fs::create_dir_all(&temp_dir).await?;
 
         let test_file = temp_dir.join("bytes.bin");
@@ -737,7 +737,7 @@ mod tests {
     #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
     #[expect(clippy::unwrap_used, reason = "tests use unwrap after assert")]
     async fn test_file_entry_is_hidden() -> Result<()> {
-        let temp_dir = env::temp_dir().join("snowflake_fs_hidden_entry_test");
+        let temp_dir = env::temp_dir().join("orbit_fs_hidden_entry_test");
         fs::create_dir_all(&temp_dir).await?;
 
         // Create visible and hidden files
@@ -779,7 +779,7 @@ mod tests {
     async fn test_file_entry_symlink() -> Result<()> {
         use std::os::unix::fs::symlink;
 
-        let temp_dir = env::temp_dir().join("snowflake_fs_symlink_test");
+        let temp_dir = env::temp_dir().join("orbit_fs_symlink_test");
         fs::create_dir_all(&temp_dir).await?;
 
         // Create a regular file and a symlink to it
@@ -826,7 +826,7 @@ mod tests {
     async fn test_file_entry_symlink_to_directory() -> Result<()> {
         use std::os::unix::fs::symlink;
 
-        let temp_dir = env::temp_dir().join("snowflake_fs_symlink_dir_test");
+        let temp_dir = env::temp_dir().join("orbit_fs_symlink_dir_test");
         fs::create_dir_all(&temp_dir).await?;
 
         // Create a directory and a symlink to it
@@ -866,7 +866,7 @@ mod tests {
     async fn test_file_entry_broken_symlink() -> Result<()> {
         use std::os::unix::fs::symlink;
 
-        let temp_dir = env::temp_dir().join("snowflake_fs_broken_symlink_test");
+        let temp_dir = env::temp_dir().join("orbit_fs_broken_symlink_test");
         fs::create_dir_all(&temp_dir).await?;
 
         // Create a symlink to a non-existent file (broken symlink)

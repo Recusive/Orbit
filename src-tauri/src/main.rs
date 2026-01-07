@@ -1,4 +1,4 @@
-//! Snowflake - Modern AI-powered code editor
+//! Orbit - Modern AI-powered code editor
 //!
 //! Main entry point for the Tauri desktop application.
 
@@ -6,5 +6,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    snowflake_app_lib::run();
+    orbit_app_lib::run();
 }

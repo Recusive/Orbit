@@ -28,5 +28,5 @@ fix = "clippy --fix --allow-dirty --allow-staged"
 
 [env]
 RUST_BACKTRACE = "1"
-# Logging is controlled via SNOWFLAKE_LOG_MODE env var (dev/debug/prod)
+# Logging is controlled via ORBIT_LOG_MODE env var (dev/debug/prod)
 # See docs/DEVELOPMENT.md for details

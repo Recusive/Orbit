@@ -777,7 +777,7 @@ export function createCanvasMcpServer(
   logger.info({ toolCount: tools.length }, 'Creating Canvas MCP server');
 
   return createSdkMcpServer({
-    name: 'snowflake-canvas',
+    name: 'orbit-canvas',
     version: '1.0.0',
     tools,
   });
@@ -788,24 +788,24 @@ export function createCanvasMcpServer(
  */
 export function getCanvasToolNames(): string[] {
   return [
-    'mcp__snowflake-canvas__create_component',
-    'mcp__snowflake-canvas__update_component',
-    'mcp__snowflake-canvas__delete_component',
-    'mcp__snowflake-canvas__connect_components',
-    'mcp__snowflake-canvas__move_component',
-    'mcp__snowflake-canvas__get_canvas_state',
-    'mcp__snowflake-canvas__get_aria_snapshot',
-    'mcp__snowflake-canvas__get_computed_styles',
-    'mcp__snowflake-canvas__get_element_bounds',
-    'mcp__snowflake-canvas__verify_component',
-    'mcp__snowflake-canvas__create_page',
-    'mcp__snowflake-canvas__add_to_page',
-    'mcp__snowflake-canvas__remove_from_page',
-    'mcp__snowflake-canvas__reorder_layers',
-    'mcp__snowflake-canvas__update_layout',
-    'mcp__snowflake-canvas__update_page_slot',
-    'mcp__snowflake-canvas__generate_variants',
-    'mcp__snowflake-canvas__iterate_design',
-    'mcp__snowflake-canvas__create_layout',
+    'mcp__orbit-canvas__create_component',
+    'mcp__orbit-canvas__update_component',
+    'mcp__orbit-canvas__delete_component',
+    'mcp__orbit-canvas__connect_components',
+    'mcp__orbit-canvas__move_component',
+    'mcp__orbit-canvas__get_canvas_state',
+    'mcp__orbit-canvas__get_aria_snapshot',
+    'mcp__orbit-canvas__get_computed_styles',
+    'mcp__orbit-canvas__get_element_bounds',
+    'mcp__orbit-canvas__verify_component',
+    'mcp__orbit-canvas__create_page',
+    'mcp__orbit-canvas__add_to_page',
+    'mcp__orbit-canvas__remove_from_page',
+    'mcp__orbit-canvas__reorder_layers',
+    'mcp__orbit-canvas__update_layout',
+    'mcp__orbit-canvas__update_page_slot',
+    'mcp__orbit-canvas__generate_variants',
+    'mcp__orbit-canvas__iterate_design',
+    'mcp__orbit-canvas__create_layout',
   ];
 }

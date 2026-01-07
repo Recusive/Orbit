@@ -1,7 +1,7 @@
 //! AI commands
 
-use snowflake_ai::AiManager;
-use snowflake_core::{ChatMessage, ChatResponse, Result};
+use orbit_ai::AiManager;
+use orbit_core::{ChatMessage, ChatResponse, Result};
 use std::sync::OnceLock;
 use tokio::sync::Mutex;
 

@@ -7,11 +7,11 @@
     reason = "Tauri commands receive owned types from JSON deserialization"
 )]
 
-use snowflake_conversations::{
+use orbit_conversations::{
     Conversation, ConversationManager, ConversationSummary, Message, MessageRole, TokenUsage,
     ToolUse,
 };
-use snowflake_core::Result;
+use orbit_core::Result;
 use tauri::State;
 
 /// Serializable message for frontend

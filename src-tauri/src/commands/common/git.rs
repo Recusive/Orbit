@@ -9,17 +9,15 @@
 
 use std::path::Path;
 
-use snowflake_core::{GitBranch, GitCommit, GitStatus, Result};
-use snowflake_git::{
-    BlameLine, BranchInfo, FileDiff, GitManager, WorktreeAddOptions, WorktreeInfo,
-};
+use orbit_core::{GitBranch, GitCommit, GitStatus, Result};
+use orbit_git::{BlameLine, BranchInfo, FileDiff, GitManager, WorktreeAddOptions, WorktreeInfo};
 
 /// Discover the git repository containing the given path.
 ///
 /// Searches upward to find the repository root.
 #[tauri::command]
 pub fn git_discover(path: String) -> Result<String> {
-    let repo_path = snowflake_git::discover(Path::new(&path))?;
+    let repo_path = orbit_git::discover(Path::new(&path))?;
     Ok(repo_path.to_string_lossy().to_string())
 }
 
@@ -68,7 +66,7 @@ pub fn git_diff_structured(repo_path: String) -> Result<Vec<FileDiff>> {
 /// Get staged diff (structured).
 #[tauri::command]
 pub fn git_staged_diff(repo_path: String) -> Result<Vec<FileDiff>> {
-    snowflake_git::get_staged_diff(Path::new(&repo_path))
+    orbit_git::get_staged_diff(Path::new(&repo_path))
 }
 
 /// Discard changes in files.
@@ -95,7 +93,7 @@ pub fn git_branches(repo_path: String) -> Result<Vec<GitBranch>> {
 /// Get branch info (with more details).
 #[tauri::command]
 pub fn git_branch_info(repo_path: String) -> Result<Vec<BranchInfo>> {
-    snowflake_git::branches(Path::new(&repo_path))
+    orbit_git::branches(Path::new(&repo_path))
 }
 
 /// Checkout a branch.
@@ -108,13 +106,13 @@ pub fn git_checkout(repo_path: String, branch: String) -> Result<()> {
 /// Create a new branch.
 #[tauri::command]
 pub fn git_create_branch(repo_path: String, name: String) -> Result<()> {
-    snowflake_git::create_branch(Path::new(&repo_path), &name)
+    orbit_git::create_branch(Path::new(&repo_path), &name)
 }
 
 /// Delete a branch.
 #[tauri::command]
 pub fn git_delete_branch(repo_path: String, name: String) -> Result<()> {
-    snowflake_git::delete_branch(Path::new(&repo_path), &name)
+    orbit_git::delete_branch(Path::new(&repo_path), &name)
 }
 
 /// Get blame information for a file.
@@ -127,25 +125,25 @@ pub fn git_blame(repo_path: String, file: String) -> Result<Vec<BlameLine>> {
 /// Stage all changes.
 #[tauri::command]
 pub fn git_stage_all(repo_path: String) -> Result<()> {
-    snowflake_git::stage_all(Path::new(&repo_path))
+    orbit_git::stage_all(Path::new(&repo_path))
 }
 
 /// Push commits to the remote repository.
 #[tauri::command]
 pub fn git_push(repo_path: String, remote: Option<String>) -> Result<()> {
-    snowflake_git::push(Path::new(&repo_path), remote.as_deref())
+    orbit_git::push(Path::new(&repo_path), remote.as_deref())
 }
 
 /// Pull changes from the remote repository.
 #[tauri::command]
 pub fn git_pull(repo_path: String, remote: Option<String>) -> Result<()> {
-    snowflake_git::pull(Path::new(&repo_path), remote.as_deref())
+    orbit_git::pull(Path::new(&repo_path), remote.as_deref())
 }
 
 /// List all worktrees for the repository.
 #[tauri::command]
 pub fn git_worktree_list(repo_path: String) -> Result<Vec<WorktreeInfo>> {
-    snowflake_git::worktree_list(Path::new(&repo_path))
+    orbit_git::worktree_list(Path::new(&repo_path))
 }
 
 /// Add a new worktree.
@@ -155,11 +153,11 @@ pub fn git_worktree_add(
     worktree_path: String,
     options: WorktreeAddOptions,
 ) -> Result<WorktreeInfo> {
-    snowflake_git::worktree_add(Path::new(&repo_path), Path::new(&worktree_path), &options)
+    orbit_git::worktree_add(Path::new(&repo_path), Path::new(&worktree_path), &options)
 }
 
 /// Remove a worktree.
 #[tauri::command]
 pub fn git_worktree_remove(repo_path: String, worktree_path: String, force: bool) -> Result<()> {
-    snowflake_git::worktree_remove(Path::new(&repo_path), Path::new(&worktree_path), force)
+    orbit_git::worktree_remove(Path::new(&repo_path), Path::new(&worktree_path), force)
 }

@@ -1,4 +1,4 @@
-import { formatZodError } from '@snowflake/shared-schemas';
+import { formatZodError } from '@orbit/shared-schemas';
 
 // Import types to ensure global Window declarations are applied
 import type { ExtensionMessage } from './types/tauri-types';
@@ -12,16 +12,16 @@ import { ExtensionMessageSchema } from '@/types/protocol';
 // ═══════════════════════════════════════════════════════════════
 
 // Initialize global handler registry if not present
-window.__SNOWFLAKE_MESSAGE_HANDLERS__ ??= new Set<(message: ExtensionMessage) => void>();
+window.__ORBIT_MESSAGE_HANDLERS__ ??= new Set<(message: ExtensionMessage) => void>();
 
 // Clean up window listener on HMR
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    if (window.__SNOWFLAKE_REMOVE_WINDOW_LISTENER__) {
-      window.__SNOWFLAKE_REMOVE_WINDOW_LISTENER__();
-      window.__SNOWFLAKE_REMOVE_WINDOW_LISTENER__ = null;
-      window.__SNOWFLAKE_WINDOW_LISTENER_INITIALIZED__ = false;
-      console.warn('[Snowflake] Window message listener cleaned up for HMR');
+    if (window.__ORBIT_REMOVE_WINDOW_LISTENER__) {
+      window.__ORBIT_REMOVE_WINDOW_LISTENER__();
+      window.__ORBIT_REMOVE_WINDOW_LISTENER__ = null;
+      window.__ORBIT_WINDOW_LISTENER_INITIALIZED__ = false;
+      console.warn('[Orbit] Window message listener cleaned up for HMR');
     }
   });
 }
@@ -29,12 +29,12 @@ if (import.meta.hot) {
 // Registry of message handlers - each useTauri hook registers its handler here
 // Safe because we initialize it above with ??=
 export const messageHandlers: Set<(message: ExtensionMessage) => void> =
-  window.__SNOWFLAKE_MESSAGE_HANDLERS__;
+  window.__ORBIT_MESSAGE_HANDLERS__;
 
 // Singleton window message listener
 export function initWindowMessageListener(): void {
-  if (window.__SNOWFLAKE_WINDOW_LISTENER_INITIALIZED__) return;
-  window.__SNOWFLAKE_WINDOW_LISTENER_INITIALIZED__ = true;
+  if (window.__ORBIT_WINDOW_LISTENER_INITIALIZED__) return;
+  window.__ORBIT_WINDOW_LISTENER_INITIALIZED__ = true;
 
   // Single global UUID deduplication set
   const processedUuids = new Set<string>();
@@ -53,13 +53,13 @@ export function initWindowMessageListener(): void {
         // Log validation failures for debugging
         if (event.data.type.startsWith('conversation:')) {
           console.error(
-            '[Snowflake] Conversation message validation failed:',
+            '[Orbit] Conversation message validation failed:',
             event.data.type,
             formatZodError(result.error)
           );
         } else if (event.data.type.startsWith('agent:')) {
           console.warn(
-            '[Snowflake] Invalid agent message dropped:',
+            '[Orbit] Invalid agent message dropped:',
             event.data.type,
             formatZodError(result.error)
           );
@@ -90,7 +90,7 @@ export function initWindowMessageListener(): void {
     // This ensures rewinding to a message restores files to the state AFTER that message completed
     if (result.data.type === 'agent:checkpoint') {
       const { session_id, checkpoint_id } = result.data;
-      console.warn('[Snowflake] 🔖 Received checkpoint event:', { session_id, checkpoint_id });
+      console.warn('[Orbit] Received checkpoint event:', { session_id, checkpoint_id });
       // This will associate the checkpoint with any pending message from the previous turn
       useCheckpointStore.getState().onCheckpointReceived(session_id, checkpoint_id);
     }
@@ -99,7 +99,7 @@ export function initWindowMessageListener(): void {
     // The next checkpoint that arrives (from the next user message) will be associated with it
     if (result.data.type === 'agent:complete') {
       const { session_id, message_id } = result.data;
-      console.warn('[Snowflake] 📝 Message complete, waiting for next checkpoint:', {
+      console.warn('[Orbit] Message complete, waiting for next checkpoint:', {
         session_id,
         message_id,
       });
@@ -117,9 +117,9 @@ export function initWindowMessageListener(): void {
   window.addEventListener('message', handleWindowMessage);
 
   // Store removal function for HMR cleanup
-  window.__SNOWFLAKE_REMOVE_WINDOW_LISTENER__ = (): void => {
+  window.__ORBIT_REMOVE_WINDOW_LISTENER__ = (): void => {
     window.removeEventListener('message', handleWindowMessage);
   };
 
-  console.warn('[Snowflake] Singleton window message listener initialized');
+  console.warn('[Orbit] Singleton window message listener initialized');
 }

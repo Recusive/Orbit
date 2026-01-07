@@ -3,11 +3,11 @@
 > **Last Updated:** January 6, 2025
 > **Tauri Version:** 2.9.5 (latest)
 
-This document catalogs Tauri plugins - both those currently used in Snowflake and potential additions based on analysis of the Conductor app.
+This document catalogs Tauri plugins - both those currently used in Orbit and potential additions based on analysis of the Conductor app.
 
 ---
 
-## Current Snowflake Plugins
+## Current Orbit Plugins
 
 | Plugin                           | Version | Purpose                    |
 | -------------------------------- | ------- | -------------------------- |
@@ -21,7 +21,7 @@ This document catalogs Tauri plugins - both those currently used in Snowflake an
 
 **What it does:** Read, write, create, delete, rename, and watch files and directories.
 
-**Snowflake usage:**
+**Orbit usage:**
 
 - File explorer tree
 - Reading source files into CodeMirror editor
@@ -49,7 +49,7 @@ const content = await invoke('read_file', { path: '/src/main.ts' });
 
 **What it does:** Spawn child processes, run shell commands, open URLs/files with default apps.
 
-**Snowflake usage:**
+**Orbit usage:**
 
 - Terminal emulation (PTY via portable-pty)
 - Running git commands
@@ -80,7 +80,7 @@ async fn run_command(app: AppHandle, cmd: String) -> Result<String, String> {
 
 **What it does:** Native file picker dialogs (open, save, message boxes, confirmations).
 
-**Snowflake usage:**
+**Orbit usage:**
 
 - "Open Folder" to select workspace
 - "Save As" for new files
@@ -117,7 +117,7 @@ const confirmed = await message('Delete this file?', {
 
 **What it does:** Read from and write to the system clipboard.
 
-**Snowflake usage:**
+**Orbit usage:**
 
 - Copy/paste code in editor
 - Copy file paths
@@ -138,7 +138,7 @@ const text = await readText();
 
 **What it does:** Structured logging with levels (trace, debug, info, warn, error) that works across Rust and JavaScript.
 
-**Snowflake usage:**
+**Orbit usage:**
 
 - Debug logging during development
 - Error tracking in production
@@ -223,7 +223,7 @@ import { sendNotification, requestPermission } from '@tauri-apps/plugin-notifica
 await requestPermission();
 await sendNotification({
   title: 'Build Complete',
-  body: 'snowflake-agent compiled successfully',
+  body: 'orbit-agent compiled successfully',
   icon: 'icons/success.png',
 });
 ```
@@ -275,18 +275,18 @@ if (update?.available) {
 
 **Why add it:**
 
-- `snowflake://open?file=/path/to/file.ts&line=42`
-- Browser extensions could send files to Snowflake
+- `orbit://open?file=/path/to/file.ts&line=42`
+- Browser extensions could send files to Orbit
 - GitHub/GitLab integration links
 - Cross-app workflows
 
 **Example URL schemes:**
 
 ```
-snowflake://open?file=/Users/dev/project/src/main.ts
-snowflake://open?file=/path/file.ts&line=42&column=10
-snowflake://project?path=/Users/dev/my-project
-snowflake://search?query=TODO&path=/Users/dev/project
+orbit://open?file=/Users/dev/project/src/main.ts
+orbit://open?file=/path/file.ts&line=42&column=10
+orbit://project?path=/Users/dev/my-project
+orbit://search?query=TODO&path=/Users/dev/project
 ```
 
 **Configuration:**
@@ -297,7 +297,7 @@ snowflake://search?query=TODO&path=/Users/dev/project
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["snowflake"]
+        "schemes": ["orbit"]
       }
     }
   }
@@ -350,7 +350,7 @@ await revealItemInDir('/path/to/file.ts'); // Opens Finder with file selected
 
 ## Conductor Plugin Analysis
 
-Conductor (v0.28.7) uses these plugins that Snowflake doesn't:
+Conductor (v0.28.7) uses these plugins that Orbit doesn't:
 
 ```
 tauri-plugin-http        2.4.3   → HTTP client
@@ -371,18 +371,18 @@ Conductor bundles a 110MB Node.js runtime because:
 2. Some tools may require Node as a dependency
 3. Flexibility to run arbitrary JS outside WebView sandbox
 
-**Snowflake approach:** We use Bun for agent-bridge sidecar instead, compiled to a standalone binary. This is more efficient than bundling a full Node runtime.
+**Orbit approach:** We use Bun for agent-bridge sidecar instead, compiled to a standalone binary. This is more efficient than bundling a full Node runtime.
 
 ---
 
 ## Version Comparison
 
-| Component           | Snowflake | Conductor | Notes                         |
-| ------------------- | --------- | --------- | ----------------------------- |
-| Tauri               | **2.9.5** | 2.6.2     | Snowflake is 3 versions ahead |
-| tauri-plugin-fs     | **2.4.4** | 2.2.1     | Snowflake newer               |
-| tauri-plugin-shell  | **2.3.3** | 2.3.0     | Snowflake newer               |
-| tauri-plugin-dialog | **2.4.2** | 2.2.1     | Snowflake newer               |
+| Component           | Orbit     | Conductor | Notes                     |
+| ------------------- | --------- | --------- | ------------------------- |
+| Tauri               | **2.9.5** | 2.6.2     | Orbit is 3 versions ahead |
+| tauri-plugin-fs     | **2.4.4** | 2.2.1     | Orbit newer               |
+| tauri-plugin-shell  | **2.3.3** | 2.3.0     | Orbit newer               |
+| tauri-plugin-dialog | **2.4.2** | 2.2.1     | Orbit newer               |
 
 ---
 
@@ -402,7 +402,7 @@ Conductor bundles a 110MB Node.js runtime because:
 
 ### Phase 3: Power Features
 
-- [ ] Add `tauri-plugin-deep-link` for `snowflake://` URLs
+- [ ] Add `tauri-plugin-deep-link` for `orbit://` URLs
 - [ ] Add `tauri-plugin-global-shortcut` for system-wide hotkey
 
 ---

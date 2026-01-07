@@ -1,6 +1,6 @@
-# Snowflake Development Makefile
+# Orbit Development Makefile
 # ================================
-# Professional development commands for the Snowflake editor
+# Professional development commands for the Orbit editor
 #
 # Usage: make <target>
 # Run 'make help' to see all available commands
@@ -24,7 +24,7 @@ BOLD := \033[1m
 
 help: ## Show this help message
 	@echo ""
-	@echo "$(BOLD)Snowflake Development Commands$(RESET)"
+	@echo "$(BOLD)Orbit Development Commands$(RESET)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "$(BOLD)$(CYAN)Development$(RESET)"
@@ -46,15 +46,15 @@ help: ## Show this help message
 
 dev: ## Start development server (balanced logging)
 	@echo "$(CYAN)Starting development server...$(RESET)"
-	@SNOWFLAKE_LOG_MODE=dev pnpm tauri dev
+	@ORBIT_LOG_MODE=dev pnpm tauri dev
 
 debug: ## Start with verbose logging (all trace logs)
 	@echo "$(YELLOW)Starting debug server (verbose logs)...$(RESET)"
-	@SNOWFLAKE_LOG_MODE=debug pnpm tauri dev
+	@ORBIT_LOG_MODE=debug pnpm tauri dev
 
 quiet: ## Start with minimal logging (warnings only)
 	@echo "$(GREEN)Starting quiet server (minimal logs)...$(RESET)"
-	@SNOWFLAKE_LOG_MODE=prod pnpm tauri dev
+	@ORBIT_LOG_MODE=prod pnpm tauri dev
 
 web: ## Start Vite dev server only (no Tauri)
 	@echo "$(CYAN)Starting web-only dev server on http://localhost:5176...$(RESET)"
@@ -143,9 +143,9 @@ clean-deps: ## Remove all dependencies and rebuild
 
 logs: ## Show log file location (production builds)
 	@echo "$(CYAN)Log files are stored in:$(RESET)"
-	@echo "  macOS: ~/Library/Logs/com.snowflake.app/"
-	@echo "  Linux: ~/.config/com.snowflake.app/logs/"
-	@echo "  Windows: %APPDATA%\\com.snowflake.app\\logs\\"
+	@echo "  macOS: ~/Library/Logs/com.orbit.app/"
+	@echo "  Linux: ~/.config/com.orbit.app/logs/"
+	@echo "  Windows: %APPDATA%\\com.orbit.app\\logs\\"
 
 deps: ## Show dependency tree
 	@echo "$(CYAN)Rust dependencies:$(RESET)"

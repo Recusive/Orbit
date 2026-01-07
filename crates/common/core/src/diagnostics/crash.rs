@@ -17,13 +17,13 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use snowflake_core::diagnostics::crash::{CrashManager, setup_panic_hook};
+//! use orbit_core::diagnostics::crash::{CrashManager, setup_panic_hook};
 //!
 //! // Set up panic handler at app start
-//! setup_panic_hook("snowflake");
+//! setup_panic_hook("orbit");
 //!
 //! // Check for crashes from previous session
-//! let manager = CrashManager::new("snowflake");
+//! let manager = CrashManager::new("orbit");
 //! if let Some(ref mgr) = manager {
 //!     if mgr.has_pending_crashes() {
 //!         if let Some(report) = mgr.consume_crash_log() {
@@ -99,12 +99,12 @@ pub struct CrashManager {
 ///
 /// # Arguments
 ///
-/// * `app_name` - The application name (e.g., "snowflake"). Used for the log directory.
+/// * `app_name` - The application name (e.g., "orbit"). Used for the log directory.
 ///
 /// # Example
 ///
 /// ```rust,no_run
-/// use snowflake_core::diagnostics::crash::setup_panic_hook;
+/// use orbit_core::diagnostics::crash::setup_panic_hook;
 ///
 /// setup_panic_hook("my_app");
 /// // ... rest of app
@@ -250,7 +250,7 @@ impl CrashManager {
     ///
     /// # Arguments
     ///
-    /// * `app_name` - The application name (e.g., "snowflake").
+    /// * `app_name` - The application name (e.g., "orbit").
     #[must_use]
     pub fn new(app_name: &str) -> Option<Self> {
         let log_dir = dirs::data_local_dir()?.join(app_name).join("logs");
@@ -596,7 +596,7 @@ Backtrace:
 
     #[test]
     fn test_crash_manager_no_pending_crashes_when_empty() {
-        let Some(manager) = CrashManager::new("snowflake_test_empty") else {
+        let Some(manager) = CrashManager::new("orbit_test_empty") else {
             return;
         };
         // Should be false if log doesn't exist or is empty
@@ -606,7 +606,7 @@ Backtrace:
 
     #[test]
     fn test_crash_manager_read_nonexistent_log() {
-        let Some(manager) = CrashManager::new("snowflake_test_nonexistent_xyz123") else {
+        let Some(manager) = CrashManager::new("orbit_test_nonexistent_xyz123") else {
             return;
         };
         let contents = manager.read_crash_log();
@@ -617,7 +617,7 @@ Backtrace:
 
     #[test]
     fn test_crash_manager_all_crash_logs() {
-        let manager = CrashManager::new("snowflake_test_all_logs");
+        let manager = CrashManager::new("orbit_test_all_logs");
         if let Some(m) = &manager {
             let logs = m.all_crash_logs();
             // Should return a list (possibly empty)
@@ -666,7 +666,7 @@ Backtrace:
     fn test_crash_log_write_and_read() {
         use std::io::Write as _;
 
-        let test_app = "snowflake_test_write_read";
+        let test_app = "orbit_test_write_read";
         let manager = CrashManager::new(test_app);
         let Some(m) = manager.as_ref() else {
             return; // Skip if can't create manager
@@ -721,7 +721,7 @@ Backtrace:
     fn test_crash_log_consume() {
         use std::io::Write as _;
 
-        let test_app = "snowflake_test_consume";
+        let test_app = "orbit_test_consume";
         let manager = CrashManager::new(test_app);
         let Some(m) = manager.as_ref() else {
             return;
@@ -760,7 +760,7 @@ Backtrace:
     fn test_crash_log_clear() {
         use std::io::Write as _;
 
-        let test_app = "snowflake_test_clear";
+        let test_app = "orbit_test_clear";
         let manager = CrashManager::new(test_app);
         let Some(m) = manager.as_ref() else {
             return;

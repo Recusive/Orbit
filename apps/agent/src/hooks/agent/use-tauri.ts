@@ -1,4 +1,4 @@
-import { formatZodError } from '@snowflake/shared-schemas';
+import { formatZodError } from '@orbit/shared-schemas';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Internal modules
@@ -49,10 +49,10 @@ function isTauriEnvironment(): boolean {
 // Clean up on HMR to prevent listener accumulation
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    if (window.__SNOWFLAKE_AGENT_LISTENER_UNLISTEN__) {
-      window.__SNOWFLAKE_AGENT_LISTENER_UNLISTEN__();
-      window.__SNOWFLAKE_AGENT_LISTENER_UNLISTEN__ = null;
-      window.__SNOWFLAKE_AGENT_LISTENERS_INITIALIZED__ = false;
+    if (window.__ORBIT_AGENT_LISTENER_UNLISTEN__) {
+      window.__ORBIT_AGENT_LISTENER_UNLISTEN__();
+      window.__ORBIT_AGENT_LISTENER_UNLISTEN__ = null;
+      window.__ORBIT_AGENT_LISTENERS_INITIALIZED__ = false;
       logger.debug('Agent listeners cleaned up for HMR');
     }
   });

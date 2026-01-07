@@ -44,7 +44,7 @@ describe('Canvas MCP Server', () => {
 
     it('should create server with correct name', () => {
       const server = createCanvasMcpServer(bridge);
-      expect(server.name).toBe('snowflake-canvas');
+      expect(server.name).toBe('orbit-canvas');
     });
 
     it('should have instance with registered tools', () => {
@@ -104,14 +104,14 @@ describe('Canvas MCP Server', () => {
       expect(names.every((n) => n.startsWith('mcp__'))).toBe(true);
     });
 
-    it('should include snowflake-canvas', () => {
+    it('should include orbit-canvas', () => {
       const names = getCanvasToolNames();
-      expect(names.every((n) => n.includes('snowflake-canvas'))).toBe(true);
+      expect(names.every((n) => n.includes('orbit-canvas'))).toBe(true);
     });
 
     it('should have correct first tool name', () => {
       const names = getCanvasToolNames();
-      expect(names[0]).toBe('mcp__snowflake-canvas__create_component');
+      expect(names[0]).toBe('mcp__orbit-canvas__create_component');
     });
   });
 });

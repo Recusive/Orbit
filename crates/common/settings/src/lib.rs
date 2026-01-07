@@ -1,14 +1,14 @@
-//! Snowflake Settings - User configuration management
+//! Orbit Settings - User configuration management
 //!
 //! This crate handles loading, saving, and managing user settings
-//! for the Snowflake editor.
+//! for the Orbit editor.
 //!
 //! # Configuration Location
 //!
 //! Settings are stored in platform-specific config directories:
-//! - macOS: `~/Library/Application Support/snowflake/settings.json`
-//! - Linux: `~/.config/snowflake/settings.json`
-//! - Windows: `%APPDATA%/snowflake/settings.json`
+//! - macOS: `~/Library/Application Support/orbit/settings.json`
+//! - Linux: `~/.config/orbit/settings.json`
+//! - Windows: `%APPDATA%/orbit/settings.json`
 
 use std::fs;
 use std::io::ErrorKind;
@@ -16,9 +16,9 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use directories::ProjectDirs;
+use orbit_core::{Error, Result};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use snowflake_core::{Error, Result};
 
 // ============================================
 // Editor Settings
@@ -247,11 +247,10 @@ impl SettingsManager {
     /// Get the default config directory for the current platform.
     #[must_use]
     pub fn default_config_dir() -> PathBuf {
-        ProjectDirs::from("com", "snowflake", "snowflake").map_or_else(
+        ProjectDirs::from("com", "recursive", "orbit").map_or_else(
             || {
                 // Fallback to home directory
-                dirs::home_dir()
-                    .map_or_else(|| PathBuf::from(".snowflake"), |h| h.join(".snowflake"))
+                dirs::home_dir().map_or_else(|| PathBuf::from(".orbit"), |h| h.join(".orbit"))
             },
             |dirs| dirs.config_dir().to_path_buf(),
         )

@@ -1,6 +1,6 @@
 import { spawnSync } from 'child_process';
 
-import { formatZodError } from '@snowflake/shared-schemas';
+import { formatZodError } from '@orbit/shared-schemas';
 
 import { KeychainCredentialsSchema } from '../../protocol/schemas.js';
 import { createLogger } from '../logging/logger.js';

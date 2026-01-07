@@ -165,7 +165,7 @@ const saveConversationsToStorage = (conversations: ConversationSummary[]): void 
 // Helper to load worktrees from localStorage
 const loadWorktreesFromStorage = (): WorktreeUIState[] => {
   try {
-    const saved = localStorage.getItem('snowflake-worktrees');
+    const saved = localStorage.getItem('orbit-worktrees');
     if (saved === null) {
       return [];
     }
@@ -183,7 +183,7 @@ const loadWorktreesFromStorage = (): WorktreeUIState[] => {
 // Helper to save worktrees to localStorage
 const saveWorktreesToStorage = (worktrees: WorktreeUIState[]): void => {
   try {
-    localStorage.setItem('snowflake-worktrees', JSON.stringify(worktrees));
+    localStorage.setItem('orbit-worktrees', JSON.stringify(worktrees));
   } catch {
     // Ignore storage errors
   }
@@ -192,7 +192,7 @@ const saveWorktreesToStorage = (worktrees: WorktreeUIState[]): void => {
 // Helper to load active worktree path from localStorage
 const loadActiveWorktreeFromStorage = (): string | null => {
   try {
-    return localStorage.getItem('snowflake-active-worktree');
+    return localStorage.getItem('orbit-active-worktree');
   } catch {
     return null;
   }
@@ -202,9 +202,9 @@ const loadActiveWorktreeFromStorage = (): string | null => {
 const saveActiveWorktreeToStorage = (path: string | null): void => {
   try {
     if (path === null) {
-      localStorage.removeItem('snowflake-active-worktree');
+      localStorage.removeItem('orbit-active-worktree');
     } else {
-      localStorage.setItem('snowflake-active-worktree', path);
+      localStorage.setItem('orbit-active-worktree', path);
     }
   } catch {
     // Ignore storage errors

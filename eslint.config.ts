@@ -23,7 +23,9 @@ export default defineConfig(
   {
     plugins: {
       react: reactPlugin,
+      // @ts-expect-error - Plugin types have legacy config format incompatibility
       'react-hooks': reactHooksPlugin,
+      // @ts-expect-error - Plugin types have legacy config format incompatibility
       'import-x': importPlugin,
     },
     settings: {
@@ -84,6 +86,22 @@ export default defineConfig(
       /* General */
       'no-console': ['error', { allow: ['warn', 'error'] }],
       eqeqeq: ['error', 'always'],
+
+      /* No emojis in code (allows keyboard symbols like ⌘, ↵, ⇧) */
+      'no-restricted-syntax': [
+        'error',
+        {
+          // Targets actual emojis, excludes keyboard/technical symbols (U+2300-U+23FF, U+2190-U+21FF)
+          selector:
+            'Literal[value=/[\\u{1F300}-\\u{1F9FF}\\u{1F600}-\\u{1F64F}\\u{1F680}-\\u{1F6FF}\\u{1F1E0}-\\u{1F1FF}\\u{2600}-\\u{26FF}\\u{2702}\\u{2705}\\u{2708}-\\u{270D}\\u{270F}\\u{2712}\\u{2714}\\u{2716}\\u{271D}\\u{2721}\\u{2728}\\u{2733}-\\u{2734}\\u{2744}\\u{2747}\\u{274C}\\u{274E}\\u{2753}-\\u{2755}\\u{2757}\\u{2763}-\\u{2764}\\u{2795}-\\u{2797}\\u{27A1}\\u{27B0}\\u{27BF}\\u{2B50}\\u{2B55}]/u]',
+          message: 'Emojis are not allowed in the codebase. Use descriptive text instead.',
+        },
+        {
+          selector:
+            'TemplateElement[value.raw=/[\\u{1F300}-\\u{1F9FF}\\u{1F600}-\\u{1F64F}\\u{1F680}-\\u{1F6FF}\\u{1F1E0}-\\u{1F1FF}\\u{2600}-\\u{26FF}\\u{2702}\\u{2705}\\u{2708}-\\u{270D}\\u{270F}\\u{2712}\\u{2714}\\u{2716}\\u{271D}\\u{2721}\\u{2728}\\u{2733}-\\u{2734}\\u{2744}\\u{2747}\\u{274C}\\u{274E}\\u{2753}-\\u{2755}\\u{2757}\\u{2763}-\\u{2764}\\u{2795}-\\u{2797}\\u{27A1}\\u{27B0}\\u{27BF}\\u{2B50}\\u{2B55}]/u]',
+          message: 'Emojis are not allowed in template literals. Use descriptive text instead.',
+        },
+      ],
     },
   }
 );

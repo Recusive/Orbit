@@ -1,6 +1,6 @@
-# Snowflake DMG Build Guide
+# Orbit DMG Build Guide
 
-Guide for building, installing, and understanding the Snowflake macOS application.
+Guide for building, installing, and understanding the Orbit macOS application.
 
 ## Quick Start
 
@@ -25,28 +25,28 @@ pnpm build:sidecar
 pnpm tauri build
 ```
 
-Output: `target/release/bundle/dmg/Snowflake_0.1.0_aarch64.dmg`
+Output: `target/release/bundle/dmg/Orbit_0.1.0_aarch64.dmg`
 
 ## Installation
 
 ### From DMG
 
 1. Double-click the `.dmg` file to mount it
-2. Drag `Snowflake.app` to `/Applications`
+2. Drag `Orbit.app` to `/Applications`
 3. Eject the DMG
-4. Launch Snowflake from Applications
+4. Launch Orbit from Applications
 
 ### Manual Installation
 
 ```bash
 # Mount DMG
-hdiutil attach target/release/bundle/dmg/Snowflake_0.1.0_aarch64.dmg
+hdiutil attach target/release/bundle/dmg/Orbit_0.1.0_aarch64.dmg
 
 # Copy to Applications
-cp -R "/Volumes/Snowflake/Snowflake.app" /Applications/
+cp -R "/Volumes/Orbit/Orbit.app" /Applications/
 
 # Eject
-hdiutil detach /Volumes/Snowflake
+hdiutil detach /Volumes/Orbit
 ```
 
 ## Running with Logs
@@ -54,23 +54,23 @@ hdiutil detach /Volumes/Snowflake
 To see application logs for debugging:
 
 ```bash
-/Applications/Snowflake.app/Contents/MacOS/snowflake-app
+/Applications/Orbit.app/Contents/MacOS/orbit-app
 ```
 
 ## Architecture
 
 ```
-Snowflake.app/
+Orbit.app/
 └── Contents/
     └── MacOS/
-        ├── snowflake-app      # Main Tauri app (13MB)
+        ├── orbit-app      # Main Tauri app (13MB)
         ├── agent-bridge       # Node.js sidecar compiled with Bun (58MB)
         └── claude             # Official Claude CLI from Anthropic (158MB)
 ```
 
 ### How It Works
 
-1. **snowflake-app** (Rust/Tauri)
+1. **orbit-app** (Rust/Tauri)
    - Main application window
    - Spawns `agent-bridge` as a sidecar process
    - Communicates via stdin/stdout JSON IPC
@@ -90,7 +90,7 @@ Snowflake.app/
 ```
 ┌─────────────────┐     IPC      ┌──────────────────┐    SDK     ┌─────────┐
 │  Tauri (Rust)   │◄────────────►│  agent-bridge    │◄──────────►│  Claude │
-│  snowflake-app  │  stdin/stdout│  (TypeScript)    │   spawn    │   CLI   │
+│  orbit-app  │  stdin/stdout│  (TypeScript)    │   spawn    │   CLI   │
 └─────────────────┘              └──────────────────┘            └─────────┘
         ▲
         │ WebView
@@ -138,28 +138,28 @@ When downloading the DMG from the internet (GitHub Actions, etc.), macOS adds a 
 
 ```bash
 # 1. Remove any existing installation
-rm -rf /Applications/Snowflake.app
+rm -rf /Applications/Orbit.app
 
 # 2. Mount the DMG
-hdiutil attach ~/Desktop/Snowflake_*.dmg
+hdiutil attach ~/Desktop/Orbit_*.dmg
 
 # 3. Copy to Applications
-cp -R /Volumes/Snowflake/Snowflake.app /Applications/
+cp -R /Volumes/Orbit/Orbit.app /Applications/
 
 # 4. Remove the quarantine flag (requires sudo)
-sudo xattr -rd com.apple.quarantine /Applications/Snowflake.app
+sudo xattr -rd com.apple.quarantine /Applications/Orbit.app
 
 # 5. Eject the DMG
-hdiutil detach /Volumes/Snowflake
+hdiutil detach /Volumes/Orbit
 
 # 6. Launch the app
-open /Applications/Snowflake.app
+open /Applications/Orbit.app
 ```
 
 #### Solution 2: Right-Click → Open
 
 1. Open Finder → Applications
-2. **Right-click** (or Control-click) on Snowflake.app
+2. **Right-click** (or Control-click) on Orbit.app
 3. Select **Open** from the context menu
 4. Click **Open** in the warning dialog
 
@@ -169,12 +169,12 @@ This bypasses Gatekeeper for the first launch only.
 
 1. Try to open the app (it will fail)
 2. Go to **System Preferences → Security & Privacy → General**
-3. Click **Open Anyway** next to the Snowflake message
+3. Click **Open Anyway** next to the Orbit message
 
 #### Why `xattr -cr` Sometimes Fails
 
 ```bash
-xattr -cr /Applications/Snowflake.app
+xattr -cr /Applications/Orbit.app
 # Error: Operation not permitted
 ```
 
@@ -200,7 +200,7 @@ This allows users to open the app normally without terminal commands.
 Check the bundled binary exists:
 
 ```bash
-ls -la /Applications/Snowflake.app/Contents/MacOS/claude
+ls -la /Applications/Orbit.app/Contents/MacOS/claude
 ```
 
 ### Authentication issues
@@ -215,10 +215,10 @@ claude auth login
 
 ```bash
 # Run with terminal output
-/Applications/Snowflake.app/Contents/MacOS/snowflake-app 2>&1
+/Applications/Orbit.app/Contents/MacOS/orbit-app 2>&1
 
 # Or check system logs
-log show --predicate 'process == "snowflake-app"' --last 5m
+log show --predicate 'process == "orbit-app"' --last 5m
 ```
 
 ## File Locations
@@ -226,7 +226,7 @@ log show --predicate 'process == "snowflake-app"' --last 5m
 | File             | Location                                    |
 | ---------------- | ------------------------------------------- |
 | DMG output       | `target/release/bundle/dmg/`                |
-| App bundle       | `target/release/bundle/macos/Snowflake.app` |
+| App bundle       | `target/release/bundle/macos/Orbit.app`     |
 | Sidecar binaries | `src-tauri/binaries/`                       |
 | Build script     | `agent-bridge/scripts/build-claude-cli.mjs` |
 | Tauri config     | `src-tauri/tauri.conf.json`                 |

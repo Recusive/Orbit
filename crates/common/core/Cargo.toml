@@ -1,11 +1,11 @@
 [package]
-name = "snowflake-core"
+name = "orbit-core"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Core types and utilities for Snowflake"
+description = "Core types and utilities for Orbit"
 
 [lints]
 workspace = true

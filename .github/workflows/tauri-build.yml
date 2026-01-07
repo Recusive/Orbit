@@ -49,7 +49,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
-          name: snowflake-${{ matrix.target }}
+          name: orbit-${{ matrix.target }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/
           retention-days: 30 # Don't keep forever

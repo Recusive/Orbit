@@ -4,7 +4,7 @@ import {
   InputModeSchema,
   CommandScopeSchema,
   ShellTypeSchema,
-} from '@snowflake/shared-schemas';
+} from '@orbit/shared-schemas';
 import { z } from 'zod';
 
 // Re-export shared schemas for consumers
@@ -19,7 +19,7 @@ export {
   type InputMode,
   type CommandScope,
   type ShellType,
-} from '@snowflake/shared-schemas';
+} from '@orbit/shared-schemas';
 
 // ═══════════════════════════════════════════════════════════════
 // SCHEMA VALIDATORS (for use in message schemas)
@@ -116,7 +116,7 @@ export function createFilePath(value: string): FilePath {
 // ═══════════════════════════════════════════════════════════════
 
 // Note: InputModeSchema, ThinkingModeSchema, ModelSchema, CommandScopeSchema
-// are imported and re-exported from @snowflake/shared-schemas above
+// are imported and re-exported from @orbit/shared-schemas above
 
 // Minimal conversation summary for sidebar list (stored in localStorage)
 // Note: Different from conversation.ts ConversationSummarySchema which has more fields
@@ -717,7 +717,7 @@ export const SubagentDeleteSchema = z
 // SLASH COMMANDS (Webview → Extension)
 // ═══════════════════════════════════════════════════════════════
 
-// Note: CommandScopeSchema is imported from @snowflake/shared-schemas
+// Note: CommandScopeSchema is imported from @orbit/shared-schemas
 
 // Slash command definition
 export const SlashCommandDefinitionSchema = z
@@ -735,7 +735,7 @@ export const SlashCommandDefinitionSchema = z
   .strict();
 
 export type SlashCommandDefinition = z.infer<typeof SlashCommandDefinitionSchema>;
-// Note: CommandScope type is exported from @snowflake/shared-schemas
+// Note: CommandScope type is exported from @orbit/shared-schemas
 
 // List all slash commands
 export const CommandsListSchema = z
@@ -1078,7 +1078,7 @@ export const PanelVisibleSchema = z
   })
   .strict();
 
-// Note: ShellTypeSchema is imported from @snowflake/shared-schemas
+// Note: ShellTypeSchema is imported from @orbit/shared-schemas
 
 // Terminal - Capabilities state
 export const TerminalCapabilitiesStateSchema = z
@@ -1784,7 +1784,7 @@ export type PermissionResponse = z.infer<typeof PermissionResponseSchema>;
 export type SetInputMode = z.infer<typeof SetInputModeSchema>;
 export type SetThinkingMode = z.infer<typeof SetThinkingModeSchema>;
 export type SetModel = z.infer<typeof SetModelSchema>;
-// Note: Model type is exported from @snowflake/shared-schemas at file top
+// Note: Model type is exported from @orbit/shared-schemas at file top
 // Browser (Webview → Extension)
 export type BrowserCreate = z.infer<typeof BrowserCreateSchema>;
 export type BrowserNavigate = z.infer<typeof BrowserNavigateSchema>;
@@ -1814,14 +1814,14 @@ export type ToolStart = z.infer<typeof ToolStartSchema>;
 export type ToolEnd = z.infer<typeof ToolEndSchema>;
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
 export type InputModeChanged = z.infer<typeof InputModeChangedSchema>;
-// Note: InputMode type is exported from @snowflake/shared-schemas at file top
+// Note: InputMode type is exported from @orbit/shared-schemas at file top
 export type ThinkingModeChanged = z.infer<typeof ThinkingModeChangedSchema>;
-// Note: ThinkingMode type is exported from @snowflake/shared-schemas at file top
+// Note: ThinkingMode type is exported from @orbit/shared-schemas at file top
 export type ModelChanged = z.infer<typeof ModelChangedSchema>;
 export type PanelCommandType = z.infer<typeof PanelCommandTypeSchema>;
 export type PanelCommand = z.infer<typeof PanelCommandSchema>;
 export type PanelVisible = z.infer<typeof PanelVisibleSchema>;
-// Note: ShellType type is exported from @snowflake/shared-schemas at file top
+// Note: ShellType type is exported from @orbit/shared-schemas at file top
 export type TerminalCapabilitiesState = z.infer<typeof TerminalCapabilitiesStateSchema>;
 export type TerminalOutputMessage = z.infer<typeof TerminalOutputMessageSchema>;
 export type TerminalData = z.infer<typeof TerminalDataSchema>;

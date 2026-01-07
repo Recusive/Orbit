@@ -4,7 +4,7 @@
 > **Author:** Claude (via code review)
 > **Applies to:** React + Zustand applications with async data loading
 
-This document explains common causes of UI flash/flicker in React applications and the patterns used to prevent them in the Snowflake codebase.
+This document explains common causes of UI flash/flicker in React applications and the patterns used to prevent them in the Orbit codebase.
 
 ---
 
@@ -526,7 +526,7 @@ useLayoutEffect      → Waits for 3 stable frames
 
 ---
 
-## Files in Snowflake Using These Patterns
+## Files in Orbit Using These Patterns
 
 | File                                                     | Patterns Used                        |
 | -------------------------------------------------------- | ------------------------------------ |

@@ -1,6 +1,6 @@
-//! Snowflake Core - Shared types and utilities
+//! Orbit Core - Shared types and utilities
 //!
-//! This crate provides the foundation types used across all Snowflake crates.
+//! This crate provides the foundation types used across all Orbit crates.
 //!
 //! # Crash Handling
 //!

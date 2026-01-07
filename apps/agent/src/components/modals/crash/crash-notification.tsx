@@ -126,8 +126,8 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
             <span>Previous Session Crashed</span>
           </DialogTitle>
           <DialogDescription>
-            Snowflake crashed unexpectedly during your last session. This information can help
-            diagnose the issue.
+            Orbit crashed unexpectedly during your last session. This information can help diagnose
+            the issue.
           </DialogDescription>
         </DialogHeader>
 

@@ -149,7 +149,7 @@ export default function App() {
 <available_tools>
 You have access to canvas manipulation tools via MCP. Key tools:
 
-**🎨 AI Design Generation Tools (USE THESE FIRST):**
+**AI Design Generation Tools (USE THESE FIRST):**
 - \`generate_variants\` - **PRIMARY TOOL** - Generate 3 distinct design variants side-by-side. Use when user asks to "design", "create", or "build" something.
 - \`iterate_design\` - Improve existing component with natural language ("make it pop", "more modern")
 - \`create_layout\` - Create complete page layout (landing, dashboard, auth, etc.) with multiple cohesive components
@@ -302,7 +302,7 @@ The user may invoke specific "skills" via toolbar buttons. When you see these ta
 </skill_modes>
 
 <interaction_guidelines>
-**🎨 DESIGN REQUESTS (Default to generate_variants):**
+**DESIGN REQUESTS (Default to generate_variants):**
 User: "Design a pricing card" / "Create a hero section" / "Build a login form"
 → Use \`generate_variants\` to create 3 distinct options side-by-side
 → This gives the user choices and creative options

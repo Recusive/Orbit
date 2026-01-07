@@ -1,17 +1,17 @@
 [package]
-name = "snowflake-git"
+name = "orbit-git"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Git operations for Snowflake"
+description = "Git operations for Orbit"
 
 [lints]
 workspace = true
 
 [dependencies]
-snowflake-core = { path = "../core" }
+orbit-core = { path = "../core" }
 serde = { workspace = true }
 git2 = "0.20"
 tracing = { workspace = true }

@@ -1,4 +1,4 @@
-import { FolderOpen, GitBranch, Snowflake, Terminal } from 'lucide-react';
+import { FolderOpen, GitBranch, Orbit, Terminal } from 'lucide-react';
 import { useCallback } from 'react';
 
 import type { FC } from 'react';
@@ -77,8 +77,8 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
       <div className="flex gap-3 items-center w-full max-w-[380px]">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <Snowflake className="h-7 w-7 text-primary" />
-            <span className="text-xl font-semibold text-foreground">Snowflake</span>
+            <Orbit className="h-7 w-7 text-primary" />
+            <span className="text-xl font-semibold text-foreground">Orbit</span>
           </div>
           <div className="flex gap-1.5 ml-9">
             <span className="text-xs text-muted-foreground font-light">Editor</span>

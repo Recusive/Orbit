@@ -1,5 +1,5 @@
 {
-  "name": "@snowflake/shared-schemas",
+  "name": "@orbit/shared-schemas",
   "version": "0.0.1",
   "private": true,
   "type": "module",

@@ -36,8 +36,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./apps/canvas/src/*"],
-      "@snowflake/common": ["./apps/common/src/index.ts"],
-      "@snowflake/common/*": ["./apps/common/src/*"]
+      "@orbit/common": ["./apps/common/src/index.ts"],
+      "@orbit/common/*": ["./apps/common/src/*"]
     }
   },
   "include": ["apps/canvas/src/**/*"]

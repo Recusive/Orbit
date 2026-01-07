@@ -177,7 +177,7 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
         <div className="flex flex-col gap-2 text-center">
           <h2 className="text-2xl font-semibold text-foreground">Connect an AI Provider</h2>
           <p className="text-muted-foreground">
-            Snowflake requires an AI provider to function. Connect Claude to get started.
+            Orbit requires an AI provider to function. Connect Claude to get started.
           </p>
         </div>
 

@@ -21,7 +21,7 @@ import {
 
 /**
  * Languages that have LSP server support.
- * This must match the backend's default_config_for_language() in snowflake-lsp.
+ * This must match the backend's default_config_for_language() in orbit-lsp.
  */
 const SUPPORTED_LSP_LANGUAGES = new Set([
   // Core languages

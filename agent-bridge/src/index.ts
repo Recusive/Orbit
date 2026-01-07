@@ -34,7 +34,7 @@ process.env.PATH = Array.from(pathSet).join(':');
 
 import * as readline from 'readline';
 
-import { formatZodError } from '@snowflake/shared-schemas';
+import { formatZodError } from '@orbit/shared-schemas';
 
 import {
   createAgent,

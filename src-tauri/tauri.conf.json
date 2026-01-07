@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Snowflake",
+  "productName": "Orbit",
   "version": "0.1.0",
-  "identifier": "com.snowflake.app",
+  "identifier": "com.recursive.orbit",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5176",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Snowflake",
+        "title": "Orbit",
         "width": 1400,
         "height": 900,
         "minWidth": 800,
@@ -55,7 +55,7 @@
     ],
     "category": "DeveloperTool",
     "shortDescription": "Modern AI-powered code editor",
-    "longDescription": "Snowflake is a modern code editor built with Tauri, React, and Rust, featuring an AI coding assistant.",
+    "longDescription": "Orbit is a modern code editor built with Tauri, React, and Rust, featuring an AI coding assistant.",
     "macOS": {
       "entitlements": "Entitlements.plist",
       "minimumSystemVersion": "10.15"

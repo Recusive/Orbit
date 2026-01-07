@@ -1,11 +1,11 @@
-//! Error types for Snowflake
+//! Error types for Orbit
 
 use std::io;
 use std::result;
 
 use thiserror::Error;
 
-/// Main error type for Snowflake operations
+/// Main error type for Orbit operations
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {

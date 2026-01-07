@@ -171,7 +171,7 @@ export const useProviderStore = create<ProviderState & ProviderActions>()(
       },
     })),
     {
-      name: 'snowflake-providers',
+      name: 'orbit-providers',
     }
   )
 );

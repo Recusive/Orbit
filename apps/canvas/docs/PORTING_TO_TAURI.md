@@ -1,4 +1,4 @@
-# Orbit Canvas → Snowflake Tauri Porting Guide
+# Orbit Canvas → Orbit Tauri Porting Guide
 
 > **Status:** Ready for Implementation
 > **Last Updated:** 2025-01-05
@@ -6,7 +6,7 @@
 
 ## Overview
 
-orbit-canvas was built for VS Code webview communication using `window.vscode.postMessage()`. To work in Snowflake (Tauri), we need to replace this with Tauri's `invoke()` for commands and `listen()` for events.
+orbit-canvas was built for VS Code webview communication using `window.vscode.postMessage()`. To work in Orbit (Tauri), we need to replace this with Tauri's `invoke()` for commands and `listen()` for events.
 
 ## Architecture Comparison
 
@@ -265,7 +265,7 @@ Test the canvas integration with Tauri:
    pnpm build    # Build the canvas
 
 2. Start the full Tauri app:
-   cd ../..      # Back to Snowflake-v0 root
+   cd ../..      # Back to Orbit root
    pnpm tauri dev
 
 3. Test scenarios:

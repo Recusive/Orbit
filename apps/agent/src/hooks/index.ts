@@ -9,8 +9,8 @@ export * from './agent';
 // Browser hooks (in-app webview)
 export * from './browser';
 
-// Canvas hooks (from @snowflake/common)
-export * from '@snowflake/common/hooks/canvas';
+// Canvas hooks (from @orbit/common)
+export * from '@orbit/common/hooks/canvas';
 
 // Chat hooks
 export * from './chat';

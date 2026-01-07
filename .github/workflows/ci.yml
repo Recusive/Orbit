@@ -349,7 +349,7 @@ jobs:
   #         cache-on-failure: false
   #
   #     # Build agent-bridge sidecar (Bun standalone binary)
-  #     # Note: pnpm install already resolved workspace dependencies (@snowflake/shared-schemas)
+  #     # Note: pnpm install already resolved workspace dependencies (@orbit/shared-schemas)
   #     - name: Build agent-bridge sidecar
   #       run: |
   #         cd agent-bridge
@@ -377,7 +377,7 @@ jobs:
   #     - name: Upload DMG
   #       uses: actions/upload-artifact@v6
   #       with:
-  #         name: Snowflake-macOS-arm64-${{ github.sha }}
+  #         name: Orbit-macOS-arm64-${{ github.sha }}
   #         path: target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
   #         retention-days: 7
 

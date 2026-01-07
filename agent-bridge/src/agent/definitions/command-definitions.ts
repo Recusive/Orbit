@@ -53,7 +53,7 @@ const BUILTIN_COMMANDS: SlashCommandDefinition[] = [
 ];
 
 /**
- * Default commands shipped with Snowflake (read-only)
+ * Default commands shipped with Orbit (read-only)
  */
 const DEFAULT_COMMANDS: SlashCommandDefinition[] = [
   {
@@ -305,7 +305,7 @@ export function listCommands(workspacePath: string): SlashCommandDefinition[] {
   // Add builtin commands (always available)
   commands.push(...BUILTIN_COMMANDS);
 
-  // Add default commands (shipped with Snowflake)
+  // Add default commands (shipped with Orbit)
   commands.push(...DEFAULT_COMMANDS);
 
   // Add project commands
