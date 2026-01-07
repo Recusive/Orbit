@@ -15,7 +15,8 @@ use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
 use commands::canvas::lifecycle as canvas_cmd;
 use commands::common::{
-    dev_monitor, diagnostics, files, git, lsp, search, settings, terminal, workspace,
+    credentials, dev_monitor, diagnostics, files, git, lsp, providers, search, settings, terminal,
+    workspace,
 };
 use snowflake_conversations::ConversationManager;
 use snowflake_settings::SettingsManager;
@@ -370,6 +371,14 @@ pub fn run() {
             dev_monitor::dev_monitor_write_batch,
             dev_monitor::dev_monitor_read_entries,
             dev_monitor::dev_monitor_clear,
+            // Provider detection commands
+            providers::detect_claude_cli,
+            providers::check_claude_keychain,
+            // Credentials commands
+            credentials::store_api_key,
+            credentials::retrieve_api_key,
+            credentials::validate_api_key,
+            credentials::delete_api_key,
         ])
         .run(tauri::generate_context!());
 

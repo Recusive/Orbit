@@ -7,11 +7,13 @@ import { HeaderBar } from '@/components/layout/header-bar';
 import { RootLayout } from '@/components/layout/root-layout';
 import { StatusBar } from '@/components/layout/status-bar';
 import { CrashNotification } from '@/components/modals';
+import { OnboardingFlow } from '@/components/onboarding';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { WelcomePage } from '@/components/welcome';
 import { useBrowser } from '@/hooks/browser/use-browser';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { TauriProvider } from '@/providers/tauri-provider';
+import { useOnboardingStore } from '@/stores/onboarding/onboarding-store';
 import { useHasWorkspace, useUIStore } from '@/stores/ui/ui-store';
 
 /**
@@ -78,6 +80,7 @@ const App: FC = () => {
 
   const activeTab = useUIStore((state) => state.activeTab);
   const hasWorkspace = useHasWorkspace();
+  const hasCompletedOnboarding = useOnboardingStore((state) => state.hasCompletedOnboarding);
 
   // Handle dialog close - either dismiss or acknowledge based on user action
   const handleOpenChange = useCallback(
@@ -90,6 +93,11 @@ const App: FC = () => {
     },
     [acknowledge]
   );
+
+  // Show onboarding flow if user hasn't completed it yet
+  if (!hasCompletedOnboarding) {
+    return <OnboardingFlow />;
+  }
 
   return (
     <TauriProvider>
