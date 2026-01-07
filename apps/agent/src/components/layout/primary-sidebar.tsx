@@ -680,7 +680,7 @@ const ConversationItem: FC<ConversationItemProps> = ({
         {/* Text - truncate with ellipsis by default, gradient fade on hover */}
         <span
           className={cn(
-            'text-sm overflow-hidden flex-1 text-left transition-all duration-150',
+            'text-base overflow-hidden flex-1 text-left transition-all duration-150',
             collapsed ? 'w-0 opacity-0 whitespace-nowrap' : '',
             // When not hovered: truncate with ellipsis
             // When hovered: allow full text with gradient mask

@@ -18,14 +18,16 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 6px);
 
-  /* Font size tokens (compact UI scale)
-     NOTE: text-[9px] is used directly since Tailwind has no 2xs tier
+  /* Font size tokens (VS Code typography scale)
+     Matches VS Code/Copilot conventions for consistent IDE feel
+     9px: text-[9px] (badges, counts) - no Tailwind tier
      Tailwind v4 uses --text-* for font-size utilities */
-  --text-xs: 10px;
-  --text-sm: 11px;
-  --text-base: 13px;
-  --text-lg: 14px;
-  --text-xl: 15px;
+  --text-xs: 10px; /* Small counts */
+  --text-sm: 11px; /* Secondary labels, metadata, status */
+  --text-base: 13px; /* Primary body, chat text, tabs, labels */
+  --text-lg: 14px; /* H3, command center, emphasized text */
+  --text-xl: 16px; /* H2, icons, multi-editor tabs */
+  --text-2xl: 20px; /* H1 headings */
 
   /* Shadow tokens (elevation system)
      xs: subtle kbd, sm: message bubble, md: tool collapsed, lg: panel/header, xl: tool expanded */
@@ -382,7 +384,7 @@ html.dark {
 }
 
 [data-streamdown='code-block-header'] span {
-  font-size: 0.6875rem !important;
+  font-size: 0.6875rem !important; /* 11px - VS Code secondary label */
   color: var(--muted-foreground);
   opacity: 0.7;
 }
@@ -404,7 +406,7 @@ html.dark {
 [data-streamdown='code-block-body'] {
   margin: 0 !important;
   padding: 0.625rem 0.75rem !important;
-  font-size: 0.6875rem !important;
+  font-size: 0.75rem !important; /* 12px - VS Code code font size */
   line-height: 1.5 !important;
   background-color: var(--card) !important;
   border-top: 1px solid oklch(0 0 0 / 4%) !important;
@@ -440,17 +442,17 @@ html.dark [data-streamdown='code-block-body'] code span::before {
    Compact shadcn/ui inspired patterns
    ============================================ */
 
-/* Base markdown container */
+/* Base markdown container - VS Code chat typography */
 .chat-markdown {
-  font-size: 0.8125rem;
-  line-height: 1.6;
+  font-size: 0.8125rem; /* 13px - VS Code chat body */
+  line-height: 1.5; /* VS Code standard line-height */
   color: var(--foreground);
 }
 
-/* Headings - compact scale */
+/* Headings - VS Code scale (H1: 20px, H2: 16px, H3: 14px) */
 .chat-markdown h1 {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.25rem; /* 20px - VS Code H1 */
+  font-weight: 600; /* VS Code uses 600 for headings */
   line-height: 1.25;
   letter-spacing: -0.02em;
   text-wrap: balance;
@@ -464,7 +466,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 }
 
 .chat-markdown h2 {
-  font-size: 1.0625rem;
+  font-size: 1rem; /* 16px - VS Code H2 */
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.015em;
@@ -478,7 +480,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 }
 
 .chat-markdown h3 {
-  font-size: 0.9375rem;
+  font-size: 0.875rem; /* 14px - VS Code H3 */
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.01em;
@@ -488,7 +490,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 }
 
 .chat-markdown h4 {
-  font-size: 0.875rem;
+  font-size: 0.8125rem; /* 13px - same as body */
   font-weight: 600;
   line-height: 1.4;
   margin-top: 0.875rem;
@@ -498,7 +500,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 
 .chat-markdown h5,
 .chat-markdown h6 {
-  font-size: 0.8125rem;
+  font-size: 0.8125rem; /* 13px - same as body */
   font-weight: 600;
   line-height: 1.4;
   margin-top: 0.75rem;
@@ -514,7 +516,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 
 /* Paragraphs */
 .chat-markdown p {
-  line-height: 1.6;
+  line-height: 1.5; /* VS Code standard */
   margin-top: 0;
   margin-bottom: 0;
 }
@@ -546,7 +548,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
   margin-top: 0.25rem;
   margin-bottom: 0;
   padding-left: 0;
-  line-height: 1.6;
+  line-height: 1.5; /* VS Code standard */
 }
 
 .chat-markdown li::marker {
@@ -562,15 +564,15 @@ html.dark [data-streamdown='code-block-body'] code span::before {
   margin-bottom: 0.25rem;
 }
 
-/* Inline code */
+/* Inline code - VS Code uses 12px (0.923em relative to 13px body) */
 .chat-markdown code:not(pre code) {
   position: relative;
   padding: 0.125rem 0.25rem;
   border-radius: var(--radius-sm);
   background-color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.75rem; /* 12px - VS Code inline code */
+  font-weight: 500;
   color: var(--foreground);
 }
 
@@ -583,7 +585,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 }
 
 .chat-markdown pre code {
-  font-size: 0.75rem;
+  font-size: 0.75rem; /* 12px - VS Code code font size */
   font-weight: 400;
   line-height: 1.5;
 }
@@ -650,14 +652,14 @@ html.dark [data-streamdown='code-block-body'] code span::before {
   margin-top: 0.375rem;
 }
 
-/* Table styling - compact */
+/* Table styling - VS Code uses 12px for tables */
 .chat-markdown table,
 .prose table {
   width: 100%;
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
   border-collapse: collapse;
-  font-size: 0.75rem;
+  font-size: 0.75rem; /* 12px - VS Code standard UI text */
   overflow-y: auto;
 }
 
