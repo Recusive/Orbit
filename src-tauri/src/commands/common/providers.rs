@@ -9,8 +9,6 @@
     reason = "Tauri commands receive owned types from JSON deserialization"
 )]
 
-use std::process::Command;
-
 use serde::{Deserialize, Serialize};
 
 /// Result of keychain credential check.
@@ -55,6 +53,8 @@ pub async fn check_claude_keychain() -> KeychainStatus {
 /// Check if credentials exist in macOS keychain (without parsing them).
 #[cfg(target_os = "macos")]
 async fn check_macos_keychain_exists() -> KeychainStatus {
+    use std::process::Command;
+
     // Try to read the Claude Code credentials from Keychain
     // We only check if the entry exists, not parse the contents
     // (actual parsing is done in TypeScript agent-bridge)
