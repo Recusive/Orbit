@@ -367,7 +367,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
             )}
           >
             <div className="flex items-center justify-between px-3 py-1">
-              <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-normal whitespace-nowrap">
+              <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-normal whitespace-nowrap">
                 Workspaces
               </span>
               <Tooltip>

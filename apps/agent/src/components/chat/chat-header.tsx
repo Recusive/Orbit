@@ -13,7 +13,7 @@ export const ChatHeader: FC = () => {
       style={{ height: HEIGHTS.headerBar }}
     >
       {/* Breadcrumb */}
-      <div className="flex items-center text-sm min-w-0 flex-1 max-w-[280px]">
+      <div className="flex items-center text-base min-w-0 flex-1 max-w-[280px]">
         <span className="opacity-70 cursor-pointer hover:opacity-100 transition-opacity shrink-0">
           {workspaceName ?? 'No workspace'}
         </span>
