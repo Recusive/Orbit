@@ -286,7 +286,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
       postMessage({
         type: 'file:tree:request',
         uuid,
-        path: path,
+        path: requestPath || undefined,
       });
     },
     [postMessage, debug]
@@ -332,13 +332,12 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
       }
     }
 
-    // Also check root path
+    // Also check root path - fetch if not loaded (covers both cleared cache and new root path)
     if (currentRootPath) {
-      const wasRootLoaded = prevTreeNodesRef.current.has(currentRootPath);
       const isRootLoaded = currentPaths.has(currentRootPath);
-      if (wasRootLoaded && !isRootLoaded && !pendingRequests.current.has(currentRootPath)) {
+      if (!isRootLoaded && !pendingRequests.current.has(currentRootPath)) {
         if (debug) {
-          logger.debug('Re-fetching cleared root', { path: currentRootPath });
+          logger.debug('Fetching root (not loaded)', { path: currentRootPath });
         }
         requestChildren(currentRootPath);
       }

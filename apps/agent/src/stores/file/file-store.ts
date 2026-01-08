@@ -234,9 +234,23 @@ export const useFileStore = create<FileState>()(
     // ═══════════════════════════════════════════════════════════════
 
     setRootPath: (path: string) => {
-      logger.info(`Root path set: ${path}`);
+      const currentRoot = get().rootPath;
+
+      // Only update if path actually changed
+      if (currentRoot === path) {
+        return;
+      }
+
+      logger.info(`Root path changed: ${currentRoot ?? '(none)'} → ${path}`);
+
       set((state) => {
         state.rootPath = path;
+        // Clear cached tree data when root changes (prevents stale data from old workspace)
+        state.treeNodes = {};
+        state.expandedFolders = new Set();
+        state.loadingPaths = new Set();
+        state.errorPaths = new Map();
+        state.selectedTreePath = null;
       });
     },
 
