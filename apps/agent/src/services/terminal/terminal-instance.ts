@@ -19,7 +19,7 @@ import { CommandDecorationsAddon } from '@/lib/terminal/addons/command-decoratio
 import { MarkNavigationAddon } from '@/lib/terminal/addons/mark-navigation-addon';
 import { ShellIntegrationAddon } from '@/lib/terminal/addons/shell-integration-addon';
 import { getBestTheme } from '@/lib/terminal/utils/theme-sync';
-import { TerminalResizeDebouncer } from '@/services/terminal/terminal-resize-debouncer';
+import { TerminalFitDebouncer } from '@/services/terminal/terminal-fit-debouncer';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -76,6 +76,7 @@ export class TerminalInstance {
   private isConnected = false;
   private isDisposed = false;
   private ptyRequested = false;
+  private ptyCreationObserver: ResizeObserver | null = null;
 
   // Copy-on-selection
   private _copyOnSelection = false;
@@ -95,8 +96,8 @@ export class TerminalInstance {
   private unacknowledgedBytes = 0;
   private ackInterval: ReturnType<typeof setInterval> | null = null;
 
-  // Resize debouncer (VS Code pattern - separates X/Y, uses idle callbacks)
-  private resizeDebouncer: TerminalResizeDebouncer;
+  // Fit debouncer - debounces fitAddon.fit() calls for performance
+  private fitDebouncer: TerminalFitDebouncer;
   private _disableLayout = false;
 
   // Disposables
@@ -212,20 +213,15 @@ export class TerminalInstance {
     // Set up copy-on-selection
     this.setupCopyOnSelection();
 
-    // Set up resize debouncer (VS Code pattern)
-    // This replaces ResizeObserver - container will call layout() instead
-    this.resizeDebouncer = new TerminalResizeDebouncer(
-      () => this.terminal,
-      () => this.isVisible,
-      () => {
-        if (!this._disableLayout && !this.isDisposed) {
-          this.fitAddon.fit();
-        }
-      }
-    );
+    // Set up fit debouncer - debounces fitAddon.fit() calls
+    // Container's ResizeObserver calls layout() which triggers this
+    this.fitDebouncer = new TerminalFitDebouncer(this.fitAddon, () => this.isVisible);
 
     // Set up theme observer to sync with app theme
     this.setupThemeObserver();
+
+    // Set up keyboard shortcuts (Cmd+C to copy when selection exists)
+    this.setupKeyboardShortcuts();
   }
 
   // ==========================================================================
@@ -235,13 +231,20 @@ export class TerminalInstance {
   /**
    * Attach xterm to a container element.
    * Does NOT create new xterm - just moves the wrapper element.
-   * Reference: terminalInstance.ts:981-1008
+   *
+   * IMPORTANT: On first attach, we use ResizeObserver to wait for the container
+   * to have valid dimensions (width > 0 && height > 0) before creating the PTY.
+   * This is more robust than RAF-based timing because it handles complex layout
+   * hierarchies (flexbox, absolute positioning, etc.) that may need multiple
+   * layout passes before dimensions are finalized.
    */
   attachToElement(container: HTMLElement): void {
     if (this.isDisposed) return;
 
     // No-op if already attached to this container
     if (this.container === container) return;
+
+    const isFirstAttach = !this.ptyRequested;
 
     // Set new container and append wrapper
     this.container = container;
@@ -250,12 +253,51 @@ export class TerminalInstance {
     // Refresh xterm rendering
     this.terminal.refresh(0, this.terminal.rows - 1);
 
-    // Layout will be called by container's ResizeObserver
-
     // Request PTY creation on FIRST attach only
-    if (!this.ptyRequested) {
+    if (isFirstAttach) {
       this.ptyRequested = true;
-      this.requestPtyCreation();
+
+      // Use ResizeObserver to wait for valid dimensions
+      // This is more reliable than RAF because it fires when the browser
+      // has actually calculated the layout, regardless of how many passes that takes
+      this.ptyCreationObserver = new ResizeObserver((entries) => {
+        if (this.isDisposed) return;
+
+        const entry = entries[0];
+        if (!entry) return;
+
+        const { width, height } = entry.contentRect;
+
+        // Wait until we have actual dimensions
+        if (width > 0 && height > 0) {
+          // Disconnect observer - we only need it once
+          this.ptyCreationObserver?.disconnect();
+          this.ptyCreationObserver = null;
+
+          // Now fit to container - this calculates correct cols/rows
+          this.fitDebouncer.forcefit();
+
+          // Log dimensions for debugging
+          logger.info('Terminal fitted before PTY creation', {
+            sessionId: this.sessionId,
+            cols: this.terminal.cols,
+            rows: this.terminal.rows,
+            containerWidth: width,
+            containerHeight: height,
+          });
+
+          // Now request PTY with correct cols/rows
+          this.requestPtyCreation();
+        } else {
+          logger.debug('Waiting for container dimensions', {
+            sessionId: this.sessionId,
+            width,
+            height,
+          });
+        }
+      });
+
+      this.ptyCreationObserver.observe(container);
     }
   }
 
@@ -283,8 +325,9 @@ export class TerminalInstance {
     this.wrapperElement.style.display = visible ? '' : 'none';
 
     if (visible) {
-      // Flush any pending resize operations when becoming visible
-      this.resizeDebouncer.flush();
+      // Flush any pending fit operations and force re-fit when becoming visible
+      this.fitDebouncer.flush();
+      this.fitDebouncer.forcefit();
       // Auto-focus when becoming visible
       setTimeout(() => {
         this.terminal.focus();
@@ -564,6 +607,74 @@ export class TerminalInstance {
     this.terminal.options.theme = newTheme;
   }
 
+  /**
+   * Set up keyboard shortcuts for the terminal.
+   *
+   * Uses a DOM event listener on the wrapper element (capturing phase) to intercept
+   * keyboard events BEFORE xterm processes them. This is more reliable than
+   * attachCustomKeyEventHandler which can be overwritten by addons.
+   *
+   * VS Code pattern for Cmd+C / Ctrl+C:
+   * - If there's a selection → copy to clipboard (don't send to PTY)
+   * - If no selection → send SIGINT to PTY (interrupt running process)
+   *
+   * Also handles Cmd+V / Ctrl+V for paste.
+   */
+  private setupKeyboardShortcuts(): void {
+    // Use capturing phase to intercept before xterm
+    this.wrapperElement.addEventListener(
+      'keydown',
+      (event) => {
+        const isMac = navigator.platform.toUpperCase().includes('MAC');
+        const modKey = isMac ? event.metaKey : event.ctrlKey;
+        const key = event.key.toLowerCase();
+
+        // Cmd+C / Ctrl+C - Copy if selection exists, otherwise let through for SIGINT
+        if (modKey && key === 'c' && !event.shiftKey && !event.altKey) {
+          if (this.terminal.hasSelection()) {
+            // Copy selection to clipboard
+            const selection = this.terminal.getSelection();
+            if (selection) {
+              event.preventDefault();
+              event.stopPropagation();
+              navigator.clipboard.writeText(selection).catch(() => {
+                // Silently fail if clipboard not available
+              });
+              logger.debug('Copied selection to clipboard', { length: selection.length });
+            }
+            return;
+          }
+          // No selection - let event propagate to xterm for SIGINT
+          return;
+        }
+
+        // Cmd+V / Ctrl+V - Paste from clipboard
+        if (modKey && key === 'v' && !event.shiftKey && !event.altKey) {
+          event.preventDefault();
+          event.stopPropagation();
+          navigator.clipboard
+            .readText()
+            .then((text) => {
+              if (text && this.terminalId && this.isConnected) {
+                this.postMessage({
+                  type: 'terminal:write',
+                  uuid: crypto.randomUUID(),
+                  terminal_id: this.terminalId,
+                  data: text,
+                });
+                logger.debug('Pasted from clipboard', { length: text.length });
+              }
+            })
+            .catch(() => {
+              // Silently fail if clipboard not available
+            });
+          return;
+        }
+      },
+      true
+    ); // true = capturing phase
+  }
+
   // ==========================================================================
   // Clipboard Methods (for context menu)
   // ==========================================================================
@@ -703,17 +814,26 @@ export class TerminalInstance {
   }
 
   /**
-   * Layout the terminal with given container dimensions.
-   * Called by the container's ResizeObserver (VS Code pattern).
-   * Uses debouncer to prevent UI blocking.
+   * Layout the terminal to fit container dimensions.
+   * Called by the container's ResizeObserver.
+   *
+   * Uses debounced fitAddon.fit() which:
+   * 1. Calculates proper cols/rows from container size
+   * 2. Resizes xterm internally
+   * 3. Triggers xterm's onResize event → sends to backend PTY
    */
-  layout(width: number, height: number): void {
+  layout(): void {
     if (this._disableLayout || this.isDisposed) return;
-    if (width <= 0 || height <= 0) return;
+    this.fitDebouncer.fit();
+  }
 
-    // Request resize through debouncer
-    // The debouncer handles visibility-aware scheduling
-    this.resizeDebouncer.resize(this.terminal.cols, this.terminal.rows);
+  /**
+   * Force an immediate fit to container dimensions.
+   * Bypasses debouncer - use for critical moments like initial PTY creation.
+   */
+  forceFit(): void {
+    if (this.isDisposed) return;
+    this.fitDebouncer.forcefit();
   }
 
   /**
@@ -754,8 +874,14 @@ export class TerminalInstance {
       this.themeObserver = null;
     }
 
-    // Dispose resize debouncer
-    this.resizeDebouncer.dispose();
+    // Disconnect PTY creation observer (if still waiting)
+    if (this.ptyCreationObserver) {
+      this.ptyCreationObserver.disconnect();
+      this.ptyCreationObserver = null;
+    }
+
+    // Dispose fit debouncer
+    this.fitDebouncer.dispose();
 
     // Send close message to backend
     if (this.terminalId && this.isConnected) {

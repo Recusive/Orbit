@@ -51,6 +51,7 @@ import {
   generateCommandDefinition,
 } from '@/lib/api/backend';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
+import { useTerminalStore } from '@/stores/terminal/terminal-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 // ═══════════════════════════════════════════════════════════════
@@ -188,6 +189,15 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
         },
         '*'
       );
+
+      // Check if session has an initial command to execute (e.g., SSH)
+      const session = useTerminalStore.getState().sessions.find((s) => s.id === message.session_id);
+      if (session?.initialCommand) {
+        // Small delay to ensure terminal is ready
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        await writeTerminal(info.id, `${session.initialCommand}\n`);
+        console.warn('[Orbit] Executed initial command:', session.initialCommand);
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create terminal';
       console.error('[Orbit] Terminal creation error:', errorMessage);

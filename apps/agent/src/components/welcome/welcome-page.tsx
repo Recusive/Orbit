@@ -5,6 +5,7 @@ import type { FC } from 'react';
 
 import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { CloneRepositoryDialog } from '@/components/modals/git';
+import { SSHConnectionDialog } from '@/components/modals/ssh';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, openFileDialog, setWorkspacePath } from '@/lib/api/backend';
 import { cn } from '@/lib/utils/utils';
@@ -23,6 +24,7 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
   const setRootPath = useFileStore((s) => s.setRootPath);
   const { projects } = useRecentProjects();
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+  const [sshDialogOpen, setSshDialogOpen] = useState(false);
 
   const openProject = useCallback(
     async (path: string): Promise<void> => {
@@ -119,6 +121,9 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
 
         <button
           type="button"
+          onClick={() => {
+            setSshDialogOpen(true);
+          }}
           className={cn(
             'flex flex-col items-start justify-center gap-1.5 p-3 rounded-lg cursor-pointer',
             'bg-muted/30 border border-border',
@@ -173,6 +178,9 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
 
       {/* Clone Repository Dialog */}
       <CloneRepositoryDialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen} />
+
+      {/* SSH Connection Dialog */}
+      <SSHConnectionDialog open={sshDialogOpen} onOpenChange={setSshDialogOpen} />
     </div>
   );
 };

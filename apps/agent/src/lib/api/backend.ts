@@ -1175,6 +1175,43 @@ export async function getSettingsPath(): Promise<string> {
 }
 
 // ============================================
+// SSH Host Operations
+// ============================================
+
+/**
+ * Add an SSH host to the recent hosts list.
+ *
+ * The host string should be in the format "user@hostname" or "user@hostname:port".
+ * The host is moved to the front if it already exists.
+ */
+export async function addSshHost(host: string): Promise<void> {
+  return invoke('add_ssh_host', { host });
+}
+
+/**
+ * Get the list of recent SSH hosts.
+ *
+ * Returns an array of host strings, most recent first.
+ */
+export async function getSshHosts(): Promise<string[]> {
+  return invoke<string[]>('get_ssh_hosts');
+}
+
+/**
+ * Remove an SSH host from the recent hosts list.
+ */
+export async function removeSshHost(host: string): Promise<void> {
+  return invoke('remove_ssh_host', { host });
+}
+
+/**
+ * Clear all SSH hosts from the recent hosts list.
+ */
+export async function clearSshHosts(): Promise<void> {
+  return invoke('clear_ssh_hosts');
+}
+
+// ============================================
 // Diagnostics Operations
 // ============================================
 

@@ -126,13 +126,10 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
     const container = terminalContainerRefs.current.get(activeSessionId);
     if (!container) return;
 
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        const instance = terminalManager.getInstance(activeSessionId);
-        if (instance) {
-          instance.layout(width, height);
-        }
+    const observer = new ResizeObserver(() => {
+      const instance = terminalManager.getInstance(activeSessionId);
+      if (instance) {
+        instance.layout();
       }
     });
 

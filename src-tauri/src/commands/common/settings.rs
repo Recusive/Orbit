@@ -52,3 +52,31 @@ pub fn clear_recent_projects(manager: State<'_, SettingsManager>) -> Result<()> 
 pub fn get_settings_path(manager: State<'_, SettingsManager>) -> String {
     manager.config_path().to_string_lossy().to_string()
 }
+
+// ============================================
+// SSH Host Commands
+// ============================================
+
+/// Add an SSH host to the recent hosts list.
+#[tauri::command]
+pub fn add_ssh_host(host: String, manager: State<'_, SettingsManager>) -> Result<()> {
+    manager.add_ssh_host(&host)
+}
+
+/// Get the list of recent SSH hosts.
+#[tauri::command]
+pub fn get_ssh_hosts(manager: State<'_, SettingsManager>) -> Result<Vec<String>> {
+    Ok(manager.ssh_hosts())
+}
+
+/// Remove an SSH host from the recent hosts list.
+#[tauri::command]
+pub fn remove_ssh_host(host: String, manager: State<'_, SettingsManager>) -> Result<()> {
+    manager.remove_ssh_host(&host)
+}
+
+/// Clear all SSH hosts.
+#[tauri::command]
+pub fn clear_ssh_hosts(manager: State<'_, SettingsManager>) -> Result<()> {
+    manager.clear_ssh_hosts()
+}

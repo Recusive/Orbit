@@ -181,6 +181,9 @@ pub struct Settings {
     /// Recent projects (file paths)
     #[serde(default)]
     pub recent_projects: Vec<PathBuf>,
+    /// Recent SSH hosts (e.g., "user@hostname" or "user@hostname:port")
+    #[serde(default)]
+    pub ssh_hosts: Vec<String>,
 }
 
 impl Settings {
@@ -202,6 +205,9 @@ impl Settings {
 
         // Limit recent projects to 10
         self.recent_projects.truncate(10);
+
+        // Limit SSH hosts to 10
+        self.ssh_hosts.truncate(10);
 
         self
     }
@@ -449,6 +455,82 @@ impl SettingsManager {
         let settings = {
             let mut guard = self.settings.write();
             guard.recent_projects.retain(|p| p != &normalized);
+            guard.clone()
+        };
+
+        self.save_without_memory_update(&settings)
+    }
+
+    // ========================================
+    // SSH Host Management
+    // ========================================
+
+    /// Add an SSH host to the recent hosts list.
+    ///
+    /// Moves the host to the front if already in the list.
+    /// Limits the list to 10 entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the settings cannot be saved.
+    pub fn add_ssh_host(&self, host: &str) -> Result<()> {
+        let host = host.trim().to_owned();
+        if host.is_empty() {
+            return Ok(());
+        }
+
+        // Hold lock for the entire read-modify-write operation
+        let settings = {
+            let mut guard = self.settings.write();
+
+            // Remove if already exists (we'll add to front)
+            guard.ssh_hosts.retain(|h| h != &host);
+
+            // Add to front
+            guard.ssh_hosts.insert(0, host);
+
+            // Limit to 10 entries
+            guard.ssh_hosts.truncate(10);
+
+            guard.clone()
+        };
+
+        self.save_without_memory_update(&settings)
+    }
+
+    /// Get the list of recent SSH hosts.
+    #[must_use]
+    pub fn ssh_hosts(&self) -> Vec<String> {
+        self.settings.read().ssh_hosts.clone()
+    }
+
+    /// Remove an SSH host from the recent hosts list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the settings cannot be saved.
+    pub fn remove_ssh_host(&self, host: &str) -> Result<()> {
+        let host = host.trim();
+
+        // Hold lock for the entire read-modify-write operation
+        let settings = {
+            let mut guard = self.settings.write();
+            guard.ssh_hosts.retain(|h| h != host);
+            guard.clone()
+        };
+
+        self.save_without_memory_update(&settings)
+    }
+
+    /// Clear all SSH hosts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the settings cannot be saved.
+    pub fn clear_ssh_hosts(&self) -> Result<()> {
+        let settings = {
+            let mut guard = self.settings.write();
+            guard.ssh_hosts.clear();
             guard.clone()
         };
 
@@ -728,6 +810,10 @@ mod tests {
                 PathBuf::from("/home/user/project1"),
                 PathBuf::from("/home/user/project2"),
             ],
+            ssh_hosts: vec![
+                String::from("user@server1.example.com"),
+                String::from("admin@192.168.1.1:2222"),
+            ],
         };
 
         let json = serde_json::to_string_pretty(&settings).expect("Failed to serialize");
@@ -744,6 +830,7 @@ mod tests {
         assert_eq!(deserialized.window_state.width, 1920);
         assert!(deserialized.window_state.maximized);
         assert_eq!(deserialized.recent_projects.len(), 2);
+        assert_eq!(deserialized.ssh_hosts.len(), 2);
     }
 
     // ========================================

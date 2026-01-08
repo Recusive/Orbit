@@ -1,4 +1,4 @@
-import { Clipboard, ClipboardPaste, Eraser, Pencil, Search, Trash2 } from 'lucide-react';
+import { Copy, ClipboardPaste, Eraser, Pencil, Search, Trash2 } from 'lucide-react';
 
 import type { FC, ReactNode } from 'react';
 
@@ -35,35 +35,35 @@ export const TerminalContextMenu: FC<TerminalContextMenuProps> = ({
     <ContextMenu>
       {children}
       <ContextMenuContent className="w-48">
-        <ContextMenuItem onClick={onCopy} disabled={!hasSelection}>
-          <Clipboard className="mr-2 h-4 w-4" />
+        <ContextMenuItem onSelect={onCopy} disabled={!hasSelection}>
+          <Copy />
           Copy
           <ContextMenuShortcut>⌘C</ContextMenuShortcut>
         </ContextMenuItem>
-        <ContextMenuItem onClick={onPaste}>
-          <ClipboardPaste className="mr-2 h-4 w-4" />
+        <ContextMenuItem onSelect={onPaste}>
+          <ClipboardPaste />
           Paste
           <ContextMenuShortcut>⌘V</ContextMenuShortcut>
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem onClick={onClear}>
-          <Eraser className="mr-2 h-4 w-4" />
+        <ContextMenuItem onSelect={onClear}>
+          <Eraser />
           Clear Terminal
         </ContextMenuItem>
         {onFind ? (
-          <ContextMenuItem onClick={onFind}>
-            <Search className="mr-2 h-4 w-4" />
+          <ContextMenuItem onSelect={onFind}>
+            <Search />
             Find...
             <ContextMenuShortcut>⌘F</ContextMenuShortcut>
           </ContextMenuItem>
         ) : null}
         <ContextMenuSeparator />
-        <ContextMenuItem onClick={onRename}>
-          <Pencil className="mr-2 h-4 w-4" />
+        <ContextMenuItem onSelect={onRename}>
+          <Pencil />
           Rename
         </ContextMenuItem>
-        <ContextMenuItem onClick={onKill} className="text-destructive focus:text-destructive">
-          <Trash2 className="mr-2 h-4 w-4" />
+        <ContextMenuItem onSelect={onKill} className="text-destructive focus:text-destructive">
+          <Trash2 />
           Kill Terminal
         </ContextMenuItem>
       </ContextMenuContent>

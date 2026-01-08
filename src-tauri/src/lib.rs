@@ -366,6 +366,10 @@ pub fn run() {
             settings::get_recent_projects,
             settings::clear_recent_projects,
             settings::get_settings_path,
+            settings::add_ssh_host,
+            settings::get_ssh_hosts,
+            settings::remove_ssh_host,
+            settings::clear_ssh_hosts,
             // Diagnostics commands
             diagnostics::check_previous_crash,
             diagnostics::clear_crash_log,

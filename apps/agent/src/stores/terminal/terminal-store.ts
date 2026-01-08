@@ -73,6 +73,8 @@ export interface TerminalSession {
   unacknowledgedBytes: number;
   /** Current foreground process (e.g., "zsh", "node") */
   foregroundProcess?: ForegroundProcess;
+  /** Initial command to execute when terminal connects (e.g., "ssh user@host") */
+  initialCommand?: string;
 }
 
 // ============================================================================
@@ -107,7 +109,7 @@ export interface TerminalState {
   preferences: TerminalPreferences;
 
   // Session Management
-  createSession: (name?: string, cwd?: string) => string;
+  createSession: (name?: string, cwd?: string, initialCommand?: string) => string;
   closeSession: (id: string) => void;
   setActiveSession: (id: string | null) => void;
   renameSession: (id: string, name: string) => void;
@@ -171,10 +173,10 @@ export const useTerminalStore = create<TerminalState>()(
     // Session Management
     // ========================================================================
 
-    createSession: (name?: string, cwd?: string) => {
+    createSession: (name?: string, cwd?: string, initialCommand?: string) => {
       const random = Math.random().toString(36);
       const id = `term_${String(Date.now())}_${random.slice(2, 11)}`;
-      logger.info(`Creating terminal session`, { id, name, cwd });
+      logger.info(`Creating terminal session`, { id, name, cwd, initialCommand });
 
       let sessionNumber = 1;
       set((state) => {
@@ -196,6 +198,7 @@ export const useTerminalStore = create<TerminalState>()(
           isConnected: false,
           commandHistory: [],
           unacknowledgedBytes: 0,
+          ...(initialCommand !== undefined && { initialCommand }),
         };
 
         state.sessions.push(newSession);
