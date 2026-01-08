@@ -10,7 +10,10 @@
  * - In non-Tauri environment (browser dev), logs messages but doesn't crash
  */
 
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
+
+const logger = createLogger('TauriCanvas');
 
 import {
   isTauriEnvironment,
@@ -138,7 +141,7 @@ if (import.meta.hot !== undefined) {
       }
       window.__CANVAS_TAURI_UNLISTENERS__ = [];
       window.__CANVAS_TAURI_LISTENERS_INITIALIZED__ = false;
-      console.warn('[useTauriCanvas] Listeners cleaned up for HMR');
+      logger.debug('Listeners cleaned up for HMR');
     }
   });
 }
@@ -149,7 +152,7 @@ if (import.meta.hot !== undefined) {
 async function initTauriListeners(): Promise<void> {
   if (window.__CANVAS_TAURI_LISTENERS_INITIALIZED__) return;
   if (!isTauriEnvironment()) {
-    console.warn('[useTauriCanvas] Not in Tauri environment, skipping listener setup');
+    logger.debug('Not in Tauri environment, skipping listener setup');
     return;
   }
 
@@ -190,9 +193,9 @@ async function initTauriListeners(): Promise<void> {
     });
     window.__CANVAS_TAURI_UNLISTENERS__.push(unlistenError);
 
-    console.warn('[useTauriCanvas] Tauri listeners initialized');
+    logger.debug('Tauri listeners initialized');
   } catch (err) {
-    console.error('[useTauriCanvas] Failed to initialize listeners:', err);
+    logger.error('Failed to initialize listeners', err);
     window.__CANVAS_TAURI_LISTENERS_INITIALIZED__ = false;
   }
 }
@@ -244,7 +247,7 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
       // Initialize singleton listeners
       void initTauriListeners();
     } else {
-      console.warn('[useTauriCanvas] Running in browser mode (no Tauri)');
+      logger.debug('Running in browser mode (no Tauri)');
     }
   }, []);
 
@@ -365,7 +368,7 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
   /** Create session */
   const createSession = useCallback((sessionId: string): void => {
     if (!isTauriEnvironment()) {
-      console.warn('[useTauriCanvas] createSession (mock):', sessionId);
+      logger.debug('createSession (mock)', { sessionId });
       return;
     }
 
@@ -377,7 +380,7 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
     createdSessionsRef.current.add(sessionId);
 
     canvasCreateSession(sessionId).catch((err: unknown) => {
-      console.error('[useTauriCanvas] Failed to create session:', err);
+      logger.error('Failed to create session', err, { sessionId });
       createdSessionsRef.current.delete(sessionId);
     });
   }, []);
@@ -385,7 +388,7 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
   /** Delete session */
   const deleteSession = useCallback((sessionId: string): void => {
     if (!isTauriEnvironment()) {
-      console.warn('[useTauriCanvas] deleteSession (mock):', sessionId);
+      logger.debug('deleteSession (mock)', { sessionId });
       return;
     }
 
@@ -395,7 +398,7 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
     }
 
     canvasDeleteSession(sessionId).catch((err: unknown) => {
-      console.error('[useTauriCanvas] Failed to delete session:', err);
+      logger.error('Failed to delete session', err, { sessionId });
     });
   }, []);
 
@@ -404,19 +407,19 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
     const sessionId = sessionIdRef.current;
 
     if (!isTauriEnvironment()) {
-      console.warn('[useTauriCanvas] sendPrompt (mock):', { prompt, nodeId, sessionId });
+      logger.debug('sendPrompt (mock)', { prompt: prompt.substring(0, 50), nodeId, sessionId });
       return;
     }
 
     if (!sessionId) {
-      console.error('[useTauriCanvas] No session ID set. Call createSession first.');
+      logger.error('No session ID set. Call createSession first.');
       return;
     }
 
     // Note: nodeId is available for future use but not currently passed to backend
     void nodeId; // Suppress unused variable warning
     canvasSendMessage(sessionId, prompt, canvasStateRef.current).catch((err: unknown) => {
-      console.error('[useTauriCanvas] Failed to send message:', err);
+      logger.error('Failed to send message', err, { sessionId });
       callbacksRef.current?.onAgentError?.(`Failed to send message: ${String(err)}`);
     });
   }, []);
@@ -427,22 +430,17 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
       const sessionId = sessionIdRef.current;
 
       if (!isTauriEnvironment()) {
-        console.warn('[useTauriCanvas] sendMcpToolResponse (mock):', {
-          requestId,
-          success,
-          result,
-          error,
-        });
+        logger.debug('sendMcpToolResponse (mock)', { requestId, success });
         return;
       }
 
       if (!sessionId) {
-        console.error('[useTauriCanvas] No session ID set');
+        logger.error('No session ID set for tool response');
         return;
       }
 
       canvasToolResponse(sessionId, requestId, success, result, error).catch((err: unknown) => {
-        console.error('[useTauriCanvas] Failed to send tool response:', err);
+        logger.error('Failed to send tool response', err, { requestId });
       });
     },
     []
@@ -454,17 +452,17 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
       const sessionId = sessionIdRef.current;
 
       if (!isTauriEnvironment()) {
-        console.warn('[useTauriCanvas] sendOrchestratorControl (mock):', { action, taskId });
+        logger.debug('sendOrchestratorControl (mock)', { action, taskId });
         return;
       }
 
       if (!sessionId) {
-        console.error('[useTauriCanvas] No session ID set');
+        logger.error('No session ID set for orchestrator control');
         return;
       }
 
       canvasOrchestratorControl(sessionId, action, taskId).catch((err: unknown) => {
-        console.error('[useTauriCanvas] Failed to send orchestrator control:', err);
+        logger.error('Failed to send orchestrator control', err, { action, taskId });
       });
     },
     []
@@ -476,17 +474,12 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
       const sessionId = sessionIdRef.current;
 
       if (!isTauriEnvironment()) {
-        console.warn('[useTauriCanvas] sendPerceptionResult (mock):', {
-          requestId,
-          toolName,
-          nodeId,
-          result,
-        });
+        logger.debug('sendPerceptionResult (mock)', { requestId, toolName, nodeId });
         return;
       }
 
       if (!sessionId) {
-        console.error('[useTauriCanvas] No session ID set');
+        logger.error('No session ID set for perception result');
         return;
       }
 
@@ -494,7 +487,7 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
       // The result is wrapped as an MCP tool response
       canvasToolResponse(sessionId, requestId, true, { toolName, nodeId, ...result }).catch(
         (err: unknown) => {
-          console.error('[useTauriCanvas] Failed to send perception result:', err);
+          logger.error('Failed to send perception result', err, { requestId, toolName });
         }
       );
     },
@@ -505,7 +498,7 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
   const exportComponent = useCallback(
     (nodeId: string, code: string, suggestedFilename: string): void => {
       if (!isTauriEnvironment()) {
-        console.warn('[useTauriCanvas] exportComponent (mock):', { nodeId, suggestedFilename });
+        logger.debug('exportComponent (mock)', { nodeId, suggestedFilename });
         return;
       }
 
@@ -529,11 +522,11 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
           if (filePath) {
             // Write the code to the selected file
             await writeTextFile(filePath, code);
-            console.warn('[useTauriCanvas] Component exported:', filePath);
+            logger.info('Component exported', { filePath, nodeId });
             onExportResultRef.current?.(true, filePath, undefined);
           }
         } catch (err: unknown) {
-          console.error('[useTauriCanvas] Failed to export component:', err);
+          logger.error('Failed to export component', err, { nodeId, suggestedFilename });
           onExportResultRef.current?.(
             false,
             undefined,
@@ -549,7 +542,7 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
   const sendError = useCallback((nodeId: string, error: string, stack?: string): void => {
     // In Tauri, we could send this to the backend for logging/error tracking
     // For now, just log locally - the agent can see errors through other means
-    console.warn('[useTauriCanvas] Sandpack error:', { nodeId, error, stack });
+    logger.warn('Sandpack error', { nodeId, error, stack });
     // TODO: Implement Tauri command to report errors if needed
   }, []);
 
@@ -558,12 +551,12 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
     const sessionId = sessionIdRef.current;
 
     if (!isTauriEnvironment()) {
-      console.warn('[useTauriCanvas] requestFix (mock):', { nodeId, error });
+      logger.debug('requestFix (mock)', { nodeId, error });
       return;
     }
 
     if (!sessionId) {
-      console.error('[useTauriCanvas] No session ID set for requestFix');
+      logger.error('No session ID set for requestFix');
       return;
     }
 
@@ -572,7 +565,7 @@ export function useTauriCanvas(callbacks?: TauriCanvasCallbacks): UseTauriCanvas
     // Note: nodeId is included in the fixPrompt context for the agent
     void nodeId; // Suppress unused variable warning
     canvasSendMessage(sessionId, fixPrompt, canvasStateRef.current).catch((err: unknown) => {
-      console.error('[useTauriCanvas] Failed to send fix request:', err);
+      logger.error('Failed to send fix request', err, { nodeId });
     });
   }, []);
 

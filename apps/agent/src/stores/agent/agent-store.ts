@@ -1,5 +1,8 @@
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+
+const logger = createLogger('AgentStore');
 
 export type AgentPhase = 'idle' | 'planning' | 'implementing' | 'reviewing';
 
@@ -53,6 +56,7 @@ export const useAgentStore = create<AgentState>()(
     toolCalls: [],
 
     setPhase: (phase: AgentPhase) => {
+      logger.debug(`Phase changed to: ${phase}`);
       set((state) => {
         state.phase = phase;
       });
@@ -61,6 +65,7 @@ export const useAgentStore = create<AgentState>()(
     startTask: (task: Omit<AgentTask, 'id' | 'status' | 'createdAt'>) => {
       const random = Math.random().toString(36);
       const id = `task_${String(Date.now())}_${random.slice(2, 11)}`;
+      logger.info(`Task started: ${task.title}`, { id });
 
       set((state) => {
         const newTask: AgentTask = {
@@ -80,6 +85,7 @@ export const useAgentStore = create<AgentState>()(
     },
 
     stopTask: () => {
+      logger.info('Task stopped by user');
       set((state) => {
         if (state.currentTask) {
           const task = state.tasks.find((t) => t.id === state.currentTask?.id);
@@ -97,6 +103,11 @@ export const useAgentStore = create<AgentState>()(
     },
 
     completeTask: (taskId: string, error?: string) => {
+      if (error) {
+        logger.error(`Task failed: ${taskId}`, undefined, { error });
+      } else {
+        logger.info(`Task completed: ${taskId}`);
+      }
       set((state) => {
         const task = state.tasks.find((t) => t.id === taskId);
         if (task) {

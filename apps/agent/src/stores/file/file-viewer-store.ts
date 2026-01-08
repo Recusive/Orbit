@@ -1,7 +1,10 @@
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
 import type { FileDiff } from '@/stores/file/file-store';
+
+const logger = createLogger('FileViewerStore');
 
 // Diff data for files opened from Changes tab
 export interface ViewedFileDiff {
@@ -208,6 +211,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
     wordWrap: true,
 
     openFile: (path: string, content?: string): void => {
+      logger.debug(`Opening file: ${path}`);
       set((state) => {
         // Check if tab already exists
         const existingTab = state.openTabs.find((tab) => tab.path === path);
@@ -278,6 +282,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
     },
 
     closeTab: (path: string): void => {
+      logger.debug(`Closing tab: ${path}`);
       set((state) => {
         const tabIndex = state.openTabs.findIndex((tab) => tab.path === path);
         if (tabIndex === -1) return;
@@ -361,6 +366,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
     },
 
     markSaved: (path: string): void => {
+      logger.info(`File saved: ${path}`);
       set((state) => {
         const tab = state.openTabs.find((t) => t.path === path);
         if (tab) {

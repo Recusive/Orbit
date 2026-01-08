@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useMemo } from 'react';
 
 import type { Message } from '@/stores/chat/chat-store';
@@ -6,6 +7,8 @@ import type { SendMessage, EditMessage, DeleteMessage } from '@/types/protocol';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { generateUUID } from '@/types/protocol';
+
+const logger = createLogger('Chat');
 
 export interface UseChatReturn {
   messages: Message[];
@@ -44,8 +47,14 @@ export function useChat(): UseChatReturn {
   const sendMessage = useCallback(
     async (content: string): Promise<void> => {
       if (!activeConversationId) {
+        logger.error('Cannot send message: no active conversation');
         throw new Error('No active conversation');
       }
+
+      logger.info(`Sending message`, {
+        conversationId: activeConversationId,
+        contentLength: content.length,
+      });
 
       const tempId = `temp-${String(Date.now())}`;
       const timestamp = Date.now();

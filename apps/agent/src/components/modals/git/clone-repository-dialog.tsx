@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { AlertCircle, Folder, GitBranch, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -20,7 +21,6 @@ import {
   openFileDialog,
   setWorkspacePath,
 } from '@/lib/api/backend';
-import { createLogger } from '@/lib/logger';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 

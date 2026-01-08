@@ -1,7 +1,10 @@
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
 import type { ReactElementContext } from '@/types/protocol';
+
+const logger = createLogger('BrowserStore');
 
 // Navigation state from browser
 export interface NavigationState {
@@ -106,6 +109,7 @@ export const useBrowserStore = create<BrowserStore>()(
     },
 
     setViewId: (viewId: string | null): void => {
+      logger.info(`Browser view ${viewId ? 'created' : 'destroyed'}`, { viewId });
       set((state) => {
         state.viewId = viewId;
         state.isCreating = false;
@@ -149,6 +153,9 @@ export const useBrowserStore = create<BrowserStore>()(
     },
 
     setNavigation: (navigation: Partial<NavigationState>): void => {
+      if (navigation.url) {
+        logger.debug(`Browser navigated to: ${navigation.url}`);
+      }
       set((state) => {
         state.navigation = { ...state.navigation, ...navigation };
       });

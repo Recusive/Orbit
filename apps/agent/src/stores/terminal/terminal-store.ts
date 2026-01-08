@@ -1,9 +1,12 @@
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
 import type { ShellType, TerminalCapabilitiesState } from '@/types/protocol';
 
 import { TERMINAL } from '@/lib/utils/constants';
+
+const logger = createLogger('TerminalStore');
 
 // ============================================================================
 // Types
@@ -171,6 +174,7 @@ export const useTerminalStore = create<TerminalState>()(
     createSession: (name?: string, cwd?: string) => {
       const random = Math.random().toString(36);
       const id = `term_${String(Date.now())}_${random.slice(2, 11)}`;
+      logger.info(`Creating terminal session`, { id, name, cwd });
 
       let sessionNumber = 1;
       set((state) => {
@@ -206,6 +210,7 @@ export const useTerminalStore = create<TerminalState>()(
     },
 
     closeSession: (id: string) => {
+      logger.info(`Closing terminal session: ${id}`);
       set((state) => {
         const sessionIndex = state.sessions.findIndex((s) => s.id === id);
         if (sessionIndex === -1) return;
@@ -255,6 +260,7 @@ export const useTerminalStore = create<TerminalState>()(
       shellType?: ShellType,
       capabilities?: TerminalCapabilitiesState
     ) => {
+      logger.info(`Terminal connected`, { sessionId, terminalId, pid, shellType });
       set((state) => {
         const session = state.sessions.find((s) => s.id === sessionId);
         if (session) {
@@ -276,6 +282,7 @@ export const useTerminalStore = create<TerminalState>()(
     },
 
     disconnectSession: (sessionId: string, exitCode?: number) => {
+      logger.info(`Terminal disconnected`, { sessionId, exitCode });
       set((state) => {
         const session = state.sessions.find((s) => s.id === sessionId);
         if (session) {

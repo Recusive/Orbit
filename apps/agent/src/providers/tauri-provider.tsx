@@ -7,6 +7,7 @@
  * 3. Never duplicated using abort pattern for async setup
  */
 
+import { createLogger } from '@orbit/common/lib';
 import { formatZodError } from '@orbit/shared-schemas';
 import {
   createContext,
@@ -21,7 +22,6 @@ import {
 import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
 import type { FC, ReactNode } from 'react';
 
-import { trace } from '@/dev-monitor';
 import {
   onAgentCheckpoint,
   onAgentError,
@@ -57,6 +57,8 @@ const IGNORED_PATH_PATTERNS = [
 function shouldIgnorePath(path: string): boolean {
   return IGNORED_PATH_PATTERNS.some((pattern) => path.includes(pattern));
 }
+
+const logger = createLogger('TauriProvider');
 
 /**
  * Post a message to window for other hooks to receive
@@ -175,8 +177,8 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
           const content = message.content ?? '';
           const messageId = crypto.randomUUID();
 
-          // Dev-monitor: Track agent message
-          trace.log('info', `sdk:message:${message.type}`, `Agent message: ${message.type}`, {
+          // Log agent message for debugging
+          logger.debug(`Agent message: ${message.type}`, {
             sessionId,
             messageType: message.type,
             hasContent: content.length > 0,
@@ -215,14 +217,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
                 `[TauriProvider] Tool event: name="${toolName}", status="${String(status)}", id="${toolId}"`
               );
 
-              // Dev-monitor: Track tool use
+              // Log tool completion
               if (status === 'success' || status === 'error') {
-                trace.log(
-                  status === 'error' ? 'error' : 'info',
-                  'sdk:tool:end',
-                  `Tool ${status}: ${toolName}`,
-                  { sessionId, toolName, success: status === 'success' }
-                );
+                if (status === 'error') {
+                  logger.warn(`Tool ${status}: ${toolName}`, { sessionId, toolName });
+                } else {
+                  logger.debug(`Tool ${status}: ${toolName}`, { sessionId, toolName });
+                }
                 postWindowMessage({
                   type: 'tool:end',
                   uuid: crypto.randomUUID(),
@@ -234,10 +235,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
                   success: status === 'success',
                 });
               } else {
-                trace.log('info', 'sdk:tool:start', `Tool started: ${toolName}`, {
-                  sessionId,
-                  toolName,
-                });
+                logger.debug(`Tool started: ${toolName}`, { sessionId, toolName });
                 postWindowMessage({
                   type: 'tool:start',
                   uuid: crypto.randomUUID(),
@@ -253,10 +251,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
 
             case 'result':
             case 'turn_complete': {
-              // Dev-monitor: Track completion with token usage
+              // Log completion with token usage
               const usage = message.usage;
               if (usage !== undefined) {
-                trace.log('info', 'sdk:complete', 'Agent turn completed', {
+                logger.debug('Agent turn completed', {
                   sessionId,
                   inputTokens: usage.inputTokens,
                   outputTokens: usage.outputTokens,
@@ -282,7 +280,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             }
 
             case 'turn_cancel':
-              trace.log('info', 'sdk:cancel', 'Agent turn cancelled', { sessionId });
+              logger.debug('Agent turn cancelled', { sessionId });
               postWindowMessage({
                 type: 'agent:complete',
                 uuid: crypto.randomUUID(),
@@ -293,9 +291,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
               break;
 
             case 'error':
-              trace.log('error', 'sdk:error', `Agent error: ${content.slice(0, 100)}`, {
-                sessionId,
-              });
+              logger.error(`Agent error: ${content.slice(0, 100)}`, undefined, { sessionId });
               postWindowMessage({
                 type: 'agent:error',
                 uuid: crypto.randomUUID(),

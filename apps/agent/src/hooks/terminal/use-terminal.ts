@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect } from 'react';
 
 import type { TerminalSession, TerminalOutput } from '@/stores/terminal/terminal-store';
@@ -11,6 +12,8 @@ import type {
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
 import { generateUUID } from '@/types/protocol';
+
+const logger = createLogger('Terminal');
 
 export interface UseTerminalReturn {
   sessions: TerminalSession[];
@@ -102,13 +105,13 @@ export function useTerminal(defaultSessionId?: string): UseTerminalReturn {
       const targetSessionId = sessionId ?? activeSessionId;
 
       if (!targetSessionId) {
-        console.warn('No active terminal session');
+        logger.warn('No active terminal session');
         return;
       }
 
       const sessionExists = sessions.some((s) => s.id === targetSessionId);
       if (!sessionExists) {
-        console.warn(`Terminal session not found: ${targetSessionId}`);
+        logger.warn(`Terminal session not found: ${targetSessionId}`);
         return;
       }
 
@@ -134,7 +137,7 @@ export function useTerminal(defaultSessionId?: string): UseTerminalReturn {
       const targetSessionId = sessionId ?? activeSessionId;
 
       if (!targetSessionId) {
-        console.warn('No active terminal session to clear');
+        logger.warn('No active terminal session to clear');
         return;
       }
 

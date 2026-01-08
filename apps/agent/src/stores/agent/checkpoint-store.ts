@@ -20,8 +20,11 @@
  * - rewindFiles: turnEndCheckpoint[N] → Files are restored to state after N's tools completed
  */
 
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+
+const logger = createLogger('CheckpointStore');
 
 export interface RewindCheckpoints {
   /** Checkpoint for resumeSessionAt - Claude sees up to this message */
@@ -158,6 +161,7 @@ export const useCheckpointStore = create<CheckpointState>()(
     latestCheckpoints: {},
 
     onUserMessageSent: (sessionId, userMessageId): void => {
+      logger.debug(`User message sent`, { sessionId, userMessageId });
       set((state) => {
         // Store the user message ID for this turn
         // This will be used when agent:complete fires to associate checkpoints
@@ -166,6 +170,7 @@ export const useCheckpointStore = create<CheckpointState>()(
     },
 
     onCheckpointReceived: (sessionId, checkpointId): void => {
+      logger.debug(`Checkpoint received`, { sessionId, checkpointId });
       set((state) => {
         // Always track checkpoint in order and as latest
         state.checkpointOrder[sessionId] ??= [];

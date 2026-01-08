@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useMemo } from 'react';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
@@ -7,6 +8,8 @@ import type { StoredConversationSummary } from '@/types/protocol';
 
 import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/utils/constants';
 import { StoredConversationSummaryArraySchema } from '@/types/protocol';
+
+const logger = createLogger('UIStore');
 
 export type { StoredConversationSummary } from '@/types/protocol';
 
@@ -252,6 +255,7 @@ export const useUIStore = create<UIStore>()(
     },
 
     setWorkspace: (path: string): void => {
+      logger.info(`Workspace set: ${path}`);
       set((state) => {
         // Enable transition mode BEFORE workspace change takes effect
         // This ensures ChatArea mounts with visibility: hidden, preventing
@@ -269,6 +273,7 @@ export const useUIStore = create<UIStore>()(
     },
 
     setActiveConversation: (id: string | null, title: string | null): void => {
+      logger.debug(`Active conversation: ${id ?? 'none'}`, { title });
       set((state) => {
         state.activeConversationId = id;
         state.activeConversationTitle = title;
@@ -439,6 +444,7 @@ export const useUIStore = create<UIStore>()(
     },
 
     setActiveTab: (tab: HeaderTab): void => {
+      logger.debug(`Active tab: ${tab}`);
       set((state) => {
         state.activeTab = tab;
       });

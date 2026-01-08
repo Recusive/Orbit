@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback } from 'react';
 
 import { useTauri } from './use-tauri';
@@ -7,6 +8,8 @@ import type { AgentStart, AgentStop, AgentPause, AgentResume } from '@/types/pro
 
 import { useAgentStore } from '@/stores/agent/agent-store';
 import { generateUUID } from '@/types/protocol';
+
+const logger = createLogger('Agent');
 
 export interface UseAgentReturn {
   status: 'idle' | 'running' | 'paused' | 'error';
@@ -48,6 +51,7 @@ export function useAgent(): UseAgentReturn {
   const startTask = useCallback(
     (sessionId: string, task: string, context?: Record<string, unknown>): Promise<void> => {
       try {
+        logger.info('Starting task', { sessionId, task: task.substring(0, 50) });
         startTaskAction({
           title: task,
           description: JSON.stringify(context ?? {}),
@@ -63,6 +67,7 @@ export function useAgent(): UseAgentReturn {
         return Promise.resolve();
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to start task';
+        logger.error('Failed to start task', err instanceof Error ? err : new Error(errorMessage));
         if (currentTask) {
           updateTask(currentTask.id, {
             status: 'failed',
@@ -78,6 +83,7 @@ export function useAgent(): UseAgentReturn {
   const stopTask = useCallback(
     (sessionId: string): Promise<void> => {
       try {
+        logger.info('Stopping task', { sessionId });
         postMessage({
           type: 'agent:stop',
           uuid: generateUUID(),
@@ -88,6 +94,7 @@ export function useAgent(): UseAgentReturn {
         return Promise.resolve();
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to stop task';
+        logger.error('Failed to stop task', err instanceof Error ? err : new Error(errorMessage));
         if (currentTask) {
           updateTask(currentTask.id, {
             status: 'failed',

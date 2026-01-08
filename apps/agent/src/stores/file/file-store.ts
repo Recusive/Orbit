@@ -1,8 +1,11 @@
+import { createLogger } from '@orbit/common/lib';
 import { enableMapSet } from 'immer';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
 import type { FileNode } from '@/types/protocol';
+
+const logger = createLogger('FileStore');
 
 // Enable Immer support for Map and Set
 enableMapSet();
@@ -231,6 +234,7 @@ export const useFileStore = create<FileState>()(
     // ═══════════════════════════════════════════════════════════════
 
     setRootPath: (path: string) => {
+      logger.info(`Root path set: ${path}`);
       set((state) => {
         state.rootPath = path;
       });
@@ -282,6 +286,7 @@ export const useFileStore = create<FileState>()(
     },
 
     setError: (path: string, error: string) => {
+      logger.error(`File error at ${path}`, undefined, { error });
       set((state) => {
         state.errorPaths.set(path, error);
       });
@@ -294,6 +299,7 @@ export const useFileStore = create<FileState>()(
     },
 
     handleFileChanged: (path: string, changeType: FileChangeType) => {
+      logger.debug(`File changed: ${changeType}`, { path });
       set((state) => {
         // Find the parent directory of the changed file
         const lastSlashIndex = path.lastIndexOf('/');

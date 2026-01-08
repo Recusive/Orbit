@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { AlertCircle, Folder, GitBranch, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -23,7 +24,6 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { gitBranchInfo, gitWorktreeAdd } from '@/lib/api/backend';
-import { createLogger } from '@/lib/logger';
 import { useUIStore, useWorkspacePath } from '@/stores/ui/ui-store';
 
 const logger = createLogger('CreateWorktreeDialog');

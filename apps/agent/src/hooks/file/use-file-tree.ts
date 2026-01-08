@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { ExtensionMessage, FileNode } from '@/types/protocol';
@@ -6,6 +7,8 @@ import { useTauri } from '@/hooks/agent/use-tauri';
 import { lspDidOpen } from '@/lib/api/backend';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore, getLanguageFromPath } from '@/stores/file/file-viewer-store';
+
+const logger = createLogger('FileTree');
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -105,11 +108,10 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
           }
 
           if (debug) {
-            console.warn(
-              '[useFileTree] Received tree response for:',
-              message.path,
-              `(${String(message.children.length)} children)`
-            );
+            logger.debug('Received tree response', {
+              path: message.path,
+              children: message.children.length,
+            });
           }
 
           const store = useFileStore.getState();
@@ -135,13 +137,13 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
             }
           }
 
-          console.error('[useFileTree] Error fetching tree:', message.error);
+          logger.error('Error fetching tree', new Error(message.error));
           break;
         }
 
         case 'file:changed': {
           if (debug) {
-            console.warn('[useFileTree] File changed:', message.path, message.change_type);
+            logger.debug('File changed', { path: message.path, changeType: message.change_type });
           }
           // Handle file system changes (updates store, may clear cached children)
           useFileStore.getState().handleFileChanged(message.path, message.change_type);
@@ -158,9 +160,9 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
           // Notify LSP only if this is a newly opened file
           if (!isAlreadyOpen) {
             const language = getLanguageFromPath(message.path);
-            lspDidOpen(message.path, language, message.content).catch((err: unknown) => {
+            lspDidOpen(message.path, language, message.content).catch(() => {
               if (debug) {
-                console.warn('[useFileTree] Failed to notify LSP of file open:', err);
+                logger.warn('Failed to notify LSP of file open', { path: message.path });
               }
             });
           }
@@ -252,7 +254,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
       // Don't request if already pending
       if (pendingRequests.current.has(requestPath)) {
         if (debug) {
-          console.warn('[useFileTree] Skipping duplicate request for:', requestPath);
+          logger.debug('Skipping duplicate request', { path: requestPath });
         }
         return;
       }
@@ -267,7 +269,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
           pendingRequests.current.delete(requestPath);
           useFileStore.getState().setLoading(loadingKey, false);
           useFileStore.getState().setError(loadingKey, 'Request timed out');
-          console.error('[useFileTree] Request timed out for:', requestPath);
+          logger.error('Request timed out', new Error(`Path: ${requestPath}`));
         }
       }, REQUEST_TIMEOUT_MS);
 
@@ -278,7 +280,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
       useFileStore.getState().setLoading(loadingKey, true);
 
       if (debug) {
-        console.warn('[useFileTree] Requesting children for:', requestPath || '(root)');
+        logger.debug('Requesting children', { path: requestPath || '(root)' });
       }
 
       postMessage({
@@ -324,7 +326,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
       // If folder was loaded but now isn't (cache cleared), re-fetch
       if (wasLoaded && !isLoaded && !pendingRequests.current.has(folderPath)) {
         if (debug) {
-          console.warn('[useFileTree] Re-fetching cleared folder:', folderPath);
+          logger.debug('Re-fetching cleared folder', { path: folderPath });
         }
         requestChildren(folderPath);
       }
@@ -336,7 +338,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
       const isRootLoaded = currentPaths.has(currentRootPath);
       if (wasRootLoaded && !isRootLoaded && !pendingRequests.current.has(currentRootPath)) {
         if (debug) {
-          console.warn('[useFileTree] Re-fetching cleared root:', currentRootPath);
+          logger.debug('Re-fetching cleared root', { path: currentRootPath });
         }
         requestChildren(currentRootPath);
       }
@@ -360,7 +362,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
   // Refresh: clear tree and re-fetch
   const refresh = useCallback((): void => {
     if (debug) {
-      console.warn('[useFileTree] Refreshing tree');
+      logger.debug('Refreshing tree');
     }
 
     // Clear all pending request timeouts
@@ -399,7 +401,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
   const retryFolder = useCallback(
     (path: string): void => {
       if (debug) {
-        console.warn('[useFileTree] Retrying folder:', path);
+        logger.debug('Retrying folder', { path });
       }
       useFileStore.getState().clearError(path);
       requestChildren(path);
@@ -411,7 +413,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
   const openFile = useCallback(
     (path: string): void => {
       if (debug) {
-        console.warn('[useFileTree] Opening file:', path);
+        logger.debug('Opening file', { path });
       }
 
       const viewerStore = useFileViewerStore.getState();

@@ -403,30 +403,561 @@
         "notes": "Distinct from agent/ module - serves different purpose (visual canvas AI vs chat/coding AI)"
       },
       "suggestedRefactoring": []
-    }
-  ],
-  "pendingAnalysis": [
+    },
     {
       "path": "agent-bridge/src/common",
-      "priority": "low",
-      "reason": "Shared utilities - check for unused exports"
+      "name": "Common Module",
+      "description": "Shared utilities for authentication, logging, events, and retry logic",
+      "analyzedAt": "2026-01-08",
+      "overallStatus": "keep",
+      "overallHealth": "excellent",
+      "summary": "Essential foundation layer. 11 files (~650 lines). createLogger is the most-used function with 29 imports. No dead code.",
+      "files": [
+        {
+          "path": "agent-bridge/src/common/auth/credentials.ts",
+          "name": "ClaudeCredentials",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "low",
+          "lineCount": 153,
+          "responsibilities": [
+            "OAuth token from macOS Keychain",
+            "API key from environment",
+            "Credential priority (OAuth first)"
+          ],
+          "imports": ["child_process", "@orbit/shared-schemas", "../../protocol/schemas.js"],
+          "importedBy": [
+            "agent-bridge/src/agent/core/agent.ts",
+            "agent-bridge/src/canvas/core/canvas-agent.ts",
+            "agent-bridge/src/canvas/orchestrator/agents/base-agent.ts"
+          ],
+          "issues": [],
+          "notes": "Uses macOS security CLI for Keychain access"
+        },
+        {
+          "path": "agent-bridge/src/common/logging/logger.ts",
+          "name": "Logger",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "low",
+          "lineCount": 59,
+          "responsibilities": [
+            "Structured logging with prefixes",
+            "Debug level filtering",
+            "stderr output for IPC safety"
+          ],
+          "imports": [],
+          "importedBy": ["29 files across agent/ and canvas/"],
+          "issues": [],
+          "notes": "CRITICAL: Uses stderr to avoid corrupting stdout JSON IPC"
+        },
+        {
+          "path": "agent-bridge/src/common/events/events.ts",
+          "name": "Events",
+          "status": "keep",
+          "criticality": "important",
+          "complexity": "low",
+          "lineCount": 108,
+          "responsibilities": [
+            "IDisposable interface",
+            "Disposable base class",
+            "Emitter event pattern"
+          ],
+          "imports": [],
+          "importedBy": ["agent-bridge/src/agent/session/session-manager.ts"],
+          "issues": [],
+          "notes": "Replaces VS Code lifecycle utilities"
+        },
+        {
+          "path": "agent-bridge/src/common/retry/retry.ts",
+          "name": "Retry",
+          "status": "keep",
+          "criticality": "important",
+          "complexity": "medium",
+          "lineCount": 314,
+          "responsibilities": [
+            "Exponential backoff",
+            "Retryable error detection",
+            "Jitter for thundering herd prevention",
+            "Preset configurations"
+          ],
+          "imports": ["../logging/logger.js"],
+          "importedBy": ["agent-bridge/src/agent/core/agent.ts"],
+          "issues": [],
+          "notes": "Well-designed SDK reliability utility"
+        },
+        {
+          "path": "agent-bridge/src/common/i18n/nls.ts",
+          "name": "NLS",
+          "status": "keep",
+          "criticality": "utility",
+          "complexity": "low",
+          "lineCount": 15,
+          "responsibilities": ["String passthrough for localization"],
+          "imports": [],
+          "importedBy": ["agent-bridge/src/agent/permissions/permissions.ts"],
+          "issues": [],
+          "notes": "Minimal stub for VS Code API compatibility. Ready for future i18n."
+        }
+      ],
+      "dependencies": {
+        "external": ["child_process", "@orbit/shared-schemas"],
+        "internal": ["protocol/schemas"]
+      },
+      "duplicationCheck": {
+        "hasDuplication": false,
+        "notes": "Unique utilities that replace VS Code-specific APIs not available outside VS Code"
+      },
+      "suggestedRefactoring": []
     },
     {
       "path": "agent-bridge/src/protocol",
-      "priority": "low",
-      "reason": "IPC protocol definitions - check schema consistency"
+      "name": "Protocol Module",
+      "description": "IPC contract between Rust (Tauri) and Node.js (agent-bridge)",
+      "analyzedAt": "2026-01-08",
+      "overallStatus": "keep",
+      "overallHealth": "excellent",
+      "summary": "Core IPC contract. 3 files (~1,333 lines). Uses TypeScript interfaces + Zod validation pattern. No refactoring needed.",
+      "files": [
+        {
+          "path": "agent-bridge/src/protocol/index.ts",
+          "name": "Protocol Index",
+          "status": "keep",
+          "criticality": "support",
+          "complexity": "low",
+          "lineCount": 96,
+          "responsibilities": ["Barrel exports for types", "Barrel exports for schemas"],
+          "imports": ["./protocol.js", "./schemas.js"],
+          "importedBy": ["External consumers"],
+          "issues": [],
+          "notes": "Clean barrel exports"
+        },
+        {
+          "path": "agent-bridge/src/protocol/protocol.ts",
+          "name": "Protocol Types",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "high",
+          "lineCount": 643,
+          "responsibilities": [
+            "35+ request type definitions (Rust → Node.js)",
+            "10+ response type definitions (Node.js → Rust)",
+            "10+ event type definitions (unsolicited)"
+          ],
+          "imports": [
+            "../agent/definitions/agent-definitions.js",
+            "../agent/definitions/command-definitions.js",
+            "../agent/session/session-manager.js",
+            "../canvas/types/types.js"
+          ],
+          "importedBy": ["agent-bridge/src/index.ts", "Tests"],
+          "issues": [],
+          "notes": "Large but focused - all IPC types in one place"
+        },
+        {
+          "path": "agent-bridge/src/protocol/schemas.ts",
+          "name": "Protocol Schemas",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "high",
+          "lineCount": 594,
+          "responsibilities": [
+            "Zod schemas for all request types",
+            "Branded primitive types (nominal typing)",
+            "Discriminated union for O(1) validation",
+            "Strict mode to reject unknown fields"
+          ],
+          "imports": ["zod", "@orbit/shared-schemas"],
+          "importedBy": [
+            "agent-bridge/src/index.ts",
+            "agent-bridge/src/common/auth/credentials.ts"
+          ],
+          "issues": [],
+          "notes": "Runtime validation - catches malformed IPC messages"
+        }
+      ],
+      "dependencies": {
+        "external": ["zod", "@orbit/shared-schemas"],
+        "internal": ["agent/definitions", "agent/session", "agent/types", "canvas/types"]
+      },
+      "duplicationCheck": {
+        "hasDuplication": false,
+        "notes": "Intentional parallel definitions: protocol.ts for compile-time types, schemas.ts for runtime validation. Industry standard pattern."
+      },
+      "suggestedRefactoring": []
     },
     {
       "path": "apps/agent/src/stores",
-      "priority": "medium",
-      "reason": "Zustand stores - check for overlapping state"
+      "name": "Stores Module",
+      "description": "Zustand state management stores for the Agent frontend app",
+      "analyzedAt": "2026-01-08",
+      "overallStatus": "keep",
+      "overallHealth": "excellent",
+      "summary": "Well-organized domain-driven state management. 22 files (~4,184 lines). 92 imports across 57 files. No overlapping state or duplication.",
+      "files": [
+        {
+          "path": "apps/agent/src/stores/ui/ui-store.ts",
+          "name": "UI Store",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "high",
+          "lineCount": 638,
+          "responsibilities": [
+            "Container dimensions",
+            "Workspace state",
+            "Conversation list (UI side)",
+            "Left/Right/Bottom panel state",
+            "Terminal position",
+            "Activity and header tabs",
+            "Dialog open states",
+            "Worktree UI state"
+          ],
+          "imports": ["zustand", "zustand/middleware/immer"],
+          "importedBy": ["33+ component files"],
+          "issues": [],
+          "notes": "Largest store but all responsibilities relate to UI layout. Uses localStorage persistence."
+        },
+        {
+          "path": "apps/agent/src/stores/file/file-viewer-store.ts",
+          "name": "File Viewer Store",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "high",
+          "lineCount": 534,
+          "responsibilities": [
+            "Open file tabs",
+            "Tab management (open/close/switch)",
+            "Content tracking with dirty detection",
+            "Diff view support",
+            "Navigation history",
+            "Cursor position",
+            "Search state",
+            "Word wrap toggle"
+          ],
+          "imports": ["zustand", "zustand/middleware/immer", "@/stores/file/file-store"],
+          "importedBy": [
+            "editor/CodeMirrorEditor.tsx",
+            "files/file-viewer.tsx",
+            "layout/status-bar.tsx"
+          ],
+          "issues": [],
+          "notes": "Contains getLanguageFromPath() helper (80 lines) - necessary for language detection"
+        },
+        {
+          "path": "apps/agent/src/stores/terminal/terminal-store.ts",
+          "name": "Terminal Store",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "high",
+          "lineCount": 512,
+          "responsibilities": [
+            "Terminal session management",
+            "PTY connection lifecycle",
+            "Output buffering with max lines",
+            "Capability tracking (shell integration)",
+            "CWD detection",
+            "Command detection",
+            "Flow control (backpressure)",
+            "Foreground process tracking"
+          ],
+          "imports": ["zustand", "zustand/middleware/immer", "@/lib/utils/constants"],
+          "importedBy": ["terminal/terminal-panel.tsx", "hooks/terminal/*"],
+          "issues": [],
+          "notes": "Flow control prevents overwhelming UI with terminal output"
+        },
+        {
+          "path": "apps/agent/src/stores/agent/tool-store.ts",
+          "name": "Tool Store",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "medium",
+          "lineCount": 443,
+          "responsibilities": [
+            "Input/thinking mode state",
+            "Model selection (haiku/sonnet/opus)",
+            "Tool execution lifecycle",
+            "Permission request queue",
+            "Session usage tracking (tokens/cost)",
+            "Session caching for conversation switching"
+          ],
+          "imports": ["zustand", "zustand/middleware/immer"],
+          "importedBy": ["chat/* components", "hooks/agent/*"],
+          "issues": [],
+          "notes": "Session caching allows switching conversations without losing tool state"
+        },
+        {
+          "path": "apps/agent/src/stores/file/file-store.ts",
+          "name": "File Store",
+          "status": "keep",
+          "criticality": "important",
+          "complexity": "medium",
+          "lineCount": 400,
+          "responsibilities": [
+            "File tree state",
+            "Directory expansion tracking",
+            "File entry metadata",
+            "Git diff information"
+          ],
+          "imports": ["zustand", "zustand/middleware/immer"],
+          "importedBy": ["files/file-explorer.tsx", "hooks/file/*"],
+          "issues": [],
+          "notes": "Distinct from file-viewer-store (tree vs tabs)"
+        },
+        {
+          "path": "apps/agent/src/stores/agent/checkpoint-store.ts",
+          "name": "Checkpoint Store",
+          "status": "keep",
+          "criticality": "important",
+          "complexity": "medium",
+          "lineCount": 359,
+          "responsibilities": [
+            "Conversation checkpoints",
+            "Rewind state management",
+            "File snapshot tracking"
+          ],
+          "imports": ["zustand", "zustand/middleware/immer"],
+          "importedBy": ["hooks/agent/*"],
+          "issues": [],
+          "notes": "Enables conversation rewind feature"
+        },
+        {
+          "path": "apps/agent/src/stores/browser/browser-store.ts",
+          "name": "Browser Store",
+          "status": "keep",
+          "criticality": "utility",
+          "complexity": "medium",
+          "lineCount": 253,
+          "responsibilities": ["Browser panel state", "URL tracking", "Navigation history"],
+          "imports": ["zustand", "zustand/middleware/immer"],
+          "importedBy": ["browser/*", "hooks/browser/*"],
+          "issues": [],
+          "notes": "Manages embedded browser/webpage viewing"
+        },
+        {
+          "path": "apps/agent/src/stores/git/git-store.ts",
+          "name": "Git Store",
+          "status": "keep",
+          "criticality": "important",
+          "complexity": "medium",
+          "lineCount": 235,
+          "responsibilities": [
+            "Git branch state",
+            "Ahead/behind counts",
+            "Changed files list",
+            "Git status"
+          ],
+          "imports": ["zustand", "zustand/middleware/immer"],
+          "importedBy": ["git/* components", "layout/status-bar.tsx"],
+          "issues": [],
+          "notes": "Syncs with Rust git backend"
+        },
+        {
+          "path": "apps/agent/src/stores/chat/chat-store.ts",
+          "name": "Chat Store",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "low",
+          "lineCount": 131,
+          "responsibilities": [
+            "Message storage",
+            "Conversation CRUD",
+            "Active conversation tracking"
+          ],
+          "imports": ["zustand", "zustand/middleware/immer", "@/dev-monitor"],
+          "importedBy": ["hooks/chat/*"],
+          "issues": [],
+          "notes": "Uses trace.zustand wrapper for debugging"
+        },
+        {
+          "path": "apps/agent/src/stores/agent/agent-store.ts",
+          "name": "Agent Store",
+          "status": "keep",
+          "criticality": "important",
+          "complexity": "low",
+          "lineCount": 180,
+          "responsibilities": ["Agent execution state", "Running/idle status", "Error state"],
+          "imports": ["zustand", "zustand/middleware/immer"],
+          "importedBy": ["hooks/agent/*"],
+          "issues": [],
+          "notes": "Tracks agent lifecycle"
+        },
+        {
+          "path": "apps/agent/src/stores/onboarding/provider-store.ts",
+          "name": "Provider Store",
+          "status": "keep",
+          "criticality": "utility",
+          "complexity": "low",
+          "lineCount": 177,
+          "responsibilities": [
+            "AI provider selection",
+            "API key management",
+            "Provider configuration"
+          ],
+          "imports": ["zustand", "zustand/middleware/immer"],
+          "importedBy": ["onboarding/* components"],
+          "issues": [],
+          "notes": "For initial setup flow"
+        }
+      ],
+      "dependencies": {
+        "external": ["zustand", "zustand/middleware/immer", "react"],
+        "internal": ["@/lib/utils/constants", "@/types/protocol", "@/dev-monitor"]
+      },
+      "duplicationCheck": {
+        "hasDuplication": false,
+        "notes": "Each store handles distinct domain. UI store (layout) vs Chat store (messages) vs Tool store (execution) have clear boundaries."
+      },
+      "suggestedRefactoring": []
     },
     {
       "path": "apps/agent/src/components",
-      "priority": "medium",
-      "reason": "React components - check for unused/duplicate components"
+      "name": "Components Module",
+      "description": "React UI components for the Agent frontend app",
+      "analyzedAt": "2026-01-08",
+      "overallStatus": "keep",
+      "overallHealth": "good",
+      "summary": "Large, well-organized component library. 161 files (~21,400 lines). Cleaned up 10 orphaned sidebar files (~446 lines removed).",
+      "files": [
+        {
+          "path": "apps/agent/src/components/chat",
+          "name": "Chat Components",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "high",
+          "lineCount": 6125,
+          "fileCount": 44,
+          "responsibilities": [
+            "Chat input with mentions and slash commands",
+            "Message rendering (user/assistant)",
+            "Tool visualization widgets (11 tools)",
+            "Status indicators",
+            "Queued message handling"
+          ],
+          "issues": [],
+          "notes": "Largest subdirectory - well-organized into input/, messages/, tools/, status/, queued-message/"
+        },
+        {
+          "path": "apps/agent/src/components/modals",
+          "name": "Modal Components",
+          "status": "keep",
+          "criticality": "important",
+          "complexity": "high",
+          "lineCount": 3345,
+          "fileCount": 15,
+          "responsibilities": [
+            "Settings dialog with tabs",
+            "Slash commands settings",
+            "Subagents settings",
+            "Quick open (Cmd+P)",
+            "Worktree creation",
+            "Crash notification",
+            "Permission requests"
+          ],
+          "issues": [],
+          "notes": "Complex settings UIs - appropriately large"
+        },
+        {
+          "path": "apps/agent/src/components/layout",
+          "name": "Layout Components",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "high",
+          "lineCount": 2446,
+          "fileCount": 11,
+          "responsibilities": [
+            "Primary sidebar with conversations/explorer",
+            "Header bar with tabs",
+            "Bottom panel (terminal/problems)",
+            "Status bar",
+            "Resize handles",
+            "Chat area container"
+          ],
+          "issues": [],
+          "notes": "primary-sidebar.tsx is 757 lines - contains inline ConversationItem/WorkspaceItem"
+        },
+        {
+          "path": "apps/agent/src/components/ui",
+          "name": "UI Primitives",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "medium",
+          "lineCount": 1770,
+          "fileCount": 24,
+          "responsibilities": [
+            "Radix UI component wrappers",
+            "Button, Dialog, Select, Tabs, etc.",
+            "Dropdown menus, Context menus",
+            "Tooltips, Popovers, Hover cards"
+          ],
+          "issues": [],
+          "notes": "Actively used across 28+ files"
+        },
+        {
+          "path": "apps/agent/src/components/editor",
+          "name": "Editor Components",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "very_high",
+          "lineCount": 1476,
+          "fileCount": 4,
+          "responsibilities": [
+            "CodeMirror 6 integration",
+            "Syntax highlighting",
+            "Custom dark/light themes",
+            "Language support"
+          ],
+          "issues": [],
+          "notes": "CodeMirrorEditor.tsx is 1268 lines - expected for editor complexity"
+        },
+        {
+          "path": "apps/agent/src/components/sidebar",
+          "name": "Sidebar Components",
+          "status": "keep",
+          "criticality": "utility",
+          "complexity": "low",
+          "lineCount": 158,
+          "fileCount": 2,
+          "responsibilities": ["WorktreeItem for git worktree display"],
+          "issues": [],
+          "notes": "CLEANED: Removed 10 orphaned files (~446 lines). Only WorktreeItem.tsx remains."
+        },
+        {
+          "path": "apps/agent/src/components/common",
+          "name": "Common Components",
+          "status": "keep",
+          "criticality": "utility",
+          "complexity": "low",
+          "lineCount": 451,
+          "fileCount": 10,
+          "responsibilities": [
+            "IconButton, HeaderButton",
+            "LoadingSpinner, Skeleton",
+            "ErrorBoundary",
+            "TooltipWrapper",
+            "Timestamp, Avatar, BadgePill"
+          ],
+          "issues": [],
+          "notes": "Shared utilities used across 14 files"
+        }
+      ],
+      "dependencies": {
+        "external": ["react", "lucide-react", "@radix-ui/*", "@codemirror/*"],
+        "internal": ["@/stores/*", "@/hooks/*", "@/lib/*", "@/types/*"]
+      },
+      "duplicationCheck": {
+        "hasDuplication": false,
+        "notes": "Sidebar orphans cleaned up. ConversationItem/WorkspaceItem intentionally inline in primary-sidebar.tsx for animation integration."
+      },
+      "suggestedRefactoring": [],
+      "cleanupPerformed": {
+        "date": "2026-01-08",
+        "filesRemoved": 10,
+        "linesRemoved": 446,
+        "details": "Removed orphaned sidebar components: conversation-item.tsx, workspace-item.tsx, workspace-list.tsx, sidebar-toggle.tsx, sidebar-section.tsx, sidebar-utilities.tsx, new-conversation.tsx, inbox-button.tsx, playground-section.tsx, USAGE.md"
+      }
     }
   ],
+  "pendingAnalysis": [],
   "actionItems": [
     {
       "id": "REFACTOR-001",

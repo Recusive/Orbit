@@ -7,10 +7,14 @@
  * Reference: Orbit/src/vs/workbench/contrib/terminal/browser/terminalService.ts
  */
 
+import { createLogger } from '@orbit/common/lib';
+
 import { TerminalInstance } from './terminal-instance';
 
 import type { TerminalCapabilities } from './terminal-instance';
 import type { ExtensionMessage } from '@/types/protocol';
+
+const logger = createLogger('TerminalManager');
 
 // ============================================================================
 // Types
@@ -158,12 +162,16 @@ export class TerminalInstanceManager {
     // Return existing instance if present
     const existing = this.instances.get(sessionId);
     if (existing && !existing.getIsDisposed()) {
+      logger.debug(`Returning existing terminal instance: ${sessionId}`);
       return existing;
     }
 
     if (!globalPostMessage) {
+      logger.error('TerminalInstanceManager not initialized');
       throw new Error('TerminalInstanceManager not initialized. Call initialize() first.');
     }
+
+    logger.info(`Creating terminal instance: ${sessionName}`, { sessionId });
 
     // Clean up any disposed instances to prevent memory leaks
     this.cleanupDisposedInstances();

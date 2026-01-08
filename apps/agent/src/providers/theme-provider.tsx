@@ -1,6 +1,9 @@
+import { createLogger } from '@orbit/common/lib';
 import { createContext, useContext, useEffect, useState } from 'react';
 
 import type { FC, ReactNode } from 'react';
+
+const logger = createLogger('ThemeProvider');
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -72,6 +75,7 @@ export const ThemeProvider: FC<ThemeProviderProps> = ({
   }, [theme]);
 
   const setTheme = (newTheme: Theme): void => {
+    logger.debug('Theme changed', { theme: newTheme });
     localStorage.setItem(storageKey, newTheme);
     setThemeState(newTheme);
   };

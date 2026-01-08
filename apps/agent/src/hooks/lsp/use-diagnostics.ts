@@ -1,8 +1,11 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Diagnostic } from '@/lib/api/backend';
 
 import { onDiagnostics } from '@/lib/api/backend';
+
+const logger = createLogger('Diagnostics');
 
 type DiagnosticsState = Record<string, Diagnostic[]>;
 
@@ -64,7 +67,10 @@ export function useDiagnostics(): UseDiagnosticsResult {
         unlistenRef.current = unlisten;
       })
       .catch((err: unknown) => {
-        console.error('[useDiagnostics] Failed to subscribe:', err);
+        logger.error(
+          'Failed to subscribe to diagnostics',
+          err instanceof Error ? err : new Error(String(err))
+        );
       });
 
     return (): void => {

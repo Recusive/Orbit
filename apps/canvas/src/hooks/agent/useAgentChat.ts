@@ -8,9 +8,12 @@
  * - Streaming response handling
  */
 
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useState, useRef, useEffect } from 'react';
 
 import { useTauriCanvas } from '../canvas/useTauriCanvas';
+
+const logger = createLogger('AgentChat');
 
 import type { AgentStatus } from '../../components/agent/AgentStatusBadge';
 import type { Message } from '../../components/chat/ChatMessage';
@@ -210,7 +213,7 @@ export function useAgentChat(): UseAgentChatReturn {
       const sessionId = generateSessionId();
       sessionIdRef.current = sessionId;
       createSession(sessionId);
-      console.warn('[useAgentChat] Created session:', sessionId);
+      logger.info('Created session', { sessionId });
     }
 
     if (status === 'disconnected') {

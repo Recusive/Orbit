@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { ExtensionMessage } from '@/types/protocol';
@@ -6,6 +7,8 @@ import { useTauri } from '@/hooks/agent/use-tauri';
 import { useBrowserStore } from '@/stores/browser/browser-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 import { generateUUID } from '@/types/protocol';
+
+const logger = createLogger('Browser');
 
 // Track pending browser:open requests to navigate after creation
 let pendingNavigationUrl: string | null = null;
@@ -112,6 +115,7 @@ export function useBrowser(): void {
           break;
 
         case 'browser:error':
+          logger.error('Browser error', new Error(message.error));
           setError(message.error);
           setSelectingElement(false);
           break;

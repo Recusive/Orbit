@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import {
   ChevronDown,
   FlaskConical,
@@ -20,7 +21,6 @@ import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { gitWorktreeList, gitWorktreeRemove } from '@/lib/api/backend';
-import { createLogger } from '@/lib/logger';
 import { HEIGHTS, SIDEBAR, TRANSITIONS } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import {

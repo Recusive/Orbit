@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback } from 'react';
 
 import type { FileChange, FileChangeType } from '@/stores/file/file-store';
@@ -6,6 +7,8 @@ import type { FileAccept, FileReject, FileAcceptAll, FileRejectAll } from '@/typ
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { useFileStore } from '@/stores/file/file-store';
 import { generateUUID } from '@/types/protocol';
+
+const logger = createLogger('FileOperations');
 
 export interface UseFileOperationsReturn {
   changedFiles: FileChange[];
@@ -49,6 +52,7 @@ export function useFileOperations(): UseFileOperationsReturn {
       type: FileChangeType,
       content?: { oldContent?: string; newContent?: string }
     ): string => {
+      logger.debug(`File change: ${type}`, { path });
       const id = addFileChangeStore({
         path,
         type,

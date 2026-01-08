@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { CompletionItem, HoverInfo, Location } from '@/lib/api/backend';
@@ -14,6 +15,8 @@ import {
   lspStart,
   lspStop,
 } from '@/lib/api/backend';
+
+const logger = createLogger('LSP');
 
 // ============================================
 // Supported Languages
@@ -194,10 +197,13 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
     async (lang: string, root: string): Promise<void> => {
       setError(null);
       try {
+        logger.info(`Starting LSP server`, { language: lang, root });
         await lspStart(lang, root);
         setIsRunning(true);
+        logger.debug(`LSP server started`, { language: lang });
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
+        logger.error(`Failed to start LSP server`, error);
         setError(error);
         // Re-sync state with backend after error
         if (language) {
@@ -219,10 +225,12 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
     async (lang: string): Promise<void> => {
       setError(null);
       try {
+        logger.info(`Stopping LSP server`, { language: lang });
         await lspStop(lang);
         setIsRunning(false);
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
+        logger.error(`Failed to stop LSP server`, error);
         setError(error);
         // Re-sync state with backend after error
         if (language) {

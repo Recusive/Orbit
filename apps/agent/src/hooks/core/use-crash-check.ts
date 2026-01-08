@@ -5,9 +5,12 @@
  * state for displaying crash notifications.
  */
 
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useState } from 'react';
 
 import { checkPreviousCrash, clearCrashLog, isTauri } from '@/lib/api/backend';
+
+const logger = createLogger('CrashCheck');
 
 export interface UseCrashCheckReturn {
   /** Whether there is a pending crash to report */
@@ -58,11 +61,14 @@ export function useCrashCheck(): UseCrashCheckReturn {
         const log = await checkPreviousCrash();
         if (log) {
           setCrashLog(log);
-          console.warn('[useCrashCheck] Previous session crashed. See crash notification.');
+          logger.warn('Previous session crashed. See crash notification.');
         }
       } catch (err: unknown) {
         // Silently ignore errors - crash checking is non-critical
-        console.error('[useCrashCheck] Failed to check for crashes:', err);
+        logger.error(
+          'Failed to check for crashes',
+          err instanceof Error ? err : new Error(String(err))
+        );
       } finally {
         setIsChecking(false);
       }
@@ -78,7 +84,10 @@ export function useCrashCheck(): UseCrashCheckReturn {
 
     // Also try to clear the log file (fire and forget)
     clearCrashLog().catch((err: unknown) => {
-      console.error('[useCrashCheck] Failed to clear crash log:', err);
+      logger.error(
+        'Failed to clear crash log',
+        err instanceof Error ? err : new Error(String(err))
+      );
     });
   }, []);
 

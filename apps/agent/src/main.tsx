@@ -6,28 +6,14 @@ import './globals.css';
 import '@canvas/globals.css'; // Canvas styles only - colors come from agent's globals.css
 import App from './App';
 
-// Initialize dev-monitor in development mode
-async function initApp(): Promise<void> {
-  // Dev-monitor initialization (no-op in production, tree-shaken)
-  if (import.meta.env.DEV) {
-    const { initDevMonitor, trace } = await import('@/dev-monitor');
-    await initDevMonitor();
+const rootElement = document.getElementById('root');
 
-    // Subscribe to Rust tracing events
-    await trace.rust.subscribe();
-  }
-
-  const rootElement = document.getElementById('root');
-
-  if (!rootElement) {
-    throw new Error('Failed to find the root element');
-  }
-
-  createRoot(rootElement).render(
-    <StrictMode>
-      <App />
-    </StrictMode>
-  );
+if (!rootElement) {
+  throw new Error('Failed to find the root element');
 }
 
-void initApp();
+createRoot(rootElement).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);

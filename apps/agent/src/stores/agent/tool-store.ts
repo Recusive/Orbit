@@ -1,7 +1,10 @@
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
 import type { InputMode, Model, ThinkingMode } from '@/types/protocol';
+
+const logger = createLogger('ToolStore');
 
 // SDK Usage data (matches agent:complete schema)
 export interface UsageData {
@@ -190,6 +193,7 @@ export const useToolStore = create<ToolState>()(
       toolInput: Record<string, unknown>,
       contentOffset?: number
     ) => {
+      logger.debug(`Tool started: ${toolName}`, { id, messageId });
       set((state) => {
         const tool: ToolExecution = {
           id,
@@ -205,6 +209,11 @@ export const useToolStore = create<ToolState>()(
     },
 
     completeTool: (id: string, toolOutput: unknown, success: boolean) => {
+      if (!success) {
+        logger.warn(`Tool failed: ${id}`);
+      } else {
+        logger.debug(`Tool completed: ${id}`);
+      }
       set((state) => {
         const tool = state.activeTools[id];
         if (tool) {
@@ -278,6 +287,7 @@ export const useToolStore = create<ToolState>()(
     },
 
     switchSession: (newSessionId: string) => {
+      logger.debug(`Switching session to: ${newSessionId}`);
       set((state) => {
         // Save current session's data to cache (if we have a current session)
         if (state.currentSessionId) {

@@ -4,10 +4,13 @@
  * Zustand store for workflow sidebar dimensions with localStorage persistence.
  */
 
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { WORKFLOW_SIDEBAR } from '../lib/layout/workflowLayoutConstants';
+
+const logger = createLogger('WorkflowUIStore');
 
 // ============================================================================
 // State Types
@@ -69,17 +72,11 @@ export const useWorkflowUIStore = create<WorkflowUIState & WorkflowUIActions>()(
           Math.min(WORKFLOW_SIDEBAR.left.max, width)
         );
 
-        if (process.env.NODE_ENV === 'development')
-          console.warn(
-            '[WorkflowUIStore] setLeftSidebarWidth - requested:',
-            width,
-            'clamped:',
-            clampedWidth,
-            'min:',
-            WORKFLOW_SIDEBAR.left.min,
-            'max:',
-            WORKFLOW_SIDEBAR.left.max
-          );
+        logger.debug('Setting left sidebar width', {
+          requested: width,
+          clamped: clampedWidth,
+        });
+
         set({
           leftSidebarWidth: clampedWidth,
           leftSidebarLastWidth: clampedWidth,
@@ -129,17 +126,11 @@ export const useWorkflowUIStore = create<WorkflowUIState & WorkflowUIActions>()(
           Math.min(WORKFLOW_SIDEBAR.right.max, width)
         );
 
-        if (process.env.NODE_ENV === 'development')
-          console.warn(
-            '[WorkflowUIStore] setRightSidebarWidth - requested:',
-            width,
-            'clamped:',
-            clampedWidth,
-            'min:',
-            WORKFLOW_SIDEBAR.right.min,
-            'max:',
-            WORKFLOW_SIDEBAR.right.max
-          );
+        logger.debug('Setting right sidebar width', {
+          requested: width,
+          clamped: clampedWidth,
+        });
+
         set({
           rightSidebarWidth: clampedWidth,
           rightSidebarLastWidth: clampedWidth,

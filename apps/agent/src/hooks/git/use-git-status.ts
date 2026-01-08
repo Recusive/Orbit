@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/api/backend';
@@ -20,6 +21,8 @@ import {
   selectTotalChanges,
   useGitStore,
 } from '@/stores/git/git-store';
+
+const logger = createLogger('Git');
 
 export interface UseGitStatusOptions {
   /** Polling interval in ms (default: 5000, set to 0 to disable) */
@@ -289,7 +292,9 @@ export function useGitStatus(
       if (!repoPath) {
         throw new Error('Not a git repository');
       }
+      logger.info('Committing changes', { message: message.substring(0, 50) });
       const hash = await gitCommit(repoPath, message);
+      logger.debug('Commit complete', { hash });
       await loadStatus(true);
       return hash;
     },
@@ -348,6 +353,7 @@ export function useGitStatus(
       if (!repoPath) {
         throw new Error('Not a git repository');
       }
+      logger.info('Checking out branch', { branch: branchName });
       await gitCheckout(repoPath, branchName);
       await loadStatus(true);
       await listBranches();

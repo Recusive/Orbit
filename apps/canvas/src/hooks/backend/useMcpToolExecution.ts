@@ -2,7 +2,10 @@
  * Hook for handling MCP tool execution requests from the extension
  * This is the new architecture that properly integrates with Claude Agent SDK
  */
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useRef, useEffect } from 'react';
+
+const logger = createLogger('McpToolExecution');
 
 import type { SandpackNodeData } from '../../sandpack/SandpackNode';
 import type { McpToolRequest } from '../../types/ipcProtocol';
@@ -69,6 +72,8 @@ export function useMcpToolExecution({
 
       // Normalize tool name - strip MCP prefix if present (e.g., "mcp__orbit-canvas__create_component" -> "create_component")
       const tool = rawTool.replace(/^mcp__[^_]+__/, '');
+
+      logger.debug('Executing MCP tool', { requestId, tool });
 
       try {
         switch (tool) {
@@ -642,9 +647,11 @@ export function useMcpToolExecution({
           }
 
           default:
+            logger.warn('Unknown MCP tool', { tool, requestId });
             sendMcpToolResponseRef.current(requestId, false, undefined, `Unknown tool: ${tool}`);
         }
       } catch (error) {
+        logger.error('MCP tool execution failed', error, { tool, requestId });
         sendMcpToolResponseRef.current(requestId, false, undefined, String(error));
       }
     },

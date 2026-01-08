@@ -5,7 +5,7 @@
  * All functions use Tauri invoke() for communication with the Rust backend.
  */
 
-import { createLogger } from '@/lib/logger';
+import { createLogger } from '@orbit/common/lib';
 
 // ============================================
 // Tauri Detection & Imports

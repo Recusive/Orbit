@@ -7,6 +7,7 @@
  * Reference: Orbit/src/vs/workbench/contrib/terminal/browser/terminalInstance.ts
  */
 
+import { createLogger } from '@orbit/common/lib';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -14,7 +15,6 @@ import { Terminal } from '@xterm/xterm';
 
 import type { IDisposable, ITheme } from '@xterm/xterm';
 
-import { trace } from '@/dev-monitor';
 import { CommandDecorationsAddon } from '@/lib/terminal/addons/command-decorations-addon';
 import { MarkNavigationAddon } from '@/lib/terminal/addons/mark-navigation-addon';
 import { ShellIntegrationAddon } from '@/lib/terminal/addons/shell-integration-addon';
@@ -22,6 +22,8 @@ import { getBestTheme } from '@/lib/terminal/utils/theme-sync';
 import { TerminalResizeDebouncer } from '@/services/terminal/terminal-resize-debouncer';
 
 import '@xterm/xterm/css/xterm.css';
+
+const logger = createLogger('TerminalInstance');
 
 // ============================================================================
 // Constants
@@ -128,6 +130,8 @@ export class TerminalInstance {
     this.onCapabilitiesChange = options.onCapabilitiesChange;
     this.onTitleChange = options.onTitleChange;
 
+    logger.info(`Creating terminal: ${options.sessionName}`, { sessionId: options.sessionId });
+
     // Create wrapper element
     this.wrapperElement = document.createElement('div');
     this.wrapperElement.className = 'terminal-instance-wrapper';
@@ -137,8 +141,8 @@ export class TerminalInstance {
     // xterm.js requires computed color values, not CSS variable references
     const theme = this.buildThemeFromCSSVars();
 
-    // Create terminal and wrap with dev-monitor for performance tracking
-    const rawTerminal = new Terminal({
+    // Create terminal
+    this.terminal = new Terminal({
       cursorBlink: true,
       cursorStyle: 'bar',
       fontSize: 13,
@@ -148,7 +152,6 @@ export class TerminalInstance {
       theme,
       allowProposedApi: true,
     });
-    this.terminal = trace.xterm(this.sessionName, rawTerminal);
 
     // Load addons
     this.fitAddon = new FitAddon();

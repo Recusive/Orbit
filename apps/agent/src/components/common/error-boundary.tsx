@@ -1,9 +1,8 @@
+import { createLogger } from '@orbit/common/lib';
 import { AlertTriangle } from 'lucide-react';
 import { Component } from 'react';
 
 import type { ReactNode, ErrorInfo } from 'react';
-
-import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('ErrorBoundary');
 

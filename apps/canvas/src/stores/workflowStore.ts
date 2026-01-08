@@ -3,6 +3,7 @@
  * Zustand store for workflow state management with backend sync
  */
 
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
@@ -11,6 +12,8 @@ import {
   createWorkflow,
   createWorkflowConnection,
 } from '../types/workflowTypes';
+
+const logger = createLogger('WorkflowStore');
 
 import type {
   CardType,
@@ -234,16 +237,12 @@ export const useWorkflowStore = create<WorkflowState & WorkflowActions>()(
       cards: MarkdownCard[],
       connections: WorkflowConnection[]
     ): void => {
-      if (process.env.NODE_ENV === 'development')
-        console.warn('[WorkflowStore] loadWorkflow:', {
-          workflowId: workflow.id,
-          workflowName: workflow.name,
-          cardIdsInWorkflow: workflow.cardIds,
-          cardsToLoad: cards.map((c) => ({ id: c.id, name: c.name })),
-          cardIdCount: workflow.cardIds.length,
-          actualCardCount: cards.length,
-          connectionsToLoad: connections.length,
-        });
+      logger.debug('Loading workflow', {
+        workflowId: workflow.id,
+        workflowName: workflow.name,
+        cardCount: cards.length,
+        connectionCount: connections.length,
+      });
 
       const cardsMap: Record<string, MarkdownCard> = {};
       for (const card of cards) {
@@ -266,11 +265,7 @@ export const useWorkflowStore = create<WorkflowState & WorkflowActions>()(
         sync: { ...initialSyncState, status: 'idle' },
       });
 
-      if (process.env.NODE_ENV === 'development')
-        console.warn(
-          '[WorkflowStore] loadWorkflow complete - cards in store:',
-          Object.keys(cardsMap)
-        );
+      logger.debug('Workflow loaded', { cardIds: Object.keys(cardsMap) });
     },
 
     updateWorkflow: (updates: Partial<Workflow>): void => {
@@ -308,14 +303,11 @@ export const useWorkflowStore = create<WorkflowState & WorkflowActions>()(
       const card = createMarkdownCard(cardData);
       const { activeWorkflow, sync } = get();
 
-      if (process.env.NODE_ENV === 'development')
-        console.warn('[WorkflowStore] addCard:', {
-          cardId: card.id,
-          cardName: card.name,
-          activeWorkflowId: activeWorkflow?.id,
-          currentCardIds: activeWorkflow?.cardIds,
-          currentCardsInStore: Object.keys(get().cards),
-        });
+      logger.debug('Adding card', {
+        cardId: card.id,
+        cardName: card.name,
+        workflowId: activeWorkflow?.id,
+      });
 
       set((state) => ({
         cards: { ...state.cards, [card.id]: card },
@@ -330,11 +322,7 @@ export const useWorkflowStore = create<WorkflowState & WorkflowActions>()(
         sync: { ...sync, isDirty: true },
       }));
 
-      if (process.env.NODE_ENV === 'development')
-        console.warn('[WorkflowStore] addCard complete:', {
-          newCardIds: get().activeWorkflow?.cardIds,
-          newCardsInStore: Object.keys(get().cards),
-        });
+      logger.debug('Card added', { totalCards: Object.keys(get().cards).length });
 
       return card;
     },

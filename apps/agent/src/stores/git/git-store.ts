@@ -1,8 +1,11 @@
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
 import type { FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/api/backend';
+
+const logger = createLogger('GitStore');
 
 // Re-export types for convenience
 export type { FileStatus, GitBranch, GitStatus, StatusEntry };
@@ -66,12 +69,18 @@ export const useGitStore = create<GitStore>()(
       ...initialState,
 
       setRepoPath: (repoPath): void => {
+        logger.info(`Git repo path set: ${repoPath ?? 'none'}`);
         set((state) => {
           state.repoPath = repoPath;
         });
       },
 
       setStatus: (status): void => {
+        logger.debug(`Git status updated`, {
+          branch: status.branch,
+          ahead: status.ahead,
+          behind: status.behind,
+        });
         set((state) => {
           state.status = status;
           state.error = null;
@@ -87,6 +96,9 @@ export const useGitStore = create<GitStore>()(
       },
 
       setError: (error): void => {
+        if (error) {
+          logger.error(`Git error: ${error}`);
+        }
         set((state) => {
           state.error = error;
           state.isLoading = false;

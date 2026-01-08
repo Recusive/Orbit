@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { formatZodError } from '@orbit/shared-schemas';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -16,7 +17,6 @@ import type {
 } from './types/tauri-types';
 import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
 
-import { createLogger } from '@/lib/logger';
 import { WebviewMessageSchema } from '@/types/protocol';
 
 const logger = createLogger('Tauri');

@@ -2,7 +2,7 @@
  * Structured logging system for production-ready observability.
  *
  * Usage:
- *   import { createLogger } from '@/lib/logger';
+ *   import { createLogger } from '@orbit/common/lib';
  *   const logger = createLogger('MyComponent');
  *   logger.debug('Processing data', { count: 42 });
  *   logger.error('Failed to fetch', new Error('Network error'), { url: '/api' });
@@ -12,6 +12,14 @@
  *   - info: General operational messages
  *   - warn: Potential issues that don't break functionality
  *   - error: Errors that need attention
+ *
+ * TODO: Production Telemetry
+ * When ready for production monitoring:
+ * 1. Add Sentry SDK for error tracking + performance monitoring
+ * 2. Add LogTransport interface to abstract log destinations
+ * 3. Create SentryTransport that pipes logs to Sentry dashboard
+ * 4. Keep ConsoleTransport for local development debugging
+ * 5. Add logger.time() / logger.timeEnd() for performance measurement
  */
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -39,7 +47,13 @@ interface LogEntry {
  */
 const isDev = (): boolean => {
   try {
-    return import.meta.env.DEV;
+    // Vite sets MODE to 'development' or 'production'
+    const mode = import.meta.env['MODE'];
+    if (typeof mode === 'string') {
+      return mode === 'development';
+    }
+    // Fallback to NODE_ENV
+    return process.env.NODE_ENV !== 'production';
   } catch {
     // Fallback for non-Vite environments
     return process.env.NODE_ENV !== 'production';
