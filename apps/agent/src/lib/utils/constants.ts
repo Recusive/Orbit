@@ -27,6 +27,7 @@ export const PANEL_SIZES = {
   sidebar: {
     default: 256,
     min: 40,
+    minUsable: 240, // Minimum width when expanded (can't drag smaller than this)
     max: 400,
   },
   review: {

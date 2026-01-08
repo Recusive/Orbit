@@ -104,6 +104,7 @@ interface UIActions {
   toggleLeftSidebar: () => void;
   expandLeftSidebar: () => void;
   collapseLeftSidebar: () => void;
+  setLeftSidebarWidth: (width: number) => void;
   toggleReviewPanel: () => void;
   toggleRightSidebar: () => void;
   toggleBottomPanel: () => void;
@@ -348,6 +349,20 @@ export const useUIStore = create<UIStore>()(
     collapseLeftSidebar: (): void => {
       set((state) => {
         state.leftSidebarWidth = SIDEBAR.collapsed;
+      });
+    },
+
+    setLeftSidebarWidth: (width: number): void => {
+      set((state) => {
+        // Clamp to valid range: either collapsed or minUsable-max
+        if (width <= SIDEBAR.collapsed) {
+          state.leftSidebarWidth = SIDEBAR.collapsed;
+        } else {
+          state.leftSidebarWidth = Math.max(
+            PANEL_SIZES.sidebar.minUsable,
+            Math.min(PANEL_SIZES.sidebar.max, width)
+          );
+        }
       });
     },
 

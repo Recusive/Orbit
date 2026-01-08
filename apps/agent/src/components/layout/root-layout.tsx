@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActionsBar } from './actions-bar';
 import { ChatArea } from './chat-area';
 import { PrimarySidebar } from './primary-sidebar';
+import { SidebarResizeHandle } from './sidebar-resize-handle';
 
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
@@ -90,6 +91,9 @@ export const RootLayout: FC = () => {
     <div className="h-full w-full flex overflow-hidden bg-background text-foreground">
       {/* Primary Sidebar - File explorer, conversations */}
       <PrimarySidebar width={leftSidebarWidth} />
+
+      {/* Sidebar resize handle */}
+      <SidebarResizeHandle />
 
       {/* Chat Area - Main chat interface with Activity panel */}
       <ChatArea />

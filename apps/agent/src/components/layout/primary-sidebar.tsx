@@ -209,7 +209,8 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
 
   return (
     <aside
-      className="h-full flex flex-col border-r border-border/40 bg-card transition-[width] duration-150 ease-in-out overflow-hidden shadow-lg dark:shadow-none"
+      data-sidebar="primary"
+      className="h-full flex flex-col bg-card transition-[width] duration-150 ease-in-out overflow-hidden shadow-lg dark:shadow-none"
       style={{ width }}
     >
       {/* Header */}
