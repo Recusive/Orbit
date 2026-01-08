@@ -65,6 +65,7 @@ interface UIState {
   // Left Sidebar
   leftSidebarOpen: boolean;
   leftSidebarWidth: number;
+  lastExpandedSidebarWidth: number; // Remembered width when collapsed via button
   // Review Panel (inside center area as split)
   reviewPanelOpen: boolean;
   reviewPanelWidth: number;
@@ -225,6 +226,7 @@ export const useUIStore = create<UIStore>()(
     conversations: loadConversationsFromStorage(),
     leftSidebarOpen: DEFAULT_UI_STATE.leftSidebarOpen,
     leftSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
+    lastExpandedSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
     reviewPanelOpen: DEFAULT_UI_STATE.reviewPanelOpen,
     reviewPanelWidth: DEFAULT_UI_STATE.reviewPanelWidth,
     rightSidebarOpen: DEFAULT_UI_STATE.rightSidebarOpen,
@@ -333,9 +335,12 @@ export const useUIStore = create<UIStore>()(
     toggleLeftSidebar: (): void => {
       set((state) => {
         if (state.leftSidebarWidth > SIDEBAR.collapsed) {
+          // Collapsing: save current width before collapsing
+          state.lastExpandedSidebarWidth = state.leftSidebarWidth;
           state.leftSidebarWidth = SIDEBAR.collapsed;
         } else {
-          state.leftSidebarWidth = SIDEBAR.expanded;
+          // Expanding: restore to last remembered width
+          state.leftSidebarWidth = state.lastExpandedSidebarWidth;
         }
       });
     },
@@ -358,10 +363,13 @@ export const useUIStore = create<UIStore>()(
         if (width <= SIDEBAR.collapsed) {
           state.leftSidebarWidth = SIDEBAR.collapsed;
         } else {
-          state.leftSidebarWidth = Math.max(
+          const clampedWidth = Math.max(
             PANEL_SIZES.sidebar.minUsable,
             Math.min(PANEL_SIZES.sidebar.max, width)
           );
+          state.leftSidebarWidth = clampedWidth;
+          // Remember this width for when user toggles via button
+          state.lastExpandedSidebarWidth = clampedWidth;
         }
       });
     },

@@ -1,0 +1,441 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "metadata": {
+    "title": "Codebase Health Report",
+    "description": "Structured analysis of codebase modules for cleanup, refactoring, and maintenance",
+    "lastUpdated": "2026-01-08",
+    "version": "1.0.0"
+  },
+  "legend": {
+    "status": {
+      "keep": "Essential, unique, appropriately scoped - no changes needed",
+      "refactor": "Needed but has issues that should be addressed",
+      "split": "Doing too much - should be split into focused modules",
+      "merge": "Has duplicate logic - should be merged into another file",
+      "delete": "Unused/orphaned code - safe to remove"
+    },
+    "criticality": {
+      "essential": "Core functionality, breaking this breaks the app",
+      "important": "Significant feature, degraded experience without it",
+      "utility": "Helper functionality, app works without it",
+      "support": "Types, constants, or helpers for other modules"
+    },
+    "complexity": {
+      "low": "< 200 lines, single responsibility",
+      "medium": "200-500 lines, focused responsibilities",
+      "high": "500-1000 lines, multiple responsibilities",
+      "very_high": "> 1000 lines, should consider splitting"
+    }
+  },
+  "modules": [
+    {
+      "path": "agent-bridge/src/agent",
+      "name": "Agent Module",
+      "description": "Claude Agent SDK integration for chat/coding sessions",
+      "analyzedAt": "2026-01-08",
+      "overallStatus": "keep",
+      "overallHealth": "good",
+      "summary": "Core of the agent-bridge sidecar. Actively used, no duplication, well-structured.",
+      "files": [
+        {
+          "path": "agent-bridge/src/agent/core/agent.ts",
+          "name": "OrbitAgent",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "very_high",
+          "lineCount": 1384,
+          "responsibilities": [
+            "Claude SDK query management",
+            "Message queue implementation",
+            "Permission hooks setup",
+            "Session state tracking",
+            "Thinking/plan/accept mode management",
+            "File rewind functionality",
+            "MCP server registration"
+          ],
+          "imports": [
+            "@anthropic-ai/claude-agent-sdk",
+            "../../common/auth/credentials.js",
+            "../../common/logging/logger.js",
+            "../../common/retry/retry.js"
+          ],
+          "importedBy": [
+            "agent-bridge/src/agent/session/session-manager.ts",
+            "agent-bridge/src/__tests__/*.test.ts"
+          ],
+          "issues": [],
+          "notes": "Large but cohesive - all responsibilities relate to Claude SDK integration"
+        },
+        {
+          "path": "agent-bridge/src/agent/session/session-manager.ts",
+          "name": "SessionManager",
+          "status": "refactor",
+          "criticality": "essential",
+          "complexity": "very_high",
+          "lineCount": 1304,
+          "responsibilities": [
+            "Session lifecycle (create, delete, dispose)",
+            "Event emission (6 different event types)",
+            "Message routing to agents",
+            "Permission callback orchestration",
+            "Tool status tracking",
+            "Mode preference storage",
+            "Session forking logic",
+            "AI-powered definition generation"
+          ],
+          "imports": ["zod", "@orbit/shared-schemas", "../core/agent.js"],
+          "importedBy": ["agent-bridge/src/index.ts"],
+          "issues": [
+            {
+              "type": "complexity",
+              "severity": "medium",
+              "description": "File handles too many responsibilities",
+              "suggestedFix": "Extract AI generation methods to session-generator.ts"
+            }
+          ],
+          "notes": "AI generation methods (generateAgentDefinition, generateCommandDefinition) feel out of place"
+        },
+        {
+          "path": "agent-bridge/src/agent/session/session-storage.ts",
+          "name": "Session Storage",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "medium",
+          "lineCount": 204,
+          "responsibilities": [
+            "Persist SDK session IDs",
+            "Session CRUD operations",
+            "Cleanup old sessions"
+          ],
+          "imports": ["@orbit/shared-schemas", "../../common/logging/logger.js"],
+          "importedBy": ["agent-bridge/src/index.ts"],
+          "issues": [],
+          "notes": "Clean single-responsibility module"
+        },
+        {
+          "path": "agent-bridge/src/agent/session/session-mode.ts",
+          "name": "Session Mode",
+          "status": "keep",
+          "criticality": "important",
+          "complexity": "low",
+          "lineCount": 64,
+          "responsibilities": ["Define allowed tools per mode", "Mode display names"],
+          "imports": [],
+          "importedBy": ["agent-bridge/src/agent/core/agent.ts"],
+          "issues": [],
+          "notes": "Simple configuration module"
+        },
+        {
+          "path": "agent-bridge/src/agent/permissions/permissions.ts",
+          "name": "PermissionManager",
+          "status": "keep",
+          "criticality": "important",
+          "complexity": "medium",
+          "lineCount": 212,
+          "responsibilities": [
+            "Permission callback creation",
+            "Always-allowed tool tracking",
+            "Accept mode handling"
+          ],
+          "imports": [
+            "@anthropic-ai/claude-agent-sdk",
+            "../../common/i18n/nls.js",
+            "../../common/logging/logger.js"
+          ],
+          "importedBy": ["agent-bridge/src/agent/core/agent.ts"],
+          "issues": [],
+          "notes": "Clean permission abstraction"
+        },
+        {
+          "path": "agent-bridge/src/agent/definitions/agent-definitions.ts",
+          "name": "Agent Definitions",
+          "status": "keep",
+          "criticality": "utility",
+          "complexity": "medium",
+          "lineCount": 320,
+          "responsibilities": ["CRUD for .claude/agents/*.md files", "YAML frontmatter parsing"],
+          "imports": ["node:fs", "node:path"],
+          "importedBy": ["agent-bridge/src/index.ts"],
+          "issues": [],
+          "notes": "Clean file-based CRUD"
+        },
+        {
+          "path": "agent-bridge/src/agent/definitions/command-definitions.ts",
+          "name": "Command Definitions",
+          "status": "keep",
+          "criticality": "utility",
+          "complexity": "medium",
+          "lineCount": 487,
+          "responsibilities": [
+            "CRUD for .claude/commands/*.md files",
+            "YAML frontmatter parsing",
+            "Built-in and default commands"
+          ],
+          "imports": ["node:fs", "node:path", "node:os"],
+          "importedBy": ["agent-bridge/src/index.ts"],
+          "issues": [],
+          "notes": "Similar pattern to agent-definitions but different schema"
+        },
+        {
+          "path": "agent-bridge/src/agent/types/messages.ts",
+          "name": "Message Types",
+          "status": "keep",
+          "criticality": "support",
+          "complexity": "low",
+          "lineCount": 42,
+          "responsibilities": ["Attachment content block types", "Message payload types"],
+          "imports": [],
+          "importedBy": [
+            "agent-bridge/src/agent/utils/content.ts",
+            "agent-bridge/src/agent/session/session-manager.ts"
+          ],
+          "issues": [],
+          "notes": "Pure type definitions"
+        },
+        {
+          "path": "agent-bridge/src/agent/utils/content.ts",
+          "name": "Content Builder",
+          "status": "keep",
+          "criticality": "support",
+          "complexity": "low",
+          "lineCount": 163,
+          "responsibilities": [
+            "Build Claude SDK content blocks from attachments",
+            "Handle images, documents, and text"
+          ],
+          "imports": ["../types/messages.js"],
+          "importedBy": ["agent-bridge/src/agent/core/agent.ts"],
+          "issues": [],
+          "notes": "Clean utility for attachment handling"
+        },
+        {
+          "path": "agent-bridge/src/agent/utils/formatter.ts",
+          "name": "Tool Formatter",
+          "status": "keep",
+          "criticality": "support",
+          "complexity": "medium",
+          "lineCount": 253,
+          "responsibilities": [
+            "Format tool results for display",
+            "Tool-specific formatting (Read, Write, Bash, etc.)"
+          ],
+          "imports": [],
+          "importedBy": ["agent-bridge/src/agent/core/agent.ts"],
+          "issues": [],
+          "notes": "Matches Python backend's tool_formatter.py logic"
+        }
+      ],
+      "dependencies": {
+        "external": ["@anthropic-ai/claude-agent-sdk", "zod", "@orbit/shared-schemas"],
+        "internal": [
+          "common/auth/credentials",
+          "common/logging/logger",
+          "common/retry/retry",
+          "common/events/events",
+          "common/i18n/nls",
+          "protocol/schemas"
+        ]
+      },
+      "duplicationCheck": {
+        "hasDuplication": false,
+        "notes": "CanvasSessionManager is distinct - handles multi-agent orchestration for visual canvas, not chat sessions"
+      },
+      "suggestedRefactoring": [
+        {
+          "priority": "low",
+          "type": "split",
+          "source": "agent-bridge/src/agent/session/session-manager.ts",
+          "target": "agent-bridge/src/agent/session/session-generator.ts",
+          "description": "Extract AI generation methods to reduce complexity",
+          "linesAffected": 200,
+          "whatMoves": [
+            "GeneratedAgentSchema",
+            "GeneratedCommandSchema",
+            "generateAgentDefinition()",
+            "generateCommandDefinition()"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "agent-bridge/src/canvas",
+      "name": "Canvas Module",
+      "description": "Multi-agent AI system for visual canvas operations",
+      "analyzedAt": "2026-01-08",
+      "overallStatus": "keep",
+      "overallHealth": "excellent",
+      "summary": "Well-organized multi-agent system. 29 files with clear separation of concerns. No refactoring needed.",
+      "files": [
+        {
+          "path": "agent-bridge/src/canvas/core/canvas-agent.ts",
+          "name": "CanvasAgent",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "high",
+          "lineCount": 748,
+          "responsibilities": [
+            "Claude SDK wrapper for canvas",
+            "Message queue implementation",
+            "Canvas state context injection",
+            "MCP tool bridge integration"
+          ],
+          "imports": [
+            "@anthropic-ai/claude-agent-sdk",
+            "../../common/auth/credentials.js",
+            "../../common/logging/logger.js",
+            "../mcp/canvas-mcp-server.js"
+          ],
+          "importedBy": ["agent-bridge/src/canvas/session/canvas-session-manager.ts"],
+          "issues": [],
+          "notes": "Well-scoped SDK wrapper distinct from agent/core/agent.ts"
+        },
+        {
+          "path": "agent-bridge/src/canvas/session/canvas-session-manager.ts",
+          "name": "CanvasSessionManager",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "medium",
+          "lineCount": 620,
+          "responsibilities": [
+            "Session lifecycle management",
+            "Event routing to agents",
+            "Intent analysis routing (fast path vs orchestrator)",
+            "Orchestrator lifecycle"
+          ],
+          "imports": ["../core/canvas-agent.js", "../orchestrator/index.js"],
+          "importedBy": ["agent-bridge/src/index.ts"],
+          "issues": [],
+          "notes": "Clean session management with smart routing"
+        },
+        {
+          "path": "agent-bridge/src/canvas/mcp/canvas-tool-bridge.ts",
+          "name": "CanvasToolBridge",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "low",
+          "lineCount": 228,
+          "responsibilities": [
+            "Promise-based bridge for MCP tool execution",
+            "Request/response correlation",
+            "Timeout handling"
+          ],
+          "imports": ["../../common/logging/logger.js"],
+          "importedBy": [
+            "agent-bridge/src/canvas/core/canvas-agent.ts",
+            "agent-bridge/src/canvas/mcp/canvas-mcp-server.ts"
+          ],
+          "issues": [],
+          "notes": "Clean async/sync bridge pattern"
+        },
+        {
+          "path": "agent-bridge/src/canvas/orchestrator/orchestrator.ts",
+          "name": "Orchestrator",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "medium",
+          "lineCount": 553,
+          "responsibilities": [
+            "Multi-agent coordination",
+            "Task graph execution",
+            "State change events",
+            "Control actions (pause/resume/cancel)"
+          ],
+          "imports": [
+            "./blackboard.js",
+            "./intent-analyzer.js",
+            "./task-decomposer.js",
+            "./task-executor.js"
+          ],
+          "importedBy": ["agent-bridge/src/canvas/session/canvas-session-manager.ts"],
+          "issues": [],
+          "notes": "Main coordination controller"
+        },
+        {
+          "path": "agent-bridge/src/canvas/orchestrator/agents/base-agent.ts",
+          "name": "BaseAgent",
+          "status": "keep",
+          "criticality": "essential",
+          "complexity": "medium",
+          "lineCount": 565,
+          "responsibilities": [
+            "Abstract base class for specialized agents",
+            "SDK options creation",
+            "Response processing",
+            "Tool use tracking"
+          ],
+          "imports": ["@anthropic-ai/claude-agent-sdk", "../../../common/auth/credentials.js"],
+          "importedBy": [
+            "agent-bridge/src/canvas/orchestrator/agents/component-agent.ts",
+            "agent-bridge/src/canvas/orchestrator/agents/layout-agent.ts",
+            "agent-bridge/src/canvas/orchestrator/agents/style-agent.ts",
+            "agent-bridge/src/canvas/orchestrator/agents/integration-agent.ts"
+          ],
+          "issues": [],
+          "notes": "Good inheritance pattern for specialized agents"
+        },
+        {
+          "path": "agent-bridge/src/canvas/types/types.ts",
+          "name": "Canvas Types",
+          "status": "keep",
+          "criticality": "support",
+          "complexity": "low",
+          "lineCount": 252,
+          "responsibilities": [
+            "Node type definitions",
+            "Edge type definitions",
+            "State type definitions",
+            "Session type definitions",
+            "SDK message types",
+            "MCP tool types"
+          ],
+          "imports": [],
+          "importedBy": ["Multiple canvas files", "agent-bridge/src/protocol/protocol.ts"],
+          "issues": [],
+          "notes": "Pure type definitions"
+        }
+      ],
+      "dependencies": {
+        "external": ["@anthropic-ai/claude-agent-sdk"],
+        "internal": ["common/auth/credentials", "common/logging/logger"]
+      },
+      "duplicationCheck": {
+        "hasDuplication": false,
+        "notes": "Distinct from agent/ module - serves different purpose (visual canvas AI vs chat/coding AI)"
+      },
+      "suggestedRefactoring": []
+    }
+  ],
+  "pendingAnalysis": [
+    {
+      "path": "agent-bridge/src/common",
+      "priority": "low",
+      "reason": "Shared utilities - check for unused exports"
+    },
+    {
+      "path": "agent-bridge/src/protocol",
+      "priority": "low",
+      "reason": "IPC protocol definitions - check schema consistency"
+    },
+    {
+      "path": "apps/agent/src/stores",
+      "priority": "medium",
+      "reason": "Zustand stores - check for overlapping state"
+    },
+    {
+      "path": "apps/agent/src/components",
+      "priority": "medium",
+      "reason": "React components - check for unused/duplicate components"
+    }
+  ],
+  "actionItems": [
+    {
+      "id": "REFACTOR-001",
+      "status": "pending",
+      "priority": "low",
+      "module": "agent-bridge/src/agent/session",
+      "action": "Extract AI generation methods from session-manager.ts",
+      "estimatedEffort": "1 hour",
+      "blockedBy": []
+    }
+  ]
+}

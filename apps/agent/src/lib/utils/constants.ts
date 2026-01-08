@@ -29,6 +29,7 @@ export const PANEL_SIZES = {
     min: 40,
     minUsable: 240, // Minimum width when expanded (can't drag smaller than this)
     max: 400,
+    snapThreshold: 180, // Below this, sidebar snaps to collapsed
   },
   review: {
     default: 400,

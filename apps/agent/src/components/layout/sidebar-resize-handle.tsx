@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 
 import type { FC } from 'react';
 
-import { PANEL_SIZES } from '@/lib/utils/constants';
+import { PANEL_SIZES, SIDEBAR } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import { useIsLeftSidebarCollapsed, useUIStore } from '@/stores/ui/ui-store';
 
@@ -13,6 +13,7 @@ import { useIsLeftSidebarCollapsed, useUIStore } from '@/stores/ui/ui-store';
  * - Updates DOM directly during drag for smooth, lag-free resizing
  * - Only syncs to React state on mouseup (prevents re-render jank)
  * - Enforces min 240px, max 400px when expanded
+ * - Snap-to-collapse: drag below snapThreshold to collapse to 40px
  * - Disabled when sidebar is collapsed (40px)
  * - Wide hit area (8px) for easy targeting, thin visual line (1px)
  * - Orange highlight persists during drag
@@ -51,20 +52,39 @@ export const SidebarResizeHandle: FC = () => {
     const originalTransition = sidebarElement.style.transition;
     sidebarElement.style.transition = 'none';
 
+    // Track if we're in snap zone to update React state only on threshold crossing
+    let wasInSnapZone = false;
+
     const handleMouseMove = (moveEvent: MouseEvent): void => {
       // Calculate delta (positive = dragging right = wider)
       const delta = moveEvent.clientX - startX;
       let newWidth = startWidth + delta;
 
-      // Clamp to valid range when expanded
-      newWidth = Math.max(
-        PANEL_SIZES.sidebar.minUsable,
-        Math.min(PANEL_SIZES.sidebar.max, newWidth)
-      );
+      // Clamp max, but allow going below minUsable for snap behavior
+      newWidth = Math.min(PANEL_SIZES.sidebar.max, newWidth);
 
-      // Update DOM directly (no React re-renders, no transition = instant!)
-      sidebarElement.style.width = `${String(newWidth)}px`;
-      currentWidthRef.current = newWidth;
+      const isInSnapZone = newWidth < PANEL_SIZES.sidebar.snapThreshold;
+
+      // Update React state only when crossing the snap threshold (not every frame)
+      if (isInSnapZone !== wasInSnapZone) {
+        wasInSnapZone = isInSnapZone;
+        // This updates isCollapsed which controls sidebar content visibility
+        setLeftSidebarWidth(isInSnapZone ? SIDEBAR.collapsed : PANEL_SIZES.sidebar.minUsable);
+      }
+
+      // Snap behavior: if below threshold, show collapsed width
+      if (isInSnapZone) {
+        sidebarElement.style.width = `${String(SIDEBAR.collapsed)}px`;
+        currentWidthRef.current = SIDEBAR.collapsed;
+      } else if (newWidth < PANEL_SIZES.sidebar.minUsable) {
+        // Between threshold and minUsable: show minUsable (visual feedback)
+        sidebarElement.style.width = `${String(PANEL_SIZES.sidebar.minUsable)}px`;
+        currentWidthRef.current = newWidth; // Keep actual value for snap decision
+      } else {
+        // Normal range: show actual width
+        sidebarElement.style.width = `${String(newWidth)}px`;
+        currentWidthRef.current = newWidth;
+      }
     };
 
     const cleanup = (): void => {
@@ -85,8 +105,18 @@ export const SidebarResizeHandle: FC = () => {
       // Restore original transition
       sidebarElement.style.transition = originalTransition;
 
-      // Now sync to React state (single update)
-      setLeftSidebarWidth(currentWidthRef.current);
+      // Determine final width based on snap behavior
+      const finalWidth = currentWidthRef.current;
+      if (finalWidth < PANEL_SIZES.sidebar.snapThreshold) {
+        // Snap to collapsed
+        setLeftSidebarWidth(SIDEBAR.collapsed);
+      } else if (finalWidth < PANEL_SIZES.sidebar.minUsable) {
+        // Was in "resistance zone" but didn't cross threshold - snap back to minUsable
+        setLeftSidebarWidth(PANEL_SIZES.sidebar.minUsable);
+      } else {
+        // Normal range
+        setLeftSidebarWidth(finalWidth);
+      }
     };
 
     // Add global listeners
