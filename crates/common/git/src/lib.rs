@@ -983,6 +983,70 @@ pub fn pull(path: &Path, remote_name: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+/// Clone a git repository to a target directory.
+///
+/// Uses the git CLI to clone, which automatically handles authentication
+/// via the system's credential helpers (macOS Keychain, Windows Credential Manager, etc.)
+///
+/// # Arguments
+/// * `url` - The repository URL (HTTPS, SSH, or git:// protocol)
+/// * `target_path` - The directory where the repo will be cloned
+///
+/// # Errors
+/// Returns an error if clone fails (auth issues, invalid URL, disk full, etc.)
+pub fn clone(url: &str, target_path: &Path) -> Result<()> {
+    info!(url = url, target = %target_path.display(), "Starting git clone");
+
+    let output = Command::new("git")
+        .args(["clone", url])
+        .arg(target_path)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .output()
+        .map_err(|e| {
+            error!(error = %e, "Failed to execute git command");
+            Error::Git(format!("Failed to run git clone: {e}"))
+        })?;
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    info!(
+        status = %output.status,
+        stderr = %stderr.trim(),
+        "Git clone completed"
+    );
+
+    if !output.status.success() {
+        let msg = stderr.trim();
+
+        // Provide user-friendly error messages for common cases
+        if msg.contains("Authentication failed") || msg.contains("could not read Username") {
+            return Err(Error::Git(
+                "Authentication failed. Please check your credentials or try cloning via terminal first.".to_owned(),
+            ));
+        }
+        if msg.contains("not found") || msg.contains("does not exist") {
+            return Err(Error::Git(
+                "Repository not found. Please check the URL.".to_owned(),
+            ));
+        }
+        if msg.contains("already exists and is not an empty directory") {
+            return Err(Error::Git(
+                "Target directory already exists and is not empty.".to_owned(),
+            ));
+        }
+        if msg.contains("Could not resolve host") {
+            return Err(Error::Git(
+                "Could not connect to host. Please check your internet connection.".to_owned(),
+            ));
+        }
+
+        return Err(Error::Git(format!("Clone failed: {msg}")));
+    }
+
+    info!(target = %target_path.display(), "Clone successful");
+    Ok(())
+}
+
 // ============================================
 // Worktree Operations
 // ============================================

@@ -465,6 +465,15 @@ export async function gitPull(repoPath: string, remote?: string): Promise<void> 
   return invoke('git_pull', { repoPath, remote });
 }
 
+/**
+ * Clone a git repository to a target directory.
+ * @param url - The repository URL (HTTPS, SSH, or git:// protocol)
+ * @param targetPath - The directory where the repo will be cloned
+ */
+export async function gitClone(url: string, targetPath: string): Promise<void> {
+  return invoke('git_clone', { url, targetPath });
+}
+
 // ============================================
 // Git Worktree Operations
 // ============================================

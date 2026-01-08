@@ -140,6 +140,12 @@ pub fn git_pull(repo_path: String, remote: Option<String>) -> Result<()> {
     orbit_git::pull(Path::new(&repo_path), remote.as_deref())
 }
 
+/// Clone a git repository to a target directory.
+#[tauri::command]
+pub fn git_clone(url: String, target_path: String) -> Result<()> {
+    orbit_git::clone(&url, Path::new(&target_path))
+}
+
 /// List all worktrees for the repository.
 #[tauri::command]
 pub fn git_worktree_list(repo_path: String) -> Result<Vec<WorktreeInfo>> {
