@@ -1,0 +1,76 @@
+import type { ImageAttachment } from '@/components/chat/input/types';
+import type { ChatMessage } from '@/components/chat/messages';
+import type { PermissionRequest, ToolExecution, UsageData } from '@/stores/agent/tool-store';
+import type { QueuedMessage } from '@/stores/chat/queued-message-store';
+import type { FileEntry } from '@/types/agent/context';
+import type { InputMode, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
+
+/** Props for PermissionBar component */
+export interface PermissionBarProps {
+  readonly permissions: readonly PermissionRequest[];
+  readonly onApprove: (requestId: string) => void;
+  readonly onDeny: (requestId: string) => void;
+}
+
+/** Props for ChatContent component */
+export interface ChatContentProps {
+  /** Ref for stabilization measurement */
+  readonly contentRef: React.RefObject<HTMLDivElement | null>;
+  /** Whether layout is transitioning (hides content) */
+  readonly isTransitioning: boolean;
+  /** Whether conversation is loading */
+  readonly isLoadingConversation: boolean;
+  /** Chat messages - mutable for child component compatibility */
+  readonly messages: ChatMessage[];
+  /** Whether agent is currently running */
+  readonly isAgentRunning: boolean;
+  /** Current session ID */
+  readonly sessionId: string;
+  /** Queued message awaiting send */
+  readonly queuedMessage: QueuedMessage | null;
+  /** Pending permission requests */
+  readonly pendingPermissions: readonly PermissionRequest[];
+  /** File list for @ mentions - mutable for ChatInput compatibility */
+  readonly fileList: FileEntry[];
+  /** Current input mode */
+  readonly inputMode: InputMode;
+  /** Current thinking mode */
+  readonly thinkingMode: ThinkingMode;
+  /** Session token usage */
+  readonly sessionUsage: UsageData;
+  /** Max tokens limit */
+  readonly maxTokens: number;
+  /** Get tools for a specific message */
+  readonly getToolsForMessage: (messageId: string) => ToolExecution[];
+  /** Handlers */
+  readonly onSend: (
+    text: string,
+    contextFiles?: string[],
+    images?: ImageAttachment[],
+    elements?: ReactElementContext[]
+  ) => void;
+  readonly onStop: () => void;
+  readonly onRewind: (messageId: string) => void;
+  readonly onOpenFile: (path: string) => void;
+  readonly onOpenUrl: (url: string) => void;
+  readonly onCancelQueue: () => void;
+  readonly onFeedback: () => void;
+  readonly onModeChange: (mode: InputMode) => void;
+  readonly onThinkingModeChange: (mode: ThinkingMode) => void;
+  readonly onModelChange: (model: Model) => void;
+  readonly onPermissionApprove: (requestId: string) => void;
+  readonly onPermissionDeny: (requestId: string) => void;
+}
+
+/** Props for layout stabilization hook */
+export interface UseLayoutStabilizationProps {
+  readonly isTransitioning: boolean;
+  readonly messageCount: number;
+  readonly setLoadingConversation: (loading: boolean) => void;
+  readonly setConversationTransitioning: (transitioning: boolean) => void;
+}
+
+/** Return type for layout stabilization hook */
+export interface UseLayoutStabilizationReturn {
+  readonly contentRef: React.RefObject<HTMLDivElement | null>;
+}

@@ -77,7 +77,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
             {folders.length > 0 ? (
               <CommandGroup
                 heading="Folders"
-                className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground/60"
+                className="**:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/60"
               >
                 {folders.map((folder, idx) => (
                   <FileItem
@@ -96,7 +96,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
             {regularFiles.length > 0 ? (
               <CommandGroup
                 heading="Files"
-                className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground/60"
+                className="**:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/60"
               >
                 {regularFiles.map((file, idx) => (
                   <FileItem

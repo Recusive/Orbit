@@ -86,7 +86,7 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
 
             <CommandGroup
               heading="Commands"
-              className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted-foreground/60"
+              className="**:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/60"
             >
               {filteredCommands.map((cmd, idx) => (
                 <CommandItem

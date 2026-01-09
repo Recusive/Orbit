@@ -30,7 +30,6 @@
  *   7. GIT STATUS STYLING - File status indicators
  *
  * @see @/hooks/ui/use-keyboard-shortcuts.ts - Consumes KEYBOARD_SHORTCUTS
- * @see @/components/chat/messages/message-feed.tsx - Uses VIRTUALIZATION, SCROLL_THRESHOLD
  * @see @/components/layout/resize-handle.tsx - Uses RESIZE_HANDLE
  * ============================================================================
  */
@@ -131,6 +130,7 @@ export const CHAT_WIDTH_VAR = {
  */
 export const INPUT_SIZES = {
   textareaMinHeight: 44,
+  textareaMaxHeight: 300,
   editorMinHeight: 80,
   editorMaxHeight: 200,
   emptyStateMinHeight: 200,
@@ -414,3 +414,48 @@ export const GIT_STATUS_STYLES = {
   conflicted: { label: '!', color: 'text-orange-500', title: 'Conflict' },
   typechange: { label: 'T', color: 'text-purple-500', title: 'Type Changed' },
 } as const satisfies Record<string, GitStatusStyle>;
+
+// =============================================================================
+// Terminal Panel (shared between chat-area and activity-panel)
+// =============================================================================
+
+/**
+ * Terminal panel sizing constants
+ * Used by both chat-area.tsx and activity-panel.tsx for consistent terminal behavior
+ */
+export const TERMINAL_PANEL = {
+  /** Minimum height in pixels */
+  MIN_HEIGHT: 35,
+  /** Height when collapsed (shows header only) */
+  COLLAPSED_HEIGHT: 35,
+  /** Minimum drag size to persist - prevents saving collapsed state as "open" */
+  DRAG_THRESHOLD: 50,
+} as const;
+
+// =============================================================================
+// Activity Panel
+// =============================================================================
+
+/**
+ * Activity panel sizing and layout constants
+ */
+export const ACTIVITY_PANEL = {
+  PREFERRED_WIDTH: '35%',
+  MIN_WIDTH: 250,
+  MAX_WIDTH: 800,
+  /** Tabs header height in pixels */
+  TABS_HEADER_HEIGHT: 35,
+} as const;
+
+// =============================================================================
+// Chat Panel
+// =============================================================================
+
+/**
+ * Chat panel sizing constants
+ */
+export const CHAT_PANEL = {
+  MIN_WIDTH: 300,
+  /** Width when activity panel is open */
+  WITH_ACTIVITY_WIDTH: '65%',
+} as const;

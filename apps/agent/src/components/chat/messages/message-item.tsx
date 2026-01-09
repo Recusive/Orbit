@@ -25,7 +25,7 @@ import {
 
 import { MessageActions } from './message-actions';
 
-import type { ImageAttachment } from '../input/chat-input';
+import type { ImageAttachment } from '../input';
 import type { ToolExecution } from '@/stores/agent/tool-store';
 import type { FC } from 'react';
 

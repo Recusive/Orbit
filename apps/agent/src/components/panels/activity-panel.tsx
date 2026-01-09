@@ -14,6 +14,7 @@ import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Switch } from '@/components/ui/switch';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { lspDidClose, lspDidOpen } from '@/lib/api';
+import { TERMINAL_PANEL, ACTIVITY_PANEL } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import { useBrowserIsActive } from '@/stores/browser/browser-store';
 import {
@@ -269,7 +270,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
   return (
     <div
       className="flex shrink-0 bg-sidebar"
-      style={{ height: 35 }}
+      style={{ height: ACTIVITY_PANEL.TABS_HEADER_HEIGHT }}
       onMouseEnter={() => {
         setIsHovered(true);
       }}
@@ -396,7 +397,11 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   const handleTerminalSizeChange = useCallback(
     (sizes: number[]): void => {
       const terminalSize = sizes[1];
-      if (terminalSize !== undefined && terminalSize > 50 && bottomPanelOpen) {
+      if (
+        terminalSize !== undefined &&
+        terminalSize > TERMINAL_PANEL.DRAG_THRESHOLD &&
+        bottomPanelOpen
+      ) {
         // Only save if it's a meaningful size (not collapsed)
         setBottomPanelHeight(terminalSize);
       }
@@ -595,8 +600,11 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
             <div className="h-full flex flex-col">{contentSection}</div>
           </ResizablePanel>
 
-          {/* NOTE: If changing minSize/preferredSize, also update chat-area.tsx terminal panel */}
-          <ResizablePanel preferredSize={bottomPanelOpen ? bottomPanelHeight : 35} minSize={35}>
+          {/* Terminal sizing uses TERMINAL_PANEL constants from @/lib/utils/constants */}
+          <ResizablePanel
+            preferredSize={bottomPanelOpen ? bottomPanelHeight : TERMINAL_PANEL.COLLAPSED_HEIGHT}
+            minSize={TERMINAL_PANEL.MIN_HEIGHT}
+          >
             {/* Only render TerminalPanel when this layout is active - xterm can only attach to one container */}
             {showActivityTerminal ? (
               <TerminalPanel variant="embedded" collapsed={!bottomPanelOpen} />

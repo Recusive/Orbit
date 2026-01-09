@@ -73,7 +73,7 @@ const SidebarToggleIcon: FC<{ expanded: boolean }> = ({ expanded }) => (
 
 // Lazy load heavy components
 const LazySettingsDialog = lazy(() =>
-  import('@/components/modals/settings/settings-dialog').then((m) => ({
+  import('@/components/modals/settings/SettingsDialog').then((m) => ({
     default: m.SettingsDialog,
   }))
 );
