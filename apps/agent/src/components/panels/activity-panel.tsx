@@ -102,7 +102,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       {/* Bottom border - hide for active tab (connects to content) */}
       <div
         className={cn(
-          'absolute bottom-0 inset-x-0 h-px',
+          'absolute bottom-0 inset-x-0 h-px z-10',
           isActive ? 'bg-chat-area' : 'bg-border/50'
         )}
       />
@@ -269,7 +269,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
 
   return (
     <div
-      className="flex shrink-0 bg-sidebar"
+      className="flex shrink-0 bg-sidebar relative"
       style={{ height: ACTIVITY_PANEL.TABS_HEADER_HEIGHT }}
       onMouseEnter={() => {
         setIsHovered(true);
@@ -278,6 +278,9 @@ const TabsHeader: FC<TabsHeaderProps> = ({
         setIsHovered(false);
       }}
     >
+      {/* Bottom border line - spans full width, tabs' bottom borders overlay this */}
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-border/50" />
+
       {/* Scrollable tabs container */}
       <div className="relative flex-1 min-w-0">
         <div

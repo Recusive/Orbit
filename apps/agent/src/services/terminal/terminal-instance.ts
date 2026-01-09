@@ -490,10 +490,10 @@ export class TerminalInstance {
       return getComputedStyle(tempEl)[property];
     };
 
-    const bgColor = getComputedColor('--sidebar', 'backgroundColor');
-    const fgColor = getComputedColor('--sidebar-foreground', 'color');
-    const accentColor = getComputedColor('--sidebar-accent', 'color');
-    const cursorColor = getComputedColor('--sidebar-foreground', 'color');
+    const bgColor = getComputedColor('--chat-area', 'backgroundColor');
+    const fgColor = getComputedColor('--foreground', 'color');
+    const accentColor = getComputedColor('--accent', 'color');
+    const cursorColor = getComputedColor('--foreground', 'color');
 
     document.body.removeChild(tempEl);
 

@@ -11,7 +11,7 @@ import {
   ChevronsRightLeft,
   Plus,
   Search,
-  SquareTerminal,
+  Terminal,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -345,7 +345,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
         style={{ height: TERMINAL_HEADER_HEIGHT }}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0 h-full">
-          <SquareTerminal className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Terminal className="h-4 w-4 text-muted-foreground shrink-0" />
           {/* Terminal tabs */}
           <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden flex-1 min-w-0 h-full scrollbar-none pr-4">
             {sessions.map((session) => {
@@ -357,7 +357,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
               return (
                 <div
                   key={session.id}
-                  className={`group relative flex items-center px-2 py-0.5 text-xs rounded cursor-pointer shrink-0 ${
+                  className={`group relative flex items-center px-3 py-1 text-sm rounded cursor-pointer shrink-0 ${
                     session.id === activeSessionId
                       ? 'bg-accent text-accent-foreground'
                       : 'text-muted-foreground hover:bg-accent/50'
@@ -373,7 +373,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
                   {isEditing ? (
                     <input
                       type="text"
-                      className="bg-transparent border-none outline-none text-xs w-20 min-w-0"
+                      className="bg-transparent border-none outline-none text-sm w-20 min-w-0"
                       value={editValue}
                       onChange={(e) => {
                         setEditValue(e.target.value);
@@ -463,7 +463,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
           hasSelection={hasSelection}
         >
           <ContextMenuTrigger asChild>
-            <div className="flex-1 overflow-hidden relative bg-sidebar">
+            <div className="flex-1 overflow-hidden relative bg-chat-area">
               {/* Render ALL terminal containers - visibility controlled by manager */}
               {sessions.map((session) => (
                 <div
@@ -471,7 +471,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
                   ref={(el) => {
                     setTerminalContainerRef(session.id, el);
                   }}
-                  className="absolute inset-0"
+                  className="absolute inset-0 bg-chat-area"
                   style={{
                     pointerEvents: session.id === activeSessionId ? 'auto' : 'none',
                   }}

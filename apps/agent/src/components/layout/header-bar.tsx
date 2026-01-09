@@ -50,8 +50,10 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
           active ? 'bg-muted/70' : 'hover:bg-muted/40'
         )}
       />
-      {/* Active indicator */}
-      {active ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary/80" /> : null}
+      {/* Active indicator - offset to sit on header's bottom border */}
+      {active ? (
+        <div className="absolute inset-x-0 h-0.5 bg-primary/80" style={{ bottom: '-3.5px' }} />
+      ) : null}
       <span className="relative text-base font-medium">{label}</span>
     </button>
   );
