@@ -1,3 +1,9 @@
+/**
+ * FileExplorer - Virtualized file tree browser
+ *
+ * NOTE: Git status styling comes from @/lib/utils/constants.
+ * To change git status colors or labels, update GIT_STATUS_STYLES in constants.ts.
+ */
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   AlertCircle,

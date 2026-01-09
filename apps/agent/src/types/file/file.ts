@@ -304,17 +304,6 @@ export function getLanguageFromExtension(extension: string): string | undefined 
   return languageMap[extension.toLowerCase()];
 }
 
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  const size = sizes[i];
-
-  return `${String(Math.round((bytes / Math.pow(k, i)) * 100) / 100)} ${size ?? ''}`;
-}
-
 export function sortFileTreeNodes(nodes: FileTreeNode[]): FileTreeNode[] {
   return [...nodes].sort((a, b) => {
     // Directories first

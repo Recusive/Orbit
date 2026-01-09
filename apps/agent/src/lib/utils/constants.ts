@@ -1,3 +1,40 @@
+/**
+ * ============================================================================
+ * CONSTANTS - Single Source of Truth for UI Configuration
+ * ============================================================================
+ *
+ * This file is the SINGLE SOURCE OF TRUTH for all UI-related constants.
+ * DO NOT hardcode magic numbers in components - import from here instead.
+ *
+ * USAGE:
+ *   import { SIDEBAR, CHAT_WIDTH, KEYBOARD_SHORTCUTS } from '@/lib/utils/constants';
+ *
+ * WHEN TO ADD HERE:
+ *   - Layout dimensions (widths, heights, padding)
+ *   - Timing values (delays, animation durations)
+ *   - Threshold values (scroll positions, snap points)
+ *   - Configuration objects (keyboard shortcuts, git styles)
+ *
+ * WHEN NOT TO ADD HERE:
+ *   - Component-specific styles (use Tailwind or CSS)
+ *   - One-off values used in a single place
+ *   - Values that change frequently during development
+ *
+ * CATEGORIES:
+ *   1. LAYOUT DIMENSIONS - Sidebar, panels, chat widths
+ *   2. TIMING CONSTANTS - Animations, delays, transitions
+ *   3. VIRTUALIZATION & SCROLLING - List rendering, auto-scroll
+ *   4. TERMINAL SETTINGS - Font, line limits
+ *   5. UI STATE DEFAULTS - Initial state values
+ *   6. KEYBOARD SHORTCUTS - Global hotkeys (single source of truth)
+ *   7. GIT STATUS STYLING - File status indicators
+ *
+ * @see @/hooks/ui/use-keyboard-shortcuts.ts - Consumes KEYBOARD_SHORTCUTS
+ * @see @/components/chat/messages/message-feed.tsx - Uses VIRTUALIZATION, SCROLL_THRESHOLD
+ * @see @/components/layout/resize-handle.tsx - Uses RESIZE_HANDLE
+ * ============================================================================
+ */
+
 // ============================================
 // LAYOUT DIMENSIONS
 // ============================================
@@ -186,20 +223,6 @@ export const TERMINAL = {
 } as const;
 
 // ============================================
-// TYPOGRAPHY
-// ============================================
-
-/**
- * Font sizes
- */
-export const FONT_SIZE = {
-  tiny: 10,
-  small: 12,
-  base: 14,
-  large: 16,
-} as const;
-
-// ============================================
 // UI STATE DEFAULTS
 // ============================================
 
@@ -217,121 +240,149 @@ export const DEFAULT_UI_STATE = {
 } as const;
 
 /**
+ * Keyboard shortcut definition
+ */
+export interface KeyboardShortcutDef {
+  /** Key to press (e.g., 'k', 'Enter', 'Escape') */
+  key: string;
+  /** Requires Cmd (Mac) / Ctrl (Windows/Linux) */
+  cmd?: boolean;
+  /** Requires Shift key */
+  shift?: boolean;
+  /** Requires Alt/Option key */
+  alt?: boolean;
+  /** Human-readable description */
+  description: string;
+  /** Custom event name to dispatch */
+  event: string;
+  /** Whether to prevent default browser behavior (default: true) */
+  preventDefault?: boolean;
+}
+
+/**
  * Keyboard shortcuts for the application
+ * Single source of truth - used by useKeyboardShortcuts hook
  */
-export const KEYBOARD_SHORTCUTS = {
-  toggleSidebar: 'cmd+b',
-  toggleTerminal: 'cmd+j',
-  focusChat: 'cmd+i',
-  newSession: 'cmd+n',
-  search: 'cmd+f',
-  openSettings: 'cmd+,',
+export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
+  // Command palette & settings
+  openCommandPalette: {
+    key: 'k',
+    cmd: true,
+    description: 'Open command palette',
+    event: 'openCommandPalette',
+  },
+  openSettings: {
+    key: ',',
+    cmd: true,
+    description: 'Open settings',
+    event: 'openSettings',
+  },
+
+  // Sidebar & panels
+  toggleSidebar: {
+    key: '/',
+    cmd: true,
+    description: 'Toggle sidebar',
+    event: 'toggleLeftSidebar',
+  },
+  toggleLeftSidebar: {
+    key: '.',
+    cmd: true,
+    description: 'Toggle left sidebar',
+    event: 'toggleLeftSidebar',
+  },
+  toggleFileBrowser: {
+    key: 'b',
+    cmd: true,
+    description: 'Toggle file browser',
+    event: 'toggleFileBrowser',
+  },
+  toggleTerminal: {
+    key: 'j',
+    cmd: true,
+    description: 'Toggle terminal',
+    event: 'toggleTerminal',
+  },
+
+  // File operations
+  quickOpenFile: {
+    key: 'p',
+    cmd: true,
+    description: 'Quick open file',
+    event: 'quickOpenFile',
+  },
+  saveFile: {
+    key: 's',
+    cmd: true,
+    description: 'Save current file',
+    event: 'saveFile',
+  },
+  saveAllFiles: {
+    key: 's',
+    cmd: true,
+    shift: true,
+    description: 'Save all files',
+    event: 'saveAllFiles',
+  },
+  closeFile: {
+    key: 'w',
+    cmd: true,
+    description: 'Close current file',
+    event: 'closeFile',
+  },
+
+  // Agent
+  startAgentTask: {
+    key: 'Enter',
+    cmd: true,
+    description: 'Start agent task',
+    event: 'startAgentTask',
+  },
+  cancel: {
+    key: 'Escape',
+    description: 'Cancel/Close',
+    event: 'cancel',
+    preventDefault: false,
+  },
+
+  // Navigation & search
+  goToLine: {
+    key: 'g',
+    cmd: true,
+    description: 'Go to line',
+    event: 'goToLine',
+  },
+  findInFile: {
+    key: 'f',
+    cmd: true,
+    description: 'Find in file',
+    event: 'findInFile',
+  },
+  findInWorkspace: {
+    key: 'f',
+    cmd: true,
+    shift: true,
+    description: 'Find in workspace',
+    event: 'findInWorkspace',
+  },
+
+  // Edit operations (browser defaults, no custom handling)
+  undo: {
+    key: 'z',
+    cmd: true,
+    description: 'Undo',
+    event: 'undo',
+    preventDefault: false,
+  },
+  redo: {
+    key: 'z',
+    cmd: true,
+    shift: true,
+    description: 'Redo',
+    event: 'redo',
+    preventDefault: false,
+  },
 } as const;
-
-/**
- * File extension to icon name mapping
- */
-export const FILE_ICONS: Record<string, string> = {
-  // Programming languages
-  ts: 'typescript',
-  tsx: 'react',
-  js: 'javascript',
-  jsx: 'react',
-  py: 'python',
-  java: 'java',
-  c: 'c',
-  cpp: 'cpp',
-  cs: 'csharp',
-  go: 'go',
-  rs: 'rust',
-  rb: 'ruby',
-  php: 'php',
-  swift: 'swift',
-  kt: 'kotlin',
-
-  // Web technologies
-  html: 'html',
-  css: 'css',
-  scss: 'sass',
-  sass: 'sass',
-  less: 'less',
-  vue: 'vue',
-
-  // Data formats
-  json: 'json',
-  yaml: 'yaml',
-  yml: 'yaml',
-  xml: 'xml',
-  toml: 'toml',
-
-  // Documentation
-  md: 'markdown',
-  mdx: 'markdown',
-  txt: 'text',
-
-  // Config files
-  env: 'settings',
-  config: 'settings',
-
-  // Images
-  png: 'image',
-  jpg: 'image',
-  jpeg: 'image',
-  gif: 'image',
-  svg: 'image',
-
-  // Default
-  default: 'file',
-} as const;
-
-/**
- * Agent execution phases
- */
-export const AGENT_PHASES = [
-  'initializing',
-  'analyzing',
-  'planning',
-  'executing',
-  'validating',
-  'completed',
-  'error',
-] as const;
-
-export type AgentPhase = (typeof AGENT_PHASES)[number];
-
-/**
- * Available Claude model options
- */
-export const MODEL_OPTIONS = [
-  {
-    id: 'claude-opus-4-5-20251101',
-    name: 'Claude Opus 4.5',
-    description: 'Most capable model, best for complex tasks',
-    tier: 'premium',
-  },
-  {
-    id: 'claude-sonnet-4-5-20250929',
-    name: 'Claude Sonnet 4.5',
-    description: 'Balanced performance and speed',
-    tier: 'standard',
-  },
-  {
-    id: 'claude-sonnet-3-5-20241022',
-    name: 'Claude Sonnet 3.5',
-    description: 'Previous generation, fast and efficient',
-    tier: 'standard',
-  },
-  {
-    id: 'claude-haiku-3-5-20241022',
-    name: 'Claude Haiku 3.5',
-    description: 'Fastest model, great for simple tasks',
-    tier: 'economy',
-  },
-] as const;
-
-export type ModelOption = (typeof MODEL_OPTIONS)[number];
-export type ModelId = ModelOption['id'];
-export type ModelTier = ModelOption['tier'];
 
 // ============================================
 // GIT STATUS STYLING

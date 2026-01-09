@@ -1,3 +1,9 @@
+/**
+ * ModelSelector - AI model dropdown selector
+ *
+ * NOTE: Dropdown width comes from @/lib/utils/constants.
+ * To change dropdown dimensions, update CHAT_WIDTH.dropdown in constants.ts.
+ */
 import { Check, ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SiClaude, SiOpenai } from 'react-icons/si';

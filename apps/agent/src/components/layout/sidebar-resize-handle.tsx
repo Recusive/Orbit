@@ -1,8 +1,13 @@
+/**
+ * NOTE: Layout dimensions come from @/lib/utils/constants.
+ * To change sidebar widths, snap thresholds, or handle dimensions,
+ * update SIDEBAR, PANEL_SIZES, and RESIZE_HANDLE in constants.ts.
+ */
 import { useRef, useState } from 'react';
 
 import type { FC } from 'react';
 
-import { PANEL_SIZES, SIDEBAR } from '@/lib/utils/constants';
+import { PANEL_SIZES, RESIZE_HANDLE, SIDEBAR } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import { useIsLeftSidebarCollapsed, useUIStore } from '@/stores/ui/ui-store';
 
@@ -138,21 +143,32 @@ export const SidebarResizeHandle: FC = () => {
         isCollapsed ? 'cursor-default' : 'cursor-col-resize'
       )}
       onMouseDown={handleMouseDown}
-      // Wider hit area via padding, visual line is 1px
-      style={{ width: 1, padding: '0 4px', margin: '0 -4px' }}
+      // Wider hit area via padding, visual line matches RESIZE_HANDLE.width
+      style={{ width: RESIZE_HANDLE.width, padding: '0 4px', margin: '0 -4px' }}
     >
       {/* Persistent separator line (always visible, matches site border) */}
-      <div className="w-px h-full bg-border" />
+      <div className="h-full bg-border" style={{ width: RESIZE_HANDLE.width }} />
       {/* Hover/Active indicator line - only show when expanded (can resize) */}
       {!isCollapsed && (
         <div
-          className={cn(
-            'absolute inset-y-0 left-1/2 -translate-x-1/2 bg-primary',
-            // Show on hover OR when dragging
-            isDragging
-              ? 'w-[3px] opacity-100'
-              : 'w-px opacity-0 group-hover:w-[3px] group-hover:opacity-100'
-          )}
+          className="absolute inset-y-0 left-1/2 -translate-x-1/2 bg-primary transition-all duration-100"
+          style={{
+            width: isDragging ? RESIZE_HANDLE.hoverWidth : RESIZE_HANDLE.width,
+            opacity: isDragging ? 1 : 0,
+          }}
+          // Group hover handled via CSS for the non-dragging state
+          onMouseEnter={(e) => {
+            if (!isDragging) {
+              e.currentTarget.style.width = `${String(RESIZE_HANDLE.hoverWidth)}px`;
+              e.currentTarget.style.opacity = '1';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isDragging) {
+              e.currentTarget.style.width = `${String(RESIZE_HANDLE.width)}px`;
+              e.currentTarget.style.opacity = '0';
+            }
+          }}
         />
       )}
     </div>

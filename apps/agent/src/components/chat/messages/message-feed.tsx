@@ -1,10 +1,19 @@
+/**
+ * MessageFeed - Virtualized message list component
+ *
+ * NOTE: This component uses constants from @/lib/utils/constants.
+ * If you need to adjust scroll behavior or virtualization settings,
+ * update VIRTUALIZATION and SCROLL_THRESHOLD in constants.ts - DO NOT hardcode values here.
+ */
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useRef, useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { MessageSection } from './message-section';
 
 import type { Message } from './message-section';
 import type { FC } from 'react';
+
+import { SCROLL_THRESHOLD, VIRTUALIZATION } from '@/lib/utils/constants';
 
 export interface MessageGroup {
   id: string;
@@ -28,15 +37,16 @@ export const MessageFeed: FC<MessageFeedProps> = ({
   const virtualizer = useVirtualizer({
     count: messageGroups.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 200,
-    overscan: 5,
+    estimateSize: () => VIRTUALIZATION.estimatedItemHeight,
+    overscan: VIRTUALIZATION.overscan,
   });
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (shouldAutoScroll.current && parentRef.current) {
       const { scrollHeight, clientHeight } = parentRef.current;
-      const isNearBottom = scrollHeight - clientHeight - parentRef.current.scrollTop < 100;
+      const isNearBottom =
+        scrollHeight - clientHeight - parentRef.current.scrollTop < SCROLL_THRESHOLD.nearBottom;
 
       if (isNearBottom || messageGroups.length === 1) {
         virtualizer.scrollToIndex(messageGroups.length - 1, {
@@ -54,7 +64,7 @@ export const MessageFeed: FC<MessageFeedProps> = ({
 
     const handleScroll = (): void => {
       const { scrollHeight, clientHeight, scrollTop } = element;
-      const isAtBottom = scrollHeight - clientHeight - scrollTop < 50;
+      const isAtBottom = scrollHeight - clientHeight - scrollTop < SCROLL_THRESHOLD.atBottom;
       shouldAutoScroll.current = isAtBottom;
     };
 

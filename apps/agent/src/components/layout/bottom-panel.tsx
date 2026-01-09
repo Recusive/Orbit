@@ -3,6 +3,9 @@
  *
  * Uses TerminalInstanceManager for xterm lifecycle management.
  * Terminals persist across tab switches - only destroyed on explicit close.
+ *
+ * NOTE: Panel header heights come from @/lib/utils/constants.
+ * To change header dimensions, update HEIGHTS in constants.ts - DO NOT hardcode here.
  */
 
 import { Plus, X, Maximize2 } from 'lucide-react';

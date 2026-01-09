@@ -1,3 +1,10 @@
+/**
+ * ChatArea - Main chat interface with messages and input
+ *
+ * NOTE: Chat container widths come from @/lib/utils/constants.
+ * To change chat max-width or CSS variable names,
+ * update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts - DO NOT hardcode here.
+ */
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type { ChatMessage } from '@/components/chat/messages';

@@ -1,3 +1,9 @@
+/**
+ * ChatHeader - Breadcrumb header showing workspace and conversation title
+ *
+ * NOTE: Header height comes from @/lib/utils/constants.
+ * To change header dimensions, update HEIGHTS in constants.ts.
+ */
 import type { FC } from 'react';
 
 import { HEIGHTS } from '@/lib/utils/constants';

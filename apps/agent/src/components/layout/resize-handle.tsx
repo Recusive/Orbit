@@ -1,7 +1,14 @@
-import { useRef } from 'react';
+/**
+ * ResizeHandle - Draggable resize handle for panels
+ *
+ * NOTE: Handle dimensions come from @/lib/utils/constants.
+ * To change handle width or hover width, update RESIZE_HANDLE in constants.ts.
+ */
+import { useRef, useState } from 'react';
 
 import type { FC } from 'react';
 
+import { RESIZE_HANDLE } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -14,6 +21,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
   const { setReviewPanelWidth, setBottomPanelHeight, reviewPanelWidth, bottomPanelHeight } =
     useUIStore();
   const startValueRef = useRef(0);
+  const [isHovered, setIsHovered] = useState(false);
 
   const handleMouseDown = (e: React.MouseEvent): void => {
     e.preventDefault();
@@ -44,28 +52,41 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
   };
 
   const isVertical = direction === 'vertical';
+  const handleSize = isHovered ? RESIZE_HANDLE.hoverWidth : RESIZE_HANDLE.width;
 
   return (
     <div
       className={cn(
         'group relative shrink-0 flex items-center justify-center',
-        isVertical ? 'w-px h-full cursor-col-resize' : 'h-1 w-full cursor-row-resize'
+        isVertical ? 'h-full cursor-col-resize' : 'w-full cursor-row-resize'
       )}
+      style={isVertical ? { width: RESIZE_HANDLE.width } : { height: 4 }}
       onMouseDown={handleMouseDown}
+      onMouseEnter={() => {
+        setIsHovered(true);
+      }}
+      onMouseLeave={() => {
+        setIsHovered(false);
+      }}
     >
       {/* Persistent separator line */}
       <div
-        className={cn(
-          'bg-border transition-all duration-100',
-          isVertical ? 'w-px h-full' : 'h-px w-full'
-        )}
+        className="bg-border transition-all duration-100"
+        style={
+          isVertical
+            ? { width: RESIZE_HANDLE.width, height: '100%' }
+            : { height: RESIZE_HANDLE.width, width: '100%' }
+        }
       />
       {/* Hover indicator line */}
       <div
-        className={cn(
-          'absolute opacity-0 group-hover:opacity-100 bg-primary transition-all duration-100',
-          isVertical ? 'w-px group-hover:w-[3px] h-full' : 'h-px group-hover:h-[3px] w-full'
-        )}
+        className="absolute bg-primary transition-all duration-100"
+        style={{
+          opacity: isHovered ? 1 : 0,
+          ...(isVertical
+            ? { width: handleSize, height: '100%' }
+            : { height: handleSize, width: '100%' }),
+        }}
       />
     </div>
   );

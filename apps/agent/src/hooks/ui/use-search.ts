@@ -1,3 +1,9 @@
+/**
+ * useSearch - File search hook with debouncing
+ *
+ * NOTE: Debounce delay comes from @/lib/utils/constants.
+ * To change search debounce timing, update DELAYS.debounce in constants.ts.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { SearchResult } from '@/lib/api';

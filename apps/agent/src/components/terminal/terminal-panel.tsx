@@ -1,3 +1,9 @@
+/**
+ * TerminalPanel - xterm.js terminal with tabs and search
+ *
+ * NOTE: Header heights come from @/lib/utils/constants.
+ * To change terminal header dimensions, update HEIGHTS in constants.ts.
+ */
 import {
   ChevronDown,
   ChevronUp,

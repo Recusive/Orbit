@@ -1,4 +1,15 @@
-import { useEffect, useCallback } from 'react';
+/**
+ * useKeyboardShortcuts - Global keyboard shortcut handler
+ *
+ * NOTE: All shortcuts are defined in @/lib/utils/constants (KEYBOARD_SHORTCUTS).
+ * To add, remove, or modify shortcuts, update constants.ts - DO NOT hardcode here.
+ * This hook consumes KEYBOARD_SHORTCUTS as the single source of truth.
+ */
+import { useCallback, useEffect } from 'react';
+
+import type { KeyboardShortcutDef } from '@/lib/utils/constants';
+
+import { KEYBOARD_SHORTCUTS } from '@/lib/utils/constants';
 
 export interface KeyboardShortcut {
   key: string;
@@ -126,152 +137,32 @@ export function useKeyboardShortcuts(
 }
 
 /**
- * Default keyboard shortcuts for the application
+ * Convert a KeyboardShortcutDef from constants to a KeyboardShortcut with handler
  */
-export const defaultShortcuts: KeyboardShortcut[] = [
-  {
-    key: 'k',
-    cmd: true,
-    description: 'Open command palette',
+function createShortcutHandler(def: KeyboardShortcutDef): KeyboardShortcut {
+  const shortcut: KeyboardShortcut = {
+    key: def.key,
+    description: def.description,
     handler: (): void => {
-      // Dispatch custom event for command palette
-      window.dispatchEvent(new CustomEvent('openCommandPalette'));
+      window.dispatchEvent(new CustomEvent(def.event));
     },
-  },
-  {
-    key: ',',
-    cmd: true,
-    description: 'Open settings',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('openSettings'));
-    },
-  },
-  {
-    key: '/',
-    cmd: true,
-    description: 'Toggle sidebar',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('toggleLeftSidebar'));
-    },
-  },
-  {
-    key: '.',
-    cmd: true,
-    description: 'Toggle left sidebar',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('toggleLeftSidebar'));
-    },
-  },
-  {
-    key: 'b',
-    cmd: true,
-    description: 'Toggle file browser',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('toggleFileBrowser'));
-    },
-  },
-  {
-    key: 'j',
-    cmd: true,
-    description: 'Toggle terminal',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('toggleTerminal'));
-    },
-  },
-  {
-    key: 'p',
-    cmd: true,
-    description: 'Quick open file',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('quickOpenFile'));
-    },
-  },
-  {
-    key: 's',
-    cmd: true,
-    description: 'Save current file',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('saveFile'));
-    },
-  },
-  {
-    key: 's',
-    cmd: true,
-    shift: true,
-    description: 'Save all files',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('saveAllFiles'));
-    },
-  },
-  {
-    key: 'w',
-    cmd: true,
-    description: 'Close current file',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('closeFile'));
-    },
-  },
-  {
-    key: 'Enter',
-    cmd: true,
-    description: 'Start agent task',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('startAgentTask'));
-    },
-  },
-  {
-    key: 'Escape',
-    description: 'Cancel/Close',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('cancel'));
-    },
-    preventDefault: false,
-  },
-  {
-    key: 'g',
-    cmd: true,
-    description: 'Go to line',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('goToLine'));
-    },
-  },
-  {
-    key: 'f',
-    cmd: true,
-    description: 'Find in file',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('findInFile'));
-    },
-  },
-  {
-    key: 'f',
-    cmd: true,
-    shift: true,
-    description: 'Find in workspace',
-    handler: (): void => {
-      window.dispatchEvent(new CustomEvent('findInWorkspace'));
-    },
-  },
-  {
-    key: 'z',
-    cmd: true,
-    description: 'Undo',
-    handler: (): void => {
-      // Browser default, no custom handling needed
-    },
-    preventDefault: false,
-  },
-  {
-    key: 'z',
-    cmd: true,
-    shift: true,
-    description: 'Redo',
-    handler: (): void => {
-      // Browser default, no custom handling needed
-    },
-    preventDefault: false,
-  },
-];
+  };
+
+  // Only add optional properties if they are defined
+  if (def.cmd !== undefined) shortcut.cmd = def.cmd;
+  if (def.shift !== undefined) shortcut.shift = def.shift;
+  if (def.alt !== undefined) shortcut.alt = def.alt;
+  if (def.preventDefault !== undefined) shortcut.preventDefault = def.preventDefault;
+
+  return shortcut;
+}
+
+/**
+ * Default keyboard shortcuts for the application
+ * Generated from KEYBOARD_SHORTCUTS constant (single source of truth)
+ */
+export const defaultShortcuts: KeyboardShortcut[] =
+  Object.values(KEYBOARD_SHORTCUTS).map(createShortcutHandler);
 
 /**
  * Hook that provides default keyboard shortcuts

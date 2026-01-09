@@ -1,3 +1,10 @@
+/**
+ * Terminal Store - State management for terminal sessions
+ *
+ * NOTE: Terminal configuration comes from @/lib/utils/constants.
+ * To change max output lines, min output lines, or other terminal settings,
+ * update TERMINAL in constants.ts - DO NOT hardcode values here.
+ */
 import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';

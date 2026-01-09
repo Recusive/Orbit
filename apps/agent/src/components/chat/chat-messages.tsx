@@ -1,3 +1,9 @@
+/**
+ * ChatMessages - Message list with auto-scroll behavior
+ *
+ * NOTE: Chat container widths come from @/lib/utils/constants.
+ * To change chat max-width, update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts.
+ */
 import { useEffect, useRef, useState } from 'react';
 
 import { MessageItem } from './messages';

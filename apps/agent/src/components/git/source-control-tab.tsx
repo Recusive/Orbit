@@ -1,3 +1,9 @@
+/**
+ * SourceControlTab - Git status and operations panel
+ *
+ * NOTE: Git status styling comes from @/lib/utils/constants.
+ * To change status colors or labels, update GIT_STATUS_STYLES in constants.ts.
+ */
 import {
   AlertCircle,
   ArrowDown,

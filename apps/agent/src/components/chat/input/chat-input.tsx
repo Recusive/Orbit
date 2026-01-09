@@ -1,3 +1,10 @@
+/**
+ * ChatInput - Main chat input component with context attachments
+ *
+ * NOTE: Input dimensions and chat width come from @/lib/utils/constants.
+ * To change textarea sizes, chat max-width, or input box dimensions,
+ * update CHAT_WIDTH, CHAT_WIDTH_VAR, and INPUT_SIZES in constants.ts.
+ */
 import { IconImagine } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconImagine';
 import { ArrowUp, AtSign, Coins, Globe, Image, Square } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';

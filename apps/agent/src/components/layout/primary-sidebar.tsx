@@ -1,3 +1,10 @@
+/**
+ * PrimarySidebar - Main navigation sidebar with conversations and explorer
+ *
+ * NOTE: Layout dimensions come from @/lib/utils/constants.
+ * To change header heights, sidebar widths, or transition durations,
+ * update HEIGHTS, SIDEBAR, and TRANSITIONS in constants.ts - DO NOT hardcode here.
+ */
 import { createLogger } from '@orbit/common/lib';
 import {
   ChevronDown,

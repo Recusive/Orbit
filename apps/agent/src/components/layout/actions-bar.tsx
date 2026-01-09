@@ -1,3 +1,9 @@
+/**
+ * ActionsBar - VS Code-style vertical icon bar for activity tab switching
+ *
+ * NOTE: Icon column width comes from @/lib/utils/constants.
+ * To change actions bar width, update SIDEBAR.iconColumnWidth in constants.ts.
+ */
 import { FileCode, GitBranch, GitCompareArrows, Globe } from 'lucide-react';
 
 import type { ActivityTab } from '@/stores/ui/ui-store';

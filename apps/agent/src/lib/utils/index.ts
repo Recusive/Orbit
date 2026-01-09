@@ -3,7 +3,7 @@
  */
 
 // General utilities
-export { cn, formatTimestamp, formatFileSize, truncatePath } from './utils';
+export { cn, formatTimestamp, truncatePath } from './utils';
 
 // Diff utilities
 export { computeSimpleDiff, getLanguageFromPath } from './diff-utils';
@@ -29,15 +29,11 @@ export {
   VIRTUALIZATION,
   SCROLL_THRESHOLD,
   TERMINAL,
-  FONT_SIZE,
   DEFAULT_UI_STATE,
   KEYBOARD_SHORTCUTS,
-  FILE_ICONS,
-  AGENT_PHASES,
-  MODEL_OPTIONS,
   GIT_STATUS_STYLES,
 } from './constants';
-export type { AgentPhase, ModelOption, ModelId, ModelTier, GitStatusStyle } from './constants';
+export type { KeyboardShortcutDef, GitStatusStyle } from './constants';
 
 // Icon map
 export {

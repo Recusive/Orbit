@@ -1,3 +1,9 @@
+/**
+ * Timestamp - Relative and absolute time display
+ *
+ * NOTE: Time constants come from @/lib/utils/constants.
+ * To change update intervals, update TIME_MS in constants.ts.
+ */
 import { useEffect, useState, useMemo } from 'react';
 
 import type { FC } from 'react';

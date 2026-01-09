@@ -1,3 +1,10 @@
+/**
+ * UIStore - Global UI state management
+ *
+ * NOTE: Default values and constraints come from @/lib/utils/constants.
+ * To change default panel sizes, sidebar widths, or initial UI state,
+ * update DEFAULT_UI_STATE, PANEL_SIZES, and SIDEBAR in constants.ts.
+ */
 import { createLogger } from '@orbit/common/lib';
 import { useMemo } from 'react';
 import { create } from 'zustand';

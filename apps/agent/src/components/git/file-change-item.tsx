@@ -1,3 +1,9 @@
+/**
+ * FileChangeItem - Expandable diff view for a changed file
+ *
+ * NOTE: Header height comes from @/lib/utils/constants.
+ * To change file change header dimensions, update HEIGHTS in constants.ts.
+ */
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import React, { useState } from 'react';
 

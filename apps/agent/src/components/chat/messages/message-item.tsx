@@ -1,3 +1,10 @@
+/**
+ * MessageItem - Individual chat message with tool widgets
+ *
+ * NOTE: Chat widths and spacing come from @/lib/utils/constants.
+ * To change message widths or assistant padding, update CHAT_WIDTH,
+ * CHAT_WIDTH_VAR, and CHAT_SPACING in constants.ts - DO NOT hardcode here.
+ */
 import { memo } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';

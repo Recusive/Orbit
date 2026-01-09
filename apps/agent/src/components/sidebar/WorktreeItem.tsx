@@ -1,3 +1,10 @@
+/**
+ * WorktreeItem - Git worktree sidebar item
+ *
+ * NOTE: Sidebar dimensions and transitions come from @/lib/utils/constants.
+ * To change icon widths, padding, or animation timing,
+ * update SIDEBAR and TRANSITIONS in constants.ts - DO NOT hardcode here.
+ */
 import { ChevronDown, GitBranch, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
