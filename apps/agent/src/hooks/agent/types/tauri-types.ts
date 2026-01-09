@@ -18,18 +18,6 @@ export interface UseTauriReturn {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Agent Stream Types
-// ═══════════════════════════════════════════════════════════════
-
-export interface AgentStreamCallbacks {
-  onChunk: (content: string, messageId: string) => void;
-  onComplete: (messageId: string, usage?: { input_tokens: number; output_tokens: number }) => void;
-  onError: (error: string, messageId: string) => void;
-  onToolStart?: (toolName: string, messageId: string) => void;
-  onToolEnd?: (toolName: string, success: boolean, messageId: string) => void;
-}
-
-// ═══════════════════════════════════════════════════════════════
 // Rewind Context Types
 // ═══════════════════════════════════════════════════════════════
 

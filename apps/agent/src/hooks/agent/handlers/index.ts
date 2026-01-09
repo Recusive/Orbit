@@ -1,0 +1,226 @@
+import {
+  handleMessageSend,
+  handleAgentStop,
+  handlePermissionResponse,
+  handleThinkingSet,
+  handleModelSet,
+  handleInputModeSet,
+} from './agent-sdk-handlers';
+import {
+  handleCommandsList,
+  handleCommandsCreate,
+  handleCommandsUpdate,
+  handleCommandsDelete,
+  handleCommandsGenerate,
+} from './command-handlers';
+import {
+  handleConversationCreate,
+  handleConversationList,
+  handleConversationLoad,
+  handleConversationDelete,
+  handleConversationUpdateTitle,
+  handleConversationRewind,
+} from './conversation-handlers';
+import { handleFileTreeRequest, handleFileRead, handleFileListRequest } from './file-handlers';
+import {
+  handleSubagentsList,
+  handleSubagentsCreate,
+  handleSubagentsUpdate,
+  handleSubagentsDelete,
+  handleSubagentsGenerate,
+} from './subagent-handlers';
+import {
+  handleTerminalCreate,
+  handleTerminalWrite,
+  handleTerminalResize,
+  handleTerminalClose,
+} from './terminal-handlers';
+
+import type { WebviewMessage } from '@/types/protocol';
+
+// ═══════════════════════════════════════════════════════════════
+// Tauri Message Handler
+// ═══════════════════════════════════════════════════════════════
+
+export async function handleTauriMessage(message: WebviewMessage): Promise<void> {
+  // Handle file tree requests
+  if (message.type === 'file:tree:request') {
+    await handleFileTreeRequest(message);
+    return;
+  }
+
+  // Handle file read requests
+  if (message.type === 'file:read') {
+    await handleFileRead(message);
+    return;
+  }
+
+  // Handle terminal creation
+  if (message.type === 'terminal:create') {
+    await handleTerminalCreate(message);
+    return;
+  }
+
+  // Handle terminal write
+  if (message.type === 'terminal:write') {
+    await handleTerminalWrite(message);
+    return;
+  }
+
+  // Handle terminal resize
+  if (message.type === 'terminal:resize') {
+    await handleTerminalResize(message);
+    return;
+  }
+
+  // Handle terminal close
+  if (message.type === 'terminal:close') {
+    await handleTerminalClose(message);
+    return;
+  }
+
+  // Handle conversation creation
+  if (message.type === 'conversation:create') {
+    await handleConversationCreate(message);
+    return;
+  }
+
+  // Handle conversation list request
+  if (message.type === 'conversation:list') {
+    await handleConversationList(message);
+    return;
+  }
+
+  // Handle conversation load request
+  if (message.type === 'conversation:load') {
+    await handleConversationLoad(message);
+    return;
+  }
+
+  // Handle conversation delete request
+  if (message.type === 'conversation:delete') {
+    await handleConversationDelete(message);
+    return;
+  }
+
+  // Handle conversation title update
+  if (message.type === 'conversation:updateTitle') {
+    await handleConversationUpdateTitle(message);
+    return;
+  }
+
+  // Handle conversation rewind request (fork)
+  // TESTED: This rewind flow is covered by integration tests.
+  //     If you modify this, run: cd agent-bridge && bun test
+  //     Test file: src/__tests__/combined-rewind.test.ts
+  if (message.type === 'conversation:rewind') {
+    await handleConversationRewind(message);
+    return;
+  }
+
+  // Handle file list request (for file search/picker)
+  if (message.type === 'file:list:request') {
+    await handleFileListRequest(message);
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Agent SDK Message Handlers
+  // ═══════════════════════════════════════════════════════════════
+
+  // Handle sending a message to the agent
+  if (message.type === 'message:send') {
+    await handleMessageSend(message);
+    return;
+  }
+
+  // Handle stopping the agent
+  if (message.type === 'agent:stop') {
+    await handleAgentStop(message);
+    return;
+  }
+
+  // Handle permission response
+  if (message.type === 'permission:response') {
+    await handlePermissionResponse(message);
+    return;
+  }
+
+  // Handle thinking mode change
+  if (message.type === 'thinking:set') {
+    await handleThinkingSet(message);
+    return;
+  }
+
+  // Handle model change
+  if (message.type === 'model:set') {
+    await handleModelSet(message);
+    return;
+  }
+
+  // Handle input mode change
+  if (message.type === 'inputMode:set') {
+    await handleInputModeSet(message);
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Subagent Management Handlers
+  // ═══════════════════════════════════════════════════════════════
+
+  if (message.type === 'subagents:list') {
+    await handleSubagentsList(message);
+    return;
+  }
+
+  if (message.type === 'subagents:create') {
+    await handleSubagentsCreate(message);
+    return;
+  }
+
+  if (message.type === 'subagents:update') {
+    await handleSubagentsUpdate(message);
+    return;
+  }
+
+  if (message.type === 'subagents:delete') {
+    await handleSubagentsDelete(message);
+    return;
+  }
+
+  if (message.type === 'subagents:generate') {
+    await handleSubagentsGenerate(message);
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Command Management Handlers
+  // ═══════════════════════════════════════════════════════════════
+
+  if (message.type === 'commands:list') {
+    await handleCommandsList(message);
+    return;
+  }
+
+  if (message.type === 'commands:create') {
+    await handleCommandsCreate(message);
+    return;
+  }
+
+  if (message.type === 'commands:update') {
+    await handleCommandsUpdate(message);
+    return;
+  }
+
+  if (message.type === 'commands:delete') {
+    await handleCommandsDelete(message);
+    return;
+  }
+
+  if (message.type === 'commands:generate') {
+    await handleCommandsGenerate(message);
+    return;
+  }
+
+  // Other message types are handled elsewhere or not applicable
+}

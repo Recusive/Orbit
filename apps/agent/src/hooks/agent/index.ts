@@ -1,7 +1,6 @@
 // Main hook and types - this is what most consumers should import from
 export {
   useTauri,
-  useAgentStream,
   formatConversationContext,
   markSessionAsForked,
   setRewindContext,
@@ -10,7 +9,6 @@ export {
 export type {
   UseTauriOptions,
   UseTauriReturn,
-  AgentStreamCallbacks,
   RewindContextMessage,
   MessageHandler,
 } from './use-tauri';

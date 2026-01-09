@@ -11,7 +11,6 @@ import { handleMockMessage } from './use-tauri-mock';
 import type {
   UseTauriOptions,
   UseTauriReturn,
-  AgentStreamCallbacks,
   RewindContextMessage,
   MessageHandler,
 } from './types/tauri-types';
@@ -22,13 +21,7 @@ import { WebviewMessageSchema } from '@/types/protocol';
 const logger = createLogger('Tauri');
 
 // Re-export types for consumers
-export type {
-  UseTauriOptions,
-  UseTauriReturn,
-  AgentStreamCallbacks,
-  RewindContextMessage,
-  MessageHandler,
-};
+export type { UseTauriOptions, UseTauriReturn, RewindContextMessage, MessageHandler };
 
 // Re-export utility functions
 export { formatConversationContext } from './use-tauri-context';
@@ -144,59 +137,4 @@ export function useTauri(options: UseTauriOptions = {}): UseTauriReturn {
   );
 
   return { postMessage, isConnected, isMockMode };
-}
-
-// ═══════════════════════════════════════════════════════════════
-// Convenience hooks
-// ═══════════════════════════════════════════════════════════════
-
-export function useAgentStream(sessionId: string, callbacks: AgentStreamCallbacks): void {
-  const { onChunk, onComplete, onError, onToolStart, onToolEnd } = callbacks;
-
-  const handleMessage = useCallback(
-    (message: ExtensionMessage) => {
-      if (!('session_id' in message) || message.session_id !== sessionId) {
-        return;
-      }
-
-      switch (message.type) {
-        case 'agent:chunk':
-          onChunk(message.content, message.message_id);
-          break;
-        case 'agent:complete':
-          onComplete(message.message_id, message.usage);
-          break;
-        case 'agent:error':
-          onError(message.error, message.message_id);
-          break;
-        case 'tool:start':
-          onToolStart?.(message.tool_name, message.message_id);
-          break;
-        case 'tool:end':
-          onToolEnd?.(message.tool_name, message.success, message.message_id);
-          break;
-        // All other message types with session_id not relevant to agent streaming
-        case 'system:init':
-        case 'agent:thinking':
-        case 'agent:plan_mode':
-        case 'agent:accept_mode':
-        case 'permission:request':
-        case 'inputMode:changed':
-        case 'thinking:changed':
-        case 'model:changed':
-        case 'terminal:output':
-        case 'terminal:created':
-        case 'conversation:created':
-        case 'conversation:deleted':
-        case 'conversation:loading':
-        case 'conversation:loaded':
-        case 'conversation:rewound':
-        case 'agent:checkpoint':
-          break;
-      }
-    },
-    [sessionId, onChunk, onComplete, onError, onToolStart, onToolEnd]
-  );
-
-  useTauri({ onMessage: handleMessage });
 }
