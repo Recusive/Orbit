@@ -2,6 +2,21 @@
 #
 # find-dead-code.sh - Detect unused React components and TypeScript exports
 #
+# ⚠️  WARNING: This script finds CANDIDATES to investigate, NOT guaranteed dead code.
+#
+# LIMITATIONS:
+#   - Cannot detect dynamic imports: lazy(() => import('./Component'))
+#   - Cannot detect components in registries/configs looked up by string
+#   - Cannot detect usage via spreading: <Component {...props} />
+#   - Cannot detect conditional rendering patterns
+#   - May miss multiline import statements
+#
+# BEFORE DELETING:
+#   1. Manually verify each item with: grep -r "ComponentName" src/
+#   2. Delete ONE file at a time, not in batch
+#   3. Run typecheck after each deletion: bun run typecheck
+#   4. Test the app to ensure nothing broke
+#
 # Usage:
 #   ./scripts/find-dead-code.sh <target-dir> [search-root] [options]
 #
@@ -18,7 +33,7 @@
 #   --include-props    Include *Props interfaces in dead code check (excluded by default)
 #   --include-types    Include all type/interface exports (excluded by default)
 #   --verbose          Show detailed search results for each export
-#   --delete           Delete dead files after confirmation
+#   --delete           Delete dead files after confirmation (USE WITH CAUTION)
 #
 
 set -uo pipefail
@@ -170,7 +185,7 @@ check_usage() {
     # Filter out source file and index files, count remaining
     if [[ -n "$usage_matches" ]]; then
         local filtered
-        filtered=$(echo "$usage_matches" | grep -v "$source_basename" | grep -v "/index\.ts" | grep -v "/index\.tsx" || true)
+        filtered=$(echo "$usage_matches" | grep -v "/${source_basename}$" | grep -v "/index\.ts$" | grep -v "/index\.tsx$" || true)
         if [[ -n "$filtered" ]]; then
             usage_count=$(echo "$filtered" | wc -l | tr -d ' ')
             [[ "$VERBOSE" == "true" ]] && echo -e "    ${DIM}Found $usage_count usage(s)${NC}" >&2
@@ -190,7 +205,7 @@ check_usage() {
 
     if [[ -n "$reexport_matches" ]]; then
         local filtered_reexports
-        filtered_reexports=$(echo "$reexport_matches" | grep -v "$source_basename" || true)
+        filtered_reexports=$(echo "$reexport_matches" | grep -v "/${source_basename}$" || true)
         if [[ -n "$filtered_reexports" ]]; then
             has_reexport=true
         fi
