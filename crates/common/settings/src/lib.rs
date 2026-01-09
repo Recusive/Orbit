@@ -122,6 +122,35 @@ impl Default for AISettings {
 }
 
 // ============================================
+// Git Settings
+// ============================================
+
+/// Git settings controlling auto-fetch and other git behavior
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitSettings {
+    /// Enable automatic fetching from remote (default: true)
+    #[serde(default = "default_true")]
+    pub auto_fetch_enabled: bool,
+    /// Auto-fetch interval in seconds (default: 180 = 3 minutes)
+    #[serde(default = "default_auto_fetch_interval")]
+    pub auto_fetch_interval: u32,
+}
+
+impl Default for GitSettings {
+    fn default() -> Self {
+        Self {
+            auto_fetch_enabled: true,
+            auto_fetch_interval: default_auto_fetch_interval(),
+        }
+    }
+}
+
+const fn default_auto_fetch_interval() -> u32 {
+    180 // 3 minutes
+}
+
+// ============================================
 // Window State
 // ============================================
 
@@ -175,6 +204,9 @@ pub struct Settings {
     /// AI settings
     #[serde(default)]
     pub ai: AISettings,
+    /// Git settings
+    #[serde(default)]
+    pub git: GitSettings,
     /// Window state
     #[serde(default)]
     pub window_state: WindowState,
@@ -208,6 +240,9 @@ impl Settings {
 
         // Limit SSH hosts to 10
         self.ssh_hosts.truncate(10);
+
+        // Auto-fetch interval: 60-3600 seconds (1 minute to 1 hour)
+        self.git.auto_fetch_interval = self.git.auto_fetch_interval.clamp(60, 3600);
 
         self
     }
@@ -798,6 +833,10 @@ mod tests {
             ai: AISettings {
                 enabled: false,
                 inline_suggestions: false,
+            },
+            git: GitSettings {
+                auto_fetch_enabled: true,
+                auto_fetch_interval: 180,
             },
             window_state: WindowState {
                 width: 1920,

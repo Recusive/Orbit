@@ -130,40 +130,52 @@ pub fn git_stage_all(repo_path: String) -> Result<()> {
 
 /// Push commits to the remote repository.
 #[tauri::command]
-pub fn git_push(repo_path: String, remote: Option<String>) -> Result<()> {
-    orbit_git::push(Path::new(&repo_path), remote.as_deref())
+pub async fn git_push(repo_path: String, remote: Option<String>) -> Result<()> {
+    orbit_git::push(Path::new(&repo_path), remote.as_deref()).await
 }
 
 /// Pull changes from the remote repository.
 #[tauri::command]
-pub fn git_pull(repo_path: String, remote: Option<String>) -> Result<()> {
-    orbit_git::pull(Path::new(&repo_path), remote.as_deref())
+pub async fn git_pull(repo_path: String, remote: Option<String>) -> Result<()> {
+    orbit_git::pull(Path::new(&repo_path), remote.as_deref()).await
+}
+
+/// Fetch updates from the remote repository.
+///
+/// This updates remote tracking refs without modifying the working directory.
+#[tauri::command]
+pub async fn git_fetch(repo_path: String, remote: Option<String>) -> Result<()> {
+    orbit_git::fetch(Path::new(&repo_path), remote.as_deref()).await
 }
 
 /// Clone a git repository to a target directory.
 #[tauri::command]
-pub fn git_clone(url: String, target_path: String) -> Result<()> {
-    orbit_git::clone(&url, Path::new(&target_path))
+pub async fn git_clone(url: String, target_path: String) -> Result<()> {
+    orbit_git::clone(&url, Path::new(&target_path)).await
 }
 
 /// List all worktrees for the repository.
 #[tauri::command]
-pub fn git_worktree_list(repo_path: String) -> Result<Vec<WorktreeInfo>> {
-    orbit_git::worktree_list(Path::new(&repo_path))
+pub async fn git_worktree_list(repo_path: String) -> Result<Vec<WorktreeInfo>> {
+    orbit_git::worktree_list(Path::new(&repo_path)).await
 }
 
 /// Add a new worktree.
 #[tauri::command]
-pub fn git_worktree_add(
+pub async fn git_worktree_add(
     repo_path: String,
     worktree_path: String,
     options: WorktreeAddOptions,
 ) -> Result<WorktreeInfo> {
-    orbit_git::worktree_add(Path::new(&repo_path), Path::new(&worktree_path), &options)
+    orbit_git::worktree_add(Path::new(&repo_path), Path::new(&worktree_path), &options).await
 }
 
 /// Remove a worktree.
 #[tauri::command]
-pub fn git_worktree_remove(repo_path: String, worktree_path: String, force: bool) -> Result<()> {
-    orbit_git::worktree_remove(Path::new(&repo_path), Path::new(&worktree_path), force)
+pub async fn git_worktree_remove(
+    repo_path: String,
+    worktree_path: String,
+    force: bool,
+) -> Result<()> {
+    orbit_git::worktree_remove(Path::new(&repo_path), Path::new(&worktree_path), force).await
 }

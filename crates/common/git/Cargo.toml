@@ -15,3 +15,4 @@ orbit-core = { path = "../core" }
 serde = { workspace = true }
 git2 = "0.20"
 tracing = { workspace = true }
+tokio = { workspace = true }

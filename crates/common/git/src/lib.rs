@@ -5,7 +5,11 @@
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::Stdio;
+use std::time::Duration;
+
+use tokio::process::Command;
+use tokio::time::timeout;
 
 use git2::{
     BlameOptions, Delta, DiffOptions, IndexAddOption, Repository, StatusOptions, StatusShow,
@@ -834,7 +838,7 @@ pub fn blame(path: &Path, file: &Path) -> Result<Vec<BlameLine>> {
 ///
 /// # Errors
 /// Returns an error if push fails (auth issues, no remote, conflicts, etc.)
-pub fn push(path: &Path, remote_name: Option<&str>) -> Result<()> {
+pub async fn push(path: &Path, remote_name: Option<&str>) -> Result<()> {
     let remote = remote_name.unwrap_or("origin");
 
     info!(path = %path.display(), remote = remote, "Starting git push");
@@ -845,6 +849,7 @@ pub fn push(path: &Path, remote_name: Option<&str>) -> Result<()> {
         .current_dir(path)
         .env("GIT_TERMINAL_PROMPT", "0")
         .output()
+        .await
         .map_err(|e| {
             error!(error = %e, "Failed to execute git command");
             Error::Git(format!("Failed to run git push: {e}"))
@@ -865,6 +870,7 @@ pub fn push(path: &Path, remote_name: Option<&str>) -> Result<()> {
             .current_dir(path)
             .env("GIT_TERMINAL_PROMPT", "0")
             .output()
+            .await
             .map_err(|e| Error::Git(format!("Failed to run git push: {e}")))?;
 
         let publish_stderr = String::from_utf8_lossy(&publish_output.stderr);
@@ -924,7 +930,7 @@ pub fn push(path: &Path, remote_name: Option<&str>) -> Result<()> {
 /// # Errors
 /// Returns an error if pull fails (auth issues, no remote, merge conflicts,
 /// uncommitted changes, etc.)
-pub fn pull(path: &Path, remote_name: Option<&str>) -> Result<()> {
+pub async fn pull(path: &Path, remote_name: Option<&str>) -> Result<()> {
     info!(path = %path.display(), remote = ?remote_name, "Starting git pull");
 
     // Build args - only specify remote if explicitly provided
@@ -935,6 +941,7 @@ pub fn pull(path: &Path, remote_name: Option<&str>) -> Result<()> {
         .current_dir(path)
         .env("GIT_TERMINAL_PROMPT", "0")
         .output()
+        .await
         .map_err(|e| {
             error!(error = %e, "Failed to execute git command");
             Error::Git(format!("Failed to run git pull: {e}"))
@@ -983,6 +990,83 @@ pub fn pull(path: &Path, remote_name: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+/// Fetch updates from the remote repository.
+///
+/// Uses the git CLI to fetch, which automatically handles authentication
+/// via the system's credential helpers (macOS Keychain, Windows Credential Manager, etc.)
+///
+/// This updates the remote tracking refs (e.g., `refs/remotes/origin/main`) without
+/// modifying the working directory or local branches.
+///
+/// # Errors
+/// Returns an error if fetch fails (auth issues, no remote, network error, timeout, etc.)
+pub async fn fetch(path: &Path, remote_name: Option<&str>) -> Result<()> {
+    let remote = remote_name.unwrap_or("origin");
+
+    info!(path = %path.display(), remote = remote, "Starting git fetch");
+
+    // Spawn the process asynchronously
+    let child = Command::new("git")
+        .args(["fetch", "--no-auto-gc", remote])
+        .current_dir(path)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            error!(error = %e, "Failed to spawn git command");
+            Error::Git(format!("Failed to run git fetch: {e}"))
+        })?;
+
+    // Wait with 30 second timeout - child is automatically killed on drop if timeout expires
+    let output = match timeout(Duration::from_secs(30), child.wait_with_output()).await {
+        Ok(Ok(output)) => output,
+        Ok(Err(e)) => {
+            error!(error = %e, "Failed to get git output");
+            return Err(Error::Git(format!("Failed to wait for git fetch: {e}")));
+        },
+        Err(_) => {
+            return Err(Error::Git(
+                "Fetch timed out. This may be due to authentication issues - try running 'git fetch' in terminal first.".to_owned(),
+            ));
+        },
+    };
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    info!(
+        status = %output.status,
+        stderr = %stderr.trim(),
+        "Git fetch completed"
+    );
+
+    if !output.status.success() {
+        let msg = stderr.trim();
+
+        // Provide user-friendly error messages for common cases
+        if msg.contains("Authentication failed") || msg.contains("could not read Username") {
+            return Err(Error::Git(
+                "Authentication failed. Please run 'git fetch' in terminal first to cache credentials.".to_owned(),
+            ));
+        }
+        if msg.contains("Could not resolve host") {
+            return Err(Error::Git(
+                "Could not connect to host. Please check your internet connection.".to_owned(),
+            ));
+        }
+        if msg.contains("does not appear to be a git repository") {
+            return Err(Error::Git(
+                "Remote repository not found. Please check your remote configuration.".to_owned(),
+            ));
+        }
+
+        return Err(Error::Git(format!("Fetch failed: {msg}")));
+    }
+
+    info!(remote = remote, "Fetch successful");
+    Ok(())
+}
+
 /// Clone a git repository to a target directory.
 ///
 /// Uses the git CLI to clone, which automatically handles authentication
@@ -994,7 +1078,7 @@ pub fn pull(path: &Path, remote_name: Option<&str>) -> Result<()> {
 ///
 /// # Errors
 /// Returns an error if clone fails (auth issues, invalid URL, disk full, etc.)
-pub fn clone(url: &str, target_path: &Path) -> Result<()> {
+pub async fn clone(url: &str, target_path: &Path) -> Result<()> {
     info!(url = url, target = %target_path.display(), "Starting git clone");
 
     let output = Command::new("git")
@@ -1002,6 +1086,7 @@ pub fn clone(url: &str, target_path: &Path) -> Result<()> {
         .arg(target_path)
         .env("GIT_TERMINAL_PROMPT", "0")
         .output()
+        .await
         .map_err(|e| {
             error!(error = %e, "Failed to execute git command");
             Error::Git(format!("Failed to run git clone: {e}"))
@@ -1057,13 +1142,14 @@ pub fn clone(url: &str, target_path: &Path) -> Result<()> {
 ///
 /// # Errors
 /// Returns an error if the command fails or output cannot be parsed.
-pub fn worktree_list(repo_path: &Path) -> Result<Vec<WorktreeInfo>> {
+pub async fn worktree_list(repo_path: &Path) -> Result<Vec<WorktreeInfo>> {
     debug!(?repo_path, "Listing worktrees");
 
     let output = Command::new("git")
         .args(["worktree", "list", "--porcelain"])
         .current_dir(repo_path)
         .output()
+        .await
         .map_err(|e| Error::Git(format!("Failed to run git worktree list: {e}")))?;
 
     if !output.status.success() {
@@ -1170,7 +1256,7 @@ fn parse_worktree_porcelain(output: &str) -> Vec<WorktreeInfo> {
 /// - The path already exists
 /// - The branch is already checked out elsewhere
 /// - Git command fails
-pub fn worktree_add(
+pub async fn worktree_add(
     repo_path: &Path,
     worktree_path: &Path,
     options: &WorktreeAddOptions,
@@ -1206,6 +1292,7 @@ pub fn worktree_add(
         .args(&args)
         .current_dir(repo_path)
         .output()
+        .await
         .map_err(|e| Error::Git(format!("Failed to run git worktree add: {e}")))?;
 
     if !output.status.success() {
@@ -1233,7 +1320,7 @@ pub fn worktree_add(
     }
 
     // Find and return the newly created worktree
-    let worktrees = worktree_list(repo_path)?;
+    let worktrees = worktree_list(repo_path).await?;
     let worktree_path_canonical = worktree_path
         .canonicalize()
         .unwrap_or_else(|_| worktree_path.to_path_buf());
@@ -1262,7 +1349,7 @@ pub fn worktree_add(
 /// - The worktree doesn't exist
 /// - The worktree is locked (and force=false)
 /// - The worktree has uncommitted changes (and force=false)
-pub fn worktree_remove(repo_path: &Path, worktree_path: &Path, force: bool) -> Result<()> {
+pub async fn worktree_remove(repo_path: &Path, worktree_path: &Path, force: bool) -> Result<()> {
     info!(?repo_path, ?worktree_path, force, "Removing worktree");
 
     let mut args = vec!["worktree", "remove"];
@@ -1278,6 +1365,7 @@ pub fn worktree_remove(repo_path: &Path, worktree_path: &Path, force: bool) -> R
         .args(&args)
         .current_dir(repo_path)
         .output()
+        .await
         .map_err(|e| Error::Git(format!("Failed to run git worktree remove: {e}")))?;
 
     if !output.status.success() {
