@@ -289,6 +289,9 @@ export const useToolStore = create<ToolState>()(
     switchSession: (newSessionId: string) => {
       logger.debug(`Switching session to: ${newSessionId}`);
       set((state) => {
+        // Detect initial load (first time setting currentSessionId)
+        const isInitialLoad = state.currentSessionId === null;
+
         // Save current session's data to cache (if we have a current session)
         if (state.currentSessionId) {
           state.sessionCache[state.currentSessionId] = {
@@ -307,8 +310,14 @@ export const useToolStore = create<ToolState>()(
           state.processedMessageIds = new Set(cached.processedIds);
           state.activeTools = { ...cached.activeTools };
           state.completedTools = [...cached.completedTools];
+        } else if (isInitialLoad) {
+          // Initial load - DON'T clear tools! The restore effect will populate them
+          // from the backend. Only reset usage tracking.
+          state.sessionUsage = { ...initialUsage };
+          state.processedMessageIds = new Set<string>();
+          // Keep activeTools and completedTools intact for restore effect
         } else {
-          // New session - reset everything
+          // Switching to a genuinely new session - reset everything
           state.sessionUsage = { ...initialUsage };
           state.processedMessageIds = new Set<string>();
           state.activeTools = {};
@@ -411,6 +420,18 @@ export const useToolStore = create<ToolState>()(
             success: tool.success,
           };
           state.completedTools.push(toolExecution);
+        }
+
+        // Also update sessionCache so tools survive session switches
+        // Without this, switching away and back would lose the restored tools
+        if (state.currentSessionId) {
+          const existingCache = state.sessionCache[state.currentSessionId];
+          state.sessionCache[state.currentSessionId] = {
+            usage: existingCache?.usage ?? { ...initialUsage },
+            processedIds: existingCache?.processedIds ?? [],
+            activeTools: existingCache?.activeTools ?? {},
+            completedTools: [...state.completedTools],
+          };
         }
       });
     },
