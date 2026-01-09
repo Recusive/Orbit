@@ -1,10 +1,6 @@
 /**
- * Agent stores - Agent state, checkpoints, and tool execution
+ * Agent stores - Checkpoints and tool execution
  */
-
-// Agent store
-export { useAgentStore } from './agent-store';
-export type { AgentPhase, AgentTask, ToolCall, AgentState } from './agent-store';
 
 // Checkpoint store
 export { useCheckpointStore } from './checkpoint-store';

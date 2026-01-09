@@ -82,17 +82,6 @@ interface FileViewerActions {
   setFileContent: (path: string, content: string, language?: string) => void;
   updateContent: (path: string, content: string) => void; // For editor changes
   markSaved: (path: string) => void; // Mark file as saved (not modified)
-  setScrollPosition: (path: string, position: number) => void;
-
-  // View mode
-  toggleViewMode: (path: string) => void;
-  setViewMode: (path: string, mode: FileViewMode) => void;
-
-  // Navigation
-  goBack: () => void;
-  goForward: () => void;
-  canGoBack: () => boolean;
-  canGoForward: () => boolean;
 
   // Goto line/column (for diagnostics, etc.)
   gotoPosition: (path: string, line: number, column: number, content?: string) => void;
@@ -374,79 +363,6 @@ export const useFileViewerStore = create<FileViewerStore>()(
           tab.isModified = false;
         }
       });
-    },
-
-    setScrollPosition: (path: string, position: number): void => {
-      set((state) => {
-        const tab = state.openTabs.find((t) => t.path === path);
-        if (tab) {
-          tab.scrollPosition = position;
-        }
-      });
-    },
-
-    toggleViewMode: (path: string): void => {
-      set((state) => {
-        const tab = state.openTabs.find((t) => t.path === path);
-        if (tab?.diffData) {
-          tab.viewMode = tab.viewMode === 'file' ? 'diff' : 'file';
-        }
-      });
-    },
-
-    setViewMode: (path: string, mode: FileViewMode): void => {
-      set((state) => {
-        const tab = state.openTabs.find((t) => t.path === path);
-        if (tab) {
-          tab.viewMode = mode;
-        }
-      });
-    },
-
-    goBack: (): void => {
-      const state = get();
-      if (state.openTabs.length < 2 || !state.activeTabPath) return;
-
-      const currentIndex = state.openTabs.findIndex((t) => t.path === state.activeTabPath);
-      if (currentIndex === -1) return;
-
-      // Cycle to previous tab (wrap around to end if at start)
-      const newIndex = currentIndex === 0 ? state.openTabs.length - 1 : currentIndex - 1;
-      const newPath = state.openTabs[newIndex]?.path;
-
-      if (newPath) {
-        set((s) => {
-          s.activeTabPath = newPath;
-        });
-      }
-    },
-
-    goForward: (): void => {
-      const state = get();
-      if (state.openTabs.length < 2 || !state.activeTabPath) return;
-
-      const currentIndex = state.openTabs.findIndex((t) => t.path === state.activeTabPath);
-      if (currentIndex === -1) return;
-
-      // Cycle to next tab (wrap around to start if at end)
-      const newIndex = currentIndex === state.openTabs.length - 1 ? 0 : currentIndex + 1;
-      const newPath = state.openTabs[newIndex]?.path;
-
-      if (newPath) {
-        set((s) => {
-          s.activeTabPath = newPath;
-        });
-      }
-    },
-
-    canGoBack: (): boolean => {
-      const state = get();
-      return state.openTabs.length > 1;
-    },
-
-    canGoForward: (): boolean => {
-      const state = get();
-      return state.openTabs.length > 1;
     },
 
     setLoading: (isLoading: boolean, path?: string): void => {

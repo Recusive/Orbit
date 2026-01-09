@@ -317,17 +317,19 @@ The editor (`apps/agent/src/components/editor/CodeMirrorEditor.tsx`) provides:
 
 Zustand stores in `apps/agent/src/stores/`:
 
-| Store               | Purpose                                 |
-| ------------------- | --------------------------------------- |
-| `ui-store`          | Panel layout, dimensions, active tabs   |
-| `chat-store`        | Conversations, messages                 |
-| `agent-store`       | Task execution state                    |
-| `terminal-store`    | xterm sessions                          |
-| `file-store`        | File tree state                         |
-| `file-viewer-store` | Open file tabs, content, modified state |
-| `git-store`         | Git branch, status, ahead/behind        |
-| `tool-store`        | Tool execution & visualization          |
-| `browser-store`     | Browser/webpage viewing state           |
+| Store                  | Purpose                                        |
+| ---------------------- | ---------------------------------------------- |
+| `ui-store`             | Panel layout, dimensions, active tabs          |
+| `file-store`           | File tree state, changes, selections           |
+| `file-viewer-store`    | Open file tabs, content, modified state        |
+| `terminal-store`       | xterm sessions, output buffers                 |
+| `git-store`            | Git branch, status, ahead/behind               |
+| `tool-store`           | Tool execution, permissions, token tracking    |
+| `browser-store`        | Browser/webpage viewing state                  |
+| `checkpoint-store`     | Conversation checkpoints for rewind            |
+| `queued-message-store` | Pending message queue buffer                   |
+| `onboarding-store`     | First-launch setup (persisted to localStorage) |
+| `provider-store`       | OAuth provider configuration                   |
 
 ## Protocol Types
 

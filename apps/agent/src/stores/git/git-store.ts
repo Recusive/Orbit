@@ -178,9 +178,6 @@ export const useGitStore = create<GitStore>()(
 /** Select current branch name, null if not in a repo */
 export const selectBranch = (state: GitStore): string | null => state.status?.branch ?? null;
 
-/** Select upstream branch name, null if none */
-export const selectUpstream = (state: GitStore): string | null => state.status?.upstream ?? null;
-
 /** Select commits ahead of upstream */
 export const selectAhead = (state: GitStore): number => state.status?.ahead ?? 0;
 
@@ -242,32 +239,6 @@ export const selectFileStatus =
     // Fall back to suffix match (for when path includes repo root)
     const suffixMatch = allEntries.find((e) => path.endsWith(e.path) || e.path.endsWith(path));
     return suffixMatch?.status ?? null;
-  };
-
-/**
- * Create a selector for checking if a file is staged
- * Usage: useGitStore(selectIsStaged('/path/to/file'))
- */
-export const selectIsStaged =
-  (path: string) =>
-  (state: GitStore): boolean => {
-    if (!state.status) return false;
-    return state.status.staged.some(
-      (e) => e.path === path || path.endsWith(e.path) || e.path.endsWith(path)
-    );
-  };
-
-/** Select all entries for a specific status type */
-export const selectEntriesByStatus =
-  (fileStatus: FileStatus) =>
-  (state: GitStore): StatusEntry[] => {
-    if (!state.status) return [];
-    return [
-      ...state.status.staged,
-      ...state.status.modified,
-      ...state.status.untracked,
-      ...state.status.conflicted,
-    ].filter((e) => e.status === fileStatus);
   };
 
 // ============================================

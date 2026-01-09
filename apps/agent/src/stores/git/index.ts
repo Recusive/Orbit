@@ -5,7 +5,6 @@
 export {
   useGitStore,
   selectBranch,
-  selectUpstream,
   selectAhead,
   selectBehind,
   selectIsClean,
@@ -15,8 +14,6 @@ export {
   selectModifiedCount,
   selectUntrackedCount,
   selectFileStatus,
-  selectIsStaged,
-  selectEntriesByStatus,
   useGitBranch,
   useGitAhead,
   useGitBehind,
