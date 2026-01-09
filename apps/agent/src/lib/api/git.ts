@@ -211,6 +211,17 @@ export async function gitPull(repoPath: string, remote?: string): Promise<void> 
 }
 
 /**
+ * Fetch updates from the remote repository.
+ *
+ * This updates remote tracking refs without modifying the working directory.
+ * @param repoPath - Path to the repository
+ * @param remote - Remote name (defaults to "origin")
+ */
+export async function gitFetch(repoPath: string, remote?: string): Promise<void> {
+  return invoke('git_fetch', { repoPath, remote });
+}
+
+/**
  * Clone a git repository to a target directory.
  * @param url - The repository URL (HTTPS, SSH, or git:// protocol)
  * @param targetPath - The directory where the repo will be cloned

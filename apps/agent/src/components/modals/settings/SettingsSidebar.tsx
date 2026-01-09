@@ -6,6 +6,7 @@ import {
   Bell,
   Bot,
   FlaskConical,
+  GitBranch,
   Globe,
   Icon,
   Keyboard,
@@ -63,6 +64,11 @@ const NAV_ITEMS: NavItemConfig[] = [
     id: 'editor',
     label: 'Editor',
     icon: <AppWindowMac className="h-4 w-4" />,
+  },
+  {
+    id: 'git',
+    label: 'Git',
+    icon: <GitBranch className="h-4 w-4" />,
   },
   {
     id: 'notifications',

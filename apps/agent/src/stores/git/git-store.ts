@@ -27,6 +27,10 @@ interface GitState {
   lastUpdated: number | null;
   /** List of branches */
   branches: GitBranch[];
+  /** Whether a fetch from remote is in progress */
+  isFetching: boolean;
+  /** Timestamp of last successful fetch from remote */
+  lastFetchedAt: number | null;
 }
 
 interface GitActions {
@@ -40,6 +44,10 @@ interface GitActions {
   setError: (error: string | null) => void;
   /** Set branches list */
   setBranches: (branches: GitBranch[]) => void;
+  /** Set whether a fetch from remote is in progress */
+  setFetching: (fetching: boolean) => void;
+  /** Set timestamp of last successful fetch from remote */
+  setLastFetchedAt: (timestamp: number) => void;
   /** Reset all state to initial values */
   reset: () => void;
 }
@@ -57,6 +65,8 @@ const initialState: GitState = {
   error: null,
   lastUpdated: null,
   branches: [],
+  isFetching: false,
+  lastFetchedAt: null,
 };
 
 // ============================================
@@ -69,19 +79,40 @@ export const useGitStore = create<GitStore>()(
       ...initialState,
 
       setRepoPath: (repoPath): void => {
-        logger.info(`Git repo path set: ${repoPath ?? 'none'}`);
         set((state) => {
+          // Skip update if value hasn't changed (prevents cascading re-renders)
+          if (state.repoPath === repoPath) {
+            return;
+          }
+          logger.info(`Git repo path set: ${repoPath ?? 'none'}`);
           state.repoPath = repoPath;
         });
       },
 
       setStatus: (status): void => {
-        logger.debug(`Git status updated`, {
-          branch: status.branch,
-          ahead: status.ahead,
-          behind: status.behind,
-        });
         set((state) => {
+          // Skip update if status hasn't meaningfully changed
+          const prev = state.status;
+          if (prev) {
+            const unchanged =
+              prev.branch === status.branch &&
+              prev.ahead === status.ahead &&
+              prev.behind === status.behind &&
+              prev.staged.length === status.staged.length &&
+              prev.modified.length === status.modified.length &&
+              prev.untracked.length === status.untracked.length &&
+              prev.conflicted.length === status.conflicted.length;
+            if (unchanged) {
+              // Only update lastUpdated for background refreshes, don't trigger re-renders
+              state.lastUpdated = Date.now();
+              return;
+            }
+          }
+          logger.debug(`Git status updated`, {
+            branch: status.branch,
+            ahead: status.ahead,
+            behind: status.behind,
+          });
           state.status = status;
           state.error = null;
           state.isLoading = false;
@@ -111,6 +142,19 @@ export const useGitStore = create<GitStore>()(
         });
       },
 
+      setFetching: (isFetching): void => {
+        set((state) => {
+          state.isFetching = isFetching;
+        });
+      },
+
+      setLastFetchedAt: (timestamp): void => {
+        set((state) => {
+          logger.debug(`Fetch completed at ${new Date(timestamp).toISOString()}`);
+          state.lastFetchedAt = timestamp;
+        });
+      },
+
       reset: (): void => {
         set((state) => {
           state.repoPath = initialState.repoPath;
@@ -119,6 +163,8 @@ export const useGitStore = create<GitStore>()(
           state.error = initialState.error;
           state.lastUpdated = initialState.lastUpdated;
           state.branches = initialState.branches;
+          state.isFetching = initialState.isFetching;
+          state.lastFetchedAt = initialState.lastFetchedAt;
         });
       },
     }))

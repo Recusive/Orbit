@@ -31,6 +31,11 @@ export interface AISettings {
   inlineSuggestions: boolean;
 }
 
+export interface GitSettings {
+  autoFetchEnabled: boolean;
+  autoFetchInterval: number;
+}
+
 export interface WindowState {
   width: number;
   height: number;
@@ -43,6 +48,7 @@ export interface Settings {
   editor: EditorSettings;
   theme: ThemeSettings;
   ai: AISettings;
+  git: GitSettings;
   windowState: WindowState;
   recentProjects: string[];
 }

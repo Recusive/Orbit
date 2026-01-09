@@ -10,6 +10,7 @@ export { BrowserSettings } from './BrowserSettings';
 export { EditorSettings } from './EditorSettings';
 export { FeedbackSettings } from './FeedbackSettings';
 export { GeneralSettings } from './GeneralSettings';
+export { GitSettings } from './GitSettings';
 export { NotificationsSettings } from './NotificationsSettings';
 export { ShortcutsSettings } from './ShortcutsSettings';
 export { SlashCommandsSettings } from './SlashCommandsSettings';
@@ -26,6 +27,7 @@ export const SETTINGS_PAGE_COMPONENTS: Partial<
   shortcuts: lazy(() => import('./ShortcutsSettings')),
   browser: lazy(() => import('./BrowserSettings')),
   editor: lazy(() => import('./EditorSettings')),
+  git: lazy(() => import('./GitSettings')),
   notifications: lazy(() => import('./NotificationsSettings')),
   tabs: lazy(() => import('./TabsSettings')),
   account: lazy(() => import('./AccountSettings')),

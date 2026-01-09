@@ -6,7 +6,7 @@
  * NOTE: Git status styling comes from @/lib/utils/constants.
  * To change status colors or labels, update GIT_STATUS_STYLES in constants.ts.
  */
-import { AlertCircle, GitBranch, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, CloudDownload, GitBranch, Loader2, RefreshCw } from 'lucide-react';
 import React from 'react';
 
 import { BranchSelector } from './components/BranchSelector';
@@ -68,6 +68,10 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     isCheckingOut,
     handleCheckout,
 
+    // Fetch
+    isFetching,
+    handleFetch,
+
     // Operations
     operationError,
     refresh,
@@ -125,6 +129,14 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
         />
         <div className="flex items-center gap-1">
           <SyncStatus status={status} />
+          <button
+            onClick={() => void handleFetch()}
+            disabled={isFetching}
+            className="p-1.5 rounded-md hover:bg-muted/60 text-muted-foreground/70 hover:text-foreground active:scale-95 transition-all duration-150"
+            title="Fetch from remote"
+          >
+            <CloudDownload className={cn('h-3.5 w-3.5', isFetching && 'animate-pulse')} />
+          </button>
           <button
             onClick={() => void refresh()}
             disabled={isLoading}

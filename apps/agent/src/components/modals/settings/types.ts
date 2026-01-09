@@ -9,6 +9,7 @@ export type SettingsSection =
   | 'shortcuts'
   | 'browser'
   | 'editor'
+  | 'git'
   | 'notifications'
   | 'tabs'
   | 'account'

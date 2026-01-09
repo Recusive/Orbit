@@ -8,9 +8,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GIT_STATUS_POLL_INTERVAL, OPERATION_ERROR_TIMEOUT } from '../constants';
 
 import type { DisplayFileStatus, FileItem } from '../types';
-import type { FileStatus as BackendFileStatus } from '@/lib/api';
+import type { FileStatus as BackendFileStatus, GitSettings } from '@/lib/api';
 
+import { useAutoFetch } from '@/hooks/git/use-auto-fetch';
 import { useGitStatus } from '@/hooks/git/use-git-status';
+import { getSettings } from '@/lib/api';
 
 /** Convert backend status to display status */
 const toDisplayStatus = (backendStatus: BackendFileStatus): DisplayFileStatus => {
@@ -82,6 +84,11 @@ export interface UseSourceControlReturn {
   isCheckingOut: boolean;
   handleCheckout: (branch: string) => Promise<void>;
 
+  // Fetch
+  isFetching: boolean;
+  lastFetchedAt: number | null;
+  handleFetch: () => Promise<void>;
+
   // Operations
   operationError: string | null;
   refresh: () => Promise<void>;
@@ -92,6 +99,7 @@ export function useSourceControl({
 }: UseSourceControlOptions): UseSourceControlReturn {
   const {
     status,
+    repoPath,
     isLoading,
     error,
     refresh,
@@ -117,6 +125,27 @@ export function useSourceControl({
   const [commitError, setCommitError] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [pendingDiscard, setPendingDiscard] = useState<string | null>(null);
+
+  // Git settings for auto-fetch
+  const [gitSettings, setGitSettings] = useState<GitSettings | null>(null);
+
+  // Load git settings on mount
+  useEffect(() => {
+    void getSettings().then((settings) => {
+      setGitSettings(settings.git);
+    });
+  }, []);
+
+  // Auto-fetch hook
+  const {
+    fetch: autoFetch,
+    isFetching,
+    lastFetchedAt,
+  } = useAutoFetch(repoPath, {
+    enabled: gitSettings?.autoFetchEnabled ?? true,
+    intervalSeconds: gitSettings?.autoFetchInterval ?? 180,
+    pauseWhenHidden: true,
+  });
 
   // Track ongoing operations to prevent concurrent actions
   const operationInProgress = useRef(false);
@@ -365,6 +394,24 @@ export function useSourceControl({
     setCommitError(null);
   }, []);
 
+  // Fetch handler - wraps autoFetch with error handling for UI
+  const handleFetch = useCallback(async (): Promise<void> => {
+    if (operationInProgress.current) return;
+    operationInProgress.current = true;
+    setOperationError(null);
+    try {
+      await autoFetch();
+      // Refresh status after fetch to show updated ahead/behind
+      await refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setOperationError(`Fetch failed: ${message}`);
+      clearOperationError();
+    } finally {
+      operationInProgress.current = false;
+    }
+  }, [autoFetch, refresh, clearOperationError]);
+
   return {
     // Status
     status,
@@ -406,6 +453,11 @@ export function useSourceControl({
     branches,
     isCheckingOut,
     handleCheckout,
+
+    // Fetch
+    isFetching,
+    lastFetchedAt,
+    handleFetch,
 
     // Operations
     operationError,

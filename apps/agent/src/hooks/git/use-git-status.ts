@@ -133,71 +133,84 @@ export function useGitStatus(
   const trimmedPath = workspacePath?.trim();
   const normalizedPath = trimmedPath && trimmedPath.length > 0 ? trimmedPath : null;
 
-  const loadStatus = useCallback(
-    async (isBackgroundRefresh: boolean): Promise<void> => {
-      if (!normalizedPath) {
-        reset();
-        hasLoadedRef.current = false;
+  // Store normalizedPath in a ref to avoid recreating loadStatus on every render
+  const normalizedPathRef = useRef(normalizedPath);
+  normalizedPathRef.current = normalizedPath;
+
+  // Store action refs to avoid recreating loadStatus callback
+  const actionsRef = useRef({ reset, setRepoPath, setStatus, setLoading, setError });
+  actionsRef.current = { reset, setRepoPath, setStatus, setLoading, setError };
+
+  // loadStatus uses refs internally to avoid dependency changes causing effect re-runs
+  const loadStatus = useCallback(async (isBackgroundRefresh: boolean): Promise<void> => {
+    const path = normalizedPathRef.current;
+    const actions = actionsRef.current;
+
+    if (!path) {
+      actions.reset();
+      hasLoadedRef.current = false;
+      return;
+    }
+
+    const currentRequestId = ++requestIdRef.current;
+
+    if (!isBackgroundRefresh) {
+      actions.setLoading(true);
+    }
+
+    try {
+      const discovered = await gitDiscover(path);
+
+      if (requestIdRef.current !== currentRequestId) {
         return;
       }
 
-      const currentRequestId = ++requestIdRef.current;
+      actions.setRepoPath(discovered);
 
-      if (!isBackgroundRefresh) {
-        setLoading(true);
+      const result = await gitStatus(discovered);
+
+      if (requestIdRef.current !== currentRequestId) {
+        return;
       }
 
-      try {
-        const discovered = await gitDiscover(normalizedPath);
-
-        if (requestIdRef.current !== currentRequestId) {
-          return;
-        }
-
-        setRepoPath(discovered);
-
-        const result = await gitStatus(discovered);
-
-        if (requestIdRef.current !== currentRequestId) {
-          return;
-        }
-
-        setStatus(result);
-        hasLoadedRef.current = true;
-      } catch (err) {
-        if (requestIdRef.current !== currentRequestId) {
-          return;
-        }
-
-        const errStr = err instanceof Error ? err.message : String(err);
-
-        // Not a git repo is not an error state
-        if (errStr.includes('not a git repository') || errStr.includes('NOT_A_REPO')) {
-          reset();
-        } else {
-          setError(errStr);
-        }
-        hasLoadedRef.current = false;
+      actions.setStatus(result);
+      hasLoadedRef.current = true;
+    } catch (err) {
+      if (requestIdRef.current !== currentRequestId) {
+        return;
       }
-    },
-    [normalizedPath, reset, setRepoPath, setStatus, setLoading, setError]
-  );
+
+      const errStr = err instanceof Error ? err.message : String(err);
+
+      // Not a git repo is not an error state
+      if (errStr.includes('not a git repository') || errStr.includes('NOT_A_REPO')) {
+        actions.reset();
+      } else {
+        actions.setError(errStr);
+      }
+      hasLoadedRef.current = false;
+    }
+  }, []); // Empty deps - uses refs internally for stable reference
 
   // Wrap for external refresh
   const refresh = useCallback(async (): Promise<void> => {
     await loadStatus(false);
   }, [loadStatus]);
 
-  // Initial load and reload when workspace changes
+  // Reset store and reload when workspace changes
+  // This ensures stale data from previous workspace is cleared immediately
   useEffect(() => {
-    if (enabled) {
+    if (enabled && normalizedPath) {
+      // Reset first to clear any stale data from previous workspace
+      actionsRef.current.reset();
       hasLoadedRef.current = false;
       void loadStatus(false);
-    } else {
-      reset();
+    } else if (!enabled) {
+      actionsRef.current.reset();
       hasLoadedRef.current = false;
     }
-  }, [loadStatus, enabled, reset]);
+    // Only re-run when workspace path or enabled flag actually changes
+  }, [normalizedPath, enabled, loadStatus]);
 
   // Polling with visibility awareness
   useEffect(() => {
@@ -246,6 +259,7 @@ export function useGitStatus(
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
     };
+    // loadStatus is now stable (empty deps), so this effect won't restart unnecessarily
   }, [loadStatus, pollInterval, enabled, normalizedPath, pauseWhenHidden]);
 
   // Derived helper

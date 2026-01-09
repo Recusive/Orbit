@@ -11,13 +11,32 @@ let watchedWorkspacePath: string | null = null;
 
 /** Paths to ignore for file watching (reduces noise) */
 const IGNORED_PATH_PATTERNS = [
+  // Version control
   '/.git/',
+  // JavaScript/Node
   '/node_modules/',
   '/.next/',
-  '/target/',
   '/dist/',
+  '/build/',
+  '/.turbo/',
+  '/.parcel-cache/',
+  // Python
+  '/venv/',
+  '/.venv/',
+  '/site-packages/',
   '/__pycache__/',
+  '/.mypy_cache/',
+  '/.pytest_cache/',
+  '/env/',
+  '/.env/',
+  // Rust
+  '/target/',
+  // General
   '/.cache/',
+  '/.DS_Store',
+  '/coverage/',
+  '/.idea/',
+  '/.vscode/',
 ];
 
 /** Check if a path should be ignored */
@@ -25,36 +44,275 @@ function shouldIgnorePath(path: string): boolean {
   return IGNORED_PATH_PATTERNS.some((pattern) => path.includes(pattern));
 }
 
-/** Debounce file change events to avoid rapid re-fetches */
-const pendingFileChanges = new Map<
-  string,
-  { type: string; timeout: ReturnType<typeof setTimeout> }
->();
-const DEBOUNCE_MS = 150;
+// ═══════════════════════════════════════════════════════════════
+// VS Code-style Event Batching & Coalescing
+// Architecture: Events → 75ms batch → coalesce → throttle → emit
+// Source: vscode/src/vs/platform/files/node/watcher/
+// ═══════════════════════════════════════════════════════════════
 
-function emitFileChanged(path: string, changeType: string): void {
-  // Clear any pending event for this path
-  const pending = pendingFileChanges.get(path);
-  if (pending) {
-    clearTimeout(pending.timeout);
+interface FileChangeEvent {
+  path: string;
+  type: string;
+}
+
+// Platform detection for case sensitivity (VS Code: watcher.ts:384-388)
+// Uses modern userAgentData API with fallback to userAgent parsing
+function detectPlatform(): { isMac: boolean; isWindows: boolean; isLinux: boolean } {
+  if (typeof navigator === 'undefined') {
+    return { isMac: false, isWindows: false, isLinux: true }; // SSR fallback: case-sensitive
+  }
+  // Modern API (Chrome 90+, Edge 90+, Opera 76+)
+  // userAgentData is not in standard TS types yet, but supported in Chromium
+  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+  const platform: string = nav.userAgentData?.platform?.toLowerCase() ?? '';
+  if (platform) {
+    return {
+      isMac: platform.includes('mac'),
+      isWindows: platform.includes('win'),
+      isLinux: !platform.includes('mac') && !platform.includes('win'),
+    };
+  }
+  // Fallback to userAgent (deprecated but widely supported)
+  const ua = navigator.userAgent.toLowerCase();
+  return {
+    isMac: ua.includes('mac'),
+    isWindows: ua.includes('win'),
+    isLinux: !ua.includes('mac') && !ua.includes('win'),
+  };
+}
+
+const { isLinux } = detectPlatform();
+
+/**
+ * Get map key for path (case-insensitive on macOS/Windows)
+ * Source: VS Code watcher.ts:383-389
+ */
+function toKey(path: string): string {
+  return isLinux ? path : path.toLowerCase();
+}
+
+/**
+ * Check if parent is a parent path of child
+ * Source: VS Code watcher.ts:460
+ */
+function isParentPath(parent: string, child: string): boolean {
+  const normalizedParent = parent.endsWith('/') ? parent : parent + '/';
+  const normalizedChild = isLinux ? child : child.toLowerCase();
+  const normalizedParentCmp = isLinux ? normalizedParent : normalizedParent.toLowerCase();
+  return normalizedChild.startsWith(normalizedParentCmp);
+}
+
+/**
+ * Filter out child delete events when parent is deleted
+ * Source: VS Code watcher.ts:438-468
+ */
+function filterChildDeletes(events: FileChangeEvent[]): FileChangeEvent[] {
+  const addOrChange: FileChangeEvent[] = [];
+  const deletedPaths: string[] = [];
+
+  // Split ADD/CHANGE and DELETE events
+  const deletes = events.filter((e) => {
+    if (e.type !== 'deleted') {
+      addOrChange.push(e);
+      return false;
+    }
+    return true;
+  });
+
+  // Sort deletes by path length (shortest first)
+  deletes.sort((a, b) => a.path.length - b.path.length);
+
+  // Filter child deletes - if parent is deleted, skip child deletes
+  const filteredDeletes = deletes.filter((e) => {
+    const isChildOfDeleted = deletedPaths.some((deletedPath) => isParentPath(deletedPath, e.path));
+    if (isChildOfDeleted) return false;
+
+    deletedPaths.push(e.path);
+    return true;
+  });
+
+  return [...filteredDeletes, ...addOrChange];
+}
+
+/**
+ * Coalesce events using VS Code's exact rules
+ * Source: VS Code watcher.ts:378-469
+ *
+ * Rules:
+ * - ADDED + DELETED → remove both (cancelled out)
+ * - DELETED + ADDED → UPDATED (atomic save)
+ * - ADDED + UPDATED → keep as ADDED
+ * - Case rename (macOS/Windows) → keep both events
+ * - Parent delete absorbs child deletes
+ */
+function coalesceEvents(events: FileChangeEvent[]): FileChangeEvent[] {
+  const coalesced = new Set<FileChangeEvent>();
+  const mapPathToChange = new Map<string, FileChangeEvent>();
+
+  for (const event of events) {
+    const key = toKey(event.path);
+    const existing = mapPathToChange.get(key);
+
+    let keepEvent = false;
+
+    if (existing) {
+      // Case rename: paths differ in case only (macOS/Windows)
+      // Keep both events for case-sensitive rename detection
+      if (existing.path !== event.path && (event.type === 'deleted' || event.type === 'created')) {
+        keepEvent = true;
+      }
+      // ADDED + DELETED → remove both (file created and deleted in same batch)
+      else if (existing.type === 'created' && event.type === 'deleted') {
+        mapPathToChange.delete(key);
+        coalesced.delete(existing);
+      }
+      // DELETED + ADDED → UPDATED (atomic save pattern)
+      else if (existing.type === 'deleted' && event.type === 'created') {
+        existing.type = 'modified';
+      }
+      // ADDED + UPDATED → keep as ADDED (new file being modified)
+      else if (existing.type === 'created' && event.type === 'modified') {
+        // Do nothing, keep original ADDED event
+      }
+      // Otherwise use latest type
+      else {
+        existing.type = event.type;
+      }
+    } else {
+      keepEvent = true;
+    }
+
+    if (keepEvent) {
+      coalesced.add(event);
+      mapPathToChange.set(key, event);
+    }
   }
 
-  // Schedule the event with debouncing
-  const timeout = setTimeout(() => {
-    pendingFileChanges.delete(path);
-    window.postMessage(
-      {
-        type: 'file:changed',
-        uuid: crypto.randomUUID(),
-        path,
-        change_type: changeType,
-      },
-      '*'
-    );
-  }, DEBOUNCE_MS);
-
-  pendingFileChanges.set(path, { type: changeType, timeout });
+  // Parent folder optimization: filter child deletes
+  return filterChildDeletes(Array.from(coalesced));
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ThrottledWorker - Spam Prevention
+// Source: VS Code parcelWatcher.ts:181-188
+// Config: maxWorkChunkSize=500, throttleDelay=200ms, maxBufferedWork=30000
+// ═══════════════════════════════════════════════════════════════
+
+interface ThrottledWorkerConfig {
+  maxWorkChunkSize: number; // Max events per batch
+  throttleDelay: number; // Rest time between batches (ms)
+  maxBufferedWork: number; // Max queue size before dropping
+}
+
+class ThrottledWorker {
+  private buffer: FileChangeEvent[] = [];
+  private pending = false;
+  private timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  private config: ThrottledWorkerConfig = {
+    maxWorkChunkSize: 500, // VS Code: process up to 500 changes at once
+    throttleDelay: 200, // VS Code: rest for 200ms between batches
+    maxBufferedWork: 30000, // VS Code: never buffer more than 30000 events
+  };
+
+  work(events: FileChangeEvent[]): void {
+    // Drop if buffer is full (prevents memory explosion)
+    if (this.buffer.length >= this.config.maxBufferedWork) {
+      console.warn('[FileWatcher] Buffer full, dropping events');
+      return;
+    }
+
+    this.buffer.push(...events);
+    this.scheduleFlush();
+  }
+
+  private scheduleFlush(): void {
+    if (this.pending) return;
+    this.pending = true;
+
+    this.timeoutId = setTimeout(() => {
+      this.timeoutId = null;
+      this.flush();
+    }, this.config.throttleDelay);
+  }
+
+  private flush(): void {
+    this.pending = false;
+
+    // Process up to maxWorkChunkSize
+    const chunk = this.buffer.splice(0, this.config.maxWorkChunkSize);
+
+    // Emit chunk
+    for (const event of chunk) {
+      window.postMessage(
+        {
+          type: 'file:changed',
+          uuid: crypto.randomUUID(),
+          path: event.path,
+          change_type: event.type,
+        },
+        '*'
+      );
+    }
+
+    // If more in buffer, schedule next flush
+    if (this.buffer.length > 0) {
+      this.scheduleFlush();
+    }
+  }
+
+  /** Cleanup for HMR - clears pending timers and buffer */
+  dispose(): void {
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
+    this.buffer = [];
+    this.pending = false;
+  }
+}
+
+const throttledWorker = new ThrottledWorker();
+
+// ═══════════════════════════════════════════════════════════════
+// RunOnceWorker - 75ms Event Batching
+// Source: VS Code parcelWatcher.ts:177
+// "Parcel internally uses 50ms as delay, so we use 75ms"
+// ═══════════════════════════════════════════════════════════════
+
+/** VS Code's magic number - aggregate events for 75ms before processing */
+const FILE_CHANGES_HANDLER_DELAY = 75;
+
+/** Batch of pending events waiting to be coalesced and emitted */
+let batchedEvents: FileChangeEvent[] = [];
+let batchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Queue a file change event for batched processing.
+ * Events are collected for 75ms, then coalesced and throttle-emitted.
+ */
+function queueFileChange(path: string, changeType: string): void {
+  batchedEvents.push({ path, type: changeType });
+
+  // Start batch timer if not already running
+  batchTimeout ??= setTimeout(() => {
+    const events = batchedEvents;
+    batchedEvents = [];
+    batchTimeout = null;
+
+    // Coalesce events (dedupe, merge, parent optimization)
+    const coalesced = coalesceEvents(events);
+
+    // Throttle emit (max 500/batch, 200ms rest)
+    if (coalesced.length > 0) {
+      throttledWorker.work(coalesced);
+    }
+  }, FILE_CHANGES_HANDLER_DELAY);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// File Watcher Initialization
+// ═══════════════════════════════════════════════════════════════
 
 export async function initFileWatcher(workspacePath: string): Promise<void> {
   // If already watching this path, skip
@@ -99,19 +357,19 @@ export async function initFileWatcher(workspacePath: string): Promise<void> {
             event.newPath.startsWith(watchedWorkspacePath) &&
             !shouldIgnorePath(event.newPath)
           ) {
-            emitFileChanged(event.path, 'deleted');
-            emitFileChanged(event.newPath, 'created');
+            queueFileChange(event.path, 'deleted');
+            queueFileChange(event.newPath, 'created');
           } else {
             // Just treat as delete if renamed outside workspace
-            emitFileChanged(event.path, 'deleted');
+            queueFileChange(event.path, 'deleted');
           }
         } else {
           // Forward as-is for created/modified/deleted
-          emitFileChanged(event.path, event.type);
+          queueFileChange(event.path, event.type);
         }
       });
 
-      console.warn('[Orbit] File change listener initialized');
+      console.warn('[Orbit] File change listener initialized (VS Code-style batching)');
     } catch (err) {
       console.error('[Orbit] Failed to set up file change listener:', err);
       fileWatcherInitialized = false;
@@ -137,4 +395,14 @@ export function getWatchedWorkspacePath(): string | null {
 /** Check if file watcher is initialized */
 export function isFileWatcherInitialized(): boolean {
   return fileWatcherInitialized;
+}
+
+/** Cleanup for HMR - clears all pending timers and buffers */
+export function disposeFileWatcher(): void {
+  if (batchTimeout) {
+    clearTimeout(batchTimeout);
+    batchTimeout = null;
+  }
+  batchedEvents = [];
+  throttledWorker.dispose();
 }
