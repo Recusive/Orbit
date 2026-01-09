@@ -84,6 +84,8 @@ const logger = createLogger('SessionManager');
 export interface AgentMessage {
   type: 'text' | 'thinking' | 'tool_use' | 'result' | 'error';
   content: string;
+  /** Stable message ID from SDK - all events in a single assistant turn share this ID */
+  messageId?: string;
   metadata?: {
     toolName?: string;
     toolId?: string;
@@ -248,14 +250,20 @@ interface SDKSystemMessage {
 
 interface SDKStreamEventMessage {
   type: 'stream_event';
+  uuid?: string; // Stable message UUID from SDK - same as parent assistant message
+  session_id?: string;
   event?: StreamEvent;
+  parent_tool_use_id?: string | null;
 }
 
 interface SDKAssistantMessage {
   type: 'assistant';
+  uuid?: string; // Stable message UUID from SDK - shared across all events in a turn
+  session_id?: string;
   message?: {
     content?: ContentBlock[];
   };
+  parent_tool_use_id?: string | null;
 }
 
 interface SDKUserMessage {
@@ -374,6 +382,10 @@ export class SessionManager extends Disposable {
   private sessionResumeState = new Map<string, { isResumed: boolean; isForked: boolean }>();
   private sessionInitFired = new Set<string>();
   private pendingDisplayNames = new Map<string, string>();
+
+  // Track current assistant message UUID per session (stable across all events in a turn)
+  // This is the SDK's message `uuid` field - all events in a single turn share this UUID
+  private currentAssistantMessageId = new Map<string, string>();
 
   /**
    * Create a new agent session
@@ -607,6 +619,18 @@ export class SessionManager extends Disposable {
             const event = sdkMessage.event;
             if (event === undefined) continue;
 
+            // Stream events also have the UUID - capture it if not already set
+            if (sdkMessage.uuid && !this.currentAssistantMessageId.has(sessionId)) {
+              this.currentAssistantMessageId.set(sessionId, sdkMessage.uuid);
+              logger.debug(
+                { sessionId, messageId: sdkMessage.uuid },
+                'Captured message UUID from stream_event'
+              );
+            }
+
+            // Get current message ID (may have been set from this or previous stream event)
+            const streamMessageId = this.currentAssistantMessageId.get(sessionId);
+
             // Handle text deltas
             if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
               const textDelta = event.delta.text;
@@ -614,7 +638,7 @@ export class SessionManager extends Disposable {
                 textWasStreamed = true; // Mark that we received streaming text
                 this._onAgentMessage.fire({
                   sessionId,
-                  message: { type: 'text', content: textDelta },
+                  message: { type: 'text', content: textDelta, messageId: streamMessageId },
                 });
               }
             }
@@ -627,7 +651,7 @@ export class SessionManager extends Disposable {
               if (thinkingDelta !== undefined) {
                 this._onAgentMessage.fire({
                   sessionId,
-                  message: { type: 'thinking', content: thinkingDelta },
+                  message: { type: 'thinking', content: thinkingDelta, messageId: streamMessageId },
                 });
               }
             }
@@ -639,6 +663,19 @@ export class SessionManager extends Disposable {
             const content = sdkMessage.message?.content;
             if (content === undefined) continue;
 
+            // Capture the SDK's stable message UUID for this turn
+            // All events (text, tool_use, etc.) in this turn should share this UUID
+            if (sdkMessage.uuid) {
+              this.currentAssistantMessageId.set(sessionId, sdkMessage.uuid);
+              logger.debug(
+                { sessionId, messageId: sdkMessage.uuid },
+                'Captured assistant message UUID from SDK'
+              );
+            }
+
+            // Get the current message ID (may have been set by this or a previous assistant message in the turn)
+            const currentMessageId = this.currentAssistantMessageId.get(sessionId);
+
             for (const block of content) {
               // Handle text blocks - emit if not already streamed
               if (block.type === 'text') {
@@ -646,7 +683,7 @@ export class SessionManager extends Disposable {
                   // No streaming happened (e.g., image input), emit full text
                   this._onAgentMessage.fire({
                     sessionId,
-                    message: { type: 'text', content: block.text },
+                    message: { type: 'text', content: block.text, messageId: currentMessageId },
                   });
                 }
                 continue;
@@ -657,6 +694,7 @@ export class SessionManager extends Disposable {
                   message: {
                     type: 'thinking',
                     content: block.thinking ?? '',
+                    messageId: currentMessageId,
                   },
                 });
                 continue;
@@ -689,6 +727,7 @@ export class SessionManager extends Disposable {
               const toolMessage: AgentMessage = {
                 type: 'tool_use',
                 content: `Using tool: ${toolName}`,
+                messageId: currentMessageId,
                 metadata: {
                   toolName,
                   toolId,
@@ -756,11 +795,14 @@ export class SessionManager extends Disposable {
                     const isError = block.is_error === true;
                     const storedToolId = originalMessage.metadata.toolId;
 
+                    // Get the current message ID for this turn
+                    const toolCompleteMessageId = this.currentAssistantMessageId.get(sessionId);
                     const completedMessage: AgentMessage = {
                       type: 'tool_use',
                       content: isError
                         ? `Tool ${toolInfo.name} failed`
                         : `Tool ${toolInfo.name} completed`,
+                      messageId: toolCompleteMessageId,
                       metadata: {
                         toolName: toolInfo.name,
                         toolId: storedToolId,
@@ -785,6 +827,8 @@ export class SessionManager extends Disposable {
           } else {
             // sdkMessage.type === 'result'
             const resultMsg = sdkMessage;
+            // Get the final message ID for this turn before resetting
+            const turnMessageId = this.currentAssistantMessageId.get(sessionId);
             this._onAgentMessage.fire({
               sessionId,
               message: {
@@ -793,6 +837,7 @@ export class SessionManager extends Disposable {
                   resultMsg.subtype === 'error_max_structured_output_retries'
                     ? 'Failed to produce valid structured output'
                     : 'Turn complete',
+                messageId: turnMessageId,
                 usage:
                   resultMsg.usage !== undefined
                     ? {
@@ -808,8 +853,9 @@ export class SessionManager extends Disposable {
                 resultSubtype: resultMsg.subtype,
               },
             });
-            // Reset streaming flag for next turn
+            // Reset for next turn - the next turn will get a new message ID from the SDK
             textWasStreamed = false;
+            this.currentAssistantMessageId.delete(sessionId);
           }
 
           // Check for pending rewind after processing each message
@@ -864,6 +910,7 @@ export class SessionManager extends Disposable {
     this.sessionResumeState.delete(sessionId);
     this.sessionInitFired.delete(sessionId);
     this.pendingDisplayNames.delete(sessionId);
+    this.currentAssistantMessageId.delete(sessionId);
   }
 
   /**

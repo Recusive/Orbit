@@ -54,6 +54,8 @@ export interface ToolMetadata {
 export interface AgentMessage {
   type: 'text' | 'thinking' | 'tool_use' | 'result' | 'error' | 'turn_complete' | 'turn_cancel';
   content?: string;
+  /** Stable message ID from SDK - all events in a single assistant turn share this ID */
+  messageId?: string;
   metadata?: ToolMetadata;
   usage?: {
     inputTokens: number;

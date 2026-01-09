@@ -45,13 +45,32 @@ import { WebviewMessageSchema } from '@/types/protocol';
 
 /** Paths to ignore for file watching */
 const IGNORED_PATH_PATTERNS = [
+  // Version control
   '/.git/',
+  // JavaScript/Node
   '/node_modules/',
   '/.next/',
-  '/target/',
   '/dist/',
+  '/build/',
+  '/.turbo/',
+  '/.parcel-cache/',
+  // Python
+  '/venv/',
+  '/.venv/',
+  '/site-packages/',
   '/__pycache__/',
+  '/.mypy_cache/',
+  '/.pytest_cache/',
+  '/env/',
+  '/.env/',
+  // Rust
+  '/target/',
+  // General
   '/.cache/',
+  '/.DS_Store',
+  '/coverage/',
+  '/.idea/',
+  '/.vscode/',
 ];
 
 function shouldIgnorePath(path: string): boolean {
@@ -175,7 +194,9 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
         onAgentMessage((event) => {
           const { sessionId, message } = event;
           const content = message.content ?? '';
-          const messageId = crypto.randomUUID();
+          // Use SDK's stable message ID if available (all events in a turn share this ID)
+          // Fall back to random UUID only if SDK doesn't provide one (shouldn't happen normally)
+          const messageId = message.messageId ?? crypto.randomUUID();
 
           // Log agent message for debugging
           logger.debug(`Agent message: ${message.type}`, {
@@ -183,6 +204,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             messageType: message.type,
             hasContent: content.length > 0,
             hasUsage: message.usage !== undefined,
+            messageId, // Add messageId to debug logs
           });
 
           switch (message.type) {
@@ -214,7 +236,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
 
               // Debug: Log tool name for debugging widget mismatch issues
               console.warn(
-                `[TauriProvider] Tool event: name="${toolName}", status="${String(status)}", id="${toolId}"`
+                `[TauriProvider] Tool event: name="${toolName}", status="${String(status)}", toolId="${toolId}", messageId="${messageId}"`
               );
 
               // Log tool completion
