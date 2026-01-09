@@ -111,7 +111,6 @@ export default defineConfig({
       '@codemirror/state',
       '@codemirror/view',
       '@lezer/highlight',
-      'codemirror',
     ],
   },
   // Tauri expects a fixed port

@@ -1,0 +1,18 @@
+{
+  "entry": ["apps/agent/src/main.tsx", "apps/canvas/src/main.tsx", "apps/canvas/src/CanvasApp.tsx"],
+  "extensions": [".ts", ".tsx"],
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/agent-bridge/**",
+    "**/src-tauri/**"
+  ],
+  "ignoreUnimported": [],
+  "ignoreUnused": [],
+  "ignoreUnresolved": []
+}
