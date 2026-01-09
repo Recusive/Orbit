@@ -21,6 +21,11 @@ import type { FC } from 'react';
 import { FileIcon } from '@/components/files';
 import { CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils/constants';
 
+// Stable plugin arrays - defined outside component to prevent recreation on each render
+// This is critical for Streamdown performance as it compares plugin arrays by reference
+const REMARK_PLUGINS = [remarkGfm];
+const REHYPE_PLUGINS: never[] = [];
+
 export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
   tools,
@@ -98,7 +103,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                     className="chat-markdown prose prose-sm dark:prose-invert max-w-none"
                     onClick={handleContentClick}
                   >
-                    <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>
+                    <Streamdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS}>
                       {segment.text}
                     </Streamdown>
                   </div>

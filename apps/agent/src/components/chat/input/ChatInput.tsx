@@ -5,6 +5,8 @@
  * To change textarea sizes, chat max-width, or input box dimensions,
  * update CHAT_WIDTH, CHAT_WIDTH_VAR, and INPUT_SIZES in constants.ts.
  */
+import { memo } from 'react';
+
 import { InputControls } from './InputControls';
 import { ContextChips } from './context-chips';
 import { MentionPopover } from './mention-popover';
@@ -17,7 +19,7 @@ import type { FC } from 'react';
 import { ElementContextList } from '@/components/browser';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils/constants';
 
-export const ChatInput: FC<ChatInputProps> = ({
+export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   inputMode,
   thinkingMode,
   isAgentRunning,
@@ -30,7 +32,7 @@ export const ChatInput: FC<ChatInputProps> = ({
   onModeChange,
   onThinkingModeChange,
   onModelChange,
-}) => {
+}) {
   const {
     // State
     attachedContext,
@@ -152,4 +154,4 @@ export const ChatInput: FC<ChatInputProps> = ({
       </div>
     </div>
   );
-};
+});

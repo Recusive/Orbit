@@ -44,16 +44,16 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 py-2 px-2 -mx-2',
+        'w-full flex items-center gap-2 py-1.5 px-2.5',
         'rounded-lg hover:bg-muted/20',
         'transition-all duration-150 group',
-        isFailed && 'border-2 border-dashed border-destructive/40 opacity-60 mx-0'
+        isFailed && 'border-2 border-dashed border-destructive/40 opacity-60'
       )}
     >
       {/* Icon container */}
       <div
         className={cn(
-          'w-6 h-6 rounded-lg flex items-center justify-center',
+          'w-5 h-5 rounded flex items-center justify-center',
           'transition-colors duration-150',
           isFailed
             ? 'bg-destructive/8 group-hover:bg-destructive/12'
@@ -62,7 +62,7 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
       >
         <File
           className={cn(
-            'h-3.5 w-3.5',
+            'h-3 w-3',
             'transition-colors duration-150',
             isFailed
               ? 'text-destructive/60 group-hover:text-destructive/80'
@@ -74,10 +74,10 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
 
       {/* Content */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-        <span className="text-sm text-muted-foreground/50 font-medium">Read</span>
+        <span className="text-xs text-muted-foreground/50 font-medium">Read</span>
         <button
           className={cn(
-            'text-md font-medium',
+            'text-xs font-medium',
             'hover:text-primary/80 transition-colors duration-150 truncate',
             isFailed ? 'text-muted-foreground line-through' : 'text-foreground/90'
           )}

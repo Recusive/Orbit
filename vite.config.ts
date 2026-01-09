@@ -5,10 +5,14 @@ import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 
+import { reactDevToolsPlugin } from './vite-plugins/react-devtools';
+
 // https://vite.dev/config/
 export default defineConfig({
   root: './apps/agent',
   plugins: [
+    // React DevTools must be FIRST to inject script before React initializes
+    reactDevToolsPlugin(),
     react({
       babel: {
         plugins: [['babel-plugin-react-compiler', {}]],

@@ -8,5 +8,11 @@
     "strict": true,
     "noEmit": false
   },
-  "include": ["vite.config.ts", "vite.config.canvas.ts", "eslint.config.ts", "knip.config.ts"]
+  "include": [
+    "vite.config.ts",
+    "vite.config.canvas.ts",
+    "eslint.config.ts",
+    "knip.config.ts",
+    "vite-plugins/**/*.ts"
+  ]
 }

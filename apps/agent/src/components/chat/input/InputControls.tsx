@@ -1,4 +1,5 @@
 import { ArrowUp, AtSign, Globe, Image, Square } from 'lucide-react';
+import { memo } from 'react';
 
 import { ThinkingModeButton } from './ThinkingModeButton';
 import { INPUT_MODE_LABELS } from './constants';
@@ -19,7 +20,7 @@ import type { FC } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils/utils';
 
-export const InputControls: FC<InputControlsProps> = ({
+export const InputControls: FC<InputControlsProps> = memo(function InputControls({
   inputMode,
   thinkingMode,
   isAgentRunning,
@@ -39,7 +40,7 @@ export const InputControls: FC<InputControlsProps> = ({
   onStop,
   getThinkingInfo,
   getActiveDots,
-}) => {
+}) {
   return (
     <div className="flex w-full items-center justify-between gap-1 px-1 pb-1">
       {/* Left Controls - Mode & Model Pickers */}
@@ -205,4 +206,4 @@ export const InputControls: FC<InputControlsProps> = ({
       </div>
     </div>
   );
-};
+});
