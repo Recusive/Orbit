@@ -7,6 +7,7 @@ import { useTauri } from '@/hooks/agent/use-tauri';
 import { lspDidOpen } from '@/lib/api';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore, getLanguageFromPath } from '@/stores/file/file-viewer-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('FileTree');
 
@@ -416,10 +417,14 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
       }
 
       const viewerStore = useFileViewerStore.getState();
+      const uiStore = useUIStore.getState();
 
       // Open tab in viewer (shows loading state)
       viewerStore.openFile(path);
       viewerStore.setLoading(true, path);
+
+      // Open the activity panel and switch to file tab
+      uiStore.openFileTab();
 
       // Request file content
       postMessage({

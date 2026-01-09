@@ -129,6 +129,7 @@ interface UIActions {
   // Activity panel actions
   setActivityTab: (tab: ActivityTab) => void;
   openBrowserTab: () => void;
+  openFileTab: () => void;
   // Header tab actions
   setActiveTab: (tab: HeaderTab) => void;
   // Bottom panel actions
@@ -248,7 +249,7 @@ export const useUIStore = create<UIStore>()(
     bottomPanelHeight: DEFAULT_UI_STATE.bottomPanelHeight,
     bottomPanelTab: 'terminal' as BottomPanelTab,
     terminalPosition: 'activity' as TerminalPosition,
-    activityTab: 'files' as ActivityTab,
+    activityTab: 'file' as ActivityTab,
     activeTab: 'agent' as HeaderTab,
     goToLineDialogOpen: false,
     settingsDialogOpen: false,
@@ -456,6 +457,13 @@ export const useUIStore = create<UIStore>()(
       set((state) => {
         state.activityTab = 'browser';
         // Also ensure the activity panel is open
+        state.reviewPanelOpen = true;
+      });
+    },
+
+    openFileTab: (): void => {
+      set((state) => {
+        state.activityTab = 'file';
         state.reviewPanelOpen = true;
       });
     },
