@@ -255,15 +255,16 @@
 }
 
 /* Responsive chat widths - scales down on smaller screens */
+/* Uses min() to ensure chat never exceeds 650px, only shrinks when viewport is too small */
 @media (max-width: 900px) {
   :root {
-    --chat-max-width: calc(100vw - 64px);
+    --chat-max-width: min(650px, calc(100vw - 64px));
   }
 }
 
 @media (max-width: 640px) {
   :root {
-    --chat-max-width: calc(100vw - 32px);
+    --chat-max-width: min(650px, calc(100vw - 32px));
   }
 }
 
