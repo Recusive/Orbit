@@ -16,11 +16,13 @@ import {
 import { Input } from '@/components/ui/input';
 import {
   addRecentProject,
+  conversationList,
   fileExists,
   gitClone,
   openFileDialog,
   setWorkspacePath,
 } from '@/lib/api';
+import { toConversationSummaries } from '@/lib/mappers';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -218,6 +220,10 @@ export const CloneRepositoryDialog: FC<CloneRepositoryDialogProps> = ({ open, on
       await addRecentProject(finalPath);
       useUIStore.getState().setWorkspace(finalPath);
       setRootPath(finalPath);
+
+      // Load conversations for this workspace (Claude Code-style folder isolation)
+      const conversations = await conversationList(finalPath);
+      useUIStore.getState().setConversations(toConversationSummaries(conversations));
 
       onOpenChange(false);
     } catch (err) {

@@ -67,6 +67,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     updateConversationTitle,
     conversations,
     workspacePath,
+    activeWorktreePath,
   } = useUIStore();
   const {
     setInputMode,
@@ -333,7 +334,9 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         isAgentRunning,
         setIsAgentRunning,
         conversations,
-        workspacePath,
+        // Use active worktree path for worktree-based session isolation
+        // Falls back to workspace path if no worktree is active
+        workspacePath: activeWorktreePath ?? workspacePath,
         messagesCache,
         setPendingMessage,
         postMessage,
@@ -351,6 +354,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       isAgentRunning,
       conversations,
       workspacePath,
+      activeWorktreePath,
       messagesCache,
       postMessage,
       updateConversationTitle,

@@ -16,7 +16,8 @@ import type { FC } from 'react';
 
 import { FileIcon, FolderIcon } from '@/components/files';
 import { useFileTree } from '@/hooks/file/use-file-tree';
-import { openFileDialog, setWorkspacePath } from '@/lib/api';
+import { conversationList, openFileDialog, setWorkspacePath } from '@/lib/api';
+import { toConversationSummaries } from '@/lib/mappers';
 import { GIT_STATUS_STYLES } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import { useFileStore } from '@/stores/file/file-store';
@@ -225,6 +226,10 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
         setRootPath(selected);
         // Refresh the file tree
         refresh();
+
+        // Load conversations for this workspace (Claude Code-style folder isolation)
+        const conversations = await conversationList(selected);
+        useUIStore.getState().setConversations(toConversationSummaries(conversations));
       }
     } catch (err) {
       console.error('[FileExplorer] Failed to open folder:', err);

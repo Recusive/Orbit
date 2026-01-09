@@ -16,11 +16,13 @@ import {
 import { Input } from '@/components/ui/input';
 import {
   addSshHost,
+  conversationList,
   getSshHosts,
   openFileDialog,
   removeSshHost,
   setWorkspacePath,
 } from '@/lib/api';
+import { toConversationSummaries } from '@/lib/mappers';
 import { useFileStore } from '@/stores/file/file-store';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -146,6 +148,10 @@ export const SSHConnectionDialog: FC<SSHConnectionDialogProps> = ({ open, onOpen
         await setWorkspacePath(selected);
         useUIStore.getState().setWorkspace(selected);
         setRootPath(selected);
+
+        // Load conversations for this workspace (Claude Code-style folder isolation)
+        const conversations = await conversationList(selected);
+        useUIStore.getState().setConversations(toConversationSummaries(conversations));
 
         logger.info('Set workspace for SSH terminal', { workspace: selected });
       }

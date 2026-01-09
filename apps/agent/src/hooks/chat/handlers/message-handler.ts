@@ -1,7 +1,8 @@
 import type { ChatMessage } from '@/components/chat';
 import type { ExtensionMessage, Model } from '@/types/protocol';
 
-import { conversationAddMessage } from '@/lib/api';
+import { conversationAddMessage, conversationList } from '@/lib/api';
+import { toConversationSummaries } from '@/lib/mappers';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';
@@ -122,6 +123,10 @@ export function createMessageHandler(
         // This prevents file tree operations from overwriting the root workspace
         if (message.cwd && !workspacePath) {
           setWorkspace(message.cwd);
+          // Load conversations for this workspace (Claude Code-style folder isolation)
+          void conversationList(message.cwd).then((conversations) => {
+            setConversations(toConversationSummaries(conversations));
+          });
         }
         break;
 

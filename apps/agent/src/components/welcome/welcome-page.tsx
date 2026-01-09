@@ -7,7 +7,8 @@ import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { CloneRepositoryDialog } from '@/components/modals/git';
 import { SSHConnectionDialog } from '@/components/modals/ssh';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
-import { addRecentProject, openFileDialog, setWorkspacePath } from '@/lib/api';
+import { addRecentProject, conversationList, openFileDialog, setWorkspacePath } from '@/lib/api';
+import { toConversationSummaries } from '@/lib/mappers';
 import { cn } from '@/lib/utils/utils';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -37,6 +38,10 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
         useUIStore.getState().setWorkspace(path);
         // Update file store root path
         setRootPath(path);
+
+        // Load conversations for this workspace (Claude Code-style folder isolation)
+        const conversations = await conversationList(path);
+        useUIStore.getState().setConversations(toConversationSummaries(conversations));
       } catch (err) {
         console.error('[WelcomePage] Failed to open project:', err);
       }

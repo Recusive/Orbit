@@ -586,18 +586,19 @@ export const useConversations = (): ConversationSummary[] => {
 };
 
 export const useWorkspaceConversations = (): ConversationSummary[] => {
-  // Get raw state values with stable selectors
+  // With Claude Code-style folder isolation, the backend only loads
+  // conversations from the current workspace's folder. No filtering needed!
   const workspacePath = useUIStore((state) => state.workspacePath);
   const conversations = useUIStore((state) => state.conversations);
 
-  // Memoize the filtered result to prevent unnecessary re-renders
   return useMemo(() => {
     if (!workspacePath) {
       // No workspace set - return empty list (user should open a folder first)
       return [];
     }
-    // Filter to only show conversations for the current workspace
-    return conversations.filter((c) => c.workspacePath === workspacePath);
+    // All loaded conversations are already for the current workspace
+    // (loaded from its specific folder by the backend)
+    return conversations;
   }, [workspacePath, conversations]);
 };
 

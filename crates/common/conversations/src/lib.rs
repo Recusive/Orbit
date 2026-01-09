@@ -2,14 +2,18 @@
 //!
 //! This crate handles saving and loading conversation history for the Orbit editor.
 //!
-//! # Storage Location
+//! # Storage Location (Claude Code Style)
 //!
-//! Conversations are stored in platform-specific data directories:
-//! - macOS: `~/Library/Application Support/orbit/conversations/`
-//! - Linux: `~/.local/share/orbit/conversations/`
-//! - Windows: `%APPDATA%/orbit/conversations/`
+//! Conversations are stored in platform-specific data directories, organized by workspace:
+//! - macOS: `~/Library/Application Support/orbit/projects/{encoded-workspace}/`
+//! - Linux: `~/.local/share/orbit/projects/{encoded-workspace}/`
+//! - Windows: `%APPDATA%/orbit/projects/{encoded-workspace}/`
+//!
+//! The workspace path is encoded by replacing `/` with `-` (Claude Code pattern).
+//! Example: `/Users/pranit/Desktop/orbit` → `-Users-pranit-Desktop-orbit`
 //!
 //! Each conversation is stored as a separate JSON file named by its session ID.
+//! This folder-based isolation ensures sessions are automatically scoped to their workspace.
 
 use std::fs;
 use std::io::ErrorKind;
@@ -225,67 +229,83 @@ impl From<&Conversation> for ConversationSummary {
 // Conversation Manager
 // ============================================
 
-/// Manages conversation persistence
+/// Manages conversation persistence with workspace-based isolation (Claude Code style)
+///
+/// Conversations are stored in folders organized by encoded workspace path:
+/// `{base_dir}/projects/{encoded-workspace}/{session_id}.json`
 #[derive(Debug)]
 pub struct ConversationManager {
-    /// Path to conversations directory
-    data_dir: PathBuf,
-    /// In-memory cache of conversation summaries
+    /// Base path for all projects (e.g., `~/.../orbit/`)
+    base_dir: PathBuf,
+    /// In-memory cache of conversation summaries (per-workspace, keyed by workspace path)
     summaries: RwLock<Vec<ConversationSummary>>,
+    /// Current workspace path being managed (for legacy API compatibility)
+    current_workspace: RwLock<Option<String>>,
 }
 
 impl ConversationManager {
-    /// Create a new conversation manager with default data directory
+    /// Create a new conversation manager with default base directory
     #[must_use]
     pub fn new() -> Self {
-        let data_dir = Self::default_data_dir();
+        let base_dir = Self::default_base_dir();
         Self {
-            data_dir,
+            base_dir,
             summaries: RwLock::new(Vec::new()),
+            current_workspace: RwLock::new(None),
         }
     }
 
-    /// Create a conversation manager with a custom data directory
+    /// Create a conversation manager with a custom base directory
     #[must_use]
     pub fn with_data_dir(data_dir: PathBuf) -> Self {
         Self {
-            data_dir,
+            base_dir: data_dir,
             summaries: RwLock::new(Vec::new()),
+            current_workspace: RwLock::new(None),
         }
     }
 
-    /// Get the default data directory for conversations
+    /// Get the default base directory for orbit data
     #[must_use]
-    pub fn default_data_dir() -> PathBuf {
+    pub fn default_base_dir() -> PathBuf {
         ProjectDirs::from("com", "recursive", "orbit").map_or_else(
-            || {
-                dirs::data_local_dir().map_or_else(
-                    || PathBuf::from(".orbit/conversations"),
-                    |d| d.join("orbit").join("conversations"),
-                )
-            },
-            |dirs| dirs.data_dir().join("conversations"),
+            || dirs::data_local_dir().map_or_else(|| PathBuf::from(".orbit"), |d| d.join("orbit")),
+            |dirs| dirs.data_dir().to_path_buf(),
         )
     }
 
-    /// Get the data directory path
+    /// Get the projects directory (contains all workspace folders)
+    #[must_use]
+    pub fn projects_dir(&self) -> PathBuf {
+        self.base_dir.join("projects")
+    }
+
+    /// Get the data directory path (legacy API - returns projects dir)
     #[must_use]
     pub fn data_dir(&self) -> &PathBuf {
-        &self.data_dir
+        &self.base_dir
     }
 
-    /// Get the file path for a conversation
-    fn conversation_path(&self, session_id: &str) -> PathBuf {
-        self.data_dir.join(format!("{session_id}.json"))
+    /// Get the directory for a specific workspace
+    fn workspace_dir(&self, workspace_path: Option<&str>) -> PathBuf {
+        let encoded = workspace_path.map_or_else(|| String::from("_global"), encode_workspace_path);
+        self.projects_dir().join(encoded)
     }
 
-    /// Ensure the data directory exists
-    fn ensure_data_dir(&self) -> Result<()> {
-        if !self.data_dir.exists() {
-            fs::create_dir_all(&self.data_dir).map_err(|e| {
+    /// Get the file path for a conversation in a workspace
+    fn conversation_path(&self, session_id: &str, workspace_path: Option<&str>) -> PathBuf {
+        self.workspace_dir(workspace_path)
+            .join(format!("{session_id}.json"))
+    }
+
+    /// Ensure a workspace directory exists
+    fn ensure_workspace_dir(&self, workspace_path: Option<&str>) -> Result<()> {
+        let dir = self.workspace_dir(workspace_path);
+        if !dir.exists() {
+            fs::create_dir_all(&dir).map_err(|e| {
                 Error::Config(format!(
-                    "Failed to create conversations directory {}: {}",
-                    self.data_dir.display(),
+                    "Failed to create workspace directory {}: {}",
+                    dir.display(),
                     e
                 ))
             })?;
@@ -293,19 +313,49 @@ impl ConversationManager {
         Ok(())
     }
 
-    /// Load all conversation summaries from disk
+    /// Load all conversation summaries for a specific workspace
+    ///
+    /// This reads only from the workspace's folder - no filtering needed!
     ///
     /// # Errors
     ///
     /// Returns an error if the directory cannot be read.
     pub fn load_summaries(&self) -> Result<Vec<ConversationSummary>> {
-        self.ensure_data_dir()?;
+        // Load from current workspace (legacy API)
+        let workspace = self.current_workspace.read().clone();
+        self.load_summaries_for_workspace(workspace.as_deref())
+    }
+
+    /// Get cached summaries (call `load_summaries` first to populate)
+    #[must_use]
+    pub fn get_summaries(&self) -> Vec<ConversationSummary> {
+        self.summaries.read().clone()
+    }
+
+    /// Load all conversation summaries for a specific workspace
+    ///
+    /// With Claude Code-style isolation, this reads ONLY from the workspace's folder.
+    /// No filtering needed - folder structure provides automatic isolation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be read.
+    pub fn load_summaries_for_workspace(
+        &self,
+        workspace_path: Option<&str>,
+    ) -> Result<Vec<ConversationSummary>> {
+        let workspace_dir = self.workspace_dir(workspace_path);
+
+        // If the directory doesn't exist yet, return empty list
+        if !workspace_dir.exists() {
+            return Ok(Vec::new());
+        }
 
         let mut summaries = Vec::new();
 
-        let entries = fs::read_dir(&self.data_dir).map_err(|e| {
+        let entries = fs::read_dir(&workspace_dir).map_err(|e| {
             if e.kind() == ErrorKind::PermissionDenied {
-                Error::PermissionDenied(self.data_dir.display().to_string())
+                Error::PermissionDenied(workspace_dir.display().to_string())
             } else {
                 Error::Io(e)
             }
@@ -338,77 +388,51 @@ impl ConversationManager {
             cache.clone_from(&summaries);
         }
 
+        tracing::debug!(
+            "Loaded {} conversations from workspace: {:?}",
+            summaries.len(),
+            workspace_path
+        );
+
         Ok(summaries)
     }
 
-    /// Get cached summaries (call `load_summaries` first to populate)
-    #[must_use]
-    pub fn get_summaries(&self) -> Vec<ConversationSummary> {
-        self.summaries.read().clone()
-    }
-
-    /// Load all conversation summaries filtered by workspace path
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the directory cannot be read.
-    pub fn load_summaries_for_workspace(
-        &self,
-        workspace_path: Option<&str>,
-    ) -> Result<Vec<ConversationSummary>> {
-        let all_summaries = self.load_summaries()?;
-
-        match workspace_path {
-            Some(path) => {
-                // Filter to only conversations for this workspace
-                Ok(all_summaries
-                    .into_iter()
-                    .filter(|s| s.workspace_path.as_deref() == Some(path))
-                    .collect())
-            },
-            None => {
-                // No workspace specified - return only orphaned conversations
-                Ok(all_summaries
-                    .into_iter()
-                    .filter(|s| s.workspace_path.is_none())
-                    .collect())
-            },
-        }
-    }
-
-    /// Delete all conversations without a workspace path (orphaned)
+    /// Delete all conversations in the global (no workspace) folder
     ///
     /// # Errors
     ///
     /// Returns an error if any conversation cannot be deleted.
     pub fn cleanup_orphaned_conversations(&self) -> Result<usize> {
-        let summaries = self.load_summaries()?;
+        // Load conversations from the _global folder
+        let summaries = self.load_summaries_for_workspace(None)?;
         let mut removed = 0;
 
         for summary in summaries {
-            if summary.workspace_path.is_none() {
-                self.delete(&summary.session_id)?;
-                removed += 1;
-            }
+            self.delete_in_workspace(&summary.session_id, None)?;
+            removed += 1;
         }
 
         tracing::info!("Cleaned up {} orphaned conversations", removed);
         Ok(removed)
     }
 
-    /// Create a new conversation
+    /// Create a new conversation in the appropriate workspace folder
     ///
     /// # Errors
     ///
     /// Returns an error if the conversation cannot be saved.
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "workspace_path is cloned for Conversation::new"
+    )]
     pub fn create(
         &self,
         session_id: String,
         title: String,
         workspace_path: Option<String>,
     ) -> Result<Conversation> {
-        let conversation = Conversation::new(session_id, title, workspace_path);
-        self.save(&conversation)?;
+        let conversation = Conversation::new(session_id, title, workspace_path.clone());
+        self.save_to_workspace(&conversation, workspace_path.as_deref())?;
 
         // Update summaries cache
         {
@@ -416,16 +440,26 @@ impl ConversationManager {
             summaries.insert(0, ConversationSummary::from(&conversation));
         }
 
+        tracing::debug!(
+            "Created conversation {} in workspace: {:?}",
+            conversation.session_id,
+            workspace_path
+        );
+
         Ok(conversation)
     }
 
-    /// Load a conversation by session ID
+    /// Load a conversation by session ID from a specific workspace
     ///
     /// # Errors
     ///
     /// Returns an error if the conversation cannot be loaded.
-    pub fn load(&self, session_id: &str) -> Result<Option<Conversation>> {
-        let path = self.conversation_path(session_id);
+    pub fn load_from_workspace(
+        &self,
+        session_id: &str,
+        workspace_path: Option<&str>,
+    ) -> Result<Option<Conversation>> {
+        let path = self.conversation_path(session_id, workspace_path);
 
         if !path.exists() {
             return Ok(None);
@@ -443,16 +477,71 @@ impl ConversationManager {
         Ok(Some(conversation))
     }
 
-    /// Save a conversation to disk
+    /// Load a conversation by session ID (searches in conversation's stored workspace)
+    ///
+    /// This method first tries to find the conversation in any workspace folder.
+    /// For better performance, use `load_from_workspace` if you know the workspace.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the conversation cannot be loaded.
+    pub fn load(&self, session_id: &str) -> Result<Option<Conversation>> {
+        // First, try the current workspace
+        let current = self.current_workspace.read().clone();
+        if let Some(conv) = self.load_from_workspace(session_id, current.as_deref())? {
+            return Ok(Some(conv));
+        }
+
+        // If not found, search all workspace folders
+        let projects_dir = self.projects_dir();
+        if !projects_dir.exists() {
+            return Ok(None);
+        }
+
+        if let Ok(entries) = fs::read_dir(&projects_dir) {
+            for entry in entries.flatten() {
+                if entry.path().is_dir() {
+                    let conv_path = entry.path().join(format!("{session_id}.json"));
+                    if conv_path.exists() {
+                        if let Ok(content) = fs::read_to_string(&conv_path) {
+                            if let Ok(conv) = serde_json::from_str::<Conversation>(&content) {
+                                return Ok(Some(conv));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Save a conversation to its workspace folder
+    ///
+    /// Uses the conversation's workspace_path field to determine the folder.
     ///
     /// # Errors
     ///
     /// Returns an error if the conversation cannot be saved.
     pub fn save(&self, conversation: &Conversation) -> Result<()> {
-        self.ensure_data_dir()?;
+        self.save_to_workspace(conversation, conversation.workspace_path.as_deref())
+    }
 
-        let path = self.conversation_path(&conversation.session_id);
-        let temp_path = self.data_dir.join(Self::unique_temp_name());
+    /// Save a conversation to a specific workspace folder
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the conversation cannot be saved.
+    pub fn save_to_workspace(
+        &self,
+        conversation: &Conversation,
+        workspace_path: Option<&str>,
+    ) -> Result<()> {
+        self.ensure_workspace_dir(workspace_path)?;
+
+        let workspace_dir = self.workspace_dir(workspace_path);
+        let path = self.conversation_path(&conversation.session_id, workspace_path);
+        let temp_path = workspace_dir.join(Self::unique_temp_name());
         let content = serde_json::to_string_pretty(conversation)?;
 
         // Write to temp file first (atomic write)
@@ -482,13 +571,17 @@ impl ConversationManager {
         Ok(())
     }
 
-    /// Delete a conversation
+    /// Delete a conversation from a specific workspace
     ///
     /// # Errors
     ///
     /// Returns an error if the conversation cannot be deleted.
-    pub fn delete(&self, session_id: &str) -> Result<()> {
-        let path = self.conversation_path(session_id);
+    pub fn delete_in_workspace(
+        &self,
+        session_id: &str,
+        workspace_path: Option<&str>,
+    ) -> Result<()> {
+        let path = self.conversation_path(session_id, workspace_path);
 
         if path.exists() {
             fs::remove_file(&path).map_err(|e| {
@@ -505,10 +598,30 @@ impl ConversationManager {
                 summaries.retain(|s| s.session_id != session_id);
             }
 
-            tracing::debug!("Deleted conversation {}", session_id);
+            tracing::debug!(
+                "Deleted conversation {} from {:?}",
+                session_id,
+                workspace_path
+            );
         }
 
         Ok(())
+    }
+
+    /// Delete a conversation (searches all workspaces if needed)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the conversation cannot be deleted.
+    pub fn delete(&self, session_id: &str) -> Result<()> {
+        // First, find the conversation to get its workspace
+        if let Some(conv) = self.load(session_id)? {
+            return self.delete_in_workspace(session_id, conv.workspace_path.as_deref());
+        }
+
+        // Try current workspace
+        let current = self.current_workspace.read().clone();
+        self.delete_in_workspace(session_id, current.as_deref())
     }
 
     /// Update conversation title
@@ -619,6 +732,24 @@ impl Default for ConversationManager {
 // ============================================
 // Utilities
 // ============================================
+
+/// Encode a workspace path to a folder name (Claude Code style)
+///
+/// Replaces all `/` with `-` to create a valid folder name.
+/// Example: `/Users/pranit/Desktop/orbit` → `-Users-pranit-Desktop-orbit`
+#[must_use]
+pub fn encode_workspace_path(path: &str) -> String {
+    path.replace('/', "-")
+}
+
+/// Decode an encoded folder name back to an absolute path
+///
+/// Replaces all `-` with `/` to restore the original path.
+/// Example: `-Users-pranit-Desktop-orbit` → `/Users/pranit/Desktop/orbit`
+#[must_use]
+pub fn decode_workspace_path(encoded: &str) -> String {
+    encoded.replace('-', "/")
+}
 
 /// Get current timestamp in milliseconds
 fn current_timestamp() -> u64 {

@@ -26,9 +26,6 @@ export * from './agent';
 // Conversation operations
 export * from './conversations';
 
-// AI operations
-export * from './ai';
-
 // Search operations
 export * from './search';
 

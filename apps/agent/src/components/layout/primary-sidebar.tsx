@@ -202,9 +202,12 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
     [workspacePath, removeWorktree]
   );
 
-  // Get conversations for the active worktree
-  const activeWorktreeConversations = conversations.filter(
-    (c) => c.workspacePath === activeWorktreePath || c.workspacePath === workspacePath
+  // Helper to get conversations for a specific worktree path
+  const getWorktreeConversations = useCallback(
+    (worktreePath: string): ConversationSummary[] => {
+      return conversations.filter((c) => c.workspacePath === worktreePath);
+    },
+    [conversations]
   );
 
   return (
@@ -403,28 +406,29 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
                         }}
                       />
                       {/* Conversations for this worktree */}
-                      {wt.isExpanded &&
-                      wt.worktree.path === activeWorktreePath &&
-                      activeWorktreeConversations.length > 0 ? (
-                        <div className="relative ml-[19px] mt-1">
-                          {/* Vertical timeline line */}
-                          <div className="absolute left-0 top-0 bottom-2 w-px bg-border/60" />
-                          {/* Conversations */}
-                          <div className="flex flex-col gap-0.5">
-                            {activeWorktreeConversations.map((conv) => (
-                              <ConversationItem
-                                key={conv.sessionId}
-                                conversation={conv}
-                                active={conv.sessionId === activeConversationId}
-                                collapsed={isCollapsed}
-                                onClick={() => {
-                                  handleLoadConversation(conv.sessionId);
-                                }}
-                              />
-                            ))}
+                      {(() => {
+                        const worktreeConversations = getWorktreeConversations(wt.worktree.path);
+                        return wt.isExpanded && worktreeConversations.length > 0 ? (
+                          <div className="relative ml-[19px] mt-1">
+                            {/* Vertical timeline line */}
+                            <div className="absolute left-0 top-0 bottom-2 w-px bg-border/60" />
+                            {/* Conversations */}
+                            <div className="flex flex-col gap-0.5">
+                              {worktreeConversations.map((conv) => (
+                                <ConversationItem
+                                  key={conv.sessionId}
+                                  conversation={conv}
+                                  active={conv.sessionId === activeConversationId}
+                                  collapsed={isCollapsed}
+                                  onClick={() => {
+                                    handleLoadConversation(conv.sessionId);
+                                  }}
+                                />
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
+                        ) : null;
+                      })()}
                     </div>
                   ))}
                 </>
