@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { ExtensionMessage, FileNode } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
-import { lspDidOpen } from '@/lib/api/backend';
+import { lspDidOpen } from '@/lib/api';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore, getLanguageFromPath } from '@/stores/file/file-viewer-store';
 

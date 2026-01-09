@@ -1,7 +1,7 @@
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
 import type { Model, ReactElementContext, ThinkingMode, WebviewMessage } from '@/types/protocol';
 
-import { conversationAddMessage } from '@/lib/api/backend';
+import { conversationAddMessage } from '@/lib/api';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';

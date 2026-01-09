@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
-import type { Diagnostic } from '@/lib/api/backend';
+import type { Diagnostic } from '@/lib/api';
 import type { FC } from 'react';
 
 import { useDiagnostics } from '@/hooks/lsp/use-diagnostics';

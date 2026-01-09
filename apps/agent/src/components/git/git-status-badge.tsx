@@ -1,4 +1,4 @@
-import type { FileStatus } from '@/lib/api/backend';
+import type { FileStatus } from '@/lib/api';
 import type { FC } from 'react';
 
 import { cn } from '@/lib/utils/utils';

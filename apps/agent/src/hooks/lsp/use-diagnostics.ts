@@ -1,9 +1,9 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { Diagnostic } from '@/lib/api/backend';
+import type { Diagnostic } from '@/lib/api';
 
-import { onDiagnostics } from '@/lib/api/backend';
+import { onDiagnostics } from '@/lib/api';
 
 const logger = createLogger('Diagnostics');
 

@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Switch } from '@/components/ui/switch';
 import { useTauri } from '@/hooks/agent/use-tauri';
-import { lspDidClose, lspDidOpen } from '@/lib/api/backend';
+import { lspDidClose, lspDidOpen } from '@/lib/api';
 import { cn } from '@/lib/utils/utils';
 import { useBrowserIsActive } from '@/stores/browser/browser-store';
 import {

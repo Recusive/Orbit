@@ -2,7 +2,7 @@ import { createLogger } from '@orbit/common/lib';
 import { AlertCircle, Folder, GitBranch, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { BranchInfo, WorktreeInfo } from '@/lib/api/backend';
+import type { BranchInfo, WorktreeInfo } from '@/lib/api';
 import type { FC, KeyboardEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { gitBranchInfo, gitWorktreeAdd } from '@/lib/api/backend';
+import { gitBranchInfo, gitWorktreeAdd } from '@/lib/api';
 import { useUIStore, useWorkspacePath } from '@/stores/ui/ui-store';
 
 const logger = createLogger('CreateWorktreeDialog');

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { FileStatus as BackendFileStatus, GitStatus } from '@/lib/api/backend';
+import type { FileStatus as BackendFileStatus, GitStatus } from '@/lib/api';
 
 import {
   DropdownMenu,

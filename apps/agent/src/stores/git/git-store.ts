@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
-import type { FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/api/backend';
+import type { FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/api';
 
 const logger = createLogger('GitStore');
 

@@ -1,7 +1,7 @@
 import type { ChatMessage } from '@/components/chat';
 import type { ExtensionMessage, Model } from '@/types/protocol';
 
-import { conversationAddMessage } from '@/lib/api/backend';
+import { conversationAddMessage } from '@/lib/api';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';

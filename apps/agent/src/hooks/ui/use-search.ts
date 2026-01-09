@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { SearchResult } from '@/lib/api/backend';
+import type { SearchResult } from '@/lib/api';
 
-import { searchFiles } from '@/lib/api/backend';
+import { searchFiles } from '@/lib/api';
 import { DELAYS } from '@/lib/utils/constants';
 
 // ============================================

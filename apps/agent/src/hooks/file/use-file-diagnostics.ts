@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { Diagnostic } from '@/lib/api/backend';
+import type { Diagnostic } from '@/lib/api';
 
-import { onFileDiagnostics } from '@/lib/api/backend';
+import { onFileDiagnostics } from '@/lib/api';
 
 interface UseFileDiagnosticsResult {
   /** Diagnostics for this file */

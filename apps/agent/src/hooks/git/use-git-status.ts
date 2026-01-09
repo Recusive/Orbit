@@ -1,7 +1,7 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
 
-import type { FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/api/backend';
+import type { FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/api';
 
 import {
   gitBranches,
@@ -14,7 +14,7 @@ import {
   gitStage,
   gitStatus,
   gitUnstage,
-} from '@/lib/api/backend';
+} from '@/lib/api';
 import {
   selectHasConflicts,
   selectIsClean,

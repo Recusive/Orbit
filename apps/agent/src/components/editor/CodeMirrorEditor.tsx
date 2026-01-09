@@ -42,7 +42,7 @@ import {
 import { tags } from '@lezer/highlight';
 import { useCallback, useEffect, useRef } from 'react';
 
-import type { CompletionItem } from '@/lib/api/backend';
+import type { CompletionItem } from '@/lib/api';
 import type { Diagnostic as CmDiagnostic } from '@codemirror/lint';
 import type { Extension } from '@codemirror/state';
 import type { Tooltip, ViewUpdate } from '@codemirror/view';

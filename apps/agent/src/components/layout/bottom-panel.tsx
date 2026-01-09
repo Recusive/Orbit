@@ -8,14 +8,14 @@
 import { Plus, X, Maximize2 } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 
-import type { Diagnostic } from '@/lib/api/backend';
+import type { Diagnostic } from '@/lib/api';
 import type { FC } from 'react';
 
 import { DiagnosticsPanel } from '@/components/panels';
 import { Button } from '@/components/ui/button';
 import { useDiagnostics } from '@/hooks/lsp/use-diagnostics';
 import { useTerminalInstanceManager } from '@/hooks/terminal/use-terminal-instance-manager';
-import { readFile } from '@/lib/api/backend';
+import { readFile } from '@/lib/api';
 import { HEIGHTS } from '@/lib/utils/constants';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';

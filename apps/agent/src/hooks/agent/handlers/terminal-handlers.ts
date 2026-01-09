@@ -1,6 +1,6 @@
 import type { WebviewMessage } from '@/types/protocol';
 
-import { createTerminal, writeTerminal, resizeTerminal, closeTerminal } from '@/lib/api/backend';
+import { createTerminal, writeTerminal, resizeTerminal, closeTerminal } from '@/lib/api';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
 
 export async function handleTerminalCreate(

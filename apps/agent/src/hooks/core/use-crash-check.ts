@@ -8,7 +8,7 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useState } from 'react';
 
-import { checkPreviousCrash, clearCrashLog, isTauri } from '@/lib/api/backend';
+import { checkPreviousCrash, clearCrashLog, isTauri } from '@/lib/api';
 
 const logger = createLogger('CrashCheck');
 

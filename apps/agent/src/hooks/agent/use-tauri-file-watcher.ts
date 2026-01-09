@@ -1,4 +1,4 @@
-import { watchPath, onFileChange } from '@/lib/api/backend';
+import { watchPath, onFileChange } from '@/lib/api';
 
 // ═══════════════════════════════════════════════════════════════
 // File Watcher Singleton
@@ -66,7 +66,7 @@ export async function initFileWatcher(workspacePath: string): Promise<void> {
   if (fileWatcherInitialized && watchedWorkspacePath && watchedWorkspacePath !== workspacePath) {
     // Unwatch old workspace
     try {
-      const { unwatchPath } = await import('@/lib/api/backend');
+      const { unwatchPath } = await import('@/lib/api');
       await unwatchPath(watchedWorkspacePath);
       console.warn('[Orbit] Unwatched old workspace:', watchedWorkspacePath);
     } catch (err) {

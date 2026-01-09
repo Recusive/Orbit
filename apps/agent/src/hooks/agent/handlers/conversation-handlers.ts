@@ -12,7 +12,7 @@ import {
   conversationDelete,
   conversationUpdateTitle,
   conversationFork,
-} from '@/lib/api/backend';
+} from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 
 export async function handleConversationCreate(

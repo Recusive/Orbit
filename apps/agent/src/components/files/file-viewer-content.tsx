@@ -6,7 +6,7 @@ import type { FC } from 'react';
 
 import { EditorBreadcrumbs, EditorSkeleton, extractMarkdownOutline } from '@/components/editor';
 import { FileDiffViewer } from '@/components/git';
-import { writeFile, lspDidChange, lspDidSave } from '@/lib/api/backend';
+import { writeFile, lspDidChange, lspDidSave } from '@/lib/api';
 import {
   useCursorPosition,
   useFileViewerStore,

@@ -20,7 +20,7 @@ import {
   openFileDialog,
   removeSshHost,
   setWorkspacePath,
-} from '@/lib/api/backend';
+} from '@/lib/api';
 import { useFileStore } from '@/stores/file/file-store';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
 import { useUIStore } from '@/stores/ui/ui-store';

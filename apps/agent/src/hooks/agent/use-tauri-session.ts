@@ -1,7 +1,7 @@
 import type { RewindContextMessage } from './types/tauri-types';
-import type { SessionConfig } from '@/lib/api/backend';
+import type { SessionConfig } from '@/lib/api';
 
-import { agentCreateSession, getWorkspacePath } from '@/lib/api/backend';
+import { agentCreateSession, getWorkspacePath } from '@/lib/api';
 
 // ═══════════════════════════════════════════════════════════════
 // Session State

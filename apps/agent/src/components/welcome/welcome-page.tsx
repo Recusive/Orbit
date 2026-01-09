@@ -7,7 +7,7 @@ import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { CloneRepositoryDialog } from '@/components/modals/git';
 import { SSHConnectionDialog } from '@/components/modals/ssh';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
-import { addRecentProject, openFileDialog, setWorkspacePath } from '@/lib/api/backend';
+import { addRecentProject, openFileDialog, setWorkspacePath } from '@/lib/api';
 import { cn } from '@/lib/utils/utils';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';

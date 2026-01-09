@@ -1,7 +1,7 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { CompletionItem, HoverInfo, Location } from '@/lib/api/backend';
+import type { CompletionItem, HoverInfo, Location } from '@/lib/api';
 
 import {
   getCompletions,
@@ -14,7 +14,7 @@ import {
   lspIsRunning,
   lspStart,
   lspStop,
-} from '@/lib/api/backend';
+} from '@/lib/api';
 
 const logger = createLogger('LSP');
 

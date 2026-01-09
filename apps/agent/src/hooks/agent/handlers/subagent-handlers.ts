@@ -7,7 +7,7 @@ import {
   updateAgent,
   deleteAgent,
   generateAgentDefinition,
-} from '@/lib/api/backend';
+} from '@/lib/api';
 
 export async function handleSubagentsList(
   message: Extract<WebviewMessage, { type: 'subagents:list' }>

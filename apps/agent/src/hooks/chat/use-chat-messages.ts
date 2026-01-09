@@ -9,7 +9,7 @@ import type { ChatMessage, ImageAttachment } from '@/components/chat';
 import type { Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
-import { conversationAddMessage, conversationLoad } from '@/lib/api/backend';
+import { conversationAddMessage, conversationLoad } from '@/lib/api';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useQueuedMessageStore } from '@/stores/chat/queued-message-store';
 import { useUIStore } from '@/stores/ui/ui-store';

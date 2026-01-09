@@ -20,7 +20,7 @@ import {
   gitClone,
   openFileDialog,
   setWorkspacePath,
-} from '@/lib/api/backend';
+} from '@/lib/api';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 

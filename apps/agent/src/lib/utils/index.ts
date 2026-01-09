@@ -12,9 +12,6 @@ export { computeSimpleDiff, getLanguageFromPath } from './diff-utils';
 export { compressImage } from './image-utils';
 export type { CompressedImage } from './image-utils';
 
-// Lazy loading
-export { lazyLoad } from './lazy';
-
 // Constants
 export {
   SIDEBAR,

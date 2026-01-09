@@ -10,13 +10,13 @@ import {
 } from 'lucide-react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 
-import type { FileStatus } from '@/lib/api/backend';
+import type { FileStatus } from '@/lib/api';
 import type { FileNode } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { FileIcon, FolderIcon } from '@/components/files';
 import { useFileTree } from '@/hooks/file/use-file-tree';
-import { openFileDialog, setWorkspacePath } from '@/lib/api/backend';
+import { openFileDialog, setWorkspacePath } from '@/lib/api';
 import { GIT_STATUS_STYLES } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import { useFileStore } from '@/stores/file/file-store';

@@ -7,7 +7,7 @@ import {
   updateCommand,
   deleteCommand,
   generateCommandDefinition,
-} from '@/lib/api/backend';
+} from '@/lib/api';
 
 export async function handleCommandsList(
   message: Extract<WebviewMessage, { type: 'commands:list' }>

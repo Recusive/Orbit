@@ -1,9 +1,9 @@
 import { initFileWatcher } from '../use-tauri-file-watcher';
 
-import type { FileEntry } from '@/lib/api/backend';
+import type { FileEntry } from '@/lib/api';
 import type { WebviewMessage } from '@/types/protocol';
 
-import { listDirectory, readFile, getWorkspacePath, lspSetWorkspace } from '@/lib/api/backend';
+import { listDirectory, readFile, getWorkspacePath, lspSetWorkspace } from '@/lib/api';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 export async function handleFileTreeRequest(

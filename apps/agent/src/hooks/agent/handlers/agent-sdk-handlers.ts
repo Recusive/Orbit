@@ -1,7 +1,7 @@
 import { formatConversationContext } from '../use-tauri-context';
 import { ensureSession, consumeRewindContext } from '../use-tauri-session';
 
-import type { AttachmentContentBlock } from '@/lib/api/backend';
+import type { AttachmentContentBlock } from '@/lib/api';
 import type { WebviewMessage } from '@/types/protocol';
 
 import {
@@ -12,7 +12,7 @@ import {
   agentSetModel,
   agentSetPlanMode,
   agentSetAcceptMode,
-} from '@/lib/api/backend';
+} from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 
 export async function handleMessageSend(

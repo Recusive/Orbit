@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { addRecentProject, getRecentProjects } from '@/lib/api/backend';
+import { addRecentProject, getRecentProjects } from '@/lib/api';
 
 export interface RecentProject {
   /** Full path to the project */
