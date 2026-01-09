@@ -1,6 +1,17 @@
-export { MessageItem } from './message-item';
-export type { ChatMessage } from './message-item';
-export { UserMessage } from './user-message';
-export { AgentMessage } from './agent-message';
+/**
+ * Messages exports
+ */
+
+// Main component
+export { MessageItem } from './MessageItem';
+
+// Sub-components
+export { ToolWidgetRenderer } from './ToolWidgetRenderer';
 export { MessageActions } from './message-actions';
-export { MessageFeedback } from './message-feedback';
+
+// Types
+export type { ToolWidgetRendererProps } from './ToolWidgetRenderer';
+export type { ChatMessage, MessageItemProps, Segment } from './types';
+
+// Utilities
+export { arePropsEqual, buildSegments, hasVisibleContent } from './message-utils';

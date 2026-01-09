@@ -8,6 +8,7 @@ import { RootLayout } from '@/components/layout/root-layout';
 import { StatusBar } from '@/components/layout/status-bar';
 import { CrashNotification } from '@/components/modals';
 import { OnboardingFlow } from '@/components/onboarding';
+import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { WelcomePage } from '@/components/welcome';
 import { useBrowser } from '@/hooks/browser/use-browser';
@@ -131,6 +132,9 @@ const App: FC = () => {
               onDismiss={dismiss}
             />
           ) : null}
+
+          {/* Toast notifications */}
+          <Toaster position="bottom-right" />
         </div>
       </TooltipProvider>
     </TauriProvider>

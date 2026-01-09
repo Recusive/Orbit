@@ -1,6 +1,3 @@
-// Code display
-export * from './code';
-
 // File components
 export * from './files';
 

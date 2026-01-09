@@ -72,6 +72,8 @@ interface UIState {
   isConversationTransitioning: boolean;
   // Conversation list
   conversations: ConversationSummary[];
+  // Conversation editing state (for inline rename)
+  editingConversationId: string | null;
   // Left Sidebar
   leftSidebarOpen: boolean;
   leftSidebarWidth: number;
@@ -111,6 +113,7 @@ interface UIActions {
   addConversation: (conversation: ConversationSummary) => void;
   removeConversation: (sessionId: string) => void;
   updateConversationTitle: (sessionId: string, title: string) => void;
+  setEditingConversationId: (id: string | null) => void;
   // Sidebar actions
   toggleLeftSidebar: () => void;
   expandLeftSidebar: () => void;
@@ -234,6 +237,7 @@ export const useUIStore = create<UIStore>()(
     isLoadingConversation: false,
     isConversationTransitioning: false,
     conversations: loadConversationsFromStorage(),
+    editingConversationId: null,
     leftSidebarOpen: DEFAULT_UI_STATE.leftSidebarOpen,
     leftSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
     lastExpandedSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
@@ -341,6 +345,12 @@ export const useUIStore = create<UIStore>()(
         if (state.activeConversationId === sessionId) {
           state.activeConversationTitle = title;
         }
+      });
+    },
+
+    setEditingConversationId: (id: string | null): void => {
+      set((state) => {
+        state.editingConversationId = id;
       });
     },
 

@@ -394,6 +394,98 @@ logger.error('Error occurred', new Error('fail')); // Always shown with stack
 - Ternary for conditional rendering
 - Props interfaces marked `readonly`
 
+## Module Organization Patterns
+
+### Frontend (TypeScript) - Barrel Pattern
+
+Use `index.ts` barrel files to organize exports. Every folder with multiple files should have an `index.ts`.
+
+**Structure:**
+
+```text
+components/chat/messages/
+├── index.ts              ← Barrel file (exports all public items)
+├── MessageItem.tsx       ← Main component
+├── ToolWidgetRenderer.tsx
+├── message-utils.ts      ← Utilities
+└── types.ts              ← Types
+```
+
+**Barrel file pattern:**
+
+```typescript
+// index.ts
+export { MessageItem } from './MessageItem';
+export { ToolWidgetRenderer } from './ToolWidgetRenderer';
+export type { ChatMessage, MessageItemProps } from './types';
+export { buildSegments } from './message-utils';
+```
+
+**For folders with subfolders** (e.g., `components/`, `hooks/`):
+
+```text
+primary-sidebar/
+├── index.ts              ← Imports from subfolders
+├── PrimarySidebar.tsx
+├── types.ts
+├── components/
+│   ├── index.ts          ← Subfolder barrel
+│   └── *.tsx
+└── hooks/
+    ├── index.ts          ← Subfolder barrel
+    └── *.ts
+```
+
+**Two valid sub-patterns:**
+
+| Pattern         | When to Use                             | Example                                   |
+| --------------- | --------------------------------------- | ----------------------------------------- |
+| **Full export** | Reusable component libraries            | `chat/tools/` - all widgets exported      |
+| **Facade**      | Complex modules with single entry point | `chat/input/` - only `ChatInput` exported |
+
+### Backend (Rust) - Explicit Paths
+
+For Tauri commands, use **explicit module paths** (no barrel re-exports). This is appropriate because:
+
+1. Commands are registered by function reference, not imported by users
+2. Frontend calls commands by string name via `invoke('command_name')`
+3. Explicit paths make code easier to trace
+
+**Structure:**
+
+```rust
+// commands/mod.rs - Just declare modules
+pub mod agent;
+pub mod common;
+
+// commands/common/mod.rs - Declare submodules
+pub mod files;
+pub mod git;
+pub mod terminal;
+
+// No `pub use` needed - commands use full paths
+```
+
+**For shared types in crates**, use selective re-exports:
+
+```rust
+// crates/common/core/src/lib.rs
+pub mod types;
+pub mod error;
+
+// Re-export commonly used types for convenience
+pub use error::{Error, Result};
+pub use types::{FileStatus, GitStatus};
+```
+
+**Summary:**
+
+| Layer              | Pattern                 | Reason                            |
+| ------------------ | ----------------------- | --------------------------------- |
+| Frontend TS        | **Barrel** (`index.ts`) | Users import from modules         |
+| Tauri commands     | **Explicit paths**      | Internal, registered by function  |
+| Shared Rust crates | **Selective re-export** | Convenience for cross-crate types |
+
 ## Monorepo Structure
 
 ### Apps (`apps/`)
@@ -878,3 +970,6 @@ apps/canvas/src/
   - Updated all scripts, CI workflows, and husky hooks to use `bun`
   - Added comprehensive `lint-all.sh` script for running all checks
 - **Added comprehensive audit** - Aligned all linting, TypeScript, and CI checks across the monorepo
+- **Documented module organization patterns** - Barrel pattern for frontend, explicit paths for Rust backend
+  - Frontend: Every folder with multiple files gets an `index.ts` barrel
+  - Backend: Tauri commands use explicit paths, shared crates use selective re-exports

@@ -1,4 +1,4 @@
-export { SourceControlTab } from './source-control-tab';
+export { SourceControlTab } from './source-control';
 export { GitStatusBadge } from './git-status-badge';
 export { FilesChangedList } from './files-changed-list';
 export { FileChangeItem } from './file-change-item';

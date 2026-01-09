@@ -1,3 +1,6 @@
+// Conversation dialogs
+export * from './conversation';
+
 // Crash notifications
 export * from './crash';
 
