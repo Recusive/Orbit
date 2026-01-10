@@ -4,6 +4,7 @@ import { formatZodError } from '@orbit/shared-schemas';
 import type { ExtensionMessage } from './types/tauri-types';
 import './types/tauri-types';
 
+import { createCheckpointBatcher } from '@/lib/utils/event-batcher';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { ExtensionMessageSchema } from '@/types/protocol';
 
@@ -38,6 +39,15 @@ export function initWindowMessageListener(): void {
 
   // Single global UUID deduplication set
   const processedUuids = new Set<string>();
+
+  // Batched checkpoint processor - debounces rapid checkpoint events (100ms window)
+  // This reduces ~30 checkpoint state updates per agent run to ~2-3
+  const batchedCheckpoint = createCheckpointBatcher(
+    (sessionId, checkpointId) => {
+      useCheckpointStore.getState().onCheckpointReceived(sessionId, checkpointId);
+    },
+    100 // 100ms debounce - coalesce rapid intermediate checkpoints
+  );
 
   const handleWindowMessage = (event: MessageEvent<unknown>): void => {
     const result = ExtensionMessageSchema.safeParse(event.data);
@@ -88,11 +98,11 @@ export function initWindowMessageListener(): void {
     // Handle checkpoint events for file rewind functionality
     // Uses "delayed association" - each message gets the checkpoint from the NEXT user message
     // This ensures rewinding to a message restores files to the state AFTER that message completed
+    // NOTE: Checkpoints are batched/debounced to reduce state updates during rapid tool execution
     if (result.data.type === 'agent:checkpoint') {
       const { session_id, checkpoint_id } = result.data;
-      console.warn('[Orbit] Received checkpoint event:', { session_id, checkpoint_id });
-      // This will associate the checkpoint with any pending message from the previous turn
-      useCheckpointStore.getState().onCheckpointReceived(session_id, checkpoint_id);
+      // Use batched processor to debounce rapid checkpoint events
+      batchedCheckpoint(session_id, checkpoint_id);
     }
 
     // When agent completes, mark this message as waiting for its checkpoint
