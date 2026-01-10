@@ -13,3 +13,4 @@ workspace = true
 [dependencies]
 orbit-core = { path = "../core" }
 ignore = { workspace = true }
+tracing = { workspace = true }

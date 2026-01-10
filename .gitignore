@@ -66,3 +66,6 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 vscode-reference/
+
+# TypeScript build cache
+*.tsbuildinfo

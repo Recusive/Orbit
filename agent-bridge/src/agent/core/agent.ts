@@ -8,6 +8,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 
 import { ClaudeCredentials } from '../../common/auth/credentials.js';
 import { createLogger } from '../../common/logging/logger.js';
+import { perfStart, perfEnd, perfEvent } from '../../common/perf/index.js';
 import { withRetry, RetryPresets } from '../../common/retry/retry.js';
 import { PermissionManager } from '../permissions/permissions.js';
 import { getAllowedToolsForMode } from '../session/session-mode.js';
@@ -918,6 +919,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     const messageIterator = this.messageQueue[Symbol.asyncIterator]();
     const options = this._createOptions();
 
+    const queryStart = perfStart('session_start');
     this.currentQuery = await withRetry(
       () => {
         // query() is synchronous but may throw on initialization errors
@@ -932,6 +934,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         operationName: 'startSession.query',
       }
     );
+    perfEnd('session_start', queryStart);
 
     logger.info('Session started successfully');
   }
@@ -961,6 +964,12 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             ? 'hard'
             : 'ultra'
         : 'off';
+
+    // Log message being queued for Claude API call
+    perfEvent(
+      'api_call',
+      `Queuing message (${String(message.length)} chars, ${String(attachments?.length ?? 0)} attachments)`
+    );
 
     logger.info(
       {

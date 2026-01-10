@@ -4,6 +4,9 @@ use orbit_core::{Result, SearchOptions, SearchResult, TextSearchResult};
 use orbit_search::SearchManager;
 use std::sync::OnceLock;
 
+use crate::core::perf_logger::PerfSource;
+use crate::perf_log;
+
 static SEARCH_MANAGER: OnceLock<SearchManager> = OnceLock::new();
 
 fn get_search_manager() -> &'static SearchManager {
@@ -26,17 +29,19 @@ pub async fn search_files(
     exclude: Option<Vec<String>>,
     max_results: Option<u32>,
 ) -> Result<Vec<SearchResult>> {
-    let options = SearchOptions {
-        case_sensitive,
-        whole_word,
-        regex,
-        include,
-        exclude,
-        max_results,
-    };
-    get_search_manager()
-        .search_files(&root_path, &query, Some(options))
-        .await
+    perf_log!(PerfSource::Search, "search_files", {
+        let options = SearchOptions {
+            case_sensitive,
+            whole_word,
+            regex,
+            include,
+            exclude,
+            max_results,
+        };
+        get_search_manager()
+            .search_files(&root_path, &query, Some(options))
+            .await
+    })
 }
 
 /// Search for text within files
@@ -55,15 +60,17 @@ pub async fn search_text(
     exclude: Option<Vec<String>>,
     max_results: Option<u32>,
 ) -> Result<Vec<TextSearchResult>> {
-    let options = SearchOptions {
-        case_sensitive,
-        whole_word,
-        regex,
-        include,
-        exclude,
-        max_results,
-    };
-    get_search_manager()
-        .search_text(&root_path, &pattern, Some(options))
-        .await
+    perf_log!(PerfSource::Search, "search_text", {
+        let options = SearchOptions {
+            case_sensitive,
+            whole_word,
+            regex,
+            include,
+            exclude,
+            max_results,
+        };
+        get_search_manager()
+            .search_text(&root_path, &pattern, Some(options))
+            .await
+    })
 }

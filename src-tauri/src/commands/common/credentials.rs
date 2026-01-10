@@ -22,6 +22,9 @@ use rand::RngCore as _;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
+use crate::core::perf_logger::PerfSource;
+use crate::perf_log;
+
 /// Result of storing an API key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -230,38 +233,40 @@ fn save_credentials(credentials: &StoredCredentials) -> Result<(), String> {
 /// Encrypts the key using AES-256-GCM with a machine-specific key.
 #[tauri::command]
 pub async fn store_api_key(provider: String, key: String) -> StoreResult {
-    let result = (|| -> Result<(), String> {
-        let mut credentials = load_credentials()?;
+    perf_log!(PerfSource::Ipc, "store_api_key", {
+        let result = (|| -> Result<(), String> {
+            let mut credentials = load_credentials()?;
 
-        match provider.as_str() {
-            "claude" | "anthropic" => {
-                credentials.anthropic_api_key = Some(key);
+            match provider.as_str() {
+                "claude" | "anthropic" => {
+                    credentials.anthropic_api_key = Some(key);
+                },
+                "openai" => {
+                    credentials.openai_api_key = Some(key);
+                },
+                "google" => {
+                    credentials.google_api_key = Some(key);
+                },
+                _ => {
+                    return Err(format!("Unknown provider: {provider}"));
+                },
+            }
+
+            save_credentials(&credentials)?;
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => StoreResult {
+                success: true,
+                error: None,
             },
-            "openai" => {
-                credentials.openai_api_key = Some(key);
-            },
-            "google" => {
-                credentials.google_api_key = Some(key);
-            },
-            _ => {
-                return Err(format!("Unknown provider: {provider}"));
+            Err(e) => StoreResult {
+                success: false,
+                error: Some(e),
             },
         }
-
-        save_credentials(&credentials)?;
-        Ok(())
-    })();
-
-    match result {
-        Ok(()) => StoreResult {
-            success: true,
-            error: None,
-        },
-        Err(e) => StoreResult {
-            success: false,
-            error: Some(e),
-        },
-    }
+    })
 }
 
 /// Retrieve a stored API key.
@@ -269,28 +274,30 @@ pub async fn store_api_key(provider: String, key: String) -> StoreResult {
 /// Decrypts the key from secure storage.
 #[tauri::command]
 pub async fn retrieve_api_key(provider: String) -> RetrieveResult {
-    let result = (|| -> Result<Option<String>, String> {
-        let credentials = load_credentials()?;
+    perf_log!(PerfSource::Ipc, "retrieve_api_key", {
+        let result = (|| -> Result<Option<String>, String> {
+            let credentials = load_credentials()?;
 
-        let key = match provider.as_str() {
-            "claude" | "anthropic" => credentials.anthropic_api_key,
-            "openai" => credentials.openai_api_key,
-            "google" => credentials.google_api_key,
-            _ => {
-                return Err(format!("Unknown provider: {provider}"));
+            let key = match provider.as_str() {
+                "claude" | "anthropic" => credentials.anthropic_api_key,
+                "openai" => credentials.openai_api_key,
+                "google" => credentials.google_api_key,
+                _ => {
+                    return Err(format!("Unknown provider: {provider}"));
+                },
+            };
+
+            Ok(key)
+        })();
+
+        match result {
+            Ok(key) => RetrieveResult { key, error: None },
+            Err(e) => RetrieveResult {
+                key: None,
+                error: Some(e),
             },
-        };
-
-        Ok(key)
-    })();
-
-    match result {
-        Ok(key) => RetrieveResult { key, error: None },
-        Err(e) => RetrieveResult {
-            key: None,
-            error: Some(e),
-        },
-    }
+        }
+    })
 }
 
 /// Validate an API key by making a test request to the provider.
@@ -298,64 +305,70 @@ pub async fn retrieve_api_key(provider: String) -> RetrieveResult {
 /// For Claude/Anthropic, makes a minimal API call to verify the key works.
 #[tauri::command]
 pub async fn validate_api_key(key: String) -> ValidationResult {
-    // Basic format validation
-    if key.trim().is_empty() {
-        return ValidationResult {
-            valid: false,
-            error: Some("API key cannot be empty".to_owned()),
-        };
-    }
+    perf_log!(PerfSource::Ipc, "validate_api_key", {
+        // Basic format validation
+        if key.trim().is_empty() {
+            return ValidationResult {
+                valid: false,
+                error: Some("API key cannot be empty".to_owned()),
+            };
+        }
 
-    // Check for Anthropic key format (sk-ant-...)
-    if !key.starts_with("sk-ant-") {
-        return ValidationResult {
-            valid: false,
-            error: Some("Invalid API key format. Anthropic keys start with 'sk-ant-'".to_owned()),
-        };
-    }
+        // Check for Anthropic key format (sk-ant-...)
+        if !key.starts_with("sk-ant-") {
+            return ValidationResult {
+                valid: false,
+                error: Some(
+                    "Invalid API key format. Anthropic keys start with 'sk-ant-'".to_owned(),
+                ),
+            };
+        }
 
-    // For now, just validate format. Full API validation would require
-    // making an HTTP request which adds complexity and latency.
-    // The actual API call will fail if the key is invalid anyway.
-    ValidationResult {
-        valid: true,
-        error: None,
-    }
+        // For now, just validate format. Full API validation would require
+        // making an HTTP request which adds complexity and latency.
+        // The actual API call will fail if the key is invalid anyway.
+        ValidationResult {
+            valid: true,
+            error: None,
+        }
+    })
 }
 
 /// Delete a stored API key.
 #[tauri::command]
 pub async fn delete_api_key(provider: String) -> StoreResult {
-    let result = (|| -> Result<(), String> {
-        let mut credentials = load_credentials()?;
+    perf_log!(PerfSource::Ipc, "delete_api_key", {
+        let result = (|| -> Result<(), String> {
+            let mut credentials = load_credentials()?;
 
-        match provider.as_str() {
-            "claude" | "anthropic" => {
-                credentials.anthropic_api_key = None;
+            match provider.as_str() {
+                "claude" | "anthropic" => {
+                    credentials.anthropic_api_key = None;
+                },
+                "openai" => {
+                    credentials.openai_api_key = None;
+                },
+                "google" => {
+                    credentials.google_api_key = None;
+                },
+                _ => {
+                    return Err(format!("Unknown provider: {provider}"));
+                },
+            }
+
+            save_credentials(&credentials)?;
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => StoreResult {
+                success: true,
+                error: None,
             },
-            "openai" => {
-                credentials.openai_api_key = None;
-            },
-            "google" => {
-                credentials.google_api_key = None;
-            },
-            _ => {
-                return Err(format!("Unknown provider: {provider}"));
+            Err(e) => StoreResult {
+                success: false,
+                error: Some(e),
             },
         }
-
-        save_credentials(&credentials)?;
-        Ok(())
-    })();
-
-    match result {
-        Ok(()) => StoreResult {
-            success: true,
-            error: None,
-        },
-        Err(e) => StoreResult {
-            success: false,
-            error: Some(e),
-        },
-    }
+    })
 }

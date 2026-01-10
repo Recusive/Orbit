@@ -1,6 +1,12 @@
 //! Agent Bridge - Spawns and communicates with the Node.js sidecar
 //!
 //! Uses stdin/stdout JSON IPC to communicate with the agent-bridge Node.js process.
+//!
+//! # Sidecar Lifecycle
+//!
+//! The sidecar is spawned **once** on first use and kept alive for the lifetime of the app.
+//! It is NOT spawned per-request. This amortizes the ~1-2 second startup cost across all
+//! subsequent requests, which then only incur write/read latency.
 
 use std::fmt;
 use std::io::{BufRead as _, BufReader, Write as _};
@@ -15,6 +21,7 @@ use crossbeam_channel::{bounded, Receiver, Sender};
 use parking_lot::Mutex;
 
 use super::protocol::{BridgeEvent, BridgeRequest, BridgeResponse, CommandResponse};
+use crate::core::perf_logger::{perf_log_end, perf_log_end_with_count, perf_log_start, PerfSource};
 
 /// Error type for bridge operations
 #[derive(Debug, thiserror::Error)]
@@ -90,6 +97,7 @@ impl AgentBridge {
             return Ok(()); // Already running
         }
 
+        let spawn_start = perf_log_start(PerfSource::Sidecar, "spawn");
         log::info!("Spawning agent bridge sidecar: {sidecar_path}");
 
         // Derive claude binary path from sidecar path (same directory)
@@ -141,6 +149,7 @@ impl AgentBridge {
         // Wait for ready event
         self.wait_for_ready()?;
 
+        perf_log_end(PerfSource::Sidecar, "spawn", spawn_start);
         log::info!("Agent bridge sidecar ready");
         Ok(())
     }
@@ -227,20 +236,33 @@ impl AgentBridge {
             return Err(BridgeError::NotRunning);
         }
 
+        let total_start = perf_log_start(PerfSource::Sidecar, "total");
+
         let stdin = self.stdin.as_ref().ok_or(BridgeError::NotRunning)?;
         let rx = self.response_rx.as_ref().ok_or(BridgeError::NotRunning)?;
 
         // Serialize and send request (lock stdin)
+        let write_start = perf_log_start(PerfSource::Sidecar, "write");
+        let bytes_written: usize;
         {
             let mut stdin_guard = stdin.lock();
             let json = serde_json::to_string(request)?;
+            bytes_written = json.len();
             writeln!(stdin_guard, "{json}").map_err(|e| BridgeError::SendError(e.to_string()))?;
             stdin_guard
                 .flush()
                 .map_err(|e| BridgeError::SendError(e.to_string()))?;
         }
+        perf_log_end_with_count(
+            PerfSource::Sidecar,
+            "write",
+            write_start,
+            bytes_written,
+            "bytes",
+        );
 
         // Wait for response (with timeout)
+        let read_start = perf_log_start(PerfSource::Sidecar, "read");
         let timeout = Duration::from_secs(300); // 5 minutes for long operations
 
         loop {
@@ -248,14 +270,21 @@ impl AgentBridge {
                 Ok(response) => {
                     // Check if it's a command response (not an event)
                     if let Some(cmd) = response.as_command() {
+                        // Note: We don't have access to raw bytes here, so we estimate from serialized size
+                        perf_log_end(PerfSource::Sidecar, "read", read_start);
+                        perf_log_end(PerfSource::Sidecar, "total", total_start);
                         return Ok(cmd.clone());
                     }
                     // Skip events, continue waiting for command response
                 },
                 Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
+                    perf_log_end(PerfSource::Sidecar, "read", read_start);
+                    perf_log_end(PerfSource::Sidecar, "total", total_start);
                     return Err(BridgeError::Timeout);
                 },
                 Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
+                    perf_log_end(PerfSource::Sidecar, "read", read_start);
+                    perf_log_end(PerfSource::Sidecar, "total", total_start);
                     return Err(BridgeError::ReceiveError("Channel disconnected".to_owned()));
                 },
             }
@@ -272,15 +301,25 @@ impl AgentBridge {
             return Err(BridgeError::NotRunning);
         }
 
+        let write_start = perf_log_start(PerfSource::Sidecar, "write_async");
+
         let stdin = self.stdin.as_ref().ok_or(BridgeError::NotRunning)?;
 
         let mut stdin_guard = stdin.lock();
         let json = serde_json::to_string(request)?;
+        let bytes_written = json.len();
         writeln!(stdin_guard, "{json}").map_err(|e| BridgeError::SendError(e.to_string()))?;
         stdin_guard
             .flush()
             .map_err(|e| BridgeError::SendError(e.to_string()))?;
 
+        perf_log_end_with_count(
+            PerfSource::Sidecar,
+            "write_async",
+            write_start,
+            bytes_written,
+            "bytes",
+        );
         Ok(())
     }
 

@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
+use std::time::Instant;
 
 use hashbrown::HashMap;
 use orbit_core::{Error, Result, TerminalInfo};
@@ -174,6 +175,9 @@ impl ForegroundProcessTracker {
         reason = "iteration order doesn't matter for finding child processes"
     )]
     fn get_foreground_process(&self) -> ForegroundProcess {
+        let start = Instant::now();
+        debug!(target: "orbit::perf", "[TERMINAL:get_foreground] START - shell_pid={}", self.shell_pid);
+
         let mut system = self.system.lock();
 
         // Refresh all processes to find children of our shell
@@ -190,9 +194,11 @@ impl ForegroundProcessTracker {
         // We look for direct children of our shell process
         let mut foreground_pid = self.shell_pid;
         let mut foreground_name = self.shell_name.clone();
+        let mut processes_checked: usize = 0;
 
         // Iterate through all processes to find children of our shell
         for (pid, process) in system.processes() {
+            processes_checked += 1;
             if let Some(parent_pid) = process.parent() {
                 if parent_pid == shell_pid {
                     // This is a child of our shell - use it as the foreground
@@ -204,6 +210,12 @@ impl ForegroundProcessTracker {
                 }
             }
         }
+
+        let elapsed = start.elapsed().as_millis();
+        debug!(
+            target: "orbit::perf",
+            "[TERMINAL:get_foreground] END ({elapsed}ms) - {processes_checked} processes checked, fg={foreground_name:?}"
+        );
 
         ForegroundProcess::new(foreground_pid, foreground_name)
     }
@@ -319,6 +331,9 @@ impl Terminal {
         reason = "iteration order doesn't matter for environment variables"
     )]
     pub fn new(id: String, config: TerminalConfig) -> Result<Self> {
+        let start = Instant::now();
+        debug!(target: "orbit::perf", "[TERMINAL:create] START - id={id:?}");
+
         // Validate dimensions - PTY systems don't accept zero dimensions
         let cols = if config.cols == 0 { 80 } else { config.cols };
         let rows = if config.rows == 0 { 24 } else { config.rows };
@@ -430,6 +445,12 @@ impl Terminal {
 
         // Create foreground process tracker
         let process_tracker = ForegroundProcessTracker::new(pid, &shell);
+
+        let elapsed = start.elapsed().as_millis();
+        debug!(
+            target: "orbit::perf",
+            "[TERMINAL:create] END ({elapsed}ms) - pid={pid}, shell={shell:?}"
+        );
 
         Ok(Self {
             id,

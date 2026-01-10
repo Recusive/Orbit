@@ -68,6 +68,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::{Mutex, RwLock};
@@ -572,8 +573,17 @@ impl LspClient {
 
     /// Start the language server process
     pub async fn start(&self) -> Result<()> {
+        let start = Instant::now();
+        debug!(
+            target: "orbit::perf",
+            "[LSP:start] START - language={}, cmd={}",
+            self.config.language_id,
+            self.config.command
+        );
+
         let mut process = self.process.lock().await;
         if process.is_some() {
+            debug!(target: "orbit::perf", "[LSP:start] END (0ms) - already running");
             return Ok(());
         }
 
@@ -624,6 +634,13 @@ impl LspClient {
 
         // Send initialize request
         self.initialize().await?;
+
+        let elapsed = start.elapsed().as_millis();
+        debug!(
+            target: "orbit::perf",
+            "[LSP:start] END ({elapsed}ms) - language={} initialized",
+            self.config.language_id
+        );
 
         Ok(())
     }
@@ -856,6 +873,9 @@ impl LspClient {
         method: &str,
         params: P,
     ) -> Result<R> {
+        let start = Instant::now();
+        debug!(target: "orbit::perf", "[LSP:request] START - method={method:?}");
+
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
         let request = JsonRpcRequest {
@@ -875,8 +895,18 @@ impl LspClient {
         // Wait for response with timeout
         let response = tokio::time::timeout(std::time::Duration::from_secs(30), rx)
             .await
-            .map_err(|_| Error::Lsp("Request timed out".into()))?
-            .map_err(|_| Error::Lsp("Response channel closed".into()))?;
+            .map_err(|_| {
+                let elapsed = start.elapsed().as_millis();
+                debug!(target: "orbit::perf", "[LSP:request] END ({elapsed}ms) - method={method:?} TIMEOUT");
+                Error::Lsp("Request timed out".into())
+            })?
+            .map_err(|_| {
+                let elapsed = start.elapsed().as_millis();
+                debug!(target: "orbit::perf", "[LSP:request] END ({elapsed}ms) - method={method:?} channel closed");
+                Error::Lsp("Response channel closed".into())
+            })?;
+
+        let elapsed = start.elapsed().as_millis();
 
         // Check for error
         if let Some(error) = response.get("error") {
@@ -884,8 +914,11 @@ impl LspClient {
                 .get("message")
                 .and_then(|v| v.as_str())
                 .unwrap_or("Unknown error");
+            debug!(target: "orbit::perf", "[LSP:request] END ({elapsed}ms) - method={method:?} ERROR");
             return Err(Error::Lsp(msg.into()));
         }
+
+        debug!(target: "orbit::perf", "[LSP:request] END ({elapsed}ms) - method={method:?} OK");
 
         // Parse result
         let result = response

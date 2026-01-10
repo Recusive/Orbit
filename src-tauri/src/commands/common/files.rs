@@ -20,6 +20,9 @@ use serde::Serialize;
 use tauri::{async_runtime, AppHandle, Emitter as _};
 use tokio::time::sleep;
 
+use crate::core::perf_logger::PerfSource;
+use crate::perf_log;
+
 // ============================================
 // Basic File Operations
 // ============================================
@@ -27,25 +30,33 @@ use tokio::time::sleep;
 /// Read file contents as a string
 #[tauri::command]
 pub async fn read_file(path: String) -> Result<String> {
-    orbit_fs::read_file(&path).await
+    perf_log!(PerfSource::Fs, "read_file", {
+        orbit_fs::read_file(&path).await
+    })
 }
 
 /// Read file contents as bytes (base64 encoded for transport)
 #[tauri::command]
 pub async fn read_file_bytes(path: String) -> Result<Vec<u8>> {
-    orbit_fs::read_file_bytes(&path).await
+    perf_log!(PerfSource::Fs, "read_file_bytes", {
+        orbit_fs::read_file_bytes(&path).await
+    })
 }
 
 /// Write content to a file
 #[tauri::command]
 pub async fn write_file(path: String, content: String) -> Result<()> {
-    orbit_fs::write_file(&path, &content).await
+    perf_log!(PerfSource::Fs, "write_file", {
+        orbit_fs::write_file(&path, &content).await
+    })
 }
 
 /// Write bytes to a file
 #[tauri::command]
 pub async fn write_file_bytes(path: String, content: Vec<u8>) -> Result<()> {
-    orbit_fs::write_file_bytes(&path, &content).await
+    perf_log!(PerfSource::Fs, "write_file_bytes", {
+        orbit_fs::write_file_bytes(&path, &content).await
+    })
 }
 
 /// List directory contents
@@ -56,55 +67,73 @@ pub async fn write_file_bytes(path: String, content: Vec<u8>) -> Result<()> {
 /// * `show_hidden` - Whether to include hidden files (default: false)
 #[tauri::command]
 pub async fn list_directory(path: String, show_hidden: Option<bool>) -> Result<Vec<FileEntry>> {
-    orbit_fs::list_directory(&path, show_hidden.unwrap_or(false)).await
+    perf_log!(PerfSource::Fs, "list_directory", {
+        orbit_fs::list_directory(&path, show_hidden.unwrap_or(false)).await
+    })
 }
 
 /// Create an empty file
 #[tauri::command]
 pub async fn create_file(path: String) -> Result<()> {
-    orbit_fs::create_file(&path).await
+    perf_log!(PerfSource::Fs, "create_file", {
+        orbit_fs::create_file(&path).await
+    })
 }
 
 /// Create a directory (and parents if needed)
 #[tauri::command]
 pub async fn create_directory(path: String) -> Result<()> {
-    orbit_fs::create_directory(&path).await
+    perf_log!(PerfSource::Fs, "create_directory", {
+        orbit_fs::create_directory(&path).await
+    })
 }
 
 /// Delete a file or directory
 #[tauri::command]
 pub async fn delete_file(path: String) -> Result<()> {
-    orbit_fs::delete_file(&path).await
+    perf_log!(PerfSource::Fs, "delete_file", {
+        orbit_fs::delete_file(&path).await
+    })
 }
 
 /// Rename or move a file
 #[tauri::command]
 pub async fn rename_file(old_path: String, new_path: String) -> Result<()> {
-    orbit_fs::rename_file(&old_path, &new_path).await
+    perf_log!(PerfSource::Fs, "rename_file", {
+        orbit_fs::rename_file(&old_path, &new_path).await
+    })
 }
 
 /// Copy a file
 #[tauri::command]
 pub async fn copy_file(from: String, to: String) -> Result<()> {
-    orbit_fs::copy_file(&from, &to).await
+    perf_log!(PerfSource::Fs, "copy_file", {
+        orbit_fs::copy_file(&from, &to).await
+    })
 }
 
 /// Check if a file exists
 #[tauri::command]
 pub async fn file_exists(path: String) -> bool {
-    orbit_fs::file_exists(&path).await
+    perf_log!(PerfSource::Fs, "file_exists", {
+        orbit_fs::file_exists(&path).await
+    })
 }
 
 /// Check if a path is a directory
 #[tauri::command]
 pub async fn is_directory(path: String) -> bool {
-    orbit_fs::is_directory(&path).await
+    perf_log!(PerfSource::Fs, "is_directory", {
+        orbit_fs::is_directory(&path).await
+    })
 }
 
 /// Get detailed file information
 #[tauri::command]
 pub async fn get_file_info(path: String) -> Result<FileInfo> {
-    orbit_fs::get_file_info(&path).await
+    perf_log!(PerfSource::Fs, "get_file_info", {
+        orbit_fs::get_file_info(&path).await
+    })
 }
 
 // ============================================
@@ -280,58 +309,60 @@ fn start_event_forwarder(app: AppHandle) {
 /// - The path cannot be watched
 #[tauri::command]
 pub fn watch_path(path: String, app: AppHandle) -> Result<()> {
-    // Normalize the path for consistent comparison
-    let normalized_path = normalize_path(&path);
-    let path_obj = Path::new(&normalized_path);
+    perf_log!(PerfSource::Fs, "watch_path", {
+        // Normalize the path for consistent comparison
+        let normalized_path = normalize_path(&path);
+        let path_obj = Path::new(&normalized_path);
 
-    // Validate path exists
-    if !path_obj.exists() {
-        return Err(Error::FileNotFound(normalized_path));
-    }
-
-    let state = get_watcher_state();
-
-    // Check if already watching this path
-    {
-        let paths = state.watched_paths.lock();
-        if paths.contains(&normalized_path) {
-            log::debug!("Path already being watched: {normalized_path}");
-            return Ok(());
-        }
-    }
-
-    // Add to watched paths
-    let _was_new = state.watched_paths.lock().insert(normalized_path.clone());
-
-    // Ensure watcher exists and watch the path
-    {
-        let mut watcher_guard = state.watcher.lock();
-
-        // Initialize watcher if needed
-        if watcher_guard.is_none() {
-            let new_watcher = FileWatcher::new().map_err(|e| {
-                // Remove from watched_paths on failure
-                let _removed = state.watched_paths.lock().remove(&normalized_path);
-                Error::Other(format!("Failed to create file watcher: {e}"))
-            })?;
-            *watcher_guard = Some(new_watcher);
+        // Validate path exists
+        if !path_obj.exists() {
+            return Err(Error::FileNotFound(normalized_path));
         }
 
-        // Watch the path
-        if let Some(watcher) = watcher_guard.as_mut() {
-            if let Err(e) = watcher.watch(path_obj) {
-                // Remove from watched_paths on failure
-                let _removed = state.watched_paths.lock().remove(&normalized_path);
-                return Err(e);
+        let state = get_watcher_state();
+
+        // Check if already watching this path
+        {
+            let paths = state.watched_paths.lock();
+            if paths.contains(&normalized_path) {
+                log::debug!("Path already being watched: {normalized_path}");
+                return Ok(());
             }
         }
-    }
 
-    // Start forwarder if not running
-    start_event_forwarder(app);
+        // Add to watched paths
+        let _was_new = state.watched_paths.lock().insert(normalized_path.clone());
 
-    log::debug!("Started watching path: {normalized_path}");
-    Ok(())
+        // Ensure watcher exists and watch the path
+        {
+            let mut watcher_guard = state.watcher.lock();
+
+            // Initialize watcher if needed
+            if watcher_guard.is_none() {
+                let new_watcher = FileWatcher::new().map_err(|e| {
+                    // Remove from watched_paths on failure
+                    let _removed = state.watched_paths.lock().remove(&normalized_path);
+                    Error::Other(format!("Failed to create file watcher: {e}"))
+                })?;
+                *watcher_guard = Some(new_watcher);
+            }
+
+            // Watch the path
+            if let Some(watcher) = watcher_guard.as_mut() {
+                if let Err(e) = watcher.watch(path_obj) {
+                    // Remove from watched_paths on failure
+                    let _removed = state.watched_paths.lock().remove(&normalized_path);
+                    return Err(e);
+                }
+            }
+        }
+
+        // Start forwarder if not running
+        start_event_forwarder(app);
+
+        log::debug!("Started watching path: {normalized_path}");
+        Ok(())
+    })
 }
 
 /// Stop watching a path for file changes.
@@ -339,33 +370,35 @@ pub fn watch_path(path: String, app: AppHandle) -> Result<()> {
 /// This is idempotent - calling it on a path that isn't being watched is a no-op.
 #[tauri::command]
 pub fn unwatch_path(path: String) -> Result<()> {
-    // Normalize the path for consistent comparison
-    let normalized_path = normalize_path(&path);
+    perf_log!(PerfSource::Fs, "unwatch_path", {
+        // Normalize the path for consistent comparison
+        let normalized_path = normalize_path(&path);
 
-    let state = get_watcher_state();
+        let state = get_watcher_state();
 
-    // Check if we're actually watching this path
-    let was_watching = {
-        let mut paths = state.watched_paths.lock();
-        paths.remove(&normalized_path)
-    };
+        // Check if we're actually watching this path
+        let was_watching = {
+            let mut paths = state.watched_paths.lock();
+            paths.remove(&normalized_path)
+        };
 
-    if !was_watching {
-        log::debug!("Path was not being watched: {normalized_path}");
-        return Ok(());
-    }
+        if !was_watching {
+            log::debug!("Path was not being watched: {normalized_path}");
+            return Ok(());
+        }
 
-    // Unwatch from the watcher (ignore errors - path might already be gone)
-    {
-        let mut watcher_guard = state.watcher.lock();
-        if let Some(ref mut watcher) = *watcher_guard {
-            // Log but don't fail if unwatch errors (path might have been deleted)
-            if let Err(e) = watcher.unwatch(Path::new(&normalized_path)) {
-                log::debug!("Unwatch returned error (path may have been deleted): {e}");
+        // Unwatch from the watcher (ignore errors - path might already be gone)
+        {
+            let mut watcher_guard = state.watcher.lock();
+            if let Some(ref mut watcher) = *watcher_guard {
+                // Log but don't fail if unwatch errors (path may have been deleted)
+                if let Err(e) = watcher.unwatch(Path::new(&normalized_path)) {
+                    log::debug!("Unwatch returned error (path may have been deleted): {e}");
+                }
             }
         }
-    }
 
-    log::debug!("Stopped watching path: {normalized_path}");
-    Ok(())
+        log::debug!("Stopped watching path: {normalized_path}");
+        Ok(())
+    })
 }

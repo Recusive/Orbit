@@ -16,6 +16,17 @@ export { localize } from './i18n/index.js';
 // Logging
 export { createLogger } from './logging/index.js';
 
+// Performance logging (output to stderr to avoid IPC interference)
+export {
+  perfStart,
+  perfEnd,
+  perfEndWithTokens,
+  perfEndWithCount,
+  perfEvent,
+  PerfTimer,
+} from './perf/index.js';
+export type { TokenCounts } from './perf/index.js';
+
 // Retry utilities
 export { withRetry, createRetryable, RetryPresets } from './retry/index.js';
 export type { RetryOptions } from './retry/index.js';

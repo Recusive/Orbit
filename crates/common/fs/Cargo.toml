@@ -14,6 +14,7 @@ workspace = true
 orbit-core = { path = "../core" }
 tokio = { workspace = true }
 serde = { workspace = true }
+tracing = { workspace = true }
 
 # File watching
 notify = { workspace = true }

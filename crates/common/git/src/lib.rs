@@ -2,6 +2,8 @@
 //!
 //! This crate provides git functionality using the git2 library.
 
+pub mod perf;
+
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -175,10 +177,12 @@ pub fn discover(path: &Path) -> Result<PathBuf> {
     reason = "Git status gathering is inherently complex with many checks"
 )]
 pub fn status(path: &Path) -> Result<GitStatus> {
+    let timer = perf::start("status");
     debug!(?path, "Getting git status");
 
     let repo = open(path)?;
     let mut result = GitStatus::default();
+    let mut file_count: usize = 0;
 
     // Get current branch and upstream info
     if let Ok(head) = repo.head() {
@@ -233,6 +237,8 @@ pub fn status(path: &Path) -> Result<GitStatus> {
         .map_err(|e| Error::Git(format!("Failed to get status: {e}")))?;
 
     for entry in statuses.iter() {
+        file_count += 1;
+
         // Skip entries with empty or invalid paths
         let Some(path_str) = entry.path().map(String::from) else {
             continue;
@@ -312,6 +318,7 @@ pub fn status(path: &Path) -> Result<GitStatus> {
         debug!("Found {} conflicted files", result.conflicted.len());
     }
 
+    timer.end_with_count(file_count, "files checked");
     Ok(result)
 }
 
@@ -343,6 +350,7 @@ fn get_rename_info(entry: &git2::StatusEntry<'_>, index: bool) -> (Option<String
 /// # Errors
 /// Returns an error if staging fails.
 pub fn stage(path: &Path, files: &[&Path]) -> Result<()> {
+    let timer = perf::start("stage");
     let repo = open(path)?;
     let mut index = repo
         .index()
@@ -365,6 +373,7 @@ pub fn stage(path: &Path, files: &[&Path]) -> Result<()> {
         .map_err(|e| Error::Git(format!("Failed to write index: {e}")))?;
 
     debug!("Staged {} files", files.len());
+    timer.end_with_count(files.len(), "files staged");
     Ok(())
 }
 
@@ -373,6 +382,7 @@ pub fn stage(path: &Path, files: &[&Path]) -> Result<()> {
 /// # Errors
 /// Returns an error if unstaging fails.
 pub fn unstage(path: &Path, files: &[&Path]) -> Result<()> {
+    let timer = perf::start("unstage");
     let repo = open(path)?;
     let head = repo.head().and_then(|h| h.peel_to_commit()).ok();
 
@@ -407,6 +417,7 @@ pub fn unstage(path: &Path, files: &[&Path]) -> Result<()> {
     }
 
     debug!("Unstaged {} files", files.len());
+    timer.end_with_count(files.len(), "files unstaged");
     Ok(())
 }
 
@@ -415,6 +426,7 @@ pub fn unstage(path: &Path, files: &[&Path]) -> Result<()> {
 /// # Errors
 /// Returns an error if staging fails.
 pub fn stage_all(path: &Path) -> Result<()> {
+    let timer = perf::start("stage_all");
     let repo = open(path)?;
     let mut index = repo
         .index()
@@ -429,6 +441,7 @@ pub fn stage_all(path: &Path) -> Result<()> {
         .map_err(|e| Error::Git(format!("Failed to write index: {e}")))?;
 
     debug!("Staged all changes");
+    timer.end();
     Ok(())
 }
 
@@ -437,6 +450,8 @@ pub fn stage_all(path: &Path) -> Result<()> {
 /// # Errors
 /// Returns an error if the commit fails or if the message is empty.
 pub fn commit(path: &Path, message: &str) -> Result<String> {
+    let timer = perf::start("commit");
+
     // Validate message
     let message = message.trim();
     if message.is_empty() {
@@ -481,6 +496,7 @@ pub fn commit(path: &Path, message: &str) -> Result<String> {
         .map_err(|e| Error::Git(format!("Failed to create commit: {e}")))?;
 
     debug!(hash = %oid, "Created commit");
+    timer.end();
     Ok(oid.to_string())
 }
 
@@ -489,6 +505,7 @@ pub fn commit(path: &Path, message: &str) -> Result<String> {
 /// # Errors
 /// Returns an error if the diff cannot be retrieved.
 pub fn get_diff(path: &Path) -> Result<Vec<FileDiff>> {
+    let timer = perf::start("diff");
     let repo = open(path)?;
 
     let mut opts = DiffOptions::new();
@@ -499,7 +516,9 @@ pub fn get_diff(path: &Path) -> Result<Vec<FileDiff>> {
         .diff_index_to_workdir(None, Some(&mut opts))
         .map_err(|e| Error::Git(format!("Failed to get diff: {e}")))?;
 
-    parse_diff(&diff)
+    let result = parse_diff(&diff)?;
+    timer.end_with_count(result.len(), "files changed");
+    Ok(result)
 }
 
 /// Get the diff of staged changes.
@@ -507,6 +526,7 @@ pub fn get_diff(path: &Path) -> Result<Vec<FileDiff>> {
 /// # Errors
 /// Returns an error if the diff cannot be retrieved.
 pub fn get_staged_diff(path: &Path) -> Result<Vec<FileDiff>> {
+    let timer = perf::start("staged_diff");
     let repo = open(path)?;
 
     // Get HEAD tree
@@ -517,7 +537,9 @@ pub fn get_staged_diff(path: &Path) -> Result<Vec<FileDiff>> {
         .diff_tree_to_index(head_tree.as_ref(), None, None)
         .map_err(|e| Error::Git(format!("Failed to get staged diff: {e}")))?;
 
-    parse_diff(&diff)
+    let result = parse_diff(&diff)?;
+    timer.end_with_count(result.len(), "files staged");
+    Ok(result)
 }
 
 /// Get the diff for a specific file.
@@ -525,6 +547,7 @@ pub fn get_staged_diff(path: &Path) -> Result<Vec<FileDiff>> {
 /// # Errors
 /// Returns an error if the diff cannot be retrieved.
 pub fn get_file_diff(path: &Path, file: &Path) -> Result<FileDiff> {
+    let timer = perf::start("file_diff");
     let repo = open(path)?;
 
     let relative_path = if file.is_absolute() {
@@ -542,12 +565,14 @@ pub fn get_file_diff(path: &Path, file: &Path) -> Result<FileDiff> {
         .map_err(|e| Error::Git(format!("Failed to get file diff: {e}")))?;
 
     let diffs = parse_diff(&diff)?;
-    diffs.into_iter().next().ok_or_else(|| {
+    let result = diffs.into_iter().next().ok_or_else(|| {
         Error::Git(format!(
             "No diff found for file: {}",
             relative_path.display()
         ))
-    })
+    })?;
+    timer.end_with_count(result.hunks.len(), "hunks");
+    Ok(result)
 }
 
 /// Discard changes in files.
@@ -558,6 +583,7 @@ pub fn get_file_diff(path: &Path, file: &Path) -> Result<FileDiff> {
 /// # Errors
 /// Returns an error if discarding fails.
 pub fn discard_changes(path: &Path, files: &[&Path]) -> Result<()> {
+    let timer = perf::start("discard");
     let repo = open(path)?;
 
     // Get HEAD tree for restoring deleted files
@@ -602,6 +628,7 @@ pub fn discard_changes(path: &Path, files: &[&Path]) -> Result<()> {
     }
 
     debug!("Discarded changes in {} files", files.len());
+    timer.end_with_count(files.len(), "files discarded");
     Ok(())
 }
 
@@ -610,6 +637,7 @@ pub fn discard_changes(path: &Path, files: &[&Path]) -> Result<()> {
 /// # Errors
 /// Returns an error if branches cannot be listed.
 pub fn branches(path: &Path) -> Result<Vec<BranchInfo>> {
+    let timer = perf::start("branches");
     let repo = open(path)?;
     let current_branch = get_current_branch(&repo).ok();
 
@@ -638,6 +666,7 @@ pub fn branches(path: &Path) -> Result<Vec<BranchInfo>> {
         }
     }
 
+    timer.end_with_count(result.len(), "branches");
     Ok(result)
 }
 
@@ -647,6 +676,7 @@ pub fn branches(path: &Path) -> Result<Vec<BranchInfo>> {
 /// Returns an error if checkout fails or if there are uncommitted changes
 /// that would be overwritten.
 pub fn checkout_branch(path: &Path, name: &str) -> Result<()> {
+    let timer = perf::start("checkout");
     let repo = open(path)?;
 
     // Find the branch
@@ -684,6 +714,7 @@ pub fn checkout_branch(path: &Path, name: &str) -> Result<()> {
         .map_err(|e| Error::Git(format!("Failed to update HEAD: {e}")))?;
 
     debug!(branch = name, "Checked out branch");
+    timer.end();
     Ok(())
 }
 
@@ -692,6 +723,7 @@ pub fn checkout_branch(path: &Path, name: &str) -> Result<()> {
 /// # Errors
 /// Returns an error if branch creation fails.
 pub fn create_branch(path: &Path, name: &str) -> Result<()> {
+    let timer = perf::start("create_branch");
     let repo = open(path)?;
 
     let head = repo
@@ -707,6 +739,7 @@ pub fn create_branch(path: &Path, name: &str) -> Result<()> {
         .map_err(|e| Error::Git(format!("Failed to create branch: {e}")))?;
 
     debug!(branch = name, "Created branch");
+    timer.end();
     Ok(())
 }
 
@@ -715,6 +748,7 @@ pub fn create_branch(path: &Path, name: &str) -> Result<()> {
 /// # Errors
 /// Returns an error if branch deletion fails.
 pub fn delete_branch(path: &Path, name: &str) -> Result<()> {
+    let timer = perf::start("delete_branch");
     let repo = open(path)?;
 
     let mut branch = repo
@@ -726,6 +760,7 @@ pub fn delete_branch(path: &Path, name: &str) -> Result<()> {
         .map_err(|e| Error::Git(format!("Failed to delete branch: {e}")))?;
 
     debug!(branch = name, "Deleted branch");
+    timer.end();
     Ok(())
 }
 
@@ -735,10 +770,12 @@ pub fn delete_branch(path: &Path, name: &str) -> Result<()> {
 /// Returns an error if the log cannot be retrieved.
 /// Returns an empty list for repositories with no commits.
 pub fn log(path: &Path, limit: usize) -> Result<Vec<CommitInfo>> {
+    let timer = perf::start("log");
     let repo = open(path)?;
 
     // Handle empty repos (no HEAD)
     let Ok(head) = repo.head().and_then(|h| h.peel_to_commit()) else {
+        timer.end_with_count(0, "commits");
         return Ok(Vec::new()); // Empty repo, no commits
     };
 
@@ -772,6 +809,7 @@ pub fn log(path: &Path, limit: usize) -> Result<Vec<CommitInfo>> {
         });
     }
 
+    timer.end_with_count(result.len(), "commits");
     Ok(result)
 }
 
@@ -780,6 +818,7 @@ pub fn log(path: &Path, limit: usize) -> Result<Vec<CommitInfo>> {
 /// # Errors
 /// Returns an error if blame cannot be retrieved.
 pub fn blame(path: &Path, file: &Path) -> Result<Vec<BlameLine>> {
+    let timer = perf::start("blame");
     let repo = open(path)?;
 
     let relative_path = if file.is_absolute() {
@@ -820,6 +859,7 @@ pub fn blame(path: &Path, file: &Path) -> Result<Vec<BlameLine>> {
         }
     }
 
+    timer.end_with_count(result.len(), "lines");
     Ok(result)
 }
 
@@ -839,6 +879,7 @@ pub fn blame(path: &Path, file: &Path) -> Result<Vec<BlameLine>> {
 /// # Errors
 /// Returns an error if push fails (auth issues, no remote, conflicts, etc.)
 pub async fn push(path: &Path, remote_name: Option<&str>) -> Result<()> {
+    let timer = perf::start("push");
     let remote = remote_name.unwrap_or("origin");
 
     info!(path = %path.display(), remote = remote, "Starting git push");
@@ -887,6 +928,7 @@ pub async fn push(path: &Path, remote_name: Option<&str>) -> Result<()> {
         }
 
         info!(remote = remote, "Branch published and pushed successfully");
+        timer.end();
         return Ok(());
     }
 
@@ -915,6 +957,7 @@ pub async fn push(path: &Path, remote_name: Option<&str>) -> Result<()> {
     }
 
     info!(remote = remote, "Push successful");
+    timer.end();
     Ok(())
 }
 
@@ -931,6 +974,7 @@ pub async fn push(path: &Path, remote_name: Option<&str>) -> Result<()> {
 /// Returns an error if pull fails (auth issues, no remote, merge conflicts,
 /// uncommitted changes, etc.)
 pub async fn pull(path: &Path, remote_name: Option<&str>) -> Result<()> {
+    let timer = perf::start("pull");
     info!(path = %path.display(), remote = ?remote_name, "Starting git pull");
 
     // Build args - only specify remote if explicitly provided
@@ -987,6 +1031,7 @@ pub async fn pull(path: &Path, remote_name: Option<&str>) -> Result<()> {
     }
 
     info!("Pull successful");
+    timer.end();
     Ok(())
 }
 
@@ -1001,6 +1046,7 @@ pub async fn pull(path: &Path, remote_name: Option<&str>) -> Result<()> {
 /// # Errors
 /// Returns an error if fetch fails (auth issues, no remote, network error, timeout, etc.)
 pub async fn fetch(path: &Path, remote_name: Option<&str>) -> Result<()> {
+    let timer = perf::start("fetch");
     let remote = remote_name.unwrap_or("origin");
 
     info!(path = %path.display(), remote = remote, "Starting git fetch");
@@ -1064,6 +1110,7 @@ pub async fn fetch(path: &Path, remote_name: Option<&str>) -> Result<()> {
     }
 
     info!(remote = remote, "Fetch successful");
+    timer.end();
     Ok(())
 }
 
@@ -1079,6 +1126,7 @@ pub async fn fetch(path: &Path, remote_name: Option<&str>) -> Result<()> {
 /// # Errors
 /// Returns an error if clone fails (auth issues, invalid URL, disk full, etc.)
 pub async fn clone(url: &str, target_path: &Path) -> Result<()> {
+    let timer = perf::start("clone");
     info!(url = url, target = %target_path.display(), "Starting git clone");
 
     let output = Command::new("git")
@@ -1129,6 +1177,7 @@ pub async fn clone(url: &str, target_path: &Path) -> Result<()> {
     }
 
     info!(target = %target_path.display(), "Clone successful");
+    timer.end();
     Ok(())
 }
 
@@ -1143,6 +1192,7 @@ pub async fn clone(url: &str, target_path: &Path) -> Result<()> {
 /// # Errors
 /// Returns an error if the command fails or output cannot be parsed.
 pub async fn worktree_list(repo_path: &Path) -> Result<Vec<WorktreeInfo>> {
+    let timer = perf::start("worktree_list");
     debug!(?repo_path, "Listing worktrees");
 
     let output = Command::new("git")
@@ -1161,7 +1211,9 @@ pub async fn worktree_list(repo_path: &Path) -> Result<Vec<WorktreeInfo>> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(parse_worktree_porcelain(&stdout))
+    let result = parse_worktree_porcelain(&stdout);
+    timer.end_with_count(result.len(), "worktrees");
+    Ok(result)
 }
 
 /// Parse `git worktree list --porcelain` output.
@@ -1261,6 +1313,7 @@ pub async fn worktree_add(
     worktree_path: &Path,
     options: &WorktreeAddOptions,
 ) -> Result<WorktreeInfo> {
+    let timer = perf::start("worktree_add");
     info!(?repo_path, ?worktree_path, ?options, "Adding worktree");
 
     let mut args = vec!["worktree", "add"];
@@ -1325,7 +1378,7 @@ pub async fn worktree_add(
         .canonicalize()
         .unwrap_or_else(|_| worktree_path.to_path_buf());
 
-    worktrees
+    let result = worktrees
         .into_iter()
         .find(|wt| {
             let wt_path = Path::new(&wt.path);
@@ -1334,7 +1387,10 @@ pub async fn worktree_add(
                 .unwrap_or_else(|_| wt_path.to_path_buf());
             wt_canonical == worktree_path_canonical
         })
-        .ok_or_else(|| Error::Git("Worktree was created but not found in list".to_owned()))
+        .ok_or_else(|| Error::Git("Worktree was created but not found in list".to_owned()));
+
+    timer.end();
+    result
 }
 
 /// Remove a worktree.
@@ -1350,6 +1406,7 @@ pub async fn worktree_add(
 /// - The worktree is locked (and force=false)
 /// - The worktree has uncommitted changes (and force=false)
 pub async fn worktree_remove(repo_path: &Path, worktree_path: &Path, force: bool) -> Result<()> {
+    let timer = perf::start("worktree_remove");
     info!(?repo_path, ?worktree_path, force, "Removing worktree");
 
     let mut args = vec!["worktree", "remove"];
@@ -1391,6 +1448,7 @@ pub async fn worktree_remove(repo_path: &Path, worktree_path: &Path, force: bool
     }
 
     info!(?worktree_path, "Worktree removed");
+    timer.end();
     Ok(())
 }
 

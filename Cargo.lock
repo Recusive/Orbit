@@ -3301,6 +3301,7 @@ dependencies = [
  "orbit-terminal",
  "parking_lot",
  "rand 0.8.5",
+ "regex",
  "serde",
  "serde_json",
  "sha2",
@@ -3357,6 +3358,7 @@ dependencies = [
  "serde",
  "tempfile",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3391,6 +3393,7 @@ version = "0.1.0"
 dependencies = [
  "ignore",
  "orbit-core",
+ "tracing",
 ]
 
 [[package]]

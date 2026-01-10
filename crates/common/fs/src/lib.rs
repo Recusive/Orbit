@@ -11,7 +11,7 @@ use std::fs::Metadata;
 use std::io::ErrorKind;
 use std::path::Path;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::time::UNIX_EPOCH;
+use std::time::{Instant, UNIX_EPOCH};
 
 use grep::matcher::Matcher as _;
 use grep::regex::RegexMatcher;
@@ -22,6 +22,7 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher as _};
 use orbit_core::{Error, FileEntry, FileInfo, Result, SearchOptions, TextSearchResult};
 use serde::{Deserialize, Serialize};
 use tokio::fs;
+use tracing::debug;
 
 // ============================================
 // File Operations
@@ -98,6 +99,9 @@ pub async fn write_file_bytes(path: &str, content: &[u8]) -> Result<()> {
 ///
 /// Returns an error if the directory cannot be read
 pub async fn list_directory(path: &str, show_hidden: bool) -> Result<Vec<FileEntry>> {
+    let start = Instant::now();
+    debug!(target: "orbit::perf", "[FS:list_directory] START - path={path:?}");
+
     let mut entries = Vec::new();
     let mut dir = fs::read_dir(path).await.map_err(|e| match e.kind() {
         ErrorKind::NotFound => Error::DirectoryNotFound(path.to_owned()),
@@ -180,6 +184,13 @@ pub async fn list_directory(path: &str, show_hidden: bool) -> Result<Vec<FileEnt
         (false, true) => Ordering::Greater,
         _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
     });
+
+    let elapsed = start.elapsed().as_millis();
+    debug!(
+        target: "orbit::perf",
+        "[FS:list_directory] END ({elapsed}ms) - {} entries",
+        entries.len()
+    );
 
     Ok(entries)
 }
@@ -463,6 +474,9 @@ pub fn search_text(
     query: &str,
     options: &SearchOptions,
 ) -> Result<Vec<TextSearchResult>> {
+    let start = Instant::now();
+    debug!(target: "orbit::perf", "[FS:search_text] START - query={query:?}");
+
     let case_sensitive = options.case_sensitive.unwrap_or(false);
     let use_regex = options.regex.unwrap_or(false);
     let max_results = options.max_results.map(|n| n as usize);
@@ -510,6 +524,7 @@ pub fn search_text(
 
     let mut results: Vec<TextSearchResult> = Vec::new();
     let mut searcher = Searcher::new();
+    let mut files_searched: usize = 0;
 
     for entry in walker.flatten() {
         // Check max results
@@ -524,6 +539,7 @@ pub fn search_text(
             continue;
         }
 
+        files_searched += 1;
         let path_str = path.to_string_lossy().into_owned();
 
         // Search this file
@@ -556,6 +572,13 @@ pub fn search_text(
         }
     }
 
+    let elapsed = start.elapsed().as_millis();
+    debug!(
+        target: "orbit::perf",
+        "[FS:search_text] END ({elapsed}ms) - {files_searched} files searched, {} matches",
+        results.len()
+    );
+
     Ok(results)
 }
 
@@ -577,6 +600,9 @@ pub fn search_files(
     pattern: &str,
     options: &SearchOptions,
 ) -> Result<Vec<orbit_core::SearchResult>> {
+    let start = Instant::now();
+    debug!(target: "orbit::perf", "[FS:search_files] START - pattern={pattern:?}");
+
     let max_results = options.max_results.map(|n| n as usize);
     let case_sensitive = options.case_sensitive.unwrap_or(false);
 
@@ -584,11 +610,14 @@ pub fn search_files(
     let walker = WalkBuilder::new(root).build();
 
     let mut results: Vec<orbit_core::SearchResult> = Vec::new();
+    let mut entries_scanned: usize = 0;
 
     // Compile pattern for matching
     let pattern_lower = pattern.to_lowercase();
 
     for entry in walker.flatten() {
+        entries_scanned += 1;
+
         // Check max results
         if let Some(max) = max_results {
             if results.len() >= max {
@@ -614,6 +643,13 @@ pub fn search_files(
             });
         }
     }
+
+    let elapsed = start.elapsed().as_millis();
+    debug!(
+        target: "orbit::perf",
+        "[FS:search_files] END ({elapsed}ms) - {entries_scanned} entries scanned, {} matches",
+        results.len()
+    );
 
     Ok(results)
 }

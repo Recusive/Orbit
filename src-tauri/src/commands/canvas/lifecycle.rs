@@ -19,6 +19,8 @@ use tauri::State;
 
 use crate::agent::protocol::{CanvasSessionConfig, CanvasState, McpToolResponse};
 use crate::agent::SessionManager;
+use crate::core::perf_logger::PerfSource;
+use crate::perf_log;
 
 /// Result type for canvas commands (matches agent commands pattern)
 type Result<T> = result::Result<T, String>;
@@ -39,9 +41,11 @@ pub async fn canvas_create_session(
     config: Option<CanvasSessionConfig>,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    state
-        .canvas_create_session(&session_id, config)
-        .map_err(to_error)
+    perf_log!(PerfSource::Canvas, "canvas_create_session", {
+        state
+            .canvas_create_session(&session_id, config)
+            .map_err(to_error)
+    })
 }
 
 /// Delete a canvas session
@@ -50,7 +54,9 @@ pub async fn canvas_delete_session(
     session_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    state.canvas_delete_session(&session_id).map_err(to_error)
+    perf_log!(PerfSource::Canvas, "canvas_delete_session", {
+        state.canvas_delete_session(&session_id).map_err(to_error)
+    })
 }
 
 /// Send a message to a canvas session with current canvas state
@@ -61,9 +67,11 @@ pub async fn canvas_send_message(
     canvas_state: CanvasState,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    state
-        .canvas_send_message(&session_id, &message, canvas_state)
-        .map_err(to_error)
+    perf_log!(PerfSource::Canvas, "canvas_send_message", {
+        state
+            .canvas_send_message(&session_id, &message, canvas_state)
+            .map_err(to_error)
+    })
 }
 
 /// Interrupt a canvas session
@@ -72,7 +80,9 @@ pub async fn canvas_interrupt(
     session_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    state.canvas_interrupt(&session_id).map_err(to_error)
+    perf_log!(PerfSource::Canvas, "canvas_interrupt", {
+        state.canvas_interrupt(&session_id).map_err(to_error)
+    })
 }
 
 /// Send a tool response back to a canvas session
@@ -82,7 +92,9 @@ pub async fn canvas_tool_response(
     response: McpToolResponse,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    state
-        .canvas_tool_response(&session_id, response)
-        .map_err(to_error)
+    perf_log!(PerfSource::Canvas, "canvas_tool_response", {
+        state
+            .canvas_tool_response(&session_id, response)
+            .map_err(to_error)
+    })
 }

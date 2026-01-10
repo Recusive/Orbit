@@ -4,6 +4,8 @@
 //! sessions and manage crash logs.
 
 use crate::core::crash;
+use crate::core::perf_logger::PerfSource;
+use crate::perf_log;
 
 /// Check if the previous session crashed.
 ///
@@ -14,7 +16,9 @@ use crate::core::crash;
 /// will return `None` until another crash occurs.
 #[tauri::command]
 pub fn check_previous_crash() -> Option<String> {
-    crash::check_previous_crash()
+    perf_log!(PerfSource::Ipc, "check_previous_crash", {
+        crash::check_previous_crash()
+    })
 }
 
 /// Clear any pending crash logs without reading them.
@@ -25,7 +29,9 @@ pub fn check_previous_crash() -> Option<String> {
 /// Returns `true` if the log was cleared successfully.
 #[tauri::command]
 pub fn clear_crash_log() -> bool {
-    crash::clear_crash_log()
+    perf_log!(PerfSource::Ipc, "clear_crash_log", {
+        crash::clear_crash_log()
+    })
 }
 
 /// Get the path to the crash log directory.
@@ -33,5 +39,7 @@ pub fn clear_crash_log() -> bool {
 /// Returns `None` if the directory cannot be determined.
 #[tauri::command]
 pub fn get_crash_log_path() -> Option<String> {
-    crash::get_manager().map(|m| m.crash_log_path().to_string_lossy().into_owned())
+    perf_log!(PerfSource::Ipc, "get_crash_log_path", {
+        crash::get_manager().map(|m| m.crash_log_path().to_string_lossy().into_owned())
+    })
 }

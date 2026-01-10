@@ -3,9 +3,11 @@
 //! This crate provides fast search functionality using ripgrep-like capabilities.
 
 use std::fs;
+use std::time::Instant;
 
 use ignore::WalkBuilder;
 use orbit_core::{Result, SearchOptions, SearchResult, TextSearchResult};
+use tracing::debug;
 
 /// Search manager for file and text search
 #[derive(Debug, Clone, Copy)]
@@ -25,11 +27,15 @@ impl SearchManager {
         query: &str,
         search_options: Option<SearchOptions>,
     ) -> Result<Vec<SearchResult>> {
+        let start = Instant::now();
+        debug!(target: "orbit::perf", "[SEARCH:search_files] START - query={query:?}");
+
         let options = search_options.unwrap_or_default();
         let max_results = options.max_results.map_or(100, |n| n as usize);
         let query_lower = query.to_lowercase();
 
         let mut results = Vec::new();
+        let mut files_scanned: usize = 0;
 
         let walker = WalkBuilder::new(root_path)
             .hidden(false)
@@ -39,6 +45,7 @@ impl SearchManager {
             .build();
 
         for entry in walker.flatten() {
+            files_scanned += 1;
             let path = entry.path();
             let name = path
                 .file_name()
@@ -58,6 +65,13 @@ impl SearchManager {
             }
         }
 
+        let elapsed = start.elapsed().as_millis();
+        debug!(
+            target: "orbit::perf",
+            "[SEARCH:search_files] END ({elapsed}ms) - {files_scanned} files scanned, {} matches",
+            results.len()
+        );
+
         Ok(results)
     }
 
@@ -68,11 +82,16 @@ impl SearchManager {
         pattern: &str,
         search_options: Option<SearchOptions>,
     ) -> Result<Vec<TextSearchResult>> {
+        let start = Instant::now();
+        debug!(target: "orbit::perf", "[SEARCH:search_text] START - pattern={pattern:?}");
+
         let options = search_options.unwrap_or_default();
         let max_results = options.max_results.map_or(100, |n| n as usize);
         let case_sensitive = options.case_sensitive.unwrap_or(false);
 
         let mut results = Vec::new();
+        let mut files_scanned: usize = 0;
+        let mut files_read: usize = 0;
 
         let walker = WalkBuilder::new(root_path)
             .hidden(false)
@@ -82,12 +101,14 @@ impl SearchManager {
             .build();
 
         for entry in walker.flatten() {
+            files_scanned += 1;
             let path = entry.path();
             if !path.is_file() {
                 continue;
             }
 
             if let Ok(content) = fs::read_to_string(path) {
+                files_read += 1;
                 for (line_num, line) in content.lines().enumerate() {
                     let matches = if case_sensitive {
                         line.contains(pattern)
@@ -119,12 +140,25 @@ impl SearchManager {
                         });
 
                         if results.len() >= max_results {
+                            let elapsed = start.elapsed().as_millis();
+                            debug!(
+                                target: "orbit::perf",
+                                "[SEARCH:search_text] END ({elapsed}ms) - {files_scanned} entries, {files_read} files read, {} matches (max reached)",
+                                results.len()
+                            );
                             return Ok(results);
                         }
                     }
                 }
             }
         }
+
+        let elapsed = start.elapsed().as_millis();
+        debug!(
+            target: "orbit::perf",
+            "[SEARCH:search_text] END ({elapsed}ms) - {files_scanned} entries, {files_read} files read, {} matches",
+            results.len()
+        );
 
         Ok(results)
     }

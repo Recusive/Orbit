@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { Disposable, Emitter } from '../../common/events/events.js';
 import { createLogger } from '../../common/logging/logger.js';
+import { perfEvent, perfEndWithTokens } from '../../common/perf/index.js';
 import { OrbitAgent } from '../core/agent.js';
 
 import type { OrbitAgentConfig } from '../core/agent.js';
@@ -380,6 +381,8 @@ export class SessionManager extends Disposable {
   >();
   private approvedToolNames = new Map<string, Set<string>>();
   private sessionResumeState = new Map<string, { isResumed: boolean; isForked: boolean }>();
+  /** Tracks turn start times per session for performance logging */
+  private turnStartTimes = new Map<string, number>();
   private sessionInitFired = new Set<string>();
   private pendingDisplayNames = new Map<string, string>();
 
@@ -829,6 +832,24 @@ export class SessionManager extends Disposable {
             const resultMsg = sdkMessage;
             // Get the final message ID for this turn before resetting
             const turnMessageId = this.currentAssistantMessageId.get(sessionId);
+
+            // Log SDK turn completion with token counts
+            const turnStartTime = this.turnStartTimes.get(sessionId);
+            if (turnStartTime !== undefined && resultMsg.usage !== undefined) {
+              perfEndWithTokens('sdk_turn', turnStartTime, {
+                input: resultMsg.usage.input_tokens ?? 0,
+                output: resultMsg.usage.output_tokens ?? 0,
+              });
+              this.turnStartTimes.delete(sessionId);
+            } else if (turnStartTime !== undefined) {
+              // No usage data, just log the duration
+              perfEvent(
+                'sdk_turn',
+                `Turn complete (${String(Date.now() - turnStartTime)}ms, no usage data)`
+              );
+              this.turnStartTimes.delete(sessionId);
+            }
+
             this._onAgentMessage.fire({
               sessionId,
               message: {
@@ -952,6 +973,10 @@ export class SessionManager extends Disposable {
     if (!agent.isSessionReady()) {
       throw new Error(`Session ${sessionId} is not ready.`);
     }
+
+    // Track turn start time for performance logging
+    this.turnStartTimes.set(sessionId, Date.now());
+    perfEvent('sdk_turn', `Message queued (${String(message.length)} chars)`);
 
     agent.queueMessage(message, attachments);
   }

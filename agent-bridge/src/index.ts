@@ -60,6 +60,7 @@ import {
 } from './agent/session/session-storage.js';
 import { CanvasSessionManager } from './canvas/index.js';
 import { createLogger } from './common/logging/logger.js';
+import { perfStart, perfEnd, perfEndWithCount, perfEvent } from './common/perf/index.js';
 import { BridgeRequestSchema } from './protocol/schemas.js';
 
 import type {
@@ -77,6 +78,7 @@ const logger = createLogger('AgentBridge');
  */
 function sendMessage(message: BridgeResponse): void {
   const json = JSON.stringify(message);
+  perfEvent('response', `Sending (${String(json.length)} chars)`);
   process.stdout.write(json + '\n');
 }
 
@@ -99,6 +101,7 @@ function sendEvent(event: BridgeEvent): void {
  */
 function main(): void {
   logger.info('Agent Bridge starting...');
+  const initStart = perfStart('init');
 
   // Create session managers
   const sessionManager = new SessionManager();
@@ -205,6 +208,9 @@ function main(): void {
       return;
     }
 
+    const requestStart = perfStart('request');
+    perfEvent('request', `Received (${String(line.length)} chars)`);
+
     let request: BridgeRequest;
     try {
       const parsed: unknown = JSON.parse(line);
@@ -217,6 +223,7 @@ function main(): void {
           requestType: 'unknown',
           error: `Invalid request: ${errorMessage}`,
         });
+        perfEndWithCount('request', requestStart, line.length, 'chars (error)');
         return;
       }
       request = result.data;
@@ -227,20 +234,26 @@ function main(): void {
         requestType: 'unknown',
         error: `Failed to parse request: ${error instanceof Error ? error.message : String(error)}`,
       });
+      perfEndWithCount('request', requestStart, line.length, 'chars (parse error)');
       return;
     }
 
     logger.info({ requestType: request.type }, 'Received request');
 
-    handleRequest(request, sessionManager, canvasSessionManager).catch((error: unknown) => {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error({ requestType: request.type, error: errorMessage }, 'Error handling request');
-      sendResponse({
-        type: 'error',
-        requestType: request.type,
-        error: errorMessage,
+    handleRequest(request, sessionManager, canvasSessionManager)
+      .then(() => {
+        perfEnd('request', requestStart);
+      })
+      .catch((error: unknown) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error({ requestType: request.type, error: errorMessage }, 'Error handling request');
+        sendResponse({
+          type: 'error',
+          requestType: request.type,
+          error: errorMessage,
+        });
+        perfEndWithCount('request', requestStart, line.length, 'chars (handler error)');
       });
-    });
   });
 
   rl.on('close', () => {
@@ -273,6 +286,7 @@ function main(): void {
 
   // Send ready event
   sendEvent({ type: 'ready' });
+  perfEnd('init', initStart);
   logger.info('Agent Bridge ready');
 }
 

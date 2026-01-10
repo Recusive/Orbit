@@ -15,8 +15,8 @@ use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
 use commands::canvas::lifecycle as canvas_cmd;
 use commands::common::{
-    credentials, dev_monitor, diagnostics, files, git, lsp, providers, search, settings, terminal,
-    workspace,
+    credentials, dev_monitor, diagnostics, files, git, lsp, perf, providers, search, settings,
+    terminal, workspace,
 };
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
@@ -375,6 +375,12 @@ pub fn run() {
             diagnostics::check_previous_crash,
             diagnostics::clear_crash_log,
             diagnostics::get_crash_log_path,
+            // Performance logging commands
+            perf::clear_perf_log,
+            perf::get_perf_log,
+            perf::get_perf_log_path,
+            perf::analyze_performance,
+            perf::get_recent_perf_events,
             // Conversation commands
             conversations::conversation_create,
             conversations::conversation_list,
