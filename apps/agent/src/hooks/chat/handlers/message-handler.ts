@@ -4,9 +4,32 @@ import type { ExtensionMessage, Model } from '@/types/protocol';
 import { conversationAddMessage, conversationList } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
+import { rafBatch } from '@/lib/utils/event-batcher';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
+
+// ============================================
+// Tool Event Batching Types
+// ============================================
+
+interface ToolStartEvent {
+  type: 'start';
+  toolId: string;
+  messageId: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  contentOffset: number;
+}
+
+interface ToolEndEvent {
+  type: 'end';
+  toolId: string;
+  toolOutput: unknown;
+  success: boolean;
+}
+
+type ToolEvent = ToolStartEvent | ToolEndEvent;
 
 interface Conversation {
   sessionId: string;
@@ -110,6 +133,69 @@ export function createMessageHandler(
     messagesCache,
     thinkingStartTimes,
   } = deps;
+
+  // ============================================
+  // RAF-Batched Tool Event Processor
+  // ============================================
+  // Batches tool:start and tool:end events to reduce React re-renders.
+  // Multiple tool events in the same JS tick are processed together in one RAF callback.
+  const batchedToolHandler = rafBatch<ToolEvent>((events) => {
+    // Process all tool events in a single batch
+    for (const event of events) {
+      if (event.type === 'start') {
+        startTool(
+          event.toolId,
+          event.messageId,
+          event.toolName,
+          event.toolInput,
+          event.contentOffset
+        );
+      } else {
+        // For tool:end, we need to handle file changes too
+        // Get tool data BEFORE completing (still in activeTools)
+        const toolState = useToolStore.getState();
+        const tool = toolState.activeTools[event.toolId];
+
+        // Track file changes for Edit/Write tools
+        if (tool && event.success) {
+          const toolName = tool.toolName.toLowerCase();
+          const { addFileChange } = useFileStore.getState();
+
+          if (toolName === 'edit') {
+            const filePath = tool.toolInput['file_path'] as string;
+            const rawOld = tool.toolInput['old_string'];
+            const rawNew = tool.toolInput['new_string'];
+            const oldString = typeof rawOld === 'string' ? rawOld : '';
+            const newString = typeof rawNew === 'string' ? rawNew : '';
+            addFileChange({
+              path: filePath,
+              type: 'modified',
+              oldContent: oldString,
+              newContent: newString,
+              diff: computeSimpleDiff(oldString, newString),
+              language: getLanguageFromPath(filePath),
+            });
+          }
+          if (toolName === 'write') {
+            const filePath = tool.toolInput['file_path'] as string;
+            const rawContent = tool.toolInput['content'];
+            const content = typeof rawContent === 'string' ? rawContent : '';
+            addFileChange({
+              path: filePath,
+              type: 'created',
+              oldContent: '',
+              newContent: content,
+              diff: computeSimpleDiff('', content),
+              language: getLanguageFromPath(filePath),
+            });
+          }
+        }
+
+        // Complete the tool (moves to completedTools)
+        completeTool(event.toolId, event.toolOutput, event.success);
+      }
+    }
+  });
 
   return (message: ExtensionMessage): void => {
     switch (message.type) {
@@ -510,10 +596,18 @@ export function createMessageHandler(
         const currentMsg = messagesRef.current.find((m) => m.id === message.message_id);
         const contentOffset = currentMsg?.content.length ?? 0;
 
-        // Start tool tracking BEFORE updating messages (avoids setState during render)
-        startTool(toolId, message.message_id, message.tool_name, message.tool_input, contentOffset);
+        // Queue tool start to be processed in next RAF (reduces re-renders)
+        batchedToolHandler({
+          type: 'start',
+          toolId,
+          messageId: message.message_id,
+          toolName: message.tool_name,
+          toolInput: message.tool_input,
+          contentOffset,
+        });
 
         // Only update messages if we need to create a new assistant message
+        // This stays synchronous because we need the message for streaming
         if (!currentMsg) {
           setMessages((prev) => [
             ...prev,
@@ -530,49 +624,14 @@ export function createMessageHandler(
       }
 
       case 'tool:end': {
-        const toolId = message.tool_id;
-
-        // Get tool data BEFORE completing (still in activeTools)
-        const toolState = useToolStore.getState();
-        const tool = toolState.activeTools[toolId];
-
-        // Track file changes for Edit/Write tools
-        if (tool && message.success) {
-          const toolName = tool.toolName.toLowerCase();
-          const { addFileChange } = useFileStore.getState();
-
-          if (toolName === 'edit') {
-            const filePath = tool.toolInput['file_path'] as string;
-            const rawOld = tool.toolInput['old_string'];
-            const rawNew = tool.toolInput['new_string'];
-            const oldString = typeof rawOld === 'string' ? rawOld : '';
-            const newString = typeof rawNew === 'string' ? rawNew : '';
-            addFileChange({
-              path: filePath,
-              type: 'modified',
-              oldContent: oldString,
-              newContent: newString,
-              diff: computeSimpleDiff(oldString, newString),
-              language: getLanguageFromPath(filePath),
-            });
-          }
-          if (toolName === 'write') {
-            const filePath = tool.toolInput['file_path'] as string;
-            const rawContent = tool.toolInput['content'];
-            const content = typeof rawContent === 'string' ? rawContent : '';
-            addFileChange({
-              path: filePath,
-              type: 'created',
-              oldContent: '',
-              newContent: content,
-              diff: computeSimpleDiff('', content),
-              language: getLanguageFromPath(filePath),
-            });
-          }
-        }
-
-        // Complete the tool (moves to completedTools)
-        completeTool(toolId, message.tool_output, message.success);
+        // Queue tool end to be processed in next RAF (reduces re-renders)
+        // File change tracking is handled in the batched processor
+        batchedToolHandler({
+          type: 'end',
+          toolId: message.tool_id,
+          toolOutput: message.tool_output,
+          success: message.success,
+        });
         break;
       }
 
