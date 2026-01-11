@@ -1,12 +1,11 @@
 /**
- * TerminalFitDebouncer - Simple debouncer for xterm.js FitAddon
+ * TerminalFitDebouncer - RAF-based debouncer for xterm.js FitAddon
  *
- * This debouncer handles the proper pattern for terminal resizing:
- * 1. Debounce rapid resize events to prevent UI blocking
- * 2. Call fitAddon.fit() which calculates cols/rows from container
+ * Uses requestAnimationFrame for instant resize response:
+ * 1. Coalesces multiple resize events within a single frame
+ * 2. Syncs fit() with browser's render cycle for smooth resizing
  * 3. xterm's onResize event automatically notifies backend
  *
- * Unlike the previous implementation, this doesn't try to compare dimensions.
  * FitAddon.fit() is the source of truth - it reads the container and calculates.
  */
 
@@ -16,9 +15,6 @@ import type { FitAddon } from '@xterm/addon-fit';
 // Constants
 // ============================================================================
 
-/** Debounce delay in milliseconds for resize operations */
-const RESIZE_DEBOUNCE_MS = 50;
-
 /** Delay for idle callback when terminal is hidden */
 const IDLE_DELAY_MS = 100;
 
@@ -27,7 +23,7 @@ const IDLE_DELAY_MS = 100;
 // ============================================================================
 
 export class TerminalFitDebouncer {
-  private _timeout: ReturnType<typeof setTimeout> | null = null;
+  private _rafId: number | null = null;
   private _idleCallback: number | null = null;
   private _disposed = false;
   private _pendingFit = false;
@@ -66,20 +62,19 @@ export class TerminalFitDebouncer {
   }
 
   /**
-   * Schedule a debounced fit for visible terminals.
+   * Schedule a fit for visible terminals using requestAnimationFrame.
+   * This syncs with the browser's render cycle for instant, smooth resizing.
    */
   private _scheduleFit(): void {
-    // Clear any existing timeout
-    if (this._timeout !== null) {
-      clearTimeout(this._timeout);
-    }
+    // Already scheduled for this frame
+    if (this._rafId !== null) return;
 
-    this._timeout = setTimeout(() => {
-      this._timeout = null;
+    this._rafId = requestAnimationFrame(() => {
+      this._rafId = null;
       if (!this._disposed && this._pendingFit) {
         this._doFit();
       }
-    }, RESIZE_DEBOUNCE_MS);
+    });
   }
 
   /**
@@ -135,9 +130,9 @@ export class TerminalFitDebouncer {
    * Clear all pending callbacks.
    */
   private _clearPending(): void {
-    if (this._timeout !== null) {
-      clearTimeout(this._timeout);
-      this._timeout = null;
+    if (this._rafId !== null) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
     }
 
     if (this._idleCallback !== null) {

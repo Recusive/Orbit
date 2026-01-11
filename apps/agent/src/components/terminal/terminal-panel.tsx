@@ -463,28 +463,35 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
           hasSelection={hasSelection}
         >
           <ContextMenuTrigger asChild>
-            <div className="flex-1 overflow-hidden relative bg-chat-area">
-              {/* Render ALL terminal containers - visibility controlled by manager */}
-              {sessions.map((session) => (
-                <div
-                  key={session.id}
-                  ref={(el) => {
-                    setTerminalContainerRef(session.id, el);
-                  }}
-                  className="absolute inset-0 bg-chat-area"
-                  style={{
-                    pointerEvents: session.id === activeSessionId ? 'auto' : 'none',
-                  }}
-                  onClick={() => {
-                    terminalManager.getInstance(session.id)?.focus();
-                  }}
-                />
-              ))}
-              {sessions.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                  No terminal session
-                </div>
-              ) : null}
+            {/* VS Code container hierarchy: outer → groups → split-pane → wrapper */}
+            <div className="terminal-outer-container flex-1 overflow-hidden">
+              <div className="terminal-groups-container">
+                {/* Render ALL terminal containers - visibility controlled by manager */}
+                {sessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="terminal-split-pane"
+                    style={{
+                      display: session.id === activeSessionId ? 'block' : 'none',
+                    }}
+                  >
+                    <div
+                      ref={(el) => {
+                        setTerminalContainerRef(session.id, el);
+                      }}
+                      className={`terminal-wrapper ${session.id === activeSessionId ? 'active' : ''}`}
+                      onClick={() => {
+                        terminalManager.getInstance(session.id)?.focus();
+                      }}
+                    />
+                  </div>
+                ))}
+                {sessions.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                    No terminal session
+                  </div>
+                ) : null}
+              </div>
             </div>
           </ContextMenuTrigger>
         </TerminalContextMenu>

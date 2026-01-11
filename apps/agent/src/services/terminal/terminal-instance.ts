@@ -22,6 +22,7 @@ import { getBestTheme } from '@/lib/terminal/utils/theme-sync';
 import { TerminalFitDebouncer } from '@/services/terminal/terminal-fit-debouncer';
 
 import '@xterm/xterm/css/xterm.css';
+import '@/styles/terminal.css';
 
 const logger = createLogger('TerminalInstance');
 
@@ -133,10 +134,10 @@ export class TerminalInstance {
 
     logger.info(`Creating terminal: ${options.sessionName}`, { sessionId: options.sessionId });
 
-    // Create wrapper element
+    // Create wrapper element - uses CSS from terminal.css
+    // Padding is handled by .terminal-wrapper .xterm CSS rules
     this.wrapperElement = document.createElement('div');
     this.wrapperElement.className = 'terminal-instance-wrapper';
-    this.wrapperElement.style.cssText = 'height: 100%; width: 100%; padding: 4px 8px;';
 
     // Build xterm theme from CSS variables
     // xterm.js requires computed color values, not CSS variable references
@@ -492,13 +493,13 @@ export class TerminalInstance {
 
     const bgColor = getComputedColor('--chat-area', 'backgroundColor');
     const fgColor = getComputedColor('--foreground', 'color');
-    const accentColor = getComputedColor('--accent', 'color');
     const cursorColor = getComputedColor('--foreground', 'color');
+    const selectionColor = getComputedColor('--accent', 'backgroundColor');
 
     document.body.removeChild(tempEl);
 
-    // Convert rgb to rgba with opacity for selection highlight
-    const selectionBg = accentColor.replace('rgb(', 'rgba(').replace(')', ', 0.5)');
+    // Selection uses accent color - already computed to rgb/hex
+    const selectionBg = selectionColor;
 
     return {
       ...baseTheme,
@@ -507,6 +508,7 @@ export class TerminalInstance {
       cursor: cursorColor,
       cursorAccent: bgColor,
       selectionBackground: selectionBg,
+      // Note: xterm.js uses native browser scrollbar styled via CSS in terminal.css
     };
   }
 

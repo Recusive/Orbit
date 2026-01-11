@@ -1,0 +1,252 @@
+/**
+ * Terminal Styling - VS Code Reference Implementation
+ *
+ * This file implements VS Code's terminal styling patterns including:
+ * - Container hierarchy for proper layout
+ * - 20px left gutter for command decorations
+ * - Z-index layering for viewport, screen, and decorations
+ * - Scrollbar styling with visibility transitions
+ * - Shadow effects for scroll indication
+ *
+ * Reference: vscode-reference/src/vs/workbench/contrib/terminal/browser/media/terminal.css
+ */
+
+/* ============================================================================
+   Container Hierarchy
+   terminal-outer-container → terminal-groups-container → terminal-split-pane → terminal-wrapper
+   ============================================================================ */
+
+.terminal-outer-container {
+  height: 100%;
+  width: 100%;
+  background-color: var(--chat-area);
+}
+
+.terminal-groups-container {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-split-pane {
+  height: 100%;
+  width: 100%;
+  position: relative;
+  /* Note: overflow visible to not clip scrollbar */
+}
+
+/* Terminal wrapper - main container for xterm instance */
+.terminal-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: var(--chat-area);
+}
+
+/* Active terminal indicator (optional border styling) */
+.terminal-wrapper.active {
+  /* Can add active state styling here */
+}
+
+/* ============================================================================
+   xterm.js Overrides - Padding & Layout
+   ============================================================================ */
+
+/* All terminals have at least 20px left padding for the command decoration gutter */
+.terminal-wrapper .xterm {
+  padding-left: 20px;
+  padding-right: 8px;
+  /* No vertical padding - let xterm-screen fill the container height */
+}
+
+/* Offset viewport and screen for gutter:
+ * - Maintains 20px left gutter for command decorations
+ * - Content starts after the gutter area */
+.terminal-wrapper .xterm .xterm-viewport,
+.terminal-wrapper .xterm .xterm-screen {
+  /* Gutter offset handled by parent .xterm padding */
+}
+
+
+/* Position .xterm to fill split-pane and center content vertically.
+ * - position: absolute fills the container
+ * - display: flex + justify-content: center distributes row-height remainder gap equally
+ * - xterm-viewport is position: absolute so unaffected by flexbox
+ * - xterm-scrollable-element is position: relative so it participates in flexbox */
+.terminal-split-pane .xterm {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* When terminal has fixed dimensions (not fitting to container) */
+.terminal-wrapper.fixed-dims .xterm {
+  position: static;
+}
+
+/* ============================================================================
+   Z-Index Layering (VS Code pattern)
+   ============================================================================ */
+
+/* Viewport - scroll container */
+.terminal-wrapper .xterm-viewport {
+  z-index: 30;
+  box-sizing: border-box;
+}
+
+/* Decoration overview ruler (right side marks) */
+.terminal-wrapper .xterm-decoration-overview-ruler {
+  z-index: 31;
+  pointer-events: none;
+}
+
+/* Screen - main rendering surface */
+.terminal-wrapper .xterm-screen {
+  z-index: 31;
+}
+
+/* Accessibility layer */
+.terminal-wrapper .xterm-accessibility {
+  z-index: 32;
+}
+
+/* Decoration container - command marks, etc. */
+.terminal-wrapper .xterm-screen .xterm-decoration-container .xterm-decoration {
+  z-index: 6;
+  position: absolute;
+}
+
+.terminal-wrapper .xterm-screen .xterm-decoration-container .xterm-decoration.xterm-decoration-top-layer {
+  z-index: 7;
+}
+
+/* Widget container - for overlays */
+.terminal-wrapper .terminal-widget-container {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 33;
+}
+
+/* ============================================================================
+   Scrollbar Styling
+   ============================================================================ */
+
+/* Hide native scrollbar - xterm uses custom overlay scrollbar */
+.terminal-wrapper .xterm .xterm-viewport {
+  scrollbar-width: none;
+}
+
+.terminal-wrapper .xterm .xterm-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================================
+   Scroll Shadows (VS Code pattern - optional)
+   Note: xterm.js doesn't have built-in shadow elements like Monaco.
+   These can be added via custom implementation if desired.
+   ============================================================================ */
+
+/* ============================================================================
+   Terminal Instance Wrapper (from TerminalInstance class)
+   ============================================================================ */
+
+/* Matches Cursor's xterm-wrapper flex properties */
+.terminal-instance-wrapper {
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================================
+   Command Decoration Gutter Styling
+   ============================================================================ */
+
+/* Gutter decoration icons positioning */
+.terminal-wrapper .xterm-decoration-container .terminal-command-decoration {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: -17px; /* Position in the gutter */
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Default/incomplete state */
+.terminal-wrapper .terminal-command-decoration.default-color {
+  color: var(--muted-foreground);
+  opacity: 0.6;
+}
+
+/* Success state (exit code 0) */
+.terminal-wrapper .terminal-command-decoration.success {
+  color: var(--success);
+  opacity: 0.9;
+}
+
+/* Error state (non-zero exit code) */
+.terminal-wrapper .terminal-command-decoration.error {
+  color: var(--destructive);
+  opacity: 0.9;
+}
+
+/* ============================================================================
+   Viewport Adjustments
+   ============================================================================ */
+
+/* Viewport positioning and scroll behavior */
+.terminal-wrapper .xterm .xterm-viewport {
+  overflow-y: scroll;
+  overflow-x: hidden;
+  background-color: transparent;
+}
+
+
+
+/* ============================================================================
+   Focus Styling
+   ============================================================================ */
+
+.terminal-wrapper:focus-within .xterm {
+  outline: none;
+}
+
+/* Optional: subtle border on focus */
+.terminal-wrapper:focus-within {
+  /* box-shadow: inset 0 0 0 1px var(--border); */
+}
+
+/* ============================================================================
+   Link Styling
+   ============================================================================ */
+
+.terminal-wrapper .xterm .xterm-link-layer {
+  pointer-events: auto;
+}
+
+/* ============================================================================
+   Canvas Rendering
+   ============================================================================ */
+
+/* Ensure crisp canvas rendering */
+.terminal-wrapper .xterm canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: pixelated;
+}
