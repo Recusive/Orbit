@@ -23,6 +23,7 @@ import { TerminalContextMenu } from '@/components/terminal/terminal-context-menu
 import { TerminalSearchBar } from '@/components/terminal/terminal-search-bar';
 import { ContextMenuTrigger } from '@/components/ui/context-menu';
 import { useTerminalInstanceManager } from '@/hooks/terminal/use-terminal-instance-manager';
+import { cn } from '@/lib/utils';
 import { HEIGHTS } from '@/lib/utils/constants';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
 import { useUIStore, useTerminalPosition } from '@/stores/ui/ui-store';
@@ -479,7 +480,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
                       ref={(el) => {
                         setTerminalContainerRef(session.id, el);
                       }}
-                      className={`terminal-wrapper ${session.id === activeSessionId ? 'active' : ''}`}
+                      className={cn('terminal-wrapper', session.id === activeSessionId && 'active')}
                       onClick={() => {
                         terminalManager.getInstance(session.id)?.focus();
                       }}

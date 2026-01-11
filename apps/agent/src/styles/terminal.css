@@ -3,13 +3,21 @@
  *
  * This file implements VS Code's terminal styling patterns including:
  * - Container hierarchy for proper layout
- * - 20px left gutter for command decorations
+ * - Left gutter for command decorations (configurable via --terminal-gutter-width)
  * - Z-index layering for viewport, screen, and decorations
  * - Scrollbar styling with visibility transitions
  * - Shadow effects for scroll indication
  *
  * Reference: vscode-reference/src/vs/workbench/contrib/terminal/browser/media/terminal.css
  */
+
+/* ============================================================================
+   CSS Variables
+   ============================================================================ */
+
+:root {
+  --terminal-gutter-width: 20px;
+}
 
 /* ============================================================================
    Container Hierarchy
@@ -52,9 +60,9 @@
    xterm.js Overrides - Padding & Layout
    ============================================================================ */
 
-/* All terminals have padding for spacing and the command decoration gutter (20px left) */
+/* All terminals have padding for spacing and the command decoration gutter */
 .terminal-wrapper .xterm {
-  padding: 4px 8px 4px 20px;
+  padding: 4px 8px 4px var(--terminal-gutter-width);
 }
 
 /* Position .xterm to fill split-pane and center content vertically.
@@ -71,13 +79,6 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-}
-
-/* Reserved for future fixed-dimensions mode (not currently used).
- * When terminal has fixed dimensions instead of fitting to container,
- * this class would be added to .terminal-wrapper to disable absolute positioning. */
-.terminal-wrapper.fixed-dims .xterm {
-  position: static;
 }
 
 /* ============================================================================
@@ -124,19 +125,6 @@
   z-index: 7;
 }
 
-/* Widget container - reserved for future VS Code-style overlays (find widget, etc.)
- * Not currently used, but included to maintain VS Code pattern compatibility. */
-.terminal-wrapper .terminal-widget-container {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  right: 0;
-  top: 0;
-  overflow: visible;
-  pointer-events: none;
-  z-index: 33;
-}
-
 /* Scrollbar styling is consolidated with viewport rules in Z-Index section above */
 
 /* ============================================================================
@@ -162,7 +150,8 @@
    Command Decoration Gutter Styling
    ============================================================================ */
 
-/* Gutter decoration icons positioning */
+/* Gutter decoration icons positioning
+ * margin-left positions the icon in the gutter: -(gutter-width) + 3px for visual centering */
 .terminal-wrapper .xterm-decoration-container .terminal-command-decoration {
   position: absolute;
   display: flex;
@@ -170,7 +159,7 @@
   justify-content: center;
   width: 16px;
   height: 16px;
-  margin-left: -17px; /* Position in the gutter */
+  margin-left: calc(-1 * var(--terminal-gutter-width) + 3px);
   font-size: 14px;
   line-height: 1;
 }
