@@ -54,12 +54,11 @@ export interface DecorationConfig {
   gutterWidth: number;
 }
 
-/** Decoration colors */
-const COLORS = {
+/** Overview ruler colors - used by xterm's overview ruler, not the gutter icons */
+const OVERVIEW_RULER_COLORS = {
+  running: '#3b8eea',
   success: '#23d18b',
   error: '#f14c4c',
-  running: '#3b8eea',
-  gutterBackground: 'rgba(255, 255, 255, 0.05)',
 } as const;
 
 // ============================================================================
@@ -301,7 +300,7 @@ export class CommandDecorationsAddon implements ITerminalAddon {
       anchor: 'left',
       width: this._config.gutterWidth,
       overviewRulerOptions: {
-        color: COLORS.running,
+        color: OVERVIEW_RULER_COLORS.running,
         position: 'left',
       },
     });
@@ -325,7 +324,8 @@ export class CommandDecorationsAddon implements ITerminalAddon {
 
     // Update overview ruler color based on exit status
     if (mark.exitCode !== undefined) {
-      const color = mark.exitCode === 0 ? COLORS.success : COLORS.error;
+      const color =
+        mark.exitCode === 0 ? OVERVIEW_RULER_COLORS.success : OVERVIEW_RULER_COLORS.error;
       decoration.options.overviewRulerOptions = {
         color,
         position: 'left',
@@ -360,13 +360,9 @@ export class CommandDecorationsAddon implements ITerminalAddon {
   }
 
   private _renderDecorationElement(element: HTMLElement, mark: CommandMark): void {
-    // Style the gutter element
-    element.style.display = 'flex';
-    element.style.alignItems = 'center';
-    element.style.justifyContent = 'center';
-    element.style.width = `${String(this._config.gutterWidth)}px`;
-    element.style.height = '100%';
-    element.style.backgroundColor = COLORS.gutterBackground;
+    // Apply CSS class for styling (defined in terminal.css)
+    // Using CSS classes instead of inline styles for better maintainability
+    element.className = 'terminal-command-decoration';
     element.style.cursor = 'pointer';
 
     // Clear existing content
@@ -374,22 +370,19 @@ export class CommandDecorationsAddon implements ITerminalAddon {
 
     if (this._config.showStatusIcons) {
       const icon = document.createElement('span');
-      icon.style.fontSize = '12px';
-      icon.style.lineHeight = '1';
 
       if (mark.isRunning) {
         // Running indicator (spinning dot)
         icon.textContent = '●';
-        icon.style.color = COLORS.running;
-        icon.style.animation = 'pulse 1s ease-in-out infinite';
+        icon.className = 'default-color';
       } else if (mark.exitCode === 0) {
         // Success checkmark
         icon.textContent = '✓';
-        icon.style.color = COLORS.success;
+        icon.className = 'success';
       } else {
         // Error X
         icon.textContent = '✕';
-        icon.style.color = COLORS.error;
+        icon.className = 'error';
       }
 
       element.appendChild(icon);

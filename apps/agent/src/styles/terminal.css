@@ -150,7 +150,7 @@
    Command Decoration Gutter Styling
    ============================================================================ */
 
-/* Gutter decoration icons positioning
+/* Gutter decoration container positioning
  * margin-left positions the icon in the gutter: -(gutter-width) + 3px for visual centering */
 .terminal-wrapper .xterm-decoration-container .terminal-command-decoration {
   position: absolute;
@@ -162,24 +162,36 @@
   margin-left: calc(-1 * var(--terminal-gutter-width) + 3px);
   font-size: 14px;
   line-height: 1;
+  background-color: var(--muted);
 }
 
-/* Default/incomplete state */
-.terminal-wrapper .terminal-command-decoration.default-color {
-  color: var(--muted-foreground);
-  opacity: 0.6;
+/* Default/running state - icon child */
+.terminal-wrapper .terminal-command-decoration .default-color {
+  color: var(--info);
+  animation: terminal-pulse 1s ease-in-out infinite;
 }
 
-/* Success state (exit code 0) */
-.terminal-wrapper .terminal-command-decoration.success {
+/* Success state (exit code 0) - icon child */
+.terminal-wrapper .terminal-command-decoration .success {
   color: var(--success);
   opacity: 0.9;
 }
 
-/* Error state (non-zero exit code) */
-.terminal-wrapper .terminal-command-decoration.error {
+/* Error state (non-zero exit code) - icon child */
+.terminal-wrapper .terminal-command-decoration .error {
   color: var(--destructive);
   opacity: 0.9;
+}
+
+/* Running command pulse animation */
+@keyframes terminal-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Viewport adjustments are consolidated with viewport rules in Z-Index section above */

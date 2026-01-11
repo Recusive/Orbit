@@ -467,7 +467,9 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
             {/* VS Code container hierarchy: outer → groups → split-pane → wrapper */}
             <div className="terminal-outer-container flex-1 overflow-hidden">
               <div className="terminal-groups-container">
-                {/* Render ALL terminal containers - visibility controlled by manager */}
+                {/* Render ALL terminals - use display:none (not pointerEvents) to properly
+                    hide inactive terminals. This prevents layout calculations on hidden
+                    terminals and improves performance. */}
                 {sessions.map((session) => (
                   <div
                     key={session.id}

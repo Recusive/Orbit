@@ -168,10 +168,11 @@ export class TerminalInstance {
     this.terminal.loadAddon(webLinksAddon);
 
     // Command decorations addon
+    // Note: gutterWidth must match --terminal-gutter-width in terminal.css (20px)
     this.decorationsAddon = new CommandDecorationsAddon({
       showGutterMarkers: true,
       showStatusIcons: true,
-      gutterWidth: 24,
+      gutterWidth: 20,
     });
     this.terminal.loadAddon(this.decorationsAddon);
 
