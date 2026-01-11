@@ -1,4 +1,5 @@
 import { CheckCircle2, ChevronDown, Circle, ListTodo, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { FC, ReactElement } from 'react';
@@ -191,65 +192,71 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
         </button>
 
         {/* Collapsible content */}
-        <div
-          className={cn(
-            'grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
-            isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          )}
-        >
-          <div className="overflow-hidden min-h-0">
-            <div className="p-2.5">
-              {isRunning && todos.length === 0 ? (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  <span>Updating task list...</span>
-                </div>
-              ) : todos.length > 0 ? (
-                <div className="space-y-0.5">
-                  {todos.map((todo, index) => (
-                    <div
-                      key={`${todo.content}-${String(index)}`}
-                      className={cn(
-                        'flex items-center gap-2 text-sm py-1 px-1.5 -mx-1.5 rounded transition-colors',
-                        todo.status === 'in_progress' && 'bg-primary/5',
-                        todo.status === 'completed' && 'opacity-50'
-                      )}
-                    >
-                      <StatusIcon status={todo.status} />
-                      <span
+        <AnimatePresence initial={false} mode="wait">
+          {isExpanded ? (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+                opacity: { duration: 0.15, ease: 'easeOut' },
+              }}
+              style={{ overflow: 'hidden' }}
+            >
+              <div className="p-2.5">
+                {isRunning && todos.length === 0 ? (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    <span>Updating task list...</span>
+                  </div>
+                ) : todos.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {todos.map((todo, index) => (
+                      <div
+                        key={`${todo.content}-${String(index)}`}
                         className={cn(
-                          'text-foreground flex-1 leading-relaxed',
-                          todo.status === 'completed' && 'line-through text-muted-foreground'
+                          'flex items-center gap-2 text-sm py-1 px-1.5 -mx-1.5 rounded transition-colors',
+                          todo.status === 'in_progress' && 'bg-primary/5',
+                          todo.status === 'completed' && 'opacity-50'
                         )}
                       >
-                        {todo.status === 'in_progress' ? todo.activeForm : todo.content}
+                        <StatusIcon status={todo.status} />
+                        <span
+                          className={cn(
+                            'text-foreground flex-1 leading-relaxed',
+                            todo.status === 'completed' && 'line-through text-muted-foreground'
+                          )}
+                        >
+                          {todo.status === 'in_progress' ? todo.activeForm : todo.content}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground/60 italic">No tasks</div>
+                )}
+
+                {/* Progress bar */}
+                {totalCount > 0 ? (
+                  <div className="mt-2 pt-2 border-t border-border/30">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1 bg-muted/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-success transition-all duration-300 rounded-full"
+                          style={{ width: `${String((completedCount / totalCount) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground/60 font-medium">
+                        {Math.round((completedCount / totalCount) * 100)}%
                       </span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground/60 italic">No tasks</div>
-              )}
-
-              {/* Progress bar */}
-              {totalCount > 0 ? (
-                <div className="mt-2 pt-2 border-t border-border/30">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1 bg-muted/50 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-success transition-all duration-300 rounded-full"
-                        style={{ width: `${String((completedCount / totalCount) * 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground/60 font-medium">
-                      {Math.round((completedCount / totalCount) * 100)}%
-                    </span>
                   </div>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
+                ) : null}
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   );

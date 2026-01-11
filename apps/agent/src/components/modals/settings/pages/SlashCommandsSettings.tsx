@@ -23,6 +23,12 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { cn } from '@/lib/utils/utils';
+import {
+  useCommandsStore,
+  useCommands,
+  useCommandsLoading,
+  useCommandsHasFetched,
+} from '@/stores/agent';
 
 // Available tools that can be selected
 const AVAILABLE_TOOLS = [
@@ -553,51 +559,56 @@ const CommandEditor: FC<CommandEditorProps> = ({
 
 // Main SlashCommandsSettings component
 export const SlashCommandsSettings: FC = () => {
-  const [commands, setCommands] = useState<SlashCommandDefinition[]>([]);
+  // Use centralized commands store (prevents duplicate IPC calls)
+  const commands = useCommands();
+  const isLoading = useCommandsLoading();
+  const hasFetched = useCommandsHasFetched();
+  const { fetchCommands, addCommand, updateCommand, removeCommand } = useCommandsStore();
+
+  // Initial load state: loading and haven't fetched yet
+  const isInitialLoad = isLoading && !hasFetched;
+
   const [error, setError] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingCommand, setEditingCommand] = useState<SlashCommandDefinition | undefined>(
     undefined
   );
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  // Use ref for the initial fetch flag to avoid re-fetching
-  const hasFetched = useRef(false);
 
   // Callback ref for generated command handler
   const generatedCommandCallbackRef = useRef<((command: SlashCommandDefinition) => void) | null>(
     null
   );
 
-  // Message handler for command-related messages
-  const handleMessage = useCallback((message: ExtensionMessage): void => {
-    if (message.type === 'commands:list:response') {
-      setCommands(message.commands);
-      setError(null);
-      setIsInitialLoad(false);
-    } else if (message.type === 'commands:created') {
-      setCommands((prev) => [...prev, message.command]);
-      setError(null);
-    } else if (message.type === 'commands:updated') {
-      setCommands((prev) =>
-        prev.map((c) =>
-          c.name === message.command.name && c.scope === message.command.scope ? message.command : c
-        )
-      );
-      setError(null);
-    } else if (message.type === 'commands:deleted') {
-      setCommands((prev) => prev.filter((c) => c.name !== message.name));
-      setError(null);
-    } else if (message.type === 'commands:error') {
-      setError(message.error);
-    } else if (message.type === 'commands:generated') {
-      // Call the registered callback with the generated command
-      if (generatedCommandCallbackRef.current) {
-        generatedCommandCallbackRef.current(message.command);
+  // Message handler for command CRUD operations (store handles list response)
+  // Note: Using store actions directly avoids stale closure issues
+  const handleMessage = useCallback(
+    (message: ExtensionMessage): void => {
+      if (message.type === 'commands:created') {
+        addCommand(message.command);
+        setError(null);
+      } else if (message.type === 'commands:updated') {
+        updateCommand(message.command);
+        setError(null);
+      } else if (message.type === 'commands:deleted') {
+        // Get current commands from store to find scope
+        const currentCommands = useCommandsStore.getState().commands;
+        const deletedCmd = currentCommands.find((c) => c.name === message.name);
+        if (deletedCmd) {
+          removeCommand(message.name, deletedCmd.scope);
+        }
+        setError(null);
+      } else if (message.type === 'commands:error') {
+        setError(message.error);
+      } else if (message.type === 'commands:generated') {
+        // Call the registered callback with the generated command
+        if (generatedCommandCallbackRef.current) {
+          generatedCommandCallbackRef.current(message.command);
+        }
       }
-    }
-    // Ignore other message types
-  }, []);
+      // Ignore other message types (list:response is handled by store)
+    },
+    [addCommand, updateCommand, removeCommand]
+  );
 
   // Register callback for generated command
   const handleRegisterGeneratedCallback = useCallback(
@@ -607,19 +618,13 @@ export const SlashCommandsSettings: FC = () => {
     []
   );
 
-  // Use VS Code API with message handler
+  // Use Tauri API for CRUD operations
   const { postMessage } = useTauri({ onMessage: handleMessage });
 
-  // Fetch commands on mount
+  // Fetch commands on mount (store handles deduplication)
   useEffect(() => {
-    if (!hasFetched.current) {
-      hasFetched.current = true;
-      postMessage({
-        type: 'commands:list',
-        uuid: crypto.randomUUID(),
-      });
-    }
-  }, [postMessage]);
+    void fetchCommands();
+  }, [fetchCommands]);
 
   const handleCreateCommand = useCallback((): void => {
     setEditingCommand(undefined);

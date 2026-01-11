@@ -1,4 +1,5 @@
 import { ChevronDown, ExternalLink, Globe, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { FC } from 'react';
@@ -100,59 +101,65 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
         </button>
 
         {/* Collapsible content */}
-        <div
-          className={cn(
-            'grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
-            isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          )}
-        >
-          <div className="overflow-hidden min-h-0">
-            {/* URL */}
-            <div className="px-2.5 py-2 bg-muted/30">
-              <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
-                url
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  onOpenUrl?.(url);
-                }}
-                className="flex items-center gap-1 group focus:outline-none"
-              >
-                <code className="bg-muted/50 text-foreground rounded-md px-2 py-1 font-mono text-sm group-hover:bg-muted transition-colors truncate max-w-full">
-                  {hostname}
-                </code>
-                <ExternalLink className="h-2.5 w-2.5 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-            </div>
-
-            {/* Prompt */}
-            <div className="h-px bg-border/30 mx-2.5" />
-            <div className="px-2.5 py-2">
-              <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
-                prompt
-              </div>
-              <div className="text-sm text-foreground line-clamp-2">{prompt}</div>
-            </div>
-
-            {/* Output */}
-            <div className="h-px bg-border/30 mx-2.5" />
-            <div className="p-2.5">
-              {isRunning ? (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  <span>Fetching and processing content...</span>
+        <AnimatePresence initial={false} mode="wait">
+          {isExpanded ? (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+                opacity: { duration: 0.15, ease: 'easeOut' },
+              }}
+              style={{ overflow: 'hidden' }}
+            >
+              {/* URL */}
+              <div className="px-2.5 py-2 bg-muted/30">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
+                  url
                 </div>
-              ) : output ? (
-                <div className="bg-muted/40 rounded-lg p-2 border border-border/30 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto">
-                  <pre className="whitespace-pre-wrap break-words m-0">{output}</pre>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenUrl?.(url);
+                  }}
+                  className="flex items-center gap-1 group focus:outline-none"
+                >
+                  <code className="bg-muted/50 text-foreground rounded-md px-2 py-1 font-mono text-sm group-hover:bg-muted transition-colors truncate max-w-full">
+                    {hostname}
+                  </code>
+                  <ExternalLink className="h-2.5 w-2.5 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              </div>
+
+              {/* Prompt */}
+              <div className="h-px bg-border/30 mx-2.5" />
+              <div className="px-2.5 py-2">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
+                  prompt
                 </div>
-              ) : (
-                <div className="text-sm text-muted-foreground/60 italic">No content fetched</div>
-              )}
-            </div>
-          </div>
-        </div>
+                <div className="text-sm text-foreground line-clamp-2">{prompt}</div>
+              </div>
+
+              {/* Output */}
+              <div className="h-px bg-border/30 mx-2.5" />
+              <div className="p-2.5">
+                {isRunning ? (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    <span>Fetching and processing content...</span>
+                  </div>
+                ) : output ? (
+                  <div className="bg-muted/40 rounded-lg p-2 border border-border/30 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto">
+                    <pre className="whitespace-pre-wrap break-words m-0">{output}</pre>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground/60 italic">No content fetched</div>
+                )}
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   );

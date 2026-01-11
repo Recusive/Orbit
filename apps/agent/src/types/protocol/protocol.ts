@@ -908,6 +908,8 @@ export const LayoutSchema = z
   .strict();
 
 // Agent streaming (matches SDK pattern)
+// message_id is required - backend TextEventBatcher captures stable UUID from SDK's stream_event
+// Frontend handler adds defensive check for falsy message_id and emits error if missing
 export const AgentChunkSchema = z
   .object({
     type: z.literal('agent:chunk'),
@@ -1001,6 +1003,13 @@ export const ToolStartSchema = z
     tool_id: z.string(),
     tool_name: z.string(),
     tool_input: z.record(z.string(), z.unknown()),
+    /**
+     * Position in the text stream where this tool was invoked.
+     * This is the character offset in the accumulated text at the time
+     * the tool was called. Used to interleave tool widgets at the correct
+     * position when rendering the message.
+     */
+    content_offset: z.number().optional(),
   })
   .strict();
 

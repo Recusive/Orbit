@@ -68,16 +68,46 @@ export function throttle<T extends (...args: Parameters<T>) => void>(
 }
 
 /**
+ * Return type for rafBatch - a function that adds items with a cancel method attached.
+ * The cancel method allows cleanup when a component unmounts to prevent firing into dead state.
+ */
+export interface RafBatchHandler<T> {
+  (item: T): void;
+  /**
+   * Cancel pending RAF callback.
+   * @param flush - If true, process any pending items before clearing. Default false.
+   *                Use flush=true when you want to ensure all data is processed (e.g., on agent:complete).
+   *                Use flush=false (default) when unmounting and state may already be invalid.
+   */
+  cancel: (flush?: boolean) => void;
+}
+
+/**
  * Creates a RAF-batched function that collects calls and invokes once per animation frame.
  * Perfect for batching state updates to align with React's render cycle.
  *
  * @param processBatch - Function that receives all batched items and processes them together
+ * @returns A handler function with an attached `cancel` method for cleanup
+ *
+ * @example
+ * ```ts
+ * const batcher = rafBatch<string>((items) => {
+ *   // Process all batched items together
+ *   setState(prev => [...prev, ...items]);
+ * });
+ * batcher('a');
+ * batcher('b');
+ * // On next frame: processes ['a', 'b'] in single setState
+ *
+ * // In useEffect cleanup:
+ * return () => batcher.cancel();
+ * ```
  */
-export function rafBatch<T>(processBatch: (items: T[]) => void): (item: T) => void {
+export function rafBatch<T>(processBatch: (items: T[]) => void): RafBatchHandler<T> {
   let batch: T[] = [];
   let rafId: number | null = null;
 
-  return (item: T): void => {
+  const handler = ((item: T): void => {
     batch.push(item);
 
     // Schedule RAF callback if not already scheduled
@@ -87,7 +117,26 @@ export function rafBatch<T>(processBatch: (items: T[]) => void): (item: T) => vo
       rafId = null;
       processBatch(items);
     });
+  }) as RafBatchHandler<T>;
+
+  // Attach cancel method for cleanup on unmount
+  handler.cancel = (flush = false): void => {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+
+    // Optionally process pending items before clearing
+    if (flush && batch.length > 0) {
+      const items = batch;
+      batch = [];
+      processBatch(items);
+    } else {
+      batch = [];
+    }
   };
+
+  return handler;
 }
 
 /**

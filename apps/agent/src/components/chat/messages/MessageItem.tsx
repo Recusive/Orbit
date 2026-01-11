@@ -19,6 +19,7 @@ import type { MessageItemProps } from './types';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files';
+import { ErrorBoundary } from '@/components/shared';
 import { CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils/constants';
 
 // Stable plugin arrays - defined outside component to prevent recreation on each render
@@ -35,8 +36,14 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   onOpenUrl,
   onFeedback,
 }) {
-  const isComplete =
-    !message.isStreaming && message.displayedContent.length === message.content.length;
+  // Message is complete when streaming has finished
+  // Note: displayedContent.length === content.length check removed - with backend batching,
+  // both fields are always equal. Streaming state is the authoritative signal.
+  const isComplete = !message.isStreaming;
+
+  // Use displayedContent directly - backend batching (50ms) provides smooth streaming
+  // Note: JS animation hooks cause flash when combined with auto-scroll during streaming
+  const animatedContent = message.displayedContent;
 
   // Handle clicks on links in markdown content
   const handleContentClick = (e: React.MouseEvent<HTMLDivElement>): void => {
@@ -49,8 +56,8 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   };
 
   // Build interleaved segments for assistant messages
-  const segments =
-    message.role === 'assistant' ? buildSegments(message.displayedContent, tools) : [];
+  // Use animated content for smooth streaming reveal
+  const segments = message.role === 'assistant' ? buildSegments(animatedContent, tools) : [];
 
   // Check for attachments
   const hasFiles = (message.attachedFiles?.length ?? 0) > 0;
@@ -97,13 +104,20 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           <div className="space-y-2">
             {segments.map((segment) => {
               if (segment.type === 'content') {
+                // Use mode="static" to prevent scrollbar jumping during streaming.
+                // Default "streaming" mode uses block splitting + useTransition which
+                // causes height fluctuations that conflict with auto-scroll.
                 return (
                   <div
                     key={segment.key}
                     className="chat-markdown prose prose-sm dark:prose-invert max-w-none"
                     onClick={handleContentClick}
                   >
-                    <Streamdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS}>
+                    <Streamdown
+                      remarkPlugins={REMARK_PLUGINS}
+                      rehypePlugins={REHYPE_PLUGINS}
+                      mode="static"
+                    >
                       {segment.text}
                     </Streamdown>
                   </div>
@@ -111,11 +125,19 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
               }
               return (
                 <div key={segment.key} className="tool-widget">
-                  <ToolWidgetRenderer
-                    tool={segment.tool}
-                    onOpenFile={onOpenFile}
-                    onOpenUrl={onOpenUrl}
-                  />
+                  <ErrorBoundary
+                    fallback={
+                      <div className="p-2 rounded-md bg-muted/50 border border-border/50 text-muted-foreground text-sm">
+                        Failed to render tool: {segment.tool.toolName}
+                      </div>
+                    }
+                  >
+                    <ToolWidgetRenderer
+                      tool={segment.tool}
+                      onOpenFile={onOpenFile}
+                      onOpenUrl={onOpenUrl}
+                    />
+                  </ErrorBoundary>
                 </div>
               );
             })}

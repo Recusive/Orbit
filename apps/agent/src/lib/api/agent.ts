@@ -56,6 +56,13 @@ export interface AgentMessage {
   content?: string;
   /** Stable message ID from SDK - all events in a single assistant turn share this ID */
   messageId?: string;
+  /**
+   * Position in the text stream where this event occurred.
+   * For tool_use events, this is the character offset in the accumulated text
+   * at the time the tool was invoked. Used to interleave tool widgets at the
+   * correct position in the message.
+   */
+  contentOffset?: number;
   metadata?: ToolMetadata;
   usage?: {
     inputTokens: number;

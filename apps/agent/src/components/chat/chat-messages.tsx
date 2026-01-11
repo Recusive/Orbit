@@ -87,17 +87,18 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const prevSessionIdRef = useRef(sessionId);
   const hasResetScrollRef = useRef(false);
 
-  // Check if any message is still animating
-  const isAnimating = messages.some((m) => m.displayedContent.length < m.content.length);
-  const isLoading = isAgentRunning || isAnimating;
+  // Loading state - shown while agent is running
+  // Note: Animation interval was removed for performance. Streaming effect is now
+  // achieved through backend batching (50ms) + Streamdown's incremental markdown rendering.
+  const isLoading = isAgentRunning;
 
   // Rotating loading message for a bit of personality
   const loadingMessage = useRotatingMessage(isLoading);
 
-  // Track last message content length for auto-scroll dependency
+  // Track last message content length for scroll dependency
   const lastMessageContentLength = messages[messages.length - 1]?.displayedContent.length ?? 0;
 
-  // Auto-scroll to bottom during streaming
+  // Auto-scroll to bottom when new content arrives during streaming
   useEffect(() => {
     if (!shouldAutoScroll.current || !containerRef.current) return;
     const el = containerRef.current;

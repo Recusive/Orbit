@@ -11,9 +11,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::perf_logger::PerfSource;
-use crate::perf_log;
-
 /// Result of keychain credential check.
 /// Used by frontend to know if credentials exist (actual reading done in TypeScript).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,23 +33,21 @@ pub struct KeychainStatus {
 /// to avoid duplicating the parsing logic.
 #[tauri::command]
 pub async fn check_claude_keychain() -> KeychainStatus {
-    perf_log!(PerfSource::Ipc, "check_claude_keychain", {
-        #[cfg(target_os = "macos")]
-        {
-            check_macos_keychain_exists().await
-        }
+    #[cfg(target_os = "macos")]
+    {
+        check_macos_keychain_exists().await
+    }
 
-        #[cfg(not(target_os = "macos"))]
-        {
-            // On non-macOS platforms, keychain check is not yet supported
-            KeychainStatus {
-                has_credentials: false,
-                credential_type: None,
-                expires_at: None,
-                error: Some("Keychain check not supported on this platform".to_owned()),
-            }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // On non-macOS platforms, keychain check is not yet supported
+        KeychainStatus {
+            has_credentials: false,
+            credential_type: None,
+            expires_at: None,
+            error: Some("Keychain check not supported on this platform".to_owned()),
         }
-    })
+    }
 }
 
 /// Check if credentials exist in macOS keychain (without parsing them).

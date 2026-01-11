@@ -34,6 +34,3 @@ export * from './settings';
 
 // Window operations
 export * from './window';
-
-// Performance operations (dev-only)
-export * from './perf';

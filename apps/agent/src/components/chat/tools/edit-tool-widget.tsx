@@ -1,4 +1,5 @@
 import { ChevronDown, FilePen, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { FC } from 'react';
@@ -74,6 +75,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   onOpenFile,
 }) => {
   const [isExpanded, setIsExpanded] = useState(isRunning);
+  const [showAllLines, setShowAllLines] = useState(false);
   const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
 
@@ -91,11 +93,12 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   const deletions = oldLines.length;
   const additions = newLines.length;
 
-  // For collapsed view, show first few lines of each
-  const maxCollapsedLines = 4;
-  const displayOldLines = isExpanded ? oldLines : oldLines.slice(0, maxCollapsedLines);
-  const displayNewLines = isExpanded ? newLines : newLines.slice(0, maxCollapsedLines);
-  const hasMore = oldLines.length > maxCollapsedLines || newLines.length > maxCollapsedLines;
+  // For preview view, show first few lines of each
+  const maxPreviewLines = 4;
+  const displayOldLines = showAllLines ? oldLines : oldLines.slice(0, maxPreviewLines);
+  const displayNewLines = showAllLines ? newLines : newLines.slice(0, maxPreviewLines);
+  const hasMore =
+    !showAllLines && (oldLines.length > maxPreviewLines || newLines.length > maxPreviewLines);
 
   const handleFileClick = (e: React.MouseEvent): void => {
     e.preventDefault();
@@ -181,70 +184,86 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
         </button>
 
         {/* Diff preview */}
-        <div
-          className={cn(
-            'grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
-            isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          )}
-        >
-          <div className="overflow-hidden min-h-0">
-            <div className="overflow-auto max-h-[300px]">
-              {/* Deleted lines (old) */}
-              {displayOldLines.map((line, index) => (
-                <div
-                  key={`old-${String(index)}`}
-                  className="flex font-mono text-sm leading-4 bg-destructive/10"
-                >
-                  {/* Gutter */}
-                  <div className="w-0.5 bg-destructive shrink-0" />
-                  {/* Line indicator */}
-                  <div className="w-5 px-1 text-center text-destructive/70 select-none shrink-0">
-                    -
+        <AnimatePresence initial={false} mode="wait">
+          {isExpanded ? (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+                opacity: { duration: 0.15, ease: 'easeOut' },
+              }}
+              style={{ overflow: 'hidden' }}
+            >
+              <div className={cn('overflow-auto', !showAllLines && 'max-h-[300px]')}>
+                {/* Deleted lines (old) */}
+                {displayOldLines.map((line, index) => (
+                  <div
+                    key={`old-${String(index)}`}
+                    className="flex font-mono text-sm leading-4 bg-destructive/10"
+                  >
+                    {/* Gutter */}
+                    <div className="w-0.5 bg-destructive shrink-0" />
+                    {/* Line indicator */}
+                    <div className="w-5 px-1 text-center text-destructive/70 select-none shrink-0">
+                      -
+                    </div>
+                    {/* Content */}
+                    <div className="flex-1 px-2 text-foreground/70 whitespace-pre overflow-x-auto">
+                      {line || ' '}
+                    </div>
                   </div>
-                  {/* Content */}
-                  <div className="flex-1 px-2 text-foreground/70 whitespace-pre overflow-x-auto">
-                    {line || ' '}
-                  </div>
-                </div>
-              ))}
+                ))}
 
-              {/* Separator */}
-              {displayOldLines.length > 0 && displayNewLines.length > 0 ? (
-                <div className="h-px bg-border/50" />
+                {/* Separator */}
+                {displayOldLines.length > 0 && displayNewLines.length > 0 ? (
+                  <div className="h-px bg-border/50" />
+                ) : null}
+
+                {/* Added lines (new) */}
+                {displayNewLines.map((line, index) => (
+                  <div
+                    key={`new-${String(index)}`}
+                    className="flex font-mono text-sm leading-4 bg-success/10"
+                  >
+                    {/* Gutter */}
+                    <div className="w-0.5 bg-success shrink-0" />
+                    {/* Line indicator */}
+                    <div className="w-5 px-1 text-center text-success/70 select-none shrink-0">
+                      +
+                    </div>
+                    {/* Content */}
+                    <div className="flex-1 px-2 text-foreground whitespace-pre overflow-x-auto">
+                      {line || ' '}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Show all / Show less toggle button */}
+              {(hasMore || showAllLines) &&
+              (oldLines.length > maxPreviewLines || newLines.length > maxPreviewLines) ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAllLines(!showAllLines);
+                  }}
+                  className="w-full py-1 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-0.5"
+                >
+                  <ChevronDown
+                    className={cn('h-2.5 w-2.5 transition-transform', showAllLines && 'rotate-180')}
+                  />
+                  <span>
+                    {showAllLines
+                      ? 'Show less'
+                      : `Show all changes (${String(oldLines.length + newLines.length)} lines)`}
+                  </span>
+                </button>
               ) : null}
-
-              {/* Added lines (new) */}
-              {displayNewLines.map((line, index) => (
-                <div
-                  key={`new-${String(index)}`}
-                  className="flex font-mono text-sm leading-4 bg-success/10"
-                >
-                  {/* Gutter */}
-                  <div className="w-0.5 bg-success shrink-0" />
-                  {/* Line indicator */}
-                  <div className="w-5 px-1 text-center text-success/70 select-none shrink-0">+</div>
-                  {/* Content */}
-                  <div className="flex-1 px-2 text-foreground whitespace-pre overflow-x-auto">
-                    {line || ' '}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Expand bar */}
-            {hasMore && !isExpanded ? (
-              <button
-                onClick={() => {
-                  setIsExpanded(true);
-                }}
-                className="w-full py-1 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-0.5"
-              >
-                <ChevronDown className="h-2.5 w-2.5" />
-                <span>Show all changes</span>
-              </button>
-            ) : null}
-          </div>
-        </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   );

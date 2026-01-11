@@ -8,9 +8,9 @@ import { randomUUID } from 'node:crypto';
 import { formatZodError } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
+import { TextEventBatcher } from '../../common/batching/index.js';
 import { Disposable, Emitter } from '../../common/events/events.js';
 import { createLogger } from '../../common/logging/logger.js';
-import { perfEvent, perfEndWithTokens } from '../../common/perf/index.js';
 import { OrbitAgent } from '../core/agent.js';
 
 import type { OrbitAgentConfig } from '../core/agent.js';
@@ -87,6 +87,13 @@ export interface AgentMessage {
   content: string;
   /** Stable message ID from SDK - all events in a single assistant turn share this ID */
   messageId?: string;
+  /**
+   * Position in the text stream where this event occurred.
+   * For tool_use events, this is the character offset in the accumulated text
+   * at the time the tool was invoked. Used by frontend to interleave tool
+   * widgets at the correct position in the message.
+   */
+  contentOffset?: number;
   metadata?: {
     toolName?: string;
     toolId?: string;
@@ -322,9 +329,43 @@ function generateToolId(): string {
 }
 
 /**
+ * Metrics for tracking content loss events (data loss due to SDK integration issues).
+ * These are critical issues that should be monitored in production.
+ */
+interface ContentLossMetrics {
+  /** Number of text chunks lost due to missing message ID during streaming */
+  streamingChunksLost: number;
+  /** Total bytes of streaming content lost */
+  streamingBytesLost: number;
+  /** Number of full text blocks lost due to missing message ID */
+  textBlocksLost: number;
+  /** Total bytes of text block content lost */
+  textBlockBytesLost: number;
+  /** Timestamp of first content loss event (null if no loss) */
+  firstLossAt: number | null;
+  /** Timestamp of most recent content loss event (null if no loss) */
+  lastLossAt: number | null;
+}
+
+/**
  * Session Manager - orchestrates Claude Agent SDK sessions
  */
 export class SessionManager extends Disposable {
+  // Text event batcher - reduces ~200 events per response to ~4-8 batched events
+  // Batches at 50ms intervals to align with screen refresh and reduce IPC overhead
+  private readonly textBatcher: TextEventBatcher;
+
+  // Content loss tracking - monitors data loss due to SDK integration issues
+  // These metrics help diagnose production issues where content silently fails to render
+  private contentLossMetrics: ContentLossMetrics = {
+    streamingChunksLost: 0,
+    streamingBytesLost: 0,
+    textBlocksLost: 0,
+    textBlockBytesLost: 0,
+    firstLossAt: null,
+    lastLossAt: null,
+  };
+
   // Event emitters
   private readonly _onError = this._register(new Emitter<SerializableError>());
   readonly onError = this._onError.event;
@@ -386,9 +427,30 @@ export class SessionManager extends Disposable {
   private sessionInitFired = new Set<string>();
   private pendingDisplayNames = new Map<string, string>();
 
-  // Track current assistant message UUID per session (stable across all events in a turn)
-  // This is the SDK's message `uuid` field - all events in a single turn share this UUID
-  private currentAssistantMessageId = new Map<string, string>();
+  // Track the current turn ID per session (our OWN stable ID, not SDK's uuid)
+  // The SDK sends different UUIDs for each message (stream_event, assistant, etc.)
+  // We generate our own stable turn ID when a turn starts and use it for ALL events
+  // until the turn completes (result message). This ensures text chunks, tool events,
+  // and results all share the same messageId for proper UI interleaving.
+  private currentTurnId = new Map<string, string>();
+
+  constructor() {
+    super();
+
+    // Initialize text batcher - fires batched text events every 16ms (~1 frame)
+    // Keep backend batching minimal; frontend RAF batching handles render smoothness.
+    // This gives fast feedback while frontend coalesces into 60fps renders.
+    this.textBatcher = new TextEventBatcher((event) => {
+      this._onAgentMessage.fire({
+        sessionId: event.sessionId,
+        message: {
+          type: 'text',
+          content: event.content,
+          messageId: event.messageId,
+        },
+      });
+    }, 16);
+  }
 
   /**
    * Create a new agent session
@@ -470,28 +532,15 @@ export class SessionManager extends Disposable {
           approvedTools.add(toolName);
         }
 
-        // Update pending tools status
-        const sessionPendingTools = this.pendingTools.get(sessionId);
-        if (sessionPendingTools !== undefined) {
-          for (const tool of sessionPendingTools.values()) {
-            if (tool.toolName === toolName) {
-              this._onAgentMessage.fire({
-                sessionId,
-                message: {
-                  type: 'tool_use',
-                  content: `Tool ${toolName} running`,
-                  metadata: {
-                    toolName: tool.toolName,
-                    toolId: tool.toolId,
-                    toolInput: tool.toolInput,
-                    status: 'running',
-                  },
-                },
-              });
-              break;
-            }
-          }
-        }
+        // NOTE: We intentionally do NOT emit a second tool_use event here.
+        // The tool was already emitted with 'awaiting-permission' or 'running' status
+        // when the SDK first sent the tool_use block. Emitting again would:
+        // 1. Trigger another tool:start in the frontend (TauriProvider treats non-success/error as start)
+        // 2. Overwrite the tool's contentOffset with a stale/incorrect value
+        // 3. Cause buildSegments to place the tool at the wrong position
+        //
+        // The frontend already tracks the tool from the initial event.
+        // Permission approval is handled through the permission:response mechanism.
       }
 
       return result;
@@ -622,27 +671,58 @@ export class SessionManager extends Disposable {
             const event = sdkMessage.event;
             if (event === undefined) continue;
 
-            // Stream events also have the UUID - capture it if not already set
-            if (sdkMessage.uuid && !this.currentAssistantMessageId.has(sessionId)) {
-              this.currentAssistantMessageId.set(sessionId, sdkMessage.uuid);
-              logger.debug(
-                { sessionId, messageId: sdkMessage.uuid },
-                'Captured message UUID from stream_event'
-              );
+            // Generate our own stable turn ID if this is the first event of a new turn
+            // SDK sends different UUIDs per message, so we can't rely on them for grouping
+            if (!this.currentTurnId.has(sessionId)) {
+              const newTurnId = randomUUID();
+              this.currentTurnId.set(sessionId, newTurnId);
             }
 
-            // Get current message ID (may have been set from this or previous stream event)
-            const streamMessageId = this.currentAssistantMessageId.get(sessionId);
+            // Get our stable turn ID for this session
+            const streamMessageId = this.currentTurnId.get(sessionId);
 
-            // Handle text deltas
+            // Handle text deltas - batch to reduce event flooding
+            // SDK emits ~200 events per response, we batch at 50ms intervals
             if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
               const textDelta = event.delta.text;
               if (textDelta !== undefined) {
                 textWasStreamed = true; // Mark that we received streaming text
-                this._onAgentMessage.fire({
-                  sessionId,
-                  message: { type: 'text', content: textDelta, messageId: streamMessageId },
-                });
+
+                logger.debug(
+                  { sessionId, messageId: streamMessageId, textLength: textDelta.length },
+                  'Text delta received'
+                );
+
+                // Message ID should always be set from the SDK's stream_event.uuid
+                // If missing, something is wrong with the SDK flow - skip to prevent corruption
+                if (!streamMessageId) {
+                  // Track content loss metrics for monitoring
+                  this.contentLossMetrics.streamingChunksLost++;
+                  this.contentLossMetrics.streamingBytesLost += textDelta.length;
+                  const now = Date.now();
+                  this.contentLossMetrics.firstLossAt ??= now;
+                  this.contentLossMetrics.lastLossAt = now;
+
+                  const errorMsg =
+                    'Streaming content was lost due to missing message ID. ' +
+                    'This indicates an SDK integration issue. Please report this bug.';
+                  logger.error(
+                    {
+                      sessionId,
+                      textDeltaLength: textDelta.length,
+                      totalChunksLost: this.contentLossMetrics.streamingChunksLost,
+                      totalBytesLost: this.contentLossMetrics.streamingBytesLost,
+                    },
+                    'CRITICAL: Text delta received before message UUID was captured - content will be lost. ' +
+                      'This indicates SDK integration failure. Check stream_event handling above.'
+                  );
+                  // Emit error to frontend so user knows something went wrong
+                  this._onError.fire({ message: errorMsg });
+                  continue;
+                }
+
+                // Queue in batcher instead of firing directly
+                this.textBatcher.add(sessionId, streamMessageId, textDelta);
               }
             }
             // Handle thinking deltas
@@ -666,28 +746,48 @@ export class SessionManager extends Disposable {
             const content = sdkMessage.message?.content;
             if (content === undefined) continue;
 
-            // Capture the SDK's stable message UUID for this turn
-            // All events (text, tool_use, etc.) in this turn should share this UUID
-            if (sdkMessage.uuid) {
-              this.currentAssistantMessageId.set(sessionId, sdkMessage.uuid);
-              logger.debug(
-                { sessionId, messageId: sdkMessage.uuid },
-                'Captured assistant message UUID from SDK'
-              );
+            // Generate our own stable turn ID if this is the first event of a new turn
+            // This handles cases where assistant message arrives before any stream_event
+            if (!this.currentTurnId.has(sessionId)) {
+              const newTurnId = randomUUID();
+              this.currentTurnId.set(sessionId, newTurnId);
             }
 
-            // Get the current message ID (may have been set by this or a previous assistant message in the turn)
-            const currentMessageId = this.currentAssistantMessageId.get(sessionId);
+            // Get our stable turn ID for this session
+            const currentMessageId = this.currentTurnId.get(sessionId);
 
             for (const block of content) {
               // Handle text blocks - emit if not already streamed
               if (block.type === 'text') {
                 if (!textWasStreamed && block.text) {
-                  // No streaming happened (e.g., image input), emit full text
-                  this._onAgentMessage.fire({
-                    sessionId,
-                    message: { type: 'text', content: block.text, messageId: currentMessageId },
-                  });
+                  // No streaming happened (e.g., image input), emit full text via batcher
+                  // currentMessageId should always be set from sdkMessage.uuid above
+                  if (!currentMessageId) {
+                    // Track content loss metrics for monitoring
+                    this.contentLossMetrics.textBlocksLost++;
+                    this.contentLossMetrics.textBlockBytesLost += block.text.length;
+                    const now = Date.now();
+                    this.contentLossMetrics.firstLossAt ??= now;
+                    this.contentLossMetrics.lastLossAt = now;
+
+                    const errorMsg =
+                      'Response content was lost due to missing message ID. ' +
+                      'This indicates an SDK integration issue. Please report this bug.';
+                    logger.error(
+                      {
+                        sessionId,
+                        textLength: block.text.length,
+                        totalBlocksLost: this.contentLossMetrics.textBlocksLost,
+                        totalBytesLost: this.contentLossMetrics.textBlockBytesLost,
+                      },
+                      'CRITICAL: Assistant text block received without message UUID - content will be lost. ' +
+                        'This indicates SDK integration failure. The sdkMessage.uuid should have been captured.'
+                    );
+                    // Emit error to frontend so user knows something went wrong
+                    this._onError.fire({ message: errorMsg });
+                    continue;
+                  }
+                  this.textBatcher.add(sessionId, currentMessageId, block.text);
                 }
                 continue;
               }
@@ -707,7 +807,21 @@ export class SessionManager extends Disposable {
               const toolId = getString(block.id) || generateToolId();
               const toolInput = block.input ?? {};
 
-              // Debug: Log tool_use block received
+              const approvedTools = this.approvedToolNames.get(sessionId);
+              const wasAlreadyApproved = approvedTools?.has(toolName) ?? false;
+
+              if (wasAlreadyApproved && approvedTools !== undefined) {
+                approvedTools.delete(toolName);
+              }
+
+              const initialStatus = wasAlreadyApproved ? 'running' : 'awaiting-permission';
+
+              // Get the current accumulated text length - this is where the tool
+              // appears in the stream. Used by frontend to interleave tool widgets.
+              const contentOffset = currentMessageId
+                ? this.textBatcher.getAccumulatedLength(sessionId, currentMessageId)
+                : 0;
+
               logger.info(
                 {
                   sessionId,
@@ -718,19 +832,11 @@ export class SessionManager extends Disposable {
                 'Tool use block received from SDK'
               );
 
-              const approvedTools = this.approvedToolNames.get(sessionId);
-              const wasAlreadyApproved = approvedTools?.has(toolName) ?? false;
-
-              if (wasAlreadyApproved && approvedTools !== undefined) {
-                approvedTools.delete(toolName);
-              }
-
-              const initialStatus = wasAlreadyApproved ? 'running' : 'awaiting-permission';
-
               const toolMessage: AgentMessage = {
                 type: 'tool_use',
                 content: `Using tool: ${toolName}`,
                 messageId: currentMessageId,
+                contentOffset,
                 metadata: {
                   toolName,
                   toolId,
@@ -799,7 +905,7 @@ export class SessionManager extends Disposable {
                     const storedToolId = originalMessage.metadata.toolId;
 
                     // Get the current message ID for this turn
-                    const toolCompleteMessageId = this.currentAssistantMessageId.get(sessionId);
+                    const toolCompleteMessageId = this.currentTurnId.get(sessionId);
                     const completedMessage: AgentMessage = {
                       type: 'tool_use',
                       content: isError
@@ -830,25 +936,28 @@ export class SessionManager extends Disposable {
           } else {
             // sdkMessage.type === 'result'
             const resultMsg = sdkMessage;
-            // Get the final message ID for this turn before resetting
-            const turnMessageId = this.currentAssistantMessageId.get(sessionId);
 
-            // Log SDK turn completion with token counts
-            const turnStartTime = this.turnStartTimes.get(sessionId);
-            if (turnStartTime !== undefined && resultMsg.usage !== undefined) {
-              perfEndWithTokens('sdk_turn', turnStartTime, {
-                input: resultMsg.usage.input_tokens ?? 0,
-                output: resultMsg.usage.output_tokens ?? 0,
-              });
-              this.turnStartTimes.delete(sessionId);
-            } else if (turnStartTime !== undefined) {
-              // No usage data, just log the duration
-              perfEvent(
-                'sdk_turn',
-                `Turn complete (${String(Date.now() - turnStartTime)}ms, no usage data)`
-              );
-              this.turnStartTimes.delete(sessionId);
+            // Gradually drain any remaining batched text before completing the turn.
+            // Uses drainSession instead of flushSession to emit content in smooth chunks
+            // (~80 chars per 16ms) rather than dumping everything at once.
+            // This prevents the "2-3 words then dump rest" pattern on fast/short responses.
+            //
+            // TIMING SAFETY: Safe to await here because 'result' signals SDK turn completion.
+            // No more messages will arrive for this turn until we emit agent:complete and
+            // the user sends a new message. The for-await loop is effectively paused during
+            // drain, but no new SDK messages are expected until the next turn begins.
+            await this.textBatcher.drainSession(sessionId);
+
+            // Get the final message ID for this turn before resetting
+            const turnMessageId = this.currentTurnId.get(sessionId);
+
+            // Clear accumulated length tracking for this message (reset for next turn)
+            if (turnMessageId) {
+              this.textBatcher.clearAccumulatedLength(sessionId, turnMessageId);
             }
+
+            // Clear turn start time tracking
+            this.turnStartTimes.delete(sessionId);
 
             this._onAgentMessage.fire({
               sessionId,
@@ -876,7 +985,7 @@ export class SessionManager extends Disposable {
             });
             // Reset for next turn - the next turn will get a new message ID from the SDK
             textWasStreamed = false;
-            this.currentAssistantMessageId.delete(sessionId);
+            this.currentTurnId.delete(sessionId);
           }
 
           // Check for pending rewind after processing each message
@@ -914,6 +1023,12 @@ export class SessionManager extends Disposable {
    * Delete a session
    */
   async deleteSession(sessionId: string): Promise<void> {
+    // Flush any pending text events for this session before cleanup
+    // This prevents memory leak from orphaned buffer entries
+    this.textBatcher.flushSession(sessionId);
+    // Clear accumulated length tracking for this session (prevents memory leak)
+    this.textBatcher.clearSessionAccumulatedLengths(sessionId);
+
     const consumer = this.sessionConsumers.get(sessionId);
     if (consumer) {
       consumer.cancel();
@@ -931,7 +1046,7 @@ export class SessionManager extends Disposable {
     this.sessionResumeState.delete(sessionId);
     this.sessionInitFired.delete(sessionId);
     this.pendingDisplayNames.delete(sessionId);
-    this.currentAssistantMessageId.delete(sessionId);
+    this.currentTurnId.delete(sessionId);
   }
 
   /**
@@ -974,9 +1089,8 @@ export class SessionManager extends Disposable {
       throw new Error(`Session ${sessionId} is not ready.`);
     }
 
-    // Track turn start time for performance logging
+    // Track turn start time
     this.turnStartTimes.set(sessionId, Date.now());
-    perfEvent('sdk_turn', `Message queued (${String(message.length)} chars)`);
 
     agent.queueMessage(message, attachments);
   }
@@ -1347,9 +1461,41 @@ Return ONLY the JSON object with the command definition.`;
   }
 
   /**
+   * Get content loss metrics for monitoring.
+   * These metrics track data loss due to SDK integration issues.
+   * Non-zero values indicate bugs that should be investigated.
+   *
+   * @returns Snapshot of current content loss metrics
+   */
+  getContentLossMetrics(): Readonly<ContentLossMetrics> {
+    return { ...this.contentLossMetrics };
+  }
+
+  /**
+   * Check if any content loss has occurred.
+   * Useful for quick health checks without retrieving full metrics.
+   */
+  hasContentLoss(): boolean {
+    return (
+      this.contentLossMetrics.streamingChunksLost > 0 || this.contentLossMetrics.textBlocksLost > 0
+    );
+  }
+
+  /**
    * Dispose the session manager
    */
   override dispose(): void {
+    // Log content loss metrics on shutdown if any loss occurred
+    if (this.hasContentLoss()) {
+      logger.warn(
+        { metrics: this.contentLossMetrics },
+        'Content loss detected during session manager lifetime - this indicates SDK integration issues'
+      );
+    }
+
+    // Flush and destroy text batcher
+    this.textBatcher.destroy();
+
     // Deny all pending permission requests
     for (const [, resolver] of this.permissionResolvers.entries()) {
       resolver({ decision: 'deny', always: false });

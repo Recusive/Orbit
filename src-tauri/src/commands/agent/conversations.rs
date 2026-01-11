@@ -14,9 +14,6 @@ use orbit_conversations::{
 use orbit_core::Result;
 use tauri::State;
 
-use crate::core::perf_logger::PerfSource;
-use crate::perf_log;
-
 /// Serializable message for frontend
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -246,10 +243,8 @@ pub fn conversation_create(
     workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<ConversationDto> {
-    perf_log!(PerfSource::Ipc, "conversation_create", {
-        let conv = manager.create(session_id, title, workspace_path)?;
-        Ok(ConversationDto::from(conv))
-    })
+    let conv = manager.create(session_id, title, workspace_path)?;
+    Ok(ConversationDto::from(conv))
 }
 
 /// List conversations for a workspace (summaries only)
@@ -258,13 +253,11 @@ pub fn conversation_list(
     workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<Vec<ConversationSummaryDto>> {
-    perf_log!(PerfSource::Ipc, "conversation_list", {
-        let summaries = manager.load_summaries_for_workspace(workspace_path.as_deref())?;
-        Ok(summaries
-            .into_iter()
-            .map(ConversationSummaryDto::from)
-            .collect())
-    })
+    let summaries = manager.load_summaries_for_workspace(workspace_path.as_deref())?;
+    Ok(summaries
+        .into_iter()
+        .map(ConversationSummaryDto::from)
+        .collect())
 }
 
 /// Load a conversation by session ID
@@ -273,10 +266,8 @@ pub fn conversation_load(
     session_id: String,
     manager: State<'_, ConversationManager>,
 ) -> Result<Option<ConversationDto>> {
-    perf_log!(PerfSource::Ipc, "conversation_load", {
-        let conv = manager.load(&session_id)?;
-        Ok(conv.map(ConversationDto::from))
-    })
+    let conv = manager.load(&session_id)?;
+    Ok(conv.map(ConversationDto::from))
 }
 
 /// Delete a conversation
@@ -285,9 +276,7 @@ pub fn conversation_delete(
     session_id: String,
     manager: State<'_, ConversationManager>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Ipc, "conversation_delete", {
-        manager.delete(&session_id)
-    })
+    manager.delete(&session_id)
 }
 
 /// Update conversation title
@@ -297,9 +286,7 @@ pub fn conversation_update_title(
     title: String,
     manager: State<'_, ConversationManager>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Ipc, "conversation_update_title", {
-        manager.update_title(&session_id, title)
-    })
+    manager.update_title(&session_id, title)
 }
 
 /// Add a message to a conversation
@@ -310,13 +297,11 @@ pub fn conversation_add_message(
     workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Ipc, "conversation_add_message", {
-        manager.add_message(
-            &session_id,
-            Message::from(message),
-            workspace_path.as_deref(),
-        )
-    })
+    manager.add_message(
+        &session_id,
+        Message::from(message),
+        workspace_path.as_deref(),
+    )
 }
 
 /// Fork (rewind) a conversation
@@ -327,24 +312,18 @@ pub fn conversation_fork(
     up_to_message_id: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<Option<ConversationDto>> {
-    perf_log!(PerfSource::Ipc, "conversation_fork", {
-        let forked = manager.fork(&session_id, new_session_id, up_to_message_id.as_deref())?;
-        Ok(forked.map(ConversationDto::from))
-    })
+    let forked = manager.fork(&session_id, new_session_id, up_to_message_id.as_deref())?;
+    Ok(forked.map(ConversationDto::from))
 }
 
 /// Get the conversations data directory path
 #[tauri::command]
 pub fn conversation_data_path(manager: State<'_, ConversationManager>) -> String {
-    perf_log!(PerfSource::Ipc, "conversation_data_path", {
-        manager.data_dir().to_string_lossy().to_string()
-    })
+    manager.data_dir().to_string_lossy().to_string()
 }
 
 /// Delete all conversations without a workspace path (orphaned)
 #[tauri::command]
 pub fn conversation_cleanup_orphaned(manager: State<'_, ConversationManager>) -> Result<usize> {
-    perf_log!(PerfSource::Ipc, "conversation_cleanup_orphaned", {
-        manager.cleanup_orphaned_conversations()
-    })
+    manager.cleanup_orphaned_conversations()
 }

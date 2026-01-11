@@ -234,11 +234,6 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
               const status = meta?.status;
               const toolName = meta?.toolName ?? 'unknown';
 
-              // Debug: Log tool name for debugging widget mismatch issues
-              console.warn(
-                `[TauriProvider] Tool event: name="${toolName}", status="${String(status)}", toolId="${toolId}", messageId="${messageId}"`
-              );
-
               // Log tool completion
               if (status === 'success' || status === 'error') {
                 if (status === 'error') {
@@ -266,6 +261,8 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
                   tool_id: toolId,
                   tool_name: toolName,
                   tool_input: meta?.toolInput ?? {},
+                  // Pass through backend-provided content offset for accurate tool positioning
+                  content_offset: message.contentOffset,
                 });
               }
               break;

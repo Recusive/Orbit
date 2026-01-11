@@ -22,8 +22,6 @@ use crate::agent::{
     PermissionDecision, PermissionResponse, SessionConfig, SessionManager, SlashCommandDefinition,
     SubagentDefinition,
 };
-use crate::core::perf_logger::PerfSource;
-use crate::perf_log;
 
 /// Result type for agent commands
 type Result<T> = result::Result<T, String>;
@@ -44,9 +42,7 @@ pub async fn agent_create_session(
     config: Option<SessionConfig>,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_create_session", {
-        state.create_session(&session_id, config).map_err(to_error)
-    })
+    state.create_session(&session_id, config).map_err(to_error)
 }
 
 /// Delete an agent session
@@ -55,9 +51,7 @@ pub async fn agent_delete_session(
     session_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_delete_session", {
-        state.delete_session(&session_id).map_err(to_error)
-    })
+    state.delete_session(&session_id).map_err(to_error)
 }
 
 /// Send a message to an agent session
@@ -68,11 +62,9 @@ pub async fn agent_send_message(
     attachments: Option<Vec<AttachmentContentBlock>>,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_send_message", {
-        state
-            .send_message(&session_id, &message, attachments)
-            .map_err(to_error)
-    })
+    state
+        .send_message(&session_id, &message, attachments)
+        .map_err(to_error)
 }
 
 /// Interrupt the current agent execution
@@ -81,9 +73,7 @@ pub async fn agent_interrupt(
     session_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_interrupt", {
-        state.interrupt(&session_id).map_err(to_error)
-    })
+    state.interrupt(&session_id).map_err(to_error)
 }
 
 /// Check if a session is ready
@@ -92,9 +82,7 @@ pub async fn agent_is_session_ready(
     session_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<bool> {
-    perf_log!(PerfSource::Sidecar, "agent_is_session_ready", {
-        state.is_session_ready(&session_id).map_err(to_error)
-    })
+    state.is_session_ready(&session_id).map_err(to_error)
 }
 
 /// Get the SDK session ID
@@ -103,9 +91,7 @@ pub async fn agent_get_sdk_session_id(
     session_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<Option<String>> {
-    perf_log!(PerfSource::Sidecar, "agent_get_sdk_session_id", {
-        state.get_sdk_session_id(&session_id).map_err(to_error)
-    })
+    state.get_sdk_session_id(&session_id).map_err(to_error)
 }
 
 // ============================================================================
@@ -121,22 +107,20 @@ pub async fn agent_respond_permission(
     answers: Option<hashbrown::HashMap<String, String>>,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_respond_permission", {
-        let decision = match decision.as_str() {
-            "approve" => PermissionDecision::Approve,
-            "deny" => PermissionDecision::Deny,
-            _ => return Err("Invalid decision: must be 'approve' or 'deny'".to_owned()),
-        };
+    let decision = match decision.as_str() {
+        "approve" => PermissionDecision::Approve,
+        "deny" => PermissionDecision::Deny,
+        _ => return Err("Invalid decision: must be 'approve' or 'deny'".to_owned()),
+    };
 
-        let response = PermissionResponse {
-            request_id,
-            decision,
-            always,
-            answers,
-        };
+    let response = PermissionResponse {
+        request_id,
+        decision,
+        always,
+        answers,
+    };
 
-        state.respond_to_permission(response).map_err(to_error)
-    })
+    state.respond_to_permission(response).map_err(to_error)
 }
 
 // ============================================================================
@@ -151,11 +135,9 @@ pub async fn agent_set_thinking_mode(
     max_tokens: Option<u32>,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_set_thinking_mode", {
-        state
-            .set_thinking_mode(&session_id, enabled, max_tokens)
-            .map_err(to_error)
-    })
+    state
+        .set_thinking_mode(&session_id, enabled, max_tokens)
+        .map_err(to_error)
 }
 
 /// Get thinking mode for a session
@@ -164,9 +146,7 @@ pub async fn agent_get_thinking_mode(
     session_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<bool> {
-    perf_log!(PerfSource::Sidecar, "agent_get_thinking_mode", {
-        state.get_thinking_mode(&session_id).map_err(to_error)
-    })
+    state.get_thinking_mode(&session_id).map_err(to_error)
 }
 
 /// Set model for a session
@@ -176,16 +156,14 @@ pub async fn agent_set_model(
     model: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_set_model", {
-        let model = match model.as_str() {
-            "haiku" => Model::Haiku,
-            "sonnet" => Model::Sonnet,
-            "opus" => Model::Opus,
-            _ => return Err("Invalid model: must be 'haiku', 'sonnet', or 'opus'".to_owned()),
-        };
+    let model = match model.as_str() {
+        "haiku" => Model::Haiku,
+        "sonnet" => Model::Sonnet,
+        "opus" => Model::Opus,
+        _ => return Err("Invalid model: must be 'haiku', 'sonnet', or 'opus'".to_owned()),
+    };
 
-        state.set_model(&session_id, model).map_err(to_error)
-    })
+    state.set_model(&session_id, model).map_err(to_error)
 }
 
 /// Set plan mode for a session
@@ -195,9 +173,7 @@ pub async fn agent_set_plan_mode(
     enabled: bool,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_set_plan_mode", {
-        state.set_plan_mode(&session_id, enabled).map_err(to_error)
-    })
+    state.set_plan_mode(&session_id, enabled).map_err(to_error)
 }
 
 /// Get plan mode for a session
@@ -206,9 +182,7 @@ pub async fn agent_get_plan_mode(
     session_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<bool> {
-    perf_log!(PerfSource::Sidecar, "agent_get_plan_mode", {
-        state.get_plan_mode(&session_id).map_err(to_error)
-    })
+    state.get_plan_mode(&session_id).map_err(to_error)
 }
 
 /// Set accept mode for a session
@@ -218,11 +192,9 @@ pub async fn agent_set_accept_mode(
     enabled: bool,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_set_accept_mode", {
-        state
-            .set_accept_mode(&session_id, enabled)
-            .map_err(to_error)
-    })
+    state
+        .set_accept_mode(&session_id, enabled)
+        .map_err(to_error)
 }
 
 /// Get accept mode for a session
@@ -231,9 +203,7 @@ pub async fn agent_get_accept_mode(
     session_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<bool> {
-    perf_log!(PerfSource::Sidecar, "agent_get_accept_mode", {
-        state.get_accept_mode(&session_id).map_err(to_error)
-    })
+    state.get_accept_mode(&session_id).map_err(to_error)
 }
 
 // ============================================================================
@@ -246,9 +216,7 @@ pub async fn agent_get_stored_session(
     session_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<Option<String>> {
-    perf_log!(PerfSource::Sidecar, "agent_get_stored_session", {
-        state.get_stored_session(&session_id).map_err(to_error)
-    })
+    state.get_stored_session(&session_id).map_err(to_error)
 }
 
 /// Cleanup old sessions
@@ -257,9 +225,7 @@ pub async fn agent_cleanup_sessions(
     max_age_days: Option<u32>,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<i64> {
-    perf_log!(PerfSource::Sidecar, "agent_cleanup_sessions", {
-        state.cleanup_sessions(max_age_days).map_err(to_error)
-    })
+    state.cleanup_sessions(max_age_days).map_err(to_error)
 }
 
 // ============================================================================
@@ -272,9 +238,7 @@ pub async fn agent_list_agents(
     workspace_path: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<Vec<SubagentDefinition>> {
-    perf_log!(PerfSource::Sidecar, "agent_list_agents", {
-        state.list_agents(&workspace_path).map_err(to_error)
-    })
+    state.list_agents(&workspace_path).map_err(to_error)
 }
 
 /// Get a single agent by name
@@ -284,9 +248,7 @@ pub async fn agent_get_agent(
     name: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<Option<SubagentDefinition>> {
-    perf_log!(PerfSource::Sidecar, "agent_get_agent", {
-        state.get_agent(&workspace_path, &name).map_err(to_error)
-    })
+    state.get_agent(&workspace_path, &name).map_err(to_error)
 }
 
 /// Create a new agent
@@ -296,9 +258,7 @@ pub async fn agent_create_agent(
     agent: SubagentDefinition,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<SubagentDefinition> {
-    perf_log!(PerfSource::Sidecar, "agent_create_agent", {
-        state.create_agent(&workspace_path, agent).map_err(to_error)
-    })
+    state.create_agent(&workspace_path, agent).map_err(to_error)
 }
 
 /// Update an existing agent
@@ -309,11 +269,9 @@ pub async fn agent_update_agent(
     agent: SubagentDefinition,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<SubagentDefinition> {
-    perf_log!(PerfSource::Sidecar, "agent_update_agent", {
-        state
-            .update_agent(&workspace_path, &original_name, agent)
-            .map_err(to_error)
-    })
+    state
+        .update_agent(&workspace_path, &original_name, agent)
+        .map_err(to_error)
 }
 
 /// Delete an agent
@@ -323,9 +281,7 @@ pub async fn agent_delete_agent(
     name: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_delete_agent", {
-        state.delete_agent(&workspace_path, &name).map_err(to_error)
-    })
+    state.delete_agent(&workspace_path, &name).map_err(to_error)
 }
 
 // ============================================================================
@@ -338,9 +294,7 @@ pub async fn agent_list_commands(
     workspace_path: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<Vec<SlashCommandDefinition>> {
-    perf_log!(PerfSource::Sidecar, "agent_list_commands", {
-        state.list_commands(&workspace_path).map_err(to_error)
-    })
+    state.list_commands(&workspace_path).map_err(to_error)
 }
 
 /// Get a single command by name and scope
@@ -351,23 +305,20 @@ pub async fn agent_get_command(
     scope: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<Option<SlashCommandDefinition>> {
-    perf_log!(PerfSource::Sidecar, "agent_get_command", {
-        let scope = match scope.as_str() {
-            "builtin" => CommandScope::Builtin,
-            "default" => CommandScope::Default,
-            "project" => CommandScope::Project,
-            "personal" => CommandScope::Personal,
-            _ => {
-                return Err(
-                    "Invalid scope: must be 'builtin', 'default', 'project', or 'personal'"
-                        .to_owned(),
-                )
-            },
-        };
-        state
-            .get_command(&workspace_path, &name, scope)
-            .map_err(to_error)
-    })
+    let scope = match scope.as_str() {
+        "builtin" => CommandScope::Builtin,
+        "default" => CommandScope::Default,
+        "project" => CommandScope::Project,
+        "personal" => CommandScope::Personal,
+        _ => {
+            return Err(
+                "Invalid scope: must be 'builtin', 'default', 'project', or 'personal'".to_owned(),
+            )
+        },
+    };
+    state
+        .get_command(&workspace_path, &name, scope)
+        .map_err(to_error)
 }
 
 /// Create a new command
@@ -377,11 +328,9 @@ pub async fn agent_create_command(
     command: SlashCommandDefinition,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<SlashCommandDefinition> {
-    perf_log!(PerfSource::Sidecar, "agent_create_command", {
-        state
-            .create_command(&workspace_path, command)
-            .map_err(to_error)
-    })
+    state
+        .create_command(&workspace_path, command)
+        .map_err(to_error)
 }
 
 /// Update an existing command
@@ -392,11 +341,9 @@ pub async fn agent_update_command(
     command: SlashCommandDefinition,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<SlashCommandDefinition> {
-    perf_log!(PerfSource::Sidecar, "agent_update_command", {
-        state
-            .update_command(&workspace_path, &original_name, command)
-            .map_err(to_error)
-    })
+    state
+        .update_command(&workspace_path, &original_name, command)
+        .map_err(to_error)
 }
 
 /// Delete a command
@@ -407,23 +354,20 @@ pub async fn agent_delete_command(
     scope: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_delete_command", {
-        let scope = match scope.as_str() {
-            "builtin" => CommandScope::Builtin,
-            "default" => CommandScope::Default,
-            "project" => CommandScope::Project,
-            "personal" => CommandScope::Personal,
-            _ => {
-                return Err(
-                    "Invalid scope: must be 'builtin', 'default', 'project', or 'personal'"
-                        .to_owned(),
-                )
-            },
-        };
-        state
-            .delete_command(&workspace_path, &name, scope)
-            .map_err(to_error)
-    })
+    let scope = match scope.as_str() {
+        "builtin" => CommandScope::Builtin,
+        "default" => CommandScope::Default,
+        "project" => CommandScope::Project,
+        "personal" => CommandScope::Personal,
+        _ => {
+            return Err(
+                "Invalid scope: must be 'builtin', 'default', 'project', or 'personal'".to_owned(),
+            )
+        },
+    };
+    state
+        .delete_command(&workspace_path, &name, scope)
+        .map_err(to_error)
 }
 
 // ============================================================================
@@ -437,9 +381,7 @@ pub async fn agent_fork_session(
     options: Option<ForkSessionOptions>,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<ForkSessionResult> {
-    perf_log!(PerfSource::Sidecar, "agent_fork_session", {
-        state.fork_session(&session_id, options).map_err(to_error)
-    })
+    state.fork_session(&session_id, options).map_err(to_error)
 }
 
 /// Rewind files to a specific checkpoint.
@@ -451,11 +393,9 @@ pub async fn agent_rewind_files(
     checkpoint_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    perf_log!(PerfSource::Sidecar, "agent_rewind_files", {
-        state
-            .rewind_files(&session_id, &checkpoint_id)
-            .map_err(to_error)
-    })
+    state
+        .rewind_files(&session_id, &checkpoint_id)
+        .map_err(to_error)
 }
 
 /// Generate an agent definition from a natural language description
@@ -464,11 +404,9 @@ pub async fn agent_generate_agent_definition(
     description: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<SubagentDefinition> {
-    perf_log!(PerfSource::Sidecar, "agent_generate_agent_definition", {
-        state
-            .generate_agent_definition(&description)
-            .map_err(to_error)
-    })
+    state
+        .generate_agent_definition(&description)
+        .map_err(to_error)
 }
 
 /// Generate a command definition from a natural language description
@@ -477,11 +415,9 @@ pub async fn agent_generate_command_definition(
     description: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<SlashCommandDefinition> {
-    perf_log!(PerfSource::Sidecar, "agent_generate_command_definition", {
-        state
-            .generate_command_definition(&description)
-            .map_err(to_error)
-    })
+    state
+        .generate_command_definition(&description)
+        .map_err(to_error)
 }
 
 // ============================================================================

@@ -12,173 +12,132 @@ use std::path::Path;
 use orbit_core::{GitBranch, GitCommit, GitStatus, Result};
 use orbit_git::{BlameLine, BranchInfo, FileDiff, GitManager, WorktreeAddOptions, WorktreeInfo};
 
-use crate::core::perf_logger::PerfSource;
-use crate::perf_log;
-
 /// Discover the git repository containing the given path.
 ///
 /// Searches upward to find the repository root.
 #[tauri::command]
 pub fn git_discover(path: String) -> Result<String> {
-    perf_log!(PerfSource::Git, "git_discover", {
-        let repo_path = orbit_git::discover(Path::new(&path))?;
-        Ok(repo_path.to_string_lossy().to_string())
-    })
+    let repo_path = orbit_git::discover(Path::new(&path))?;
+    Ok(repo_path.to_string_lossy().to_string())
 }
 
 /// Get git repository status.
 #[tauri::command]
 pub fn git_status(repo_path: String) -> Result<GitStatus> {
-    perf_log!(PerfSource::Git, "git_status", {
-        let manager = GitManager::new();
-        manager.status(&repo_path)
-    })
+    let manager = GitManager::new();
+    manager.status(&repo_path)
 }
 
 /// Stage files for commit.
 #[tauri::command]
 pub fn git_stage(repo_path: String, files: Vec<String>) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_stage", {
-        let manager = GitManager::new();
-        manager.stage(&repo_path, &files)
-    })
+    let manager = GitManager::new();
+    manager.stage(&repo_path, &files)
 }
 
 /// Unstage files.
 #[tauri::command]
 pub fn git_unstage(repo_path: String, files: Vec<String>) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_unstage", {
-        let manager = GitManager::new();
-        manager.unstage(&repo_path, &files)
-    })
+    let manager = GitManager::new();
+    manager.unstage(&repo_path, &files)
 }
 
 /// Create a commit.
 #[tauri::command]
 pub fn git_commit(repo_path: String, message: String) -> Result<String> {
-    perf_log!(PerfSource::Git, "git_commit", {
-        let manager = GitManager::new();
-        manager.commit(&repo_path, &message)
-    })
+    let manager = GitManager::new();
+    manager.commit(&repo_path, &message)
 }
 
 /// Get diff for changes (as unified diff string).
 #[tauri::command]
 pub fn git_diff(repo_path: String, file: Option<String>) -> Result<String> {
-    perf_log!(PerfSource::Git, "git_diff", {
-        let manager = GitManager::new();
-        manager.diff(&repo_path, file.as_deref())
-    })
+    let manager = GitManager::new();
+    manager.diff(&repo_path, file.as_deref())
 }
 
 /// Get structured diff for changes.
 #[tauri::command]
 pub fn git_diff_structured(repo_path: String) -> Result<Vec<FileDiff>> {
-    perf_log!(PerfSource::Git, "git_diff_structured", {
-        let manager = GitManager::new();
-        manager.get_diff_structured(&repo_path)
-    })
+    let manager = GitManager::new();
+    manager.get_diff_structured(&repo_path)
 }
 
 /// Get staged diff (structured).
 #[tauri::command]
 pub fn git_staged_diff(repo_path: String) -> Result<Vec<FileDiff>> {
-    perf_log!(PerfSource::Git, "git_staged_diff", {
-        orbit_git::get_staged_diff(Path::new(&repo_path))
-    })
+    orbit_git::get_staged_diff(Path::new(&repo_path))
 }
 
 /// Discard changes in files.
 #[tauri::command]
 pub fn git_discard(repo_path: String, files: Vec<String>) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_discard", {
-        let manager = GitManager::new();
-        manager.discard(&repo_path, &files)
-    })
+    let manager = GitManager::new();
+    manager.discard(&repo_path, &files)
 }
 
 /// Get commit history.
 #[tauri::command]
 pub fn git_log(repo_path: String, limit: Option<u32>) -> Result<Vec<GitCommit>> {
-    perf_log!(PerfSource::Git, "git_log", {
-        let manager = GitManager::new();
-        manager.log(&repo_path, limit)
-    })
+    let manager = GitManager::new();
+    manager.log(&repo_path, limit)
 }
 
 /// List branches.
 #[tauri::command]
 pub fn git_branches(repo_path: String) -> Result<Vec<GitBranch>> {
-    perf_log!(PerfSource::Git, "git_branches", {
-        let manager = GitManager::new();
-        manager.branches(&repo_path)
-    })
+    let manager = GitManager::new();
+    manager.branches(&repo_path)
 }
 
 /// Get branch info (with more details).
 #[tauri::command]
 pub fn git_branch_info(repo_path: String) -> Result<Vec<BranchInfo>> {
-    perf_log!(PerfSource::Git, "git_branch_info", {
-        orbit_git::branches(Path::new(&repo_path))
-    })
+    orbit_git::branches(Path::new(&repo_path))
 }
 
 /// Checkout a branch.
 #[tauri::command]
 pub fn git_checkout(repo_path: String, branch: String) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_checkout", {
-        let manager = GitManager::new();
-        manager.checkout(&repo_path, &branch)
-    })
+    let manager = GitManager::new();
+    manager.checkout(&repo_path, &branch)
 }
 
 /// Create a new branch.
 #[tauri::command]
 pub fn git_create_branch(repo_path: String, name: String) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_create_branch", {
-        orbit_git::create_branch(Path::new(&repo_path), &name)
-    })
+    orbit_git::create_branch(Path::new(&repo_path), &name)
 }
 
 /// Delete a branch.
 #[tauri::command]
 pub fn git_delete_branch(repo_path: String, name: String) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_delete_branch", {
-        orbit_git::delete_branch(Path::new(&repo_path), &name)
-    })
+    orbit_git::delete_branch(Path::new(&repo_path), &name)
 }
 
 /// Get blame information for a file.
 #[tauri::command]
 pub fn git_blame(repo_path: String, file: String) -> Result<Vec<BlameLine>> {
-    perf_log!(PerfSource::Git, "git_blame", {
-        let manager = GitManager::new();
-        manager.blame(&repo_path, &file)
-    })
+    let manager = GitManager::new();
+    manager.blame(&repo_path, &file)
 }
 
 /// Stage all changes.
 #[tauri::command]
 pub fn git_stage_all(repo_path: String) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_stage_all", {
-        orbit_git::stage_all(Path::new(&repo_path))
-    })
+    orbit_git::stage_all(Path::new(&repo_path))
 }
 
 /// Push commits to the remote repository.
 #[tauri::command]
 pub async fn git_push(repo_path: String, remote: Option<String>) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_push", {
-        orbit_git::push(Path::new(&repo_path), remote.as_deref()).await
-    })
+    orbit_git::push(Path::new(&repo_path), remote.as_deref()).await
 }
 
 /// Pull changes from the remote repository.
 #[tauri::command]
 pub async fn git_pull(repo_path: String, remote: Option<String>) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_pull", {
-        orbit_git::pull(Path::new(&repo_path), remote.as_deref()).await
-    })
+    orbit_git::pull(Path::new(&repo_path), remote.as_deref()).await
 }
 
 /// Fetch updates from the remote repository.
@@ -186,25 +145,19 @@ pub async fn git_pull(repo_path: String, remote: Option<String>) -> Result<()> {
 /// This updates remote tracking refs without modifying the working directory.
 #[tauri::command]
 pub async fn git_fetch(repo_path: String, remote: Option<String>) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_fetch", {
-        orbit_git::fetch(Path::new(&repo_path), remote.as_deref()).await
-    })
+    orbit_git::fetch(Path::new(&repo_path), remote.as_deref()).await
 }
 
 /// Clone a git repository to a target directory.
 #[tauri::command]
 pub async fn git_clone(url: String, target_path: String) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_clone", {
-        orbit_git::clone(&url, Path::new(&target_path)).await
-    })
+    orbit_git::clone(&url, Path::new(&target_path)).await
 }
 
 /// List all worktrees for the repository.
 #[tauri::command]
 pub async fn git_worktree_list(repo_path: String) -> Result<Vec<WorktreeInfo>> {
-    perf_log!(PerfSource::Git, "git_worktree_list", {
-        orbit_git::worktree_list(Path::new(&repo_path)).await
-    })
+    orbit_git::worktree_list(Path::new(&repo_path)).await
 }
 
 /// Add a new worktree.
@@ -214,9 +167,7 @@ pub async fn git_worktree_add(
     worktree_path: String,
     options: WorktreeAddOptions,
 ) -> Result<WorktreeInfo> {
-    perf_log!(PerfSource::Git, "git_worktree_add", {
-        orbit_git::worktree_add(Path::new(&repo_path), Path::new(&worktree_path), &options).await
-    })
+    orbit_git::worktree_add(Path::new(&repo_path), Path::new(&worktree_path), &options).await
 }
 
 /// Remove a worktree.
@@ -226,7 +177,5 @@ pub async fn git_worktree_remove(
     worktree_path: String,
     force: bool,
 ) -> Result<()> {
-    perf_log!(PerfSource::Git, "git_worktree_remove", {
-        orbit_git::worktree_remove(Path::new(&repo_path), Path::new(&worktree_path), force).await
-    })
+    orbit_git::worktree_remove(Path::new(&repo_path), Path::new(&worktree_path), force).await
 }

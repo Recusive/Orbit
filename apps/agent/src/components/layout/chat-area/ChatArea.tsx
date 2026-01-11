@@ -40,6 +40,9 @@ import {
   useTerminalPosition,
   useIsLoadingConversation,
   useIsConversationTransitioning,
+  useReviewPanelOpen,
+  useBottomPanelOpen,
+  useBottomPanelHeight,
 } from '@/stores/ui/ui-store';
 
 // Lazy load heavy components
@@ -53,14 +56,14 @@ const TerminalPanel: FC<TerminalPanelProps> = (props) => (
 );
 
 export const ChatArea: FC = () => {
-  const {
-    reviewPanelOpen,
-    bottomPanelOpen,
-    bottomPanelHeight,
-    setBottomPanelHeight,
-    setConversationTransitioning,
-    setLoadingConversation,
-  } = useUIStore();
+  // ============================================
+  // Isolated Selectors (Minimal Subscriptions)
+  // ============================================
+  // Each selector creates an independent subscription. Changes to one value
+  // don't trigger re-renders for components subscribed to other values.
+  const reviewPanelOpen = useReviewPanelOpen();
+  const bottomPanelOpen = useBottomPanelOpen();
+  const bottomPanelHeight = useBottomPanelHeight();
   const terminalPosition = useTerminalPosition();
   const isLoadingConversation = useIsLoadingConversation();
   const isTransitioning = useIsConversationTransitioning();
@@ -92,11 +95,12 @@ export const ChatArea: FC = () => {
   } = useChatMessages();
 
   // Layout stabilization hook
+  // PERF: Get actions via getState() to avoid subscription overhead
   const { contentRef } = useLayoutStabilization({
     isTransitioning,
     messageCount: messages.length,
-    setLoadingConversation,
-    setConversationTransitioning,
+    setLoadingConversation: useUIStore.getState().setLoadingConversation,
+    setConversationTransitioning: useUIStore.getState().setConversationTransitioning,
   });
 
   // Create addMessage function for queued message handler
@@ -161,6 +165,7 @@ export const ChatArea: FC = () => {
   }, [bottomPanelOpen]);
 
   // Track terminal size when user drags - save to shared store
+  // PERF: Use getState() inside callback to avoid subscription to action
   const handleTerminalSizeChange = useCallback(
     (sizes: number[]): void => {
       const terminalSize = sizes[1];
@@ -170,10 +175,10 @@ export const ChatArea: FC = () => {
         bottomPanelOpen
       ) {
         // Only save if it's a meaningful size (not collapsed)
-        setBottomPanelHeight(terminalSize);
+        useUIStore.getState().setBottomPanelHeight(terminalSize);
       }
     },
-    [bottomPanelOpen, setBottomPanelHeight]
+    [bottomPanelOpen]
   );
 
   // Chat content section - shared between layout modes

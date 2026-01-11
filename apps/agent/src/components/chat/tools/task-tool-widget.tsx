@@ -1,4 +1,5 @@
 import { Bot, ChevronDown, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
@@ -139,52 +140,60 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
         </button>
 
         {/* Collapsible content */}
-        <div
-          className={cn(
-            'grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
-            isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          )}
-        >
-          <div className="overflow-hidden min-h-0">
-            {/* Task details */}
-            <div className="px-2.5 py-2 bg-muted/30">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase">
-                  agent
+        <AnimatePresence initial={false} mode="wait">
+          {isExpanded ? (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+                opacity: { duration: 0.15, ease: 'easeOut' },
+              }}
+              style={{ overflow: 'hidden' }}
+            >
+              {/* Task details */}
+              <div className="px-2.5 py-2 bg-muted/30">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase">
+                    agent
+                  </div>
+                  <span className="px-1 py-0.5 rounded bg-muted/50 text-sm font-medium text-foreground">
+                    {formattedType}
+                  </span>
+                  {model ? (
+                    <span className="text-sm text-muted-foreground/60">({model})</span>
+                  ) : null}
                 </div>
-                <span className="px-1 py-0.5 rounded bg-muted/50 text-sm font-medium text-foreground">
-                  {formattedType}
-                </span>
-                {model ? <span className="text-sm text-muted-foreground/60">({model})</span> : null}
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
+                  prompt
+                </div>
+                <div className="text-sm text-foreground line-clamp-3" title={prompt}>
+                  {truncatePrompt(prompt, 300)}
+                </div>
               </div>
-              <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
-                prompt
-              </div>
-              <div className="text-sm text-foreground line-clamp-3" title={prompt}>
-                {truncatePrompt(prompt, 300)}
-              </div>
-            </div>
 
-            {/* Output */}
-            <div className="h-px bg-border/30 mx-2.5" />
-            <div className="p-2.5">
-              {isRunning ? (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  <span>Agent is working on the task...</span>
-                </div>
-              ) : output ? (
-                <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none text-sm">
-                  <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>
-                    {parseTaskOutput(output)}
-                  </Streamdown>
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground/60 italic">Task completed</div>
-              )}
-            </div>
-          </div>
-        </div>
+              {/* Output */}
+              <div className="h-px bg-border/30 mx-2.5" />
+              <div className="p-2.5">
+                {isRunning ? (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    <span>Agent is working on the task...</span>
+                  </div>
+                ) : output ? (
+                  <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none text-sm">
+                    <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>
+                      {parseTaskOutput(output)}
+                    </Streamdown>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground/60 italic">Task completed</div>
+                )}
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   );

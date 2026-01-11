@@ -53,33 +53,8 @@ export function useMessageState(sessionId: string): UseMessageStateReturn {
     }
   }, [messages]);
 
-  // Track if we have pending animations - only run interval when needed
-  const hasAnimatingMessage = messages.some((m) => m.displayedContent.length < m.content.length);
-
-  // Streaming animation - use interval to reveal content progressively
-  // Only runs when there's actually content to animate
-  useEffect(() => {
-    if (!hasAnimatingMessage) return;
-
-    const intervalId = window.setInterval(() => {
-      setMessages((prev) => {
-        const pendingIdx = prev.findIndex((m) => m.displayedContent.length < m.content.length);
-        if (pendingIdx === -1) return prev;
-
-        const msg = prev[pendingIdx];
-        if (!msg) return prev;
-        const nextLength = Math.min(msg.displayedContent.length + 3, msg.content.length);
-        const newMsg: ChatMessage = { ...msg, displayedContent: msg.content.slice(0, nextLength) };
-        const updated = [...prev];
-        updated[pendingIdx] = newMsg;
-        return updated;
-      });
-    }, 16);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [hasAnimatingMessage]);
+  // Animation interval removed for performance - streaming effect now achieved
+  // through backend batching (50ms) + Streamdown's incremental markdown rendering.
 
   return {
     messages,

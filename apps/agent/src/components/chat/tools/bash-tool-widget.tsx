@@ -1,4 +1,5 @@
 import { ChevronDown, Loader2, Terminal } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { codeToHtml } from 'shiki';
 
@@ -73,11 +74,10 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
     <div>
       <div
         className={cn(
-          'bg-card overflow-hidden transition-all duration-200',
+          'bg-card overflow-hidden rounded-lg shadow-md',
           isFailed
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
-            : 'border border-border/50',
-          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
+            : 'border border-border/50'
         )}
       >
         {/* Header */}
@@ -125,66 +125,72 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
         </button>
 
         {/* Collapsible content */}
-        <div
-          className={cn(
-            'grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
-            isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          )}
-        >
-          <div className="overflow-hidden min-h-0">
-            {/* Command section */}
-            <div className="px-2.5 py-2 bg-muted/30">
-              <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
-                command
+        <AnimatePresence initial={false} mode="wait">
+          {isExpanded ? (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+                opacity: { duration: 0.15, ease: 'easeOut' },
+              }}
+              style={{ overflow: 'hidden' }}
+            >
+              {/* Command section */}
+              <div className="px-2.5 py-2 bg-muted/30">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
+                  command
+                </div>
+                {highlightedCommand ? (
+                  <div
+                    className="bg-muted/50 rounded-md px-2 py-1 font-mono text-sm overflow-x-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent [&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_code]:!bg-transparent"
+                    dangerouslySetInnerHTML={{ __html: highlightedCommand }}
+                  />
+                ) : (
+                  <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-sm text-foreground break-all">
+                    {command}
+                  </code>
+                )}
               </div>
-              {highlightedCommand ? (
-                <div
-                  className="bg-muted/50 rounded-md px-2 py-1 font-mono text-sm overflow-x-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent [&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_code]:!bg-transparent"
-                  dangerouslySetInnerHTML={{ __html: highlightedCommand }}
-                />
-              ) : (
-                <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-sm text-foreground break-all">
-                  {command}
-                </code>
-              )}
-            </div>
 
-            {/* Description section */}
-            {description ? (
-              <>
-                <div className="h-px bg-border/30 mx-2.5" />
-                <div className="px-2.5 py-2">
-                  <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
-                    description
-                  </div>
-                  <div className="text-sm text-muted-foreground">{description}</div>
-                </div>
-              </>
-            ) : null}
-
-            {/* Output section */}
-            <div className="h-px bg-border/30 mx-2.5" />
-            <div className="p-2.5">
-              {isRunning && !output ? (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  <span>Running command...</span>
-                </div>
-              ) : output ? (
-                <div className="bg-muted/40 rounded-lg p-2 border border-border/30 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
-                  <pre className="whitespace-pre-wrap break-words m-0">{displayOutput}</pre>
-                  {hasMoreLines && !isExpanded ? (
-                    <div className="mt-1.5 text-muted-foreground/60">
-                      {outputLines.length} lines total
+              {/* Description section */}
+              {description ? (
+                <>
+                  <div className="h-px bg-border/30 mx-2.5" />
+                  <div className="px-2.5 py-2">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
+                      description
                     </div>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground/60 italic">No output</div>
-              )}
-            </div>
-          </div>
-        </div>
+                    <div className="text-sm text-muted-foreground">{description}</div>
+                  </div>
+                </>
+              ) : null}
+
+              {/* Output section */}
+              <div className="h-px bg-border/30 mx-2.5" />
+              <div className="p-2.5">
+                {isRunning && !output ? (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    <span>Running command...</span>
+                  </div>
+                ) : output ? (
+                  <div className="bg-muted/40 rounded-lg p-2 border border-border/30 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
+                    <pre className="whitespace-pre-wrap break-words m-0">{displayOutput}</pre>
+                    {hasMoreLines ? (
+                      <div className="mt-1.5 text-muted-foreground/60">
+                        {String(outputLines.length)} lines total
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground/60 italic">No output</div>
+                )}
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   );

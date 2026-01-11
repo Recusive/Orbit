@@ -114,6 +114,16 @@ pub struct AgentMessage {
     #[serde(rename = "type")]
     pub message_type: AgentMessageType,
     pub content: String,
+    /// Stable message ID from SDK - all events in a single assistant turn share this ID
+    /// Used for batching text events on the frontend
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_id: Option<String>,
+    /// Position in the text stream where this event occurred.
+    /// For tool_use events, this is the character offset in the accumulated text
+    /// at the time the tool was invoked. Used by frontend to interleave tool
+    /// widgets at the correct position in the message.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_offset: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ToolMetadata>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -517,7 +527,7 @@ pub enum BridgeEvent {
     AgentMessage {
         #[serde(rename = "sessionId")]
         session_id: String,
-        message: AgentMessage,
+        message: Box<AgentMessage>,
     },
     PermissionRequest {
         request: PermissionRequest,

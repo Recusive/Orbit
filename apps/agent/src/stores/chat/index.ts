@@ -1,5 +1,5 @@
 /**
- * Chat stores - Message queue state
+ * Chat stores - Message queue and streaming state
  */
 
 // Queued message store

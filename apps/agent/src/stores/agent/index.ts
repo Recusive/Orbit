@@ -1,10 +1,21 @@
 /**
- * Agent stores - Checkpoints and tool execution
+ * Agent stores - Checkpoints, commands, and tool execution
  */
 
 // Checkpoint store
 export { useCheckpointStore } from './checkpoint-store';
 export type { RewindCheckpoints, CheckpointState } from './checkpoint-store';
+
+// Commands store
+export {
+  useCommandsStore,
+  useCommands,
+  useCommandsLoading,
+  useCommandsHasFetched,
+  useCommandsError,
+  useSlashCommands,
+} from './commands-store';
+export type { CommandsState, SlashCommand } from './commands-store';
 
 // Tool store
 export {

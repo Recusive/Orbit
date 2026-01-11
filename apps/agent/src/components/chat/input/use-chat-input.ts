@@ -7,11 +7,11 @@ import { usePopoverNavigation, handlePopoverKeyDown } from './use-popover-naviga
 
 import type { SlashCommand, UseChatInputOptions, UseChatInputReturn } from './types';
 import type { ContextItem, FileEntry } from '@/types/agent/context';
-import type { ExtensionMessage, InputMode } from '@/types/protocol';
+import type { InputMode } from '@/types/protocol';
 
-import { useTauri } from '@/hooks/agent/use-tauri';
 import { compressImage } from '@/lib/utils/image-utils';
 import { cn } from '@/lib/utils/utils';
+import { useSlashCommands, useCommandsStore } from '@/stores/agent';
 import { useElementContexts, useBrowserStore } from '@/stores/browser/browser-store';
 
 export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
@@ -29,8 +29,10 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   // Core input state
   const [inputText, setInputText] = useState('');
   const [attachedContext, setAttachedContext] = useState<ContextItem[]>([]);
-  const [slashCommands, setSlashCommands] = useState<SlashCommand[]>([]);
-  const commandsFetchedRef = useRef(false);
+
+  // Slash commands from centralized store (prevents duplicate IPC calls)
+  const slashCommands = useSlashCommands();
+  const fetchCommands = useCommandsStore((state) => state.fetchCommands);
 
   // Refs
   const inputRef = useRef<HTMLDivElement>(null);
@@ -44,29 +46,10 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const removeElementContext = useBrowserStore((state) => state.removeElementContext);
   const clearElementContexts = useBrowserStore((state) => state.clearElementContexts);
 
-  // Fetch slash commands from backend
-  const handleCommandsMessage = useCallback((message: ExtensionMessage): void => {
-    if (message.type === 'commands:list:response') {
-      const commands: SlashCommand[] = message.commands.map((cmd) => ({
-        name: cmd.name,
-        description: cmd.description ?? '',
-      }));
-      setSlashCommands(commands);
-    }
-  }, []);
-
-  const { postMessage } = useTauri({ onMessage: handleCommandsMessage });
-
-  // Fetch commands on mount
+  // Fetch commands on mount (store handles deduplication)
   useEffect(() => {
-    if (!commandsFetchedRef.current) {
-      commandsFetchedRef.current = true;
-      postMessage({
-        type: 'commands:list',
-        uuid: crypto.randomUUID(),
-      });
-    }
-  }, [postMessage]);
+    void fetchCommands();
+  }, [fetchCommands]);
 
   // Listen for focus event from feedback button
   useEffect(() => {

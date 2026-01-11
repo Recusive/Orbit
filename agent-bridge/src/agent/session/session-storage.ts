@@ -1,5 +1,9 @@
 /*---------------------------------------------------------------------------------------------
  *  Session Storage - Persists SDK session IDs for resume functionality
+ *
+ *  PERFORMANCE: Uses in-memory caching to prevent repeated disk I/O.
+ *  Sessions are loaded from disk once on first access, then operated on in memory.
+ *  Disk writes only occur when data is modified (save, delete, touch, cleanup).
  *--------------------------------------------------------------------------------------------*/
 
 import * as fs from 'node:fs';
@@ -21,6 +25,13 @@ export type { StoredSession } from '../../protocol/schemas.js';
 const STORAGE_VERSION = 1;
 const STORAGE_FILENAME = 'orbit-sessions.json';
 const MAX_SESSIONS = 50; // Limit stored sessions to prevent unbounded growth
+
+// ============================================
+// In-memory cache
+// ============================================
+
+/** In-memory cache of sessions - null means not yet loaded from disk */
+let sessionsCache: StoredSession[] | null = null;
 
 /**
  * Get the storage directory path
@@ -60,9 +71,9 @@ function ensureStorageDir(): void {
 }
 
 /**
- * Load sessions from storage (internal helper)
+ * Load sessions from disk into cache (only called once)
  */
-function loadSessions(): StoredSession[] {
+function loadSessionsFromDisk(): StoredSession[] {
   try {
     const storagePath = getStoragePath();
     if (!fs.existsSync(storagePath)) {
@@ -93,7 +104,7 @@ function loadSessions(): StoredSession[] {
       return [];
     }
 
-    logger.info({ count: parsed.sessions.length }, 'Loaded sessions from storage');
+    logger.info({ count: parsed.sessions.length }, 'Loaded sessions from storage (initial load)');
     return parsed.sessions;
   } catch (error) {
     logger.error({ error }, 'Failed to load sessions from storage');
@@ -102,9 +113,17 @@ function loadSessions(): StoredSession[] {
 }
 
 /**
- * Save sessions to storage (internal helper)
+ * Get sessions from cache (lazy-loads from disk on first access)
  */
-function saveSessions(sessions: StoredSession[]): void {
+function getSessions(): StoredSession[] {
+  sessionsCache ??= loadSessionsFromDisk();
+  return sessionsCache;
+}
+
+/**
+ * Save sessions to disk and update cache
+ */
+function persistSessions(sessions: StoredSession[]): void {
   try {
     ensureStorageDir();
 
@@ -112,6 +131,9 @@ function saveSessions(sessions: StoredSession[]): void {
     const sortedSessions = [...sessions]
       .sort((a, b) => b.lastActiveAt - a.lastActiveAt)
       .slice(0, MAX_SESSIONS);
+
+    // Update cache
+    sessionsCache = sortedSessions;
 
     const data: SessionStorageData = {
       version: STORAGE_VERSION,
@@ -130,7 +152,7 @@ function saveSessions(sessions: StoredSession[]): void {
  * Save or update a single session
  */
 export function saveSession(session: StoredSession): void {
-  const sessions = loadSessions();
+  const sessions = getSessions();
   const existingIndex = sessions.findIndex((s) => s.sessionId === session.sessionId);
 
   if (existingIndex >= 0) {
@@ -139,14 +161,14 @@ export function saveSession(session: StoredSession): void {
     sessions.push(session);
   }
 
-  saveSessions(sessions);
+  persistSessions(sessions);
 }
 
 /**
- * Get a session by session ID (internal helper)
+ * Get a session by session ID (from cache)
  */
 function getSession(sessionId: string): StoredSession | undefined {
-  const sessions = loadSessions();
+  const sessions = getSessions();
   return sessions.find((s) => s.sessionId === sessionId);
 }
 
@@ -162,20 +184,20 @@ export function getSDKSessionIdForSession(sessionId: string): string | undefined
  * Delete a session
  */
 export function deleteSession(sessionId: string): void {
-  const sessions = loadSessions();
+  const sessions = getSessions();
   const filtered = sessions.filter((s) => s.sessionId !== sessionId);
-  saveSessions(filtered);
+  persistSessions(filtered);
 }
 
 /**
  * Update the last active timestamp for a session
  */
 export function touchSession(sessionId: string): void {
-  const sessions = loadSessions();
+  const sessions = getSessions();
   const session = sessions.find((s) => s.sessionId === sessionId);
   if (session) {
     session.lastActiveAt = Date.now();
-    saveSessions(sessions);
+    persistSessions(sessions);
   } else {
     // Session not found - this can happen if message is sent before system:init completes
     logger.debug(
@@ -189,15 +211,24 @@ export function touchSession(sessionId: string): void {
  * Clean up old sessions (older than specified days)
  */
 export function cleanupOldSessions(maxAgeDays = 30): number {
-  const sessions = loadSessions();
+  const sessions = getSessions();
   const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
   const filtered = sessions.filter((s) => s.lastActiveAt >= cutoff);
   const removed = sessions.length - filtered.length;
 
   if (removed > 0) {
-    saveSessions(filtered);
+    persistSessions(filtered);
     logger.info({ removed, remaining: filtered.length }, 'Cleaned up old sessions');
   }
 
   return removed;
+}
+
+/**
+ * Invalidate the cache (for testing or forced reload)
+ * This will cause the next operation to reload from disk
+ */
+export function invalidateCache(): void {
+  sessionsCache = null;
+  logger.debug('Session storage cache invalidated');
 }

@@ -1,4 +1,5 @@
 import { ChevronDown, File, Folder, Loader2, Search } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { FC } from 'react';
@@ -113,73 +114,79 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
         </button>
 
         {/* Collapsible content */}
-        <div
-          className={cn(
-            'grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
-            isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          )}
-        >
-          <div className="overflow-hidden min-h-0">
-            {/* Pattern & Path */}
-            <div className="px-2.5 py-2 bg-muted/30">
-              <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
-                pattern
+        <AnimatePresence initial={false} mode="wait">
+          {isExpanded ? (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+                opacity: { duration: 0.15, ease: 'easeOut' },
+              }}
+              style={{ overflow: 'hidden' }}
+            >
+              {/* Pattern & Path */}
+              <div className="px-2.5 py-2 bg-muted/30">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
+                  pattern
+                </div>
+                <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-sm text-foreground">
+                  {pattern}
+                </code>
+                {path ? (
+                  <>
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1 mt-2">
+                      in
+                    </div>
+                    <span className="text-sm text-muted-foreground font-mono">{path}</span>
+                  </>
+                ) : null}
               </div>
-              <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-sm text-foreground">
-                {pattern}
-              </code>
-              {path ? (
-                <>
-                  <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1 mt-2">
-                    in
-                  </div>
-                  <span className="text-sm text-muted-foreground font-mono">{path}</span>
-                </>
-              ) : null}
-            </div>
 
-            {/* Results */}
-            <div className="h-px bg-border/30 mx-2.5" />
-            <div className="p-2.5">
-              {isRunning ? (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                  <span>Searching for files...</span>
-                </div>
-              ) : files.length > 0 ? (
-                <div className="space-y-0.5 max-h-[200px] overflow-y-auto overflow-x-hidden">
-                  {files.map((file, index) => (
-                    <button
-                      key={`${file}-${String(index)}`}
-                      type="button"
-                      onClick={() => {
-                        onOpenFile?.(file);
-                      }}
-                      className="w-full flex items-center gap-1.5 text-sm py-0.5 hover:bg-muted/40 rounded px-1.5 -mx-1.5 transition-colors overflow-hidden cursor-pointer text-left"
-                    >
-                      {file.endsWith('/') ? (
-                        <Folder className="h-3 w-3 text-muted-foreground/60 shrink-0" />
-                      ) : (
-                        <File className="h-3 w-3 text-muted-foreground/60 shrink-0" />
-                      )}
-                      <span className="font-mono text-foreground shrink-0">
-                        {getFileName(file)}
-                      </span>
-                      <span
-                        className="text-muted-foreground/60 truncate text-right flex-1"
-                        title={file}
+              {/* Results */}
+              <div className="h-px bg-border/30 mx-2.5" />
+              <div className="p-2.5">
+                {isRunning ? (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    <span>Searching for files...</span>
+                  </div>
+                ) : files.length > 0 ? (
+                  <div className="space-y-0.5 max-h-[200px] overflow-y-auto overflow-x-hidden">
+                    {files.map((file, index) => (
+                      <button
+                        key={`${file}-${String(index)}`}
+                        type="button"
+                        onClick={() => {
+                          onOpenFile?.(file);
+                        }}
+                        className="w-full flex items-center gap-1.5 text-sm py-0.5 hover:bg-muted/40 rounded px-1.5 -mx-1.5 transition-colors overflow-hidden cursor-pointer text-left"
                       >
-                        {file}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground/60 italic">No files found</div>
-              )}
-            </div>
-          </div>
-        </div>
+                        {file.endsWith('/') ? (
+                          <Folder className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+                        ) : (
+                          <File className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+                        )}
+                        <span className="font-mono text-foreground shrink-0">
+                          {getFileName(file)}
+                        </span>
+                        <span
+                          className="text-muted-foreground/60 truncate text-right flex-1"
+                          title={file}
+                        >
+                          {file}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground/60 italic">No files found</div>
+                )}
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   );

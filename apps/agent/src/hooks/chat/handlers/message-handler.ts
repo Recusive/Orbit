@@ -1,3 +1,5 @@
+import { createLogger } from '@orbit/common/lib';
+
 import type { ChatMessage } from '@/components/chat';
 import type { ExtensionMessage, Model } from '@/types/protocol';
 
@@ -9,9 +11,28 @@ import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 
+const logger = createLogger('MessageHandler');
+
 // ============================================
-// Tool Event Batching Types
+// Event Batching Constants
 // ============================================
+
+/**
+ * When cancelling a RAF batcher, flush=true processes pending items before clearing.
+ * Use FLUSH_PENDING when you want to ensure all data is rendered (e.g., on agent:complete).
+ * Use false (default) when unmounting and state may already be invalid.
+ */
+const FLUSH_PENDING = true;
+
+// ============================================
+// Event Batching Types
+// ============================================
+
+/** Text chunk event for RAF batching - accumulates rapid streaming chunks */
+interface TextChunkEvent {
+  messageId: string;
+  content: string;
+}
 
 interface ToolStartEvent {
   type: 'start';
@@ -95,6 +116,7 @@ interface MessageHandlerDeps {
       success: boolean;
     }[]
   ) => void;
+  clearSessionTools: (sessionId: string) => void;
   onSessionCreated?: ((sessionId: string, title: string) => void) | undefined;
   setSessionId: React.Dispatch<React.SetStateAction<string>>;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
@@ -105,9 +127,15 @@ interface MessageHandlerDeps {
   thinkingStartTimes: React.RefObject<Map<string, number>>;
 }
 
-export function createMessageHandler(
-  deps: MessageHandlerDeps
-): (message: ExtensionMessage) => void {
+/** Return type for createMessageHandler - handler function plus cleanup */
+export interface MessageHandlerResult {
+  /** Handle incoming extension messages */
+  handleMessage: (message: ExtensionMessage) => void;
+  /** Cleanup function - cancels pending RAF batchers. Call on unmount. */
+  cleanup: () => void;
+}
+
+export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerResult {
   const {
     setWorkspace,
     workspacePath,
@@ -124,6 +152,7 @@ export function createMessageHandler(
     switchSession,
     restoreSessionUsage,
     restoreToolsForMessage,
+    clearSessionTools,
     onSessionCreated,
     setSessionId,
     setMessages,
@@ -133,6 +162,101 @@ export function createMessageHandler(
     messagesCache,
     thinkingStartTimes,
   } = deps;
+
+  // ============================================
+  // RAF-Batched Text Chunk Processor
+  // ============================================
+  // Batches rapid text chunks (140+ during streaming) into single state updates.
+  // Reduces 58ms jank from per-chunk React state updates.
+  const batchedChunkHandler = rafBatch<TextChunkEvent>((events) => {
+    if (events.length === 0) return;
+
+    // Accumulate all chunks by message ID (in case multiple messages are streaming)
+    const chunksByMessage = new Map<string, string>();
+    for (const event of events) {
+      const existing = chunksByMessage.get(event.messageId) ?? '';
+      chunksByMessage.set(event.messageId, existing + event.content);
+    }
+
+    // Apply all accumulated content in a single setMessages call
+    setMessages((prev) => {
+      let result = prev;
+      for (const [messageId, accumulatedContent] of chunksByMessage) {
+        const lastIdx = result.length - 1;
+
+        // Sanity check: ensure valid array index before accessing
+        if (lastIdx < 0) {
+          // Empty array - create new message below
+          result = [
+            ...result,
+            {
+              id: messageId,
+              role: 'assistant' as const,
+              content: accumulatedContent,
+              displayedContent: accumulatedContent,
+              isStreaming: true,
+            },
+          ];
+          continue;
+        }
+
+        const lastMsg = result[lastIdx];
+
+        // STRICT MESSAGE MATCHING:
+        // Only append to a message if the ID matches exactly. This prevents race conditions
+        // where events for message B could be appended to message A if A is still streaming.
+        //
+        // The backend batching (50ms intervals) provides stable message IDs from the SDK.
+        // If a chunk arrives before its message exists, we create a new message with that ID.
+        // This is correct behavior - the ID comes from the SDK and identifies the turn.
+        //
+        // Previous fallback `|| lastMsg.isStreaming` was REMOVED because it caused:
+        // - Message A completes, B's first chunk arrives before B's message object created
+        // - B's chunk appended to A because A was last assistant message still marked streaming
+        // - Result: Data corruption where B's content merged into A
+        if (lastMsg?.role === 'assistant' && lastMsg.id === messageId) {
+          // Fast path: append to last assistant message with matching ID (common case)
+          const newContent = lastMsg.content + accumulatedContent;
+          result = [
+            ...result.slice(0, lastIdx),
+            { ...lastMsg, content: newContent, displayedContent: newContent },
+          ];
+        } else {
+          // Fallback: O(n) scan for out-of-order messages. This is acceptable because:
+          // 1. It's rare - normal flow uses fast path above (last message matches)
+          // 2. Message arrays are typically <100 items
+          // 3. Adding a Map index would complicate state management for minimal gain
+          // Include role check in findIndex for proper type narrowing
+          const existingIdx = result.findIndex((m) => m.id === messageId && m.role === 'assistant');
+          if (existingIdx !== -1) {
+            // Append to existing assistant message found earlier in array
+            // Safe access: findIndex returned valid index, and we checked role in predicate
+            const existingMsg = result[existingIdx];
+            if (!existingMsg) continue; // Defensive: should never happen given findIndex check
+            const newContent = existingMsg.content + accumulatedContent;
+            result = [
+              ...result.slice(0, existingIdx),
+              { ...existingMsg, content: newContent, displayedContent: newContent },
+              ...result.slice(existingIdx + 1),
+            ];
+          } else {
+            // Create new streaming message (first chunk of a new response)
+            result = [
+              ...result,
+              {
+                id: messageId,
+                role: 'assistant' as const,
+                content: accumulatedContent,
+                displayedContent: accumulatedContent,
+                isStreaming: true,
+              },
+            ];
+          }
+        }
+      }
+      return result;
+    });
+  });
 
   // ============================================
   // RAF-Batched Tool Event Processor
@@ -197,7 +321,7 @@ export function createMessageHandler(
     }
   });
 
-  return (message: ExtensionMessage): void => {
+  const handleMessage = (message: ExtensionMessage): void => {
     switch (message.type) {
       case 'system:init':
         // Only set sessionId if we don't already have an active session with messages
@@ -217,23 +341,33 @@ export function createMessageHandler(
         break;
 
       case 'agent:chunk': {
-        setMessages((prev) => {
-          const lastMsg = prev[prev.length - 1];
-          if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-            const newContent = lastMsg.content + message.content;
-            return [...prev.slice(0, -1), { ...lastMsg, content: newContent }];
-          }
-          return [
-            ...prev,
-            {
-              id: message.message_id,
-              role: 'assistant',
-              content: message.content,
-              displayedContent: '',
-              isStreaming: true,
-            },
-          ];
-        });
+        // Queue chunk to be processed in next RAF (reduces 58ms jank from rapid chunks)
+        // Multiple chunks arriving in the same frame are batched into a single state update
+        if (!message.message_id) {
+          // CRITICAL: This shouldn't happen in normal flow - backend batching provides stable IDs.
+          // If it does, we skip the chunk to prevent data corruption.
+          // Using a fallback ID risks merging chunks from different turns into one message.
+          logger.error(
+            `CRITICAL: Chunk received without message_id - content will be lost. ` +
+              `Session: ${message.session_id}, Length: ${String(message.content.length)}, ` +
+              `Preview: "${message.content.slice(0, 50)}...". Check agent-bridge batching.`
+          );
+          // Show user-visible error so they know something went wrong
+          setMessages((prev) => {
+            const errorMsg = '[Some content may be missing due to a streaming error]';
+            const lastMsg = prev[prev.length - 1];
+            // Only add error indicator once per streaming session
+            if (lastMsg?.role === 'assistant' && !lastMsg.content.includes(errorMsg)) {
+              return [
+                ...prev.slice(0, -1),
+                { ...lastMsg, content: lastMsg.content + `\n\n${errorMsg}` },
+              ];
+            }
+            return prev;
+          });
+          break;
+        }
+        batchedChunkHandler({ messageId: message.message_id, content: message.content });
         break;
       }
 
@@ -280,6 +414,11 @@ export function createMessageHandler(
       }
 
       case 'agent:complete': {
+        // Flush any pending text chunks BEFORE marking message as complete
+        // This ensures all streamed content is rendered before the message is finalized.
+        // Without this, the last chunk batch could appear AFTER isStreaming is set to false.
+        batchedChunkHandler.cancel(FLUSH_PENDING);
+
         // Calculate final thinking duration if we were tracking it
         const thinkingStart = thinkingStartTimes.current.get(message.message_id);
         const finalThinkingDuration =
@@ -375,6 +514,10 @@ export function createMessageHandler(
       }
 
       case 'agent:error': {
+        // Flush any pending text chunks before handling error
+        // This ensures partial content is preserved before appending error message
+        batchedChunkHandler.cancel(FLUSH_PENDING);
+
         setIsAgentRunning(false);
         const errorContent = `Error: ${message.error}`;
         setMessages((prev) => {
@@ -592,9 +735,12 @@ export function createMessageHandler(
 
       case 'tool:start': {
         const toolId = message.tool_id;
-        // Get content offset from current messages (outside of setState to avoid render-time updates)
+
+        // Use backend-provided content_offset for accurate tool positioning.
+        // The backend tracks accumulated text length and provides this when emitting tool events.
+        // Only fall back to computed offset if backend didn't provide one (legacy compatibility).
         const currentMsg = messagesRef.current.find((m) => m.id === message.message_id);
-        const contentOffset = currentMsg?.content.length ?? 0;
+        const contentOffset = message.content_offset ?? currentMsg?.content.length ?? 0;
 
         // Queue tool start to be processed in next RAF (reduces re-renders)
         batchedToolHandler({
@@ -668,7 +814,12 @@ export function createMessageHandler(
       case 'terminal:foreground':
       case 'file:changed':
       case 'file:written':
-      case 'conversation:deleted':
+        break;
+      case 'conversation:deleted': {
+        // Clean up tool data for deleted conversation
+        clearSessionTools(message.session_id);
+        break;
+      }
       case 'agent:plan_mode':
       case 'agent:accept_mode':
       case 'panel:command':
@@ -701,4 +852,13 @@ export function createMessageHandler(
         break;
     }
   };
+
+  // Cleanup function cancels any pending RAF callbacks to prevent
+  // firing into dead state after component unmount
+  const cleanup = (): void => {
+    batchedChunkHandler.cancel();
+    batchedToolHandler.cancel();
+  };
+
+  return { handleMessage, cleanup };
 }

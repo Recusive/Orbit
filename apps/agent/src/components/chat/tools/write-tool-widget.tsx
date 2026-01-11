@@ -1,4 +1,5 @@
 import { ChevronDown, FilePlus, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { FC } from 'react';
@@ -75,6 +76,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   onOpenFile,
 }) => {
   const [isExpanded, setIsExpanded] = useState(isRunning);
+  const [showAllLines, setShowAllLines] = useState(false);
   const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
 
@@ -86,11 +88,19 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
     wasRunningRef.current = isRunning;
   }, [isRunning]);
 
+  // Reset showAllLines when collapsed to avoid stale state on re-expand
+  useEffect(() => {
+    if (!isExpanded) {
+      setShowAllLines(false);
+    }
+  }, [isExpanded]);
+
   const fileName = filePath.split('/').pop() ?? filePath;
   const lines = content.split('\n');
   const lineCount = lines.length;
-  const displayLines = isExpanded ? lines : lines.slice(0, 8);
-  const hasMore = lines.length > 8;
+  const maxPreviewLines = 8;
+  const displayLines = showAllLines ? lines : lines.slice(0, maxPreviewLines);
+  const hasMore = !showAllLines && lines.length > maxPreviewLines;
 
   const handleFileClick = (e: React.MouseEvent): void => {
     e.preventDefault();
@@ -176,44 +186,57 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
         </button>
 
         {/* Code preview */}
-        <div
-          className={cn(
-            'grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
-            isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          )}
-        >
-          <div className="overflow-hidden min-h-0">
-            <div className="overflow-auto max-h-[300px]">
-              {displayLines.map((line, index) => (
-                <div key={index} className="flex font-mono text-sm leading-4 bg-success/5">
-                  {/* Gutter */}
-                  <div className="w-0.5 bg-success shrink-0" />
-                  {/* Line number */}
-                  <div className="w-8 px-1.5 text-right text-muted-foreground/50 select-none shrink-0 bg-success/10">
-                    {index + 1}
+        <AnimatePresence initial={false} mode="wait">
+          {isExpanded ? (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{
+                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
+                opacity: { duration: 0.15, ease: 'easeOut' },
+              }}
+              style={{ overflow: 'hidden' }}
+            >
+              <div className={cn('overflow-auto', !showAllLines && 'max-h-[300px]')}>
+                {displayLines.map((line, index) => (
+                  <div key={index} className="flex font-mono text-sm leading-4 bg-success/5">
+                    {/* Gutter */}
+                    <div className="w-0.5 bg-success shrink-0" />
+                    {/* Line number */}
+                    <div className="w-8 px-1.5 text-right text-muted-foreground/50 select-none shrink-0 bg-success/10">
+                      {index + 1}
+                    </div>
+                    {/* Content */}
+                    <div className="flex-1 px-2 text-foreground whitespace-pre overflow-x-auto">
+                      {line || ' '}
+                    </div>
                   </div>
-                  {/* Content */}
-                  <div className="flex-1 px-2 text-foreground whitespace-pre overflow-x-auto">
-                    {line || ' '}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            {/* Expand bar */}
-            {hasMore && !isExpanded ? (
-              <button
-                onClick={() => {
-                  setIsExpanded(true);
-                }}
-                className="w-full py-1 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-0.5"
-              >
-                <ChevronDown className="h-2.5 w-2.5" />
-                <span>{lines.length - 8} more lines</span>
-              </button>
-            ) : null}
-          </div>
-        </div>
+              {/* Show all / Show less toggle button */}
+              {(hasMore || showAllLines) && lines.length > maxPreviewLines ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAllLines(!showAllLines);
+                  }}
+                  className="w-full py-1 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-0.5"
+                >
+                  <ChevronDown
+                    className={cn('h-2.5 w-2.5 transition-transform', showAllLines && 'rotate-180')}
+                  />
+                  <span>
+                    {showAllLines
+                      ? 'Show less'
+                      : `${String(lines.length - maxPreviewLines)} more lines`}
+                  </span>
+                </button>
+              ) : null}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   );

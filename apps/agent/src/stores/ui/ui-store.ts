@@ -668,3 +668,19 @@ export const useActiveWorktree = (): WorktreeUIState | null => {
 export const useCreateWorktreeDialogOpen = (): boolean => {
   return useUIStore((state) => state.createWorktreeDialogOpen);
 };
+
+// ============================================
+// Panel State Selectors (for isolated subscriptions)
+// ============================================
+
+export const useReviewPanelOpen = (): boolean => {
+  return useUIStore((state) => state.reviewPanelOpen);
+};
+
+export const useBottomPanelOpen = (): boolean => {
+  return useUIStore((state) => state.bottomPanelOpen);
+};
+
+export const useBottomPanelHeight = (): number => {
+  return useUIStore((state) => state.bottomPanelHeight);
+};

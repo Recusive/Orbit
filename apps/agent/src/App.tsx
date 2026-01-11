@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { FC } from 'react';
 
-import { JankIndicator, PerfDashboard } from '@/components/debug';
 import { HeaderBar } from '@/components/layout/header-bar';
 import { RootLayout } from '@/components/layout/root-layout';
 import { StatusBar } from '@/components/layout/status-bar';
@@ -14,24 +13,9 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { WelcomePage } from '@/components/welcome';
 import { useBrowser } from '@/hooks/browser/use-browser';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
-import { useJankDetector } from '@/hooks/debug';
 import { TauriProvider } from '@/providers/tauri-provider';
 import { useOnboardingStore } from '@/stores/onboarding/onboarding-store';
 import { useHasWorkspace, useUIStore } from '@/stores/ui/ui-store';
-
-// ============================================
-// Dev Mode Check
-// ============================================
-
-const isDev = (): boolean => {
-  try {
-    // eslint-disable-next-line @typescript-eslint/dot-notation -- Vite env access pattern
-    const mode = import.meta.env['MODE'] as string | undefined;
-    return mode === 'development';
-  } catch {
-    return true;
-  }
-};
 
 // ============================================
 // Hooks
@@ -69,46 +53,6 @@ function useThemeSync(): void {
 }
 
 /**
- * Hook to toggle performance dashboard with Ctrl+Shift+P (dev mode only).
- */
-function usePerfDashboard(): { open: boolean; toggle: () => void; close: () => void } {
-  const [open, setOpen] = useState(false);
-
-  const toggle = useCallback((): void => {
-    setOpen((prev) => !prev);
-  }, []);
-
-  const close = useCallback((): void => {
-    setOpen(false);
-  }, []);
-
-  useEffect(() => {
-    // Only enable in development mode
-    if (!isDev()) return;
-
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      // Ctrl+Shift+P (Windows/Linux) or Cmd+Shift+P (Mac)
-      const isMac = navigator.userAgent.toUpperCase().includes('MAC');
-      const modifier = isMac ? event.metaKey : event.ctrlKey;
-
-      if (modifier && event.shiftKey && event.key.toLowerCase() === 'p') {
-        event.preventDefault();
-        event.stopPropagation();
-        toggle();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown, true);
-
-    return (): void => {
-      document.removeEventListener('keydown', handleKeyDown, true);
-    };
-  }, [toggle]);
-
-  return { open, toggle, close };
-}
-
-/**
  * Agent mode - the main chat interface with sidebar and activity panel
  */
 const AgentMode: FC = () => {
@@ -138,8 +82,6 @@ const App: FC = () => {
   useBrowser(); // Handle browser messages from Tauri backend
   const { hasCrash, crashLog, dismiss, acknowledge } = useCrashCheck();
   const [crashDialogOpen, setCrashDialogOpen] = useState(true);
-  const perfDashboard = usePerfDashboard(); // Dev-only performance dashboard
-  const jankDetector = useJankDetector(); // Dev-only jank detection
 
   const activeTab = useUIStore((state) => state.activeTab);
   const hasWorkspace = useHasWorkspace();
@@ -197,15 +139,6 @@ const App: FC = () => {
 
           {/* Toast notifications */}
           <Toaster position="bottom-right" />
-
-          {/* Dev-only performance dashboard (Ctrl+Shift+P to toggle) */}
-          <PerfDashboard open={perfDashboard.open} onClose={perfDashboard.close} />
-
-          {/* Dev-only jank indicator */}
-          <JankIndicator
-            jankEvent={jankDetector.currentJank}
-            onDismiss={jankDetector.dismissEvent}
-          />
         </div>
       </TooltipProvider>
     </TauriProvider>

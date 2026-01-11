@@ -14,6 +14,77 @@ import { useToolStore } from '@/stores/agent/tool-store';
 import { useQueuedMessageStore } from '@/stores/chat/queued-message-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
+// ============================================
+// Store Action Accessors (No Subscriptions)
+// ============================================
+// These functions get actions via getState() to avoid subscribing to store changes.
+// Actions are stable references - we don't need to re-render when store state changes.
+
+/** Get UIStore actions without subscribing to state changes */
+const getUIActions = (): Pick<
+  ReturnType<typeof useUIStore.getState>,
+  | 'setWorkspace'
+  | 'setActiveConversation'
+  | 'setConversationTransitioning'
+  | 'setConversations'
+  | 'addConversation'
+  | 'updateConversationTitle'
+> => {
+  const state = useUIStore.getState();
+  return {
+    setWorkspace: state.setWorkspace,
+    setActiveConversation: state.setActiveConversation,
+    setConversationTransitioning: state.setConversationTransitioning,
+    setConversations: state.setConversations,
+    addConversation: state.addConversation,
+    updateConversationTitle: state.updateConversationTitle,
+  };
+};
+
+/** Get ToolStore actions without subscribing to state changes */
+const getToolActions = (): Pick<
+  ReturnType<typeof useToolStore.getState>,
+  | 'setInputMode'
+  | 'setThinkingMode'
+  | 'setModel'
+  | 'startTool'
+  | 'completeTool'
+  | 'addPermissionRequest'
+  | 'removePermissionRequest'
+  | 'clearPermissions'
+  | 'addUsage'
+  | 'switchSession'
+  | 'restoreSessionUsage'
+  | 'restoreToolsForMessage'
+  | 'clearSessionTools'
+> => {
+  const state = useToolStore.getState();
+  return {
+    setInputMode: state.setInputMode,
+    setThinkingMode: state.setThinkingMode,
+    setModel: state.setModel,
+    startTool: state.startTool,
+    completeTool: state.completeTool,
+    addPermissionRequest: state.addPermissionRequest,
+    removePermissionRequest: state.removePermissionRequest,
+    clearPermissions: state.clearPermissions,
+    addUsage: state.addUsage,
+    switchSession: state.switchSession,
+    restoreSessionUsage: state.restoreSessionUsage,
+    restoreToolsForMessage: state.restoreToolsForMessage,
+    clearSessionTools: state.clearSessionTools,
+  };
+};
+
+/** Get QueuedMessageStore actions without subscribing to state changes */
+const getQueueActions = (): Pick<
+  ReturnType<typeof useQueuedMessageStore.getState>,
+  'queueMessage'
+> => {
+  const state = useQueuedMessageStore.getState();
+  return { queueMessage: state.queueMessage };
+};
+
 interface UseChatMessagesOptions {
   onSessionCreated?: (sessionId: string, title: string) => void;
 }
@@ -58,32 +129,16 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   // Track thinking start times by message ID to calculate duration
   const thinkingStartTimes = useRef<Map<string, number>>(new Map());
 
-  const {
-    setWorkspace,
-    setActiveConversation,
-    setConversationTransitioning,
-    setConversations,
-    addConversation,
-    updateConversationTitle,
-    conversations,
-    workspacePath,
-    activeWorktreePath,
-  } = useUIStore();
-  const {
-    setInputMode,
-    setThinkingMode,
-    setModel,
-    startTool,
-    completeTool,
-    addPermissionRequest,
-    removePermissionRequest,
-    clearPermissions,
-    addUsage,
-    switchSession,
-    restoreSessionUsage,
-    restoreToolsForMessage,
-  } = useToolStore();
-  const { queueMessage: storeQueueMessage } = useQueuedMessageStore();
+  // ============================================
+  // Isolated Reactive Selectors (Minimal Subscriptions)
+  // ============================================
+  // Only subscribe to the specific values we need to react to.
+  // Actions are accessed via getState() in callbacks to avoid subscription overhead.
+
+  // UIStore reactive values - only these 3 values cause re-renders when changed
+  const conversations = useUIStore((state) => state.conversations);
+  const workspacePath = useUIStore((state) => state.workspacePath);
+  const activeWorktreePath = useUIStore((state) => state.activeWorktreePath);
 
   // Restore usage from backend on initial mount (when sessionId comes from localStorage)
   // This ensures token counts persist across window reloads
@@ -161,49 +216,31 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   }, []); // Empty deps - only run on mount, uses refs for values
 
   // Handle messages from extension - memoized to prevent unnecessary recreations
-  const handleMessage = useMemo(
-    () =>
-      createMessageHandler({
-        setWorkspace,
-        workspacePath,
-        setActiveConversation,
-        setConversationTransitioning,
-        setConversations,
-        addConversation,
-        setInputMode,
-        setModel,
-        startTool,
-        completeTool,
-        addPermissionRequest,
-        addUsage,
-        switchSession,
-        restoreSessionUsage,
-        restoreToolsForMessage,
-        onSessionCreated,
-        setSessionId,
-        setMessages,
-        setIsAgentRunning,
-        sessionIdRef,
-        messagesRef,
-        messagesCache,
-        thinkingStartTimes,
-      }),
-    [
-      setWorkspace,
+  // Returns { handleMessage, cleanup } - cleanup cancels pending RAF batchers
+  //
+  // PERF: Actions are passed via getState() accessors to avoid re-creating handler
+  // when unrelated store state changes. Only workspacePath is reactive here.
+  const messageHandler = useMemo(() => {
+    const uiActions = getUIActions();
+    const toolActions = getToolActions();
+
+    return createMessageHandler({
+      setWorkspace: uiActions.setWorkspace,
       workspacePath,
-      setActiveConversation,
-      setConversationTransitioning,
-      setConversations,
-      addConversation,
-      setInputMode,
-      setModel,
-      startTool,
-      completeTool,
-      addPermissionRequest,
-      addUsage,
-      switchSession,
-      restoreSessionUsage,
-      restoreToolsForMessage,
+      setActiveConversation: uiActions.setActiveConversation,
+      setConversationTransitioning: uiActions.setConversationTransitioning,
+      setConversations: uiActions.setConversations,
+      addConversation: uiActions.addConversation,
+      setInputMode: toolActions.setInputMode,
+      setModel: toolActions.setModel,
+      startTool: toolActions.startTool,
+      completeTool: toolActions.completeTool,
+      addPermissionRequest: toolActions.addPermissionRequest,
+      addUsage: toolActions.addUsage,
+      switchSession: toolActions.switchSession,
+      restoreSessionUsage: toolActions.restoreSessionUsage,
+      restoreToolsForMessage: toolActions.restoreToolsForMessage,
+      clearSessionTools: toolActions.clearSessionTools,
       onSessionCreated,
       setSessionId,
       setMessages,
@@ -212,10 +249,34 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       messagesRef,
       messagesCache,
       thinkingStartTimes,
-    ]
-  );
+    });
+  }, [
+    // Only reactive dependencies - actions come from getState() inside useMemo
+    workspacePath,
+    onSessionCreated,
+    setSessionId,
+    setMessages,
+    setIsAgentRunning,
+    sessionIdRef,
+    messagesRef,
+    messagesCache,
+    thinkingStartTimes,
+  ]);
 
-  const { postMessage, isMockMode } = useTauri({ onMessage: handleMessage });
+  // Cleanup RAF batchers when handler changes OR on unmount
+  // This prevents memory leaks from old batchers' pending RAF callbacks firing into stale closures
+  // When messageHandler changes (due to dependency changes), the OLD batchers must be cancelled
+  useEffect(() => {
+    // Store current cleanup function for this effect instance
+    const cleanup = messageHandler.cleanup;
+
+    return (): void => {
+      // Cancel pending RAF callbacks from THIS handler before switching to new one
+      cleanup();
+    };
+  }, [messageHandler]); // Run cleanup when handler changes, not just on unmount
+
+  const { postMessage, isMockMode } = useTauri({ onMessage: messageHandler.handleMessage });
 
   // Request conversation list when session is ready or workspace changes
   useEffect(() => {
@@ -258,7 +319,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         model: toolState.model,
       });
 
-      updateConversationTitle(sessionId, text);
+      // Get action via getState() to avoid subscription
+      useUIStore.getState().updateConversationTitle(sessionId, text);
       postMessage({
         type: 'conversation:updateTitle',
         uuid: crypto.randomUUID(),
@@ -313,63 +375,53 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         context,
       });
     }
-  }, [
-    sessionId,
-    pendingMessage,
-    postMessage,
-    updateConversationTitle,
-    setMessages,
-    setPendingMessage,
-    setIsAgentRunning,
-  ]);
+  }, [sessionId, pendingMessage, postMessage, setMessages, setPendingMessage, setIsAgentRunning]);
 
   // Create chat actions - memoized to prevent unnecessary recreations
-  const chatActions = useMemo(
-    () =>
-      createChatActions({
-        sessionId,
-        setSessionId,
-        messages,
-        setMessages,
-        isAgentRunning,
-        setIsAgentRunning,
-        conversations,
-        // Use active worktree path for worktree-based session isolation
-        // Falls back to workspace path if no worktree is active
-        workspacePath: activeWorktreePath ?? workspacePath,
-        messagesCache,
-        setPendingMessage,
-        postMessage,
-        updateConversationTitle,
-        storeQueueMessage,
-        setInputMode,
-        setThinkingMode,
-        setModel,
-        clearPermissions,
-        removePermissionRequest,
-      }),
-    [
+  // PERF: Actions are accessed via getState() inside the factory to avoid
+  // re-creating chatActions when unrelated store state changes.
+  const chatActions = useMemo(() => {
+    const uiActions = getUIActions();
+    const toolActions = getToolActions();
+    const queueActions = getQueueActions();
+
+    return createChatActions({
       sessionId,
-      messages,
-      isAgentRunning,
-      conversations,
-      workspacePath,
-      activeWorktreePath,
-      messagesCache,
-      postMessage,
-      updateConversationTitle,
-      storeQueueMessage,
-      setInputMode,
-      setThinkingMode,
-      setModel,
-      clearPermissions,
-      removePermissionRequest,
       setSessionId,
+      messages,
       setMessages,
+      isAgentRunning,
       setIsAgentRunning,
+      conversations,
+      // Use active worktree path for worktree-based session isolation
+      // Falls back to workspace path if no worktree is active
+      workspacePath: activeWorktreePath ?? workspacePath,
+      messagesCache,
       setPendingMessage,
-    ]
-  );
+      postMessage,
+      updateConversationTitle: uiActions.updateConversationTitle,
+      storeQueueMessage: queueActions.queueMessage,
+      setInputMode: toolActions.setInputMode,
+      setThinkingMode: toolActions.setThinkingMode,
+      setModel: toolActions.setModel,
+      clearPermissions: toolActions.clearPermissions,
+      removePermissionRequest: toolActions.removePermissionRequest,
+    });
+  }, [
+    // Only reactive dependencies - actions come from getState() inside useMemo
+    sessionId,
+    messages,
+    isAgentRunning,
+    conversations,
+    workspacePath,
+    activeWorktreePath,
+    messagesCache,
+    postMessage,
+    setSessionId,
+    setMessages,
+    setIsAgentRunning,
+    setPendingMessage,
+  ]);
 
   // Destructure actions for stable references
   const {
