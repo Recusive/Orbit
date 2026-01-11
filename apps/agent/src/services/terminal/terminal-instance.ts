@@ -278,7 +278,7 @@ export class TerminalInstance {
           this.ptyCreationObserver = null;
 
           // Now fit to container - this calculates correct cols/rows
-          this.fitDebouncer.forcefit();
+          this.fitDebouncer.forceFit();
 
           // Log dimensions for debugging
           logger.info('Terminal fitted before PTY creation', {
@@ -330,7 +330,7 @@ export class TerminalInstance {
     if (visible) {
       // Flush any pending fit operations and force re-fit when becoming visible
       this.fitDebouncer.flush();
-      this.fitDebouncer.forcefit();
+      this.fitDebouncer.forceFit();
       // Auto-focus when becoming visible
       setTimeout(() => {
         this.terminal.focus();
@@ -501,8 +501,10 @@ export class TerminalInstance {
     document.body.removeChild(tempEl);
 
     // WARNING: Do NOT modify selectionBg to add rgba() transparency!
-    // The accent color from CSS already has correct opacity for selection.
-    // Adding .replace('rgb(', 'rgba(').replace(')', ', 0.5)') breaks selection rendering.
+    // xterm.js internally handles selection opacity/blending. The accent color
+    // should be solid - xterm will apply appropriate transparency when rendering.
+    // The old .replace('rgb(', 'rgba(') approach was broken with oklch() colors
+    // and incorrectly double-applied transparency.
     const selectionBg = selectionColor;
 
     return {
@@ -839,7 +841,7 @@ export class TerminalInstance {
    */
   forceFit(): void {
     if (this.isDisposed) return;
-    this.fitDebouncer.forcefit();
+    this.fitDebouncer.forceFit();
   }
 
   /**

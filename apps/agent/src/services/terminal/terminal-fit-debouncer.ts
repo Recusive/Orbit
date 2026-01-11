@@ -64,6 +64,11 @@ export class TerminalFitDebouncer {
   /**
    * Schedule a fit for visible terminals using requestAnimationFrame.
    * This syncs with the browser's render cycle for instant, smooth resizing.
+   *
+   * Note: Unlike the previous setTimeout-based debouncer which used trailing-edge
+   * behavior (last call wins, timer resets on each call), this uses frame-coalescing
+   * (first call triggers RAF, subsequent calls within same frame are no-ops).
+   * This provides faster, more responsive resize behavior.
    */
   private _scheduleFit(): void {
     // Already scheduled for this frame
@@ -120,7 +125,7 @@ export class TerminalFitDebouncer {
    * Force an immediate fit, regardless of pending state.
    * Use for critical moments like initial PTY creation.
    */
-  forcefit(): void {
+  forceFit(): void {
     if (this._disposed) return;
     this._clearPending();
     this._doFit();

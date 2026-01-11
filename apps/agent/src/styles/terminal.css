@@ -52,15 +52,10 @@
    xterm.js Overrides - Padding & Layout
    ============================================================================ */
 
-/* All terminals have at least 20px left padding for the command decoration gutter */
+/* All terminals have padding for spacing and the command decoration gutter (20px left) */
 .terminal-wrapper .xterm {
-  padding-left: 20px;
-  padding-right: 8px;
-  /* No vertical padding - let xterm-screen fill the container height */
+  padding: 4px 8px 4px 20px;
 }
-
-/* Note: Viewport and screen gutter offset is handled by parent .xterm padding (20px left) */
-
 
 /* Position .xterm to fill split-pane and center content vertically.
  * - position: absolute fills the container
@@ -208,8 +203,6 @@
   overflow-x: hidden;
   background-color: transparent;
 }
-
-
 
 /* ============================================================================
    Focus Styling
