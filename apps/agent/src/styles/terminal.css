@@ -73,7 +73,9 @@
   justify-content: center;
 }
 
-/* When terminal has fixed dimensions (not fitting to container) */
+/* Reserved for future fixed-dimensions mode (not currently used).
+ * When terminal has fixed dimensions instead of fitting to container,
+ * this class would be added to .terminal-wrapper to disable absolute positioning. */
 .terminal-wrapper.fixed-dims .xterm {
   position: static;
 }
@@ -82,10 +84,18 @@
    Z-Index Layering (VS Code pattern)
    ============================================================================ */
 
-/* Viewport - scroll container */
-.terminal-wrapper .xterm-viewport {
+/* Viewport - scroll container with hidden native scrollbar (xterm uses overlay scrollbar) */
+.terminal-wrapper .xterm .xterm-viewport {
   z-index: 30;
   box-sizing: border-box;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  background-color: transparent;
+  scrollbar-width: none;
+}
+
+.terminal-wrapper .xterm .xterm-viewport::-webkit-scrollbar {
+  display: none;
 }
 
 /* Decoration overview ruler (right side marks) */
@@ -114,7 +124,8 @@
   z-index: 7;
 }
 
-/* Widget container - for overlays */
+/* Widget container - reserved for future VS Code-style overlays (find widget, etc.)
+ * Not currently used, but included to maintain VS Code pattern compatibility. */
 .terminal-wrapper .terminal-widget-container {
   position: absolute;
   left: 0;
@@ -126,18 +137,7 @@
   z-index: 33;
 }
 
-/* ============================================================================
-   Scrollbar Styling
-   ============================================================================ */
-
-/* Hide native scrollbar - xterm uses custom overlay scrollbar */
-.terminal-wrapper .xterm .xterm-viewport {
-  scrollbar-width: none;
-}
-
-.terminal-wrapper .xterm .xterm-viewport::-webkit-scrollbar {
-  display: none;
-}
+/* Scrollbar styling is consolidated with viewport rules in Z-Index section above */
 
 /* ============================================================================
    Scroll Shadows (VS Code pattern - optional)
@@ -193,16 +193,7 @@
   opacity: 0.9;
 }
 
-/* ============================================================================
-   Viewport Adjustments
-   ============================================================================ */
-
-/* Viewport positioning and scroll behavior */
-.terminal-wrapper .xterm .xterm-viewport {
-  overflow-y: scroll;
-  overflow-x: hidden;
-  background-color: transparent;
-}
+/* Viewport adjustments are consolidated with viewport rules in Z-Index section above */
 
 /* ============================================================================
    Focus Styling

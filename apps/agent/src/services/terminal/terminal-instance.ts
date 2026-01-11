@@ -136,8 +136,8 @@ export class TerminalInstance {
 
     logger.info(`Creating terminal: ${options.sessionName}`, { sessionId: options.sessionId });
 
-    // Create wrapper element - uses CSS from terminal.css
-    // Padding is handled by .terminal-wrapper .xterm CSS rules
+    // Create wrapper element - styled by .terminal-instance-wrapper in terminal.css
+    // Note: Terminal content padding is applied via .terminal-wrapper .xterm rules, not here
     this.wrapperElement = document.createElement('div');
     this.wrapperElement.className = 'terminal-instance-wrapper';
 
