@@ -46,10 +46,7 @@
   background-color: var(--chat-area);
 }
 
-/* Active terminal indicator (optional border styling) */
-.terminal-wrapper.active {
-  /* Can add active state styling here */
-}
+/* Active terminal has no special styling currently - class used for JS targeting */
 
 /* ============================================================================
    xterm.js Overrides - Padding & Layout
@@ -62,13 +59,7 @@
   /* No vertical padding - let xterm-screen fill the container height */
 }
 
-/* Offset viewport and screen for gutter:
- * - Maintains 20px left gutter for command decorations
- * - Content starts after the gutter area */
-.terminal-wrapper .xterm .xterm-viewport,
-.terminal-wrapper .xterm .xterm-screen {
-  /* Gutter offset handled by parent .xterm padding */
-}
+/* Note: Viewport and screen gutter offset is handled by parent .xterm padding (20px left) */
 
 
 /* Position .xterm to fill split-pane and center content vertically.
@@ -228,10 +219,8 @@
   outline: none;
 }
 
-/* Optional: subtle border on focus */
-.terminal-wrapper:focus-within {
-  /* box-shadow: inset 0 0 0 1px var(--border); */
-}
+/* Note: No focus border currently - uncomment below if needed:
+   .terminal-wrapper:focus-within { box-shadow: inset 0 0 0 1px var(--border); } */
 
 /* ============================================================================
    Link Styling

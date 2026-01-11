@@ -22,6 +22,8 @@ import { getBestTheme } from '@/lib/terminal/utils/theme-sync';
 import { TerminalFitDebouncer } from '@/services/terminal/terminal-fit-debouncer';
 
 import '@xterm/xterm/css/xterm.css';
+// CSS imported here (not in component) because TerminalInstance creates DOM elements directly.
+// This ensures styles are loaded when the class is instantiated, regardless of React lifecycle.
 import '@/styles/terminal.css';
 
 const logger = createLogger('TerminalInstance');
@@ -498,7 +500,9 @@ export class TerminalInstance {
 
     document.body.removeChild(tempEl);
 
-    // Selection uses accent color - already computed to rgb/hex
+    // WARNING: Do NOT modify selectionBg to add rgba() transparency!
+    // The accent color from CSS already has correct opacity for selection.
+    // Adding .replace('rgb(', 'rgba(').replace(')', ', 0.5)') breaks selection rendering.
     const selectionBg = selectionColor;
 
     return {
