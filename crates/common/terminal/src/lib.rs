@@ -14,6 +14,7 @@
 
 use std::fmt;
 use std::io::{ErrorKind, Read as _, Write};
+use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -330,6 +331,14 @@ impl Terminal {
         clippy::iter_over_hash_type,
         reason = "iteration order doesn't matter for environment variables"
     )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "PTY setup requires sequential initialization that shouldn't be split"
+    )]
+    #[allow(
+        clippy::cognitive_complexity,
+        reason = "UTF-8 boundary detection logic in reader thread adds necessary complexity"
+    )]
     pub fn new(id: String, config: TerminalConfig) -> Result<Self> {
         let start = Instant::now();
         debug!(target: "orbit::perf", "[TERMINAL:create] START - id={id:?}");
@@ -408,22 +417,89 @@ impl Terminal {
         // Spawn a thread to read PTY output
         let _handle = thread::spawn(move || {
             let mut buf = [0u8; 4096];
+            // Buffer for incomplete UTF-8 sequences at chunk boundaries
+            let mut utf8_buffer: Vec<u8> = Vec::with_capacity(4);
+
             loop {
                 match reader.read(&mut buf) {
                     Ok(0) => {
                         // EOF - terminal closed
+                        // Flush any remaining buffer (may be incomplete UTF-8)
+                        if !utf8_buffer.is_empty() {
+                            let _ = bytes_written_clone
+                                .fetch_add(utf8_buffer.len() as u64, Ordering::Relaxed);
+                            let _send = output_tx.send(mem::take(&mut utf8_buffer));
+                        }
                         debug!(terminal_id = %id_clone, "PTY reader got EOF");
                         break;
                     },
                     Ok(n) => {
-                        // Track bytes written for flow control
-                        let _ = bytes_written_clone.fetch_add(n as u64, Ordering::Relaxed);
-
                         #[expect(clippy::indexing_slicing, reason = "n is bounded by buf.len()")]
-                        if output_tx.send(buf[..n].to_vec()).is_err() {
-                            // Receiver dropped
-                            debug!(terminal_id = %id_clone, "Output receiver dropped");
-                            break;
+                        let data = &buf[..n];
+
+                        // Prepend any incomplete UTF-8 from previous read
+                        let full_data = if utf8_buffer.is_empty() {
+                            data.to_vec()
+                        } else {
+                            let mut combined = mem::take(&mut utf8_buffer);
+                            combined.extend_from_slice(data);
+                            combined
+                        };
+
+                        // Find the longest valid UTF-8 prefix
+                        // UTF-8 continuation bytes start with 10xxxxxx (0x80-0xBF)
+                        // Lead bytes: 0xxxxxxx (ASCII), 110xxxxx, 1110xxxx, 11110xxx
+                        let mut valid_len = full_data.len();
+
+                        // Check if the last bytes might be an incomplete UTF-8 sequence
+                        // Walk backwards to find potential incomplete sequence
+                        for i in 1..=4.min(full_data.len()) {
+                            #[expect(
+                                clippy::indexing_slicing,
+                                reason = "i <= full_data.len() is checked"
+                            )]
+                            let byte = full_data[full_data.len() - i];
+
+                            // If this is a lead byte, check if we have enough bytes
+                            if byte >= 0xC0 {
+                                // 110xxxxx (2-byte) or higher
+                                let expected_len = if byte >= 0xF0 {
+                                    4 // 11110xxx
+                                } else if byte >= 0xE0 {
+                                    3 // 1110xxxx
+                                } else {
+                                    2 // 110xxxxx
+                                };
+
+                                if i < expected_len {
+                                    // Incomplete sequence - don't send these bytes yet
+                                    valid_len = full_data.len() - i;
+                                }
+                                break;
+                            } else if byte < 0x80 {
+                                // ASCII byte - no incomplete sequence
+                                break;
+                            }
+                            // else: continuation byte (10xxxxxx), keep looking
+                        }
+
+                        // Split into complete and incomplete parts
+                        let (complete, incomplete) = full_data.split_at(valid_len);
+
+                        // Buffer incomplete bytes for next iteration
+                        if !incomplete.is_empty() {
+                            utf8_buffer.extend_from_slice(incomplete);
+                        }
+
+                        // Send complete data
+                        if !complete.is_empty() {
+                            let _ = bytes_written_clone
+                                .fetch_add(complete.len() as u64, Ordering::Relaxed);
+                            if output_tx.send(complete.to_vec()).is_err() {
+                                // Receiver dropped
+                                debug!(terminal_id = %id_clone, "Output receiver dropped");
+                                break;
+                            }
                         }
                     },
                     Err(e) => {
