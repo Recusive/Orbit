@@ -45,7 +45,6 @@ dirs = { workspace = true }
 crossbeam-channel = { workspace = true }
 hashbrown = { workspace = true }
 hostname = "0.4"  # For non-macOS device ID generation
-regex = "1.11"    # For performance log parsing
 
 # Tauri
 tauri = { workspace = true, features = ["tray-icon"] }
