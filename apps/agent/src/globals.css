@@ -211,6 +211,9 @@
   --info-foreground: oklch(0.25 0.08 240);
   --info-muted: oklch(0.95 0.04 240);
 
+  /* Terminal - syncs with TERMINAL.gutterWidth in constants.ts */
+  --terminal-gutter-width: 20px;
+
   /* Diff colors */
   --diff-added: oklch(0.92 0.06 145);
   --diff-added-border: oklch(0.65 0.18 145);

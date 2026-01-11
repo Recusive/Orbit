@@ -361,9 +361,8 @@ export class CommandDecorationsAddon implements ITerminalAddon {
 
   private _renderDecorationElement(element: HTMLElement, mark: CommandMark): void {
     // Apply CSS class for styling (defined in terminal.css)
-    // Using CSS classes instead of inline styles for better maintainability
+    // All styles including cursor:pointer are handled via CSS for maintainability
     element.className = 'terminal-command-decoration';
-    element.style.cursor = 'pointer';
 
     // Clear existing content
     element.innerHTML = '';

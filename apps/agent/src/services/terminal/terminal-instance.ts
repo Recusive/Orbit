@@ -19,6 +19,7 @@ import { CommandDecorationsAddon } from '@/lib/terminal/addons/command-decoratio
 import { MarkNavigationAddon } from '@/lib/terminal/addons/mark-navigation-addon';
 import { ShellIntegrationAddon } from '@/lib/terminal/addons/shell-integration-addon';
 import { getBestTheme } from '@/lib/terminal/utils/theme-sync';
+import { TERMINAL } from '@/lib/utils/constants';
 import { TerminalFitDebouncer } from '@/services/terminal/terminal-fit-debouncer';
 
 import '@xterm/xterm/css/xterm.css';
@@ -168,11 +169,11 @@ export class TerminalInstance {
     this.terminal.loadAddon(webLinksAddon);
 
     // Command decorations addon
-    // Note: gutterWidth must match --terminal-gutter-width in terminal.css (20px)
+    // Note: gutterWidth syncs with --terminal-gutter-width in globals.css
     this.decorationsAddon = new CommandDecorationsAddon({
       showGutterMarkers: true,
       showStatusIcons: true,
-      gutterWidth: 20,
+      gutterWidth: TERMINAL.gutterWidth,
     });
     this.terminal.loadAddon(this.decorationsAddon);
 

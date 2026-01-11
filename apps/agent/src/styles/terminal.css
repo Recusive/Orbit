@@ -13,11 +13,8 @@
 
 /* ============================================================================
    CSS Variables
+   Note: --terminal-gutter-width is defined in globals.css as the source of truth
    ============================================================================ */
-
-:root {
-  --terminal-gutter-width: 20px;
-}
 
 /* ============================================================================
    Container Hierarchy
@@ -66,10 +63,16 @@
 }
 
 /* Position .xterm to fill split-pane and center content vertically.
- * - position: absolute fills the container
- * - display: flex + justify-content: center distributes row-height remainder gap equally
- * - xterm-viewport is position: absolute so unaffected by flexbox
- * - xterm-scrollable-element is position: relative so it participates in flexbox */
+ *
+ * WHY: xterm renders in fixed-height rows (e.g., 20px each). If the container
+ * height isn't evenly divisible by row height, there's a remainder gap.
+ * Using flexbox with justify-content:center splits this gap evenly (top/bottom).
+ *
+ * HOW IT WORKS:
+ * - position: absolute fills the container completely
+ * - display: flex + justify-content: center distributes remainder gap
+ * - xterm-viewport is position: absolute (unaffected by flexbox)
+ * - xterm-scrollable-element is position: relative (participates in flexbox) */
 .terminal-split-pane .xterm {
   position: absolute;
   bottom: 0;
@@ -163,6 +166,7 @@
   font-size: 14px;
   line-height: 1;
   background-color: var(--muted);
+  cursor: pointer;
 }
 
 /* Default/running state - icon child */

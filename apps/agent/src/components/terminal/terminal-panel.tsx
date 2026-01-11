@@ -338,7 +338,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
   return (
     <div
       ref={panelRef}
-      className={`${panelBackground} relative z-10 flex flex-col border-l border-border/50 min-h-[35px] ${collapsed ? 'shrink-0' : 'h-full'}`}
+      className={`${panelBackground} relative z-10 flex flex-col border-l border-border min-h-[35px] ${collapsed ? 'shrink-0' : 'h-full'}`}
       style={collapsed ? { height: TERMINAL_HEADER_HEIGHT } : undefined}
     >
       <header

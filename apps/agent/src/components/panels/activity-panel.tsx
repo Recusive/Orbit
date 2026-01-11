@@ -334,7 +334,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       </div>
 
       {/* Editor actions - VS Code style */}
-      <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-border/50 bg-sidebar">
+      <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-border bg-sidebar">
         <button
           onClick={onToggleSearch}
           className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"

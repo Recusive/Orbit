@@ -220,6 +220,8 @@ export const TERMINAL = {
   fontFamily: 'Menlo, Monaco, "Courier New", monospace',
   maxOutputLines: 1000,
   minOutputLines: 100,
+  /** Gutter width for command decorations - syncs with --terminal-gutter-width in globals.css */
+  gutterWidth: 20,
 } as const;
 
 // ============================================

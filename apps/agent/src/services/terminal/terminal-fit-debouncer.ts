@@ -75,9 +75,12 @@ export class TerminalFitDebouncer {
     if (this._rafId !== null) return;
 
     this._rafId = requestAnimationFrame(() => {
-      this._rafId = null;
-      if (!this._disposed && this._pendingFit) {
-        this._doFit();
+      try {
+        if (!this._disposed && this._pendingFit) {
+          this._doFit();
+        }
+      } finally {
+        this._rafId = null;
       }
     });
   }
@@ -114,10 +117,12 @@ export class TerminalFitDebouncer {
   flush(): void {
     if (this._disposed) return;
 
+    // Cancel any scheduled RAF/idle callbacks (doesn't clear _pendingFit flag)
     this._clearPending();
 
+    // Execute immediately if a fit was pending
     if (this._pendingFit) {
-      this._doFit();
+      this._doFit(); // This sets _pendingFit = false
     }
   }
 

@@ -83,7 +83,7 @@ export const ActionsBar: FC = () => {
 
   return (
     <aside
-      className="h-full flex flex-col border-l border-border/40 bg-card"
+      className="h-full flex flex-col border-l border-border bg-card"
       style={{ width: SIDEBAR.iconColumnWidth }}
       role="tablist"
       aria-label="Actions Bar"
