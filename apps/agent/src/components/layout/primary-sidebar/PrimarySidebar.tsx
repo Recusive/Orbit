@@ -194,7 +194,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       <div
         className={cn(
           'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-all duration-150 ease-in-out',
-          isCollapsed ? '' : 'border-b border-border'
+          isCollapsed ? '' : 'border-b border-divider'
         )}
         // TODO: Move 40 to constants - tab navigation height
         style={{ height: isCollapsed ? 0 : 40, opacity: isCollapsed ? 0 : 1 }}
@@ -219,7 +219,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {activeTab === 'conversations' ? (
         <div
           className={cn(
-            'flex flex-col border-b border-border shrink-0 transition-all duration-150 ease-in-out',
+            'flex flex-col border-b border-divider shrink-0 transition-all duration-150 ease-in-out',
             isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
           )}
         >
@@ -292,7 +292,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         )}
       </div>
 
-      <hr className={cn('border-border shrink-0', isCollapsed ? 'my-0' : 'my-2')} />
+      <hr className={cn('border-divider shrink-0', isCollapsed ? 'my-0' : 'my-2')} />
 
       {/* Utilities */}
       <div className={cn('flex flex-col shrink-0', isCollapsed ? 'gap-0 py-0' : 'gap-1 py-1.5')}>

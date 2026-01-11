@@ -84,6 +84,9 @@
   --color-mode-accept: var(--mode-accept);
   --color-mode-think: var(--mode-think);
 
+  /* Structural dividers (panel borders, separators) */
+  --color-divider: var(--divider);
+
   /* Sidebar */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -179,6 +182,7 @@
   --accent-foreground: oklch(0.24 0.02 55);
   --destructive: oklch(0.55 0.22 25);
   --border: oklch(0.84 0.025 70); /* Visible border, sand-toned */
+  --divider: oklch(0.84 0.025 70); /* Structural panel dividers - same as border for consistency */
   --input: oklch(0.87 0.02 70); /* Input fields */
   --ring: oklch(0.56 0.18 35); /* Coral - darker */
   --chat-area: oklch(0.93 0.015 75); /* 3% lighter than card (0.90) */
@@ -308,6 +312,7 @@ html.dark {
   --accent-foreground: oklch(0.93 0.01 75);
   --destructive: oklch(0.65 0.2 25);
   --border: oklch(1 0 0 / 10%);
+  --divider: oklch(1 0 0 / 10%); /* Structural panel dividers - same as border for consistency */
   --input: oklch(1 0 0 / 12%);
   --ring: oklch(0.55 0.15 38);
   --chat-area: oklch(0.18 0.012 60); /* Between background (0.16) and card (0.20) */
