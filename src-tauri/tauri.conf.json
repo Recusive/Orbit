@@ -62,7 +62,8 @@
     "longDescription": "Orbit is a modern code editor built with Tauri, React, and Rust, featuring an AI coding assistant.",
     "macOS": {
       "entitlements": "Entitlements.plist",
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": "Developer ID Application: Pranit sharma (QSAMZF2NJ7)"
     }
   },
   "plugins": {}

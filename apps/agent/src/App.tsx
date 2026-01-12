@@ -1,4 +1,5 @@
 import { CanvasApp } from '@canvas/CanvasApp';
+import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { HeaderTab } from '@/stores/ui/ui-store';
@@ -9,6 +10,8 @@ import { RootLayout } from '@/components/layout/root-layout';
 import { StatusBar } from '@/components/layout/status-bar';
 import { CrashNotification } from '@/components/modals';
 import { OnboardingFlow } from '@/components/onboarding';
+import { ErrorBoundary } from '@/components/shared';
+import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { WelcomePage } from '@/components/welcome';
@@ -60,6 +63,10 @@ function useThemeSync(): void {
  *
  * Uses useMemo to ensure the set is only updated when activeTab changes,
  * following idiomatic React patterns for derived state.
+ *
+ * ⚠️ MEMORY NOTE: Mounted tabs are never unmounted. For memory-intensive
+ * modes (Canvas with ReactFlow), consider adding a manual "unload" action
+ * or timeout-based unmounting for long-idle tabs if memory becomes an issue.
  */
 function useMountedTabs(activeTab: HeaderTab): Set<HeaderTab> {
   const mountedTabsRef = useRef<Set<HeaderTab>>(new Set());
@@ -73,6 +80,57 @@ function useMountedTabs(activeTab: HeaderTab): Set<HeaderTab> {
     return mountedTabsRef.current;
   }, [activeTab]);
 }
+
+// ============================================
+// Error Fallback
+// ============================================
+
+interface ModeErrorFallbackProps {
+  readonly mode: HeaderTab;
+  readonly error?: Error;
+}
+
+/**
+ * Fallback UI shown when a mode (Agent/Canvas/Editor) crashes.
+ * Isolates crashes to individual modes so the app remains usable.
+ */
+const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error }) => {
+  const modeLabels: Record<HeaderTab, string> = {
+    agent: 'Agent',
+    canvas: 'Canvas',
+    editor: 'Editor',
+  };
+
+  const handleReload = useCallback((): void => {
+    window.location.reload();
+  }, []);
+
+  return (
+    <div className="h-full w-full flex items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-4 max-w-md text-center p-6">
+        <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+          <AlertTriangle className="h-6 w-6 text-destructive" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold text-foreground">{modeLabels[mode]} Mode Crashed</h2>
+          <p className="text-sm text-muted-foreground">
+            An unexpected error occurred. You can continue using other modes, or reload to try
+            again.
+          </p>
+          {error ? (
+            <p className="text-xs text-destructive/80 font-mono bg-destructive/5 p-2 rounded">
+              {error.message}
+            </p>
+          ) : null}
+        </div>
+        <Button variant="outline" size="sm" onClick={handleReload}>
+          <RotateCcw className="h-4 w-4 mr-2" />
+          Reload App
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 /**
  * Agent mode - the main chat interface with sidebar and activity panel
@@ -154,7 +212,9 @@ const App: FC = () => {
                     className="h-full w-full"
                     style={{ display: activeTab === 'agent' ? 'block' : 'none' }}
                   >
-                    <AgentMode />
+                    <ErrorBoundary fallback={<ModeErrorFallback mode="agent" />}>
+                      <AgentMode />
+                    </ErrorBoundary>
                   </div>
                 ) : null}
                 {/* Canvas mode - mounted on first visit, kept alive */}
@@ -163,7 +223,9 @@ const App: FC = () => {
                     className="h-full w-full"
                     style={{ display: activeTab === 'canvas' ? 'block' : 'none' }}
                   >
-                    <CanvasMode />
+                    <ErrorBoundary fallback={<ModeErrorFallback mode="canvas" />}>
+                      <CanvasMode />
+                    </ErrorBoundary>
                   </div>
                 ) : null}
                 {/* Editor mode - mounted on first visit, kept alive */}
@@ -172,7 +234,9 @@ const App: FC = () => {
                     className="h-full w-full"
                     style={{ display: activeTab === 'editor' ? 'block' : 'none' }}
                   >
-                    <EditorMode />
+                    <ErrorBoundary fallback={<ModeErrorFallback mode="editor" />}>
+                      <EditorMode />
+                    </ErrorBoundary>
                   </div>
                 ) : null}
               </>
