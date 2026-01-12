@@ -14,7 +14,13 @@ set -e
 if [ -f .env ]; then
   echo "Loading .env for code signing and notarization..."
   set -a  # Auto-export all variables
-  source .env
+  # shellcheck source=/dev/null
+  if ! source .env 2>&1; then
+    echo "Error: Failed to parse .env file."
+    echo "  Check for syntax errors (unquoted values with spaces, missing quotes, etc.)"
+    echo "  Hint: Run 'bash -n .env' to check for syntax errors"
+    exit 1
+  fi
   set +a
   echo "  APPLE_SIGNING_IDENTITY: ${APPLE_SIGNING_IDENTITY:-(not set)}"
   echo "  APPLE_ID: ${APPLE_ID:-(not set)}"

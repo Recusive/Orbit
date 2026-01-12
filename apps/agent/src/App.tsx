@@ -106,6 +106,13 @@ function useMountedTabs(activeTab: HeaderTab): MountedTabsResult {
 // Error Fallback
 // ============================================
 
+/** Display labels for each mode - hoisted to avoid recreation on each render */
+const MODE_LABELS: Record<HeaderTab, string> = {
+  agent: 'Agent',
+  canvas: 'Canvas',
+  editor: 'Editor',
+} as const;
+
 interface ModeErrorFallbackProps {
   readonly mode: HeaderTab;
   readonly error?: Error;
@@ -119,12 +126,6 @@ interface ModeErrorFallbackProps {
  * Provides both "Try Again" (reset error boundary) and "Reload App" options.
  */
 const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error, onReset }) => {
-  const modeLabels: Record<HeaderTab, string> = {
-    agent: 'Agent',
-    canvas: 'Canvas',
-    editor: 'Editor',
-  };
-
   const handleReload = (): void => {
     window.location.reload();
   };
@@ -136,7 +137,9 @@ const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error, onReset })
           <AlertTriangle className="h-6 w-6 text-destructive" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-lg font-semibold text-foreground">{modeLabels[mode]} Mode Crashed</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            {MODE_LABELS[mode]} Mode Crashed
+          </h2>
           <p className="text-sm text-muted-foreground">
             An unexpected error occurred. You can try again, continue using other modes, or reload
             the app.

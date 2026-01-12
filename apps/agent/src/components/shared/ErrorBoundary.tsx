@@ -59,7 +59,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
    */
   resetErrorBoundary: ErrorBoundaryResetFn = (): void => {
     logger.info('Error boundary reset requested');
-    this.setState({ hasError: false, error: null } as ErrorBoundaryState);
+    this.setState({ hasError: false, error: null });
   };
 
   override render(): ReactNode {
