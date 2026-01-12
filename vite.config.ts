@@ -10,6 +10,11 @@ import { reactDevToolsPlugin } from './vite-plugins/react-devtools';
 // https://vite.dev/config/
 export default defineConfig({
   root: './apps/agent',
+  // Compile-time constants - enables dead code elimination
+  define: {
+    __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0'),
+  },
   plugins: [
     // React DevTools must be FIRST to inject script before React initializes
     reactDevToolsPlugin(),
@@ -43,6 +48,15 @@ export default defineConfig({
     // No need to transpile to older ES versions - results in smaller, faster code.
     target: 'esnext',
     outDir: '../../dist',
+    // Clean output directory on each build (prevents stale files)
+    emptyOutDir: true,
+    // Hidden sourcemaps - generates them but doesn't reference in bundle
+    // Useful for crash reporting services (Sentry) without exposing source
+    sourcemap: 'hidden',
+    // Skip module preload polyfill - Tauri WebViews are always modern
+    modulePreload: { polyfill: false },
+    // Skip compressed size calc - visualizer plugin already does this
+    reportCompressedSize: false,
     cssCodeSplit: false,
     chunkSizeWarningLimit: 500, // Warn on chunks > 500KB
     rollupOptions: {

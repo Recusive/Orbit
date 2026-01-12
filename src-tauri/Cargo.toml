@@ -55,3 +55,4 @@ tauri-plugin-dialog = { workspace = true }
 tauri-plugin-clipboard-manager = { workspace = true }
 whoami = "2.0.0"
 tauri-plugin-decorum = "1.1.1"
+tauri-plugin-window-state = "2"

@@ -14,15 +14,15 @@
     "windows": [
       {
         "title": "Orbit",
-        "width": 1400,
-        "height": 900,
+        "width": 1280,
+        "height": 800,
         "minWidth": 800,
         "minHeight": 600,
         "resizable": true,
         "fullscreen": false,
         "decorations": true,
         "transparent": false,
-        "center": true,
+        "center": false,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": {
