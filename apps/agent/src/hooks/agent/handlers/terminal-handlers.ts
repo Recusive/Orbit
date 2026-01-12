@@ -1,7 +1,11 @@
+import { createLogger } from '@orbit/common/lib';
+
 import type { WebviewMessage } from '@/types/protocol';
 
 import { createTerminal, writeTerminal, resizeTerminal, closeTerminal } from '@/lib/api';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
+
+const logger = createLogger('TerminalHandlers');
 
 export async function handleTerminalCreate(
   message: Extract<WebviewMessage, { type: 'terminal:create' }>
@@ -40,11 +44,11 @@ export async function handleTerminalCreate(
       // Small delay to ensure terminal is ready
       await new Promise((resolve) => setTimeout(resolve, 150));
       await writeTerminal(info.id, `${initialCommand}\n`);
-      console.warn('[Orbit] Executed initial command:', initialCommand);
+      logger.info('Executed initial command', { command: initialCommand });
     }
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to create terminal';
-    console.error('[Orbit] Terminal creation error:', errorMessage);
+    logger.error('Terminal creation error', new Error(errorMessage));
   }
 }
 
@@ -54,7 +58,7 @@ export async function handleTerminalWrite(
   try {
     await writeTerminal(message.terminal_id, message.data);
   } catch (err: unknown) {
-    console.error('[Orbit] Terminal write error:', err);
+    logger.error('Terminal write error', err instanceof Error ? err : new Error(String(err)));
   }
 }
 
@@ -64,7 +68,7 @@ export async function handleTerminalResize(
   try {
     await resizeTerminal(message.terminal_id, message.cols, message.rows);
   } catch (err: unknown) {
-    console.error('[Orbit] Terminal resize error:', err);
+    logger.error('Terminal resize error', err instanceof Error ? err : new Error(String(err)));
   }
 }
 
@@ -74,6 +78,6 @@ export async function handleTerminalClose(
   try {
     await closeTerminal(message.terminal_id);
   } catch (err: unknown) {
-    console.error('[Orbit] Terminal close error:', err);
+    logger.error('Terminal close error', err instanceof Error ? err : new Error(String(err)));
   }
 }

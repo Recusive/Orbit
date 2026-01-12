@@ -701,8 +701,14 @@ export class TerminalInstance {
   private setupCursorBlinkOptimization(): void {
     // xterm.js doesn't expose onBlur/onFocus events, so we use DOM listeners
     // on the wrapper element (which contains the terminal's focusable textarea)
-    const handleBlur = (): void => {
-      this.terminal.options.cursorBlink = false;
+    const handleBlur = (event: FocusEvent): void => {
+      // Only disable blink if focus is moving outside the terminal wrapper entirely.
+      // This prevents disabling blink when focus moves between internal elements
+      // (e.g., from textarea to a tooltip or overlay within the terminal).
+      const relatedTarget = event.relatedTarget as Node | null;
+      if (!relatedTarget || !this.wrapperElement.contains(relatedTarget)) {
+        this.terminal.options.cursorBlink = false;
+      }
     };
 
     const handleFocus = (): void => {

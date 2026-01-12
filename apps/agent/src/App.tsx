@@ -1,5 +1,5 @@
 import { CanvasApp } from '@canvas/CanvasApp';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { HeaderTab } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
@@ -58,21 +58,20 @@ function useThemeSync(): void {
  * in the set so its component remains mounted (hidden via CSS).
  * This implements a "mount once, keep alive" pattern for tab switching.
  *
- * Uses a ref with synchronous mutation during render. This is safe because:
- * 1. The mutation happens before the value is used
- * 2. React re-renders when activeTab changes (from useUIStore)
- * 3. The new tab is added synchronously in that same render
+ * Uses useMemo to ensure the set is only updated when activeTab changes,
+ * following idiomatic React patterns for derived state.
  */
 function useMountedTabs(activeTab: HeaderTab): Set<HeaderTab> {
   const mountedTabsRef = useRef<Set<HeaderTab>>(new Set());
 
-  // Synchronously add active tab during render (before we return the set)
-  // This ensures the tab is mounted immediately, not after a useEffect cycle
-  if (!mountedTabsRef.current.has(activeTab)) {
-    mountedTabsRef.current = new Set(mountedTabsRef.current).add(activeTab);
-  }
-
-  return mountedTabsRef.current;
+  // useMemo ensures we only create a new Set when activeTab changes.
+  // The ref persists across renders to accumulate all visited tabs.
+  return useMemo(() => {
+    if (!mountedTabsRef.current.has(activeTab)) {
+      mountedTabsRef.current = new Set(mountedTabsRef.current).add(activeTab);
+    }
+    return mountedTabsRef.current;
+  }, [activeTab]);
 }
 
 /**
