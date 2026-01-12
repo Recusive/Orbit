@@ -2,7 +2,7 @@
 
 > AI-Powered Code Editor Built with Tauri 2 + React 19
 
-[![CI](https://github.com/Recusive/Orbit/actions/workflows/ci.yml/badge.svg)](https://github.com/Recusive/Orbit/actions/workflows/ci.yml)
+[![CI](https://github.com/Recusive/Snowflake-V0/actions/workflows/ci.yml/badge.svg)](https://github.com/Recusive/Snowflake-V0/actions/workflows/ci.yml)
 ![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?logo=tauri&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Rust](https://img.shields.io/badge/Rust-1.85-DEA584?logo=rust&logoColor=black)
@@ -254,8 +254,8 @@ Orbit/
 
 ```bash
 # Clone and install
-git clone https://github.com/Recusive/Orbit.git
-cd Orbit
+git clone https://github.com/Recusive/Snowflake-V0.git
+cd Snowflake-V0
 bun install
 
 # Run the full app (Vite + Tauri + Rust)
