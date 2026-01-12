@@ -15,8 +15,8 @@ const logger = createLogger('ErrorBoundary');
 interface ErrorBoundaryProps {
   /** Content to render when no error */
   children: ReactNode;
-  /** Optional fallback UI when error occurs. Defaults to simple error message. */
-  fallback?: ReactNode;
+  /** Optional fallback UI when error occurs. Can be a ReactNode or a render function that receives the error. */
+  fallback?: ReactNode | ((error: Error) => ReactNode);
   /** Optional callback when error is caught */
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
@@ -48,8 +48,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   override render(): ReactNode {
     if (this.state.hasError) {
-      if (this.props.fallback !== undefined) {
-        return this.props.fallback;
+      const { fallback } = this.props;
+      const error = this.state.error ?? new Error('Unknown error');
+
+      // Support render function pattern: fallback={(error) => <Fallback error={error} />}
+      if (typeof fallback === 'function') {
+        return fallback(error);
+      }
+
+      if (fallback !== undefined) {
+        return fallback;
       }
 
       // Default fallback UI

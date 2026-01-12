@@ -66,6 +66,8 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
   const hasCreatedInitialSession = useRef(false);
 
   // Create a default terminal session when panel opens (only once)
+  // NOTE: If workspace changes after initial session creation, existing sessions
+  // keep their original cwd. This is intentional - users expect terminal cwd to persist.
   useEffect(() => {
     if (sessions.length === 0 && !hasCreatedInitialSession.current) {
       hasCreatedInitialSession.current = true;

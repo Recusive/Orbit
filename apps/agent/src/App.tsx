@@ -1,6 +1,6 @@
 import { CanvasApp } from '@canvas/CanvasApp';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { HeaderTab } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
@@ -61,24 +61,21 @@ function useThemeSync(): void {
  * in the set so its component remains mounted (hidden via CSS).
  * This implements a "mount once, keep alive" pattern for tab switching.
  *
- * Uses useMemo to ensure the set is only updated when activeTab changes,
- * following idiomatic React patterns for derived state.
- *
- * ⚠️ MEMORY NOTE: Mounted tabs are never unmounted. For memory-intensive
+ * MEMORY NOTE: Mounted tabs are never unmounted. For memory-intensive
  * modes (Canvas with ReactFlow), consider adding a manual "unload" action
  * or timeout-based unmounting for long-idle tabs if memory becomes an issue.
  */
 function useMountedTabs(activeTab: HeaderTab): Set<HeaderTab> {
-  const mountedTabsRef = useRef<Set<HeaderTab>>(new Set());
+  const [mountedTabs, setMountedTabs] = useState<Set<HeaderTab>>(() => new Set([activeTab]));
 
-  // useMemo ensures we only create a new Set when activeTab changes.
-  // The ref persists across renders to accumulate all visited tabs.
-  return useMemo(() => {
-    if (!mountedTabsRef.current.has(activeTab)) {
-      mountedTabsRef.current = new Set(mountedTabsRef.current).add(activeTab);
-    }
-    return mountedTabsRef.current;
+  useEffect(() => {
+    setMountedTabs((prev) => {
+      if (prev.has(activeTab)) return prev;
+      return new Set(prev).add(activeTab);
+    });
   }, [activeTab]);
+
+  return mountedTabs;
 }
 
 // ============================================
@@ -101,9 +98,9 @@ const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error }) => {
     editor: 'Editor',
   };
 
-  const handleReload = useCallback((): void => {
+  const handleReload = (): void => {
     window.location.reload();
-  }, []);
+  };
 
   return (
     <div className="h-full w-full flex items-center justify-center bg-background">
@@ -212,7 +209,9 @@ const App: FC = () => {
                     className="h-full w-full"
                     style={{ display: activeTab === 'agent' ? 'block' : 'none' }}
                   >
-                    <ErrorBoundary fallback={<ModeErrorFallback mode="agent" />}>
+                    <ErrorBoundary
+                      fallback={(error) => <ModeErrorFallback mode="agent" error={error} />}
+                    >
                       <AgentMode />
                     </ErrorBoundary>
                   </div>
@@ -223,7 +222,9 @@ const App: FC = () => {
                     className="h-full w-full"
                     style={{ display: activeTab === 'canvas' ? 'block' : 'none' }}
                   >
-                    <ErrorBoundary fallback={<ModeErrorFallback mode="canvas" />}>
+                    <ErrorBoundary
+                      fallback={(error) => <ModeErrorFallback mode="canvas" error={error} />}
+                    >
                       <CanvasMode />
                     </ErrorBoundary>
                   </div>
@@ -234,7 +235,9 @@ const App: FC = () => {
                     className="h-full w-full"
                     style={{ display: activeTab === 'editor' ? 'block' : 'none' }}
                   >
-                    <ErrorBoundary fallback={<ModeErrorFallback mode="editor" />}>
+                    <ErrorBoundary
+                      fallback={(error) => <ModeErrorFallback mode="editor" error={error} />}
+                    >
                       <EditorMode />
                     </ErrorBoundary>
                   </div>

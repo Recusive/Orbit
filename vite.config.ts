@@ -5,15 +5,17 @@ import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 
+import pkg from './package.json';
 import { reactDevToolsPlugin } from './vite-plugins/react-devtools';
 
 // https://vite.dev/config/
 export default defineConfig({
   root: './apps/agent',
   // Compile-time constants - enables dead code elimination
+  // Note: npm_package_version isn't set by Bun, so we read from package.json directly
   define: {
     __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0'),
+    __APP_VERSION__: JSON.stringify(pkg.version),
   },
   plugins: [
     // React DevTools must be FIRST to inject script before React initializes
@@ -58,7 +60,9 @@ export default defineConfig({
     // Skip compressed size calc - visualizer plugin already does this
     reportCompressedSize: false,
     cssCodeSplit: false,
-    chunkSizeWarningLimit: 500, // Warn on chunks > 500KB
+    // Tauri apps load from disk, not network - larger chunks are acceptable
+    // Shiki (syntax highlighting) alone is ~9MB with all language grammars
+    chunkSizeWarningLimit: 10000, // 10MB - suppress warnings for desktop app
     rollupOptions: {
       output: {
         // Split heavy dependencies into separate lazy-loaded chunks
