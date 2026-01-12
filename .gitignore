@@ -69,3 +69,6 @@ vscode-reference/
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Reference repos for analysis
+opencode-reference/

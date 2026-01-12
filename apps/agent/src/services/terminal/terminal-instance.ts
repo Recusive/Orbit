@@ -45,6 +45,8 @@ const FLOW_CONTROL = {
 export interface TerminalInstanceOptions {
   sessionId: string;
   sessionName: string;
+  /** Initial working directory (defaults to HOME if not provided) */
+  cwd?: string;
   postMessage: (message: unknown) => void;
   isMockMode?: boolean;
   /** Enable copy-on-selection (auto-copy selected text to clipboard) */
@@ -76,6 +78,7 @@ export class TerminalInstance {
   // Core state
   readonly sessionId: string;
   readonly sessionName: string;
+  private readonly initialCwd: string | undefined;
   private terminalId: string | null = null;
   private isConnected = false;
   private isDisposed = false;
@@ -124,6 +127,7 @@ export class TerminalInstance {
   constructor(options: TerminalInstanceOptions) {
     this.sessionId = options.sessionId;
     this.sessionName = options.sessionName;
+    this.initialCwd = options.cwd;
     this.postMessage = options.postMessage;
     this.isMockMode = options.isMockMode ?? false;
     this._copyOnSelection = options.copyOnSelection ?? false;
@@ -227,6 +231,9 @@ export class TerminalInstance {
 
     // Set up keyboard shortcuts (Cmd+C to copy when selection exists)
     this.setupKeyboardShortcuts();
+
+    // Set up cursor blink optimization (disable when unfocused to save GPU)
+    this.setupCursorBlinkOptimization();
   }
 
   // ==========================================================================
@@ -361,6 +368,7 @@ export class TerminalInstance {
       uuid: crypto.randomUUID(),
       session_id: this.sessionId,
       name: this.sessionName,
+      cwd: this.initialCwd,
       cols,
       rows,
       shell_integration: true,
@@ -683,6 +691,35 @@ export class TerminalInstance {
       },
       true
     ); // true = capturing phase
+  }
+
+  /**
+   * Optimize cursor blink by disabling it when the terminal loses focus.
+   * The blinking cursor uses GPU resources for the animation - disabling it
+   * when unfocused saves power and reduces GPU load.
+   */
+  private setupCursorBlinkOptimization(): void {
+    // xterm.js doesn't expose onBlur/onFocus events, so we use DOM listeners
+    // on the wrapper element (which contains the terminal's focusable textarea)
+    const handleBlur = (): void => {
+      this.terminal.options.cursorBlink = false;
+    };
+
+    const handleFocus = (): void => {
+      this.terminal.options.cursorBlink = true;
+    };
+
+    // Use focusin/focusout which bubble (unlike focus/blur)
+    this.wrapperElement.addEventListener('focusout', handleBlur);
+    this.wrapperElement.addEventListener('focusin', handleFocus);
+
+    // Track for cleanup
+    this.disposables.push({
+      dispose: () => {
+        this.wrapperElement.removeEventListener('focusout', handleBlur);
+        this.wrapperElement.removeEventListener('focusin', handleFocus);
+      },
+    });
   }
 
   // ==========================================================================

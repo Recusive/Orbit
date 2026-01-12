@@ -47,3 +47,7 @@ export {
   getFileIconName,
   getFolderIconName,
 } from './iconMap';
+
+// Event batching utilities
+export { debounce, throttle, rafBatch, createCheckpointBatcher } from './event-batcher';
+export type { RafBatchHandler, CheckpointBatch, ToolEventBatch } from './event-batcher';

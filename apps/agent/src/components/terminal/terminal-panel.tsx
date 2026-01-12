@@ -26,7 +26,7 @@ import { useTerminalInstanceManager } from '@/hooks/terminal/use-terminal-instan
 import { cn } from '@/lib/utils';
 import { HEIGHTS } from '@/lib/utils/constants';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
-import { useUIStore, useTerminalPosition } from '@/stores/ui/ui-store';
+import { useUIStore, useTerminalPosition, useWorkspacePath } from '@/stores/ui/ui-store';
 
 // Terminal header uses headerBar height (35px) to match chat header
 const TERMINAL_HEADER_HEIGHT = HEIGHTS.headerBar;
@@ -45,6 +45,7 @@ export interface TerminalPanelProps {
 export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = false }) => {
   const { toggleBottomPanel, cycleTerminalPosition } = useUIStore();
   const terminalPosition = useTerminalPosition();
+  const workspacePath = useWorkspacePath();
   const sessions = useTerminalStore((state) => state.sessions);
   const activeSessionId = useTerminalStore((state) => state.activeSessionId);
   const createSession = useTerminalStore((state) => state.createSession);
@@ -68,9 +69,9 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
   useEffect(() => {
     if (sessions.length === 0 && !hasCreatedInitialSession.current) {
       hasCreatedInitialSession.current = true;
-      createSession('Terminal');
+      createSession('Terminal', workspacePath ?? undefined);
     }
-  }, [sessions.length, createSession]);
+  }, [sessions.length, createSession, workspacePath]);
 
   // Create terminal instances for sessions
   useEffect(() => {
@@ -78,7 +79,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
 
     for (const session of sessions) {
       if (!terminalManager.getInstance(session.id)) {
-        terminalManager.createInstance(session.id, session.name);
+        terminalManager.createInstance(session.id, session.name, session.cwd);
       }
     }
   }, [sessions, terminalManager]);
@@ -182,9 +183,9 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
   );
 
   const handleNewSession = useCallback((): void => {
-    const id = createSession(`Terminal ${String(sessions.length + 1)}`);
+    const id = createSession(`Terminal ${String(sessions.length + 1)}`, workspacePath ?? undefined);
     setActiveSession(id);
-  }, [createSession, sessions.length, setActiveSession]);
+  }, [createSession, sessions.length, setActiveSession, workspacePath]);
 
   const handleStartRename = useCallback((sessionId: string, currentName: string): void => {
     setEditingSessionId(sessionId);

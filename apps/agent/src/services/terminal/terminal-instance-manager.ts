@@ -157,8 +157,9 @@ export class TerminalInstanceManager {
   /**
    * Create a new terminal instance.
    * Returns existing instance if one already exists for this sessionId.
+   * @param cwd - Initial working directory for the terminal (defaults to HOME if not provided)
    */
-  createInstance(sessionId: string, sessionName: string): TerminalInstance {
+  createInstance(sessionId: string, sessionName: string, cwd?: string): TerminalInstance {
     // Return existing instance if present
     const existing = this.instances.get(sessionId);
     if (existing && !existing.getIsDisposed()) {
@@ -181,6 +182,8 @@ export class TerminalInstanceManager {
     const inst = new TerminalInstance({
       sessionId,
       sessionName,
+      // Only include cwd if provided (avoid exactOptionalPropertyTypes issue)
+      ...(cwd !== undefined && { cwd }),
       postMessage: globalPostMessage,
       isMockMode: globalIsMockMode,
       onConnected: (terminalId, pid, shellType, name) => {
@@ -189,8 +192,8 @@ export class TerminalInstanceManager {
       onDisconnected: (exitCode) => {
         globalCallbacks.onInstanceDisconnected?.(sessionId, exitCode);
       },
-      onCwdChange: (cwd) => {
-        globalCallbacks.onCwdChange?.(sessionId, cwd);
+      onCwdChange: (newCwd) => {
+        globalCallbacks.onCwdChange?.(sessionId, newCwd);
       },
       onCommandStart: (commandLine) => {
         globalCallbacks.onCommandStart?.(sessionId, commandLine);

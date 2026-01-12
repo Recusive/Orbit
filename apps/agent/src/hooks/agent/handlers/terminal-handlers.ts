@@ -9,7 +9,7 @@ export async function handleTerminalCreate(
   try {
     const info = await createTerminal(
       message.session_id,
-      undefined, // cwd - use default
+      message.cwd, // Pass workspace cwd from frontend
       undefined, // shell - use default
       message.cols,
       message.rows

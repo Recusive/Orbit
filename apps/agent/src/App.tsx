@@ -1,6 +1,7 @@
 import { CanvasApp } from '@canvas/CanvasApp';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { HeaderTab } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
 import { HeaderBar } from '@/components/layout/header-bar';
@@ -53,6 +54,28 @@ function useThemeSync(): void {
 }
 
 /**
+ * Tracks which tabs have been visited. Once a tab is visited, it stays
+ * in the set so its component remains mounted (hidden via CSS).
+ * This implements a "mount once, keep alive" pattern for tab switching.
+ *
+ * Uses a ref with synchronous mutation during render. This is safe because:
+ * 1. The mutation happens before the value is used
+ * 2. React re-renders when activeTab changes (from useUIStore)
+ * 3. The new tab is added synchronously in that same render
+ */
+function useMountedTabs(activeTab: HeaderTab): Set<HeaderTab> {
+  const mountedTabsRef = useRef<Set<HeaderTab>>(new Set());
+
+  // Synchronously add active tab during render (before we return the set)
+  // This ensures the tab is mounted immediately, not after a useEffect cycle
+  if (!mountedTabsRef.current.has(activeTab)) {
+    mountedTabsRef.current = new Set(mountedTabsRef.current).add(activeTab);
+  }
+
+  return mountedTabsRef.current;
+}
+
+/**
  * Agent mode - the main chat interface with sidebar and activity panel
  */
 const AgentMode: FC = () => {
@@ -87,6 +110,9 @@ const App: FC = () => {
   const hasWorkspace = useHasWorkspace();
   const hasCompletedOnboarding = useOnboardingStore((state) => state.hasCompletedOnboarding);
 
+  // Track which tabs have been visited for lazy mounting
+  const mountedTabs = useMountedTabs(activeTab);
+
   // Handle dialog close - either dismiss or acknowledge based on user action
   const handleOpenChange = useCallback(
     (open: boolean): void => {
@@ -112,15 +138,45 @@ const App: FC = () => {
           <HeaderBar />
 
           {/* Mode content - show welcome page if no workspace, otherwise show active mode */}
+          {/*
+           * LAZY MOUNT PATTERN: Modes are only mounted when first visited, then kept
+           * alive via CSS display toggling. This prevents:
+           * 1. Layout flashes when switching tabs (no remounting)
+           * 2. Unnecessary memory usage for unvisited modes
+           */}
           <div className="flex-1 min-h-0 overflow-hidden">
             {!hasWorkspace ? (
               <WelcomePage />
-            ) : activeTab === 'agent' ? (
-              <AgentMode />
-            ) : activeTab === 'canvas' ? (
-              <CanvasMode />
             ) : (
-              <EditorMode />
+              <>
+                {/* Agent mode - mounted on first visit, kept alive */}
+                {mountedTabs.has('agent') ? (
+                  <div
+                    className="h-full w-full"
+                    style={{ display: activeTab === 'agent' ? 'block' : 'none' }}
+                  >
+                    <AgentMode />
+                  </div>
+                ) : null}
+                {/* Canvas mode - mounted on first visit, kept alive */}
+                {mountedTabs.has('canvas') ? (
+                  <div
+                    className="h-full w-full"
+                    style={{ display: activeTab === 'canvas' ? 'block' : 'none' }}
+                  >
+                    <CanvasMode />
+                  </div>
+                ) : null}
+                {/* Editor mode - mounted on first visit, kept alive */}
+                {mountedTabs.has('editor') ? (
+                  <div
+                    className="h-full w-full"
+                    style={{ display: activeTab === 'editor' ? 'block' : 'none' }}
+                  >
+                    <EditorMode />
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
 

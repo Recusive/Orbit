@@ -34,7 +34,14 @@ export default defineConfig({
       '@orbit/common': path.resolve(__dirname, './apps/common/src'),
     },
   },
+  // Keep function/class names in production for readable stack traces and profiling
+  esbuild: {
+    keepNames: true,
+  },
   build: {
+    // Tauri uses modern WebViews (WebKit/WebView2) that support latest JS features.
+    // No need to transpile to older ES versions - results in smaller, faster code.
+    target: 'esnext',
     outDir: '../../dist',
     cssCodeSplit: false,
     chunkSizeWarningLimit: 500, // Warn on chunks > 500KB
