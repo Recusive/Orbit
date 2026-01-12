@@ -60,9 +60,10 @@ export default defineConfig({
     // Skip compressed size calc - visualizer plugin already does this
     reportCompressedSize: false,
     cssCodeSplit: false,
-    // Tauri apps load from disk, not network - larger chunks are acceptable
-    // Shiki (syntax highlighting) alone is ~9MB with all language grammars
-    chunkSizeWarningLimit: 10000, // 10MB - suppress warnings for desktop app
+    // Tauri apps load from disk, not network - larger chunks are acceptable.
+    // Combined vendor chunks can be several MB (shiki ~300KB, mermaid ~900KB, codemirror ~500KB).
+    // Using 10MB limit to suppress warnings for desktop app bundles.
+    chunkSizeWarningLimit: 10000,
     rollupOptions: {
       output: {
         // Split heavy dependencies into separate lazy-loaded chunks

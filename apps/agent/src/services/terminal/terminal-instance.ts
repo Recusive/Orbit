@@ -705,11 +705,12 @@ export class TerminalInstance {
       // Guard against events firing after disposal
       if (this.isDisposed) return;
 
-      // Only disable blink if focus is moving outside the terminal wrapper entirely.
-      // This prevents disabling blink when focus moves between internal elements
-      // (e.g., from textarea to a tooltip or overlay within the terminal).
+      // Only disable blink if focus is moving outside the terminal wrapper entirely,
+      // OR if focus is moving to an element we can't track (like browser chrome).
+      // relatedTarget is null when focus goes to non-DOM targets (e.g., window title bar,
+      // other applications, or browser UI elements outside the document).
       const relatedTarget = event.relatedTarget as Node | null;
-      if (!relatedTarget || !this.wrapperElement.contains(relatedTarget)) {
+      if (relatedTarget === null || !this.wrapperElement.contains(relatedTarget)) {
         this.terminal.options.cursorBlink = false;
       }
     };

@@ -64,8 +64,19 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
   const terminalManager = useTerminalInstanceManager();
   const terminalContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const hasCreatedInitialSession = useRef(false);
+  const previousWorkspacePath = useRef(workspacePath);
 
-  // Create a default terminal session when panel opens (only once)
+  // Reset hasCreatedInitialSession when workspace changes, so if all terminals are
+  // closed, a new one will be created in the new workspace.
+  // Existing terminals keep their original cwd - they are not affected.
+  useEffect(() => {
+    if (previousWorkspacePath.current !== workspacePath) {
+      hasCreatedInitialSession.current = false;
+      previousWorkspacePath.current = workspacePath;
+    }
+  }, [workspacePath]);
+
+  // Create a default terminal session when panel opens (only once per workspace)
   // NOTE: If workspace changes after initial session creation, existing sessions
   // keep their original cwd. This is intentional - users expect terminal cwd to persist.
   useEffect(() => {
@@ -129,12 +140,14 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
     [terminalManager]
   );
 
-  // ResizeObserver for terminal containers
+  // ResizeObserver for panel - observe panelRef instead of terminal wrapper
+  // This ensures resize events are captured when the Allotment panel changes size,
+  // which propagates more reliably than observing the terminal wrapper with height: 100%
   useEffect(() => {
-    if (!activeSessionId) return;
+    if (!activeSessionId || collapsed) return;
 
-    const container = terminalContainerRefs.current.get(activeSessionId);
-    if (!container) return;
+    const panel = panelRef.current;
+    if (!panel) return;
 
     const observer = new ResizeObserver(() => {
       const instance = terminalManager.getInstance(activeSessionId);
@@ -143,11 +156,11 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
       }
     });
 
-    observer.observe(container);
+    observer.observe(panel);
     return () => {
       observer.disconnect();
     };
-  }, [activeSessionId, terminalManager]);
+  }, [activeSessionId, terminalManager, collapsed]);
 
   // Switch terminal with disableLayout to prevent expensive resize during DOM changes
   const handleSwitchTerminal = useCallback(
@@ -341,7 +354,12 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
   return (
     <div
       ref={panelRef}
-      className={`${panelBackground} relative z-10 flex flex-col border-l border-divider min-h-[35px] ${collapsed ? 'shrink-0' : 'h-full'}`}
+      className={cn(
+        panelBackground,
+        'relative z-10 flex flex-col min-h-[35px]',
+        isFullWidth ? 'border-l border-border' : 'border-l border-border/50',
+        collapsed ? 'shrink-0' : 'h-full'
+      )}
       style={collapsed ? { height: TERMINAL_HEADER_HEIGHT } : undefined}
     >
       <header

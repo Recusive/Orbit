@@ -1,6 +1,6 @@
 import { CanvasApp } from '@canvas/CanvasApp';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { HeaderTab } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
@@ -58,14 +58,23 @@ function useThemeSync(): void {
 
 /**
  * Tracks which tabs have been visited. Once a tab is visited, it stays
- * in the set so its component remains mounted (hidden via CSS).
+ * mounted so its component remains alive (hidden via CSS).
  * This implements a "mount once, keep alive" pattern for tab switching.
+ *
+ * Returns stable boolean values to avoid unnecessary re-renders from
+ * Set reference changes.
  *
  * MEMORY NOTE: Mounted tabs are never unmounted. For memory-intensive
  * modes (Canvas with ReactFlow), consider adding a manual "unload" action
  * or timeout-based unmounting for long-idle tabs if memory becomes an issue.
  */
-function useMountedTabs(activeTab: HeaderTab): Set<HeaderTab> {
+interface MountedTabsResult {
+  hasAgent: boolean;
+  hasCanvas: boolean;
+  hasEditor: boolean;
+}
+
+function useMountedTabs(activeTab: HeaderTab): MountedTabsResult {
   const [mountedTabs, setMountedTabs] = useState<Set<HeaderTab>>(() => new Set([activeTab]));
 
   useEffect(() => {
@@ -75,7 +84,15 @@ function useMountedTabs(activeTab: HeaderTab): Set<HeaderTab> {
     });
   }, [activeTab]);
 
-  return mountedTabs;
+  // Return stable booleans instead of Set to avoid reference changes
+  return useMemo(
+    () => ({
+      hasAgent: mountedTabs.has('agent'),
+      hasCanvas: mountedTabs.has('canvas'),
+      hasEditor: mountedTabs.has('editor'),
+    }),
+    [mountedTabs]
+  );
 }
 
 // ============================================
@@ -165,7 +182,7 @@ const App: FC = () => {
   const hasCompletedOnboarding = useOnboardingStore((state) => state.hasCompletedOnboarding);
 
   // Track which tabs have been visited for lazy mounting
-  const mountedTabs = useMountedTabs(activeTab);
+  const { hasAgent, hasCanvas, hasEditor } = useMountedTabs(activeTab);
 
   // Handle dialog close - either dismiss or acknowledge based on user action
   const handleOpenChange = useCallback(
@@ -204,7 +221,7 @@ const App: FC = () => {
             ) : (
               <>
                 {/* Agent mode - mounted on first visit, kept alive */}
-                {mountedTabs.has('agent') ? (
+                {hasAgent ? (
                   <div
                     className="h-full w-full"
                     style={{ display: activeTab === 'agent' ? 'block' : 'none' }}
@@ -217,7 +234,7 @@ const App: FC = () => {
                   </div>
                 ) : null}
                 {/* Canvas mode - mounted on first visit, kept alive */}
-                {mountedTabs.has('canvas') ? (
+                {hasCanvas ? (
                   <div
                     className="h-full w-full"
                     style={{ display: activeTab === 'canvas' ? 'block' : 'none' }}
@@ -230,7 +247,7 @@ const App: FC = () => {
                   </div>
                 ) : null}
                 {/* Editor mode - mounted on first visit, kept alive */}
-                {mountedTabs.has('editor') ? (
+                {hasEditor ? (
                   <div
                     className="h-full w-full"
                     style={{ display: activeTab === 'editor' ? 'block' : 'none' }}

@@ -1,4 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
+import { toast } from 'sonner';
 
 import type { WebviewMessage } from '@/types/protocol';
 
@@ -49,6 +50,9 @@ export async function handleTerminalCreate(
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to create terminal';
     logger.error('Terminal creation error', new Error(errorMessage));
+    toast.error('Failed to create terminal', {
+      description: errorMessage,
+    });
   }
 }
 

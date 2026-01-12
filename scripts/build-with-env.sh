@@ -19,7 +19,7 @@ if [ -f .env ]; then
   echo "  APPLE_SIGNING_IDENTITY: ${APPLE_SIGNING_IDENTITY:-(not set)}"
   echo "  APPLE_ID: ${APPLE_ID:-(not set)}"
   echo "  APPLE_TEAM_ID: ${APPLE_TEAM_ID:-(not set)}"
-  echo "  APPLE_PASSWORD: ${APPLE_PASSWORD:+****}"
+  # Note: APPLE_PASSWORD presence not logged for security
 else
   echo "Warning: No .env file found - build will be unsigned"
   echo "  To enable signing/notarization, copy .env.example to .env and fill in credentials"
