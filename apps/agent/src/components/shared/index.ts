@@ -3,3 +3,4 @@
  */
 
 export { ErrorBoundary } from './ErrorBoundary';
+export type { ErrorBoundaryResetFn } from './ErrorBoundary';

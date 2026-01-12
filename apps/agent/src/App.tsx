@@ -3,7 +3,7 @@ import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { HeaderTab } from '@/stores/ui/ui-store';
-import type { FC } from 'react';
+import type { CSSProperties, FC } from 'react';
 
 import { HeaderBar } from '@/components/layout/header-bar';
 import { RootLayout } from '@/components/layout/root-layout';
@@ -20,6 +20,13 @@ import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { TauriProvider } from '@/providers/tauri-provider';
 import { useOnboardingStore } from '@/stores/onboarding/onboarding-store';
 import { useHasWorkspace, useUIStore } from '@/stores/ui/ui-store';
+
+// ============================================
+// Style Constants (avoid new object refs on each render)
+// ============================================
+
+const STYLE_DISPLAY_BLOCK: CSSProperties = { display: 'block' };
+const STYLE_DISPLAY_NONE: CSSProperties = { display: 'none' };
 
 // ============================================
 // Hooks
@@ -102,13 +109,16 @@ function useMountedTabs(activeTab: HeaderTab): MountedTabsResult {
 interface ModeErrorFallbackProps {
   readonly mode: HeaderTab;
   readonly error?: Error;
+  /** Optional callback to reset the error boundary and retry rendering */
+  readonly onReset?: () => void;
 }
 
 /**
  * Fallback UI shown when a mode (Agent/Canvas/Editor) crashes.
  * Isolates crashes to individual modes so the app remains usable.
+ * Provides both "Try Again" (reset error boundary) and "Reload App" options.
  */
-const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error }) => {
+const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error, onReset }) => {
   const modeLabels: Record<HeaderTab, string> = {
     agent: 'Agent',
     canvas: 'Canvas',
@@ -128,8 +138,8 @@ const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error }) => {
         <div className="space-y-2">
           <h2 className="text-lg font-semibold text-foreground">{modeLabels[mode]} Mode Crashed</h2>
           <p className="text-sm text-muted-foreground">
-            An unexpected error occurred. You can continue using other modes, or reload to try
-            again.
+            An unexpected error occurred. You can try again, continue using other modes, or reload
+            the app.
           </p>
           {error ? (
             <p className="text-xs text-destructive/80 font-mono bg-destructive/5 p-2 rounded">
@@ -137,10 +147,17 @@ const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error }) => {
             </p>
           ) : null}
         </div>
-        <Button variant="outline" size="sm" onClick={handleReload}>
-          <RotateCcw className="h-4 w-4 mr-2" />
-          Reload App
-        </Button>
+        <div className="flex gap-2">
+          {onReset ? (
+            <Button variant="default" size="sm" onClick={onReset}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+          ) : null}
+          <Button variant="outline" size="sm" onClick={handleReload}>
+            Reload App
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -224,10 +241,12 @@ const App: FC = () => {
                 {hasAgent ? (
                   <div
                     className="h-full w-full"
-                    style={{ display: activeTab === 'agent' ? 'block' : 'none' }}
+                    style={activeTab === 'agent' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
                   >
                     <ErrorBoundary
-                      fallback={(error) => <ModeErrorFallback mode="agent" error={error} />}
+                      fallback={(error, reset) => (
+                        <ModeErrorFallback mode="agent" error={error} onReset={reset} />
+                      )}
                     >
                       <AgentMode />
                     </ErrorBoundary>
@@ -237,10 +256,12 @@ const App: FC = () => {
                 {hasCanvas ? (
                   <div
                     className="h-full w-full"
-                    style={{ display: activeTab === 'canvas' ? 'block' : 'none' }}
+                    style={activeTab === 'canvas' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
                   >
                     <ErrorBoundary
-                      fallback={(error) => <ModeErrorFallback mode="canvas" error={error} />}
+                      fallback={(error, reset) => (
+                        <ModeErrorFallback mode="canvas" error={error} onReset={reset} />
+                      )}
                     >
                       <CanvasMode />
                     </ErrorBoundary>
@@ -250,10 +271,12 @@ const App: FC = () => {
                 {hasEditor ? (
                   <div
                     className="h-full w-full"
-                    style={{ display: activeTab === 'editor' ? 'block' : 'none' }}
+                    style={activeTab === 'editor' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
                   >
                     <ErrorBoundary
-                      fallback={(error) => <ModeErrorFallback mode="editor" error={error} />}
+                      fallback={(error, reset) => (
+                        <ModeErrorFallback mode="editor" error={error} onReset={reset} />
+                      )}
                     >
                       <EditorMode />
                     </ErrorBoundary>
