@@ -135,13 +135,17 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
 
   // Re-attach terminals when this mode becomes active (switching between Agent/Editor)
   // This is needed because React refs don't re-fire for already-mounted components
+  // Using requestAnimationFrame for smoother visual transitions vs setTimeout
   const isThisModeActive = activeTab === mode;
   useEffect(() => {
     if (!isThisModeActive || collapsed) return;
     if (!terminalManager.isInitialized()) return;
 
-    // Small delay to ensure DOM has updated after mode switch
-    const timeoutId = setTimeout(() => {
+    let cancelled = false;
+
+    // Use RAF to ensure DOM has updated after mode switch
+    requestAnimationFrame(() => {
+      if (cancelled) return;
       for (const session of sessions) {
         const instance = terminalManager.getInstance(session.id);
         const container = terminalContainerRefs.current.get(session.id);
@@ -151,10 +155,10 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
           instance.setVisible(session.id === activeSessionId);
         }
       }
-    }, 50);
+    });
 
     return () => {
-      clearTimeout(timeoutId);
+      cancelled = true;
     };
   }, [isThisModeActive, collapsed, sessions, activeSessionId, terminalManager, mode]);
 

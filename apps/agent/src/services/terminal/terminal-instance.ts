@@ -38,6 +38,9 @@ const FLOW_CONTROL = {
   ackThreshold: 10000, // 10KB
 } as const;
 
+/** Delay before auto-focusing terminal (ms). Ensures DOM is ready after visibility change. */
+const FOCUS_DELAY_MS = 50;
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -83,6 +86,7 @@ export class TerminalInstance {
   private isConnected = false;
   private isDisposed = false;
   private ptyRequested = false;
+  private ptyCreationInProgress = false;
   private ptyCreationObserver: ResizeObserver | null = null;
 
   // Copy-on-selection
@@ -266,7 +270,8 @@ export class TerminalInstance {
     // FIX: If PTY was requested but never created (e.g., container changed before
     // ResizeObserver fired), we need to treat this as a first attach to create
     // a new observer. Check if we're actually connected to know if PTY was created.
-    const needsPtyCreation = !this.isConnected && !this.terminalId;
+    // Also check ptyCreationInProgress to avoid duplicate requests during creation.
+    const needsPtyCreation = !this.isConnected && !this.terminalId && !this.ptyCreationInProgress;
     const isFirstAttach = !this.ptyRequested || needsPtyCreation;
 
     // Reset ptyRequested if we need to retry PTY creation
@@ -375,10 +380,10 @@ export class TerminalInstance {
       // Flush any pending fit operations and force re-fit when becoming visible
       this.fitDebouncer.flush();
       this.fitDebouncer.forceFit();
-      // Auto-focus when becoming visible
+      // Auto-focus when becoming visible (small delay ensures DOM is ready)
       setTimeout(() => {
         this.terminal.focus();
-      }, 50);
+      }, FOCUS_DELAY_MS);
     }
   }
 
@@ -395,6 +400,13 @@ export class TerminalInstance {
   // ==========================================================================
 
   private requestPtyCreation(): void {
+    // Guard against duplicate PTY creation requests
+    if (this.ptyCreationInProgress) {
+      logger.debug('PTY creation already in progress', { sessionId: this.sessionId });
+      return;
+    }
+    this.ptyCreationInProgress = true;
+
     const cols = this.terminal.cols;
     const rows = this.terminal.rows;
 
@@ -441,6 +453,8 @@ export class TerminalInstance {
         // Check if this message is for our session
         if (message.session_id !== this.sessionId) return;
 
+        // Clear the in-progress flag now that PTY creation completed
+        this.ptyCreationInProgress = false;
         this.terminalId = message.terminal_id ?? null;
         this.isConnected = true;
         this.onConnected?.(

@@ -414,6 +414,7 @@ export const EditorCenter: FC = () => {
   // Auto-close split when no files are open
   useEffect(() => {
     if (!hasOpenFiles && isSplit) {
+      logger.debug('Split view closed: no files open');
       setIsSplit(false);
       setRightPaneTabs([]);
       setRightPaneActiveTab(null);
@@ -472,6 +473,7 @@ export const EditorCenter: FC = () => {
 
   // Handle active tab changes when tabs are removed
   // Using useEffect ensures we always have the latest state values
+  // Note: React batches these state updates, so no intermediate render occurs
   useEffect(() => {
     if (!isSplit) return;
 
@@ -480,7 +482,8 @@ export const EditorCenter: FC = () => {
       if (rightPaneTabs.length > 0) {
         setRightPaneActiveTab(rightPaneTabs[0] ?? null);
       } else {
-        // No tabs left - close split
+        // No tabs left - close split (batched update - both happen atomically)
+        logger.debug('Split view closed: all right pane tabs closed');
         setIsSplit(false);
         setRightPaneActiveTab(null);
       }

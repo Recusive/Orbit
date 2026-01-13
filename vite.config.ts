@@ -114,7 +114,9 @@ export default defineConfig({
           if (id.includes('node_modules/streamdown')) {
             return 'vendor-streamdown';
           }
-          // Return undefined for default chunking behavior
+          // All other node_modules will be bundled together into the main vendor chunk
+          // by Vite's default behavior. Only split out packages that are >100KB or
+          // used lazily to benefit from code splitting.
           return undefined;
         },
       },

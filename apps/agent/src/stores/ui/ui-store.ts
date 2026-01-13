@@ -7,6 +7,7 @@
  */
 import { createLogger } from '@orbit/common/lib';
 import { useMemo } from 'react';
+import { z } from 'zod';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
@@ -40,6 +41,24 @@ export interface WorktreeUIState {
   worktree: WorktreeInfo;
   isExpanded: boolean;
 }
+
+// Zod schema for validating persisted worktree data
+const WorktreeInfoSchema = z.object({
+  path: z.string(),
+  head: z.string(),
+  shortHead: z.string(),
+  branch: z.string().nullable(),
+  isMain: z.boolean(),
+  isDetached: z.boolean(),
+  locked: z.string().nullable(),
+});
+
+const WorktreeUIStateSchema = z.object({
+  worktree: WorktreeInfoSchema,
+  isExpanded: z.boolean(),
+});
+
+const WorktreeUIStateArraySchema = z.array(WorktreeUIStateSchema);
 
 // Re-export for backwards compatibility
 export type ConversationSummary = StoredConversationSummary;
@@ -183,6 +202,7 @@ const saveConversationsToStorage = (conversations: ConversationSummary[]): void 
 };
 
 // Helper to load worktrees from localStorage
+// Uses Zod validation to prevent runtime errors from malformed data
 const loadWorktreesFromStorage = (): WorktreeUIState[] => {
   try {
     const saved = localStorage.getItem('orbit-worktrees');
@@ -190,11 +210,14 @@ const loadWorktreesFromStorage = (): WorktreeUIState[] => {
       return [];
     }
     const json: unknown = JSON.parse(saved);
-    // Basic validation - ensure it's an array
-    if (!Array.isArray(json)) {
+    const result = WorktreeUIStateArraySchema.safeParse(json);
+    if (!result.success) {
+      logger.warn('Invalid worktrees data in localStorage, clearing', {
+        error: result.error.message,
+      });
       return [];
     }
-    return json as WorktreeUIState[];
+    return result.data;
   } catch {
     return [];
   }

@@ -692,8 +692,9 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
   // Get workspace root path for LSP
   const rootPath = useFileStore((state) => state.rootPath);
 
-  // Initialize LSP hook
+  // Initialize LSP hook - destructure stable functions for use in deps
   const lsp = useLsp(language, rootPath);
+  const { didOpen: lspDidOpenFn, didClose: lspDidCloseFn } = lsp;
 
   // Get diagnostics for this file
   const { diagnostics: lspDiagnostics } = useFileDiagnostics(filePath ?? null);
@@ -990,7 +991,9 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
       view.destroy();
       viewRef.current = null;
     };
-    // Only create editor once
+    // INTENTIONAL: Create editor once on mount. All prop changes (language, theme,
+    // readOnly, wordWrap) are handled by separate effects using CodeMirror compartments.
+    // This is the standard CodeMirror pattern - adding deps would recreate the editor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1015,7 +1018,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
       // If filePath becomes null/undefined, close any previously opened file
       const previousFile = lspOpenedFileRef.current;
       if (previousFile) {
-        void lsp.didClose(previousFile);
+        void lspDidCloseFn(previousFile);
         lspOpenedFileRef.current = null;
       }
       return;
@@ -1024,12 +1027,12 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
     // Close previous file if different (handles rapid file switching)
     const previousFile = lspOpenedFileRef.current;
     if (previousFile && previousFile !== filePath) {
-      void lsp.didClose(previousFile);
+      void lspDidCloseFn(previousFile);
     }
 
     // Open new file
     lspOpenedFileRef.current = filePath;
-    void lsp.didOpen(filePath, language, valueRef.current);
+    void lspDidOpenFn(filePath, language, valueRef.current);
     // Reset version when opening a new file
     versionRef.current = 0;
 
@@ -1037,13 +1040,11 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
       // Only close if this file is still the one we opened
       // (prevents race condition with rapid file switching)
       if (lspOpenedFileRef.current === filePath) {
-        void lsp.didClose(filePath);
+        void lspDidCloseFn(filePath);
         lspOpenedFileRef.current = null;
       }
     };
-    // Only trigger on filePath/language change, not lsp object changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filePath, language]);
+  }, [filePath, language, lspDidOpenFn, lspDidCloseFn]);
 
   // Update language
   useEffect(() => {
@@ -1179,29 +1180,37 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
     [onGotoComplete]
   );
 
+  // Track if we've handled the initial goto (for mount race condition)
+  const initialGotoHandledRef = useRef(false);
+
   // Handle goto position (scroll to line/column)
   useEffect(() => {
     const view = viewRef.current;
     if (!view || !gotoPosition) return;
 
     executeGoto(view, gotoPosition);
+    initialGotoHandledRef.current = true;
   }, [gotoPosition, executeGoto]);
 
-  // Check for pending goto after editor mounts (handles race condition)
+  // Check for pending goto after editor mounts (handles race condition where
+  // gotoPosition exists but view wasn't ready when the above effect first ran)
   useEffect(() => {
+    // Skip if we already handled a goto
+    if (initialGotoHandledRef.current) return;
+
     // Small delay to ensure editor is fully initialized
     const timeoutId = setTimeout(() => {
       const view = viewRef.current;
-      if (view && gotoPosition) {
+      if (view && gotoPosition && !initialGotoHandledRef.current) {
         executeGoto(view, gotoPosition);
+        initialGotoHandledRef.current = true;
       }
     }, 50);
 
     return (): void => {
       clearTimeout(timeoutId);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once after mount
+  }, [gotoPosition, executeGoto]);
 
   return <div ref={containerRef} className={`h-full w-full overflow-hidden ${className ?? ''}`} />;
 };
