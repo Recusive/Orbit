@@ -61,6 +61,7 @@ interface FileViewerState {
 
   // Search state
   searchOpen: boolean;
+  searchTrigger: number; // Increments to trigger search panel open
   searchQuery: string;
 
   // Pending goto position (for diagnostic clicks, etc.)
@@ -195,6 +196,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
     isLoading: false,
     loadingPath: null,
     searchOpen: false,
+    searchTrigger: 0,
     searchQuery: '',
     pendingGoto: null,
     wordWrap: true,
@@ -202,6 +204,10 @@ export const useFileViewerStore = create<FileViewerStore>()(
     openFile: (path: string, content?: string): void => {
       logger.debug(`Opening file: ${path}`);
       set((state) => {
+        // Close search when opening/switching files
+        state.searchOpen = false;
+        state.searchQuery = '';
+
         // Check if tab already exists
         const existingTab = state.openTabs.find((tab) => tab.path === path);
 
@@ -297,6 +303,9 @@ export const useFileViewerStore = create<FileViewerStore>()(
         const tab = state.openTabs.find((t) => t.path === path);
         if (tab) {
           state.activeTabPath = path;
+          // Close search when switching tabs
+          state.searchOpen = false;
+          state.searchQuery = '';
 
           // Update history
           if (state.history[state.historyIndex] !== path) {
@@ -374,10 +383,9 @@ export const useFileViewerStore = create<FileViewerStore>()(
 
     toggleSearch: (): void => {
       set((state) => {
-        state.searchOpen = !state.searchOpen;
-        if (!state.searchOpen) {
-          state.searchQuery = '';
-        }
+        // Increment trigger to open search panel (effect watches this)
+        state.searchTrigger += 1;
+        state.searchOpen = true;
       });
     },
 
@@ -429,6 +437,13 @@ export const useActiveFile = (): ViewedFile | null => {
   return useFileViewerStore((state) => {
     if (!state.activeTabPath) return null;
     return state.openTabs.find((t) => t.path === state.activeTabPath) ?? null;
+  });
+};
+
+export const useFileByPath = (path: string | null): ViewedFile | null => {
+  return useFileViewerStore((state) => {
+    if (!path) return null;
+    return state.openTabs.find((t) => t.path === path) ?? null;
   });
 };
 

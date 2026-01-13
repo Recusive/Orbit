@@ -37,6 +37,7 @@
     "paths": {
       "@/*": ["./apps/agent/src/*"],
       "@canvas/*": ["./apps/canvas/src/*"],
+      "@editor/*": ["./apps/editor/src/*"],
       "@orbit/common": ["./apps/common/src/index.ts"],
       "@orbit/common/*": ["./apps/common/src/*"]
     }

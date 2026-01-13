@@ -660,8 +660,8 @@ interface CodeMirrorEditorProps {
   readonly gotoPosition?: GotoPosition | null;
   /** Called after scrolling to the position */
   readonly onGotoComplete?: () => void;
-  /** When true, opens the search panel */
-  readonly searchOpen?: boolean;
+  /** Trigger counter - increments to open search panel */
+  readonly searchTrigger?: number;
   /** Enable line wrapping */
   readonly wordWrap?: boolean;
 }
@@ -681,7 +681,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
   className,
   gotoPosition,
   onGotoComplete,
-  searchOpen,
+  searchTrigger = 0,
   wordWrap = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1077,13 +1077,18 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
     });
   }, [wordWrap]);
 
-  // Open search panel when searchOpen prop is true
+  // Track previous trigger value to detect changes
+  const prevSearchTriggerRef = useRef(searchTrigger);
+
+  // Open search panel when searchTrigger increments
   useEffect(() => {
     const view = viewRef.current;
-    if (!view || !searchOpen) return;
+    // Only open if trigger actually changed (not on initial mount)
+    if (!view || searchTrigger === 0 || searchTrigger === prevSearchTriggerRef.current) return;
 
+    prevSearchTriggerRef.current = searchTrigger;
     openSearchPanel(view);
-  }, [searchOpen]);
+  }, [searchTrigger]);
 
   // Update diagnostics (squiggles)
   useEffect(() => {

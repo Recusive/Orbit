@@ -1,4 +1,5 @@
 import { CanvasApp } from '@canvas/CanvasApp';
+import { EditorApp } from '@editor/EditorApp';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -181,14 +182,10 @@ const CanvasMode: FC = () => {
 };
 
 /**
- * Editor mode - code editor (placeholder for now)
+ * Editor mode - VS Code-style code editor with AI chat sidebar
  */
 const EditorMode: FC = () => {
-  return (
-    <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-      Editor Mode (coming soon)
-    </div>
-  );
+  return <EditorApp />;
 };
 
 const App: FC = () => {

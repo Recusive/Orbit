@@ -51,7 +51,7 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   const theme = useDetectTheme();
   const cursorPosition = useCursorPosition();
   const wordWrap = useWordWrap();
-  const searchOpen = useFileViewerStore((state) => state.searchOpen);
+  const searchTrigger = useFileViewerStore((state) => state.searchTrigger);
   const updateContent = useFileViewerStore((state) => state.updateContent);
   const markSaved = useFileViewerStore((state) => state.markSaved);
   const pendingGoto = useFileViewerStore((state) => state.pendingGoto);
@@ -155,7 +155,7 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
             theme={theme}
             gotoPosition={gotoForThisFile}
             onGotoComplete={clearPendingGoto}
-            searchOpen={searchOpen}
+            searchTrigger={searchTrigger}
             wordWrap={wordWrap}
           />
         </Suspense>
