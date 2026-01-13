@@ -263,7 +263,16 @@ export class TerminalInstance {
       this.ptyCreationObserver = null;
     }
 
-    const isFirstAttach = !this.ptyRequested;
+    // FIX: If PTY was requested but never created (e.g., container changed before
+    // ResizeObserver fired), we need to treat this as a first attach to create
+    // a new observer. Check if we're actually connected to know if PTY was created.
+    const needsPtyCreation = !this.isConnected && !this.terminalId;
+    const isFirstAttach = !this.ptyRequested || needsPtyCreation;
+
+    // Reset ptyRequested if we need to retry PTY creation
+    if (needsPtyCreation && this.ptyRequested) {
+      this.ptyRequested = false;
+    }
 
     // Set new container and append wrapper
     this.container = container;
@@ -271,6 +280,19 @@ export class TerminalInstance {
 
     // Refresh xterm rendering
     this.terminal.refresh(0, this.terminal.rows - 1);
+
+    // If PTY already exists (re-attach after mode switch), force re-fit and re-render
+    if (this.isConnected && this.terminalId) {
+      // Use RAF to ensure DOM is ready, then fit and refresh
+      requestAnimationFrame(() => {
+        if (this.isDisposed || !this.container) return;
+        this.fitDebouncer.forceFit();
+        // Clear and re-render to ensure canvas is properly drawn
+        this.terminal.clearTextureAtlas();
+        this.terminal.refresh(0, this.terminal.rows - 1);
+      });
+      return; // Skip PTY creation logic
+    }
 
     // Request PTY creation on FIRST attach only
     if (isFirstAttach) {

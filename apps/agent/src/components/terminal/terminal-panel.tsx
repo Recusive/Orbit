@@ -26,7 +26,12 @@ import { useTerminalInstanceManager } from '@/hooks/terminal/use-terminal-instan
 import { cn } from '@/lib/utils';
 import { HEIGHTS } from '@/lib/utils/constants';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
-import { useUIStore, useTerminalPosition, useWorkspacePath } from '@/stores/ui/ui-store';
+import {
+  useUIStore,
+  useTerminalPosition,
+  useWorkspacePath,
+  useActiveTab,
+} from '@/stores/ui/ui-store';
 
 // Terminal header uses headerBar height (35px) to match chat header
 const TERMINAL_HEADER_HEIGHT = HEIGHTS.headerBar;
@@ -40,11 +45,21 @@ export interface TerminalPanelProps {
    * Whether the panel is collapsed (shows only header)
    */
   readonly collapsed?: boolean;
+  /**
+   * Which mode this terminal panel belongs to. Used to re-attach when switching modes.
+   * Defaults to 'agent' for backwards compatibility.
+   */
+  readonly mode?: 'agent' | 'editor';
 }
 
-export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = false }) => {
+export const TerminalPanel: FC<TerminalPanelProps> = ({
+  variant,
+  collapsed = false,
+  mode = 'agent',
+}) => {
   const { toggleBottomPanel, cycleTerminalPosition } = useUIStore();
   const terminalPosition = useTerminalPosition();
+  const activeTab = useActiveTab();
   const workspacePath = useWorkspacePath();
   const sessions = useTerminalStore((state) => state.sessions);
   const activeSessionId = useTerminalStore((state) => state.activeSessionId);
@@ -117,6 +132,31 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
       clearTimeout(timeoutId);
     };
   }, [sessions, activeSessionId, terminalManager]);
+
+  // Re-attach terminals when this mode becomes active (switching between Agent/Editor)
+  // This is needed because React refs don't re-fire for already-mounted components
+  const isThisModeActive = activeTab === mode;
+  useEffect(() => {
+    if (!isThisModeActive || collapsed) return;
+    if (!terminalManager.isInitialized()) return;
+
+    // Small delay to ensure DOM has updated after mode switch
+    const timeoutId = setTimeout(() => {
+      for (const session of sessions) {
+        const instance = terminalManager.getInstance(session.id);
+        const container = terminalContainerRefs.current.get(session.id);
+
+        if (instance && container) {
+          instance.attachToElement(container);
+          instance.setVisible(session.id === activeSessionId);
+        }
+      }
+    }, 50);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isThisModeActive, collapsed, sessions, activeSessionId, terminalManager, mode]);
 
   // Callback to set container ref
   const setTerminalContainerRef = useCallback(

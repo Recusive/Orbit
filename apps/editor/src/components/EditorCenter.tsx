@@ -598,7 +598,7 @@ export const EditorCenter: FC = () => {
           preferredSize={bottomPanelOpen ? bottomPanelHeight : TERMINAL_PANEL.COLLAPSED_HEIGHT}
           minSize={TERMINAL_PANEL.MIN_HEIGHT}
         >
-          <TerminalPanel variant="full-width" collapsed={!bottomPanelOpen} />
+          <TerminalPanel variant="full-width" collapsed={!bottomPanelOpen} mode="editor" />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
