@@ -88,6 +88,7 @@ export class TerminalInstance {
   private ptyRequested = false;
   private ptyCreationInProgress = false;
   private ptyCreationObserver: ResizeObserver | null = null;
+  private ptyCreationTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   // Copy-on-selection
   private _copyOnSelection = false;
@@ -407,6 +408,16 @@ export class TerminalInstance {
     }
     this.ptyCreationInProgress = true;
 
+    // Set timeout to reset flag if connection never completes (30 seconds)
+    // This prevents permanent blocking if backend fails to respond
+    this.ptyCreationTimeoutId = setTimeout(() => {
+      if (this.ptyCreationInProgress && !this.isConnected) {
+        logger.warn('PTY creation timed out', { sessionId: this.sessionId });
+        this.ptyCreationInProgress = false;
+        this.ptyCreationTimeoutId = null;
+      }
+    }, 30000);
+
     const cols = this.terminal.cols;
     const rows = this.terminal.rows;
 
@@ -453,8 +464,12 @@ export class TerminalInstance {
         // Check if this message is for our session
         if (message.session_id !== this.sessionId) return;
 
-        // Clear the in-progress flag now that PTY creation completed
+        // Clear the in-progress flag and timeout now that PTY creation completed
         this.ptyCreationInProgress = false;
+        if (this.ptyCreationTimeoutId) {
+          clearTimeout(this.ptyCreationTimeoutId);
+          this.ptyCreationTimeoutId = null;
+        }
         this.terminalId = message.terminal_id ?? null;
         this.isConnected = true;
         this.onConnected?.(
@@ -977,6 +992,12 @@ export class TerminalInstance {
     if (this.ptyCreationObserver) {
       this.ptyCreationObserver.disconnect();
       this.ptyCreationObserver = null;
+    }
+
+    // Clear PTY creation timeout (if still waiting)
+    if (this.ptyCreationTimeoutId) {
+      clearTimeout(this.ptyCreationTimeoutId);
+      this.ptyCreationTimeoutId = null;
     }
 
     // Dispose fit debouncer

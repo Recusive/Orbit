@@ -383,9 +383,9 @@ export const useFileViewerStore = create<FileViewerStore>()(
 
     toggleSearch: (): void => {
       set((state) => {
-        // Use timestamp to ensure unique trigger value each time
-        // This guarantees the effect watching searchTrigger will always fire
-        state.searchTrigger = Date.now();
+        // Increment trigger to ensure effects watching searchTrigger fire
+        // Simple counter is deterministic and testable (vs Date.now())
+        state.searchTrigger += 1;
         state.searchOpen = true;
       });
     },

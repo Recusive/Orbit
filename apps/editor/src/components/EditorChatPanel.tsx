@@ -113,7 +113,7 @@ export const EditorChatPanel: FC = () => {
   const queuedMessage = rawQueuedMessage?.sessionId === sessionId ? rawQueuedMessage : null;
 
   // Handle file list response for @ mentions
-  // Note: Protocol layer (Zod schema) already validates file entry shape
+  // Protocol layer (Zod schema) validates file entry shape
   const handleFileListMessage = (message: ExtensionMessage): void => {
     if (message.type === 'file:list:response' && Array.isArray(message.files)) {
       setFileList(

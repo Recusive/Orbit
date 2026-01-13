@@ -1,7 +1,7 @@
 import { CanvasApp } from '@canvas/CanvasApp';
 import { EditorApp } from '@editor/EditorApp';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { HeaderTab } from '@/stores/ui/ui-store';
 import type { CSSProperties, FC } from 'react';
@@ -96,15 +96,8 @@ function useMountedTabs(activeTab: HeaderTab): MountedTabsState {
     });
   }, [activeTab]);
 
-  // Return stable object with boolean values
-  return useMemo(
-    () => ({
-      agent: mounted.agent,
-      canvas: mounted.canvas,
-      editor: mounted.editor,
-    }),
-    [mounted.agent, mounted.canvas, mounted.editor]
-  );
+  // State is already stable - no need for useMemo
+  return mounted;
 }
 
 // ============================================

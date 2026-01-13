@@ -141,11 +141,9 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
     if (!isThisModeActive || collapsed) return;
     if (!terminalManager.isInitialized()) return;
 
-    let cancelled = false;
-
     // Use RAF to ensure DOM has updated after mode switch
-    requestAnimationFrame(() => {
-      if (cancelled) return;
+    // cancelAnimationFrame in cleanup prevents redundant attach operations during rapid switches
+    const rafId = requestAnimationFrame(() => {
       for (const session of sessions) {
         const instance = terminalManager.getInstance(session.id);
         const container = terminalContainerRefs.current.get(session.id);
@@ -158,7 +156,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
     });
 
     return () => {
-      cancelled = true;
+      cancelAnimationFrame(rafId);
     };
   }, [isThisModeActive, collapsed, sessions, activeSessionId, terminalManager, mode]);
 
