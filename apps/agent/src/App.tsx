@@ -69,37 +69,41 @@ function useThemeSync(): void {
  * mounted so its component remains alive (hidden via CSS).
  * This implements a "mount once, keep alive" pattern for tab switching.
  *
- * Returns stable boolean values to avoid unnecessary re-renders from
- * Set reference changes.
+ * Uses object-based tracking to avoid Set recreation on updates.
  *
  * MEMORY NOTE: Mounted tabs are never unmounted. For memory-intensive
  * modes (Canvas with ReactFlow), consider adding a manual "unload" action
  * or timeout-based unmounting for long-idle tabs if memory becomes an issue.
  */
-interface MountedTabsResult {
-  hasAgent: boolean;
-  hasCanvas: boolean;
-  hasEditor: boolean;
+interface MountedTabsState {
+  agent: boolean;
+  canvas: boolean;
+  editor: boolean;
 }
 
-function useMountedTabs(activeTab: HeaderTab): MountedTabsResult {
-  const [mountedTabs, setMountedTabs] = useState<Set<HeaderTab>>(() => new Set([activeTab]));
+function useMountedTabs(activeTab: HeaderTab): MountedTabsState {
+  const [mounted, setMounted] = useState<MountedTabsState>(() => ({
+    agent: activeTab === 'agent',
+    canvas: activeTab === 'canvas',
+    editor: activeTab === 'editor',
+  }));
 
   useEffect(() => {
-    setMountedTabs((prev) => {
-      if (prev.has(activeTab)) return prev;
-      return new Set(prev).add(activeTab);
+    setMounted((prev) => {
+      // Skip update if already mounted
+      if (prev[activeTab]) return prev;
+      return { ...prev, [activeTab]: true };
     });
   }, [activeTab]);
 
-  // Return stable booleans instead of Set to avoid reference changes
+  // Return stable object with boolean values
   return useMemo(
     () => ({
-      hasAgent: mountedTabs.has('agent'),
-      hasCanvas: mountedTabs.has('canvas'),
-      hasEditor: mountedTabs.has('editor'),
+      agent: mounted.agent,
+      canvas: mounted.canvas,
+      editor: mounted.editor,
     }),
-    [mountedTabs]
+    [mounted.agent, mounted.canvas, mounted.editor]
   );
 }
 
@@ -199,7 +203,7 @@ const App: FC = () => {
   const hasCompletedOnboarding = useOnboardingStore((state) => state.hasCompletedOnboarding);
 
   // Track which tabs have been visited for lazy mounting
-  const { hasAgent, hasCanvas, hasEditor } = useMountedTabs(activeTab);
+  const mounted = useMountedTabs(activeTab);
 
   // Handle dialog close - either dismiss or acknowledge based on user action
   const handleOpenChange = useCallback(
@@ -238,7 +242,7 @@ const App: FC = () => {
             ) : (
               <>
                 {/* Agent mode - mounted on first visit, kept alive */}
-                {hasAgent ? (
+                {mounted.agent ? (
                   <div
                     className="h-full w-full"
                     style={activeTab === 'agent' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
@@ -253,7 +257,7 @@ const App: FC = () => {
                   </div>
                 ) : null}
                 {/* Canvas mode - mounted on first visit, kept alive */}
-                {hasCanvas ? (
+                {mounted.canvas ? (
                   <div
                     className="h-full w-full"
                     style={activeTab === 'canvas' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
@@ -268,7 +272,7 @@ const App: FC = () => {
                   </div>
                 ) : null}
                 {/* Editor mode - mounted on first visit, kept alive */}
-                {hasEditor ? (
+                {mounted.editor ? (
                   <div
                     className="h-full w-full"
                     style={activeTab === 'editor' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}

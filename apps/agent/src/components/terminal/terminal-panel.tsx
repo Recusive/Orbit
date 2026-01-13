@@ -265,25 +265,53 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
   }, [activeSessionId, handleCloseSession]);
 
   // Track if current terminal has selection (for context menu disabled state)
+  // Uses a ref to store the latest value to avoid re-renders during polling
+  const hasSelectionRef = useRef(false);
   const [hasSelection, setHasSelection] = useState(false);
+  const [isContextMenuHovered, setIsContextMenuHovered] = useState(false);
 
-  // Update selection state periodically
+  // Only poll selection state when context menu is open or being hovered
+  // This avoids unnecessary CPU usage when the menu isn't visible
   useEffect(() => {
-    if (!activeSessionId) return;
+    if (!activeSessionId || !isContextMenuHovered) return;
 
     const checkSelection = (): void => {
       const instance = terminalManager.getInstance(activeSessionId);
       if (instance) {
-        setHasSelection(instance.hasSelection());
+        const newValue = instance.hasSelection();
+        if (newValue !== hasSelectionRef.current) {
+          hasSelectionRef.current = newValue;
+          setHasSelection(newValue);
+        }
       }
     };
 
-    // Check on interval (selection events are hard to track)
+    // Check immediately when menu opens
+    checkSelection();
+
+    // Then poll while menu is open
     const interval = setInterval(checkSelection, 200);
     return () => {
       clearInterval(interval);
     };
-  }, [activeSessionId, terminalManager]);
+  }, [activeSessionId, terminalManager, isContextMenuHovered]);
+
+  // Context menu hover handlers to enable polling
+  const handleContextMenuOpenChange = useCallback(
+    (open: boolean): void => {
+      setIsContextMenuHovered(open);
+      // Immediately check selection when opening
+      if (open && activeSessionId) {
+        const instance = terminalManager.getInstance(activeSessionId);
+        if (instance) {
+          const newValue = instance.hasSelection();
+          hasSelectionRef.current = newValue;
+          setHasSelection(newValue);
+        }
+      }
+    },
+    [activeSessionId, terminalManager]
+  );
 
   // Keyboard shortcut for search (Cmd+F / Ctrl+F)
   useEffect(() => {
@@ -483,6 +511,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ variant, collapsed = fal
           onRename={handleRenameFromMenu}
           onKill={handleKillFromMenu}
           hasSelection={hasSelection}
+          onOpenChange={handleContextMenuOpenChange}
         >
           <ContextMenuTrigger asChild>
             {/* VS Code container hierarchy: outer → groups → split-pane → wrapper */}

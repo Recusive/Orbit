@@ -19,6 +19,8 @@ interface TerminalContextMenuProps {
   readonly onRename: () => void;
   readonly onKill: () => void;
   readonly hasSelection?: boolean;
+  /** Called when the context menu opens/closes */
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 export const TerminalContextMenu: FC<TerminalContextMenuProps> = ({
@@ -30,9 +32,10 @@ export const TerminalContextMenu: FC<TerminalContextMenuProps> = ({
   onRename,
   onKill,
   hasSelection = false,
+  onOpenChange,
 }) => {
   return (
-    <ContextMenu>
+    <ContextMenu {...(onOpenChange !== undefined && { onOpenChange })}>
       {children}
       <ContextMenuContent className="w-48">
         <ContextMenuItem onSelect={onCopy} disabled={!hasSelection}>

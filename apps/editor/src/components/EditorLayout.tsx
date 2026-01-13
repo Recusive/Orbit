@@ -9,7 +9,7 @@
  * │ Explorer+Git│    [Terminal]         │                       │
  * └─────────────────────────────────────────────────────────────┘
  */
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 import { EditorCenter } from './EditorCenter';
 import { EditorChatPanel } from './EditorChatPanel';
@@ -19,7 +19,7 @@ import type { FC } from 'react';
 
 import { SidebarResizeHandle } from '@/components/layout';
 import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { useUIStore } from '@/stores/ui/ui-store';
+import { useEditorChatPanelOpen, useUIStore } from '@/stores/ui/ui-store';
 
 // Editor-specific constants
 const EDITOR_PANEL = {
@@ -33,8 +33,9 @@ export const EditorLayout: FC = () => {
   // Must pass width directly like Agent does - SidebarResizeHandle manipulates DOM directly
   const leftSidebarWidth = useUIStore((state) => state.leftSidebarWidth);
 
-  // Local state for chat panel visibility
-  const [chatPanelOpen, setChatPanelOpen] = useState(true);
+  // Chat panel visibility from UIStore (persisted across mode switches)
+  const chatPanelOpen = useEditorChatPanelOpen();
+  const toggleEditorChatPanel = useUIStore((state) => state.toggleEditorChatPanel);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -42,7 +43,7 @@ export const EditorLayout: FC = () => {
       // Cmd+B to toggle chat panel
       if (e.metaKey && e.key === 'b') {
         e.preventDefault();
-        setChatPanelOpen((prev) => !prev);
+        toggleEditorChatPanel();
       }
     };
 
@@ -50,7 +51,7 @@ export const EditorLayout: FC = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [toggleEditorChatPanel]);
 
   return (
     <div className="h-full w-full flex overflow-hidden bg-background">

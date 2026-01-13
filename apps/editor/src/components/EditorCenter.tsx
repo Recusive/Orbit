@@ -431,6 +431,7 @@ export const EditorCenter: FC = () => {
   }, [rightPaneFiles, rightPaneActiveTab]);
 
   // Clean up right pane tabs when files are closed globally
+  // Note: Active tab switching is handled by the useEffect above
   useEffect(() => {
     if (!isSplit) return;
     const openPaths = new Set(openTabs.map((t) => t.path));
@@ -438,18 +439,8 @@ export const EditorCenter: FC = () => {
 
     if (validRightTabs.length !== rightPaneTabs.length) {
       setRightPaneTabs(validRightTabs);
-      // Update active tab if it was removed
-      if (rightPaneActiveTab && !openPaths.has(rightPaneActiveTab)) {
-        setRightPaneActiveTab(validRightTabs[0] ?? null);
-      }
     }
-
-    // Close split if no right pane tabs remain
-    if (validRightTabs.length === 0) {
-      setIsSplit(false);
-      setRightPaneActiveTab(null);
-    }
-  }, [isSplit, openTabs, rightPaneTabs, rightPaneActiveTab]);
+  }, [isSplit, openTabs, rightPaneTabs]);
 
   const toggleSplit = useCallback((): void => {
     if (isSplit) {
@@ -473,30 +464,28 @@ export const EditorCenter: FC = () => {
   }, []);
 
   // Handle closing a tab in the right pane (independent from left pane)
-  // Uses functional update to avoid stale closure - we calculate remaining tabs
-  // inside the updater to ensure we're working with the latest state
-  const handleRightPaneCloseTab = useCallback(
-    (path: string): void => {
-      setRightPaneTabs((prev) => {
-        const remaining = prev.filter((p) => p !== path);
+  // Simply removes the tab - active tab handling is done via useEffect below
+  // to avoid stale closure issues with rapid tab operations
+  const handleRightPaneCloseTab = useCallback((path: string): void => {
+    setRightPaneTabs((prev) => prev.filter((p) => p !== path));
+  }, []);
 
-        // Handle active tab switch based on the NEW filtered state
-        if (rightPaneActiveTab === path) {
-          if (remaining.length > 0) {
-            // Switch to first remaining tab
-            setRightPaneActiveTab(remaining[0] ?? null);
-          } else {
-            // No tabs left - close split
-            setIsSplit(false);
-            setRightPaneActiveTab(null);
-          }
-        }
+  // Handle active tab changes when tabs are removed
+  // Using useEffect ensures we always have the latest state values
+  useEffect(() => {
+    if (!isSplit) return;
 
-        return remaining;
-      });
-    },
-    [rightPaneActiveTab]
-  );
+    // If active tab no longer exists in the tab list, switch to another
+    if (rightPaneActiveTab && !rightPaneTabs.includes(rightPaneActiveTab)) {
+      if (rightPaneTabs.length > 0) {
+        setRightPaneActiveTab(rightPaneTabs[0] ?? null);
+      } else {
+        // No tabs left - close split
+        setIsSplit(false);
+        setRightPaneActiveTab(null);
+      }
+    }
+  }, [isSplit, rightPaneTabs, rightPaneActiveTab]);
 
   const terminalAllotmentRef = useRef<AllotmentHandle>(null);
 

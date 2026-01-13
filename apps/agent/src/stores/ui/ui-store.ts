@@ -96,6 +96,8 @@ interface UIState {
   goToLineDialogOpen: boolean;
   settingsDialogOpen: boolean;
   settingsDialogSection: SettingsSection;
+  // Editor mode specific
+  editorChatPanelOpen: boolean;
   // Worktrees
   worktrees: WorktreeUIState[];
   activeWorktreePath: string | null;
@@ -140,6 +142,8 @@ interface UIActions {
   setGoToLineDialogOpen: (open: boolean) => void;
   setSettingsDialogOpen: (open: boolean) => void;
   openSettings: (section?: SettingsSection) => void;
+  // Editor mode actions
+  toggleEditorChatPanel: () => void;
   // Worktree actions
   setWorktrees: (worktrees: WorktreeUIState[]) => void;
   addWorktree: (worktree: WorktreeInfo) => void;
@@ -254,6 +258,8 @@ export const useUIStore = create<UIStore>()(
     goToLineDialogOpen: false,
     settingsDialogOpen: false,
     settingsDialogSection: 'agent' as const,
+    // Editor mode
+    editorChatPanelOpen: true,
     // Worktrees
     worktrees: loadWorktreesFromStorage(),
     activeWorktreePath: loadActiveWorktreeFromStorage(),
@@ -514,6 +520,12 @@ export const useUIStore = create<UIStore>()(
       });
     },
 
+    toggleEditorChatPanel: (): void => {
+      set((state) => {
+        state.editorChatPanelOpen = !state.editorChatPanelOpen;
+      });
+    },
+
     // Worktree actions
     setWorktrees: (worktrees: WorktreeUIState[]): void => {
       set((state) => {
@@ -683,4 +695,8 @@ export const useBottomPanelOpen = (): boolean => {
 
 export const useBottomPanelHeight = (): number => {
   return useUIStore((state) => state.bottomPanelHeight);
+};
+
+export const useEditorChatPanelOpen = (): boolean => {
+  return useUIStore((state) => state.editorChatPanelOpen);
 };

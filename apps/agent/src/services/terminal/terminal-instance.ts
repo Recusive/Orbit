@@ -502,41 +502,31 @@ export class TerminalInstance {
   /**
    * Build xterm theme by computing CSS variable values.
    * xterm.js doesn't support CSS variables directly, so we compute the
-   * actual color values at runtime.
+   * actual color values at runtime using getComputedStyle.
    */
   private buildThemeFromCSSVars(): ITheme {
     const baseTheme = getBestTheme();
+    const computedStyle = getComputedStyle(document.documentElement);
 
-    // Create temporary element to compute CSS variable values
-    const tempEl = document.createElement('div');
-    document.body.appendChild(tempEl);
-
-    const getComputedColor = (cssVar: string, property: 'color' | 'backgroundColor'): string => {
-      tempEl.style[property] = `var(${cssVar})`;
-      return getComputedStyle(tempEl)[property];
-    };
-
-    const bgColor = getComputedColor('--chat-area', 'backgroundColor');
-    const fgColor = getComputedColor('--foreground', 'color');
-    const cursorColor = getComputedColor('--foreground', 'color');
-    const selectionColor = getComputedColor('--accent', 'backgroundColor');
-
-    document.body.removeChild(tempEl);
+    // Get CSS variable values directly from computed style
+    // These return the resolved color values (e.g., "rgb(30, 30, 30)")
+    const bgColor = computedStyle.getPropertyValue('--chat-area').trim();
+    const fgColor = computedStyle.getPropertyValue('--foreground').trim();
+    const selectionColor = computedStyle.getPropertyValue('--accent').trim();
 
     // WARNING: Do NOT modify selectionBg to add rgba() transparency!
     // xterm.js internally handles selection opacity/blending. The accent color
     // should be solid - xterm will apply appropriate transparency when rendering.
     // The old .replace('rgb(', 'rgba(') approach was broken with oklch() colors
     // and incorrectly double-applied transparency.
-    const selectionBg = selectionColor;
 
     return {
       ...baseTheme,
       background: bgColor,
       foreground: fgColor,
-      cursor: cursorColor,
+      cursor: fgColor,
       cursorAccent: bgColor,
-      selectionBackground: selectionBg,
+      selectionBackground: selectionColor,
       // Note: xterm.js uses native browser scrollbar styled via CSS in terminal.css
     };
   }
