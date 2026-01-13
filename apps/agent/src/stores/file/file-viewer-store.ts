@@ -384,7 +384,8 @@ export const useFileViewerStore = create<FileViewerStore>()(
     toggleSearch: (): void => {
       set((state) => {
         // Increment trigger to open search panel (effect watches this)
-        state.searchTrigger += 1;
+        // Wrap around at 1 billion to prevent unbounded growth from repeated toggles
+        state.searchTrigger = (state.searchTrigger % 1_000_000_000) + 1;
         state.searchOpen = true;
       });
     },

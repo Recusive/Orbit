@@ -473,22 +473,29 @@ export const EditorCenter: FC = () => {
   }, []);
 
   // Handle closing a tab in the right pane (independent from left pane)
+  // Uses functional update to avoid stale closure - we calculate remaining tabs
+  // inside the updater to ensure we're working with the latest state
   const handleRightPaneCloseTab = useCallback(
     (path: string): void => {
-      setRightPaneTabs((prev) => prev.filter((p) => p !== path));
-      if (rightPaneActiveTab === path) {
-        // Switch to another tab in the right pane
-        const remaining = rightPaneTabs.filter((p) => p !== path);
-        if (remaining.length > 0) {
-          setRightPaneActiveTab(remaining[0] ?? null);
-        } else {
-          // No tabs left - close split
-          setIsSplit(false);
-          setRightPaneActiveTab(null);
+      setRightPaneTabs((prev) => {
+        const remaining = prev.filter((p) => p !== path);
+
+        // Handle active tab switch based on the NEW filtered state
+        if (rightPaneActiveTab === path) {
+          if (remaining.length > 0) {
+            // Switch to first remaining tab
+            setRightPaneActiveTab(remaining[0] ?? null);
+          } else {
+            // No tabs left - close split
+            setIsSplit(false);
+            setRightPaneActiveTab(null);
+          }
         }
-      }
+
+        return remaining;
+      });
     },
-    [rightPaneTabs, rightPaneActiveTab]
+    [rightPaneActiveTab]
   );
 
   const terminalAllotmentRef = useRef<AllotmentHandle>(null);

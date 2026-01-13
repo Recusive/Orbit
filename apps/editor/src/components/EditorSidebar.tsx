@@ -97,8 +97,8 @@ const EditorSidebarItem: FC<EditorSidebarItemProps> = ({
             <span className="text-sm truncate flex-1 text-left">{label}</span>
             {shortcut ? (
               <KbdGroup className="ml-auto">
-                {shortcut.map((key, i) => (
-                  <Kbd key={i} className="text-xs">
+                {shortcut.map((key, idx) => (
+                  <Kbd key={`${key}-${String(idx)}`} className="text-xs">
                     {key}
                   </Kbd>
                 ))}

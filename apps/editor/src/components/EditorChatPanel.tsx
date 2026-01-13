@@ -114,7 +114,7 @@ export const EditorChatPanel: FC = () => {
 
   // Handle file list response for @ mentions
   const handleFileListMessage = (message: ExtensionMessage): void => {
-    if (message.type === 'file:list:response') {
+    if (message.type === 'file:list:response' && Array.isArray(message.files)) {
       setFileList(
         message.files.map((f) => ({
           path: f.path,

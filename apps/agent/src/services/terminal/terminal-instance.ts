@@ -256,6 +256,13 @@ export class TerminalInstance {
     // No-op if already attached to this container
     if (this.container === container) return;
 
+    // Clean up any pending PTY creation observer from previous attach
+    // This handles rapid attach/detach cycles before dimensions resolve
+    if (this.ptyCreationObserver) {
+      this.ptyCreationObserver.disconnect();
+      this.ptyCreationObserver = null;
+    }
+
     const isFirstAttach = !this.ptyRequested;
 
     // Set new container and append wrapper
@@ -319,6 +326,12 @@ export class TerminalInstance {
    */
   detachFromElement(): void {
     if (this.isDisposed) return;
+
+    // Clean up any pending PTY creation observer
+    if (this.ptyCreationObserver) {
+      this.ptyCreationObserver.disconnect();
+      this.ptyCreationObserver = null;
+    }
 
     this.wrapperElement.remove();
     this.container = null;
