@@ -1,4 +1,7 @@
+import { createLogger } from '@orbit/common/lib';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+const logger = createLogger('FileViewerContent');
 
 import type { OutlineItem } from '@/components/editor/editor-breadcrumbs';
 import type { GotoPosition, ViewedFile } from '@/stores/file/file-viewer-store';
@@ -107,7 +110,9 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
       // Notify LSP of document change
       documentVersionRef.current += 1;
       lspDidChange(file.path, newContent, documentVersionRef.current).catch((err: unknown) => {
-        console.warn('[FileViewerContent] Failed to notify LSP of change:', err);
+        logger.warn('Failed to notify LSP of change', {
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
     },
     [file.path, updateContent]
@@ -121,10 +126,14 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
 
       // Notify LSP of document save
       lspDidSave(file.path).catch((err: unknown) => {
-        console.warn('[FileViewerContent] Failed to notify LSP of save:', err);
+        logger.warn('Failed to notify LSP of save', {
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
     } catch (error) {
-      console.error('Failed to save file:', error);
+      logger.error('Failed to save file', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }, [file.path, file.content, markSaved]);
 

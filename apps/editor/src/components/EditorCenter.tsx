@@ -12,8 +12,11 @@
  * │         Terminal (optional)         │  <- Bottom panel
  * └─────────────────────────────────────┘
  */
+import { createLogger } from '@orbit/common/lib';
 import { Columns2, Ellipsis, Search, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+const logger = createLogger('EditorCenter');
 
 import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { ViewedFile } from '@/stores/file/file-viewer-store';
@@ -516,7 +519,9 @@ export const EditorCenter: FC = () => {
   const handleCloseTab = useCallback(
     (path: string): void => {
       lspDidClose(path).catch((err: unknown) => {
-        console.warn('[EditorCenter] Failed to notify LSP of file close:', err);
+        logger.warn('Failed to notify LSP of file close', {
+          error: err instanceof Error ? err.message : String(err),
+        });
       });
       closeTab(path);
     },
