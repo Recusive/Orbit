@@ -142,7 +142,7 @@ interface TabsHeaderProps {
   readonly activeTabPath: string | null;
   readonly onSelectTab: (path: string) => void;
   readonly onCloseTab: (path: string) => void;
-  readonly onToggleSearch: () => void;
+  readonly onToggleSearch: (path: string) => void;
   readonly wordWrap: boolean;
   readonly onToggleWordWrap: () => void;
 }
@@ -336,7 +336,9 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       {/* Editor actions - VS Code style */}
       <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-sidebar">
         <button
-          onClick={onToggleSearch}
+          onClick={() => {
+            if (activeTabPath) onToggleSearch(activeTabPath);
+          }}
           className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
           title="Search (⌘F)"
         >

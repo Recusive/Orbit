@@ -662,8 +662,8 @@ interface CodeMirrorEditorProps {
   readonly gotoPosition?: GotoPosition | null;
   /** Called after scrolling to the position */
   readonly onGotoComplete?: () => void;
-  /** Trigger counter - increments to open search panel */
-  readonly searchTrigger?: number;
+  /** Search trigger scoped by file path (for split view) */
+  readonly searchTrigger?: { path: string; id: number } | null;
   /** Enable line wrapping */
   readonly wordWrap?: boolean;
 }
@@ -683,7 +683,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
   className,
   gotoPosition,
   onGotoComplete,
-  searchTrigger = 0,
+  searchTrigger = null,
   wordWrap = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -917,20 +917,28 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
           onChange?.(newValue);
 
           // Notify LSP of document changes
+          // Guard: only send didChange if this file has been opened with LSP
+          // This prevents race condition where didChange fires before didOpen on file switch
           const currentLsp = lspRef.current;
           const currentPath = filePathRef.current;
-          if (currentPath && currentLsp.isRunning) {
+          if (currentPath && currentLsp.isRunning && lspOpenedFileRef.current === currentPath) {
             versionRef.current += 1;
             void currentLsp.didChange(currentPath, newValue, versionRef.current);
           }
         }
 
         // Update cursor position on selection changes
+        // Scoped by file path for split view support
         if (update.selectionSet || update.docChanged) {
-          const pos = update.state.selection.main.head;
-          const line = update.state.doc.lineAt(pos);
-          // Status bar uses 1-indexed line/column
-          useFileViewerStore.getState().setCursorPosition(line.number, pos - line.from + 1);
+          const currentPath = filePathRef.current;
+          if (currentPath) {
+            const pos = update.state.selection.main.head;
+            const line = update.state.doc.lineAt(pos);
+            // Status bar uses 1-indexed line/column
+            useFileViewerStore
+              .getState()
+              .setCursorPosition(currentPath, line.number, pos - line.from + 1);
+          }
         }
       }),
 
@@ -1080,18 +1088,21 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
     });
   }, [wordWrap]);
 
-  // Track previous trigger value to detect changes
-  const prevSearchTriggerRef = useRef(searchTrigger);
+  // Track previous trigger ID to detect changes
+  const prevSearchTriggerIdRef = useRef<number | null>(null);
 
-  // Open search panel when searchTrigger increments
+  // Open search panel when searchTrigger changes for THIS file
+  // Scoped by path so split view editors don't both open search
   useEffect(() => {
     const view = viewRef.current;
-    // Only open if trigger actually changed (not on initial mount)
-    if (!view || searchTrigger === 0 || searchTrigger === prevSearchTriggerRef.current) return;
+    // Skip if no trigger, no view, or trigger is for a different file
+    if (!view || !searchTrigger || searchTrigger.path !== filePath) return;
+    // Skip if we already handled this trigger ID
+    if (searchTrigger.id === prevSearchTriggerIdRef.current) return;
 
-    prevSearchTriggerRef.current = searchTrigger;
+    prevSearchTriggerIdRef.current = searchTrigger.id;
     openSearchPanel(view);
-  }, [searchTrigger]);
+  }, [searchTrigger, filePath]);
 
   // Update diagnostics (squiggles)
   useEffect(() => {

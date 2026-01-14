@@ -45,13 +45,26 @@ export interface CursorPosition {
   column: number; // 1-indexed for display
 }
 
+// Stable default reference - MUST be a constant to avoid infinite re-renders in Zustand selectors
+const DEFAULT_CURSOR_POSITION: CursorPosition = { line: 1, column: 1 };
+
+// Search trigger scoped by file path (for split view)
+export interface SearchTrigger {
+  path: string;
+  id: number;
+}
+
+// Monotonic counter for unique IDs (guaranteed unique, unlike Date.now())
+let gotoIdCounter = 0;
+let searchIdCounter = 0;
+
 interface FileViewerState {
   // Open file tabs
   openTabs: ViewedFile[];
   activeTabPath: string | null;
 
-  // Cursor position (for status bar)
-  cursorPosition: CursorPosition;
+  // Cursor positions per file (for split view - each pane tracks its own cursor)
+  cursorPositions: Record<string, CursorPosition>;
 
   // Navigation history
   history: string[];
@@ -61,9 +74,9 @@ interface FileViewerState {
   isLoading: boolean;
   loadingPath: string | null;
 
-  // Search state
+  // Search state (scoped by file path for split view)
   searchOpen: boolean;
-  searchTrigger: number; // Increments to trigger search panel open
+  searchTrigger: SearchTrigger | null; // { path, id } - only matching editor opens search
   searchQuery: string;
 
   // Pending goto position (for diagnostic clicks, etc.)
@@ -90,14 +103,14 @@ interface FileViewerActions {
   gotoPosition: (path: string, line: number, column: number, content?: string) => void;
   clearPendingGoto: () => void;
 
-  // Cursor position (for status bar)
-  setCursorPosition: (line: number, column: number) => void;
+  // Cursor position (for status bar) - scoped by file path for split view
+  setCursorPosition: (path: string, line: number, column: number) => void;
 
   // Loading
   setLoading: (isLoading: boolean, path?: string) => void;
 
-  // Search
-  toggleSearch: () => void;
+  // Search - scoped by file path for split view
+  toggleSearch: (path: string) => void;
   setSearchQuery: (query: string) => void;
   closeSearch: () => void;
 
@@ -192,13 +205,13 @@ export const useFileViewerStore = create<FileViewerStore>()(
     // Initial state
     openTabs: [],
     activeTabPath: null,
-    cursorPosition: { line: 1, column: 1 },
+    cursorPositions: {}, // Per-file cursor positions for split view
     history: [],
     historyIndex: -1,
     isLoading: false,
     loadingPath: null,
     searchOpen: false,
-    searchTrigger: 0,
+    searchTrigger: null, // { path, id } for scoped search in split view
     searchQuery: '',
     pendingGoto: null,
     wordWrap: true,
@@ -383,16 +396,18 @@ export const useFileViewerStore = create<FileViewerStore>()(
       });
     },
 
-    toggleSearch: (): void => {
+    toggleSearch: (path: string): void => {
       set((state) => {
-        if (state.searchOpen) {
-          // Closing: clear search state
+        if (state.searchOpen && state.searchTrigger?.path === path) {
+          // Closing: clear search state for this file
           state.searchOpen = false;
           state.searchQuery = '';
+          state.searchTrigger = null;
         } else {
-          // Opening: increment trigger to ensure effects watching searchTrigger fire
-          // Simple counter is deterministic and testable (vs Date.now())
-          state.searchTrigger += 1;
+          // Opening: set scoped trigger so only matching editor opens search
+          // Use monotonic counter for guaranteed unique IDs
+          searchIdCounter += 1;
+          state.searchTrigger = { path, id: searchIdCounter };
           state.searchOpen = true;
         }
       });
@@ -408,6 +423,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
       set((state) => {
         state.searchOpen = false;
         state.searchQuery = '';
+        state.searchTrigger = null;
       });
     },
 
@@ -417,8 +433,10 @@ export const useFileViewerStore = create<FileViewerStore>()(
 
       // Set the pending goto position with unique ID to ensure effect re-triggers
       // Include path for split view scoping - only matching editor should navigate
+      // Use monotonic counter for guaranteed unique IDs (Date.now() can collide)
+      gotoIdCounter += 1;
       set((state) => {
-        state.pendingGoto = { path, line, column, id: Date.now() };
+        state.pendingGoto = { path, line, column, id: gotoIdCounter };
       });
     },
 
@@ -428,9 +446,9 @@ export const useFileViewerStore = create<FileViewerStore>()(
       });
     },
 
-    setCursorPosition: (line: number, column: number): void => {
+    setCursorPosition: (path: string, line: number, column: number): void => {
       set((state) => {
-        state.cursorPosition = { line, column };
+        state.cursorPositions[path] = { line, column };
       });
     },
 
@@ -472,8 +490,13 @@ export const useFileViewerLoading = (): { isLoading: boolean; path: string | nul
   return { isLoading, path };
 };
 
-export const useCursorPosition = (): CursorPosition => {
-  return useFileViewerStore((state) => state.cursorPosition);
+// Get cursor position for a specific file (for split view)
+// Returns stable DEFAULT_CURSOR_POSITION reference to prevent infinite re-renders
+export const useCursorPosition = (path: string | null): CursorPosition => {
+  return useFileViewerStore((state) => {
+    if (!path) return DEFAULT_CURSOR_POSITION;
+    return state.cursorPositions[path] ?? DEFAULT_CURSOR_POSITION;
+  });
 };
 
 export const useWordWrap = (): boolean => {

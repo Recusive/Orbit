@@ -40,8 +40,8 @@ export const EditorLayout: FC = () => {
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
-      // Cmd+B to toggle chat panel
-      if (e.metaKey && e.key === 'b') {
+      // Cmd+B (Mac) / Ctrl+B (Windows/Linux) to toggle chat panel
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
         e.preventDefault();
         toggleEditorChatPanel();
       }

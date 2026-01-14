@@ -17,12 +17,13 @@ function resetStore(): void {
   useFileViewerStore.setState({
     openTabs: [],
     activeTabPath: null,
-    cursorPosition: { line: 1, column: 1 },
+    cursorPositions: {},
     history: [],
     historyIndex: -1,
     isLoading: false,
     loadingPath: null,
     searchOpen: false,
+    searchTrigger: null,
     searchQuery: '',
     pendingGoto: null,
     wordWrap: true,
@@ -68,8 +69,8 @@ describe('file-viewer-store', () => {
       expect(useFileViewerStore.getState().activeTabPath).toBeNull();
     });
 
-    it('should start with default cursorPosition at line 1, column 1', () => {
-      expect(useFileViewerStore.getState().cursorPosition).toEqual({ line: 1, column: 1 });
+    it('should start with empty cursorPositions', () => {
+      expect(useFileViewerStore.getState().cursorPositions).toEqual({});
     });
 
     it('should start with empty history', () => {
@@ -627,12 +628,26 @@ describe('file-viewer-store', () => {
   // ============================================================================
 
   describe('setCursorPosition', () => {
-    it('should set cursor position', () => {
+    it('should set cursor position for a specific file', () => {
       const { setCursorPosition } = useFileViewerStore.getState();
 
-      setCursorPosition(42, 15);
+      setCursorPosition('/src/file.ts', 42, 15);
 
-      expect(useFileViewerStore.getState().cursorPosition).toEqual({ line: 42, column: 15 });
+      expect(useFileViewerStore.getState().cursorPositions['/src/file.ts']).toEqual({
+        line: 42,
+        column: 15,
+      });
+    });
+
+    it('should track cursor positions independently per file (for split view)', () => {
+      const { setCursorPosition } = useFileViewerStore.getState();
+
+      setCursorPosition('/src/file1.ts', 10, 5);
+      setCursorPosition('/src/file2.ts', 20, 10);
+
+      const positions = useFileViewerStore.getState().cursorPositions;
+      expect(positions['/src/file1.ts']).toEqual({ line: 10, column: 5 });
+      expect(positions['/src/file2.ts']).toEqual({ line: 20, column: 10 });
     });
   });
 
@@ -669,22 +684,48 @@ describe('file-viewer-store', () => {
 
   describe('search', () => {
     describe('toggleSearch', () => {
-      it('should toggle search open', () => {
+      it('should open search with file path trigger', () => {
         const { toggleSearch } = useFileViewerStore.getState();
 
-        toggleSearch();
+        toggleSearch('/src/file.ts');
+
+        const state = useFileViewerStore.getState();
+        expect(state.searchOpen).toBe(true);
+        expect(state.searchTrigger).toMatchObject({ path: '/src/file.ts' });
+        expect(state.searchTrigger?.id).toBeGreaterThan(0);
+      });
+
+      it('should close search when toggling same file', () => {
+        const { toggleSearch } = useFileViewerStore.getState();
+
+        toggleSearch('/src/file.ts');
         expect(useFileViewerStore.getState().searchOpen).toBe(true);
 
-        toggleSearch();
+        toggleSearch('/src/file.ts');
         expect(useFileViewerStore.getState().searchOpen).toBe(false);
+        expect(useFileViewerStore.getState().searchTrigger).toBeNull();
+      });
+
+      it('should switch search to new file path (for split view)', () => {
+        const { toggleSearch } = useFileViewerStore.getState();
+
+        toggleSearch('/src/file1.ts');
+        const firstTrigger = useFileViewerStore.getState().searchTrigger;
+
+        toggleSearch('/src/file2.ts'); // Different file
+
+        const state = useFileViewerStore.getState();
+        expect(state.searchOpen).toBe(true);
+        expect(state.searchTrigger?.path).toBe('/src/file2.ts');
+        expect(state.searchTrigger?.id).not.toBe(firstTrigger?.id);
       });
 
       it('should clear query when closing search', () => {
         const { toggleSearch, setSearchQuery } = useFileViewerStore.getState();
 
-        toggleSearch(); // Open
+        toggleSearch('/src/file.ts'); // Open
         setSearchQuery('test query');
-        toggleSearch(); // Close
+        toggleSearch('/src/file.ts'); // Close
 
         expect(useFileViewerStore.getState().searchQuery).toBe('');
       });
@@ -701,16 +742,17 @@ describe('file-viewer-store', () => {
     });
 
     describe('closeSearch', () => {
-      it('should close search and clear query', () => {
+      it('should close search and clear query and trigger', () => {
         const { toggleSearch, setSearchQuery, closeSearch } = useFileViewerStore.getState();
 
-        toggleSearch();
+        toggleSearch('/src/file.ts');
         setSearchQuery('test');
         closeSearch();
 
         const state = useFileViewerStore.getState();
         expect(state.searchOpen).toBe(false);
         expect(state.searchQuery).toBe('');
+        expect(state.searchTrigger).toBeNull();
       });
     });
   });

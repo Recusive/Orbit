@@ -146,7 +146,7 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
 
   // File state
   const activeFile = useActiveFile();
-  const cursorPosition = useCursorPosition();
+  const cursorPosition = useCursorPosition(activeFile?.path ?? null);
 
   // Diagnostics (LSP problems)
   const { totalErrors, totalWarnings } = useDiagnostics();

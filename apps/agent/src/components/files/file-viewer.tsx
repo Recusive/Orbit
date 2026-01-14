@@ -19,10 +19,12 @@ export const FileViewer: FC = () => {
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
-      // Cmd+F to search
+      // Cmd+F to search - scoped by active file path for split view
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
-        toggleSearch();
+        if (activeFile?.path) {
+          toggleSearch(activeFile.path);
+        }
       }
     };
 
@@ -30,7 +32,7 @@ export const FileViewer: FC = () => {
     return (): void => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [toggleSearch]);
+  }, [toggleSearch, activeFile?.path]);
 
   return (
     <div className="flex flex-col h-full bg-chat-area relative">

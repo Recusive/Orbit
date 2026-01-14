@@ -52,7 +52,8 @@ interface FileViewerContentProps {
 
 export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   const theme = useDetectTheme();
-  const cursorPosition = useCursorPosition();
+  // Cursor position is scoped by file path for split view support
+  const cursorPosition = useCursorPosition(file.path);
   const wordWrap = useWordWrap();
   const searchTrigger = useFileViewerStore((state) => state.searchTrigger);
   const updateContent = useFileViewerStore((state) => state.updateContent);
@@ -96,7 +97,8 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   // Handle outline item click - navigate to that line
   const handleOutlineClick = useCallback(
     (item: OutlineItem): void => {
-      gotoPosition(file.path, item.line + 1, 1); // Convert 0-indexed to 1-indexed
+      // item.line is 0-indexed, gotoPosition expects 0-indexed (CodeMirrorEditor converts)
+      gotoPosition(file.path, item.line, 0);
     },
     [gotoPosition, file.path]
   );
