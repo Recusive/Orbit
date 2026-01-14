@@ -12,7 +12,7 @@
 //! # Windows Note
 //!
 //! All webview creation must be async to avoid deadlocks on Windows.
-//! See: https://docs.rs/tauri/latest/tauri/webview/struct.WebviewBuilder.html
+//! See: <https://docs.rs/tauri/latest/tauri/webview/struct.WebviewBuilder.html>
 
 #![allow(
     clippy::needless_pass_by_value,

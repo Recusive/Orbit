@@ -57,7 +57,7 @@ pub fn set_window_bounds(pid: u32, bounds: WindowBounds) -> Result<()> {
     {
         let _ = (pid, bounds);
         Err(crate::BrowserError::PositioningFailed(
-            "Window positioning not supported on this platform".to_string(),
+            "Window positioning not supported on this platform".to_owned(),
         ))
     }
 }
