@@ -76,12 +76,11 @@ const getPersistedState = (): Partial<BrowserState> => {
   }
 };
 
-const persistedState = getPersistedState();
-
-const initialState: BrowserState = {
-  viewId: persistedState.viewId ?? null,
+// Clean initial state (used by reset)
+const cleanInitialState: BrowserState = {
+  viewId: null,
   isCreating: false,
-  isActive: persistedState.isActive ?? false,
+  isActive: false,
   navigation: {
     url: '',
     title: '',
@@ -93,6 +92,14 @@ const initialState: BrowserState = {
   selectedElement: null,
   elementContexts: [],
   error: null,
+};
+
+// Hydrated initial state (used on first load, includes persisted values)
+const persistedState = getPersistedState();
+const initialState: BrowserState = {
+  ...cleanInitialState,
+  viewId: persistedState.viewId ?? null,
+  isActive: persistedState.isActive ?? false,
 };
 
 export const useBrowserStore = create<BrowserStore>()(
@@ -142,7 +149,8 @@ export const useBrowserStore = create<BrowserStore>()(
     },
 
     reset: (): void => {
-      set(() => initialState);
+      // Use clean state, not the hydrated initialState (which has persisted values)
+      set(() => cleanInitialState);
       // Clear persisted state
       try {
         localStorage.removeItem('orbit-browser-viewId');

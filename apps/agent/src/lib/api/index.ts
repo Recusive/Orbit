@@ -34,3 +34,6 @@ export * from './settings';
 
 // Window operations
 export * from './window';
+
+// Browser operations (embedded Chromium + CDP)
+export * from './browser';

@@ -7,6 +7,12 @@ import {
   handleInputModeSet,
 } from './agent-sdk-handlers';
 import {
+  handleBrowserBounds,
+  handleBrowserClear,
+  handleBrowserCreate,
+  handleBrowserNavigate,
+} from './browser-handlers';
+import {
   handleCommandsList,
   handleCommandsCreate,
   handleCommandsUpdate,
@@ -37,6 +43,8 @@ import {
 } from './terminal-handlers';
 
 import type { WebviewMessage } from '@/types/protocol';
+
+import { useBrowserStore } from '@/stores/browser/browser-store';
 
 // ═══════════════════════════════════════════════════════════════
 // Tauri Message Handler
@@ -219,6 +227,51 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
 
   if (message.type === 'commands:generate') {
     await handleCommandsGenerate(message);
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Browser Handlers (Embedded WebKit Webview)
+  // ═══════════════════════════════════════════════════════════════
+
+  if (message.type === 'browser:create') {
+    await handleBrowserCreate(message);
+    return;
+  }
+
+  if (message.type === 'browser:navigate') {
+    await handleBrowserNavigate(message);
+    return;
+  }
+
+  if (message.type === 'browser:bounds') {
+    await handleBrowserBounds(message);
+    return;
+  }
+
+  if (message.type === 'browser:clear') {
+    await handleBrowserClear(message);
+    return;
+  }
+
+  // Legacy: browser:detect (deprecated - use browser:create instead)
+  // Inline the deprecated handler logic to avoid calling deprecated function
+  if (message.type === 'browser:detect') {
+    const browserStore = useBrowserStore.getState();
+    browserStore.setCreating(false);
+    browserStore.setError(
+      'External browser detection is no longer supported. The browser is now embedded within Orbit.'
+    );
+
+    window.postMessage(
+      {
+        type: 'browser:error',
+        uuid: crypto.randomUUID(),
+        request_uuid: message.uuid,
+        error: 'Use browser:create to create an embedded browser',
+      },
+      '*'
+    );
     return;
   }
 

@@ -3,6 +3,7 @@ import { createLogger } from '@orbit/common/lib';
 import type { ChatMessage } from '@/components/chat';
 import type { ExtensionMessage, Model } from '@/types/protocol';
 
+import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-handlers';
 import { conversationAddMessage, conversationList } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
@@ -735,6 +736,13 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
 
       case 'tool:start': {
         const toolId = message.tool_id;
+        const toolName = message.tool_name;
+
+        // Record browser activity when AI uses Playwright MCP tools
+        // This resets the idle timer to prevent auto-close during AI automation
+        if (toolName.toLowerCase().includes('browser')) {
+          recordBrowserActivityFromAI();
+        }
 
         // Use backend-provided content_offset for accurate tool positioning.
         // The backend tracks accumulated text length and provides this when emitting tool events.
@@ -747,7 +755,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           type: 'start',
           toolId,
           messageId: message.message_id,
-          toolName: message.tool_name,
+          toolName,
           toolInput: message.tool_input,
           contentOffset,
         });
@@ -830,12 +838,13 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       case 'thinking:changed':
       case 'browser:open':
       case 'browser:close':
-      case 'browser:created':
+      case 'browser:detected':
       case 'browser:navigated':
       case 'browser:element-selected':
       case 'browser:loading':
       case 'browser:error':
-      case 'browser:destroyed':
+      case 'browser:cleared':
+      case 'browser:created':
       case 'subagents:list:response':
       case 'subagents:created':
       case 'subagents:updated':

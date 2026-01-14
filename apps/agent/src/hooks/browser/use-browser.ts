@@ -60,7 +60,7 @@ export function useBrowser(): void {
             pendingNavigationUrl = url;
             useBrowserStore.getState().setCreating(true);
             postMessage({
-              type: 'browser:create',
+              type: 'browser:detect',
               uuid: generateUUID(),
             });
           } else if (browserState.isActive) {
@@ -82,8 +82,9 @@ export function useBrowser(): void {
         }
 
         // Browser messages
-        case 'browser:created':
-          setViewId(message.viewId);
+        case 'browser:detected':
+          // Use pid as the identifier (convert to string for store compatibility)
+          setViewId(String(message.pid));
           setError(null);
           // Check if there's a pending navigation from browser:open
           if (pendingNavigationUrl) {
@@ -120,8 +121,12 @@ export function useBrowser(): void {
           setSelectingElement(false);
           break;
 
-        case 'browser:destroyed':
+        case 'browser:cleared':
           reset();
+          break;
+
+        case 'browser:created':
+          // Handled by browser-handlers.ts
           break;
 
         // Ignore non-browser messages - handled elsewhere

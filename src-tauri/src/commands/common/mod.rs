@@ -1,5 +1,6 @@
 //! Common commands shared across all apps
 
+pub mod browser;
 pub mod credentials;
 pub mod dev_monitor;
 pub mod diagnostics;

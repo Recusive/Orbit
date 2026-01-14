@@ -15,6 +15,7 @@ use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
 use commands::canvas::lifecycle as canvas_cmd;
 use commands::common::{
+    browser::{self, EmbeddedBrowserState},
     credentials, dev_monitor, diagnostics, files, git, lsp, providers, search, settings, terminal,
     workspace,
 };
@@ -208,11 +209,15 @@ pub fn run() {
     // Clone for .manage() before moving into .setup()
     let session_manager_for_state = Arc::clone(&session_manager);
 
+    // Initialize embedded browser state
+    let browser_state = Arc::new(EmbeddedBrowserState::new());
+
     let result = tauri::Builder::default()
         // Managed state
         .manage(settings_manager)
         .manage(conversation_manager)
         .manage(session_manager_for_state)
+        .manage(browser_state)
         // Plugins
         .plugin(build_log_plugin().build())
         .plugin(tauri_plugin_fs::init())
@@ -398,6 +403,18 @@ pub fn run() {
             credentials::retrieve_api_key,
             credentials::validate_api_key,
             credentials::delete_api_key,
+            // Embedded browser commands
+            browser::browser_create,
+            browser::browser_navigate,
+            browser::browser_set_bounds,
+            browser::browser_close,
+            browser::browser_has,
+            browser::browser_info,
+            browser::browser_eval,
+            // Legacy browser commands (deprecated)
+            browser::browser_detect,
+            browser::browser_get_pid,
+            browser::browser_clear,
         ])
         .run(tauri::generate_context!());
 

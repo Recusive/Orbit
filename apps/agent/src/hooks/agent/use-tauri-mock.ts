@@ -235,6 +235,7 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'thinking:set':
     case 'model:set':
     case 'browser:create':
+    case 'browser:detect':
     case 'browser:navigate':
     case 'browser:back':
     case 'browser:forward':
@@ -243,7 +244,7 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'browser:select-element:start':
     case 'browser:select-element:cancel':
     case 'browser:bounds':
-    case 'browser:destroy':
+    case 'browser:clear':
     case 'browser:devtools':
     case 'browser:show':
     case 'browser:hide':

@@ -534,6 +534,7 @@ pub use types::{FileStatus, GitStatus};
 - [x] Git status & operations
 - [x] Bun workspace management
 - [x] CI/CD with GitHub Actions
+- [x] Embedded browser panel (WebKit via Tauri multiwebview)
 
 ### In Progress
 
@@ -962,10 +963,22 @@ apps/canvas/src/
 
 ---
 
+## Feature Documentation
+
+For detailed documentation on specific features, see the `docs/` folder:
+
+| Feature          | Documentation                                          | Description                                                                  |
+| ---------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Embedded Browser | [`docs/EMBEDDED_BROWSER.md`](docs/EMBEDDED_BROWSER.md) | Tauri multiwebview browser panel, WKWebView workarounds, idle timeout system |
+
+---
+
 ## Changelog
 
 ### January 2026
 
+- **Embedded browser panel** - True embedded WebKit browser via Tauri's `unstable` feature (multiwebview)
+  - See `docs/EMBEDDED_BROWSER.md` for implementation details and known issues
 - **Migrated from pnpm to Bun** - All package management now uses Bun for faster installs and unified tooling
   - Removed `pnpm-workspace.yaml` - workspaces defined in `package.json`
   - Removed `pnpm-lock.yaml` - replaced by `bun.lockb`

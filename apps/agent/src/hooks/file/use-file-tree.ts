@@ -209,12 +209,13 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         case 'conversation:rewound':
         case 'browser:open':
         case 'browser:close':
-        case 'browser:created':
+        case 'browser:detected':
         case 'browser:navigated':
         case 'browser:element-selected':
         case 'browser:loading':
         case 'browser:error':
-        case 'browser:destroyed':
+        case 'browser:cleared':
+        case 'browser:created':
         case 'subagents:list:response':
         case 'subagents:created':
         case 'subagents:updated':

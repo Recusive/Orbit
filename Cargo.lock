@@ -3291,6 +3291,7 @@ dependencies = [
  "hostname",
  "log",
  "orbit-ai",
+ "orbit-browser",
  "orbit-conversations",
  "orbit-core",
  "orbit-fs",
@@ -3316,6 +3317,16 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "whoami",
+]
+
+[[package]]
+name = "orbit-browser"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "parking_lot",
+ "serde",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

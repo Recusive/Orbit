@@ -550,10 +550,27 @@ export const WebviewReadySchema = z
 // BROWSER (Webview → Extension)
 // ═══════════════════════════════════════════════════════════════
 
-// Create a browser view
+// Create an embedded browser webview
 export const BrowserCreateSchema = z
   .object({
     type: z.literal('browser:create'),
+    uuid: UUIDSchema,
+    bounds: z
+      .object({
+        x: z.number(),
+        y: z.number(),
+        width: z.number(),
+        height: z.number(),
+        url: z.string().optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
+// @deprecated - Use browser:create instead. Detect external browser (legacy)
+export const BrowserDetectSchema = z
+  .object({
+    type: z.literal('browser:detect'),
     uuid: UUIDSchema,
   })
   .strict();
@@ -627,10 +644,10 @@ export const BrowserBoundsSchema = z
   })
   .strict();
 
-// Destroy browser view
-export const BrowserDestroySchema = z
+// Clear browser tracking (doesn't close browser - Playwright handles that)
+export const BrowserClearSchema = z
   .object({
-    type: z.literal('browser:destroy'),
+    type: z.literal('browser:clear'),
     uuid: UUIDSchema,
   })
   .strict();
@@ -850,6 +867,7 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   SetModelSchema,
   // Browser
   BrowserCreateSchema,
+  BrowserDetectSchema, // @deprecated
   BrowserNavigateSchema,
   BrowserBackSchema,
   BrowserForwardSchema,
@@ -858,7 +876,7 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   BrowserSelectElementStartSchema,
   BrowserSelectElementCancelSchema,
   BrowserBoundsSchema,
-  BrowserDestroySchema,
+  BrowserClearSchema, // @deprecated
   BrowserDevToolsSchema,
   BrowserShowSchema,
   BrowserHideSchema,
@@ -1458,12 +1476,22 @@ export const ReactElementContextSchema = z
   })
   .strict();
 
-// Browser view created
+// Embedded browser created
 export const BrowserCreatedSchema = z
   .object({
     type: z.literal('browser:created'),
     uuid: UUIDSchema,
-    viewId: z.string(),
+    label: z.string(),
+    url: z.string(),
+  })
+  .strict();
+
+// @deprecated - Legacy: Browser window detected (Playwright-spawned)
+export const BrowserDetectedSchema = z
+  .object({
+    type: z.literal('browser:detected'),
+    uuid: UUIDSchema,
+    pid: z.number(),
   })
   .strict();
 
@@ -1508,10 +1536,10 @@ export const BrowserErrorSchema = z
   })
   .strict();
 
-// Browser destroyed
-export const BrowserDestroyedSchema = z
+// Browser tracking cleared
+export const BrowserClearedSchema = z
   .object({
-    type: z.literal('browser:destroyed'),
+    type: z.literal('browser:cleared'),
     uuid: UUIDSchema,
   })
   .strict();
@@ -1721,11 +1749,12 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   ErrorSchema,
   // Browser
   BrowserCreatedSchema,
+  BrowserDetectedSchema, // @deprecated
   BrowserNavigatedSchema,
   BrowserElementSelectedSchema,
   BrowserLoadingSchema,
   BrowserErrorSchema,
-  BrowserDestroyedSchema,
+  BrowserClearedSchema,
   BrowserOpenSchema,
   BrowserCloseSchema,
   // Subagents
@@ -1796,6 +1825,7 @@ export type SetModel = z.infer<typeof SetModelSchema>;
 // Note: Model type is exported from @orbit/shared-schemas at file top
 // Browser (Webview → Extension)
 export type BrowserCreate = z.infer<typeof BrowserCreateSchema>;
+export type BrowserDetect = z.infer<typeof BrowserDetectSchema>; // @deprecated
 export type BrowserNavigate = z.infer<typeof BrowserNavigateSchema>;
 export type BrowserBack = z.infer<typeof BrowserBackSchema>;
 export type BrowserForward = z.infer<typeof BrowserForwardSchema>;
@@ -1804,7 +1834,7 @@ export type BrowserStop = z.infer<typeof BrowserStopSchema>;
 export type BrowserSelectElementStart = z.infer<typeof BrowserSelectElementStartSchema>;
 export type BrowserSelectElementCancel = z.infer<typeof BrowserSelectElementCancelSchema>;
 export type BrowserBounds = z.infer<typeof BrowserBoundsSchema>;
-export type BrowserDestroy = z.infer<typeof BrowserDestroySchema>;
+export type BrowserClear = z.infer<typeof BrowserClearSchema>;
 export type BrowserDevTools = z.infer<typeof BrowserDevToolsSchema>;
 export type BrowserShow = z.infer<typeof BrowserShowSchema>;
 export type BrowserHide = z.infer<typeof BrowserHideSchema>;
@@ -1859,11 +1889,12 @@ export type ProtocolError = z.infer<typeof ErrorSchema>;
 // Browser (Extension → Webview)
 export type ReactElementContext = z.infer<typeof ReactElementContextSchema>;
 export type BrowserCreated = z.infer<typeof BrowserCreatedSchema>;
+export type BrowserDetected = z.infer<typeof BrowserDetectedSchema>; // @deprecated
 export type BrowserNavigated = z.infer<typeof BrowserNavigatedSchema>;
 export type BrowserElementSelected = z.infer<typeof BrowserElementSelectedSchema>;
 export type BrowserLoading = z.infer<typeof BrowserLoadingSchema>;
 export type BrowserError = z.infer<typeof BrowserErrorSchema>;
-export type BrowserDestroyed = z.infer<typeof BrowserDestroyedSchema>;
+export type BrowserCleared = z.infer<typeof BrowserClearedSchema>;
 export type BrowserOpen = z.infer<typeof BrowserOpenSchema>;
 export type BrowserClose = z.infer<typeof BrowserCloseSchema>;
 
@@ -1910,12 +1941,12 @@ export function isProtocolFileMessage(
 export function isProtocolBrowserMessage(
   msg: ExtensionMessage
 ): msg is
-  | BrowserCreated
+  | BrowserDetected
   | BrowserNavigated
   | BrowserElementSelected
   | BrowserLoading
   | BrowserError
-  | BrowserDestroyed
+  | BrowserCleared
   | BrowserOpen
   | BrowserClose {
   return msg.type.startsWith('browser:');

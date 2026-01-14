@@ -28,6 +28,7 @@ orbit-ai = { path = "../crates/common/ai" }
 orbit-search = { path = "../crates/common/search" }
 orbit-settings = { path = "../crates/common/settings" }
 orbit-conversations = { path = "../crates/common/conversations" }
+orbit-browser = { path = "../crates/common/browser" }
 
 # Core dependencies
 tokio = { workspace = true }
