@@ -482,6 +482,8 @@ export const useUIStore = create<UIStore>()(
     setActivityTab: (tab: ActivityTab): void => {
       set((state) => {
         state.activityTab = tab;
+        // Also open the activity panel when selecting a tab
+        state.reviewPanelOpen = true;
       });
     },
 

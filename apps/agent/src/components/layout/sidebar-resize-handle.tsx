@@ -42,16 +42,18 @@ export const SidebarResizeHandle: FC = () => {
     if (isCollapsed) return;
 
     e.preventDefault();
+
+    // Find the sidebar element first - if not found, bail out before setting any state
+    const sidebarElement = document.querySelector<HTMLElement>('[data-sidebar="primary"]');
+    if (!sidebarElement) return;
+
+    // Now safe to set dragging state since we have a valid element
     isDraggingRef.current = true;
     setIsDragging(true);
     currentWidthRef.current = leftSidebarWidth;
 
     const startX = e.clientX;
     const startWidth = leftSidebarWidth;
-
-    // Find the sidebar element to update directly
-    const sidebarElement = document.querySelector<HTMLElement>('[data-sidebar="primary"]');
-    if (!sidebarElement) return;
 
     // Store original transition and disable it for smooth dragging
     const originalTransition = sidebarElement.style.transition;

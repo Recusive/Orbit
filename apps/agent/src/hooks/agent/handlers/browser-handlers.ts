@@ -119,12 +119,17 @@ export async function handleBrowserCreate(
 export async function handleBrowserNavigate(
   message: Extract<WebviewMessage, { type: 'browser:navigate' }>
 ): Promise<void> {
+  // Clear any previous error before navigation
+  useBrowserStore.getState().setError(null);
+
   try {
     await browserNavigate(message.url);
     useBrowserLifecycleStore.getState().recordActivity();
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Navigation failed';
     logger.warn('Browser navigation failed', { error: errorMessage });
+    // Surface error to UI so user gets feedback
+    useBrowserStore.getState().setError(errorMessage);
   }
 }
 

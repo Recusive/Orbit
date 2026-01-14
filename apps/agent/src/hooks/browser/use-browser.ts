@@ -83,11 +83,13 @@ export function useBrowser(): void {
 
         case 'browser:navigated': {
           // Build partial navigation update - only include fields that are provided
+          // This preserves previous values (e.g., title) when backend doesn't provide them
           // canGoBack/canGoForward left as null (unknown) if not provided from WebKit
           const navUpdate: Parameters<typeof setNavigation>[0] = {
             url: message.url,
-            title: message.title ?? '',
           };
+          // Only update title if provided (preserves previous title otherwise)
+          if (message.title !== undefined) navUpdate.title = message.title;
           if (message.canGoBack !== undefined) navUpdate.canGoBack = message.canGoBack;
           if (message.canGoForward !== undefined) navUpdate.canGoForward = message.canGoForward;
           if (message.isLoading !== undefined) navUpdate.isLoading = message.isLoading;

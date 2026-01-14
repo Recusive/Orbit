@@ -42,9 +42,9 @@
  * Sidebar width constants
  */
 export const SIDEBAR = {
-  collapsed: 40,
+  collapsed: 35,
   expanded: 256,
-  iconColumnWidth: 40,
+  iconColumnWidth: 35,
   itemPadding: 12, // 6px mx-1.5 each side
 } as const;
 
@@ -62,7 +62,7 @@ export const HEIGHTS = {
 export const PANEL_SIZES = {
   sidebar: {
     default: 256,
-    min: 40,
+    min: 35,
     minUsable: 240, // Minimum width when expanded (can't drag smaller than this)
     max: 400,
     snapThreshold: 180, // Below this, sidebar snaps to collapsed
@@ -236,7 +236,7 @@ export const DEFAULT_UI_STATE = {
   leftSidebarWidth: SIDEBAR.expanded,
   reviewPanelOpen: false,
   reviewPanelWidth: PANEL_SIZES.review.default,
-  rightSidebarOpen: false,
+  rightSidebarOpen: true,
   bottomPanelOpen: false,
   bottomPanelHeight: PANEL_SIZES.terminal.default,
 } as const;

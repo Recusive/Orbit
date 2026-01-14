@@ -116,14 +116,22 @@ function isTauriEnvironment(): boolean {
 // ============================================================================
 
 /**
- * Simple abort controller for managing async listener registration
- * Using a class so TypeScript doesn't over-optimize the aborted check
+ * Simple abort controller for managing async listener registration.
+ *
+ * Uses isAborted() method instead of a getter property because TypeScript's
+ * control flow analysis narrows getter properties after conditional checks,
+ * but doesn't narrow method return values. This is important because the
+ * aborted state CAN change during await boundaries when cleanup is called.
  */
 class ListenerAbortController {
   private _aborted = false;
   private _unlistenFns: (() => void)[] = [];
 
-  get aborted(): boolean {
+  /**
+   * Check if abort has been requested.
+   * Use this method instead of a property to prevent TypeScript narrowing.
+   */
+  isAborted(): boolean {
     return this._aborted;
   }
 
@@ -150,6 +158,59 @@ class ListenerAbortController {
       }
     }
     this._unlistenFns = [];
+  }
+}
+
+// ============================================================================
+// File Watcher Setup (extracted to avoid ESLint false positives)
+// ============================================================================
+
+/**
+ * Setup file watcher with proper abort handling.
+ *
+ * Extracted to a separate function because TypeScript's flow analysis doesn't
+ * understand that `controller.isAborted()` can change during `await` statements
+ * (the cleanup function can be called from React while we're awaiting).
+ *
+ * By using a function that takes the controller, we make it clear to both
+ * TypeScript and readers that the aborted state needs to be checked after
+ * each await.
+ */
+async function setupFileWatcher(controller: ListenerAbortController): Promise<void> {
+  // Check abort state before starting
+  if (controller.isAborted()) return;
+
+  try {
+    const workspacePath = await getWorkspacePath();
+
+    // Check again after await - cleanup may have been called
+    if (!workspacePath || controller.isAborted()) return;
+
+    const unlisten = await onFileChange((event) => {
+      if (shouldIgnorePath(event.path)) return;
+
+      postWindowMessage({
+        type: 'file:changed',
+        uuid: crypto.randomUUID(),
+        path: event.path,
+        change_type: event.type,
+      });
+    });
+    controller.addUnlisten(unlisten);
+
+    // Check again after await - cleanup may have been called
+    if (controller.isAborted()) return;
+
+    await watchPath(workspacePath);
+    logger.info('File watcher initialized', { workspacePath });
+  } catch (err: unknown) {
+    // Only log errors if we weren't aborted (avoids noise during cleanup)
+    if (!controller.isAborted()) {
+      logger.error(
+        'Failed to setup file watcher',
+        err instanceof Error ? err : new Error(String(err))
+      );
+    }
   }
 }
 
@@ -580,42 +641,11 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
       }
 
       // File watcher (separate because it depends on workspace path)
-      // Note: controller.aborted CAN change during await - linter doesn't understand async mutation
-      if (!controller.aborted) {
-        try {
-          const workspacePath = await getWorkspacePath();
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- aborted can change during await
-          if (workspacePath && !controller.aborted) {
-            const unlisten = await onFileChange((event) => {
-              if (shouldIgnorePath(event.path)) return;
+      // Use a separate async function to handle abort checks cleanly
+      // The controller.isAborted() state CAN change during await (cleanup called from React)
+      await setupFileWatcher(controller);
 
-              postWindowMessage({
-                type: 'file:changed',
-                uuid: crypto.randomUUID(),
-                path: event.path,
-                change_type: event.type,
-              });
-            });
-            controller.addUnlisten(unlisten);
-
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- aborted can change during await
-            if (!controller.aborted) {
-              await watchPath(workspacePath);
-              logger.info('File watcher initialized', { workspacePath });
-            }
-          }
-        } catch (err: unknown) {
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- aborted can change during await
-          if (!controller.aborted) {
-            logger.error(
-              'Failed to setup file watcher',
-              err instanceof Error ? err : new Error(String(err))
-            );
-          }
-        }
-      }
-
-      if (!controller.aborted) {
+      if (!controller.isAborted()) {
         logger.info('All Tauri event listeners initialized');
         initializedRef.current = true;
       }

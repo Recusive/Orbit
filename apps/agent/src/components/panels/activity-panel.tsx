@@ -511,15 +511,20 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   }, []);
 
   // Handle closing a single tab with LSP notification
+  // Only call lspDidClose for diff tabs - CodeMirrorEditor handles LSP lifecycle
+  // for normal file tabs on unmount to avoid duplicate close calls
   const handleCloseTab = useCallback(
     (path: string): void => {
-      // Notify LSP that document was closed
-      lspDidClose(path).catch((err: unknown) => {
-        logger.warn('Failed to notify LSP of file close', { path, error: err });
-      });
+      const tab = openTabs.find((t) => t.path === path);
+      if (tab?.viewMode === 'diff') {
+        // Diff view doesn't mount CodeMirrorEditor, so close LSP here
+        lspDidClose(path).catch((err: unknown) => {
+          logger.warn('Failed to notify LSP of file close', { path, error: err });
+        });
+      }
       closeTab(path);
     },
-    [closeTab]
+    [closeTab, openTabs]
   );
 
   // Open file from Changes tab with diff view

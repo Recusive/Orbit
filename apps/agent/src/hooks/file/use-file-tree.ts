@@ -102,10 +102,26 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
       switch (message.type) {
         case 'file:tree:response': {
           // Clear pending request and timeout
-          const pending = pendingRequests.current.get(message.path);
+          // First try by path, then fall back to request_uuid lookup
+          // (needed because root requests use path: undefined but are stored as '')
+          let pendingPath = message.path;
+          let pending = pendingRequests.current.get(pendingPath);
+          if (!pending) {
+            // Search by request_uuid for root requests where path doesn't match
+            for (const [path, entry] of pendingRequests.current.entries()) {
+              if (entry.uuid === message.request_uuid) {
+                pendingPath = path;
+                pending = entry;
+                break;
+              }
+            }
+          }
           if (pending) {
             clearTimeout(pending.timeoutId);
-            pendingRequests.current.delete(message.path);
+            pendingRequests.current.delete(pendingPath);
+            // Clear loading state using the same key pattern as requestChildren
+            const loadingKey = pendingPath || '__root__';
+            useFileStore.getState().setLoading(loadingKey, false);
           }
 
           if (debug) {

@@ -68,9 +68,21 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
       if (e.key === 'Enter') {
         e.preventDefault();
         let url = urlInput.trim();
-        // Add protocol if missing
-        if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
-          // Assume localhost for numeric or localhost URLs
+        // Block empty URL submission - restore current URL
+        if (!url) {
+          setUrlInput(navigation.url);
+          return;
+        }
+        // Check if URL already has a scheme:
+        // - Schemes with authority use :// (http://, https://, ftp://, ws://, wss://, etc.)
+        // - Known schemes without :// (about:blank, data:, mailto:, javascript:, blob:, file:)
+        // This avoids false positives like "localhost:3000" being treated as scheme "localhost"
+        const hasScheme =
+          /^[a-z][a-z0-9+.-]*:\/\//i.test(url) ||
+          /^(about|data|mailto|tel|sms|javascript|blob|file):/i.test(url);
+        // Add protocol only if missing (preserves about:blank, file://, etc.)
+        if (!hasScheme) {
+          // Use http:// for localhost/127.0.0.1/port URLs, https:// for everything else
           if (/^(localhost|127\.0\.0\.1|\d+)/.exec(url)) {
             url = `http://${url}`;
           } else {

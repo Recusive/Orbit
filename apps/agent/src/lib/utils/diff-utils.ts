@@ -116,7 +116,7 @@ export function getLanguageFromPath(filePath: string): string {
     makefile: 'makefile',
     toml: 'toml',
     ini: 'ini',
-    env: 'plaintext',
+    env: 'dotenv',
     txt: 'plaintext',
   };
 
@@ -124,7 +124,7 @@ export function getLanguageFromPath(filePath: string): string {
   const filename = filePath.split('/').pop()?.toLowerCase() ?? '';
   if (filename === 'dockerfile') return 'dockerfile';
   if (filename === 'makefile') return 'makefile';
-  if (filename.startsWith('.env')) return 'plaintext';
+  if (filename.startsWith('.env')) return 'dotenv';
 
   return languageMap[extension] ?? 'plaintext';
 }

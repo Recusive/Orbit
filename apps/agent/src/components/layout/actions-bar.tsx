@@ -44,9 +44,9 @@ const ActionButton: FC<ActionButtonProps> = ({
           aria-selected={isActive}
           role="tab"
         >
-          {/* Active indicator - left border accent (VS Code style) */}
+          {/* Active indicator - overlays the left border (VS Code style) */}
           {isActive ? (
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-primary rounded-r" />
+            <div className="absolute -left-px top-1/2 -translate-y-1/2 w-0.5 h-6 bg-primary rounded-r" />
           ) : null}
 
           <Icon className="h-5 w-5" />
