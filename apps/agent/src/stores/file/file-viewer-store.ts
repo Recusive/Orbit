@@ -383,10 +383,16 @@ export const useFileViewerStore = create<FileViewerStore>()(
 
     toggleSearch: (): void => {
       set((state) => {
-        // Increment trigger to ensure effects watching searchTrigger fire
-        // Simple counter is deterministic and testable (vs Date.now())
-        state.searchTrigger += 1;
-        state.searchOpen = true;
+        if (state.searchOpen) {
+          // Closing: clear search state
+          state.searchOpen = false;
+          state.searchQuery = '';
+        } else {
+          // Opening: increment trigger to ensure effects watching searchTrigger fire
+          // Simple counter is deterministic and testable (vs Date.now())
+          state.searchTrigger += 1;
+          state.searchOpen = true;
+        }
       });
     },
 

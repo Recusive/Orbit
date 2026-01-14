@@ -151,24 +151,13 @@ export const SidebarResizeHandle: FC = () => {
       {/* Hover/Active indicator line - only show when expanded (can resize) */}
       {!isCollapsed && (
         <div
-          className="absolute inset-y-0 left-1/2 -translate-x-1/2 bg-primary transition-all duration-100"
-          style={{
-            width: isDragging ? RESIZE_HANDLE.hoverWidth : RESIZE_HANDLE.width,
-            opacity: isDragging ? 1 : 0,
-          }}
-          // Group hover handled via CSS for the non-dragging state
-          onMouseEnter={(e) => {
-            if (!isDragging) {
-              e.currentTarget.style.width = `${String(RESIZE_HANDLE.hoverWidth)}px`;
-              e.currentTarget.style.opacity = '1';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isDragging) {
-              e.currentTarget.style.width = `${String(RESIZE_HANDLE.width)}px`;
-              e.currentTarget.style.opacity = '0';
-            }
-          }}
+          className={cn(
+            'absolute inset-y-0 left-1/2 -translate-x-1/2 bg-primary transition-opacity duration-100',
+            // Use group-hover for reliable hit area detection (outer div is 8px wide)
+            isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          )}
+          // Always use hoverWidth (3px) since line is only visible on hover/drag
+          style={{ width: RESIZE_HANDLE.hoverWidth }}
         />
       )}
     </div>

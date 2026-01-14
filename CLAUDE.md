@@ -356,7 +356,7 @@ All message types in `apps/agent/src/types/protocol.ts` with Zod schemas:
 - **No `any`** - All unsafe operations are errors
 - **Explicit return types** on functions
 - **Consistent type imports** - Use `import type { }` separately
-- **Import order** - External → Internal → Types, alphabetized
+- **Import order** - External → Types → Internal, alphabetized. Use `bun run lint --fix` if unsure
 - **No console.log** - Use structured logger (see below)
 - **Strict boolean expressions** - No implicit truthy checks
 - **Exhaustive switches** - All cases must be handled

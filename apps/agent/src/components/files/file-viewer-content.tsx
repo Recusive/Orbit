@@ -1,8 +1,6 @@
 import { createLogger } from '@orbit/common/lib';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-const logger = createLogger('FileViewerContent');
-
 import type { OutlineItem } from '@/components/editor/editor-breadcrumbs';
 import type { GotoPosition, ViewedFile } from '@/stores/file/file-viewer-store';
 import type { FC } from 'react';
@@ -15,6 +13,8 @@ import {
   useFileViewerStore,
   useWordWrap,
 } from '@/stores/file/file-viewer-store';
+
+const logger = createLogger('FileViewerContent');
 
 // Lazy load CodeMirror to reduce initial bundle size (~500KB)
 const LazyCodeMirrorEditor = lazy(() =>

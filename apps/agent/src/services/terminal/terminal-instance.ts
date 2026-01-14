@@ -552,34 +552,52 @@ export class TerminalInstance {
 
   /**
    * Build xterm theme by computing CSS variable values.
-   * xterm.js doesn't support CSS variables directly, so we compute the
-   * actual color values at runtime using getComputedStyle.
+   * xterm.js doesn't support CSS variables or oklch() colors directly,
+   * so we must resolve them to rgb() format at runtime.
+   *
+   * NOTE: getPropertyValue('--var') returns raw CSS (e.g., "oklch(0.93 0.015 75)").
+   * We need to assign the variable to an element style and read the COMPUTED value,
+   * which forces the browser to resolve oklch() → rgb().
    */
   private buildThemeFromCSSVars(): ITheme {
     const baseTheme = getBestTheme();
-    const computedStyle = getComputedStyle(document.documentElement);
 
-    // Get CSS variable values directly from computed style
-    // These return the resolved color values (e.g., "rgb(30, 30, 30)")
-    const bgColor = computedStyle.getPropertyValue('--chat-area').trim();
-    const fgColor = computedStyle.getPropertyValue('--foreground').trim();
-    const selectionColor = computedStyle.getPropertyValue('--accent').trim();
+    // Create temporary element to compute CSS variable values
+    // This forces the browser to resolve oklch() to rgb()
+    // Wrapped in try-catch for robustness (tests, SSR, early init edge cases)
+    try {
+      const tempEl = document.createElement('div');
+      tempEl.style.display = 'none';
+      document.body.appendChild(tempEl);
 
-    // WARNING: Do NOT modify selectionBg to add rgba() transparency!
-    // xterm.js internally handles selection opacity/blending. The accent color
-    // should be solid - xterm will apply appropriate transparency when rendering.
-    // The old .replace('rgb(', 'rgba(') approach was broken with oklch() colors
-    // and incorrectly double-applied transparency.
+      const getComputedColor = (cssVar: string, property: 'color' | 'backgroundColor'): string => {
+        tempEl.style[property] = `var(${cssVar})`;
+        return getComputedStyle(tempEl)[property];
+      };
 
-    return {
-      ...baseTheme,
-      background: bgColor,
-      foreground: fgColor,
-      cursor: fgColor,
-      cursorAccent: bgColor,
-      selectionBackground: selectionColor,
-      // Note: xterm.js uses native browser scrollbar styled via CSS in terminal.css
-    };
+      const bgColor = getComputedColor('--chat-area', 'backgroundColor');
+      const fgColor = getComputedColor('--foreground', 'color');
+      const selectionColor = getComputedColor('--accent', 'backgroundColor');
+
+      document.body.removeChild(tempEl);
+
+      // WARNING: Do NOT modify selectionBg to add rgba() transparency!
+      // xterm.js internally handles selection opacity/blending. The accent color
+      // should be solid - xterm will apply appropriate transparency when rendering.
+
+      return {
+        ...baseTheme,
+        background: bgColor,
+        foreground: fgColor,
+        cursor: fgColor,
+        cursorAccent: bgColor,
+        selectionBackground: selectionColor,
+        // Note: xterm.js uses native browser scrollbar styled via CSS in terminal.css
+      };
+    } catch {
+      // Fallback to base theme if DOM manipulation fails (tests, SSR, etc.)
+      return baseTheme;
+    }
   }
 
   private setupInputHandling(): void {

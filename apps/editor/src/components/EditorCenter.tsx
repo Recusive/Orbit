@@ -67,9 +67,17 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
     onClose();
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect();
+    }
+  };
+
   return (
     <div
       onClick={onSelect}
+      onKeyDown={handleKeyDown}
       role="tab"
       aria-selected={isActive}
       aria-label={fileName}
