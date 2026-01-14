@@ -10,6 +10,7 @@ import {
   handleBrowserBounds,
   handleBrowserClear,
   handleBrowserCreate,
+  handleBrowserDevTools,
   handleBrowserNavigate,
 } from './browser-handlers';
 import {
@@ -251,6 +252,11 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
 
   if (message.type === 'browser:clear') {
     await handleBrowserClear(message);
+    return;
+  }
+
+  if (message.type === 'browser:devtools') {
+    await handleBrowserDevTools(message);
     return;
   }
 

@@ -96,6 +96,17 @@ export async function browserEval(script: string): Promise<void> {
   return invoke('browser_eval', { script });
 }
 
+/**
+ * Open DevTools for the embedded browser.
+ *
+ * Only available in debug builds. On macOS, uses a private API
+ * that won't work in App Store builds.
+ */
+export async function browserOpenDevTools(): Promise<void> {
+  logger.info('Opening DevTools for embedded browser');
+  return invoke('browser_open_devtools');
+}
+
 // ============================================
 // Legacy Functions (deprecated)
 // ============================================

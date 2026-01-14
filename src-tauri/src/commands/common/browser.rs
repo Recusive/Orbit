@@ -261,6 +261,38 @@ pub async fn browser_eval(
     Ok(())
 }
 
+/// Open DevTools for the embedded browser.
+///
+/// Only available in debug builds (`debug_assertions`).
+/// On macOS, this uses a private API and won't work in App Store builds.
+#[tauri::command]
+pub async fn browser_open_devtools(
+    app: AppHandle,
+    state: State<'_, Arc<EmbeddedBrowserState>>,
+) -> Result<()> {
+    let label = state
+        .current_label
+        .lock()
+        .clone()
+        .ok_or("No browser exists")?;
+
+    let webview = app.get_webview(&label).ok_or("Browser webview not found")?;
+
+    // open_devtools is only available in debug builds
+    #[cfg(debug_assertions)]
+    {
+        webview.open_devtools();
+        log::info!("Opened DevTools for embedded browser");
+        Ok(())
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = webview; // Silence unused warning
+        Err("DevTools is only available in debug builds".to_owned())
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Legacy commands (deprecated - kept for backward compatibility)
 // ═══════════════════════════════════════════════════════════════

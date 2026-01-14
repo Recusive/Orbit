@@ -411,6 +411,7 @@ pub fn run() {
             browser::browser_has,
             browser::browser_info,
             browser::browser_eval,
+            browser::browser_open_devtools,
             // Legacy browser commands (deprecated)
             browser::browser_detect,
             browser::browser_get_pid,

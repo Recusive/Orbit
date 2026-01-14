@@ -9,7 +9,13 @@ import { createLogger } from '@orbit/common/lib';
 
 import type { WebviewMessage } from '@/types/protocol';
 
-import { browserClose, browserCreate, browserNavigate, browserSetBounds } from '@/lib/api';
+import {
+  browserClose,
+  browserCreate,
+  browserNavigate,
+  browserOpenDevTools,
+  browserSetBounds,
+} from '@/lib/api';
 import { useBrowserLifecycleStore } from '@/stores/browser/browser-lifecycle-store';
 import { useBrowserStore } from '@/stores/browser/browser-store';
 
@@ -216,4 +222,22 @@ export async function handleBrowserClear(
   message: Extract<WebviewMessage, { type: 'browser:clear' }>
 ): Promise<void> {
   await closeBrowserInternal(message.uuid);
+}
+
+/**
+ * Handle browser:devtools - open DevTools for the embedded browser.
+ *
+ * Only available in debug builds. On macOS, uses a private API
+ * that won't work in App Store builds.
+ */
+export async function handleBrowserDevTools(
+  message: Extract<WebviewMessage, { type: 'browser:devtools' }>
+): Promise<void> {
+  try {
+    await browserOpenDevTools();
+    logger.info('DevTools opened for embedded browser', { requestId: message.uuid });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Failed to open DevTools';
+    logger.warn('Failed to open DevTools', { error: errorMessage });
+  }
 }
