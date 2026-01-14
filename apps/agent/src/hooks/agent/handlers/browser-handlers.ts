@@ -58,7 +58,15 @@ export async function handleBrowserCreate(
     // Delayed resize to force WKWebView repaint
     // Manual resize works because it happens AFTER webview initialization
     // We simulate this with a 200ms delay then resize
+    const currentLabel = info.label;
     setTimeout(() => {
+      // Guard: Check if browser is still active with the same label
+      const currentState = useBrowserLifecycleStore.getState();
+      if (currentState.state !== 'active' || currentState.label !== currentLabel) {
+        // Browser was closed or recreated - skip the resize
+        return;
+      }
+
       // First resize slightly smaller, then to correct size
       browserSetBounds(x, y, width - 1, height - 1)
         .then(() => browserSetBounds(x, y, width, height))

@@ -163,21 +163,8 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
     setGoToLineDialogOpen(true);
   }, [setGoToLineDialogOpen]);
 
-  const handleIndentationClick = useCallback((): void => {
-    // TODO: Open indentation picker (spaces vs tabs, size)
-  }, []);
-
-  const handleEncodingClick = useCallback((): void => {
-    // TODO: Open encoding picker
-  }, []);
-
-  const handleLineEndingClick = useCallback((): void => {
-    // TODO: Open line ending picker (LF, CRLF)
-  }, []);
-
-  const handleLanguageClick = useCallback((): void => {
-    // TODO: Open language mode picker
-  }, []);
+  // Note: Indentation, encoding, line ending, and language pickers are not yet implemented.
+  // StatusItem components without onClick are rendered as non-interactive text.
 
   return (
     <div
@@ -294,22 +281,22 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
             </StatusItem>
 
             {/* Indentation */}
-            <StatusItem title="Select Indentation" onClick={handleIndentationClick}>
+            <StatusItem title="Indentation">
               <span>Spaces: 2</span>
             </StatusItem>
 
             {/* Encoding */}
-            <StatusItem title="Select Encoding" onClick={handleEncodingClick}>
+            <StatusItem title="Encoding">
               <span>UTF-8</span>
             </StatusItem>
 
             {/* End of line */}
-            <StatusItem title="Select End of Line Sequence" onClick={handleLineEndingClick}>
+            <StatusItem title="End of Line Sequence">
               <span>LF</span>
             </StatusItem>
 
             {/* Language */}
-            <StatusItem title="Select Language Mode" onClick={handleLanguageClick}>
+            <StatusItem title="Language Mode">
               <span>{getLanguageDisplayName(activeFile.language)}</span>
             </StatusItem>
           </>

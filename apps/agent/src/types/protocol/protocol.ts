@@ -1498,15 +1498,17 @@ export const BrowserDetectedSchema = z
   .strict();
 
 // Navigation state update
+// Note: Only url is guaranteed from Tauri's on_navigation callback.
+// Other fields are optional and may not be available from WebKit events.
 export const BrowserNavigatedSchema = z
   .object({
     type: z.literal('browser:navigated'),
     uuid: UUIDSchema,
     url: z.string(),
-    title: z.string(),
-    canGoBack: z.boolean(),
-    canGoForward: z.boolean(),
-    isLoading: z.boolean(),
+    title: z.string().optional(),
+    canGoBack: z.boolean().optional(),
+    canGoForward: z.boolean().optional(),
+    isLoading: z.boolean().optional(),
   })
   .strict();
 

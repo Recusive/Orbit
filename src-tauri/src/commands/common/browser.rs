@@ -27,8 +27,10 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use tauri::webview::WebviewBuilder;
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager as _, State, WebviewUrl};
+use tauri::webview::{PageLoadEvent, WebviewBuilder};
+use tauri::{
+    AppHandle, Emitter as _, LogicalPosition, LogicalSize, Manager as _, State, WebviewUrl,
+};
 
 type Result<T> = StdResult<T, String>;
 
@@ -41,6 +43,20 @@ pub struct BrowserInfo {
     pub url: String,
     /// Whether the browser is active.
     pub active: bool,
+}
+
+/// Payload for browser navigation events.
+#[derive(Debug, Clone, Serialize)]
+pub struct BrowserNavigatedPayload {
+    /// The URL that was navigated to.
+    pub url: String,
+}
+
+/// Payload for browser loading events.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct BrowserLoadingPayload {
+    /// Whether the page is currently loading.
+    pub is_loading: bool,
 }
 
 /// State for managing the embedded browser webview.
@@ -98,8 +114,32 @@ pub async fn browser_create(
             .map_err(|e| format!("Invalid URL: {e}"))?,
     );
 
-    // Build the webview with auto_resize for proper layout handling
-    let webview_builder = WebviewBuilder::new(label, webview_url).auto_resize();
+    // Clone app handle for navigation callback (app itself is moved to page_load callback)
+    let app_for_navigation = app.clone();
+
+    // Build the webview with auto_resize and navigation event handlers
+    let webview_builder = WebviewBuilder::new(label, webview_url)
+        .auto_resize()
+        .on_navigation(move |url| {
+            // Emit navigation event to frontend
+            let payload = BrowserNavigatedPayload {
+                url: url.to_string(),
+            };
+            if let Err(e) = app_for_navigation.emit("browser:navigated", payload) {
+                log::warn!("Failed to emit browser:navigated event: {e}");
+            }
+            // Allow all navigations
+            true
+        })
+        .on_page_load(move |_webview, payload| {
+            // Emit loading state changes to frontend
+            // PageLoadPayload provides event() method to access the PageLoadEvent
+            let is_loading = matches!(payload.event(), PageLoadEvent::Started);
+            let emit_payload = BrowserLoadingPayload { is_loading };
+            if let Err(e) = app.emit("browser:loading", emit_payload) {
+                log::warn!("Failed to emit browser:loading event: {e}");
+            }
+        });
 
     // Create webview at correct position and size
     let position = LogicalPosition::new(x, y);

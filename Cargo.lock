@@ -3291,7 +3291,6 @@ dependencies = [
  "hostname",
  "log",
  "orbit-ai",
- "orbit-browser",
  "orbit-conversations",
  "orbit-core",
  "orbit-fs",

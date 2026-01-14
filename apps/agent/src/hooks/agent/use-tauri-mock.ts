@@ -234,7 +234,36 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'inputMode:set':
     case 'thinking:set':
     case 'model:set':
-    case 'browser:create':
+    case 'browser:create': {
+      // Mock browser creation - send success response
+      const createMsg = message as Extract<typeof message, { type: 'browser:create' }>;
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'browser:created',
+            uuid: crypto.randomUUID(),
+            request_uuid: createMsg.uuid,
+            label: 'mock-browser',
+            url: createMsg.bounds.url,
+          },
+          '*'
+        );
+      }, 100);
+      break;
+    }
+    case 'browser:clear':
+      // Mock browser close - send cleared response
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'browser:cleared',
+            uuid: crypto.randomUUID(),
+            request_uuid: message.uuid,
+          },
+          '*'
+        );
+      }, 50);
+      break;
     case 'browser:detect':
     case 'browser:navigate':
     case 'browser:back':
@@ -244,7 +273,6 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'browser:select-element:start':
     case 'browser:select-element:cancel':
     case 'browser:bounds':
-    case 'browser:clear':
     case 'browser:devtools':
     case 'browser:show':
     case 'browser:hide':

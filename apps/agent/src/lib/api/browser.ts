@@ -6,7 +6,7 @@
  * (not a separate app) and uses WebKit on macOS.
  */
 
-import { invoke, logger } from './core';
+import { invoke, listen, logger } from './core';
 
 // ============================================
 // Types
@@ -20,6 +20,18 @@ export interface BrowserInfo {
   url: string;
   /** Whether the browser is active */
   active: boolean;
+}
+
+/** Payload for browser:navigated events */
+export interface BrowserNavigatedEvent {
+  /** The URL that was navigated to */
+  url: string;
+}
+
+/** Payload for browser:loading events */
+export interface BrowserLoadingEvent {
+  /** Whether the page is currently loading */
+  is_loading: boolean;
 }
 
 // ============================================
@@ -155,6 +167,32 @@ export async function browserShow(): Promise<void> {
  */
 export async function browserHide(): Promise<void> {
   return invoke('browser_hide');
+}
+
+// ============================================
+// Event Listeners
+// ============================================
+
+/**
+ * Listen for browser navigation events.
+ *
+ * Called when the embedded browser navigates to a new URL.
+ */
+export async function onBrowserNavigated(
+  callback: (event: BrowserNavigatedEvent) => void
+): Promise<() => void> {
+  return listen<BrowserNavigatedEvent>('browser:navigated', callback);
+}
+
+/**
+ * Listen for browser loading state changes.
+ *
+ * Called when the page starts or finishes loading.
+ */
+export async function onBrowserLoading(
+  callback: (event: BrowserLoadingEvent) => void
+): Promise<() => void> {
+  return listen<BrowserLoadingEvent>('browser:loading', callback);
 }
 
 // ============================================

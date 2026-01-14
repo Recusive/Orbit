@@ -18,6 +18,7 @@ import {
   useBrowserStore,
   usePendingNavigationUrl,
 } from '@/stores/browser/browser-store';
+import { useActivityTab } from '@/stores/ui/ui-store';
 import { generateUUID } from '@/types/protocol';
 
 // Inset to prevent webview from overlapping panel borders
@@ -32,6 +33,9 @@ export const BrowserPanel: FC = () => {
 
   // Lifecycle store for idle tracking
   const lifecycleState = useBrowserLifecycleStore((s) => s.state);
+
+  // Track which activity tab is visible for heartbeat gating
+  const activityTab = useActivityTab();
 
   // On mount: Reset stale state if browser thinks it's active but lifecycle is idle
   // This handles the case where the app was restarted but localStorage has stale state
@@ -159,6 +163,27 @@ export const BrowserPanel: FC = () => {
       viewport.removeEventListener('keydown', handleActivity);
     };
   }, [isBrowserRunning, recordActivity]);
+
+  // Visibility heartbeat - prevents false idle closes while browser tab is VISIBLE
+  // Since Tauri webview events don't bubble up, we assume the user is active
+  // as long as the browser panel is visible and the browser is running.
+  // IMPORTANT: Gate by activityTab === 'browser' to allow idle auto-close when tab is hidden.
+  useEffect(() => {
+    // Only run heartbeat when browser tab is actually visible
+    if (!isBrowserRunning || !isActive || activityTab !== 'browser') return;
+
+    // Initial activity record when browser becomes visible
+    recordActivity();
+
+    const HEARTBEAT_MS = 30_000; // 30 seconds
+    const intervalId = setInterval(() => {
+      recordActivity();
+    }, HEARTBEAT_MS);
+
+    return (): void => {
+      clearInterval(intervalId);
+    };
+  }, [isBrowserRunning, isActive, activityTab, recordActivity]);
 
   // Report bounds when viewport changes (for repositioning embedded webview)
   useEffect(() => {

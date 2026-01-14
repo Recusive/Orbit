@@ -30,6 +30,8 @@ import {
   onAgentPlanModeChanged,
   onAgentPermissionRequest,
   onAgentSessionInit,
+  onBrowserLoading,
+  onBrowserNavigated,
   onFileChange,
   onTerminalExit,
   onTerminalForeground,
@@ -144,7 +146,7 @@ class ListenerAbortController {
       try {
         unlisten();
       } catch (err: unknown) {
-        console.error('[TauriProvider] Error during cleanup:', err);
+        logger.error('Error during cleanup', err instanceof Error ? err : new Error(String(err)));
       }
     }
     this._unlistenFns = [];
@@ -184,7 +186,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
     const controller = new ListenerAbortController();
 
     async function initializeListeners(): Promise<void> {
-      console.warn('[TauriProvider] Initializing Tauri event listeners');
+      logger.info('Initializing Tauri event listeners');
 
       // Set up all listeners in parallel for faster initialization
       const listenerPromises: Promise<void>[] = [];
@@ -325,7 +327,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             controller.addUnlisten(unlisten);
           })
           .catch((err: unknown) => {
-            console.error('[TauriProvider] Listener registration failed:', err);
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
           })
       );
 
@@ -345,7 +350,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             controller.addUnlisten(unlisten);
           })
           .catch((err: unknown) => {
-            console.error('[TauriProvider] Listener registration failed:', err);
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
           })
       );
 
@@ -365,7 +373,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             controller.addUnlisten(unlisten);
           })
           .catch((err: unknown) => {
-            console.error('[TauriProvider] Listener registration failed:', err);
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
           })
       );
 
@@ -383,7 +394,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             controller.addUnlisten(unlisten);
           })
           .catch((err: unknown) => {
-            console.error('[TauriProvider] Listener registration failed:', err);
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
           })
       );
 
@@ -401,7 +415,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             controller.addUnlisten(unlisten);
           })
           .catch((err: unknown) => {
-            console.error('[TauriProvider] Listener registration failed:', err);
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
           })
       );
 
@@ -420,7 +437,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             controller.addUnlisten(unlisten);
           })
           .catch((err: unknown) => {
-            console.error('[TauriProvider] Listener registration failed:', err);
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
           })
       );
 
@@ -438,7 +458,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             controller.addUnlisten(unlisten);
           })
           .catch((err: unknown) => {
-            console.error('[TauriProvider] Listener registration failed:', err);
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
           })
       );
 
@@ -456,7 +479,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             controller.addUnlisten(unlisten);
           })
           .catch((err: unknown) => {
-            console.error('[TauriProvider] Listener registration failed:', err);
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
           })
       );
 
@@ -474,7 +500,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             controller.addUnlisten(unlisten);
           })
           .catch((err: unknown) => {
-            console.error('[TauriProvider] Listener registration failed:', err);
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
           })
       );
 
@@ -493,7 +522,50 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             controller.addUnlisten(unlisten);
           })
           .catch((err: unknown) => {
-            console.error('[TauriProvider] Listener registration failed:', err);
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
+          })
+      );
+
+      // Browser navigation events
+      listenerPromises.push(
+        onBrowserNavigated((event) => {
+          postWindowMessage({
+            type: 'browser:navigated',
+            uuid: crypto.randomUUID(),
+            url: event.url,
+          });
+        })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            logger.error(
+              'Browser listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
+          })
+      );
+
+      // Browser loading state events
+      listenerPromises.push(
+        onBrowserLoading((event) => {
+          postWindowMessage({
+            type: 'browser:loading',
+            uuid: crypto.randomUUID(),
+            isLoading: event.is_loading,
+          });
+        })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            logger.error(
+              'Browser listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
           })
       );
 
@@ -501,7 +573,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
       try {
         await Promise.all(listenerPromises);
       } catch (err: unknown) {
-        console.error('[TauriProvider] Failed to setup listeners:', err);
+        logger.error(
+          'Failed to setup listeners',
+          err instanceof Error ? err : new Error(String(err))
+        );
       }
 
       // File watcher (separate because it depends on workspace path)
@@ -526,19 +601,22 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- aborted can change during await
             if (!controller.aborted) {
               await watchPath(workspacePath);
-              console.warn('[TauriProvider] File watcher initialized:', workspacePath);
+              logger.info('File watcher initialized', { workspacePath });
             }
           }
         } catch (err: unknown) {
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- aborted can change during await
           if (!controller.aborted) {
-            console.error('[TauriProvider] Failed to setup file watcher:', err);
+            logger.error(
+              'Failed to setup file watcher',
+              err instanceof Error ? err : new Error(String(err))
+            );
           }
         }
       }
 
       if (!controller.aborted) {
-        console.warn('[TauriProvider] All Tauri event listeners initialized');
+        logger.info('All Tauri event listeners initialized');
         initializedRef.current = true;
       }
     }
@@ -547,7 +625,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
 
     // Cleanup function - runs on unmount or HMR
     return () => {
-      console.warn('[TauriProvider] Cleaning up Tauri event listeners');
+      logger.info('Cleaning up Tauri event listeners');
       initializedRef.current = false;
       controller.cleanup();
     };
@@ -566,7 +644,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
     (message: WebviewMessage): void => {
       const result = WebviewMessageSchema.safeParse(message);
       if (!result.success) {
-        console.error('[TauriProvider] Invalid message:', formatZodError(result.error));
+        logger.error('Invalid message', new Error(formatZodError(result.error)));
         return;
       }
 

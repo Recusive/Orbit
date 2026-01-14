@@ -7,11 +7,13 @@ import type { ReactElementContext } from '@/types/protocol';
 const logger = createLogger('BrowserStore');
 
 // Navigation state from browser
+// Note: canGoBack/canGoForward are nullable because WebKit's on_navigation
+// callback doesn't provide history state. null means "unknown" (treat as enabled).
 export interface NavigationState {
   url: string;
   title: string;
-  canGoBack: boolean;
-  canGoForward: boolean;
+  canGoBack: boolean | null;
+  canGoForward: boolean | null;
   isLoading: boolean;
 }
 
@@ -88,8 +90,9 @@ const cleanInitialState: BrowserState = {
   navigation: {
     url: '',
     title: '',
-    canGoBack: false,
-    canGoForward: false,
+    // null = unknown, treat as enabled in UI
+    canGoBack: null,
+    canGoForward: null,
     isLoading: false,
   },
   pendingNavigationUrl: null,

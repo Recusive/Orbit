@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { Ellipsis, Search, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
@@ -26,6 +27,8 @@ import {
 } from '@/stores/file/file-viewer-store';
 import { useUIStore, useTerminalPosition, useActivityTab } from '@/stores/ui/ui-store';
 import { generateUUID } from '@/types/protocol';
+
+const logger = createLogger('ActivityPanel');
 
 // Lazy load heavy components
 const LazyBrowserPanel = lazy(() =>
@@ -512,7 +515,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
     (path: string): void => {
       // Notify LSP that document was closed
       lspDidClose(path).catch((err: unknown) => {
-        console.warn('[ActivityPanel] Failed to notify LSP of file close:', err);
+        logger.warn('Failed to notify LSP of file close', { path, error: err });
       });
       closeTab(path);
     },
@@ -540,7 +543,11 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
         if (!isAlreadyOpen) {
           const language = file.language ?? getLanguageFromPath(file.path);
           lspDidOpen(file.path, language, file.newContent).catch((err: unknown) => {
-            console.warn('[ActivityPanel] Failed to notify LSP of file open:', err);
+            logger.warn('Failed to notify LSP of file open', {
+              path: file.path,
+              language,
+              error: err,
+            });
           });
         }
       }

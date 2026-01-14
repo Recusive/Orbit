@@ -28,7 +28,7 @@ orbit-ai = { path = "../crates/common/ai" }
 orbit-search = { path = "../crates/common/search" }
 orbit-settings = { path = "../crates/common/settings" }
 orbit-conversations = { path = "../crates/common/conversations" }
-orbit-browser = { path = "../crates/common/browser" }
+# Note: orbit-browser crate removed - browser functionality is now in src-tauri/src/commands/common/browser.rs
 
 # Core dependencies
 tokio = { workspace = true }

@@ -8,7 +8,7 @@ import {
   SquareDashedMousePointer,
   X,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { FC, KeyboardEvent } from 'react';
 
@@ -43,9 +43,23 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
   const navigation = useBrowserNavigation();
   const isSelectingElement = useIsSelectingElement();
   const [urlInput, setUrlInput] = useState(navigation.url);
+  const isEditingRef = useRef(false);
 
-  // Sync URL input with navigation state
+  // Sync URL input with navigation state when not editing
+  useEffect(() => {
+    if (!isEditingRef.current) {
+      setUrlInput(navigation.url);
+    }
+  }, [navigation.url]);
+
   const handleUrlFocus = useCallback((): void => {
+    isEditingRef.current = true;
+    setUrlInput(navigation.url);
+  }, [navigation.url]);
+
+  const handleUrlBlur = useCallback((): void => {
+    isEditingRef.current = false;
+    // Sync back to current URL on blur (in case user didn't press Enter)
     setUrlInput(navigation.url);
   }, [navigation.url]);
 
@@ -85,13 +99,13 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
       className="flex items-center gap-1 px-2 border-b border-border bg-background shrink-0"
       style={{ height: 35 }}
     >
-      {/* Navigation buttons */}
+      {/* Navigation buttons - enabled when canGoBack/canGoForward is null (unknown) or true */}
       <button
         onClick={onBack}
-        disabled={!navigation.canGoBack}
+        disabled={navigation.canGoBack === false}
         className={cn(
           'h-7 w-7 flex items-center justify-center rounded transition-colors',
-          navigation.canGoBack
+          navigation.canGoBack !== false
             ? 'hover:bg-accent text-foreground'
             : 'text-muted-foreground/50 cursor-not-allowed'
         )}
@@ -102,10 +116,10 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
 
       <button
         onClick={onForward}
-        disabled={!navigation.canGoForward}
+        disabled={navigation.canGoForward === false}
         className={cn(
           'h-7 w-7 flex items-center justify-center rounded transition-colors',
-          navigation.canGoForward
+          navigation.canGoForward !== false
             ? 'hover:bg-accent text-foreground'
             : 'text-muted-foreground/50 cursor-not-allowed'
         )}
@@ -141,6 +155,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
             setUrlInput(e.target.value);
           }}
           onFocus={handleUrlFocus}
+          onBlur={handleUrlBlur}
           onKeyDown={handleUrlKeyDown}
           placeholder="Enter URL..."
           className="w-full h-7 px-3 rounded-md border border-border bg-muted/50 text-sm outline-none placeholder:text-muted-foreground focus:bg-background focus:ring-1 focus:ring-ring"

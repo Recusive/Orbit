@@ -201,8 +201,8 @@ const darkTheme = EditorView.theme(
     },
     '.cm-search.cm-panel': {
       position: 'relative',
-      backgroundColor: 'oklch(0.20 0.012 60 / 0.95)',
-      backdropFilter: 'blur(12px)',
+      // Use solid background - backdropFilter causes blur in Tauri WebView
+      backgroundColor: 'oklch(0.20 0.012 60)',
       borderRadius: '12px',
       border: 'none',
       boxShadow: '0 8px 32px -8px rgba(0,0,0,0.4), 0 4px 16px -4px rgba(0,0,0,0.2)',
@@ -462,8 +462,8 @@ const lightTheme = EditorView.theme({
   },
   '.cm-search.cm-panel': {
     position: 'relative',
-    backgroundColor: 'oklch(0.98 0.005 75 / 0.95)',
-    backdropFilter: 'blur(12px)',
+    // Use solid background - backdropFilter causes blur in Tauri WebView
+    backgroundColor: 'oklch(0.98 0.005 75)',
     borderRadius: '12px',
     border: 'none',
     boxShadow: '0 8px 32px -8px rgba(0,0,0,0.12), 0 4px 16px -4px rgba(0,0,0,0.06)',

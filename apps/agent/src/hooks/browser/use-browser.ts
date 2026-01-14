@@ -14,8 +14,16 @@ const logger = createLogger('Browser');
  * Hook to handle browser messages from Tauri backend
  */
 export function useBrowser(): void {
-  const { setNavigation, setLoading, setSelectedElement, setSelectingElement, setError, reset } =
-    useBrowserStore();
+  const {
+    setNavigation,
+    setLoading,
+    setSelectedElement,
+    setSelectingElement,
+    setError,
+    reset,
+    setViewId,
+    setCreating,
+  } = useBrowserStore();
 
   // Get postMessage for sending browser:show when panel becomes visible
   const { postMessage } = useTauri({});
@@ -73,15 +81,19 @@ export function useBrowser(): void {
           // Legacy external browser detection - no longer used
           break;
 
-        case 'browser:navigated':
-          setNavigation({
+        case 'browser:navigated': {
+          // Build partial navigation update - only include fields that are provided
+          // canGoBack/canGoForward left as null (unknown) if not provided from WebKit
+          const navUpdate: Parameters<typeof setNavigation>[0] = {
             url: message.url,
-            title: message.title,
-            canGoBack: message.canGoBack,
-            canGoForward: message.canGoForward,
-            isLoading: message.isLoading,
-          });
+            title: message.title ?? '',
+          };
+          if (message.canGoBack !== undefined) navUpdate.canGoBack = message.canGoBack;
+          if (message.canGoForward !== undefined) navUpdate.canGoForward = message.canGoForward;
+          if (message.isLoading !== undefined) navUpdate.isLoading = message.isLoading;
+          setNavigation(navUpdate);
           break;
+        }
 
         case 'browser:loading':
           setLoading(message.isLoading);
@@ -102,7 +114,12 @@ export function useBrowser(): void {
           break;
 
         case 'browser:created':
-          // Handled by browser-handlers.ts
+          // Handle browser creation - works in both Tauri and mock mode
+          // In Tauri mode, browser-handlers.ts also handles this for lifecycle store
+          logger.info('Browser created', { label: message.label, url: message.url });
+          setViewId(message.label);
+          setCreating(false);
+          setError(null);
           break;
 
         // Ignore non-browser messages - handled elsewhere
@@ -167,6 +184,8 @@ export function useBrowser(): void {
       setSelectingElement,
       setError,
       reset,
+      setViewId,
+      setCreating,
       postMessage,
     ]
   );
@@ -185,13 +204,19 @@ export function useBrowser(): void {
     if (browserState.isActive && browserState.viewId && uiState.activityTab === 'browser') {
       hasShownBrowserRef.current = true;
       // Small delay to ensure Orbit is ready
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         postMessage({
           type: 'browser:show',
           uuid: generateUUID(),
         });
       }, 100);
+
+      return (): void => {
+        clearTimeout(timeoutId);
+      };
     }
+
+    return undefined;
   }, [postMessage]);
 
   // Subscribe to backend messages
