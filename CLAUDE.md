@@ -979,7 +979,7 @@ For detailed documentation on specific features, see the `docs/` folder:
 ### January 2026
 
 - **Embedded browser panel** - True embedded WebKit browser via Tauri's `unstable` feature (multiwebview)
-  - See `docs/EMBEDDED_BROWSER.md` for implementation details and known issues
+  - See `docs/architecture/EMBEDDED_BROWSER.md` for implementation details and known issues
 - **Migrated from pnpm to Bun** - All package management now uses Bun for faster installs and unified tooling
   - Removed `pnpm-workspace.yaml` - workspaces defined in `package.json`
   - Removed `pnpm-lock.yaml` - replaced by `bun.lockb`

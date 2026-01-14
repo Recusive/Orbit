@@ -107,6 +107,7 @@ API documentation and SDK references.
 When adding new documentation:
 
 1. Place in the appropriate category folder
-2. Use `UPPER-CASE.md` for guides, `lower-case.md` for references
-3. Add to this README's index
-4. Update CLAUDE.md's Feature Documentation table if user-facing
+2. Use `UPPER-CASE.md` for guides (e.g., `DEVELOPMENT.md`, `CSP-SECURITY.md`)
+3. For references, use descriptive names that match upstream sources (e.g., `Agent SDK reference - TypeScript.md`)
+4. Add to this README's index
+5. Update CLAUDE.md's Feature Documentation table if user-facing

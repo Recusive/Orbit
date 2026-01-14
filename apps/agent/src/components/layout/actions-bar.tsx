@@ -9,6 +9,7 @@ import { FileCode, GitBranch, GitCompareArrows, Globe } from 'lucide-react';
 import type { ActivityTab } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SIDEBAR } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
@@ -17,7 +18,7 @@ import { useActivityTab, useUIStore } from '@/stores/ui/ui-store';
 interface ActionButtonProps {
   readonly icon: FC<{ className?: string }>;
   readonly label: string;
-  readonly shortcut?: string;
+  readonly shortcut?: readonly string[];
   readonly isActive: boolean;
   readonly onClick: () => void;
   readonly badge?: number;
@@ -59,11 +60,17 @@ const ActionButton: FC<ActionButtonProps> = ({
           ) : null}
         </button>
       </TooltipTrigger>
-      <TooltipContent side="left" sideOffset={8}>
-        <p>
-          {label}
-          {shortcut ? <span className="ml-2 text-muted-foreground">{shortcut}</span> : null}
-        </p>
+      <TooltipContent side="left" sideOffset={8} className="flex items-center gap-2">
+        <span>{label}</span>
+        {shortcut ? (
+          <KbdGroup>
+            {shortcut.map((key) => (
+              <Kbd key={key} className="bg-white/15 text-inherit border-white/20">
+                {key}
+              </Kbd>
+            ))}
+          </KbdGroup>
+        ) : null}
       </TooltipContent>
     </Tooltip>
   );
@@ -93,7 +100,7 @@ export const ActionsBar: FC = () => {
         <ActionButton
           icon={FileCode}
           label="Editor"
-          shortcut="⌘E"
+          shortcut={['⌘', 'E']}
           isActive={activeTab === 'file'}
           onClick={() => {
             handleTabClick('file');
@@ -110,7 +117,7 @@ export const ActionsBar: FC = () => {
         <ActionButton
           icon={GitBranch}
           label="Source Control"
-          shortcut="⌃⇧G"
+          shortcut={['⌃', '⇧', 'G']}
           isActive={activeTab === 'source'}
           onClick={() => {
             handleTabClick('source');

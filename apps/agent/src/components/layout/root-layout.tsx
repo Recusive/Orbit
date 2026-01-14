@@ -64,6 +64,19 @@ export const RootLayout: FC = () => {
     toggleBottomPanel();
   }, [reviewPanelOpen, bottomPanelOpen, setTerminalPosition, toggleBottomPanel]);
 
+  // Toggle editor panel in activity panel
+  // If already open on 'file' tab, close it; otherwise open and switch to it
+  const handleToggleFileBrowser = useCallback((): void => {
+    const state = useUIStore.getState();
+    if (state.reviewPanelOpen && state.activityTab === 'file') {
+      // Already showing file tab - close the panel
+      state.toggleReviewPanel();
+    } else {
+      // Not showing file tab or panel is closed - open and switch to file tab
+      state.setActivityTab('file');
+    }
+  }, []);
+
   // Handle messages from Orbit extension (including panel:command)
   const handleExtensionMessage = useCallback((message: ExtensionMessage): void => {
     if (message.type === 'panel:command') {
@@ -85,6 +98,7 @@ export const RootLayout: FC = () => {
     window.addEventListener('goToLine', handleGoToLine);
     window.addEventListener('toggleLeftSidebar', toggleLeftSidebar);
     window.addEventListener('toggleActivityPanel', toggleReviewPanel);
+    window.addEventListener('toggleFileBrowser', handleToggleFileBrowser);
     window.addEventListener('toggleTerminal', handleToggleTerminal);
     window.addEventListener('openSettings', handleOpenSettings);
 
@@ -94,6 +108,7 @@ export const RootLayout: FC = () => {
       window.removeEventListener('goToLine', handleGoToLine);
       window.removeEventListener('toggleLeftSidebar', toggleLeftSidebar);
       window.removeEventListener('toggleActivityPanel', toggleReviewPanel);
+      window.removeEventListener('toggleFileBrowser', handleToggleFileBrowser);
       window.removeEventListener('toggleTerminal', handleToggleTerminal);
       window.removeEventListener('openSettings', handleOpenSettings);
     };
@@ -103,6 +118,7 @@ export const RootLayout: FC = () => {
     handleGoToLine,
     toggleLeftSidebar,
     toggleReviewPanel,
+    handleToggleFileBrowser,
     handleToggleTerminal,
     handleOpenSettings,
   ]);

@@ -45,9 +45,9 @@ export const ShortcutsSettings: FC = () => {
       <div className="space-y-0 divide-y divide-border/40">
         <ShortcutItem label="Toggle Left Sidebar" keys={['⌘', '/']} />
         <ShortcutItem label="Toggle Activity Panel" keys={['⌘', 'B']} />
-        <ShortcutItem label="Toggle File Browser" keys={['⌘', 'E']} />
+        <ShortcutItem label="Toggle Editor Panel" keys={['⌘', 'E']} />
         <ShortcutItem label="Toggle Terminal" keys={['⌘', 'J']} />
-        <ShortcutItem label="Toggle Search" keys={['⌘', 'Shift', 'S']} />
+        <ShortcutItem label="Find in Workspace" keys={['⌘', 'Shift', 'F']} />
       </div>
     </div>
   );

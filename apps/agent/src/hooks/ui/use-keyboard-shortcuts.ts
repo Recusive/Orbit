@@ -5,11 +5,14 @@
  * To add, remove, or modify shortcuts, update constants.ts - DO NOT hardcode here.
  * This hook consumes KEYBOARD_SHORTCUTS as the single source of truth.
  */
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect } from 'react';
 
 import type { KeyboardShortcutDef } from '@/lib/utils/constants';
 
 import { KEYBOARD_SHORTCUTS } from '@/lib/utils/constants';
+
+const logger = createLogger('KeyboardShortcuts');
 
 export interface KeyboardShortcut {
   key: string;
@@ -115,7 +118,7 @@ export function useKeyboardShortcuts(
     (_shortcut: KeyboardShortcut): void => {
       // This would require state management to dynamically add shortcuts
       // For now, shortcuts are passed in options
-      console.warn('Dynamic shortcut registration not implemented');
+      logger.warn('Dynamic shortcut registration not implemented');
     },
     []
   );
@@ -124,7 +127,7 @@ export function useKeyboardShortcuts(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     (_key: string): void => {
       // This would require state management to dynamically remove shortcuts
-      console.warn('Dynamic shortcut unregistration not implemented');
+      logger.warn('Dynamic shortcut unregistration not implemented');
     },
     []
   );

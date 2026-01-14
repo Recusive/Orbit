@@ -34,11 +34,11 @@
     "security": {
       "csp": {
         "default-src": "'self'",
-        "script-src": "'self' 'unsafe-eval'",
-        "style-src": "'self' 'unsafe-inline'",
-        "connect-src": "'self' https://api.anthropic.com ipc://localhost",
+        "script-src": "'self' 'unsafe-eval' https://streamdown.ai",
+        "style-src": "'self' 'unsafe-inline' https://streamdown.ai",
+        "connect-src": "'self' https://api.anthropic.com ipc://localhost https://streamdown.ai",
         "img-src": "'self' data: blob:",
-        "font-src": "'self' data:",
+        "font-src": "'self' data: https://streamdown.ai",
         "frame-src": "'none'",
         "object-src": "'none'"
       },

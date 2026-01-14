@@ -11,11 +11,11 @@ This document explains Orbit's CSP configuration in `src-tauri/tauri.conf.json`.
   "security": {
     "csp": {
       "default-src": "'self'",
-      "script-src": "'self' 'unsafe-eval'",
-      "style-src": "'self' 'unsafe-inline'",
-      "connect-src": "'self' https://api.anthropic.com ipc://localhost",
+      "script-src": "'self' 'unsafe-eval' https://streamdown.ai",
+      "style-src": "'self' 'unsafe-inline' https://streamdown.ai",
+      "connect-src": "'self' https://api.anthropic.com ipc://localhost https://streamdown.ai",
       "img-src": "'self' data: blob:",
-      "font-src": "'self' data:",
+      "font-src": "'self' data: https://streamdown.ai",
       "frame-src": "'none'",
       "object-src": "'none'"
     }
@@ -44,7 +44,7 @@ const dynamicImport = new Function('url', 'return import(url)') as (
 | streamdown 1.x | Everything bundled statically | No `unsafe-eval` needed    |
 | streamdown 2.x | 98% smaller bundle via CDN    | **Requires `unsafe-eval`** |
 
-Streamdown 2.0 reduced bundle size by loading Shiki themes, languages, and Mermaid from Vercel's CDN at runtime. To bypass bundler static analysis (Vite/Webpack), they use `new Function()` which is functionally equivalent to `eval()`.
+Streamdown 2.0 reduces bundle size by loading Mermaid/KaTeX assets from `https://streamdown.ai/cdn` at runtime. To bypass bundler static analysis (Vite/Webpack), they use `new Function()` which is functionally equivalent to `eval()`.
 
 ### References
 
@@ -67,8 +67,7 @@ Streamdown 2.0 reduced bundle size by loading Shiki themes, languages, and Merma
 
 Only streamdown's CDN loader:
 
-- Loads Shiki themes/languages from `cdn.jsdelivr.net` or Vercel CDN
-- Loads Mermaid for diagram rendering
+- Loads Mermaid/KaTeX assets from `https://streamdown.ai/cdn`
 - **No user input ever reaches these code paths**
 
 ### Attack Surface Analysis
@@ -82,7 +81,7 @@ Untrusted Input Sources in Orbit:
 
 Code paths using eval (with unsafe-eval):
 └── Streamdown CDN loader
-    └── Hardcoded URLs only (Vercel CDN)
+    └── Hardcoded URLs only (https://streamdown.ai/cdn)
     └── No user input flows here
 ```
 
@@ -101,9 +100,13 @@ Code paths using eval (with unsafe-eval):
 
 | Directive     | Value                       | Purpose                                       |
 | ------------- | --------------------------- | --------------------------------------------- |
+| `script-src`  | `https://streamdown.ai`     | Streamdown CDN for Mermaid/KaTeX assets       |
+| `style-src`   | `https://streamdown.ai`     | Streamdown CSS assets                         |
+| `style-src`   | `'unsafe-inline'`           | Required for Tailwind/CSS-in-JS               |
 | `connect-src` | `ipc://localhost`           | Tauri's internal WebView to Rust IPC protocol |
 | `connect-src` | `https://api.anthropic.com` | Claude API calls                              |
-| `style-src`   | `'unsafe-inline'`           | Required for Tailwind/CSS-in-JS               |
+| `connect-src` | `https://streamdown.ai`     | Streamdown CDN fetch requests                 |
+| `font-src`    | `https://streamdown.ai`     | Streamdown font assets                        |
 | `img-src`     | `data: blob:`               | Inline images, screenshots, file previews     |
 | `frame-src`   | `'none'`                    | No iframes allowed (security hardening)       |
 | `object-src`  | `'none'`                    | No plugins/embeds (security hardening)        |
@@ -116,5 +119,6 @@ Code paths using eval (with unsafe-eval):
 
 ## Changelog
 
+- **January 2026:** Added `https://streamdown.ai` to CSP directives (script-src, style-src, connect-src, font-src) for Mermaid/KaTeX CDN assets
 - **January 2026:** Added `'unsafe-eval'` after upgrading streamdown 1.6.11 to 2.0.1
 - **January 2026:** Added `ipc://localhost` to `connect-src` for Tauri IPC

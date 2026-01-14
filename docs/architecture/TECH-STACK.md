@@ -148,12 +148,12 @@ Orbit is a modern AI-powered code editor built with a hybrid architecture:
 
 ### Markdown Rendering
 
-| Technology           | Version | Purpose                   |
-| -------------------- | ------- | ------------------------- |
-| **react-markdown**   | 10.1.0  | Markdown to React         |
-| **remark-gfm**       | 4.0.1   | GitHub Flavored Markdown  |
-| **rehype-highlight** | 7.0.2   | Code highlighting         |
-| **streamdown**       | 1.6.11  | Streaming markdown parser |
+| Technology           | Version | Purpose                                                |
+| -------------------- | ------- | ------------------------------------------------------ |
+| **react-markdown**   | 10.1.0  | Markdown to React                                      |
+| **remark-gfm**       | 4.0.1   | GitHub Flavored Markdown                               |
+| **rehype-highlight** | 7.0.2   | Code highlighting                                      |
+| **streamdown**       | 2.0.1   | Streaming markdown parser (requires `unsafe-eval` CSP) |
 
 ### Terminal Emulation
 

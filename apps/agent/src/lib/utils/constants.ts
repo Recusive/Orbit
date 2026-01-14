@@ -46,6 +46,10 @@ export const SIDEBAR = {
   expanded: 256,
   iconColumnWidth: 35,
   itemPadding: 12, // 6px mx-1.5 each side
+  itemHeight: 32,
+  searchBarHeight: 40,
+  tabNavHeight: 40,
+  previewBadgeFontSize: 9,
 } as const;
 
 /**
@@ -287,6 +291,13 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
     description: 'Toggle left sidebar',
     event: 'toggleLeftSidebar',
   },
+  // Alt binding for non-US keyboards where / requires Shift
+  toggleLeftSidebarAlt: {
+    key: '.',
+    cmd: true,
+    description: 'Toggle left sidebar',
+    event: 'toggleLeftSidebar',
+  },
   toggleActivityPanel: {
     key: 'b',
     cmd: true,
@@ -296,7 +307,7 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
   toggleFileBrowser: {
     key: 'e',
     cmd: true,
-    description: 'Toggle file browser',
+    description: 'Toggle editor panel',
     event: 'toggleFileBrowser',
   },
   toggleTerminal: {

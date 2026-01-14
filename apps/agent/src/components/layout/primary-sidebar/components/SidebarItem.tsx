@@ -29,8 +29,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
     return (
       <div
         className="flex items-center justify-center shrink-0"
-        // TODO: Move to constants - sidebar item height
-        style={{ height: 32, width: SIDEBAR.iconColumnWidth }}
+        style={{ height: SIDEBAR.itemHeight, width: SIDEBAR.iconColumnWidth }}
       >
         <button
           className={cn(

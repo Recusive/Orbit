@@ -127,8 +127,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           <div className="flex items-center justify-between w-full px-3">
             <div className="flex items-center gap-1.5">
               <span className="text-lg font-semibold whitespace-nowrap">Orbit Agent</span>
-              {/* TODO: Move text-[9px] to constants - preview badge font size */}
-              <span className="bg-primary/8 text-primary/70 rounded-full px-1.5 py-0.5 text-[9px] font-medium tracking-wide whitespace-nowrap">
+              <span
+                className="bg-primary/8 text-primary/70 rounded-full px-1.5 py-0.5 font-medium tracking-wide whitespace-nowrap"
+                style={{ fontSize: SIDEBAR.previewBadgeFontSize }}
+              >
                 Preview
               </span>
             </div>
@@ -159,8 +161,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           'shrink-0 mx-1.5 overflow-hidden transition-all duration-150 ease-in-out',
           isCollapsed ? 'py-0' : 'py-1'
         )}
-        // TODO: Move 40 to constants - search bar height
-        style={{ height: isCollapsed ? 0 : 40, opacity: isCollapsed ? 0 : 1 }}
+        style={{
+          height: isCollapsed ? 0 : SIDEBAR.searchBarHeight,
+          opacity: isCollapsed ? 0 : 1,
+        }}
       >
         <button
           onClick={handleOpenQuickSearch}
@@ -191,8 +195,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-all duration-150 ease-in-out',
           isCollapsed ? '' : 'border-b border-divider'
         )}
-        // TODO: Move 40 to constants - tab navigation height
-        style={{ height: isCollapsed ? 0 : 40, opacity: isCollapsed ? 0 : 1 }}
+        style={{
+          height: isCollapsed ? 0 : SIDEBAR.tabNavHeight,
+          opacity: isCollapsed ? 0 : 1,
+        }}
       >
         <TabButton
           label="Sessions"

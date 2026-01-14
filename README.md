@@ -167,10 +167,27 @@ Orbit/
 │   └── shared-schemas/             # Zod schemas shared across apps
 │
 ├── docs/                           # Documentation
-│   ├── CI-CD-GUIDE.md
-│   ├── DEVELOPMENT.md
-│   ├── DMG-BUILD-GUIDE.md
-│   └── tauri-plugins.md
+│   ├── README.md                   # Documentation index
+│   ├── architecture/               # System design & technical details
+│   │   ├── CSP-SECURITY.md
+│   │   ├── EMBEDDED_BROWSER.md
+│   │   ├── TECH-STACK.md
+│   │   └── tauri-plugins.md
+│   ├── development/                # Build & development workflow
+│   │   ├── BUNDLING-TECHNICAL-NOTES.md
+│   │   ├── CI-CD-GUIDE.md
+│   │   ├── DEVELOPMENT.md
+│   │   ├── DMG-BUILD-GUIDE.md
+│   │   └── TROUBLESHOOTING.md
+│   ├── design/                     # UI/UX documentation
+│   │   ├── TYPOGRAPHY.md
+│   │   └── flash-prevention-guide.md
+│   ├── quality/                    # Code quality & audits
+│   │   ├── AUDIT-REPORT-2026-01-07.md
+│   │   ├── LINTING-AND-QUALITY.md
+│   │   └── codebase-health.json
+│   └── reference/                  # API & SDK references
+│       └── Agent SDK reference - TypeScript.md
 │
 ├── Cargo.toml                      # Rust workspace root
 ├── package.json                    # Bun workspace root
