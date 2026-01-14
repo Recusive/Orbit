@@ -34,9 +34,9 @@
     "security": {
       "csp": {
         "default-src": "'self'",
-        "script-src": "'self'",
+        "script-src": "'self' 'unsafe-eval'",
         "style-src": "'self' 'unsafe-inline'",
-        "connect-src": "'self' https://api.anthropic.com",
+        "connect-src": "'self' https://api.anthropic.com ipc://localhost",
         "img-src": "'self' data: blob:",
         "font-src": "'self' data:",
         "frame-src": "'none'",

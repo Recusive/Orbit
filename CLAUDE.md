@@ -967,9 +967,10 @@ apps/canvas/src/
 
 For detailed documentation on specific features, see the `docs/` folder:
 
-| Feature          | Documentation                                          | Description                                                                  |
-| ---------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| Embedded Browser | [`docs/EMBEDDED_BROWSER.md`](docs/EMBEDDED_BROWSER.md) | Tauri multiwebview browser panel, WKWebView workarounds, idle timeout system |
+| Feature          | Documentation                                                                    | Description                                                                  |
+| ---------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Embedded Browser | [`docs/architecture/EMBEDDED_BROWSER.md`](docs/architecture/EMBEDDED_BROWSER.md) | Tauri multiwebview browser panel, WKWebView workarounds, idle timeout system |
+| CSP Security     | [`docs/architecture/CSP-SECURITY.md`](docs/architecture/CSP-SECURITY.md)         | Content Security Policy config, why `unsafe-eval` is required for streamdown |
 
 ---
 

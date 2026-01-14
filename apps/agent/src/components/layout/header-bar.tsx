@@ -208,8 +208,12 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                   </div>
                 </button>
               </TooltipTrigger>
-              <TooltipContent>
-                {reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}
+              <TooltipContent className="flex items-center gap-2">
+                <span>{reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}</span>
+                <KbdGroup>
+                  <Kbd className="bg-white/15 text-inherit border-white/20">⌘</Kbd>
+                  <Kbd className="bg-white/15 text-inherit border-white/20">B</Kbd>
+                </KbdGroup>
               </TooltipContent>
             </Tooltip>
 

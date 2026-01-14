@@ -25,6 +25,11 @@ export const RootLayout: FC = () => {
     goToLineDialogOpen,
     setGoToLineDialogOpen,
     toggleLeftSidebar,
+    toggleReviewPanel,
+    toggleBottomPanel,
+    reviewPanelOpen,
+    bottomPanelOpen,
+    setTerminalPosition,
     openSettings,
   } = useUIStore();
 
@@ -50,6 +55,15 @@ export const RootLayout: FC = () => {
     openSettings();
   }, [openSettings]);
 
+  // Smart terminal toggle: if activity panel is closed, open terminal in full-width mode
+  const handleToggleTerminal = useCallback((): void => {
+    if (!reviewPanelOpen && !bottomPanelOpen) {
+      // Activity panel is closed and terminal is closed - open in full-width mode
+      setTerminalPosition('both');
+    }
+    toggleBottomPanel();
+  }, [reviewPanelOpen, bottomPanelOpen, setTerminalPosition, toggleBottomPanel]);
+
   // Handle messages from Orbit extension (including panel:command)
   const handleExtensionMessage = useCallback((message: ExtensionMessage): void => {
     if (message.type === 'panel:command') {
@@ -70,6 +84,8 @@ export const RootLayout: FC = () => {
     window.addEventListener('quickOpenFile', handleQuickOpenFile);
     window.addEventListener('goToLine', handleGoToLine);
     window.addEventListener('toggleLeftSidebar', toggleLeftSidebar);
+    window.addEventListener('toggleActivityPanel', toggleReviewPanel);
+    window.addEventListener('toggleTerminal', handleToggleTerminal);
     window.addEventListener('openSettings', handleOpenSettings);
 
     return (): void => {
@@ -77,6 +93,8 @@ export const RootLayout: FC = () => {
       window.removeEventListener('quickOpenFile', handleQuickOpenFile);
       window.removeEventListener('goToLine', handleGoToLine);
       window.removeEventListener('toggleLeftSidebar', toggleLeftSidebar);
+      window.removeEventListener('toggleActivityPanel', toggleReviewPanel);
+      window.removeEventListener('toggleTerminal', handleToggleTerminal);
       window.removeEventListener('openSettings', handleOpenSettings);
     };
   }, [
@@ -84,6 +102,8 @@ export const RootLayout: FC = () => {
     handleQuickOpenFile,
     handleGoToLine,
     toggleLeftSidebar,
+    toggleReviewPanel,
+    handleToggleTerminal,
     handleOpenSettings,
   ]);
 

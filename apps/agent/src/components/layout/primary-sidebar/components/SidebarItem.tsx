@@ -76,7 +76,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
       {shortcut && !collapsed ? (
         <KbdGroup className="ml-auto mr-2">
           {shortcut.map((key, index) => (
-            <Kbd key={index} className="border-0 bg-muted/70 shadow-xs">
+            <Kbd key={index} className="bg-foreground/10 text-inherit border-foreground/15">
               {key}
             </Kbd>
           ))}

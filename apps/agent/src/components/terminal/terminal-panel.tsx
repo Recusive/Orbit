@@ -22,6 +22,8 @@ import type { FC } from 'react';
 import { TerminalContextMenu } from '@/components/terminal/terminal-context-menu';
 import { TerminalSearchBar } from '@/components/terminal/terminal-search-bar';
 import { ContextMenuTrigger } from '@/components/ui/context-menu';
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTerminalInstanceManager } from '@/hooks/terminal/use-terminal-instance-manager';
 import { cn } from '@/lib/utils';
 import { HEIGHTS } from '@/lib/utils/constants';
@@ -437,7 +439,18 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
         style={{ height: TERMINAL_HEADER_HEIGHT }}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0 h-full">
-          <Terminal className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Terminal className="h-4 w-4 text-muted-foreground shrink-0 cursor-default" />
+            </TooltipTrigger>
+            <TooltipContent className="flex items-center gap-2">
+              <span>Terminal</span>
+              <KbdGroup>
+                <Kbd className="bg-white/15 text-inherit border-white/20">⌘</Kbd>
+                <Kbd className="bg-white/15 text-inherit border-white/20">J</Kbd>
+              </KbdGroup>
+            </TooltipContent>
+          </Tooltip>
           {/* Terminal tabs */}
           <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden flex-1 min-w-0 h-full scrollbar-none pr-4">
             {sessions.map((session) => {

@@ -117,7 +117,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
                 <span>Expand sidebar</span>
                 <KbdGroup>
                   <Kbd className="bg-white/15 text-inherit border-white/20">⌘</Kbd>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">.</Kbd>
+                  <Kbd className="bg-white/15 text-inherit border-white/20">/</Kbd>
                 </KbdGroup>
               </TooltipContent>
             </Tooltip>
@@ -145,7 +145,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
                 <span>Collapse sidebar</span>
                 <KbdGroup>
                   <Kbd className="bg-white/15 text-inherit border-white/20">⌘</Kbd>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">.</Kbd>
+                  <Kbd className="bg-white/15 text-inherit border-white/20">/</Kbd>
                 </KbdGroup>
               </TooltipContent>
             </Tooltip>
@@ -178,15 +178,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           <span className="text-xs whitespace-nowrap overflow-hidden w-auto opacity-100">
             Search files...
           </span>
-          <div className="flex items-center gap-0.5 ml-auto mr-2">
-            {/* TODO: Move min-w-[20px] to constants - kbd minimum width */}
-            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-sm font-mono bg-background/60 rounded-md shadow-xs">
-              ⌘
-            </kbd>
-            <kbd className="flex items-center justify-center h-5 min-w-[20px] px-1 text-sm font-mono bg-background/60 rounded-md shadow-xs">
-              P
-            </kbd>
-          </div>
+          <KbdGroup className="ml-auto mr-2">
+            <Kbd className="bg-foreground/10 text-inherit border-foreground/15">⌘</Kbd>
+            <Kbd className="bg-foreground/10 text-inherit border-foreground/15">P</Kbd>
+          </KbdGroup>
         </button>
       </div>
 

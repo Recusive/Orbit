@@ -281,20 +281,20 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
   },
 
   // Sidebar & panels
-  toggleSidebar: {
-    key: '/',
-    cmd: true,
-    description: 'Toggle sidebar',
-    event: 'toggleLeftSidebar',
-  },
   toggleLeftSidebar: {
-    key: '.',
+    key: '/',
     cmd: true,
     description: 'Toggle left sidebar',
     event: 'toggleLeftSidebar',
   },
-  toggleFileBrowser: {
+  toggleActivityPanel: {
     key: 'b',
+    cmd: true,
+    description: 'Toggle activity panel',
+    event: 'toggleActivityPanel',
+  },
+  toggleFileBrowser: {
+    key: 'e',
     cmd: true,
     description: 'Toggle file browser',
     event: 'toggleFileBrowser',

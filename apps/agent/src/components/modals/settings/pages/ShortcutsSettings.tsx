@@ -43,10 +43,10 @@ export const ShortcutsSettings: FC = () => {
       <SectionHeader title="Panels">Panel visibility shortcuts</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">
-        <ShortcutItem label="Toggle Left Sidebar" keys={['⌘', '.']} />
-        <ShortcutItem label="Toggle File Browser" keys={['⌘', 'B']} />
+        <ShortcutItem label="Toggle Left Sidebar" keys={['⌘', '/']} />
+        <ShortcutItem label="Toggle Activity Panel" keys={['⌘', 'B']} />
+        <ShortcutItem label="Toggle File Browser" keys={['⌘', 'E']} />
         <ShortcutItem label="Toggle Terminal" keys={['⌘', 'J']} />
-        <ShortcutItem label="Toggle Activity" keys={['⌘', 'Shift', 'A']} />
         <ShortcutItem label="Toggle Search" keys={['⌘', 'Shift', 'S']} />
       </div>
     </div>
