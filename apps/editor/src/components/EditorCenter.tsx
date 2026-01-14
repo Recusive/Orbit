@@ -16,8 +16,6 @@ import { createLogger } from '@orbit/common/lib';
 import { Columns2, Ellipsis, Search, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-const logger = createLogger('EditorCenter');
-
 import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { ViewedFile } from '@/stores/file/file-viewer-store';
 import type { AllotmentHandle } from 'allotment';
@@ -27,7 +25,6 @@ import { FileIcon, FileViewer, FileViewerContent } from '@/components/files';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Switch } from '@/components/ui/switch';
-import { lspDidClose } from '@/lib/api';
 import { TERMINAL_PANEL, ACTIVITY_PANEL } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import {
@@ -37,6 +34,8 @@ import {
   useWordWrap,
 } from '@/stores/file/file-viewer-store';
 import { useUIStore, useBottomPanelOpen, useBottomPanelHeight } from '@/stores/ui/ui-store';
+
+const logger = createLogger('EditorCenter');
 
 // Lazy load terminal
 const LazyTerminalPanel = lazy(() =>
@@ -522,14 +521,10 @@ export const EditorCenter: FC = () => {
     [bottomPanelOpen, setBottomPanelHeight]
   );
 
-  // Handle closing a tab with LSP notification
+  // Handle closing a tab
+  // Note: LSP lifecycle (didClose) is handled by CodeMirrorEditor's cleanup effect
   const handleCloseTab = useCallback(
     (path: string): void => {
-      lspDidClose(path).catch((err: unknown) => {
-        logger.warn('Failed to notify LSP of file close', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
       closeTab(path);
     },
     [closeTab]

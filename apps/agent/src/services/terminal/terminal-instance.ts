@@ -41,6 +41,9 @@ const FLOW_CONTROL = {
 /** Delay before auto-focusing terminal (ms). Ensures DOM is ready after visibility change. */
 const FOCUS_DELAY_MS = 50;
 
+/** Timeout for PTY creation before giving up (ms). Handles slow backend/disk scenarios. */
+const PTY_CREATION_TIMEOUT_MS = 30_000;
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -408,15 +411,18 @@ export class TerminalInstance {
     }
     this.ptyCreationInProgress = true;
 
-    // Set timeout to reset flag if connection never completes (30 seconds)
+    // Set timeout to reset flag if connection never completes
     // This prevents permanent blocking if backend fails to respond
     this.ptyCreationTimeoutId = setTimeout(() => {
       if (this.ptyCreationInProgress && !this.isConnected) {
-        logger.warn('PTY creation timed out', { sessionId: this.sessionId });
+        logger.warn('PTY creation timed out', {
+          sessionId: this.sessionId,
+          timeoutMs: PTY_CREATION_TIMEOUT_MS,
+        });
         this.ptyCreationInProgress = false;
         this.ptyCreationTimeoutId = null;
       }
-    }, 30000);
+    }, PTY_CREATION_TIMEOUT_MS);
 
     const cols = this.terminal.cols;
     const rows = this.terminal.rows;

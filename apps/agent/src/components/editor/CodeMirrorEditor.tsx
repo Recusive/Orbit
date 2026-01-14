@@ -641,6 +641,8 @@ const lightHighlightStyle = HighlightStyle.define([
 // ============================================
 
 interface GotoPosition {
+  /** File path this goto applies to (for split view scoping) */
+  path: string;
   line: number; // 0-indexed
   column: number; // 0-indexed
   /** Unique ID to ensure effect re-triggers for same position */

@@ -214,7 +214,10 @@ const loadWorktreesFromStorage = (): WorktreeUIState[] => {
     if (!result.success) {
       logger.warn('Invalid worktrees data in localStorage, clearing', {
         error: result.error.message,
+        rawPreview: typeof saved === 'string' ? saved.substring(0, 100) : 'non-string',
       });
+      // Clear invalid data to prevent repeated warnings on reload
+      localStorage.removeItem('orbit-worktrees');
       return [];
     }
     return result.data;

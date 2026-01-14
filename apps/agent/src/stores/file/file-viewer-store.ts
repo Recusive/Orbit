@@ -31,6 +31,8 @@ export interface ViewedFile {
 
 // Position to navigate to after opening a file
 export interface GotoPosition {
+  /** File path this goto applies to (for split view scoping) */
+  path: string;
   line: number; // 0-indexed
   column: number; // 0-indexed
   /** Unique ID to ensure effect re-triggers for same position */
@@ -414,8 +416,9 @@ export const useFileViewerStore = create<FileViewerStore>()(
       get().openFile(path, content);
 
       // Set the pending goto position with unique ID to ensure effect re-triggers
+      // Include path for split view scoping - only matching editor should navigate
       set((state) => {
-        state.pendingGoto = { line, column, id: Date.now() };
+        state.pendingGoto = { path, line, column, id: Date.now() };
       });
     },
 

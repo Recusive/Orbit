@@ -1,5 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { OutlineItem } from '@/components/editor/editor-breadcrumbs';
 import type { GotoPosition, ViewedFile } from '@/stores/file/file-viewer-store';
@@ -7,7 +7,7 @@ import type { FC } from 'react';
 
 import { EditorBreadcrumbs, EditorSkeleton, extractMarkdownOutline } from '@/components/editor';
 import { FileDiffViewer } from '@/components/git';
-import { writeFile, lspDidChange, lspDidSave } from '@/lib/api';
+import { writeFile } from '@/lib/api';
 import {
   useCursorPosition,
   useFileViewerStore,
@@ -60,10 +60,9 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   const pendingGoto = useFileViewerStore((state) => state.pendingGoto);
   const clearPendingGoto = useFileViewerStore((state) => state.clearPendingGoto);
   const gotoPosition = useFileViewerStore((state) => state.gotoPosition);
-  const documentVersionRef = useRef(1); // Track document version for LSP
 
-  // Only apply goto if it's for the current file
-  const gotoForThisFile: GotoPosition | null = pendingGoto;
+  // Only apply goto if it's for the current file (prevents split view cross-navigation)
+  const gotoForThisFile: GotoPosition | null = pendingGoto?.path === file.path ? pendingGoto : null;
 
   // Extract outline for markdown files
   const outline = useMemo((): OutlineItem[] => {
@@ -103,33 +102,21 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   );
 
   // Handle content changes from editor
+  // Note: LSP notifications (didChange) are handled by CodeMirrorEditor to ensure
+  // single source of truth for document versioning
   const handleChange = useCallback(
     (newContent: string): void => {
       updateContent(file.path, newContent);
-
-      // Notify LSP of document change
-      documentVersionRef.current += 1;
-      lspDidChange(file.path, newContent, documentVersionRef.current).catch((err: unknown) => {
-        logger.warn('Failed to notify LSP of change', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
     },
     [file.path, updateContent]
   );
 
   // Handle save (Cmd-S)
+  // Note: LSP notifications (didSave) are handled by CodeMirrorEditor's Mod-s keymap
   const handleSave = useCallback(async (): Promise<void> => {
     try {
       await writeFile(file.path, file.content);
       markSaved(file.path);
-
-      // Notify LSP of document save
-      lspDidSave(file.path).catch((err: unknown) => {
-        logger.warn('Failed to notify LSP of save', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
     } catch (error) {
       logger.error('Failed to save file', {
         error: error instanceof Error ? error.message : String(error),
