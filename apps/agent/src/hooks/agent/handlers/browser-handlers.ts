@@ -227,8 +227,8 @@ export async function handleBrowserClear(
 /**
  * Handle browser:devtools - open DevTools for the embedded browser.
  *
- * Only available in debug builds. On macOS, uses a private API
- * that won't work in App Store builds.
+ * Opens native WebKit inspector in a detached window.
+ * Only available in debug builds.
  */
 export async function handleBrowserDevTools(
   message: Extract<WebviewMessage, { type: 'browser:devtools' }>
