@@ -108,7 +108,57 @@ export async function browserOpenDevTools(): Promise<void> {
 }
 
 // ============================================
-// Legacy Functions (deprecated)
+// Navigation Operations
+// ============================================
+
+/**
+ * Go back in browser history.
+ */
+export async function browserBack(): Promise<void> {
+  return invoke('browser_back');
+}
+
+/**
+ * Go forward in browser history.
+ */
+export async function browserForward(): Promise<void> {
+  return invoke('browser_forward');
+}
+
+/**
+ * Reload the current page.
+ */
+export async function browserReload(): Promise<void> {
+  return invoke('browser_reload');
+}
+
+/**
+ * Stop loading the current page.
+ */
+export async function browserStop(): Promise<void> {
+  return invoke('browser_stop');
+}
+
+// ============================================
+// Visibility Operations
+// ============================================
+
+/**
+ * Show the embedded browser webview.
+ */
+export async function browserShow(): Promise<void> {
+  return invoke('browser_show');
+}
+
+/**
+ * Hide the embedded browser webview.
+ */
+export async function browserHide(): Promise<void> {
+  return invoke('browser_hide');
+}
+
+// ============================================
+// Legacy Functions
 // ============================================
 
 /**

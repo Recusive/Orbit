@@ -412,7 +412,15 @@ pub fn run() {
             browser::browser_info,
             browser::browser_eval,
             browser::browser_open_devtools,
-            // Legacy browser commands (deprecated)
+            // Browser navigation commands
+            browser::browser_back,
+            browser::browser_forward,
+            browser::browser_reload,
+            browser::browser_stop,
+            // Browser visibility commands
+            browser::browser_show,
+            browser::browser_hide,
+            // Legacy browser commands
             browser::browser_detect,
             browser::browser_get_pid,
             browser::browser_clear,

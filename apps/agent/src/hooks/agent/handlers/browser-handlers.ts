@@ -10,11 +10,17 @@ import { createLogger } from '@orbit/common/lib';
 import type { WebviewMessage } from '@/types/protocol';
 
 import {
+  browserBack,
   browserClose,
   browserCreate,
+  browserForward,
+  browserHide,
   browserNavigate,
   browserOpenDevTools,
+  browserReload,
   browserSetBounds,
+  browserShow,
+  browserStop,
 } from '@/lib/api';
 import { useBrowserLifecycleStore } from '@/stores/browser/browser-lifecycle-store';
 import { useBrowserStore } from '@/stores/browser/browser-store';
@@ -187,7 +193,104 @@ export function recordBrowserActivityFromAI(): void {
   }
 }
 
-// Legacy handlers (deprecated)
+// ═══════════════════════════════════════════════════════════════
+// Navigation handlers
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Handle browser:back - go back in browser history.
+ */
+export async function handleBrowserBack(
+  message: Extract<WebviewMessage, { type: 'browser:back' }>
+): Promise<void> {
+  try {
+    await browserBack();
+    useBrowserLifecycleStore.getState().recordActivity();
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Back navigation failed';
+    logger.warn('Browser back failed', { error: errorMessage, requestId: message.uuid });
+  }
+}
+
+/**
+ * Handle browser:forward - go forward in browser history.
+ */
+export async function handleBrowserForward(
+  message: Extract<WebviewMessage, { type: 'browser:forward' }>
+): Promise<void> {
+  try {
+    await browserForward();
+    useBrowserLifecycleStore.getState().recordActivity();
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Forward navigation failed';
+    logger.warn('Browser forward failed', { error: errorMessage, requestId: message.uuid });
+  }
+}
+
+/**
+ * Handle browser:reload - reload the current page.
+ */
+export async function handleBrowserReload(
+  message: Extract<WebviewMessage, { type: 'browser:reload' }>
+): Promise<void> {
+  try {
+    await browserReload();
+    useBrowserLifecycleStore.getState().recordActivity();
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Reload failed';
+    logger.warn('Browser reload failed', { error: errorMessage, requestId: message.uuid });
+  }
+}
+
+/**
+ * Handle browser:stop - stop loading the current page.
+ */
+export async function handleBrowserStop(
+  message: Extract<WebviewMessage, { type: 'browser:stop' }>
+): Promise<void> {
+  try {
+    await browserStop();
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Stop failed';
+    logger.warn('Browser stop failed', { error: errorMessage, requestId: message.uuid });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Visibility handlers
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Handle browser:show - show the embedded browser webview.
+ */
+export async function handleBrowserShow(
+  message: Extract<WebviewMessage, { type: 'browser:show' }>
+): Promise<void> {
+  try {
+    await browserShow();
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Show failed';
+    logger.warn('Browser show failed', { error: errorMessage, requestId: message.uuid });
+  }
+}
+
+/**
+ * Handle browser:hide - hide the embedded browser webview.
+ */
+export async function handleBrowserHide(
+  message: Extract<WebviewMessage, { type: 'browser:hide' }>
+): Promise<void> {
+  try {
+    await browserHide();
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Hide failed';
+    logger.warn('Browser hide failed', { error: errorMessage, requestId: message.uuid });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Legacy handlers
+// ═══════════════════════════════════════════════════════════════
 
 /**
  * @deprecated Use handleBrowserCreate instead.

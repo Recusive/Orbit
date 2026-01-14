@@ -294,7 +294,141 @@ pub async fn browser_open_devtools(
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Legacy commands (deprecated - kept for backward compatibility)
+// Navigation commands
+// ═══════════════════════════════════════════════════════════════
+
+/// Go back in browser history.
+#[tauri::command]
+pub async fn browser_back(
+    app: AppHandle,
+    state: State<'_, Arc<EmbeddedBrowserState>>,
+) -> Result<()> {
+    let label = state
+        .current_label
+        .lock()
+        .clone()
+        .ok_or("No browser exists")?;
+
+    let webview = app.get_webview(&label).ok_or("Browser webview not found")?;
+
+    webview
+        .eval("history.back()")
+        .map_err(|e| format!("Failed to go back: {e}"))?;
+
+    Ok(())
+}
+
+/// Go forward in browser history.
+#[tauri::command]
+pub async fn browser_forward(
+    app: AppHandle,
+    state: State<'_, Arc<EmbeddedBrowserState>>,
+) -> Result<()> {
+    let label = state
+        .current_label
+        .lock()
+        .clone()
+        .ok_or("No browser exists")?;
+
+    let webview = app.get_webview(&label).ok_or("Browser webview not found")?;
+
+    webview
+        .eval("history.forward()")
+        .map_err(|e| format!("Failed to go forward: {e}"))?;
+
+    Ok(())
+}
+
+/// Reload the current page.
+#[tauri::command]
+pub async fn browser_reload(
+    app: AppHandle,
+    state: State<'_, Arc<EmbeddedBrowserState>>,
+) -> Result<()> {
+    let label = state
+        .current_label
+        .lock()
+        .clone()
+        .ok_or("No browser exists")?;
+
+    let webview = app.get_webview(&label).ok_or("Browser webview not found")?;
+
+    webview
+        .eval("location.reload()")
+        .map_err(|e| format!("Failed to reload: {e}"))?;
+
+    Ok(())
+}
+
+/// Stop loading the current page.
+#[tauri::command]
+pub async fn browser_stop(
+    app: AppHandle,
+    state: State<'_, Arc<EmbeddedBrowserState>>,
+) -> Result<()> {
+    let label = state
+        .current_label
+        .lock()
+        .clone()
+        .ok_or("No browser exists")?;
+
+    let webview = app.get_webview(&label).ok_or("Browser webview not found")?;
+
+    webview
+        .eval("window.stop()")
+        .map_err(|e| format!("Failed to stop: {e}"))?;
+
+    Ok(())
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Visibility commands
+// ═══════════════════════════════════════════════════════════════
+
+/// Show the embedded browser webview.
+#[tauri::command]
+pub async fn browser_show(
+    app: AppHandle,
+    state: State<'_, Arc<EmbeddedBrowserState>>,
+) -> Result<()> {
+    let label = state
+        .current_label
+        .lock()
+        .clone()
+        .ok_or("No browser exists")?;
+
+    let webview = app.get_webview(&label).ok_or("Browser webview not found")?;
+
+    webview
+        .show()
+        .map_err(|e| format!("Failed to show browser: {e}"))?;
+
+    Ok(())
+}
+
+/// Hide the embedded browser webview.
+#[tauri::command]
+pub async fn browser_hide(
+    app: AppHandle,
+    state: State<'_, Arc<EmbeddedBrowserState>>,
+) -> Result<()> {
+    let label = state
+        .current_label
+        .lock()
+        .clone()
+        .ok_or("No browser exists")?;
+
+    let webview = app.get_webview(&label).ok_or("Browser webview not found")?;
+
+    webview
+        .hide()
+        .map_err(|e| format!("Failed to hide browser: {e}"))?;
+
+    Ok(())
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Legacy commands (kept for backward compatibility)
 // ═══════════════════════════════════════════════════════════════
 
 /// Legacy: Detect browser (no longer supported).

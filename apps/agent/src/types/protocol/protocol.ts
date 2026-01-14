@@ -1481,6 +1481,8 @@ export const BrowserCreatedSchema = z
   .object({
     type: z.literal('browser:created'),
     uuid: UUIDSchema,
+    /** UUID of the original request (for request/response correlation) */
+    request_uuid: UUIDSchema.optional(),
     label: z.string(),
     url: z.string(),
   })
@@ -1541,6 +1543,8 @@ export const BrowserClearedSchema = z
   .object({
     type: z.literal('browser:cleared'),
     uuid: UUIDSchema,
+    /** UUID of the original request (for request/response correlation) */
+    request_uuid: UUIDSchema.optional(),
   })
   .strict();
 
@@ -1941,6 +1945,7 @@ export function isProtocolFileMessage(
 export function isProtocolBrowserMessage(
   msg: ExtensionMessage
 ): msg is
+  | BrowserCreated
   | BrowserDetected
   | BrowserNavigated
   | BrowserElementSelected

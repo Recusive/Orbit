@@ -136,9 +136,10 @@ export const useBrowserLifecycleStore = create<BrowserLifecycleState & BrowserLi
         const remaining = Math.ceil((totalIdleTime - idleTime) / 1000);
 
         if (remaining <= 0) {
-          // Time to auto-close - this will be handled by the component
-          logger.info('Idle timeout expired, browser should close');
-          set({ idleTimeRemaining: 0 });
+          // Time to auto-close - transition to closing state
+          // This prevents tick() from running again and ensures UI shows closing state
+          logger.info('Idle timeout expired, transitioning to closing state');
+          set({ state: 'closing', idleTimeRemaining: 0 });
         } else {
           set({ idleTimeRemaining: remaining });
         }

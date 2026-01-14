@@ -1,5 +1,5 @@
 import { AlertTriangle, Globe, Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 import { BrowserToolbar } from './browser-toolbar';
 
@@ -16,6 +16,7 @@ import {
   useBrowserError,
   useBrowserIsActive,
   useBrowserStore,
+  usePendingNavigationUrl,
 } from '@/stores/browser/browser-store';
 import { generateUUID } from '@/types/protocol';
 
@@ -34,15 +35,21 @@ export const BrowserPanel: FC = () => {
 
   // On mount: Reset stale state if browser thinks it's active but lifecycle is idle
   // This handles the case where the app was restarted but localStorage has stale state
-  useEffect(() => {
-    const browserState = useBrowserStore.getState();
-    const lifecycleState = useBrowserLifecycleStore.getState();
+  // Uses useLayoutEffect to run synchronously before paint, preventing race conditions
+  // with Zustand selector subscriptions
+  useLayoutEffect(() => {
+    const browserStoreState = useBrowserStore.getState();
+    const lifecycleStoreState = useBrowserLifecycleStore.getState();
 
-    if (browserState.isActive && lifecycleState.state === 'idle' && !browserState.isCreating) {
+    if (
+      browserStoreState.isActive &&
+      lifecycleStoreState.state === 'idle' &&
+      !browserStoreState.isCreating
+    ) {
       // Stale state: browser store says active but lifecycle says idle
       // This means the webview was destroyed when app closed
-      browserState.reset();
-      lifecycleState.reset();
+      browserStoreState.reset();
+      lifecycleStoreState.reset();
     }
   }, []);
   const isBrowserRunning = useBrowserLifecycleStore(selectIsBrowserRunning);
@@ -52,9 +59,18 @@ export const BrowserPanel: FC = () => {
   const recordActivity = useBrowserLifecycleStore((s) => s.recordActivity);
   const tick = useBrowserLifecycleStore((s) => s.tick);
 
+  // Get pending navigation URL (set by AI via browser:open)
+  const pendingUrl = usePendingNavigationUrl();
+
   // Launch embedded browser - creates a webview within the Orbit window
   const handleLaunchBrowser = useCallback((): void => {
     if (!viewportRef.current || isActive || isCreating) return;
+
+    // Use pending URL from AI request, or default
+    const initialUrl = pendingUrl ?? 'https://example.com';
+
+    // Clear pending URL now that we're using it
+    useBrowserStore.getState().setPendingNavigationUrl(null);
 
     // Get viewport bounds for initial webview position
     // Apply inset to prevent webview from overlapping panel borders
@@ -64,7 +80,7 @@ export const BrowserPanel: FC = () => {
       y: Math.round(rect.y),
       width: Math.round(rect.width) - WEBVIEW_BORDER_INSET,
       height: Math.round(rect.height),
-      url: 'https://example.com', // Default URL
+      url: initialUrl,
     };
 
     useBrowserStore.getState().setCreating(true);
@@ -73,7 +89,7 @@ export const BrowserPanel: FC = () => {
       uuid: generateUUID(),
       bounds,
     });
-  }, [isActive, isCreating, postMessage]);
+  }, [isActive, isCreating, postMessage, pendingUrl]);
 
   // Close browser handler
   const handleCloseBrowser = useCallback((): void => {
@@ -87,6 +103,13 @@ export const BrowserPanel: FC = () => {
   const handleKeepOpen = useCallback((): void => {
     recordActivity();
   }, [recordActivity]);
+
+  // Auto-launch browser when there's a pending URL from AI
+  useEffect(() => {
+    if (pendingUrl && !isActive && !isCreating && viewportRef.current) {
+      handleLaunchBrowser();
+    }
+  }, [pendingUrl, isActive, isCreating, handleLaunchBrowser]);
 
   // Tick idle timer every second when browser is running
   useEffect(() => {
@@ -108,8 +131,10 @@ export const BrowserPanel: FC = () => {
     }
   }, [shouldAutoClose, handleCloseBrowser]);
 
-  // User activity detection - record activity on mouse/keyboard in viewport
-  // Throttled to avoid excessive updates (30 second minimum between recordings)
+  // User activity detection for panel UI interactions
+  // Note: Events inside the Tauri webview don't bubble up (separate process).
+  // AI activity is tracked separately via recordBrowserActivityFromAI().
+  // Only mousedown/keydown are tracked - mousemove was too sensitive.
   useEffect(() => {
     if (!viewportRef.current || !isBrowserRunning) return;
 
@@ -125,12 +150,11 @@ export const BrowserPanel: FC = () => {
       }
     };
 
-    viewport.addEventListener('mousemove', handleActivity);
+    // Only track intentional interactions (clicks, keyboard), not passive mousemove
     viewport.addEventListener('mousedown', handleActivity);
     viewport.addEventListener('keydown', handleActivity);
 
     return (): void => {
-      viewport.removeEventListener('mousemove', handleActivity);
       viewport.removeEventListener('mousedown', handleActivity);
       viewport.removeEventListener('keydown', handleActivity);
     };

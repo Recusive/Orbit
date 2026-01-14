@@ -7,11 +7,17 @@ import {
   handleInputModeSet,
 } from './agent-sdk-handlers';
 import {
+  handleBrowserBack,
   handleBrowserBounds,
   handleBrowserClear,
   handleBrowserCreate,
   handleBrowserDevTools,
+  handleBrowserForward,
+  handleBrowserHide,
   handleBrowserNavigate,
+  handleBrowserReload,
+  handleBrowserShow,
+  handleBrowserStop,
 } from './browser-handlers';
 import {
   handleCommandsList,
@@ -257,6 +263,38 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
 
   if (message.type === 'browser:devtools') {
     await handleBrowserDevTools(message);
+    return;
+  }
+
+  // Navigation handlers
+  if (message.type === 'browser:back') {
+    await handleBrowserBack(message);
+    return;
+  }
+
+  if (message.type === 'browser:forward') {
+    await handleBrowserForward(message);
+    return;
+  }
+
+  if (message.type === 'browser:reload') {
+    await handleBrowserReload(message);
+    return;
+  }
+
+  if (message.type === 'browser:stop') {
+    await handleBrowserStop(message);
+    return;
+  }
+
+  // Visibility handlers
+  if (message.type === 'browser:show') {
+    await handleBrowserShow(message);
+    return;
+  }
+
+  if (message.type === 'browser:hide') {
+    await handleBrowserHide(message);
     return;
   }
 

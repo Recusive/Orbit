@@ -10,22 +10,12 @@ import { generateUUID } from '@/types/protocol';
 
 const logger = createLogger('Browser');
 
-// Track pending browser:open requests to navigate after creation
-let pendingNavigationUrl: string | null = null;
-
 /**
  * Hook to handle browser messages from Tauri backend
  */
 export function useBrowser(): void {
-  const {
-    setViewId,
-    setNavigation,
-    setLoading,
-    setSelectedElement,
-    setSelectingElement,
-    setError,
-    reset,
-  } = useBrowserStore();
+  const { setNavigation, setLoading, setSelectedElement, setSelectingElement, setError, reset } =
+    useBrowserStore();
 
   // Get postMessage for sending browser:show when panel becomes visible
   const { postMessage } = useTauri({});
@@ -55,21 +45,18 @@ export function useBrowser(): void {
           // 1. Open the activity panel with browser tab
           useUIStore.getState().openBrowserTab();
 
-          // 2. If browser is not active, create it and queue navigation
-          if (!browserState.isActive && !browserState.isCreating) {
-            pendingNavigationUrl = url;
-            useBrowserStore.getState().setCreating(true);
-            postMessage({
-              type: 'browser:detect',
-              uuid: generateUUID(),
-            });
-          } else if (browserState.isActive) {
-            // Browser already active, just navigate
+          // 2. If browser is already active, navigate directly
+          if (browserState.isActive) {
             postMessage({
               type: 'browser:navigate',
               uuid: generateUUID(),
               url,
             });
+          } else {
+            // Browser not active - store the pending URL
+            // browser-panel will pick this up when it creates the embedded browser
+            logger.info('Storing pending navigation URL for browser creation', { url });
+            useBrowserStore.getState().setPendingNavigationUrl(url);
           }
           break;
         }
@@ -83,18 +70,7 @@ export function useBrowser(): void {
 
         // Browser messages
         case 'browser:detected':
-          // Use pid as the identifier (convert to string for store compatibility)
-          setViewId(String(message.pid));
-          setError(null);
-          // Check if there's a pending navigation from browser:open
-          if (pendingNavigationUrl) {
-            postMessage({
-              type: 'browser:navigate',
-              uuid: generateUUID(),
-              url: pendingNavigationUrl,
-            });
-            pendingNavigationUrl = null;
-          }
+          // Legacy external browser detection - no longer used
           break;
 
         case 'browser:navigated':
@@ -185,7 +161,6 @@ export function useBrowser(): void {
       }
     },
     [
-      setViewId,
       setNavigation,
       setLoading,
       setSelectedElement,

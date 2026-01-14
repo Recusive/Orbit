@@ -24,6 +24,8 @@ interface BrowserState {
 
   // Navigation
   navigation: NavigationState;
+  /** URL to navigate to after browser is created (for AI-initiated browser:open) */
+  pendingNavigationUrl: string | null;
 
   // Element selection
   isSelectingElement: boolean;
@@ -46,6 +48,8 @@ interface BrowserActions {
   // Navigation
   setNavigation: (navigation: Partial<NavigationState>) => void;
   setLoading: (isLoading: boolean) => void;
+  /** Set pending navigation URL (for AI-initiated browser:open before browser is created) */
+  setPendingNavigationUrl: (url: string | null) => void;
 
   // Element selection
   setSelectingElement: (isSelecting: boolean) => void;
@@ -88,6 +92,7 @@ const cleanInitialState: BrowserState = {
     canGoForward: false,
     isLoading: false,
   },
+  pendingNavigationUrl: null,
   isSelectingElement: false,
   selectedElement: null,
   elementContexts: [],
@@ -172,6 +177,12 @@ export const useBrowserStore = create<BrowserStore>()(
     setLoading: (isLoading: boolean): void => {
       set((state) => {
         state.navigation.isLoading = isLoading;
+      });
+    },
+
+    setPendingNavigationUrl: (url: string | null): void => {
+      set((state) => {
+        state.pendingNavigationUrl = url;
       });
     },
 
@@ -265,4 +276,8 @@ export const useElementContexts = (): ReactElementContext[] => {
 
 export const useBrowserError = (): string | null => {
   return useBrowserStore((state) => state.error);
+};
+
+export const usePendingNavigationUrl = (): string | null => {
+  return useBrowserStore((state) => state.pendingNavigationUrl);
 };
