@@ -4,3 +4,5 @@
 
 export { ErrorBoundary } from './ErrorBoundary';
 export type { ErrorBoundaryResetFn } from './ErrorBoundary';
+
+export { StatusAnnouncer } from './StatusAnnouncer';

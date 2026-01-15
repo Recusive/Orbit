@@ -57,7 +57,7 @@ interface AgentCardProps {
 }
 
 const AgentCard: FC<AgentCardProps> = ({ agent, onEdit, onDelete }) => (
-  <div className="rounded-lg border border-border/40 p-4 hover:bg-muted/40 transition-all duration-150">
+  <div className="rounded-lg border border-border/40 p-4 hover:bg-muted/40 transition-[background-color] duration-150">
     <div className="flex items-start justify-between gap-3">
       <div className="flex items-start gap-3 min-w-0 flex-1">
         <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -341,7 +341,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
                         handleToolToggle(tool);
                       }}
                       className={cn(
-                        'text-sm px-2.5 py-1.5 rounded-lg border transition-all duration-150 active:scale-[0.98]',
+                        'text-sm px-2.5 py-1.5 rounded-lg border transition-[background-color,border-color,transform] duration-150 active:scale-[0.98]',
                         tools.includes(tool)
                           ? 'bg-primary/10 text-foreground border-primary/40 hover:bg-primary/15 hover:border-primary/50'
                           : 'bg-muted/30 text-foreground border-border/50 hover:bg-muted/50 hover:border-border/60'

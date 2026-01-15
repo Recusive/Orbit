@@ -112,7 +112,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
     <div>
       <div
         className={cn(
-          'bg-card overflow-hidden transition-all duration-200',
+          'bg-card overflow-hidden transition-[border-color,opacity,box-shadow] duration-200',
           isFailed
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
             : 'border border-border/50',

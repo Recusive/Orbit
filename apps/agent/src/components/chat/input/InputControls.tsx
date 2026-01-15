@@ -50,8 +50,9 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
           <TooltipTrigger asChild>
             <button
               onClick={cycleInputMode}
+              aria-label={`Input mode: ${INPUT_MODE_LABELS[inputMode]}. Click to change.`}
               className={cn(
-                'h-7 px-2.5 flex items-center gap-1.5 rounded-lg transition-all duration-150',
+                'h-7 px-2.5 flex items-center gap-1.5 rounded-lg transition-[background-color,color,transform] duration-150',
                 'hover:scale-[1.02] active:scale-[0.98]',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
                 inputMode === 'default' &&
@@ -77,16 +78,17 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
           <TooltipTrigger asChild>
             <button
               onClick={handleAtClick}
+              aria-label="Add context"
               className={cn(
                 'h-7 w-7 flex items-center justify-center rounded-lg',
                 'bg-transparent text-muted-foreground/70',
-                'transition-all duration-150',
+                'transition-[background-color,color,transform] duration-150',
                 'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
                 'active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
               )}
             >
-              <AtSign className="h-4 w-4" />
+              <AtSign className="h-4 w-4" aria-hidden="true" />
             </button>
           </TooltipTrigger>
           <TooltipContent>Add context (@)</TooltipContent>
@@ -106,16 +108,17 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              aria-label="Open web browser"
               className={cn(
                 'h-7 w-7 flex items-center justify-center rounded-lg',
                 'bg-transparent text-muted-foreground/70',
-                'transition-all duration-150',
+                'transition-[background-color,color,transform] duration-150',
                 'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
                 'active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
               )}
             >
-              <Globe className="h-4 w-4" />
+              <Globe className="h-4 w-4" aria-hidden="true" />
             </button>
           </TooltipTrigger>
           <TooltipContent>Web browser</TooltipContent>
@@ -126,16 +129,17 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
           <TooltipTrigger asChild>
             <button
               onClick={handleImageClick}
+              aria-label="Attach image"
               className={cn(
                 'h-7 w-7 flex items-center justify-center rounded-lg',
                 'bg-transparent text-muted-foreground/70',
-                'transition-all duration-150',
+                'transition-[background-color,color,transform] duration-150',
                 'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
                 'active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
               )}
             >
-              <Image className="h-4 w-4" />
+              <Image className="h-4 w-4" aria-hidden="true" />
             </button>
           </TooltipTrigger>
           <TooltipContent>Attach image</TooltipContent>
@@ -177,9 +181,16 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
             <button
               onClick={isAgentRunning && isInputEmpty ? onStop : handleSend}
               disabled={!isAgentRunning && isInputEmpty}
+              aria-label={
+                isAgentRunning && isInputEmpty
+                  ? 'Stop agent'
+                  : isAgentRunning
+                    ? 'Queue message'
+                    : 'Send message'
+              }
               className={cn(
                 'h-7 w-7 flex items-center justify-center rounded-full',
-                'transition-all duration-200 ease-out',
+                'transition-[background-color,color,transform,box-shadow] duration-200 ease-out',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
                 isAgentRunning && isInputEmpty
                   ? 'bg-red-400/80 text-white dark:bg-red-400/70 hover:bg-red-400/90 dark:hover:bg-red-400/80'
@@ -189,9 +200,9 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               )}
             >
               {isAgentRunning && isInputEmpty ? (
-                <Square className="h-2.5 w-2.5 fill-current" strokeWidth={0} />
+                <Square className="h-2.5 w-2.5 fill-current" strokeWidth={0} aria-hidden="true" />
               ) : (
-                <ArrowUp className="h-4 w-4" />
+                <ArrowUp className="h-4 w-4" aria-hidden="true" />
               )}
             </button>
           </TooltipTrigger>

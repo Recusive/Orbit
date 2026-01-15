@@ -33,7 +33,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
       >
         <button
           className={cn(
-            'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-all duration-150',
+            'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150',
             active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
           )}
           title={label}
@@ -48,7 +48,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
   return (
     <button
       className={cn(
-        'flex items-center h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-muted/50 active:scale-[0.98] transition-all duration-200',
+        'flex items-center h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-muted/50 active:scale-[0.98] transition-[background-color,color,transform] duration-200',
         active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
       )}
       title={collapsed ? label : undefined}

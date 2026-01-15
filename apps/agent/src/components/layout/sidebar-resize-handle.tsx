@@ -3,14 +3,18 @@
  * To change sidebar widths, snap thresholds, or handle dimensions,
  * update SIDEBAR, PANEL_SIZES, and RESIZE_HANDLE in constants.ts.
  */
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
-import type { FC } from 'react';
+import type { FC, KeyboardEvent } from 'react';
 
 import { PANEL_SIZES, RESIZE_HANDLE, SIDEBAR } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import { useIsLeftSidebarCollapsed, useUIStore } from '@/stores/ui/ui-store';
+
+/** Keyboard resize step in pixels */
+const KEYBOARD_STEP = 10;
+const KEYBOARD_STEP_LARGE = 50;
 
 /**
  * SidebarResizeHandle - A smooth resize handle for the left sidebar
@@ -39,10 +43,41 @@ export const SidebarResizeHandle: FC = () => {
 
   // Track dragging state for visual feedback (needs React state for re-render)
   const [isDragging, setIsDragging] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Track the current width during drag (not in React state to avoid re-renders)
   const currentWidthRef = useRef(leftSidebarWidth);
   const isDraggingRef = useRef(false);
+
+  // Keyboard resize handler for accessibility
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLDivElement>): void => {
+      if (isCollapsed) return; // Can't resize when collapsed
+
+      const step = e.shiftKey ? KEYBOARD_STEP_LARGE : KEYBOARD_STEP;
+      let newWidth = leftSidebarWidth;
+
+      if (e.key === 'ArrowLeft') {
+        newWidth = Math.max(PANEL_SIZES.sidebar.minUsable, leftSidebarWidth - step);
+        // Check for snap-to-collapse
+        if (newWidth < PANEL_SIZES.sidebar.snapThreshold) {
+          newWidth = SIDEBAR.collapsed;
+        }
+      } else if (e.key === 'ArrowRight') {
+        newWidth = Math.min(PANEL_SIZES.sidebar.max, leftSidebarWidth + step);
+      } else if (e.key === 'Home') {
+        newWidth = PANEL_SIZES.sidebar.minUsable;
+      } else if (e.key === 'End') {
+        newWidth = PANEL_SIZES.sidebar.max;
+      } else {
+        return; // Don't prevent default for other keys
+      }
+
+      e.preventDefault();
+      setLeftSidebarWidth(newWidth);
+    },
+    [isCollapsed, leftSidebarWidth, setLeftSidebarWidth]
+  );
 
   const handleMouseDown = (e: React.MouseEvent): void => {
     // Don't allow resizing when collapsed
@@ -146,12 +181,27 @@ export const SidebarResizeHandle: FC = () => {
 
   return (
     <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-valuenow={leftSidebarWidth}
+      aria-valuemin={PANEL_SIZES.sidebar.minUsable}
+      aria-valuemax={PANEL_SIZES.sidebar.max}
+      aria-label="Resize sidebar. Use left/right arrow keys to adjust."
+      tabIndex={isCollapsed ? -1 : 0}
       className={cn(
         'group relative shrink-0 h-full',
+        'focus:outline-none focus-visible:z-10',
         // Only show resize cursor when expanded
         isCollapsed ? 'cursor-default' : 'cursor-col-resize'
       )}
       onMouseDown={handleMouseDown}
+      onKeyDown={handleKeyDown}
+      onFocus={() => {
+        setIsFocused(true);
+      }}
+      onBlur={() => {
+        setIsFocused(false);
+      }}
       // Wider hit area via padding, visual line matches RESIZE_HANDLE.width
       style={{ width: RESIZE_HANDLE.width, padding: '0 4px', margin: '0 -4px' }}
     >
@@ -163,9 +213,9 @@ export const SidebarResizeHandle: FC = () => {
           className={cn(
             'absolute inset-y-0 left-1/2 -translate-x-1/2 bg-primary transition-opacity duration-100',
             // Use group-hover for reliable hit area detection (outer div is 8px wide)
-            isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            isDragging || isFocused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           )}
-          // Always use hoverWidth (3px) since line is only visible on hover/drag
+          // Always use hoverWidth (3px) since line is only visible on hover/drag/focus
           style={{ width: RESIZE_HANDLE.hoverWidth }}
         />
       )}

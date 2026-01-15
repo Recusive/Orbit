@@ -182,16 +182,17 @@ export const ConversationDropdownMenu: FC<ConversationDropdownMenuProps> = ({
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            'h-6 w-6 flex items-center justify-center rounded-md transition-all duration-150 hover:bg-muted/60 active:scale-90 focus:outline-none focus-visible:outline-none',
+            'h-6 w-6 flex items-center justify-center rounded-md transition-[background-color,opacity,transform] duration-150 hover:bg-muted/60 active:scale-90 focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
             visible || open ? 'opacity-100' : 'opacity-0',
             className
           )}
           onClick={(e) => {
             e.stopPropagation();
           }}
+          aria-label="Conversation options"
           title="More options"
         >
-          <MoreHorizontal className="h-4 w-4" />
+          <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">

@@ -121,7 +121,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleLeftSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-all duration-150 text-muted-foreground hover:text-foreground"
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground"
                 >
                   <SidebarToggleIcon expanded={false} />
                 </button>
@@ -151,7 +151,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleLeftSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-all duration-150 text-muted-foreground hover:text-foreground"
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground"
                 >
                   <SidebarToggleIcon expanded={true} />
                 </button>
@@ -171,7 +171,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {/* Search Bar - hidden when collapsed */}
       <div
         className={cn(
-          'shrink-0 mx-1.5 overflow-hidden transition-all duration-150 ease-in-out',
+          'shrink-0 mx-1.5 overflow-hidden transition-[height,opacity] duration-150 ease-in-out',
           isCollapsed ? 'py-0' : 'py-1'
         )}
         style={{
@@ -181,7 +181,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       >
         <button
           onClick={handleOpenQuickSearch}
-          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border border-border/50 w-full bg-muted/40 hover:bg-muted/60 hover:border-border/60 transition-all duration-200"
+          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border border-border/50 w-full bg-muted/40 hover:bg-muted/60 hover:border-border/60 transition-[background-color,border-color,color] duration-200"
           title="Search files (⌘P)"
         >
           {/* Fixed-width icon column - never moves */}
@@ -205,7 +205,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {/* Tab Navigation - hidden when collapsed */}
       <div
         className={cn(
-          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-all duration-150 ease-in-out',
+          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-[height,opacity] duration-150 ease-in-out',
           isCollapsed ? '' : 'border-b border-divider'
         )}
         style={{
@@ -233,7 +233,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {activeTab === 'conversations' ? (
         <div
           className={cn(
-            'flex flex-col border-b border-divider shrink-0 transition-all duration-150 ease-in-out',
+            'flex flex-col border-b border-divider shrink-0 transition-[gap,padding] duration-150 ease-in-out',
             isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
           )}
         >

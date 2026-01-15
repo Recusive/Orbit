@@ -122,7 +122,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
     <div>
       <div
         className={cn(
-          'bg-card overflow-hidden transition-all duration-200',
+          'bg-card overflow-hidden transition-[border-color,opacity,box-shadow] duration-200',
           isFailed
             ? 'border-2 border-dashed border-destructive/40 opacity-60'
             : 'border border-border/50',
@@ -243,7 +243,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1 bg-muted/50 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-success transition-all duration-300 rounded-full"
+                          className="h-full bg-success transition-[width] duration-300 rounded-full"
                           style={{ width: `${String((completedCount / totalCount) * 100)}%` }}
                         />
                       </div>

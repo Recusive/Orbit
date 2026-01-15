@@ -58,7 +58,7 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
       className={cn(
         'rounded-lg border border-border/40 overflow-hidden mb-3',
         'bg-gradient-to-b from-muted/20 to-muted/30',
-        'shadow-sm transition-all duration-200'
+        'shadow-sm transition-shadow duration-200'
       )}
     >
       {/* Header */}
@@ -67,7 +67,7 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
         className={cn(
           'w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-sm',
           'text-muted-foreground/70 hover:text-foreground',
-          'hover:bg-muted/20 transition-all duration-150',
+          'hover:bg-muted/20 transition-[background-color,color] duration-150',
           'focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/30'
         )}
         aria-expanded={isExpanded}

@@ -266,23 +266,26 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
           <button
             className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100"
             onClick={handleOpenQuickSearch}
+            aria-label="Quick open (search files)"
             title="Quick Open (Search Files)"
           >
-            <Search className="h-3 w-3" />
+            <Search className="h-3 w-3" aria-hidden="true" />
           </button>
           <button
             className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100"
             onClick={handleOpenFolder}
+            aria-label="Open folder"
             title="Open Folder"
           >
-            <FolderOpen className="h-3 w-3" />
+            <FolderOpen className="h-3 w-3" aria-hidden="true" />
           </button>
           <button
             className="h-5 w-5 flex items-center justify-center rounded hover:bg-accent opacity-70 hover:opacity-100"
             onClick={refresh}
+            aria-label="Refresh file tree"
             title="Refresh"
           >
-            <RefreshCw className="h-3 w-3" />
+            <RefreshCw className="h-3 w-3" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -469,8 +472,15 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
           <span
             className="text-xs text-destructive hover:underline px-1"
             onClick={handleRetry}
+            onKeyDown={(e): void => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleRetry(e as unknown as React.MouseEvent);
+              }
+            }}
             role="button"
             tabIndex={0}
+            aria-label={`Retry loading ${node.name}`}
           >
             retry
           </span>

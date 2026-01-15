@@ -230,10 +230,12 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
           </StatusItem>
         ) : null}
 
-        {/* Loading indicator */}
+        {/* Loading indicator - with aria-live for screen readers */}
         {isLoading ? (
           <StatusItem>
-            <span className="animate-pulse opacity-50">syncing...</span>
+            <span className="animate-pulse opacity-50" aria-live="polite">
+              syncing...
+            </span>
           </StatusItem>
         ) : null}
 

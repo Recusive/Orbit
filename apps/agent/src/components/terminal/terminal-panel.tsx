@@ -523,7 +523,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
                     <span title="Double-click to rename">{displayName}</span>
                   )}
                   <button
-                    className="ml-1 w-0 overflow-hidden opacity-0 group-hover:w-4 group-hover:opacity-100 transition-all duration-150 ease-out flex items-center justify-center hover:text-foreground"
+                    className="ml-1 w-0 overflow-hidden opacity-0 group-hover:w-4 group-hover:opacity-100 transition-[width,opacity,color] duration-150 ease-out flex items-center justify-center hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCloseSession(session.id);

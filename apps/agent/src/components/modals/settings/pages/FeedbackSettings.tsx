@@ -10,7 +10,7 @@ export const FeedbackSettings: FC = () => {
       <SectionHeader title="Provide Feedback">Help us improve Orbit</SectionHeader>
 
       <div className="space-y-3">
-        <div className="rounded-lg border border-border/40 p-4 hover:bg-muted/40 cursor-pointer transition-all duration-150">
+        <div className="rounded-lg border border-border/40 p-4 hover:bg-muted/40 cursor-pointer transition-[background-color] duration-150">
           <div className="flex items-center gap-3">
             <MessageSquare className="h-5 w-5 text-muted-foreground/70" />
             <div>
@@ -23,7 +23,7 @@ export const FeedbackSettings: FC = () => {
           </div>
         </div>
 
-        <div className="rounded-lg border border-border/40 p-4 hover:bg-muted/40 cursor-pointer transition-all duration-150">
+        <div className="rounded-lg border border-border/40 p-4 hover:bg-muted/40 cursor-pointer transition-[background-color] duration-150">
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-muted-foreground/70" />
             <div>

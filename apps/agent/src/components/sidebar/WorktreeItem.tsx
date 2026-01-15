@@ -78,7 +78,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
     >
       <button
         className={cn(
-          'flex items-center h-8 w-full rounded-lg overflow-hidden transition-all duration-200 hover:bg-muted/40',
+          'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-200 hover:bg-muted/40',
           active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
           isExpanded && 'bg-muted/40'
         )}
@@ -116,7 +116,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         {!collapsed && (
           <div
             className={cn(
-              'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium mr-7 shrink-0 transition-all duration-200',
+              'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium mr-7 shrink-0 transition-colors duration-200',
               worktree.isMain ? 'bg-primary/12 text-primary' : 'bg-muted text-muted-foreground'
             )}
           >
@@ -132,7 +132,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           <DropdownMenuTrigger asChild>
             <button
               className={cn(
-                'absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md transition-all duration-150 hover:bg-muted/60 active:scale-90',
+                'absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md transition-[background-color,opacity,transform] duration-150 hover:bg-muted/60 active:scale-90',
                 isHovered ? 'opacity-100' : 'opacity-0'
               )}
               onClick={(e) => {

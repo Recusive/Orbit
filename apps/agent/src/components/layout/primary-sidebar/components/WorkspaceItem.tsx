@@ -23,7 +23,7 @@ export const WorkspaceItem: FC<WorkspaceItemProps> = ({
 }) => {
   return (
     <button
-      className="flex items-center h-8 rounded-lg mx-1.5 overflow-hidden text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all duration-200"
+      className="flex items-center h-8 rounded-lg mx-1.5 overflow-hidden text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-[background-color,color] duration-200"
       onClick={onToggle}
     >
       {/* Fixed-width icon column */}

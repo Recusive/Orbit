@@ -69,7 +69,7 @@ const ContextChip: FC<ContextChipProps> = ({ item, onRemove }) => {
         onClick={() => {
           onRemove(item.id);
         }}
-        className="h-4 w-4 flex items-center justify-center rounded transition-all opacity-0 group-hover:opacity-100 hover:bg-accent shrink-0 -mr-0.5"
+        className="h-4 w-4 flex items-center justify-center rounded transition-opacity opacity-0 group-hover:opacity-100 hover:bg-accent shrink-0 -mr-0.5"
         title="Remove"
       >
         <X className="h-3 w-3" />

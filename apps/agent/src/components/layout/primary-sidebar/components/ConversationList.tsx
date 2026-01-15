@@ -123,7 +123,7 @@ export const ConversationList: FC<ConversationListProps> = ({
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-90 transition-all duration-150 text-muted-foreground hover:text-foreground shrink-0"
+              className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-90 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground shrink-0"
               onClick={onOpenCreateWorktree}
             >
               <Plus className="h-3 w-3" />

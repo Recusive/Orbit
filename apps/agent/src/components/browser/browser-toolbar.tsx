@@ -115,6 +115,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
       <button
         onClick={onBack}
         disabled={navigation.canGoBack === false}
+        aria-label="Go back"
         className={cn(
           'h-7 w-7 flex items-center justify-center rounded transition-colors',
           navigation.canGoBack !== false
@@ -123,12 +124,13 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
         )}
         title="Go back"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
       </button>
 
       <button
         onClick={onForward}
         disabled={navigation.canGoForward === false}
+        aria-label="Go forward"
         className={cn(
           'h-7 w-7 flex items-center justify-center rounded transition-colors',
           navigation.canGoForward !== false
@@ -137,24 +139,26 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
         )}
         title="Go forward"
       >
-        <ArrowRight className="h-4 w-4" />
+        <ArrowRight className="h-4 w-4" aria-hidden="true" />
       </button>
 
       {navigation.isLoading ? (
         <button
           onClick={onStop}
+          aria-label="Stop loading"
           className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors"
           title="Stop loading"
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" aria-hidden="true" />
         </button>
       ) : (
         <button
           onClick={onReload}
+          aria-label="Reload page"
           className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors"
           title="Reload"
         >
-          <RefreshCw className="h-4 w-4" />
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
         </button>
       )}
 
@@ -170,6 +174,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
           onBlur={handleUrlBlur}
           onKeyDown={handleUrlKeyDown}
           placeholder="Enter URL..."
+          aria-label="Browser URL"
           className="w-full h-7 px-3 rounded-md border border-border bg-muted/50 text-sm outline-none placeholder:text-muted-foreground focus:bg-background focus:ring-1 focus:ring-ring"
         />
       </div>
@@ -180,6 +185,8 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
       {/* Select Element button (React-grab) */}
       <button
         onClick={handleSelectElementClick}
+        aria-label={isSelectingElement ? 'Cancel element selection' : 'Select element'}
+        aria-pressed={isSelectingElement}
         className={cn(
           'h-7 w-7 flex items-center justify-center rounded transition-colors',
           isSelectingElement ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
@@ -187,9 +194,9 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
         title={isSelectingElement ? 'Cancel element selection' : 'Select element (React-grab)'}
       >
         {isSelectingElement ? (
-          <Square className="h-3.5 w-3.5" />
+          <Square className="h-3.5 w-3.5" aria-hidden="true" />
         ) : (
-          <SquareDashedMousePointer className="h-3.5 w-3.5" />
+          <SquareDashedMousePointer className="h-3.5 w-3.5" aria-hidden="true" />
         )}
       </button>
 
@@ -197,10 +204,11 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
       {onOpenDevTools ? (
         <button
           onClick={onOpenDevTools}
+          aria-label="Open DevTools"
           className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors"
           title="Open DevTools"
         >
-          <ChevronsLeftRight className="h-4 w-4" />
+          <ChevronsLeftRight className="h-4 w-4" aria-hidden="true" />
         </button>
       ) : null}
 
@@ -208,10 +216,11 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
       {onOpenExternal ? (
         <button
           onClick={onOpenExternal}
+          aria-label="Open in external browser"
           className="h-7 w-7 flex items-center justify-center rounded hover:bg-accent transition-colors"
           title="Open in external browser"
         >
-          <ExternalLink className="h-4 w-4" />
+          <ExternalLink className="h-4 w-4" aria-hidden="true" />
         </button>
       ) : null}
 
@@ -219,10 +228,11 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
       {onClose ? (
         <button
           onClick={onClose}
+          aria-label="Close browser"
           className="h-7 w-7 flex items-center justify-center rounded hover:bg-destructive/90 hover:text-destructive-foreground transition-colors"
           title="Close browser"
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" aria-hidden="true" />
         </button>
       ) : null}
     </div>

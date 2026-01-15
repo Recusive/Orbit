@@ -5,6 +5,7 @@ import type { ChatContentProps } from './types';
 import type { FC } from 'react';
 
 import { ChatInput, ChatMessages } from '@/components/chat';
+import { StatusAnnouncer } from '@/components/shared';
 
 /**
  * Chat content section handling both empty and messages states
@@ -66,6 +67,13 @@ export const ChatContent: FC<ChatContentProps> = ({
       className={`flex-1 flex flex-col min-h-0${isTransitioning ? ' no-transitions' : ''}`}
       style={isTransitioning ? { visibility: 'hidden' } : undefined}
     >
+      {/* Screen reader status announcer for agent state changes */}
+      <StatusAnnouncer
+        isLoading={isAgentRunning}
+        loadingMessage="Agent is processing your request..."
+        completeMessage={messages.length > 0 ? 'Agent response complete' : 'Ready for input'}
+      />
+
       {isEmptyState ? (
         /* Empty state: Input positioned above center */
         <div

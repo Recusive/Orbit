@@ -142,7 +142,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         className={cn(
           'h-7 px-2.5 flex items-center gap-1.5 rounded-lg',
           'bg-transparent text-muted-foreground',
-          'transition-all duration-150',
+          'transition-[background-color,color,transform] duration-150',
           'hover:bg-muted/50 hover:text-foreground',
           'active:scale-[0.98]',
           'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
@@ -191,7 +191,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                       handleSelectModel(model.id);
                     }}
                     className={cn(
-                      'w-full flex items-center justify-between px-2 py-1.5 text-xs transition-all duration-150 mt-0.5 first:mt-0 group',
+                      'w-full flex items-center justify-between px-2 py-1.5 text-xs transition-[background-color,transform] duration-150 mt-0.5 first:mt-0 group',
                       selectedModel === model.id
                         ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
                         : 'rounded-md hover:bg-muted/80 active:scale-[0.98]'

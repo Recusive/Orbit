@@ -39,7 +39,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       tabIndex={active ? 0 : -1}
       data-tauri-drag-region={false}
       className={cn(
-        'relative flex items-center justify-center h-7 px-3 transition-all duration-200',
+        'relative flex items-center justify-center h-7 px-3 transition-colors duration-200',
         active ? 'text-foreground' : 'text-muted-foreground/80 hover:text-foreground'
       )}
       onClick={onClick}
@@ -152,7 +152,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
           {/* Search button - VS Code style command palette */}
           <button
             data-tauri-drag-region={false}
-            className="flex items-center gap-2 h-6 px-2 rounded-md text-foreground hover:text-foreground overflow-hidden bg-muted hover:bg-muted/80 transition-all duration-200"
+            className="flex items-center gap-2 h-6 px-2 rounded-md text-foreground hover:text-foreground overflow-hidden bg-muted hover:bg-muted/80 transition-colors duration-200"
             title="Search files (⌘P)"
             onClick={handleOpenSearch}
           >
@@ -173,7 +173,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                 <button
                   data-tauri-drag-region={false}
                   onClick={toggleTheme}
-                  className="h-7 w-7 flex items-center justify-center rounded-md opacity-60 hover:opacity-100 hover:bg-muted/60 active:scale-95 transition-all duration-150"
+                  className="h-7 w-7 flex items-center justify-center rounded-md opacity-60 hover:opacity-100 hover:bg-muted/60 active:scale-95 transition-[background-color,opacity,transform] duration-150"
                 >
                   {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </button>
@@ -188,7 +188,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                   data-tauri-drag-region={false}
                   onClick={toggleReviewPanel}
                   className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-all duration-150',
+                    'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150',
                     reviewPanelOpen
                       ? 'text-foreground'
                       : 'text-muted-foreground/80 hover:text-foreground'
@@ -235,7 +235,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                   data-tauri-drag-region={false}
                   onClick={toggleRightSidebar}
                   className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-all duration-150',
+                    'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150',
                     rightSidebarOpen
                       ? 'text-foreground'
                       : 'text-muted-foreground/80 hover:text-foreground'

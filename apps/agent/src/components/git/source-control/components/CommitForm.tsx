@@ -39,7 +39,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({ value, onChange, onCommi
           bg-muted/30 border border-border/50
           placeholder:text-muted-foreground/50
           focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-border/70 focus:bg-muted/40
-          transition-all duration-200 resize-none
+          transition-[background-color,border-color,box-shadow] duration-200 resize-none
         "
       />
       {error ? <p className="text-xs text-destructive mt-1">{error}</p> : null}

@@ -111,7 +111,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
     >
       <button
         className={cn(
-          'flex items-center h-7 w-full rounded-lg pl-[7px] pr-7 overflow-hidden hover:bg-muted/40 transition-all duration-200',
+          'flex items-center h-7 w-full rounded-lg pl-[7px] pr-7 overflow-hidden hover:bg-muted/40 transition-[background-color,color] duration-200',
           active ? 'bg-muted/50 text-foreground' : 'text-muted-foreground hover:text-foreground'
         )}
         title={conversation.title}
@@ -124,7 +124,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
         {/* Text - truncate with ellipsis by default, gradient fade on hover */}
         <span
           className={cn(
-            'text-base overflow-hidden flex-1 text-left transition-all duration-150',
+            'text-base overflow-hidden flex-1 text-left transition-[width,opacity] duration-150',
             collapsed ? 'w-0 opacity-0 whitespace-nowrap' : '',
             // When not hovered: truncate with ellipsis
             // When hovered: allow full text with gradient mask

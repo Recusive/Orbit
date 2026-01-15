@@ -129,7 +129,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         <button
           onClick={handleCloseClick}
           className={cn(
-            'w-4 h-4 flex items-center justify-center rounded transition-all hover:bg-muted',
+            'w-4 h-4 flex items-center justify-center rounded transition-[background-color,opacity] hover:bg-muted',
             isActive ? 'opacity-70 hover:opacity-100' : 'opacity-0 group-hover:opacity-70'
           )}
           aria-label={`Close ${fileName}`}

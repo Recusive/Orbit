@@ -31,9 +31,10 @@ export const ThinkingModeButton: FC<ThinkingModeButtonProps> = ({
         <HoverCardTrigger asChild>
           <button
             onClick={cycleThinkingMode}
+            aria-label={`Extended thinking: ${thinkingInfo.level}. Click to change.`}
             className={cn(
               'h-7 flex items-center justify-center gap-1 px-1.5 rounded-lg',
-              'transition-all duration-150',
+              'transition-[background-color,color,transform] duration-150',
               'hover:bg-muted/50 hover:scale-[1.02]',
               'active:scale-95',
               'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
@@ -55,7 +56,7 @@ export const ThinkingModeButton: FC<ThinkingModeButtonProps> = ({
                   <div
                     key={dotIndex}
                     className={cn(
-                      'w-[4px] h-[4px] rounded-full transition-all duration-200',
+                      'w-[4px] h-[4px] rounded-full transition-[background-color,box-shadow] duration-200',
                       isActive
                         ? 'bg-black dark:bg-white shadow-[0_0_6px_rgba(0,0,0,0.4)] dark:shadow-[0_0_6px_rgba(255,255,255,0.8)]'
                         : 'bg-muted-foreground/30'

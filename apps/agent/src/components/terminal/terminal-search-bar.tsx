@@ -105,6 +105,7 @@ export const TerminalSearchBar: FC<TerminalSearchBarProps> = ({
         <input
           ref={inputRef}
           type="text"
+          aria-label="Find in terminal"
           className={`w-full h-7 px-2 text-xs bg-background border rounded outline-none focus:ring-1 focus:ring-ring ${
             hasResults === false ? 'border-destructive' : 'border-border'
           }`}
@@ -127,17 +128,19 @@ export const TerminalSearchBar: FC<TerminalSearchBarProps> = ({
         className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
         onClick={handleFindPrevious}
         disabled={!query}
+        aria-label="Previous match"
         title="Previous match (Shift+Enter)"
       >
-        <ChevronUp className="h-4 w-4" />
+        <ChevronUp className="h-4 w-4" aria-hidden="true" />
       </button>
       <button
         className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
         onClick={handleFindNext}
         disabled={!query}
+        aria-label="Next match"
         title="Next match (Enter)"
       >
-        <ChevronDown className="h-4 w-4" />
+        <ChevronDown className="h-4 w-4" aria-hidden="true" />
       </button>
 
       {/* Separator */}
@@ -149,27 +152,33 @@ export const TerminalSearchBar: FC<TerminalSearchBarProps> = ({
         onClick={() => {
           setCaseSensitive(!caseSensitive);
         }}
+        aria-label={caseSensitive ? 'Case sensitive enabled' : 'Enable case sensitive'}
+        aria-pressed={caseSensitive}
         title="Match case"
       >
-        <CaseSensitive className="h-3.5 w-3.5" />
+        <CaseSensitive className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
       <button
         className={toggleClass(wholeWord)}
         onClick={() => {
           setWholeWord(!wholeWord);
         }}
+        aria-label={wholeWord ? 'Whole word enabled' : 'Enable whole word'}
+        aria-pressed={wholeWord}
         title="Match whole word"
       >
-        <WholeWord className="h-3.5 w-3.5" />
+        <WholeWord className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
       <button
         className={toggleClass(regex)}
         onClick={() => {
           setRegex(!regex);
         }}
+        aria-label={regex ? 'Regular expression enabled' : 'Enable regular expression'}
+        aria-pressed={regex}
         title="Use regular expression"
       >
-        <Regex className="h-3.5 w-3.5" />
+        <Regex className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
 
       {/* Separator */}
@@ -179,9 +188,10 @@ export const TerminalSearchBar: FC<TerminalSearchBarProps> = ({
       <button
         className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
         onClick={handleClose}
+        aria-label="Close search"
         title="Close (Escape)"
       >
-        <X className="h-4 w-4" />
+        <X className="h-4 w-4" aria-hidden="true" />
       </button>
     </div>
   );

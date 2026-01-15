@@ -4,14 +4,24 @@
  * NOTE: Handle dimensions come from @/lib/utils/constants.
  * To change handle width or hover width, update RESIZE_HANDLE in constants.ts.
  */
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
-import type { FC } from 'react';
+import type { FC, KeyboardEvent } from 'react';
 
 import { RESIZE_HANDLE } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import { useUIStore } from '@/stores/ui/ui-store';
+
+/** Keyboard resize step in pixels */
+const KEYBOARD_STEP = 10;
+const KEYBOARD_STEP_LARGE = 50;
+
+/** Panel size constraints */
+const PANEL_CONSTRAINTS = {
+  review: { min: 200, max: 800 },
+  bottom: { min: 100, max: 500 },
+} as const;
 
 interface ResizeHandleProps {
   readonly direction: 'horizontal' | 'vertical';
@@ -31,6 +41,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
     );
   const startValueRef = useRef(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const handleMouseDown = (e: React.MouseEvent): void => {
     e.preventDefault();
@@ -60,17 +71,85 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
     document.body.style.userSelect = 'none';
   };
 
+  // Keyboard resize handler for accessibility
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLDivElement>): void => {
+      const step = e.shiftKey ? KEYBOARD_STEP_LARGE : KEYBOARD_STEP;
+      const constraints = PANEL_CONSTRAINTS[target];
+      const currentValue = target === 'review' ? reviewPanelWidth : bottomPanelHeight;
+      const setValue = target === 'review' ? setReviewPanelWidth : setBottomPanelHeight;
+
+      let newValue = currentValue;
+
+      if (direction === 'vertical') {
+        // Vertical handle: Left/Right arrows resize
+        if (e.key === 'ArrowLeft') {
+          newValue = Math.max(constraints.min, currentValue - step);
+        } else if (e.key === 'ArrowRight') {
+          newValue = Math.min(constraints.max, currentValue + step);
+        } else if (e.key === 'Home') {
+          newValue = constraints.min;
+        } else if (e.key === 'End') {
+          newValue = constraints.max;
+        } else {
+          return; // Don't prevent default for other keys
+        }
+      } else {
+        // Horizontal handle: Up/Down arrows resize
+        if (e.key === 'ArrowUp') {
+          newValue = Math.min(constraints.max, currentValue + step);
+        } else if (e.key === 'ArrowDown') {
+          newValue = Math.max(constraints.min, currentValue - step);
+        } else if (e.key === 'Home') {
+          newValue = constraints.min;
+        } else if (e.key === 'End') {
+          newValue = constraints.max;
+        } else {
+          return; // Don't prevent default for other keys
+        }
+      }
+
+      e.preventDefault();
+      setValue(newValue);
+    },
+    [
+      direction,
+      target,
+      reviewPanelWidth,
+      bottomPanelHeight,
+      setReviewPanelWidth,
+      setBottomPanelHeight,
+    ]
+  );
+
   const isVertical = direction === 'vertical';
-  const handleSize = isHovered ? RESIZE_HANDLE.hoverWidth : RESIZE_HANDLE.width;
+  const handleSize = isHovered || isFocused ? RESIZE_HANDLE.hoverWidth : RESIZE_HANDLE.width;
+  const currentValue = target === 'review' ? reviewPanelWidth : bottomPanelHeight;
+  const constraints = PANEL_CONSTRAINTS[target];
 
   return (
     <div
+      role="separator"
+      aria-orientation={isVertical ? 'vertical' : 'horizontal'}
+      aria-valuenow={currentValue}
+      aria-valuemin={constraints.min}
+      aria-valuemax={constraints.max}
+      aria-label={`Resize ${target} panel. Use ${isVertical ? 'left/right' : 'up/down'} arrow keys to adjust.`}
+      tabIndex={0}
       className={cn(
         'group relative shrink-0 flex items-center justify-center',
+        'focus:outline-none focus-visible:z-10',
         isVertical ? 'h-full cursor-col-resize' : 'w-full cursor-row-resize'
       )}
       style={isVertical ? { width: RESIZE_HANDLE.width } : { height: 4 }}
       onMouseDown={handleMouseDown}
+      onKeyDown={handleKeyDown}
+      onFocus={() => {
+        setIsFocused(true);
+      }}
+      onBlur={() => {
+        setIsFocused(false);
+      }}
       onMouseEnter={() => {
         setIsHovered(true);
       }}
@@ -80,7 +159,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
     >
       {/* Persistent separator line */}
       <div
-        className="bg-border transition-all duration-100"
+        className="bg-border transition-colors duration-100"
         style={
           isVertical
             ? { width: RESIZE_HANDLE.width, height: '100%' }
@@ -89,7 +168,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
       />
       {/* Hover indicator line */}
       <div
-        className="absolute bg-primary transition-all duration-100"
+        className="absolute bg-primary transition-opacity duration-100"
         style={{
           opacity: isHovered ? 1 : 0,
           ...(isVertical

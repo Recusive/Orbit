@@ -132,7 +132,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           <button
             onClick={() => void handleFetch()}
             disabled={isFetching}
-            className="p-1.5 rounded-md hover:bg-muted/60 text-muted-foreground/70 hover:text-foreground active:scale-95 transition-all duration-150"
+            className="p-1.5 rounded-md hover:bg-muted/60 text-muted-foreground/70 hover:text-foreground active:scale-95 transition-[background-color,color,transform] duration-150"
             title="Fetch from remote"
           >
             <CloudDownload className={cn('h-3.5 w-3.5', isFetching && 'animate-pulse')} />
@@ -140,7 +140,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           <button
             onClick={() => void refresh()}
             disabled={isLoading}
-            className="p-1.5 rounded-md hover:bg-muted/60 text-muted-foreground/70 hover:text-foreground active:scale-95 transition-all duration-150"
+            className="p-1.5 rounded-md hover:bg-muted/60 text-muted-foreground/70 hover:text-foreground active:scale-95 transition-[background-color,color,transform] duration-150"
             title="Refresh"
           >
             <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />

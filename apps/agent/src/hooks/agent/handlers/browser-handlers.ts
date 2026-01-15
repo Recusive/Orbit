@@ -126,8 +126,14 @@ export async function handleBrowserNavigate(
     await browserNavigate(message.url);
     useBrowserLifecycleStore.getState().recordActivity();
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Navigation failed';
-    logger.warn('Browser navigation failed', { error: errorMessage });
+    // Tauri errors can be strings or Error objects - capture the full error
+    const errorMessage =
+      err instanceof Error
+        ? err.message
+        : typeof err === 'string'
+          ? err
+          : JSON.stringify(err) || 'Navigation failed';
+    logger.warn('Browser navigation failed', { error: err, message: errorMessage });
     // Surface error to UI so user gets feedback
     useBrowserStore.getState().setError(errorMessage);
   }
