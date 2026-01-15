@@ -40,25 +40,43 @@
    Handles
    ============================================================================ */
 
+/* Handle base styling - centered on node border like workflow */
 .agent-card-handle {
-  width: 12px !important;
-  height: 12px !important;
-  background: var(--muted) !important;
+  position: absolute !important;
+  width: 10px !important;
+  height: 10px !important;
+  background: var(--muted-foreground) !important;
   border: 2px solid var(--border) !important;
   border-radius: 50% !important;
+  top: 50% !important;
 }
 
 .agent-card-handle:hover {
   background: var(--primary) !important;
   border-color: var(--primary) !important;
+  transform: translate(-50%, -50%) scale(1.2) !important;
 }
 
+/* Input handle - left side, centered on border */
 .agent-card-handle--input {
-  left: -6px !important;
+  left: 0 !important;
+  right: auto !important;
+  transform: translate(-50%, -50%) !important;
 }
 
+.agent-card-handle--input:hover {
+  transform: translate(-50%, -50%) scale(1.2) !important;
+}
+
+/* Output handle - right side, centered on border */
 .agent-card-handle--output {
-  right: -6px !important;
+  right: 0 !important;
+  left: auto !important;
+  transform: translate(50%, -50%) !important;
+}
+
+.agent-card-handle--output:hover {
+  transform: translate(50%, -50%) scale(1.2) !important;
 }
 
 /* ============================================================================

@@ -396,6 +396,66 @@ logger.error('Error occurred', new Error('fail')); // Always shown with stack
 - Ternary for conditional rendering
 - Props interfaces marked `readonly`
 
+## Agent Skills
+
+This project includes AI coding assistant skills adapted from [Vercel's agent-skills](https://github.com/vercel-labs/agent-skills). These provide performance optimization and design guidelines that should be applied when writing or reviewing code.
+
+### Available Skills
+
+| Skill                     | File                                      | When to Apply                                                |
+| ------------------------- | ----------------------------------------- | ------------------------------------------------------------ |
+| **React Best Practices**  | `.claude/skills/react-best-practices.md`  | Writing React components, data fetching, bundle optimization |
+| **Web Design Guidelines** | `.claude/skills/web-design-guidelines.md` | UI review, accessibility checks, form implementation         |
+
+### Key Rules by Priority
+
+**CRITICAL Impact:**
+
+- `async-parallel` - Use `Promise.all()` for independent async operations
+- `bundle-dynamic-imports` - Lazy-load heavy components (CodeMirror, Shiki, etc.)
+- `bundle-barrel-imports` - Import from specific files, not barrel `index.ts`
+
+**HIGH Impact:**
+
+- `server-cache-react` - Use React.cache() for per-request deduplication
+- `rerender-defer-reads` - Don't subscribe to state only used in callbacks
+- Accessibility: All icon buttons need `aria-label`
+
+**MEDIUM Impact:**
+
+- `rerender-functional-setstate` - Use functional setState for stable callbacks
+- `js-index-maps` - Build Map for O(1) lookups in repeated operations
+- Forms: Use correct input `type`, `autocomplete`, and `inputMode`
+
+### Quick Reference
+
+```typescript
+// ✅ Parallel async operations
+const [files, status] = await Promise.all([
+  invoke('list_directory', { path }),
+  invoke('get_git_status', { path })
+])
+
+// ✅ Dynamic import for heavy components
+const CodeMirrorEditor = React.lazy(() => import('./CodeMirrorEditor'))
+
+// ✅ Stable callback with functional setState
+const increment = useCallback(() => setCount(c => c + 1), [])
+
+// ✅ Read state in handler without subscribing
+const handleSave = () => {
+  const { activeFile } = useFileStore.getState()
+  // ...
+}
+
+// ✅ Accessible icon button
+<button aria-label="Close dialog" onClick={onClose}>
+  <X className="h-4 w-4" />
+</button>
+```
+
+See `.claude/skills/` for the complete guidelines with all rules and examples.
+
 ## Module Organization Patterns
 
 ### Frontend (TypeScript) - Barrel Pattern
@@ -978,6 +1038,10 @@ For detailed documentation on specific features, see the `docs/` folder:
 
 ### January 2026
 
+- **Added Agent Skills** - Integrated Vercel's agent-skills for React best practices and web design guidelines
+  - `.claude/skills/react-best-practices.md` - 45 rules across 8 categories from Vercel Engineering
+  - `.claude/skills/web-design-guidelines.md` - 100+ accessibility, UX, and performance rules
+  - Source: [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills)
 - **Embedded browser panel** - True embedded WebKit browser via Tauri's `unstable` feature (multiwebview)
   - See `docs/architecture/EMBEDDED_BROWSER.md` for implementation details and known issues
 - **Migrated from pnpm to Bun** - All package management now uses Bun for faster installs and unified tooling

@@ -126,7 +126,6 @@ export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JS
   const rightSidebarCollapsed = useMissionsUIStore((s) => s.rightSidebarCollapsed);
   const rightSidebarVisualWidth = useMissionsUIStore(selectRightSidebarVisualWidth);
   const showMinimap = useMissionsUIStore((s) => s.showMinimap);
-  const showGrid = useMissionsUIStore((s) => s.showGrid);
 
   // Callbacks for nodes
   const nodeCallbacks = useMemo(
@@ -283,9 +282,8 @@ export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JS
           proOptions={{ hideAttribution: true }}
           fitView
         >
-          {showGrid ? (
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--border)" />
-          ) : null}
+          {/* Background - hidden like workflow mode */}
+          <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="transparent" />
           <Controls
             showZoom
             showFitView
