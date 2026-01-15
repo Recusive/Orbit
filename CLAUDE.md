@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code when working with the Orbit codebase.
 
+> **Extended Documentation:** For detailed examples, historical context, and verbose explanations, see [`CLAUDE-CONTINUOUS.md`](./CLAUDE-CONTINUOUS.md).
+
 ## Project Overview
 
 Orbit is a modern AI-powered code editor built with **Tauri 2** (Rust backend) and **React 19** (TypeScript frontend). It's a monorepo containing three frontend apps (Orbit Agent, Orbit Canvas, Orbit Editor) that share a common Rust backend.
@@ -28,13 +30,7 @@ Orbit is a modern AI-powered code editor built with **Tauri 2** (Rust backend) a
 
 ### Package Manager Policy
 
-> **Migration Note (January 2026):** This project migrated from **pnpm** to **Bun** for faster installs,
-> unified tooling (Bun handles both package management and the agent-bridge runtime), and simpler
-> workspace configuration. The `pnpm-workspace.yaml` file was removed - workspaces are now defined
-> directly in `package.json`. If you encounter old documentation or scripts referencing pnpm,
-> replace with the Bun equivalents below.
-
-**IMPORTANT:** This project uses **Bun** as the primary package manager/runtime everywhere.
+**IMPORTANT:** This project uses **Bun** exclusively. Never use `npm` or `pnpm`.
 
 | Context         | Use     | Why                                                          |
 | --------------- | ------- | ------------------------------------------------------------ |
@@ -209,15 +205,9 @@ cd agent-bridge
 bun run build:dev    # Compiles to target/debug/agent-bridge
 ```
 
-Then restart the Tauri app (`Cmd+C` → `bunx tauri dev`).
+Then restart Tauri (`Cmd+C` → `bunx tauri dev`).
 
-**Why manual rebuild?**
-
-- Tauri watches Rust code, not the agent-bridge TypeScript
-- The sidecar is a standalone binary (58MB) with embedded Bun runtime
-- Located at `target/debug/agent-bridge` in dev mode
-
-**Two build outputs:**
+**Build outputs:**
 
 | Script              | Output                      | Purpose                         |
 | ------------------- | --------------------------- | ------------------------------- |
@@ -402,10 +392,11 @@ This project includes AI coding assistant skills adapted from [Vercel's agent-sk
 
 ### Available Skills
 
-| Skill                     | File                                      | When to Apply                                                |
-| ------------------------- | ----------------------------------------- | ------------------------------------------------------------ |
-| **React Best Practices**  | `.claude/skills/react-best-practices.md`  | Writing React components, data fetching, bundle optimization |
-| **Web Design Guidelines** | `.claude/skills/web-design-guidelines.md` | UI review, accessibility checks, form implementation         |
+| Skill                     | File                                             | When to Apply                                                  |
+| ------------------------- | ------------------------------------------------ | -------------------------------------------------------------- |
+| **React Best Practices**  | `.claude/skills/react-best-practices.md`         | Writing React components, data fetching, bundle optimization   |
+| **Web Design Guidelines** | `.claude/skills/web-design-guidelines.md`        | UI review, accessibility checks, form implementation           |
+| **Web Animation**         | `.claude/skills/web-animation-best-practices.md` | CSS animations, Framer Motion, transitions, micro-interactions |
 
 ### Key Rules by Priority
 
@@ -414,18 +405,24 @@ This project includes AI coding assistant skills adapted from [Vercel's agent-sk
 - `async-parallel` - Use `Promise.all()` for independent async operations
 - `bundle-dynamic-imports` - Lazy-load heavy components (CodeMirror, Shiki, etc.)
 - `bundle-barrel-imports` - Import from specific files, not barrel `index.ts`
+- `anim-transform-opacity` - Only animate `transform` and `opacity` properties
+- `anim-reduced-motion` - Always respect `prefers-reduced-motion` media query
 
 **HIGH Impact:**
 
 - `server-cache-react` - Use React.cache() for per-request deduplication
 - `rerender-defer-reads` - Don't subscribe to state only used in callbacks
 - Accessibility: All icon buttons need `aria-label`
+- `anim-easing-custom` - Use custom cubic-bezier curves, not default `ease`/`linear`
+- `anim-duration-300ms` - Keep animations under 300ms for perceived performance
 
 **MEDIUM Impact:**
 
 - `rerender-functional-setstate` - Use functional setState for stable callbacks
 - `js-index-maps` - Build Map for O(1) lookups in repeated operations
 - Forms: Use correct input `type`, `autocomplete`, and `inputMode`
+- `anim-transform-origin` - Animate from contextually meaningful locations
+- `anim-interruptible` - Ensure animations can be smoothly interrupted
 
 ### Quick Reference
 
@@ -452,6 +449,21 @@ const handleSave = () => {
 <button aria-label="Close dialog" onClick={onClose}>
   <X className="h-4 w-4" />
 </button>
+
+// ✅ Animation: only transform/opacity, custom easing, reduced motion
+.button {
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .button { transition: none; }
+}
+
+// ✅ Framer Motion with reduced motion support
+const shouldReduceMotion = useReducedMotion();
+<motion.div
+  animate={{ scale: 1 }}
+  transition={{ duration: shouldReduceMotion ? 0.01 : 0.2 }}
+/>
 ```
 
 See `.claude/skills/` for the complete guidelines with all rules and examples.
@@ -718,41 +730,6 @@ agent-bridge/src/__tests__/
    - Create E2E tests if the module doesn't have them
    - Tests must cover the full integration path
 
-#### Real Integration Test Example
-
-```typescript
-// ❌ BAD: Mock test that proves nothing
-it('should analyze intent', () => {
-  const mockAnalyzer = { analyze: () => ({ useFastPath: true }) };
-  expect(mockAnalyzer.analyze('test').useFastPath).toBe(true);
-});
-
-// ✅ GOOD: Real integration test
-it('should route simple requests to fast path via real session', async () => {
-  // Create REAL session with REAL Claude SDK
-  const manager = new CanvasSessionManager();
-  await manager.createSession('test-session', {
-    model: 'claude-sonnet-4-20250514',
-  });
-
-  // Verify REAL IntentAnalyzer is initialized
-  const intentAnalyzer = manager['intentAnalyzer'];
-  expect(intentAnalyzer).toBeDefined();
-
-  // Test REAL analysis with REAL routing logic
-  const state: CanvasState = { nodes: [], edges: [] };
-  const snapshot = manager['convertToSnapshot'](state);
-  const analysis = intentAnalyzer.analyze('Create a button', snapshot);
-
-  // Verify REAL routing decision
-  expect(analysis.useFastPath).toBe(true);
-  expect(analysis.fastPathAgent).toBe('component');
-
-  // Cleanup REAL session
-  await manager.deleteSession('test-session');
-});
-```
-
 #### Test Checklist Before PR
 
 - [ ] Added tests for ALL new functionality
@@ -790,36 +767,6 @@ Tests use `describe.skipIf(process.env.GITHUB_ACTIONS === 'true')` to:
 2. Run `claude --version` to verify CLI is working
 3. The CLI stores OAuth tokens in macOS Keychain automatically
 
-#### Why This Matters
-
-```text
-❌ WRONG: "Tests pass" with mocked data
-   → Deploys to production
-   → Real system fails because mock didn't match reality
-   → Hours of debugging
-
-✅ RIGHT: Tests pass with real integration
-   → Actual API calls verified working
-   → Full data flow tested
-   → Confidence that production will work
-```
-
-**Example - Adding orchestrator to session manager:**
-
-```text
-❌ WRONG:
-   - Mocked IntentAnalyzer to return fake results
-   - Mocked Orchestrator to skip real execution
-   - Tests pass but nothing actually works
-
-✅ RIGHT:
-   - Created REAL sessions with REAL Claude SDK
-   - Tested REAL IntentAnalyzer routing decisions
-   - Verified REAL orchestrator lifecycle (create, cleanup)
-   - Tested REAL snapshot conversion with actual canvas state
-   - All 44 tests pass with REAL integration
-```
-
 ### Tauri WebView Blur/Rendering Issues
 
 **IMPORTANT:** Tauri's WebView (WKWebView on macOS) has different rendering behavior than Chrome/Electron. Certain CSS properties cause blurry/fuzzy text and elements during interactions (hover, click, transitions).
@@ -836,50 +783,6 @@ The following CSS properties trigger GPU compositing issues that result in momen
 | `animation` with `scale()`                     | Scale transforms cause blur during animation       | Remove scale animations or use opacity-only               |
 | `opacity` transitions combined with transforms | Compound effect causes severe blur                 | Avoid combining opacity transitions with other transforms |
 
-#### Example: Fixing Blurry Nodes in ReactFlow
-
-**Problem:** Workflow nodes in Canvas app appeared blurry in Tauri but crisp in browser.
-
-**Root Cause:** The `MarkdownCardNode.css` had these problematic styles:
-
-```css
-/* BAD - causes blur in Tauri WebView */
-.card-action-toolbar {
-  background: color-mix(in oklch, var(--card) 95%, transparent);
-  backdrop-filter: blur(12px);
-}
-
-.card-action-toolbar__button:hover {
-  background: color-mix(in oklch, var(--muted) 60%, transparent);
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.markdown-card-node {
-  transition:
-    box-shadow 0.15s ease,
-    border-color 0.15s ease;
-}
-```
-
-**Solution:** Replace with solid values and remove transitions:
-
-```css
-/* GOOD - crisp rendering in Tauri WebView */
-.card-action-toolbar {
-  background: var(--card);
-  /* No backdrop-filter */
-}
-
-.card-action-toolbar__button:hover {
-  background: var(--muted);
-  /* No transition */
-}
-
-.markdown-card-node {
-  /* No transition */
-}
-```
-
 #### Quick Checklist for Tauri-Compatible CSS
 
 - [ ] No `backdrop-filter: blur()` on interactive elements
@@ -889,15 +792,7 @@ The following CSS properties trigger GPU compositing issues that result in momen
 - [ ] Avoid combining `opacity` transitions with other transforms
 - [ ] Test in Tauri app, not just browser (blur won't appear in browser)
 
-**Note:** `contain: layout style paint` and `will-change: transform` do NOT fix the blur issue. The only solution for elements inside ReactFlow's viewport is to completely remove transitions and animations.
-
-#### Debugging Blur Issues
-
-1. **Identify the blurry element** - Check if it's specific to certain components
-2. **Compare with working components** - Find similar components that render crisp
-3. **Check CSS differences** - Look for `backdrop-filter`, `color-mix()`, `transition`, `animation`
-4. **Remove one property at a time** - Isolate which property causes the blur
-5. **Replace with solid alternatives** - Use CSS variables and remove transitions
+**Note:** `will-change: transform` does NOT fix blur. Remove transitions/animations entirely for ReactFlow viewport elements.
 
 ### Known Security Vulnerabilities
 
@@ -907,26 +802,7 @@ The following CSS properties trigger GPU compositing issues that result in momen
 | --------------------------- | -------- | ------------- | ------------------- | ----------------------------------------------- |
 | `@modelcontextprotocol/sdk` | High     | CVE-2026-0621 | ⏳ Waiting upstream | ReDoS in UriTemplate class. No patch available. |
 
-#### MCP SDK ReDoS (CVE-2026-0621)
-
-**Advisory:** [GHSA-8r9q-7v3j-jr4g](https://github.com/advisories/GHSA-8r9q-7v3j-jr4g)
-
-**Issue:** The `@modelcontextprotocol/sdk` (versions ≤1.25.1) has a Regular Expression Denial of Service vulnerability in the UriTemplate class. Attackers can craft malicious URIs that trigger catastrophic regex backtracking, causing CPU exhaustion.
-
-**Risk Assessment for Orbit:** **Low practical risk** because:
-
-1. The agent-bridge runs as a local sidecar, not exposed to the internet
-2. URIs come from our own Claude SDK calls, not untrusted user input
-3. An attacker would need local access to craft malicious URIs
-
-**Mitigation:** We've added an override for `qs>=6.14.1` to fix a related DoS vulnerability in the transitive dependency chain. The MCP SDK issue requires an upstream fix from Anthropic - update `@modelcontextprotocol/sdk` when a patched version is released.
-
-**To check for updates:**
-
-```bash
-bun pm audit                  # Check current vulnerabilities (use npm audit if needed)
-bun pm view @modelcontextprotocol/sdk version  # Check latest version
-```
+CVE-2026-0621: ReDoS in UriTemplate. Low practical risk (local sidecar only). Update `@modelcontextprotocol/sdk` when patched.
 
 ## CSS Architecture
 
