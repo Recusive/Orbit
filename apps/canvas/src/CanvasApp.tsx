@@ -46,6 +46,8 @@ import {
   useTauriCanvas,
   usePerception,
 } from './hooks/index';
+import { MissionsCanvas } from './missions/components';
+import { useMissionsUIStore } from './missions/stores';
 // Canvas colors now come from CSS variables in globals.css
 import { PageNode, EsmSandpackNode } from './sandpack/index';
 import { selectActiveWorkflow, useWorkflowStore } from './stores/workflowStore';
@@ -124,13 +126,19 @@ function CanvasAppInner(): React.JSX.Element {
   const activeWorkflow = useWorkflowStore(selectActiveWorkflow);
   const { loadWorkflow, createWorkflow, deleteWorkflow, listWorkflows } = useBackendSync();
 
-  // Sidebar state
+  // Sidebar state (workflow)
   const isSidebarCollapsed = useWorkflowUIStore(selectLeftSidebarCollapsed);
   const leftSidebarVisualWidth = useWorkflowUIStore(selectLeftSidebarVisualWidth);
   const toggleLeftSidebar = useWorkflowUIStore((state) => state.toggleLeftSidebar);
   const isRightSidebarCollapsed = useWorkflowUIStore(selectRightSidebarCollapsed);
   const rightSidebarVisualWidth = useWorkflowUIStore(selectRightSidebarVisualWidth);
   const toggleRightSidebar = useWorkflowUIStore((state) => state.toggleRightSidebar);
+
+  // Sidebar state (missions) - only collapsed/toggle needed, width is managed inside MissionsCanvas
+  const missionsLeftSidebarCollapsed = useMissionsUIStore((s) => s.leftSidebarCollapsed);
+  const missionsToggleLeftSidebar = useMissionsUIStore((s) => s.toggleLeftSidebar);
+  const missionsRightSidebarCollapsed = useMissionsUIStore((s) => s.rightSidebarCollapsed);
+  const missionsToggleRightSidebar = useMissionsUIStore((s) => s.toggleRightSidebar);
 
   // Fetch workflow list when entering workflow mode
   useEffect(() => {
@@ -377,6 +385,10 @@ function CanvasAppInner(): React.JSX.Element {
     }
     if (canvasMode === 'workflow') {
       // Workflow mode: handled by WorkflowCanvas component
+      return [];
+    }
+    if (canvasMode === 'missions') {
+      // Missions mode: handled by MissionsCanvas component
       return [];
     }
     // Code mode: show Sandpack nodes (current behavior)
@@ -772,6 +784,17 @@ function CanvasAppInner(): React.JSX.Element {
               }
             }}
           />
+        ) : canvasMode === 'missions' ? (
+          /* Missions Mode Canvas */
+          <MissionsCanvas
+            onAgentSelect={(agentId: string | null): void => {
+              if (agentId !== null) {
+                canvasActions.setSelectedNodeId(agentId);
+              } else {
+                canvasActions.setSelectedNodeId(null);
+              }
+            }}
+          />
         ) : (
           <ReactFlow
             nodes={nodesToRender}
@@ -935,7 +958,7 @@ function CanvasAppInner(): React.JSX.Element {
           onWorkflowDelete={handleWorkflowDelete}
           onRefresh={handleWorkflowRefresh}
         />
-      ) : (
+      ) : canvasMode === 'missions' ? null /* MissionsCanvas renders its own sidebars */ : (
         <DesignLeftSidebar
           tree={designTree.tree}
           selection={designTree.selection}
@@ -994,7 +1017,7 @@ function CanvasAppInner(): React.JSX.Element {
       {/* Right Sidebar - Floating overlay */}
       {canvasMode === 'workflow' ? (
         <WorkflowRightSidebar selectedCardId={canvasActions.selectedNodeId} />
-      ) : (
+      ) : canvasMode === 'missions' ? null /* MissionsCanvas renders its own sidebars */ : (
         <RightSidebar
           selectedNode={selectedNode}
           nodes={nodes}
@@ -1016,10 +1039,16 @@ function CanvasAppInner(): React.JSX.Element {
         onRedo={designTree.redo}
         canvasMode={canvasMode}
         onCanvasModeChange={setCanvasMode}
-        isSidebarCollapsed={isSidebarCollapsed}
-        onToggleSidebar={toggleLeftSidebar}
-        isRightSidebarCollapsed={isRightSidebarCollapsed}
-        onToggleRightSidebar={toggleRightSidebar}
+        isSidebarCollapsed={
+          canvasMode === 'missions' ? missionsLeftSidebarCollapsed : isSidebarCollapsed
+        }
+        onToggleSidebar={canvasMode === 'missions' ? missionsToggleLeftSidebar : toggleLeftSidebar}
+        isRightSidebarCollapsed={
+          canvasMode === 'missions' ? missionsRightSidebarCollapsed : isRightSidebarCollapsed
+        }
+        onToggleRightSidebar={
+          canvasMode === 'missions' ? missionsToggleRightSidebar : toggleRightSidebar
+        }
       />
 
       {/* Command Palette */}

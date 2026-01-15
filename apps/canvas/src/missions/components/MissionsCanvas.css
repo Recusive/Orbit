@@ -1,0 +1,96 @@
+/**
+ * MissionsCanvas Styles
+ * Main canvas layout for missions mode
+ */
+
+.missions-canvas-container {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--background);
+}
+
+.missions-canvas-main {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  min-width: 0;
+}
+
+/* ReactFlow overrides for missions mode */
+.missions-canvas-main .react-flow {
+  background: var(--background);
+}
+
+.missions-canvas-main .react-flow__viewport {
+  /* Prevent blur issues in Tauri WebView */
+  transform-style: flat;
+}
+
+/* Controls styling */
+.missions-canvas-main .react-flow__controls {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.missions-canvas-main .react-flow__controls-button {
+  background: var(--card);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+
+.missions-canvas-main .react-flow__controls-button:hover {
+  background: var(--muted);
+}
+
+.missions-canvas-main .react-flow__controls-button svg {
+  fill: var(--foreground);
+}
+
+/* Minimap styling */
+.missions-canvas-main .react-flow__minimap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Edge styling */
+.missions-canvas-main .react-flow__edge-path {
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.missions-canvas-main .react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--primary);
+}
+
+/* Connection line */
+.missions-canvas-main .react-flow__connection-line {
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-dasharray: 5, 5;
+}
+
+/* Handle styling */
+.missions-canvas-main .react-flow__handle {
+  background: var(--muted-foreground);
+  border: 2px solid var(--card);
+  width: 10px;
+  height: 10px;
+}
+
+.missions-canvas-main .react-flow__handle:hover {
+  background: var(--primary);
+}
+
+.missions-canvas-main .react-flow__handle-connecting {
+  background: var(--primary);
+}
+
+/* Attribution hide (using proOptions) */
+.missions-canvas-main .react-flow__attribution {
+  display: none;
+}

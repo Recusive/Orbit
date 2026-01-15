@@ -173,6 +173,28 @@ const WorkflowIcon = (): React.JSX.Element => (
   </svg>
 );
 
+const MissionsIcon = (): React.JSX.Element => (
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {/* Target/crosshair icon representing mission objectives */}
+    <circle cx="12" cy="12" r="10"></circle>
+    <circle cx="12" cy="12" r="6"></circle>
+    <circle cx="12" cy="12" r="2"></circle>
+    <line x1="12" y1="2" x2="12" y2="6"></line>
+    <line x1="12" y1="18" x2="12" y2="22"></line>
+    <line x1="2" y1="12" x2="6" y2="12"></line>
+    <line x1="18" y1="12" x2="22" y2="12"></line>
+  </svg>
+);
+
 // Custom sidebar toggle icon - thicker middle line when expanded (LEFT sidebar)
 const SidebarToggleIcon = ({ expanded }: { expanded: boolean }): React.JSX.Element => (
   <svg
@@ -650,6 +672,7 @@ export function CanvasToolbar({
     { mode: 'design', icon: <DesignIcon />, label: 'Design' },
     { mode: 'code', icon: <CodeIcon />, label: 'Code' },
     { mode: 'workflow', icon: <WorkflowIcon />, label: 'Workflow' },
+    { mode: 'missions', icon: <MissionsIcon />, label: 'Missions' },
   ];
 
   return (

@@ -1,0 +1,304 @@
+/**
+ * MissionsRightSidebar Styles
+ */
+
+.missions-right-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--sidebar);
+  border-left: 1px solid var(--border);
+  font-family: var(--font-sans);
+}
+
+/* Tabs */
+.missions-right-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.missions-right-tab {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.missions-right-tab:hover {
+  background: var(--muted);
+}
+
+.missions-right-tab--active {
+  color: var(--foreground);
+  border-bottom: 2px solid var(--primary);
+  margin-bottom: -1px;
+}
+
+/* Content */
+.missions-right-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.missions-right-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.missions-right-empty-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* Config Panel */
+.missions-right-config {
+  padding: 16px;
+}
+
+.missions-right-config-section {
+  margin-bottom: 20px;
+}
+
+.missions-right-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted-foreground);
+  margin-bottom: 8px;
+}
+
+.missions-right-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+}
+
+.missions-right-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.missions-right-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.missions-right-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.missions-right-textarea::placeholder {
+  color: var(--muted-foreground);
+}
+
+/* Model Grid */
+.missions-right-model-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.missions-right-model-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  cursor: pointer;
+  text-align: left;
+}
+
+.missions-right-model-btn:hover {
+  background: var(--muted);
+}
+
+.missions-right-model-btn--active {
+  border-color: var(--primary);
+  background: var(--muted);
+}
+
+.missions-right-model-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.missions-right-model-desc {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 2px;
+}
+
+/* Checkbox */
+.missions-right-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.missions-right-checkbox-label input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Log Panel */
+.missions-right-log {
+  padding: 16px;
+}
+
+.missions-right-log-section {
+  margin-bottom: 16px;
+}
+
+.missions-right-log-output {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--foreground);
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.missions-right-log-empty {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.missions-right-cursor {
+  animation: missions-cursor-blink 1s step-end infinite;
+  color: var(--primary);
+}
+
+@keyframes missions-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.missions-right-log-error {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--red-500);
+  color: white;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.missions-right-log-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.missions-right-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.missions-right-stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted-foreground);
+}
+
+.missions-right-stat-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+/* History Panel */
+.missions-right-history {
+  padding: 16px;
+}
+
+.missions-right-history-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.missions-right-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.missions-right-history-num {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.missions-right-history-status {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.missions-right-history-status--completed {
+  background: var(--green-500);
+  color: white;
+}
+
+.missions-right-history-status--failed {
+  background: var(--red-500);
+  color: white;
+}
+
+.missions-right-history-status--running {
+  background: var(--blue-500);
+  color: white;
+}
+
+.missions-right-history-stats {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.missions-right-history-error {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  background: var(--red-500);
+  color: white;
+  font-size: 11px;
+}
