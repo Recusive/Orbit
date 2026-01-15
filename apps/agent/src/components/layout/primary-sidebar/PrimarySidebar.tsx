@@ -7,6 +7,7 @@
  */
 import { FlaskConical, Inbox, Plus, Search, Settings } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import { ConversationList } from './components/ConversationList';
 import { SidebarItem } from './components/SidebarItem';
@@ -49,6 +50,7 @@ const SettingsDialog: FC<SettingsDialogProps> = (props) => (
 );
 
 export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
+  // Use useShallow to prevent re-renders when unrelated store state changes
   const {
     toggleLeftSidebar,
     settingsDialogOpen,
@@ -58,7 +60,18 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
     toggleWorktreeExpanded,
     editingConversationId,
     setEditingConversationId,
-  } = useUIStore();
+  } = useUIStore(
+    useShallow((s) => ({
+      toggleLeftSidebar: s.toggleLeftSidebar,
+      settingsDialogOpen: s.settingsDialogOpen,
+      settingsDialogSection: s.settingsDialogSection,
+      setSettingsDialogOpen: s.setSettingsDialogOpen,
+      openSettings: s.openSettings,
+      toggleWorktreeExpanded: s.toggleWorktreeExpanded,
+      editingConversationId: s.editingConversationId,
+      setEditingConversationId: s.setEditingConversationId,
+    }))
+  );
   const isCollapsed = useIsLeftSidebarCollapsed();
   const workspaceName = useWorkspaceName();
   const workspacePath = useWorkspacePath();

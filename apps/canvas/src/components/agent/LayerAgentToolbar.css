@@ -109,3 +109,11 @@
     transform: rotate(360deg);
   }
 }
+
+/* Accessibility: Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .layer-agent-toolbar__spinner {
+    /* Slower, less jarring rotation for users who prefer reduced motion */
+    animation-duration: 2s;
+  }
+}

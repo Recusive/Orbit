@@ -2,7 +2,7 @@
  * ConversationList - Renders worktree groups with nested conversations
  */
 import { Plus } from 'lucide-react';
-import { useCallback } from 'react';
+import { useMemo } from 'react';
 
 import { ConversationItem } from './ConversationItem';
 import { WorkspaceItem } from './WorkspaceItem';
@@ -50,13 +50,28 @@ export const ConversationList: FC<ConversationListProps> = ({
   onRemoveWorktree,
   onOpenCreateWorktree,
 }) => {
-  // Helper to get conversations for a specific worktree path
-  const getWorktreeConversations = useCallback(
-    (worktreePath: string): ConversationSummary[] => {
-      return conversations.filter((c) => c.workspacePath === worktreePath);
-    },
-    [conversations]
-  );
+  // Build a Map of worktree path -> conversations for O(1) lookups
+  // This avoids O(n*m) complexity from filtering conversations for each worktree
+  const conversationsByWorktree = useMemo(() => {
+    const map = new Map<string, ConversationSummary[]>();
+    for (const conv of conversations) {
+      const path = conv.workspacePath;
+      if (path) {
+        const existing = map.get(path);
+        if (existing) {
+          existing.push(conv);
+        } else {
+          map.set(path, [conv]);
+        }
+      }
+    }
+    return map;
+  }, [conversations]);
+
+  // Helper to get conversations for a specific worktree path (O(1) lookup)
+  const getWorktreeConversations = (worktreePath: string): ConversationSummary[] => {
+    return conversationsByWorktree.get(worktreePath) ?? [];
+  };
 
   // Render conversation items for a given list
   const renderConversations = (convList: ConversationSummary[]): React.ReactNode => {

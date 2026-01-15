@@ -1,6 +1,7 @@
 import { createLogger } from '@orbit/common/lib';
 import { Ellipsis, Search, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { FileChange } from '@/stores/file/file-store';
@@ -382,7 +383,14 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   const toggleWordWrap = useFileViewerStore((state) => state.toggleWordWrap);
   const activeTab = useActivityTab();
   const setActiveTab = useUIStore((state) => state.setActivityTab);
-  const { bottomPanelOpen, bottomPanelHeight, setBottomPanelHeight } = useUIStore();
+  // Use useShallow to prevent re-renders when unrelated store state changes
+  const { bottomPanelOpen, bottomPanelHeight, setBottomPanelHeight } = useUIStore(
+    useShallow((s) => ({
+      bottomPanelOpen: s.bottomPanelOpen,
+      bottomPanelHeight: s.bottomPanelHeight,
+      setBottomPanelHeight: s.setBottomPanelHeight,
+    }))
+  );
   const terminalPosition = useTerminalPosition();
   const prevHasOpenFiles = useRef(hasOpenFiles);
   const isBrowserActive = useBrowserIsActive();

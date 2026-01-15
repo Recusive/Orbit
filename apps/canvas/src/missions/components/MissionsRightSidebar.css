@@ -206,6 +206,15 @@
   50% { opacity: 0; }
 }
 
+/* Accessibility: Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .missions-right-cursor {
+    animation: none;
+    /* Show static cursor instead of blinking */
+    opacity: 1;
+  }
+}
+
 .missions-right-log-error {
   padding: 10px 12px;
   border-radius: 6px;

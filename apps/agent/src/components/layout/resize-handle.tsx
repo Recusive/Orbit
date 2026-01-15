@@ -5,6 +5,7 @@
  * To change handle width or hover width, update RESIZE_HANDLE in constants.ts.
  */
 import { useRef, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
 
@@ -18,8 +19,16 @@ interface ResizeHandleProps {
 }
 
 export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
+  // Use useShallow to prevent re-renders when unrelated store state changes
   const { setReviewPanelWidth, setBottomPanelHeight, reviewPanelWidth, bottomPanelHeight } =
-    useUIStore();
+    useUIStore(
+      useShallow((s) => ({
+        setReviewPanelWidth: s.setReviewPanelWidth,
+        setBottomPanelHeight: s.setBottomPanelHeight,
+        reviewPanelWidth: s.reviewPanelWidth,
+        bottomPanelHeight: s.bottomPanelHeight,
+      }))
+    );
   const startValueRef = useRef(0);
   const [isHovered, setIsHovered] = useState(false);
 

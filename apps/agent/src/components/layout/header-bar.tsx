@@ -1,6 +1,7 @@
 import { IconSquareGridCircle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSquareGridCircle';
 import { Moon, Search, Sun } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
 
@@ -68,8 +69,18 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const workspaceName = useWorkspaceName();
   const hasWorkspace = useHasWorkspace();
+
+  // Use useShallow to prevent re-renders when unrelated store state changes
   const { setActiveTab, toggleReviewPanel, toggleRightSidebar, reviewPanelOpen, rightSidebarOpen } =
-    useUIStore();
+    useUIStore(
+      useShallow((s) => ({
+        setActiveTab: s.setActiveTab,
+        toggleReviewPanel: s.toggleReviewPanel,
+        toggleRightSidebar: s.toggleRightSidebar,
+        reviewPanelOpen: s.reviewPanelOpen,
+        rightSidebarOpen: s.rightSidebarOpen,
+      }))
+    );
 
   // Theme toggle effect
   useEffect(() => {

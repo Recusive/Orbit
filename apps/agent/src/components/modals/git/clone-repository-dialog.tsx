@@ -28,6 +28,9 @@ import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('CloneRepositoryDialog');
 
+// Hoisted RegExp for URL path splitting (avoids recreation on each call)
+const URL_PATH_SEPARATOR_RE = /[/:]/;
+
 export interface CloneRepositoryDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
@@ -97,7 +100,7 @@ function extractRepoName(url: string): string | null {
   // Remove trailing slashes
   const cleaned = withoutGit.replace(/\/+$/, '');
   // Get the last path segment (handles both / and : separators for SSH URLs)
-  const parts = cleaned.split(/[/:]/).filter(Boolean);
+  const parts = cleaned.split(URL_PATH_SEPARATOR_RE).filter(Boolean);
   const lastPart = parts[parts.length - 1];
 
   // Must have a valid name (not empty, not just whitespace)

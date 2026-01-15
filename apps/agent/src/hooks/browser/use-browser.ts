@@ -1,5 +1,6 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import type { ExtensionMessage } from '@/types/protocol';
 
@@ -14,6 +15,7 @@ const logger = createLogger('Browser');
  * Hook to handle browser messages from Tauri backend
  */
 export function useBrowser(): void {
+  // Use useShallow to prevent re-renders when unrelated store state changes
   const {
     setNavigation,
     setLoading,
@@ -23,7 +25,18 @@ export function useBrowser(): void {
     reset,
     setViewId,
     setCreating,
-  } = useBrowserStore();
+  } = useBrowserStore(
+    useShallow((s) => ({
+      setNavigation: s.setNavigation,
+      setLoading: s.setLoading,
+      setSelectedElement: s.setSelectedElement,
+      setSelectingElement: s.setSelectingElement,
+      setError: s.setError,
+      reset: s.reset,
+      setViewId: s.setViewId,
+      setCreating: s.setCreating,
+    }))
+  );
 
   // Get postMessage for sending browser:show when panel becomes visible
   const { postMessage } = useTauri({});

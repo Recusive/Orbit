@@ -136,13 +136,14 @@ export function useFileOperations(): UseFileOperationsReturn {
     newContent?: string;
   } | null => {
     if (!selectedFile) return null;
-    const file = changedFiles.find((f) => f.path === selectedFile);
+    // O(1) lookup using Map index instead of O(n) find
+    const file = useFileStore.getState().getFileByPath(selectedFile);
     if (!file) return null;
     const result: { oldContent?: string; newContent?: string } = {};
     if (file.oldContent) result.oldContent = file.oldContent;
     if (file.newContent) result.newContent = file.newContent;
     return result;
-  }, [selectedFile, changedFiles]);
+  }, [selectedFile]);
 
   return {
     changedFiles,

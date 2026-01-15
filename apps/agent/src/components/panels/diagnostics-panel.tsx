@@ -6,7 +6,7 @@ import {
   Info,
   Lightbulb,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import type { Diagnostic } from '@/lib/api';
 import type { FC } from 'react';
@@ -51,7 +51,8 @@ const SEVERITY_COLORS: Record<Diagnostic['severity'], string> = {
  */
 export const DiagnosticsPanel: FC<DiagnosticsPanelProps> = ({ onDiagnosticClick, className }) => {
   const { diagnostics, totalErrors, totalWarnings, totalIssues } = useDiagnostics();
-  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
+  // Use function initializer to avoid creating new Set on every render
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(() => new Set());
 
   const toggleFile = useCallback((path: string): void => {
     setExpandedFiles((prev) => {
@@ -65,9 +66,14 @@ export const DiagnosticsPanel: FC<DiagnosticsPanelProps> = ({ onDiagnosticClick,
     });
   }, []);
 
-  const allEntries = Object.entries(diagnostics)
-    .filter(([, diags]) => diags.length > 0)
-    .sort(([a], [b]) => a.localeCompare(b));
+  // Memoize the sorted entries to avoid recomputation on every render
+  const allEntries = useMemo(
+    () =>
+      Object.entries(diagnostics)
+        .filter(([, diags]) => diags.length > 0)
+        .sort(([a], [b]) => a.localeCompare(b)),
+    [diagnostics]
+  );
 
   const getFileName = (path: string): string => {
     return path.split('/').pop() ?? path;

@@ -29,7 +29,8 @@ export const BrowserPanel: FC = () => {
   const isActive = useBrowserIsActive();
   const error = useBrowserError();
   const { postMessage } = useTauri({});
-  const { isCreating } = useBrowserStore();
+  // Use selector to prevent re-renders on unrelated store changes
+  const isCreating = useBrowserStore((s) => s.isCreating);
 
   // Lifecycle store for idle tracking
   const lifecycleState = useBrowserLifecycleStore((s) => s.state);

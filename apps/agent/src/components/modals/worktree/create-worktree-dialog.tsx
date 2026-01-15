@@ -28,6 +28,10 @@ import { useUIStore, useWorkspacePath } from '@/stores/ui/ui-store';
 
 const logger = createLogger('CreateWorktreeDialog');
 
+// Hoisted RegExp patterns (avoids recreation on each render)
+const PATH_SEPARATOR_RE = /[/\\]/;
+const UNSAFE_FS_CHARS_RE = /[/\\:*?"<>|]/g;
+
 export interface CreateWorktreeDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
@@ -96,12 +100,12 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
     if (!workspacePath || !branchName) return '';
 
     // Get parent directory and repo name
-    const parts = workspacePath.split(/[/\\]/);
+    const parts = workspacePath.split(PATH_SEPARATOR_RE);
     const repoName = parts.pop() ?? 'repo';
     const parentDir = parts.join('/');
 
     // Sanitize branch name for filesystem
-    const safeBranchName = branchName.replace(/[/\\:*?"<>|]/g, '-');
+    const safeBranchName = branchName.replace(UNSAFE_FS_CHARS_RE, '-');
 
     return `${parentDir}/${repoName}-${safeBranchName}`;
   }, [workspacePath, branchName]);

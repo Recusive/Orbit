@@ -15,6 +15,15 @@
   }
 }
 
+/* Accessibility: Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .mission-edge--active {
+    animation: none;
+    /* Use static dashed stroke instead */
+    stroke-dasharray: 8 4;
+  }
+}
+
 .mission-edge-label {
   display: flex;
   align-items: center;

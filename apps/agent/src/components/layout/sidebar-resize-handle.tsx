@@ -4,6 +4,7 @@
  * update SIDEBAR, PANEL_SIZES, and RESIZE_HANDLE in constants.ts.
  */
 import { useRef, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
 
@@ -27,7 +28,13 @@ import { useIsLeftSidebarCollapsed, useUIStore } from '@/stores/ui/ui-store';
  * on every mousemove event.
  */
 export const SidebarResizeHandle: FC = () => {
-  const { leftSidebarWidth, setLeftSidebarWidth } = useUIStore();
+  // Use useShallow to prevent re-renders when unrelated store state changes
+  const { leftSidebarWidth, setLeftSidebarWidth } = useUIStore(
+    useShallow((s) => ({
+      leftSidebarWidth: s.leftSidebarWidth,
+      setLeftSidebarWidth: s.setLeftSidebarWidth,
+    }))
+  );
   const isCollapsed = useIsLeftSidebarCollapsed();
 
   // Track dragging state for visual feedback (needs React state for re-render)

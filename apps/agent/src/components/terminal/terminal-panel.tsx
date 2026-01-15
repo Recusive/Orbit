@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import type { SearchOptions } from '@/components/terminal/terminal-search-bar';
 import type { FC } from 'react';
@@ -59,16 +60,35 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
   collapsed = false,
   mode = 'agent',
 }) => {
-  const { toggleBottomPanel, cycleTerminalPosition } = useUIStore();
+  // Use useShallow to prevent re-renders when unrelated store state changes
+  const { toggleBottomPanel, cycleTerminalPosition } = useUIStore(
+    useShallow((s) => ({
+      toggleBottomPanel: s.toggleBottomPanel,
+      cycleTerminalPosition: s.cycleTerminalPosition,
+    }))
+  );
   const terminalPosition = useTerminalPosition();
   const activeTab = useActiveTab();
   const workspacePath = useWorkspacePath();
-  const sessions = useTerminalStore((state) => state.sessions);
-  const activeSessionId = useTerminalStore((state) => state.activeSessionId);
-  const createSession = useTerminalStore((state) => state.createSession);
-  const setActiveSession = useTerminalStore((state) => state.setActiveSession);
-  const closeSession = useTerminalStore((state) => state.closeSession);
-  const renameSession = useTerminalStore((state) => state.renameSession);
+
+  // Use useShallow for terminal store multi-value picks
+  const {
+    sessions,
+    activeSessionId,
+    createSession,
+    setActiveSession,
+    closeSession,
+    renameSession,
+  } = useTerminalStore(
+    useShallow((s) => ({
+      sessions: s.sessions,
+      activeSessionId: s.activeSessionId,
+      createSession: s.createSession,
+      setActiveSession: s.setActiveSession,
+      closeSession: s.closeSession,
+      renameSession: s.renameSession,
+    }))
+  );
 
   // State for inline tab renaming
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);

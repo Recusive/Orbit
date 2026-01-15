@@ -19,6 +19,9 @@ import { StoredConversationSummaryArraySchema } from '@/types/protocol';
 
 const logger = createLogger('UIStore');
 
+// Hoisted RegExp for path splitting (avoids recreation in store actions)
+const PATH_SEPARATOR_RE = /[/\\]/;
+
 export type { StoredConversationSummary } from '@/types/protocol';
 
 // ============================================
@@ -311,7 +314,7 @@ export const useUIStore = create<UIStore>()(
 
         state.workspacePath = path;
         // Extract folder name from path (last segment)
-        const segments = path.split(/[/\\]/).filter(Boolean);
+        const segments = path.split(PATH_SEPARATOR_RE).filter(Boolean);
         state.workspaceName = segments[segments.length - 1] ?? path;
       });
     },

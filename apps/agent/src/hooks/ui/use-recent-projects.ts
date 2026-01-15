@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { addRecentProject, getRecentProjects } from '@/lib/api';
 
+// Hoisted RegExp for path splitting (avoids recreation on each call)
+const PATH_SEPARATOR_RE = /[/\\]/;
+
 export interface RecentProject {
   /** Full path to the project */
   path: string;
@@ -28,7 +31,7 @@ export interface UseRecentProjectsReturn {
  * Extracts project info from a full path.
  */
 function parseProjectPath(path: string): RecentProject {
-  const segments = path.split(/[/\\]/).filter(Boolean);
+  const segments = path.split(PATH_SEPARATOR_RE).filter(Boolean);
   const name = segments[segments.length - 1] ?? path;
   const parentSegments = segments.slice(0, -1);
 

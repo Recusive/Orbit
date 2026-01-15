@@ -20,6 +20,9 @@ import {
 import { SIDEBAR, TRANSITIONS } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 
+// Hoisted RegExp for path splitting (avoids recreation on each render)
+const PATH_SEPARATOR_RE = /[/\\]/;
+
 // Transition string builder (matches primary-sidebar pattern)
 const getCollapseTransition = (collapsed: boolean): string =>
   collapsed
@@ -45,7 +48,8 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
   const [isHovered, setIsHovered] = useState(false);
 
   // Extract workspace name from path (last segment)
-  const workspaceName = worktree.path.split(/[/\\]/).filter(Boolean).pop() ?? worktree.path;
+  const workspaceName =
+    worktree.path.split(PATH_SEPARATOR_RE).filter(Boolean).pop() ?? worktree.path;
 
   // Get branch display name (without refs/heads/)
   const branchName = worktree.branch?.replace(/^refs\/heads\//, '') ?? worktree.shortHead;

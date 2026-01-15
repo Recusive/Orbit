@@ -49,6 +49,10 @@ export interface FileChange {
 export interface FileState {
   // File changes (existing)
   changedFiles: FileChange[];
+  /** Index for O(1) lookup by path - kept in sync with changedFiles */
+  changedFilesByPath: Map<string, FileChange>;
+  /** Index for O(1) lookup by id - kept in sync with changedFiles */
+  changedFilesById: Map<string, FileChange>;
   selectedFile: string | null;
   filterStatus: FileChangeStatus | 'all';
 
@@ -76,6 +80,10 @@ export interface FileState {
   removeFile: (path: string) => void;
   clearFiles: (status?: FileChangeStatus) => void;
   setFilterStatus: (status: FileChangeStatus | 'all') => void;
+  /** O(1) lookup by path */
+  getFileByPath: (path: string) => FileChange | undefined;
+  /** O(1) lookup by id */
+  getFileById: (id: string) => FileChange | undefined;
 
   // File tree actions (new)
   setRootPath: (path: string) => void;
@@ -97,6 +105,8 @@ export const useFileStore = create<FileState>()(
   immer((set, get) => ({
     // File changes (existing)
     changedFiles: [],
+    changedFilesByPath: new Map<string, FileChange>(),
+    changedFilesById: new Map<string, FileChange>(),
     selectedFile: null,
     filterStatus: 'all',
 
@@ -113,8 +123,8 @@ export const useFileStore = create<FileState>()(
       const id = `file_${String(Date.now())}_${random.slice(2, 11)}`;
 
       set((state) => {
-        // Check if file already exists, update it instead
-        const existingFile = state.changedFiles.find((f) => f.path === change.path);
+        // O(1) lookup using Map index
+        const existingFile = state.changedFilesByPath.get(change.path);
 
         if (existingFile) {
           // Update existing file
@@ -122,6 +132,7 @@ export const useFileStore = create<FileState>()(
             ...change,
             timestamp: Date.now(),
           });
+          // Map reference stays valid since we mutate in place
           return;
         }
 
@@ -134,6 +145,9 @@ export const useFileStore = create<FileState>()(
         };
 
         state.changedFiles.push(newChange);
+        // Update indices
+        state.changedFilesByPath.set(change.path, newChange);
+        state.changedFilesById.set(id, newChange);
 
         // Auto-select if it's the first file
         if (state.changedFiles.length === 1) {
@@ -146,9 +160,11 @@ export const useFileStore = create<FileState>()(
 
     updateFileChange: (id: string, updates: Partial<FileChange>) => {
       set((state) => {
-        const file = state.changedFiles.find((f) => f.id === id);
+        // O(1) lookup using Map index
+        const file = state.changedFilesById.get(id);
         if (file) {
           Object.assign(file, updates);
+          // Map references stay valid since we mutate in place
         }
       });
     },
@@ -161,7 +177,8 @@ export const useFileStore = create<FileState>()(
 
     acceptFile: (path: string) => {
       set((state) => {
-        const file = state.changedFiles.find((f) => f.path === path);
+        // O(1) lookup using Map index
+        const file = state.changedFilesByPath.get(path);
         if (file) {
           file.status = 'accepted';
         }
@@ -170,7 +187,8 @@ export const useFileStore = create<FileState>()(
 
     rejectFile: (path: string) => {
       set((state) => {
-        const file = state.changedFiles.find((f) => f.path === path);
+        // O(1) lookup using Map index
+        const file = state.changedFilesByPath.get(path);
         if (file) {
           file.status = 'rejected';
         }
@@ -199,6 +217,12 @@ export const useFileStore = create<FileState>()(
 
     removeFile: (path: string) => {
       set((state) => {
+        // Get file before removing to update indices
+        const file = state.changedFilesByPath.get(path);
+        if (file) {
+          state.changedFilesByPath.delete(path);
+          state.changedFilesById.delete(file.id);
+        }
         state.changedFiles = state.changedFiles.filter((f) => f.path !== path);
 
         // Update selection if the removed file was selected
@@ -211,13 +235,22 @@ export const useFileStore = create<FileState>()(
     clearFiles: (status?: FileChangeStatus) => {
       set((state) => {
         if (status) {
+          // Remove matching files from indices
+          for (const file of state.changedFiles) {
+            if (file.status === status) {
+              state.changedFilesByPath.delete(file.path);
+              state.changedFilesById.delete(file.id);
+            }
+          }
           state.changedFiles = state.changedFiles.filter((f) => f.status !== status);
         } else {
           state.changedFiles = [];
+          state.changedFilesByPath.clear();
+          state.changedFilesById.clear();
         }
 
-        // Update selection if it was cleared
-        if (state.selectedFile && !state.changedFiles.find((f) => f.path === state.selectedFile)) {
+        // Update selection if it was cleared - O(1) lookup using Map
+        if (state.selectedFile && !state.changedFilesByPath.has(state.selectedFile)) {
           state.selectedFile = state.changedFiles[0]?.path ?? null;
         }
       });
@@ -227,6 +260,16 @@ export const useFileStore = create<FileState>()(
       set((state) => {
         state.filterStatus = status;
       });
+    },
+
+    // O(1) lookup by path
+    getFileByPath: (path: string): FileChange | undefined => {
+      return get().changedFilesByPath.get(path);
+    },
+
+    // O(1) lookup by id
+    getFileById: (id: string): FileChange | undefined => {
+      return get().changedFilesById.get(id);
     },
 
     // ═══════════════════════════════════════════════════════════════

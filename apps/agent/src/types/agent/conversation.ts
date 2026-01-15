@@ -187,47 +187,69 @@ export function filterConversations(
   conversations: ConversationSummary[],
   filter: ConversationFilter
 ): ConversationSummary[] {
-  let filtered = conversations;
+  // Single-pass filter: combine all filter conditions into one pass
+  // This avoids multiple array iterations and ensures we create a new array
+  const hasFilters =
+    filter.workspaceId !== undefined ||
+    (filter.tags !== undefined && filter.tags.length > 0) ||
+    filter.searchQuery !== undefined ||
+    filter.pinned !== undefined ||
+    filter.archived !== undefined ||
+    filter.dateFrom !== undefined ||
+    filter.dateTo !== undefined;
 
-  if (filter.workspaceId) {
-    filtered = filtered.filter((c) => c.workspaceId === filter.workspaceId);
-  }
+  const searchQuery = filter.searchQuery?.toLowerCase();
+  const tags = filter.tags;
+  const dateFrom = filter.dateFrom;
+  const dateTo = filter.dateTo;
 
-  if (filter.tags && filter.tags.length > 0) {
-    filtered = filtered.filter((c) => filter.tags?.some((tag) => c.tags?.includes(tag)) ?? false);
-  }
+  // Filter in a single pass if we have filters, otherwise just copy the array
+  const filtered = hasFilters
+    ? conversations.filter((c) => {
+        // Workspace filter
+        if (filter.workspaceId !== undefined && c.workspaceId !== filter.workspaceId) {
+          return false;
+        }
+        // Tags filter
+        if (tags !== undefined && tags.length > 0) {
+          if (!tags.some((tag) => c.tags?.includes(tag))) {
+            return false;
+          }
+        }
+        // Search query filter
+        if (searchQuery !== undefined) {
+          if (
+            !c.title.toLowerCase().includes(searchQuery) &&
+            !c.lastMessagePreview?.toLowerCase().includes(searchQuery)
+          ) {
+            return false;
+          }
+        }
+        // Pinned filter
+        if (filter.pinned !== undefined && c.pinned !== filter.pinned) {
+          return false;
+        }
+        // Archived filter
+        if (filter.archived !== undefined && c.archived !== filter.archived) {
+          return false;
+        }
+        // Date range filters
+        if (dateFrom !== undefined && c.createdAt < dateFrom) {
+          return false;
+        }
+        if (dateTo !== undefined && c.createdAt > dateTo) {
+          return false;
+        }
+        return true;
+      })
+    : [...conversations]; // Create a new array even if no filters to avoid mutation
 
-  if (filter.searchQuery) {
-    const query = filter.searchQuery.toLowerCase();
-    filtered = filtered.filter(
-      (c) =>
-        c.title.toLowerCase().includes(query) || c.lastMessagePreview?.toLowerCase().includes(query)
-    );
-  }
-
-  if (filter.pinned !== undefined) {
-    filtered = filtered.filter((c) => c.pinned === filter.pinned);
-  }
-
-  if (filter.archived !== undefined) {
-    filtered = filtered.filter((c) => c.archived === filter.archived);
-  }
-
-  if (filter.dateFrom !== undefined) {
-    const dateFrom = filter.dateFrom;
-    filtered = filtered.filter((c) => c.createdAt >= dateFrom);
-  }
-
-  if (filter.dateTo !== undefined) {
-    const dateTo = filter.dateTo;
-    filtered = filtered.filter((c) => c.createdAt <= dateTo);
-  }
-
-  // Sort
+  // Sort using toSorted() for immutability (ES2023)
+  // Falls back to spread + sort for older targets
   const sortBy = filter.sortBy ?? 'updatedAt';
   const sortOrder = filter.sortOrder ?? 'desc';
 
-  filtered.sort((a, b) => {
+  const compareFn = (a: ConversationSummary, b: ConversationSummary): number => {
     let aVal: string | number;
     let bVal: string | number;
 
@@ -256,7 +278,12 @@ export function filterConversations(
     } else {
       return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
     }
-  });
+  };
 
-  return filtered;
+  // Use toSorted if available (ES2023+), otherwise spread + sort
+  return 'toSorted' in Array.prototype
+    ? (
+        filtered as unknown as { toSorted: (fn: typeof compareFn) => ConversationSummary[] }
+      ).toSorted(compareFn)
+    : [...filtered].sort(compareFn);
 }

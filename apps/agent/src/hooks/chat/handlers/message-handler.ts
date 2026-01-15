@@ -747,7 +747,15 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // Use backend-provided content_offset for accurate tool positioning.
         // The backend tracks accumulated text length and provides this when emitting tool events.
         // Only fall back to computed offset if backend didn't provide one (legacy compatibility).
-        const currentMsg = messagesRef.current.find((m) => m.id === message.message_id);
+        //
+        // Fast path: check last message first (most common case during streaming)
+        // This avoids O(n) scan through all messages when the target is almost always at the end.
+        const messages = messagesRef.current;
+        const lastMsg = messages.at(-1);
+        const currentMsg =
+          lastMsg?.id === message.message_id
+            ? lastMsg
+            : messages.find((m) => m.id === message.message_id);
         const contentOffset = message.content_offset ?? currentMsg?.content.length ?? 0;
 
         // Queue tool start to be processed in next RAF (reduces re-renders)
