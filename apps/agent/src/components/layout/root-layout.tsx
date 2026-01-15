@@ -31,6 +31,7 @@ export const RootLayout: FC = () => {
     bottomPanelOpen,
     setTerminalPosition,
     openSettings,
+    openSourceControl,
   } = useUIStore();
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
@@ -54,6 +55,12 @@ export const RootLayout: FC = () => {
   const handleOpenSettings = useCallback((): void => {
     openSettings();
   }, [openSettings]);
+
+  // Handle find in workspace - opens quick open for now
+  // TODO: When a dedicated workspace search panel is added, update this to open it instead
+  const handleFindInWorkspace = useCallback((): void => {
+    setQuickOpenVisible(true);
+  }, []);
 
   // Smart terminal toggle: if activity panel is closed, open terminal in full-width mode
   const handleToggleTerminal = useCallback((): void => {
@@ -100,6 +107,8 @@ export const RootLayout: FC = () => {
     window.addEventListener('toggleActivityPanel', toggleReviewPanel);
     window.addEventListener('toggleFileBrowser', handleToggleFileBrowser);
     window.addEventListener('toggleTerminal', handleToggleTerminal);
+    window.addEventListener('openSourceControl', openSourceControl);
+    window.addEventListener('findInWorkspace', handleFindInWorkspace);
     window.addEventListener('openSettings', handleOpenSettings);
 
     return (): void => {
@@ -110,6 +119,8 @@ export const RootLayout: FC = () => {
       window.removeEventListener('toggleActivityPanel', toggleReviewPanel);
       window.removeEventListener('toggleFileBrowser', handleToggleFileBrowser);
       window.removeEventListener('toggleTerminal', handleToggleTerminal);
+      window.removeEventListener('openSourceControl', openSourceControl);
+      window.removeEventListener('findInWorkspace', handleFindInWorkspace);
       window.removeEventListener('openSettings', handleOpenSettings);
     };
   }, [
@@ -120,6 +131,8 @@ export const RootLayout: FC = () => {
     toggleReviewPanel,
     handleToggleFileBrowser,
     handleToggleTerminal,
+    openSourceControl,
+    handleFindInWorkspace,
     handleOpenSettings,
   ]);
 

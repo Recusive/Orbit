@@ -12,7 +12,7 @@ import type { FC } from 'react';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SIDEBAR } from '@/lib/utils/constants';
-import { cn } from '@/lib/utils/utils';
+import { cn, getModifierSymbols } from '@/lib/utils/utils';
 import { useActivityTab, useUIStore } from '@/stores/ui/ui-store';
 
 interface ActionButtonProps {
@@ -64,8 +64,8 @@ const ActionButton: FC<ActionButtonProps> = ({
         <span>{label}</span>
         {shortcut ? (
           <KbdGroup>
-            {shortcut.map((key) => (
-              <Kbd key={key} className="bg-white/15 text-inherit border-white/20">
+            {shortcut.map((key, index) => (
+              <Kbd key={index} className="bg-white/15 text-inherit border-white/20">
                 {key}
               </Kbd>
             ))}
@@ -83,6 +83,7 @@ const ActionButton: FC<ActionButtonProps> = ({
 export const ActionsBar: FC = () => {
   const activeTab = useActivityTab();
   const setActiveTab = useUIStore((state) => state.setActivityTab);
+  const modifiers = getModifierSymbols();
 
   const handleTabClick = (tab: ActivityTab): void => {
     setActiveTab(tab);
@@ -100,7 +101,7 @@ export const ActionsBar: FC = () => {
         <ActionButton
           icon={FileCode}
           label="Editor"
-          shortcut={['⌘', 'E']}
+          shortcut={[modifiers.cmd, 'E']}
           isActive={activeTab === 'file'}
           onClick={() => {
             handleTabClick('file');
@@ -117,7 +118,7 @@ export const ActionsBar: FC = () => {
         <ActionButton
           icon={GitBranch}
           label="Source Control"
-          shortcut={['⌃', '⇧', 'G']}
+          shortcut={[modifiers.ctrl, modifiers.shift, 'G']}
           isActive={activeTab === 'source'}
           onClick={() => {
             handleTabClick('source');

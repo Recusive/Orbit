@@ -25,8 +25,8 @@ import { ContextMenuTrigger } from '@/components/ui/context-menu';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTerminalInstanceManager } from '@/hooks/terminal/use-terminal-instance-manager';
-import { cn } from '@/lib/utils';
 import { HEIGHTS } from '@/lib/utils/constants';
+import { cn, getCommandKey } from '@/lib/utils/utils';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
 import {
   useUIStore,
@@ -446,7 +446,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
             <TooltipContent className="flex items-center gap-2">
               <span>Terminal</span>
               <KbdGroup>
-                <Kbd className="bg-white/15 text-inherit border-white/20">⌘</Kbd>
+                <Kbd className="bg-white/15 text-inherit border-white/20">{getCommandKey()}</Kbd>
                 <Kbd className="bg-white/15 text-inherit border-white/20">J</Kbd>
               </KbdGroup>
             </TooltipContent>

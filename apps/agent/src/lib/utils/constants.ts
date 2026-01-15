@@ -251,8 +251,10 @@ export const DEFAULT_UI_STATE = {
 export interface KeyboardShortcutDef {
   /** Key to press (e.g., 'k', 'Enter', 'Escape') */
   key: string;
-  /** Requires Cmd (Mac) / Ctrl (Windows/Linux) */
+  /** Requires Cmd (Mac) / Ctrl (Windows/Linux) - platform-aware command key */
   cmd?: boolean;
+  /** Requires Ctrl key on ALL platforms (literal Ctrl, even on Mac) */
+  ctrl?: boolean;
   /** Requires Shift key */
   shift?: boolean;
   /** Requires Alt/Option key */
@@ -291,7 +293,7 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
     description: 'Toggle left sidebar',
     event: 'toggleLeftSidebar',
   },
-  // Alt binding for non-US keyboards where / requires Shift
+  // Alternative binding for non-US keyboards where / requires Shift
   toggleLeftSidebarAlt: {
     key: '.',
     cmd: true,
@@ -315,6 +317,14 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
     cmd: true,
     description: 'Toggle terminal',
     event: 'toggleTerminal',
+  },
+  openSourceControl: {
+    key: 'g',
+    cmd: false,
+    ctrl: true,
+    shift: true,
+    description: 'Open source control',
+    event: 'openSourceControl',
   },
 
   // File operations

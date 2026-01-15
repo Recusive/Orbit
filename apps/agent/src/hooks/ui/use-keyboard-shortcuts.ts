@@ -54,11 +54,22 @@ export function useKeyboardShortcuts(
       // Check modifiers
       const isMac = navigator.userAgent.toUpperCase().includes('MAC');
 
-      // Cmd key (Mac) or Ctrl key (Windows/Linux)
-      const cmdOrCtrl = shortcut.cmd ?? shortcut.ctrl;
-      if (cmdOrCtrl) {
+      // cmd: Platform-aware command key (Cmd on Mac, Ctrl on Windows/Linux)
+      if (shortcut.cmd) {
         const hasModifier = isMac ? event.metaKey : event.ctrlKey;
         if (!hasModifier) return false;
+      }
+
+      // ctrl: Literal Ctrl key on ALL platforms (even Mac)
+      // This is separate from cmd for shortcuts like Ctrl+Shift+G
+      if (shortcut.ctrl && !event.ctrlKey) return false;
+
+      // Ensure we don't match if extra modifiers are pressed
+      // (unless the shortcut expects them)
+      if (!shortcut.cmd && !shortcut.ctrl) {
+        // No command key expected - ensure neither is pressed
+        if (isMac && event.metaKey) return false;
+        if (event.ctrlKey) return false;
       }
 
       // Shift key
@@ -153,6 +164,7 @@ function createShortcutHandler(def: KeyboardShortcutDef): KeyboardShortcut {
 
   // Only add optional properties if they are defined
   if (def.cmd !== undefined) shortcut.cmd = def.cmd;
+  if (def.ctrl !== undefined) shortcut.ctrl = def.ctrl;
   if (def.shift !== undefined) shortcut.shift = def.shift;
   if (def.alt !== undefined) shortcut.alt = def.alt;
   if (def.preventDefault !== undefined) shortcut.preventDefault = def.preventDefault;

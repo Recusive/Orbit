@@ -2,16 +2,21 @@ import { SectionDivider, SectionHeader, ShortcutItem } from '../components';
 
 import type { FC } from 'react';
 
+import { getModifierSymbols } from '@/lib/utils/utils';
+
 export const ShortcutsSettings: FC = () => {
+  const mod = getModifierSymbols();
+
   return (
     <div>
       <SectionHeader title="General">Global keyboard shortcuts</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">
-        <ShortcutItem label="Command Palette" keys={['⌘', 'P']} />
-        <ShortcutItem label="Settings" keys={['⌘', ',']} />
-        <ShortcutItem label="New Chat" keys={['⌘', 'N']} />
-        <ShortcutItem label="Close Tab" keys={['⌘', 'W']} />
+        <ShortcutItem label="Command Palette" keys={[mod.cmd, 'K']} />
+        <ShortcutItem label="Quick Open / Go to File" keys={[mod.cmd, 'P']} />
+        <ShortcutItem label="Settings" keys={[mod.cmd, ',']} />
+        <ShortcutItem label="New Chat" keys={[mod.cmd, 'N']} />
+        <ShortcutItem label="Close Tab" keys={[mod.cmd, 'W']} />
       </div>
 
       <SectionDivider />
@@ -19,11 +24,11 @@ export const ShortcutsSettings: FC = () => {
       <SectionHeader title="Chat">Chat-related shortcuts</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">
-        <ShortcutItem label="Send Message" keys={['⌘', '↵']} />
+        <ShortcutItem label="Send Message" keys={[mod.cmd, '↵']} />
         <ShortcutItem label="Stop Generation" keys={['Esc']} />
         <ShortcutItem label="Add Context" keys={['@']} />
         <ShortcutItem label="Slash Commands" keys={['/']} />
-        <ShortcutItem label="New Line" keys={['Shift', '↵']} />
+        <ShortcutItem label="New Line" keys={[mod.shift, '↵']} />
       </div>
 
       <SectionDivider />
@@ -31,11 +36,11 @@ export const ShortcutsSettings: FC = () => {
       <SectionHeader title="Editor">Editor shortcuts</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">
-        <ShortcutItem label="Save File" keys={['⌘', 'S']} />
-        <ShortcutItem label="Find in File" keys={['⌘', 'F']} />
-        <ShortcutItem label="Go to Line" keys={['⌘', 'G']} />
-        <ShortcutItem label="Undo" keys={['⌘', 'Z']} />
-        <ShortcutItem label="Redo" keys={['⌘', 'Shift', 'Z']} />
+        <ShortcutItem label="Save File" keys={[mod.cmd, 'S']} />
+        <ShortcutItem label="Find in File" keys={[mod.cmd, 'F']} />
+        <ShortcutItem label="Go to Line" keys={[mod.cmd, 'G']} />
+        <ShortcutItem label="Undo" keys={[mod.cmd, 'Z']} />
+        <ShortcutItem label="Redo" keys={[mod.cmd, mod.shift, 'Z']} />
       </div>
 
       <SectionDivider />
@@ -43,11 +48,12 @@ export const ShortcutsSettings: FC = () => {
       <SectionHeader title="Panels">Panel visibility shortcuts</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">
-        <ShortcutItem label="Toggle Left Sidebar" keys={['⌘', '/']} />
-        <ShortcutItem label="Toggle Activity Panel" keys={['⌘', 'B']} />
-        <ShortcutItem label="Toggle Editor Panel" keys={['⌘', 'E']} />
-        <ShortcutItem label="Toggle Terminal" keys={['⌘', 'J']} />
-        <ShortcutItem label="Find in Workspace" keys={['⌘', 'Shift', 'F']} />
+        <ShortcutItem label="Toggle Left Sidebar" keys={[mod.cmd, '/']} />
+        <ShortcutItem label="Toggle Activity Panel" keys={[mod.cmd, 'B']} />
+        <ShortcutItem label="Toggle Editor Panel" keys={[mod.cmd, 'E']} />
+        <ShortcutItem label="Toggle Terminal" keys={[mod.cmd, 'J']} />
+        <ShortcutItem label="Source Control" keys={[mod.ctrl, mod.shift, 'G']} />
+        <ShortcutItem label="Find in Workspace" keys={[mod.cmd, mod.shift, 'F']} />
       </div>
     </div>
   );

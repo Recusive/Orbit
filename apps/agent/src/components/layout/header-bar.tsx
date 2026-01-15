@@ -6,7 +6,7 @@ import type { FC } from 'react';
 
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils/utils';
+import { cn, getCommandKey } from '@/lib/utils/utils';
 import { useUIStore, useWorkspaceName, useActiveTab, useHasWorkspace } from '@/stores/ui/ui-store';
 
 type Theme = 'light' | 'dark';
@@ -211,7 +211,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
               <TooltipContent className="flex items-center gap-2">
                 <span>{reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}</span>
                 <KbdGroup>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">⌘</Kbd>
+                  <Kbd className="bg-white/15 text-inherit border-white/20">{getCommandKey()}</Kbd>
                   <Kbd className="bg-white/15 text-inherit border-white/20">B</Kbd>
                 </KbdGroup>
               </TooltipContent>

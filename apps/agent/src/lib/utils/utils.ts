@@ -4,6 +4,33 @@ import { TIME_MS } from './constants';
 export { cn } from '@orbit/common/utils';
 
 /**
+ * Platform detection utilities for keyboard shortcuts
+ */
+export const isMac = (): boolean =>
+  typeof navigator !== 'undefined' && navigator.userAgent.toUpperCase().includes('MAC');
+
+/**
+ * Get the platform-aware command key symbol
+ * Returns ⌘ on Mac, Ctrl on Windows/Linux
+ */
+export const getCommandKey = (): string => (isMac() ? '⌘' : 'Ctrl');
+
+/**
+ * Get the platform-aware modifier symbols
+ */
+export const getModifierSymbols = (): {
+  cmd: string;
+  ctrl: string;
+  shift: string;
+  alt: string;
+} => ({
+  cmd: isMac() ? '⌘' : 'Ctrl',
+  ctrl: isMac() ? '⌃' : 'Ctrl',
+  shift: isMac() ? '⇧' : 'Shift',
+  alt: isMac() ? '⌥' : 'Alt',
+});
+
+/**
  * Format a timestamp into a human-readable string
  */
 export function formatTimestamp(timestamp: number): string {

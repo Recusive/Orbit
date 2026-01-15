@@ -23,7 +23,7 @@ import { ConversationDeleteDialog, CreateWorktreeDialog } from '@/components/mod
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { HEIGHTS, SIDEBAR } from '@/lib/utils/constants';
-import { cn } from '@/lib/utils/utils';
+import { cn, getCommandKey } from '@/lib/utils/utils';
 import {
   useUIStore,
   useIsLeftSidebarCollapsed,
@@ -116,7 +116,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipContent side="right" className="flex items-center gap-2">
                 <span>Expand sidebar</span>
                 <KbdGroup>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">⌘</Kbd>
+                  <Kbd className="bg-white/15 text-inherit border-white/20">{getCommandKey()}</Kbd>
                   <Kbd className="bg-white/15 text-inherit border-white/20">/</Kbd>
                 </KbdGroup>
               </TooltipContent>
@@ -146,7 +146,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipContent side="right" className="flex items-center gap-2">
                 <span>Collapse sidebar</span>
                 <KbdGroup>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">⌘</Kbd>
+                  <Kbd className="bg-white/15 text-inherit border-white/20">{getCommandKey()}</Kbd>
                   <Kbd className="bg-white/15 text-inherit border-white/20">/</Kbd>
                 </KbdGroup>
               </TooltipContent>
