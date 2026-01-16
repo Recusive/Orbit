@@ -393,7 +393,7 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
     }, [node.isDirectory, path, onToggle, onSelect, onOpen]);
 
     const handleRetry = useCallback(
-      (e: React.MouseEvent): void => {
+      (e: React.MouseEvent | React.KeyboardEvent): void => {
         e.stopPropagation();
         onRetry(path);
       },
@@ -475,7 +475,7 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
             onKeyDown={(e): void => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                handleRetry(e as unknown as React.MouseEvent);
+                handleRetry(e);
               }
             }}
             role="button"

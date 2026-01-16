@@ -411,8 +411,9 @@ const BRIDGE_SCRIPT = `
 		return null;
 	}
 
-	// Serialize ARIA tree to text
-	function serializeAriaTree(node: any, indent: number = 0): string {
+	// Serialize ARIA tree to text (runtime JS in Sandpack iframe)
+	function serializeAriaTree(node, indent) {
+		indent = indent || 0;
 		if (node === null || node === undefined) return '';
 		const pad = '  '.repeat(indent);
 		let line = pad + String(node.role ?? '');
@@ -443,7 +444,7 @@ const BRIDGE_SCRIPT = `
 		return count;
 	}
 
-	// Get computed styles for element
+	// Get computed styles for element (runtime JS in Sandpack iframe)
 	function getElementComputedStyles(selector, properties) {
 		const defaultProps = [
 			'color', 'background-color', 'font-size', 'font-weight', 'font-family',

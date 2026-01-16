@@ -29,6 +29,9 @@ import {
   // Types
 } from '../canvas/index.js';
 import { ClaudeCredentials } from '../common/auth/credentials.js';
+import { createLogger } from '../common/logging/logger.js';
+
+const logger = createLogger('orchestrator-e2e');
 
 import type { CanvasSnapshot, OrchestratorState, TaskOutput } from '../canvas/index.js';
 
@@ -437,19 +440,16 @@ describeWithApi('Orchestrator E2E Integration Tests (API Required)', () => {
 
     agent.onText((text) => {
       textMessages.push(text);
-      // eslint-disable-next-line no-console
-      console.log('[Text]', text.slice(0, 100));
+      logger.debug({ preview: text.slice(0, 100) }, 'Text received');
     });
 
     agent.onToolUse((tool) => {
       toolUses.push(tool);
-      // eslint-disable-next-line no-console
-      console.log('[Tool]', tool.name);
+      logger.debug({ name: tool.name }, 'Tool used');
     });
 
     agent.onThinking((thinking) => {
-      // eslint-disable-next-line no-console
-      console.log('[Thinking]', thinking.slice(0, 100));
+      logger.debug({ preview: thinking.slice(0, 100) }, 'Thinking');
     });
 
     const output = await agent.execute(
@@ -474,8 +474,7 @@ describeWithApi('Orchestrator E2E Integration Tests (API Required)', () => {
     expect(output.success).toBe(true);
     expect(textMessages.length).toBeGreaterThan(0);
 
-    // eslint-disable-next-line no-console
-    console.log('LayoutAgent output:', JSON.stringify(output, null, 2));
+    logger.info({ output }, 'LayoutAgent completed');
 
     agent.dispose();
   }, 60000);
@@ -491,8 +490,7 @@ describeWithApi('Orchestrator E2E Integration Tests (API Required)', () => {
 
     agent.onText((text) => {
       textMessages.push(text);
-      // eslint-disable-next-line no-console
-      console.log('[Text]', text.slice(0, 100));
+      logger.debug({ preview: text.slice(0, 100) }, 'Text received');
     });
 
     const output = await agent.execute(
@@ -521,8 +519,7 @@ describeWithApi('Orchestrator E2E Integration Tests (API Required)', () => {
     const fullText = textMessages.join('');
     expect(fullText.toLowerCase()).toMatch(/button|onclick|react/i);
 
-    // eslint-disable-next-line no-console
-    console.log('ComponentAgent output:', JSON.stringify(output, null, 2));
+    logger.info({ output }, 'ComponentAgent completed');
 
     agent.dispose();
   }, 60000);
@@ -538,14 +535,18 @@ describeWithApi('Orchestrator E2E Integration Tests (API Required)', () => {
 
     orchestrator.onStateChange((state) => {
       states.push(state);
-      // eslint-disable-next-line no-console
-      console.log(
-        `[State] ${state.status} - Stage ${String(state.currentStage)}/${String(state.stages.length)}`
+      logger.debug(
+        {
+          status: state.status,
+          currentStage: state.currentStage,
+          totalStages: state.stages.length,
+        },
+        'State changed'
       );
     });
 
     orchestrator.onError((error) => {
-      console.error('[Error]', error);
+      logger.error({ error }, 'Orchestrator error');
     });
 
     const canvasState: CanvasSnapshot = {
@@ -563,13 +564,15 @@ describeWithApi('Orchestrator E2E Integration Tests (API Required)', () => {
     expect(result.decomposition).toBeDefined();
     expect(result.analysis.category).toBe('create-component');
 
-    // eslint-disable-next-line no-console
-    console.log('Orchestrator analysis:', {
-      category: result.analysis.category,
-      complexity: result.analysis.complexity,
-      useFastPath: result.analysis.useFastPath,
-      taskCount: result.decomposition.graph.tasks.size,
-    });
+    logger.info(
+      {
+        category: result.analysis.category,
+        complexity: result.analysis.complexity,
+        useFastPath: result.analysis.useFastPath,
+        taskCount: result.decomposition.graph.tasks.size,
+      },
+      'Orchestrator analysis completed'
+    );
 
     orchestrator.dispose();
   }, 30000);
@@ -585,9 +588,9 @@ describeWithApi('Orchestrator E2E Integration Tests (API Required)', () => {
 
     orchestrator.onStateChange((state) => {
       states.push(state);
-      // eslint-disable-next-line no-console
-      console.log(
-        `[State] ${state.status} - Tasks: ${String(state.completedTasks)}/${String(state.totalTasks)}`
+      logger.debug(
+        { status: state.status, completed: state.completedTasks, total: state.totalTasks },
+        'State changed'
       );
     });
 
@@ -609,15 +612,17 @@ describeWithApi('Orchestrator E2E Integration Tests (API Required)', () => {
     expect(result.analysis.useFastPath).toBe(false);
     expect(result.decomposition.graph.stages.length).toBeGreaterThan(1);
 
-    // eslint-disable-next-line no-console
-    console.log('Complex intent analysis:', {
-      category: result.analysis.category,
-      complexity: result.analysis.complexity,
-      useFastPath: result.analysis.useFastPath,
-      stageCount: result.decomposition.graph.stages.length,
-      taskCount: result.decomposition.graph.tasks.size,
-      stages: result.decomposition.graph.stages.map((s) => s.name),
-    });
+    logger.info(
+      {
+        category: result.analysis.category,
+        complexity: result.analysis.complexity,
+        useFastPath: result.analysis.useFastPath,
+        stageCount: result.decomposition.graph.stages.length,
+        taskCount: result.decomposition.graph.tasks.size,
+        stages: result.decomposition.graph.stages.map((s) => s.name),
+      },
+      'Complex intent analysis completed'
+    );
 
     orchestrator.dispose();
   }, 30000);
@@ -667,10 +672,9 @@ describeWithApi('Orchestrator Stress Tests (API Required)', () => {
 
       expect(results.every((r) => r.success)).toBe(true);
 
-      // eslint-disable-next-line no-console
-      console.log(
-        'Concurrent execution results:',
-        results.map((r) => ({ success: r.success, changes: r.changes.length }))
+      logger.info(
+        { results: results.map((r) => ({ success: r.success, changes: r.changes.length })) },
+        'Concurrent execution completed'
       );
 
       agents.forEach((a) => {

@@ -8,6 +8,27 @@ import { VIEWPORT_PRESETS, ERROR_MESSAGES, SANDBOX_TIMEOUTS } from './sandpackCo
 import type { ViewportType } from './sandpackConfig';
 import type { SandpackMessage } from '@codesandbox/sandpack-client';
 
+// Type guard for idle status messages
+function isIdleStatus(msg: SandpackMessage): boolean {
+  return msg.type === 'status' && 'status' in msg && (msg as { status?: string }).status === 'idle';
+}
+
+// Type guard and extractor for show-error action messages
+function getShowErrorMessage(msg: SandpackMessage): string | undefined {
+  if (msg.type !== 'action') return undefined;
+  const data = msg as { action?: string; message?: string };
+  if (data.action !== 'show-error') return undefined;
+  return data.message;
+}
+
+// Type guard and extractor for resize messages
+function getResizeDimensions(msg: SandpackMessage): { width: number; height: number } | undefined {
+  if (msg.type !== 'resize') return undefined;
+  const data = msg as { width?: number; height?: number };
+  if (typeof data.width !== 'number' || typeof data.height !== 'number') return undefined;
+  return { width: data.width, height: data.height };
+}
+
 // Stable callback refs to prevent effect re-runs
 interface CallbackRefs {
   onError?: ((nodeId: string, error: string) => void) | undefined;
@@ -99,25 +120,27 @@ export function SandpackPreview({
   // Handle Sandpack messages - use refs for stable callback
   const handleMessage = useCallback(
     (msg: SandpackMessage): void => {
-      const data = msg as unknown as Record<string, unknown>;
-
-      if (msg.type === 'status' && data['status'] === 'idle') {
+      if (isIdleStatus(msg)) {
         setState((prev) => ({ ...prev, status: 'ready', error: null }));
         callbackRefs.current.onReady?.(nodeId);
       }
 
-      if (msg.type === 'action' && data['action'] === 'show-error') {
-        const errorMessage =
-          (typeof data['message'] === 'string' ? data['message'] : null) ??
-          ERROR_MESSAGES.RUNTIME_ERROR;
-        setState((prev) => ({ ...prev, status: 'error', error: errorMessage }));
-        callbackRefs.current.onError?.(nodeId, errorMessage);
+      const errorMsg = getShowErrorMessage(msg);
+      if (errorMsg !== undefined) {
+        setState((prev) => ({ ...prev, status: 'error', error: errorMsg }));
+        callbackRefs.current.onError?.(nodeId, errorMsg);
+      } else if (msg.type === 'action') {
+        // Handle show-error without message
+        const data = msg as { action?: string };
+        if (data.action === 'show-error') {
+          setState((prev) => ({ ...prev, status: 'error', error: ERROR_MESSAGES.RUNTIME_ERROR }));
+          callbackRefs.current.onError?.(nodeId, ERROR_MESSAGES.RUNTIME_ERROR);
+        }
       }
 
-      if (msg.type === 'resize') {
-        const height = typeof data['height'] === 'number' ? data['height'] : 0;
-        const width = typeof data['width'] === 'number' ? data['width'] : 0;
-        callbackRefs.current.onResize?.(nodeId, { width, height });
+      const dimensions = getResizeDimensions(msg);
+      if (dimensions !== undefined) {
+        callbackRefs.current.onResize?.(nodeId, dimensions);
       }
     },
     [nodeId]

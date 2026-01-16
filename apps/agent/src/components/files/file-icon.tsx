@@ -13,7 +13,8 @@ export interface FileIconProps {
 }
 
 // Import all icons from the assets directory
-const iconModules = import.meta.glob<{ default: string }>('/src/assets/icons/*.svg', {
+// When using `import: 'default'` with `?url`, Vite returns the URL string directly
+const iconModules = import.meta.glob<string>('/src/assets/icons/*.svg', {
   eager: true,
   query: '?url',
   import: 'default',
@@ -24,7 +25,7 @@ const iconMap: Record<string, string> = {};
 for (const [path, url] of Object.entries(iconModules)) {
   const match = /\/([^/]+)\.svg$/.exec(path);
   if (match?.[1]) {
-    iconMap[match[1]] = url as unknown as string;
+    iconMap[match[1]] = url;
   }
 }
 

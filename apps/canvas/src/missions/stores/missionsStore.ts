@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
+import { omit } from '../../lib/utils';
 import { createAgentCard, createMission, createMissionConnection } from '../types';
 
 import type {
@@ -709,10 +710,9 @@ export const useMissionsStore = create<MissionsState & MissionsActions>()(
       }
 
       // Build new mission without currentRun (required by exactOptionalPropertyTypes)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { currentRun: _removed, ...restMission } = activeMission;
+      const missionWithoutRun = omit(activeMission, 'currentRun');
       const updatedMission: Mission = {
-        ...restMission,
+        ...missionWithoutRun,
         status,
         runHistory: [...activeMission.runHistory, completedRun],
         updatedAt: Date.now(),

@@ -461,6 +461,8 @@ function CanvasAppInner(): React.JSX.Element {
   const { sendPerceptionRequest } = usePerception();
 
   // Sync layers with nodes when nodes change
+  // DEPS: layerManagement.syncFromNodes is a stable useCallback with [] deps (see useLayerManagement.ts:633)
+  // The layerManagement object itself changes on render, but we only use the stable syncFromNodes function.
   useEffect(() => {
     layerManagement.syncFromNodes(
       nodes.map((n) => {
@@ -477,7 +479,12 @@ function CanvasAppInner(): React.JSX.Element {
     );
   }, [nodes]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load persisted state on mount
+  // Load persisted state on mount - initialization pattern
+  // DEPS: All functions used (loadState, setNodes, setEdges, setViewport, setIsStateLoaded) are stable:
+  // - loadState: imported module function (stable)
+  // - setNodes/setEdges: ReactFlow state setters (stable by React guarantee)
+  // - setViewport: ReactFlow instance method (stable)
+  // - setIsStateLoaded: useState setter (stable by React guarantee)
   useEffect(() => {
     const persistedState = loadState();
     if (persistedState !== null) {

@@ -19,6 +19,19 @@ import { ERROR_MESSAGES, SANDBOX_TIMEOUTS, VIEWPORT_PRESETS } from './sandpackCo
 import type { ViewportType } from './sandpackConfig';
 import type { SandpackMessage } from '@codesandbox/sandpack-client';
 
+// Type guard for idle status messages
+function isIdleStatus(msg: SandpackMessage): boolean {
+  return msg.type === 'status' && 'status' in msg && (msg as { status?: string }).status === 'idle';
+}
+
+// Type guard and extractor for show-error action messages
+function getShowErrorMessage(msg: SandpackMessage): string | undefined {
+  if (msg.type !== 'action') return undefined;
+  const data = msg as { action?: string; message?: string };
+  if (data.action !== 'show-error') return undefined;
+  return data.message;
+}
+
 export interface InlinePreviewProps {
   nodeId: string;
   instanceId: string;
@@ -104,19 +117,22 @@ export function InlinePreview({
   // Handle Sandpack messages
   const handleMessage = useCallback(
     (msg: SandpackMessage): void => {
-      const data = msg as unknown as Record<string, unknown>;
-
-      if (msg.type === 'status' && data['status'] === 'idle') {
+      if (isIdleStatus(msg)) {
         setState({ status: 'ready', error: null });
         callbackRefs.current.onReady?.(instanceId);
       }
 
-      if (msg.type === 'action' && data['action'] === 'show-error') {
-        const errorMessage =
-          (typeof data['message'] === 'string' ? data['message'] : null) ??
-          ERROR_MESSAGES.RUNTIME_ERROR;
-        setState({ status: 'error', error: errorMessage });
-        callbackRefs.current.onError?.(instanceId, errorMessage);
+      const errorMsg = getShowErrorMessage(msg);
+      if (errorMsg !== undefined) {
+        setState({ status: 'error', error: errorMsg });
+        callbackRefs.current.onError?.(instanceId, errorMsg);
+      } else if (msg.type === 'action') {
+        // Handle show-error without message
+        const data = msg as { action?: string };
+        if (data.action === 'show-error') {
+          setState({ status: 'error', error: ERROR_MESSAGES.RUNTIME_ERROR });
+          callbackRefs.current.onError?.(instanceId, ERROR_MESSAGES.RUNTIME_ERROR);
+        }
       }
     },
     [instanceId]

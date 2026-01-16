@@ -124,24 +124,16 @@ export function useKeyboardShortcuts(
     };
   }, [enabled, handleKeyDown]);
 
-  const registerShortcut = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    (_shortcut: KeyboardShortcut): void => {
-      // This would require state management to dynamically add shortcuts
-      // For now, shortcuts are passed in options
-      logger.warn('Dynamic shortcut registration not implemented');
-    },
-    []
-  );
+  const registerShortcut = useCallback((shortcut: KeyboardShortcut): void => {
+    // This would require state management to dynamically add shortcuts
+    // For now, shortcuts are passed in options - log the attempt for debugging
+    logger.warn('Dynamic shortcut registration not implemented', { key: shortcut.key });
+  }, []);
 
-  const unregisterShortcut = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    (_key: string): void => {
-      // This would require state management to dynamically remove shortcuts
-      logger.warn('Dynamic shortcut unregistration not implemented');
-    },
-    []
-  );
+  const unregisterShortcut = useCallback((key: string): void => {
+    // This would require state management to dynamically remove shortcuts
+    logger.warn('Dynamic shortcut unregistration not implemented', { key });
+  }, []);
 
   return {
     registerShortcut,

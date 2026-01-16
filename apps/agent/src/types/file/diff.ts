@@ -285,13 +285,11 @@ export function formatDiffStats(additions: number, deletions: number): string {
   return [addedStr, deletedStr].filter(Boolean).join(', ');
 }
 
-export function expandDiffContext(
-  lines: DiffLine[],
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _contextLines: number
-): DiffLine[] {
+export function expandDiffContext(lines: DiffLine[], contextLines: number): DiffLine[] {
   // This would expand the context around changes
   // Implementation depends on having access to the full file content
+  // For now, return lines unchanged (context expansion requires original file)
+  void contextLines; // Parameter reserved for future implementation
   return lines;
 }
 
@@ -352,15 +350,13 @@ export function collapseDiffHunks(hunks: DiffHunk[], minGapSize = 3): DiffHunk[]
   return collapsed;
 }
 
-export function extractDiffConflicts(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _diff: FileDiff
-): DiffConflict[] {
+export function extractDiffConflicts(diff: FileDiff): DiffConflict[] {
   const conflicts: DiffConflict[] = [];
 
   // This would parse conflict markers like <<<<<<< HEAD, =======, >>>>>>> branch
   // and extract conflict regions
   // Implementation depends on specific conflict marker format
+  void diff; // Parameter reserved for future implementation
 
   return conflicts;
 }

@@ -12,6 +12,13 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 
+// Extend Window interface for dev console access
+declare global {
+  interface Window {
+    __perception?: PerceptionTestHarness;
+  }
+}
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -354,7 +361,7 @@ export function installPerceptionTestHarness(
   };
 
   // Expose on window for dev console access
-  (window as unknown as { __perception: PerceptionTestHarness }).__perception = harness;
+  window.__perception = harness;
   console.warn(
     '[Perception] Test harness installed. Use window.__perception.testAriaSnapshot(nodeId) etc.'
   );

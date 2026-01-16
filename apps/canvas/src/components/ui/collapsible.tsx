@@ -18,8 +18,10 @@ interface CollapsibleContentProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-function
-const noop = (): void => {};
+// Default no-op function for uncontrolled component default value
+const noop = (): void => {
+  return;
+};
 
 const CollapsibleContext = React.createContext<{
   open: boolean;

@@ -87,11 +87,8 @@ export const RootLayout: FC = () => {
   // Handle messages from Orbit extension (including panel:command)
   const handleExtensionMessage = useCallback((message: ExtensionMessage): void => {
     if (message.type === 'panel:command') {
-      // Handle panel commands
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Future extensibility
-      if (message.command === 'quick-open') {
-        setQuickOpenVisible(true);
-      }
+      // Currently only 'quick-open' is supported - add switch when more commands are added
+      setQuickOpenVisible(true);
     }
   }, []);
 

@@ -10,6 +10,12 @@ import type { ComponentTemplate } from '../../lib/components/componentLibrary';
 import type { SandpackNodeData } from '../../sandpack/SandpackNode';
 import type { Node, Edge } from '@xyflow/react';
 
+// Type guard for nodes with SandpackNodeData
+function hasSandpackData(node: Node): node is Node & { data: SandpackNodeData } {
+  const data = node.data;
+  return typeof data['code'] === 'string' && typeof data['label'] === 'string';
+}
+
 export interface ContextMenuState {
   isOpen: boolean;
   position: { x: number; y: number };
@@ -182,11 +188,10 @@ export function useCanvasActions({
       ? nodes.find((n) => n.id === contextMenu.nodeId)
       : nodes.find((n) => n.selected);
 
-    if (!nodeToExport) return;
+    if (!nodeToExport || !hasSandpackData(nodeToExport)) return;
 
-    const data = nodeToExport.data as unknown as SandpackNodeData;
-    const code = data.code || '';
-    const label = data.label || 'Component';
+    const code = nodeToExport.data.code;
+    const label = nodeToExport.data.label;
 
     const filename = label.replace(/[^a-zA-Z0-9]/g, '') + '.tsx';
     exportComponent(nodeToExport.id, code, filename);

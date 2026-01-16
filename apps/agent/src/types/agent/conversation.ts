@@ -280,10 +280,6 @@ export function filterConversations(
     }
   };
 
-  // Use toSorted if available (ES2023+), otherwise spread + sort
-  return 'toSorted' in Array.prototype
-    ? (
-        filtered as unknown as { toSorted: (fn: typeof compareFn) => ConversationSummary[] }
-      ).toSorted(compareFn)
-    : [...filtered].sort(compareFn);
+  // Sort without mutating the original array (ES2023 toSorted pattern)
+  return [...filtered].sort(compareFn);
 }

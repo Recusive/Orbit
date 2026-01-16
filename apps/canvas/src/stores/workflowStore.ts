@@ -7,6 +7,7 @@ import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
+import { omit } from '../lib/utils';
 import {
   createMarkdownCard,
   createWorkflow,
@@ -754,11 +755,9 @@ export const useWorkflowStore = create<WorkflowState & WorkflowActions>()(
       const card = state.cards[cardId];
       if (card === undefined) return;
 
-      // Create a new card object without the fileConflict property
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { fileConflict: _removed, ...restCard } = card;
+      const cleanCard = omit(card, 'fileConflict');
       set({
-        cards: { ...state.cards, [cardId]: restCard as MarkdownCard },
+        cards: { ...state.cards, [cardId]: cleanCard as MarkdownCard },
         sync: { ...state.sync, isDirty: true },
       });
     },
@@ -768,11 +767,9 @@ export const useWorkflowStore = create<WorkflowState & WorkflowActions>()(
       const card = state.cards[cardId];
       if (card === undefined) return;
 
-      // Create a new card object without file-related optional properties
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { filePath: _fp, fileConflict: _fc, lastFileSyncAt: _ls, ...restCard } = card;
+      const cleanCard = omit(card, 'filePath', 'fileConflict', 'lastFileSyncAt');
       set({
-        cards: { ...state.cards, [cardId]: restCard as MarkdownCard },
+        cards: { ...state.cards, [cardId]: cleanCard as MarkdownCard },
         sync: { ...state.sync, isDirty: true },
       });
     },

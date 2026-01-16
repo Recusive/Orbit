@@ -101,12 +101,13 @@ export class TerminalFitDebouncer {
       });
     } else {
       // Fallback for environments without requestIdleCallback
-      this._idleCallback = setTimeout(() => {
+      // Use window.setTimeout explicitly to get browser's numeric return type
+      this._idleCallback = window.setTimeout(() => {
         this._idleCallback = null;
         if (!this._disposed && this._pendingFit) {
           this._doFit();
         }
-      }, IDLE_DELAY_MS) as unknown as number;
+      }, IDLE_DELAY_MS);
     }
   }
 
