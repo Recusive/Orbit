@@ -44,3 +44,6 @@ export {
   createMissionConnection,
   getAgentModelConfig,
 } from './types';
+
+// Constants
+export { MISSIONS_SIDEBAR } from './lib';

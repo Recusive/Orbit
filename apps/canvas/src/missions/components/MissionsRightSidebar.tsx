@@ -6,6 +6,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { MISSIONS_SIDEBAR } from '../lib/constants';
 import { selectActiveRightPanel, useMissionsStore, useMissionsUIStore } from '../stores';
 import { AGENT_MODEL_CONFIGS } from '../types';
 
@@ -26,8 +27,9 @@ const SIDEBAR_ANIMATION = {
 
 const EASE_OUT = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
-const SIDEBAR_MIN_WIDTH = 280;
-const SIDEBAR_MAX_WIDTH = 500;
+// Use shared constants for consistency with store
+const SIDEBAR_MIN_WIDTH = MISSIONS_SIDEBAR.right.min;
+const SIDEBAR_MAX_WIDTH = MISSIONS_SIDEBAR.right.max;
 
 // ============================================================================
 // Styles

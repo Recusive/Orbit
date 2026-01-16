@@ -220,6 +220,7 @@ export function AgentCardNode({
           className="agent-card-action-btn agent-card-action-btn--delete"
           onClick={handleDeleteClick}
           title="Delete"
+          aria-label="Delete agent"
         >
           &times;
         </button>

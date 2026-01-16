@@ -6,6 +6,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { MISSIONS_SIDEBAR } from '../lib/constants';
+
 import type { MissionRightPanelTab } from '../types';
 
 // ============================================================================
@@ -70,9 +72,9 @@ interface MissionsUIActions {
 
 const initialState: MissionsUIState = {
   leftSidebarCollapsed: false,
-  leftSidebarWidth: 280,
+  leftSidebarWidth: MISSIONS_SIDEBAR.left.default,
   rightSidebarCollapsed: false,
-  rightSidebarWidth: 320,
+  rightSidebarWidth: MISSIONS_SIDEBAR.right.default,
   activeRightPanel: 'config',
   addAgentDialogOpen: false,
   newMissionDialogOpen: false,
@@ -102,12 +104,13 @@ export const useMissionsUIStore = create<MissionsUIState & MissionsUIActions>()(
       },
 
       setLeftSidebarWidth: (width: number): void => {
-        set({ leftSidebarWidth: Math.max(200, Math.min(400, width)) });
+        const { min, max } = MISSIONS_SIDEBAR.left;
+        set({ leftSidebarWidth: Math.max(min, Math.min(max, width)) });
       },
 
       setRightSidebarWidth: (width: number): void => {
-        // Max width aligned with SIDEBAR_MAX_WIDTH in MissionsRightSidebar.tsx (500px)
-        set({ rightSidebarWidth: Math.max(280, Math.min(500, width)) });
+        const { min, max } = MISSIONS_SIDEBAR.right;
+        set({ rightSidebarWidth: Math.max(min, Math.min(max, width)) });
       },
 
       setLeftSidebarCollapsed: (collapsed: boolean): void => {

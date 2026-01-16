@@ -4,6 +4,7 @@
 
 export { ConstraintPicker } from './ConstraintPicker';
 export { DeviceFrameSelector } from './DeviceFrameSelector';
+export { ErrorBoundary } from './ErrorBoundary';
 export { InlineTextEditor } from './InlineTextEditor';
 export { RightSidebar } from './RightSidebar';
 export { ShortcutsHelp } from './ShortcutsHelp';

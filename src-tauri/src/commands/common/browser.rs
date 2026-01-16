@@ -424,12 +424,12 @@ pub async fn browser_info(
 /// # Example
 ///
 /// ```ignore
-/// // Get the page title
-/// let title = browser_eval("document.title".to_string(), app, state, result_state).await?;
+/// // Get the page title (must use 'return' to get a value from the async IIFE wrapper)
+/// let title = browser_eval("return document.title".to_string(), app, state, result_state).await?;
 /// // title = "\"My Page Title\""  (JSON string)
 ///
-/// // Execute code that returns an object
-/// let data = browser_eval("({x: 1, y: 2})".to_string(), app, state, result_state).await?;
+/// // Execute code that returns an object (parentheses make it an expression)
+/// let data = browser_eval("return {x: 1, y: 2}".to_string(), app, state, result_state).await?;
 /// // data = "{\"x\":1,\"y\":2}"
 /// ```
 #[tauri::command]

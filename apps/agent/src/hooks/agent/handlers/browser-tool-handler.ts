@@ -270,14 +270,20 @@ export async function executeBrowserTool(
           useBrowserStore.getState().setPendingNavigationUrl(url);
         }
 
-        if (await waitForBrowserReady(BROWSER_READY_TIMEOUT_MS)) {
-          try {
-            await ensureConsoleCapture();
-          } catch (error) {
-            logger.warn('Console capture injection failed', {
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
+        const browserReady = await waitForBrowserReady(BROWSER_READY_TIMEOUT_MS);
+        if (!browserReady) {
+          return {
+            success: false,
+            error: `Browser did not become ready within ${String(BROWSER_READY_TIMEOUT_MS)}ms`,
+          };
+        }
+
+        try {
+          await ensureConsoleCapture();
+        } catch (error) {
+          logger.warn('Console capture injection failed', {
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         return { success: true, result: { opened: true, url } };
@@ -307,14 +313,20 @@ export async function executeBrowserTool(
         }
 
         // Re-inject console capture after navigation (new page wipes window.__orbitConsoleLogs)
-        if (await waitForBrowserReady(BROWSER_READY_TIMEOUT_MS)) {
-          try {
-            await ensureConsoleCapture();
-          } catch (error) {
-            logger.warn('Console capture injection failed after navigate', {
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
+        const browserReady = await waitForBrowserReady(BROWSER_READY_TIMEOUT_MS);
+        if (!browserReady) {
+          return {
+            success: false,
+            error: `Browser did not become ready within ${String(BROWSER_READY_TIMEOUT_MS)}ms after navigation`,
+          };
+        }
+
+        try {
+          await ensureConsoleCapture();
+        } catch (error) {
+          logger.warn('Console capture injection failed after navigate', {
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
 
         return { success: true, result: { navigated: true, url } };
@@ -488,4 +500,12 @@ export async function handleBrowserToolResponse(
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+// HMR cleanup: Reset module-level state when module is hot-replaced
+// This prevents stale cached state from causing issues during development
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    resetBrowserToolState();
+  });
 }

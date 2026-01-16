@@ -16,6 +16,7 @@ import {
 } from '@xyflow/react';
 import React, { useCallback, useEffect, useMemo } from 'react';
 
+import { ErrorBoundary } from '../../components/shared/ErrorBoundary';
 import {
   useMissionsStore,
   useMissionsUIStore,
@@ -374,12 +375,26 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
  * MissionsCanvas - Main exported component
  * Wraps MissionsCanvasInner in ReactFlowProvider to enable useReactFlow() hook
  * for coordinate transforms (screenToFlowPosition).
+ *
+ * Includes ErrorBoundary to catch ReactFlow errors and prevent canvas crashes.
  */
 export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JSX.Element {
   return (
-    <ReactFlowProvider>
-      {/* Spread props to handle exactOptionalPropertyTypes correctly */}
-      <MissionsCanvasInner {...(onAgentSelect !== undefined && { onAgentSelect })} />
-    </ReactFlowProvider>
+    <ErrorBoundary
+      fallback={(error, reset) => (
+        <div className="missions-canvas-error">
+          <div className="missions-canvas-error-content">
+            <h3>Canvas Error</h3>
+            <p>{error.message}</p>
+            <button onClick={reset}>Try Again</button>
+          </div>
+        </div>
+      )}
+    >
+      <ReactFlowProvider>
+        {/* Spread props to handle exactOptionalPropertyTypes correctly */}
+        <MissionsCanvasInner {...(onAgentSelect !== undefined && { onAgentSelect })} />
+      </ReactFlowProvider>
+    </ErrorBoundary>
   );
 }
