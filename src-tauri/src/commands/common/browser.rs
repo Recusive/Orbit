@@ -100,10 +100,15 @@ struct BrowserBounds {
 /// This enables two-way communication with the browser webview.
 /// When `browser_eval` is called, it registers a oneshot channel
 /// and waits for the result to be sent back via navigation interception.
+///
+/// Results are typed as `Result<String, String>` where:
+/// - `Ok(value)` contains the JSON-serialized return value
+/// - `Err(message)` contains the error message from JS execution
 #[derive(Debug, Default)]
 pub struct BrowserResultState {
     /// Map of pending evaluation request IDs to their result senders.
-    pending: Mutex<HashMap<String, oneshot::Sender<String>>>,
+    /// The Result distinguishes successful JS results from errors.
+    pending: Mutex<HashMap<String, oneshot::Sender<StdResult<String, String>>>>,
 }
 
 impl BrowserResultState {
@@ -117,23 +122,38 @@ impl BrowserResultState {
     /// Register a new evaluation request and return the receiver.
     ///
     /// The caller should await on the receiver to get the result.
-    pub fn register(&self, id: String) -> oneshot::Receiver<String> {
+    /// The receiver yields `Result<String, String>` where:
+    /// - `Ok(value)` is the JSON-serialized return value
+    /// - `Err(message)` is the error message from JS execution
+    pub fn register(&self, id: String) -> oneshot::Receiver<StdResult<String, String>> {
         let (tx, rx) = oneshot::channel();
         let _ = self.pending.lock().insert(id, tx);
         rx
     }
 
-    /// Complete an evaluation request with its result.
+    /// Complete an evaluation request with a successful result.
     ///
-    /// This is called when the browser sends back the JS execution result.
-    pub fn complete(&self, id: &str, result: String) {
-        // Extract the sender before the if-let to avoid holding the lock during send
+    /// This is called when the browser sends back a successful JS execution result.
+    pub fn complete_ok(&self, id: &str, result: String) {
         let maybe_tx = self.pending.lock().remove(id);
         if let Some(tx) = maybe_tx {
             // Ignore send errors - the receiver may have been dropped (timeout)
-            let _ = tx.send(result);
+            let _ = tx.send(Ok(result));
         } else {
             log::warn!("Received result for unknown eval request: {id}");
+        }
+    }
+
+    /// Complete an evaluation request with an error.
+    ///
+    /// This is called when the browser JS execution fails.
+    pub fn complete_err(&self, id: &str, error: String) {
+        let maybe_tx = self.pending.lock().remove(id);
+        if let Some(tx) = maybe_tx {
+            // Ignore send errors - the receiver may have been dropped (timeout)
+            let _ = tx.send(Err(error));
+        } else {
+            log::warn!("Received error for unknown eval request: {id}");
         }
     }
 
@@ -232,10 +252,10 @@ pub async fn browser_create(
                     if let Some(req_id) = id {
                         if success {
                             let result = data.unwrap_or_else(|| "null".to_owned());
-                            result_state_for_nav.complete(&req_id, result);
+                            result_state_for_nav.complete_ok(&req_id, result);
                         } else {
                             let error_msg = error.unwrap_or_else(|| "Unknown error".to_owned());
-                            result_state_for_nav.complete(&req_id, format!("ERROR: {error_msg}"));
+                            result_state_for_nav.complete_err(&req_id, error_msg);
                         }
                     }
                 }
@@ -492,21 +512,18 @@ pub async fn browser_eval(
         .map_err(|e| format!("JavaScript execution failed: {e}"))?;
 
     // Wait for the result with a timeout
+    // The result_rx yields Result<String, String> where:
+    // - Ok(value) = successful JS execution with JSON result
+    // - Err(message) = JS execution error
     match timeout(JS_EVAL_TIMEOUT, result_rx).await {
-        Ok(Ok(result)) => {
-            // Check if the result indicates an error
-            if result.starts_with("ERROR: ") {
-                Err(result)
-            } else {
-                Ok(result)
-            }
-        },
-        Ok(Err(_)) => {
-            // Channel was closed without a result (cancelled)
-            Err("JavaScript evaluation was cancelled".to_owned())
-        },
+        // Successful receive with successful JS execution
+        Ok(Ok(Ok(result))) => Ok(result),
+        // Successful receive but JS execution failed
+        Ok(Ok(Err(err))) => Err(err),
+        // Channel was closed without a result (cancelled)
+        Ok(Err(_)) => Err("JavaScript evaluation was cancelled".to_owned()),
+        // Timeout - clean up the pending request
         Err(_) => {
-            // Timeout - clean up the pending request
             result_state.cancel(&eval_id);
             Err(format!(
                 "JavaScript evaluation timed out after {} seconds",
@@ -543,7 +560,8 @@ pub async fn browser_js_callback(
     state: State<'_, Arc<BrowserResultState>>,
 ) -> Result<()> {
     log::debug!("Received JS callback for request: {request_id}");
-    state.complete(&request_id, result);
+    // The JS callback always sends successful results (errors are handled in JS wrapper)
+    state.complete_ok(&request_id, result);
     Ok(())
 }
 
@@ -616,18 +634,25 @@ pub async fn browser_eval_async(
         .map_err(|e| format!("JavaScript execution failed: {e}"))?;
 
     // Wait for result with timeout
+    // Note: browser_js_callback uses complete_ok for all results, so JS errors
+    // are encoded as {__error: message} in the JSON result (not as Err variant)
     let timeout_duration = Duration::from_millis(timeout_ms.unwrap_or(5000));
-    timeout(timeout_duration, rx)
-        .await
-        .map_err(|_elapsed| {
-            // Clean up pending request on timeout
+    match timeout(timeout_duration, rx).await {
+        // Successful receive with successful JS callback
+        Ok(Ok(Ok(result))) => Ok(result),
+        // Successful receive but complete_err was called (shouldn't happen with browser_js_callback)
+        Ok(Ok(Err(err))) => Err(err),
+        // Channel was closed without a result
+        Ok(Err(_recv_err)) => Err("Result channel closed unexpectedly".to_owned()),
+        // Timeout - clean up the pending request
+        Err(_elapsed) => {
             result_state.cancel(&request_id);
-            format!(
+            Err(format!(
                 "JavaScript execution timed out after {}ms",
                 timeout_duration.as_millis()
-            )
-        })?
-        .map_err(|_recv_err| "Result channel closed unexpectedly".to_owned())
+            ))
+        },
+    }
 }
 
 /// Capture screenshot of the embedded browser.
