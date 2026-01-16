@@ -3,9 +3,11 @@
  */
 
 import { existsSync } from 'fs';
+import { EventEmitter } from 'node:events';
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
+import { BrowserToolBridge, createBrowserMcpServer } from '../../browser/index.js';
 import { ClaudeCredentials } from '../../common/auth/credentials.js';
 import { createLogger } from '../../common/logging/logger.js';
 import { withRetry, RetryPresets } from '../../common/retry/retry.js';
@@ -14,6 +16,7 @@ import { getAllowedToolsForMode } from '../session/session-mode.js';
 import { buildContentBlocks } from '../utils/content.js';
 import { formatToolResult } from '../utils/formatter.js';
 
+import type { McpToolRequest, McpToolResponse } from '../../browser/index.js';
 import type { PermissionRequestCallback, SnapshotCallback } from '../permissions/permissions.js';
 import type { OrbitSessionMode } from '../session/session-mode.js';
 import type { AttachmentContentBlock } from '../types/messages.js';
@@ -39,6 +42,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 
 const logger = createLogger('OrbitAgent');
+const BROWSER_MCP_SERVER_KEY = 'orbit-browser';
 
 /**
  * Tool result block type for type guard
@@ -253,6 +257,10 @@ export class OrbitAgent {
   // MCP servers (DevTools, custom tools, etc.)
   private _mcpServers: Record<string, McpServerConfig>;
 
+  // Browser MCP bridge + events
+  private browserBridge?: BrowserToolBridge;
+  private readonly browserEmitter = new EventEmitter();
+
   // Structured output format (JSON Schema)
   private _outputFormat?: OutputFormat;
 
@@ -325,9 +333,9 @@ export class OrbitAgent {
    */
   setBrowserMcpServer(server: McpServerConfig | null): void {
     if (server) {
-      this.registerMcpServer('browser', server);
+      this.registerMcpServer(BROWSER_MCP_SERVER_KEY, server);
     } else {
-      this.unregisterMcpServer('browser');
+      this.unregisterMcpServer(BROWSER_MCP_SERVER_KEY);
     }
   }
 
@@ -335,7 +343,49 @@ export class OrbitAgent {
    * Check if browser MCP server is registered
    */
   hasBrowserMcpServer(): boolean {
-    return Object.hasOwn(this._mcpServers, 'browser');
+    return Object.hasOwn(this._mcpServers, BROWSER_MCP_SERVER_KEY);
+  }
+
+  /**
+   * Initialize embedded browser MCP server and bridge.
+   * Safe to call multiple times.
+   */
+  initializeBrowserMcp(): void {
+    if (this.browserBridge) {
+      return;
+    }
+
+    this.browserBridge = new BrowserToolBridge();
+    const browserServer = createBrowserMcpServer(this.browserBridge);
+    this.setBrowserMcpServer(browserServer);
+
+    // Forward tool requests to listeners
+    this.browserBridge.onToolRequest((request) => {
+      this.browserEmitter.emit('browserToolRequest', request);
+    });
+
+    logger.info('Browser MCP server initialized');
+  }
+
+  /**
+   * Subscribe to browser tool requests (forwarded to frontend).
+   */
+  onBrowserToolRequest(callback: (request: McpToolRequest) => void): () => void {
+    this.browserEmitter.on('browserToolRequest', callback);
+    return () => {
+      this.browserEmitter.off('browserToolRequest', callback);
+    };
+  }
+
+  /**
+   * Handle browser tool response from frontend.
+   */
+  handleBrowserToolResponse(response: McpToolResponse): void {
+    if (!this.browserBridge) {
+      logger.warn('Browser MCP bridge not initialized');
+      return;
+    }
+    this.browserBridge.handleResponse(response);
   }
 
   /**
@@ -383,52 +433,39 @@ export class OrbitAgent {
         append: `
 ## Browser Automation
 
-You have access to browser automation tools via MCP. Use mcp__browser__open_browser to start a browser session.
+You have access to embedded browser automation tools via MCP. Use mcp__orbit-browser__browser_open to start a browser session.
 
 ### Panel Control
-- **mcp__browser__open_browser**: Open the browser panel and navigate to URL. Use this first if browser is not open.
-- **mcp__browser__close_browser**: Close the browser panel when done with automation.
+- **mcp__orbit-browser__browser_open**: Open the browser panel and optionally navigate to a URL.
+- **mcp__orbit-browser__browser_close**: Close the browser panel when done with automation.
 
 ### Navigation
-- **mcp__browser__navigate**: Go to URL (returns accessibility snapshot with element refs)
-- **mcp__browser__go_back / mcp__browser__go_forward / mcp__browser__reload**: History navigation
-- **mcp__browser__url**: Get current URL
+- **mcp__orbit-browser__browser_navigate**: Go to URL
+- **mcp__orbit-browser__browser_back / mcp__orbit-browser__browser_forward / mcp__orbit-browser__browser_reload**: History navigation
 
 ### Interaction
-- **mcp__browser__click**: Click by CSS selector
-- **mcp__browser__click_ref**: Click by accessibility ref (preferred - more reliable)
-- **mcp__browser__type**: Type text character by character
-- **mcp__browser__fill**: Fill form field (clears first, more reliable for inputs)
-- **mcp__browser__select**: Select dropdown option
-- **mcp__browser__hover**: Hover over element
-- **mcp__browser__press_key**: Press keyboard key (Enter, Tab, Escape, ArrowDown, etc.)
-- **mcp__browser__scroll**: Scroll page or element
+- **mcp__orbit-browser__browser_click**: Click by CSS selector
+- **mcp__orbit-browser__browser_type**: Type text into an input field
 
 ### Observation
-- **mcp__browser__snapshot**: Get accessibility tree showing all interactive elements with refs
-- **mcp__browser__screenshot**: Capture visual screenshot
-- **mcp__browser__wait**: Wait for element to appear
+- **mcp__orbit-browser__browser_get_text**: Get page or element text
+- **mcp__orbit-browser__browser_get_html**: Get page or element HTML
+- **mcp__orbit-browser__browser_screenshot**: Get page info (URL, title, dimensions)
+- **mcp__orbit-browser__browser_console_logs**: Get console logs
 
 ### JavaScript
-- **mcp__browser__evaluate**: Execute JavaScript in page context
-
-### Console/Network
-- **mcp__browser__console_logs**: Get console messages (errors, warnings, logs)
-- **mcp__browser__network_requests**: Get network requests (useful for debugging API calls)
+- **mcp__orbit-browser__browser_eval**: Execute JavaScript in page context
 
 ### Recommended Workflow
-1. Use mcp__browser__open_browser to start a browser session (or mcp__browser__navigate if already open)
-2. Read the snapshot to find elements and their refs (e.g., ref="ref-5")
-3. Use mcp__browser__click_ref with refs for reliable clicking (not CSS selectors)
-4. After interactions, call mcp__browser__snapshot to see updated page state
-5. Use mcp__browser__console_logs to check for JavaScript errors
-6. Use mcp__browser__close_browser when done
+1. Use mcp__orbit-browser__browser_open to start a browser session (or browser_navigate if already open)
+2. Use browser_get_text/browser_get_html to inspect content
+3. Use browser_click/browser_type for interactions
+4. Use browser_console_logs to check for JavaScript errors
+5. Use browser_close when done
 
 ### Tips
-- **Use open_browser first** - it opens the panel and navigates in one step
-- **Prefer refs over CSS selectors** - accessibility refs from snapshots are more reliable
-- **Always check snapshot after navigation** to understand page structure
-- **For forms**: use mcp__browser__fill for inputs, mcp__browser__select for dropdowns
+- **Use browser_open first** - it opens the panel and navigates in one step
+- **Use specific CSS selectors** for reliable interaction
 - **Check console for errors** after page loads or after interactions fail
 
 ## Chrome DevTools (Advanced)
@@ -468,7 +505,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
 - **devtools_page_info**: Get current page title and URL
 
 ### When to Use DevTools vs Browser Tools
-- **Browser tools (mcp__browser__)**: Page interaction, navigation, clicking, typing
+- **Browser tools (mcp__orbit-browser__)**: Page interaction, navigation, clicking, typing
 - **DevTools tools (mcp__orbit-devtools__)**: Deep inspection, debugging, storage, performance analysis
 `,
       },

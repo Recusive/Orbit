@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/shallow';
 
 import type { ExtensionMessage } from '@/types/protocol';
 
+import { executeBrowserTool } from '@/hooks/agent/handlers/browser-tool-handler';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { useBrowserStore } from '@/stores/browser/browser-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -86,6 +87,23 @@ export function useBrowser(): void {
         case 'browser:close': {
           // Switch to a different tab (files is the default)
           useUIStore.getState().setActivityTab('files');
+          break;
+        }
+
+        case 'browser:tool_request': {
+          const { session_id, request } = message;
+          void (async () => {
+            const result = await executeBrowserTool(request.toolName, request.toolInput);
+            postMessage({
+              type: 'browser:tool_response',
+              uuid: generateUUID(),
+              session_id,
+              response: {
+                requestId: request.requestId,
+                ...result,
+              },
+            });
+          })();
           break;
         }
 

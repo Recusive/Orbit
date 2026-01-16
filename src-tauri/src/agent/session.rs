@@ -738,6 +738,20 @@ impl SessionManager {
         Self::check_response(resp)
     }
 
+    /// Send a tool response back to a browser MCP session
+    pub fn browser_tool_response(&self, session_id: &str, response: McpToolResponse) -> Result<()> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::BrowserToolResponse {
+            session_id: session_id.to_owned(),
+            response,
+        };
+
+        let bridge = self.bridge.lock();
+        let resp = bridge.send_request(&request)?;
+        Self::check_response(resp)
+    }
+
     /// Shutdown the session manager
     pub fn shutdown(&self) -> Result<()> {
         let mut bridge = self.bridge.lock();

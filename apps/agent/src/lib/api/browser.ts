@@ -34,6 +34,42 @@ export interface BrowserLoadingEvent {
   is_loading: boolean;
 }
 
+/** Payload for browser:tool_request events */
+export interface BrowserToolRequestEvent {
+  sessionId: string;
+  request: {
+    requestId: string;
+    toolName: string;
+    toolInput: Record<string, unknown>;
+  };
+}
+
+/** Payload for browser tool responses */
+export interface BrowserToolResponsePayload {
+  requestId: string;
+  success: boolean;
+  result?: unknown;
+  error?: string | undefined;
+}
+
+/** Screenshot/page info response */
+export interface BrowserScreenshotInfo {
+  /** Current URL */
+  url: string;
+  /** Page title */
+  title: string;
+  /** Viewport width */
+  width: number;
+  /** Viewport height */
+  height: number;
+  /** Horizontal scroll position */
+  scrollX: number;
+  /** Vertical scroll position */
+  scrollY: number;
+  /** Device pixel ratio (for retina displays) */
+  devicePixelRatio: number;
+}
+
 // ============================================
 // Embedded Browser Operations
 // ============================================
@@ -99,13 +135,77 @@ export async function browserInfo(): Promise<BrowserInfo | null> {
 }
 
 /**
- * Execute JavaScript in the embedded browser.
+ * Execute JavaScript in the embedded browser and return the result.
  *
- * Useful for AI automation and interacting with web pages.
+ * Uses navigation interception to capture results, which works on any site
+ * (including external URLs that don't have the Tauri API).
+ *
+ * @param script - JavaScript code to execute
+ * @returns JSON-serialized result of the script execution
+ *
+ * @example
+ * ```ts
+ * const title = await browserEval('return document.title');
+ * console.log(JSON.parse(title)); // "My Page Title"
+ * ```
  */
-export async function browserEval(script: string): Promise<void> {
+export async function browserEval(script: string): Promise<string> {
   logger.debug('Executing script in browser');
-  return invoke('browser_eval', { script });
+  return invoke<string>('browser_eval', { script });
+}
+
+/**
+ * Execute JavaScript and return the result using Tauri invoke callback.
+ *
+ * This variant uses `window.__TAURI__.invoke()` to send results back,
+ * which is faster but requires the Tauri API to be available in the browser.
+ * Use `browserEval` for external sites.
+ *
+ * @param script - JavaScript code to execute
+ * @param timeoutMs - Optional timeout in milliseconds (default: 5000)
+ * @returns JSON-serialized result of the script execution
+ *
+ * @example
+ * ```ts
+ * const data = await browserEvalAsync('return { x: 1, y: 2 }', 10000);
+ * console.log(JSON.parse(data)); // { x: 1, y: 2 }
+ * ```
+ */
+export async function browserEvalAsync(script: string, timeoutMs?: number): Promise<string> {
+  logger.debug('Executing script with result');
+  return invoke<string>('browser_eval_async', { script, timeoutMs });
+}
+
+/**
+ * Capture browser screenshot (page info).
+ *
+ * Currently returns page metadata (URL, title, dimensions).
+ * Full pixel capture would require html2canvas or native webview API.
+ *
+ * @returns JSON-serialized page information
+ *
+ * @example
+ * ```ts
+ * const infoJson = await browserScreenshot();
+ * const info: BrowserScreenshotInfo = JSON.parse(infoJson);
+ * console.log(`${info.title} (${info.width}x${info.height})`);
+ * ```
+ */
+export async function browserScreenshot(): Promise<string> {
+  logger.debug('Capturing browser screenshot');
+  return invoke<string>('browser_screenshot');
+}
+
+/**
+ * Capture browser screenshot and parse the result.
+ *
+ * Convenience wrapper around `browserScreenshot` that parses the JSON.
+ *
+ * @returns Parsed page information
+ */
+export async function browserScreenshotInfo(): Promise<BrowserScreenshotInfo> {
+  const json = await browserScreenshot();
+  return JSON.parse(json) as BrowserScreenshotInfo;
 }
 
 /**
@@ -170,6 +270,20 @@ export async function browserHide(): Promise<void> {
 }
 
 // ============================================
+// MCP Tool Responses
+// ============================================
+
+/**
+ * Send a browser MCP tool response back to the agent.
+ */
+export async function browserToolResponse(
+  sessionId: string,
+  response: BrowserToolResponsePayload
+): Promise<void> {
+  return invoke('browser_tool_response', { sessionId, response });
+}
+
+// ============================================
 // Event Listeners
 // ============================================
 
@@ -193,6 +307,17 @@ export async function onBrowserLoading(
   callback: (event: BrowserLoadingEvent) => void
 ): Promise<() => void> {
   return listen<BrowserLoadingEvent>('browser:loading', callback);
+}
+
+/**
+ * Listen for browser MCP tool requests.
+ *
+ * Called when the agent requests a browser tool execution.
+ */
+export async function onBrowserToolRequest(
+  callback: (event: BrowserToolRequestEvent) => void
+): Promise<() => void> {
+  return listen<BrowserToolRequestEvent>('browser:tool_request', callback);
 }
 
 // ============================================

@@ -19,6 +19,7 @@ import {
   handleBrowserShow,
   handleBrowserStop,
 } from './browser-handlers';
+import { handleBrowserToolResponse } from './browser-tool-handler';
 import {
   handleCommandsList,
   handleCommandsCreate,
@@ -295,6 +296,11 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
 
   if (message.type === 'browser:hide') {
     await handleBrowserHide(message);
+    return;
+  }
+
+  if (message.type === 'browser:tool_response') {
+    await handleBrowserToolResponse(message);
     return;
   }
 

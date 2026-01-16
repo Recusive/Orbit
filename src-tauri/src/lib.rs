@@ -15,7 +15,7 @@ use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
 use commands::canvas::lifecycle as canvas_cmd;
 use commands::common::{
-    browser::{self, EmbeddedBrowserState},
+    browser::{self, BrowserResultState, EmbeddedBrowserState},
     credentials, dev_monitor, diagnostics, files, git, lsp, providers, search, settings, terminal,
     workspace,
 };
@@ -211,6 +211,7 @@ pub fn run() {
 
     // Initialize embedded browser state
     let browser_state = Arc::new(EmbeddedBrowserState::new());
+    let browser_result_state = Arc::new(BrowserResultState::new());
 
     let result = tauri::Builder::default()
         // Managed state
@@ -218,6 +219,7 @@ pub fn run() {
         .manage(conversation_manager)
         .manage(session_manager_for_state)
         .manage(browser_state)
+        .manage(browser_result_state)
         // Plugins
         .plugin(build_log_plugin().build())
         .plugin(tauri_plugin_fs::init())
@@ -253,6 +255,7 @@ pub fn run() {
             agent_cmd::agent_is_session_ready,
             agent_cmd::agent_get_sdk_session_id,
             agent_cmd::agent_respond_permission,
+            agent_cmd::browser_tool_response,
             agent_cmd::agent_set_thinking_mode,
             agent_cmd::agent_get_thinking_mode,
             agent_cmd::agent_set_model,
@@ -411,6 +414,9 @@ pub fn run() {
             browser::browser_has,
             browser::browser_info,
             browser::browser_eval,
+            browser::browser_js_callback,
+            browser::browser_eval_async,
+            browser::browser_screenshot,
             browser::browser_open_devtools,
             // Browser navigation commands
             browser::browser_back,

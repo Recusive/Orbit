@@ -26,7 +26,12 @@ import {
   useWordWrap,
   getLanguageFromPath,
 } from '@/stores/file/file-viewer-store';
-import { useUIStore, useTerminalPosition, useActivityTab } from '@/stores/ui/ui-store';
+import {
+  useUIStore,
+  useTerminalPosition,
+  useActivityTab,
+  useReviewPanelOpen,
+} from '@/stores/ui/ui-store';
 import { generateUUID } from '@/types/protocol';
 
 const logger = createLogger('ActivityPanel');
@@ -382,6 +387,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   const wordWrap = useWordWrap();
   const toggleWordWrap = useFileViewerStore((state) => state.toggleWordWrap);
   const activeTab = useActivityTab();
+  const reviewPanelOpen = useReviewPanelOpen();
   const setActiveTab = useUIStore((state) => state.setActivityTab);
   // Use useShallow to prevent re-renders when unrelated store state changes
   const { bottomPanelOpen, bottomPanelHeight, setBottomPanelHeight } = useUIStore(
@@ -499,6 +505,28 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
 
     prevActiveTab.current = activeTab;
   }, [activeTab, isBrowserActive, postMessage]);
+
+  // Hide browser when activity panel collapses; restore visibility when reopened on browser tab.
+  useEffect(() => {
+    if (!isBrowserActive) {
+      return;
+    }
+
+    if (!reviewPanelOpen) {
+      postMessage({
+        type: 'browser:hide',
+        uuid: generateUUID(),
+      });
+      return;
+    }
+
+    if (activeTab === 'browser') {
+      postMessage({
+        type: 'browser:show',
+        uuid: generateUUID(),
+      });
+    }
+  }, [activeTab, isBrowserActive, postMessage, reviewPanelOpen]);
 
   // Hide browser when ActivityPanel unmounts (panel collapsed)
   // Use a ref to track current state for cleanup

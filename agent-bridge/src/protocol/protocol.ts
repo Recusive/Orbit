@@ -369,6 +369,15 @@ export interface CanvasToolResponseRequest {
 }
 
 /**
+ * Send a tool response back to a browser MCP session
+ */
+export interface BrowserToolResponseRequest {
+  type: 'browser:tool_response';
+  sessionId: string;
+  response: McpToolResponse;
+}
+
+/**
  * All possible requests from Rust
  */
 export type BridgeRequest =
@@ -407,7 +416,8 @@ export type BridgeRequest =
   | CanvasDeleteSessionRequest
   | CanvasSendMessageRequest
   | CanvasInterruptRequest
-  | CanvasToolResponseRequest;
+  | CanvasToolResponseRequest
+  | BrowserToolResponseRequest;
 
 // ============================================================================
 // Response Types (Node.js → Rust)
@@ -612,6 +622,15 @@ export interface CanvasToolRequestEvent {
 }
 
 /**
+ * Browser tool request event - agent requesting tool execution in webview
+ */
+export interface BrowserToolRequestEvent {
+  type: 'browser:tool_request';
+  sessionId: string;
+  request: McpToolRequest;
+}
+
+/**
  * Canvas error event
  */
 export interface CanvasErrorEvent {
@@ -634,7 +653,8 @@ export type BridgeEvent =
   | CheckpointEvent
   | CanvasMessageEvent
   | CanvasToolRequestEvent
-  | CanvasErrorEvent;
+  | CanvasErrorEvent
+  | BrowserToolRequestEvent;
 
 /**
  * All possible messages from Node.js to Rust

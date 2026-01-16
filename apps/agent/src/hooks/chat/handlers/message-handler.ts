@@ -853,6 +853,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       case 'browser:error':
       case 'browser:cleared':
       case 'browser:created':
+      case 'browser:tool_request':
       case 'subagents:list:response':
       case 'subagents:created':
       case 'subagents:updated':

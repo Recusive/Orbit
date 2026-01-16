@@ -173,6 +173,15 @@ function main(): void {
     });
   });
 
+  // Browser tool request events (from MCP server)
+  sessionManager.onBrowserToolRequest((data) => {
+    sendEvent({
+      type: 'browser:tool_request',
+      sessionId: data.sessionId,
+      request: data.request,
+    });
+  });
+
   // Wire up canvas session event handlers
   canvasSessionManager.onMessage((data) => {
     sendEvent({
@@ -509,6 +518,12 @@ async function handleRequest(
 
     case 'canvas:tool_response': {
       canvasSessionManager.handleToolResponse(request.sessionId, request.response);
+      sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
+    case 'browser:tool_response': {
+      sessionManager.handleBrowserToolResponse(request.sessionId, request.response);
       sendResponse({ type: 'success', requestType: request.type });
       break;
     }

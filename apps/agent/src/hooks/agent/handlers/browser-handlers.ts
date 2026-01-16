@@ -190,6 +190,13 @@ export async function handleBrowserBounds(
 
   const { x, y, width, height } = message.bounds;
 
+  // Skip invalid bounds - can happen during mount before layout is ready
+  // or when panel is collapsing. Min size 10px to avoid near-zero dimensions.
+  if (width < 10 || height < 10) {
+    logger.debug('Skipping invalid bounds', { width, height });
+    return;
+  }
+
   try {
     await browserSetBounds(x, y, width, height);
     // Note: Don't record activity here - bounds updates happen constantly

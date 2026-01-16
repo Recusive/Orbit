@@ -13,6 +13,7 @@ import { Disposable, Emitter } from '../../common/events/events.js';
 import { createLogger } from '../../common/logging/logger.js';
 import { OrbitAgent } from '../core/agent.js';
 
+import type { McpToolRequest, McpToolResponse } from '../../browser/index.js';
 import type { OrbitAgentConfig } from '../core/agent.js';
 import type { AttachmentContentBlock } from '../types/messages.js';
 
@@ -398,6 +399,12 @@ export class SessionManager extends Disposable {
   );
   readonly onCheckpoint = this._onCheckpoint.event;
 
+  // Browser tool request event - forwarded to frontend for execution
+  private readonly _onBrowserToolRequest = this._register(
+    new Emitter<{ sessionId: string; request: McpToolRequest }>()
+  );
+  readonly onBrowserToolRequest = this._onBrowserToolRequest.event;
+
   // Session tracking
   private activeSessions = new Map<string, OrbitAgent>();
   private sessionConsumers = new Map<
@@ -426,6 +433,7 @@ export class SessionManager extends Disposable {
   private turnStartTimes = new Map<string, number>();
   private sessionInitFired = new Set<string>();
   private pendingDisplayNames = new Map<string, string>();
+  private browserToolUnsubscribers = new Map<string, () => void>();
 
   // Track the current turn ID per session (our OWN stable ID, not SDK's uuid)
   // The SDK sends different UUIDs for each message (stream_event, assistant, etc.)
@@ -574,6 +582,13 @@ export class SessionManager extends Disposable {
       'Creating session with config'
     );
     const agent = new OrbitAgent(finalConfig);
+
+    // Initialize browser MCP server and forward tool requests
+    agent.initializeBrowserMcp();
+    const unsubscribeBrowserTools = agent.onBrowserToolRequest((request) => {
+      this._onBrowserToolRequest.fire({ sessionId, request });
+    });
+    this.browserToolUnsubscribers.set(sessionId, unsubscribeBrowserTools);
 
     // Track resume/fork state
     this.sessionResumeState.set(sessionId, {
@@ -1035,6 +1050,12 @@ export class SessionManager extends Disposable {
       this.sessionConsumers.delete(sessionId);
     }
 
+    const unsubscribeBrowserTools = this.browserToolUnsubscribers.get(sessionId);
+    if (unsubscribeBrowserTools) {
+      unsubscribeBrowserTools();
+      this.browserToolUnsubscribers.delete(sessionId);
+    }
+
     const agent = this.activeSessions.get(sessionId);
     if (agent) {
       await agent.stopSession();
@@ -1108,6 +1129,17 @@ export class SessionManager extends Disposable {
       });
       this.permissionResolvers.delete(response.requestId);
     }
+  }
+
+  /**
+   * Handle browser tool response from frontend
+   */
+  handleBrowserToolResponse(sessionId: string, response: McpToolResponse): void {
+    const agent = this.activeSessions.get(sessionId);
+    if (!agent) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+    agent.handleBrowserToolResponse(response);
   }
 
   /**
@@ -1507,6 +1539,11 @@ Return ONLY the JSON object with the command definition.`;
       consumer.cancel();
     }
     this.sessionConsumers.clear();
+
+    for (const [, unsubscribe] of this.browserToolUnsubscribers.entries()) {
+      unsubscribe();
+    }
+    this.browserToolUnsubscribers.clear();
 
     // Stop all active sessions
     for (const [sessionId, agent] of this.activeSessions.entries()) {

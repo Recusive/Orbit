@@ -501,6 +501,15 @@ export const CanvasToolResponseRequestSchema = z
   .strict();
 export type CanvasToolResponseRequest = z.infer<typeof CanvasToolResponseRequestSchema>;
 
+export const BrowserToolResponseRequestSchema = z
+  .object({
+    type: z.literal('browser:tool_response'),
+    sessionId: z.string(),
+    response: McpToolResponseSchema,
+  })
+  .strict();
+export type BrowserToolResponseRequest = z.infer<typeof BrowserToolResponseRequestSchema>;
+
 // Combined discriminated union for all requests
 export const BridgeRequestSchema = z.discriminatedUnion('type', [
   CreateSessionRequestSchema,
@@ -539,6 +548,7 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   CanvasSendMessageRequestSchema,
   CanvasInterruptRequestSchema,
   CanvasToolResponseRequestSchema,
+  BrowserToolResponseRequestSchema,
 ]);
 export type BridgeRequest = z.infer<typeof BridgeRequestSchema>;
 

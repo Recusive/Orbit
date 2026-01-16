@@ -18,9 +18,9 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter as _, State};
 
 use crate::agent::{
-    AttachmentContentBlock, CommandScope, ForkSessionOptions, ForkSessionResult, Model,
-    PermissionDecision, PermissionResponse, SessionConfig, SessionManager, SlashCommandDefinition,
-    SubagentDefinition,
+    AttachmentContentBlock, CommandScope, ForkSessionOptions, ForkSessionResult, McpToolResponse,
+    Model, PermissionDecision, PermissionResponse, SessionConfig, SessionManager,
+    SlashCommandDefinition, SubagentDefinition,
 };
 
 /// Result type for agent commands
@@ -121,6 +121,18 @@ pub async fn agent_respond_permission(
     };
 
     state.respond_to_permission(response).map_err(to_error)
+}
+
+/// Send a browser MCP tool response back to the agent session
+#[tauri::command]
+pub async fn browser_tool_response(
+    session_id: String,
+    response: McpToolResponse,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<()> {
+    state
+        .browser_tool_response(&session_id, response)
+        .map_err(to_error)
 }
 
 // ============================================================================
@@ -532,6 +544,17 @@ fn emit_canvas_tool_request(app: &AppHandle, session_id: &str, request: &McpTool
     ));
 }
 
+/// Emit browser tool request event
+fn emit_browser_tool_request(app: &AppHandle, session_id: &str, request: &McpToolRequest) {
+    drop(app.emit(
+        "browser:tool_request",
+        serde_json::json!({
+            "sessionId": session_id,
+            "request": request,
+        }),
+    ));
+}
+
 /// Emit canvas error event
 fn emit_canvas_error(app: &AppHandle, session_id: &str, error: &str) {
     drop(app.emit(
@@ -585,5 +608,9 @@ pub fn setup_event_callbacks(app: &AppHandle, session_manager: &Arc<SessionManag
         BridgeEvent::CanvasError { session_id, error } => {
             emit_canvas_error(&app_handle, &session_id, &error);
         },
+        BridgeEvent::BrowserToolRequest {
+            session_id,
+            request,
+        } => emit_browser_tool_request(&app_handle, &session_id, &request),
     }));
 }

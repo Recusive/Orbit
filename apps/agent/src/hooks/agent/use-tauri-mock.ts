@@ -276,6 +276,7 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'browser:devtools':
     case 'browser:show':
     case 'browser:hide':
+    case 'browser:tool_response':
     case 'subagents:list':
     case 'subagents:create':
     case 'subagents:update':

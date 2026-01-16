@@ -32,6 +32,7 @@ import {
   onAgentSessionInit,
   onBrowserLoading,
   onBrowserNavigated,
+  onBrowserToolRequest,
   onFileChange,
   onTerminalExit,
   onTerminalForeground,
@@ -625,6 +626,27 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
           .catch((err: unknown) => {
             logger.error(
               'Browser listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
+          })
+      );
+
+      // Browser MCP tool requests
+      listenerPromises.push(
+        onBrowserToolRequest((event) => {
+          postWindowMessage({
+            type: 'browser:tool_request',
+            uuid: crypto.randomUUID(),
+            session_id: event.sessionId,
+            request: event.request,
+          });
+        })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            logger.error(
+              'Browser tool request listener registration failed',
               err instanceof Error ? err : new Error(String(err))
             );
           })

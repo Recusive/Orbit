@@ -676,6 +676,23 @@ export const BrowserHideSchema = z
   })
   .strict();
 
+// Browser MCP tool response (webview -> extension)
+export const BrowserToolResponseSchema = z
+  .object({
+    type: z.literal('browser:tool_response'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    response: z
+      .object({
+        requestId: z.string(),
+        success: z.boolean(),
+        result: z.unknown().optional(),
+        error: z.string().optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
 // ═══════════════════════════════════════════════════════════════
 // SUBAGENTS (Webview → Extension)
 // ═══════════════════════════════════════════════════════════════
@@ -880,6 +897,7 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   BrowserDevToolsSchema,
   BrowserShowSchema,
   BrowserHideSchema,
+  BrowserToolResponseSchema,
   // Subagents
   SubagentsListSchema,
   SubagentCreateSchema,
@@ -1568,6 +1586,22 @@ export const BrowserCloseSchema = z
   })
   .strict();
 
+// Browser MCP tool request (extension -> webview)
+export const BrowserToolRequestSchema = z
+  .object({
+    type: z.literal('browser:tool_request'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    request: z
+      .object({
+        requestId: z.string(),
+        toolName: z.string(),
+        toolInput: z.record(z.string(), z.unknown()),
+      })
+      .strict(),
+  })
+  .strict();
+
 // ═══════════════════════════════════════════════════════════════
 // SUBAGENTS (Extension → Webview)
 // ═══════════════════════════════════════════════════════════════
@@ -1763,6 +1797,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   BrowserClearedSchema,
   BrowserOpenSchema,
   BrowserCloseSchema,
+  BrowserToolRequestSchema,
   // Subagents
   SubagentsListResponseSchema,
   SubagentCreatedSchema,
@@ -1903,6 +1938,8 @@ export type BrowserError = z.infer<typeof BrowserErrorSchema>;
 export type BrowserCleared = z.infer<typeof BrowserClearedSchema>;
 export type BrowserOpen = z.infer<typeof BrowserOpenSchema>;
 export type BrowserClose = z.infer<typeof BrowserCloseSchema>;
+export type BrowserToolRequest = z.infer<typeof BrowserToolRequestSchema>;
+export type BrowserToolResponse = z.infer<typeof BrowserToolResponseSchema>;
 
 // ═══════════════════════════════════════════════════════════════
 // TYPE GUARDS (Protocol layer - prefixed to avoid conflicts with message.ts)
@@ -1955,6 +1992,7 @@ export function isProtocolBrowserMessage(
   | BrowserError
   | BrowserCleared
   | BrowserOpen
-  | BrowserClose {
+  | BrowserClose
+  | BrowserToolRequest {
   return msg.type.startsWith('browser:');
 }

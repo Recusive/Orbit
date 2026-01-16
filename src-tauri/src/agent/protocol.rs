@@ -455,6 +455,12 @@ pub enum BridgeRequest {
         session_id: String,
         response: McpToolResponse,
     },
+    #[serde(rename = "browser:tool_response")]
+    BrowserToolResponse {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        response: McpToolResponse,
+    },
     Shutdown,
 }
 
@@ -573,6 +579,12 @@ pub enum BridgeEvent {
         #[serde(rename = "sessionId")]
         session_id: String,
         error: String,
+    },
+    #[serde(rename = "browser:tool_request")]
+    BrowserToolRequest {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        request: McpToolRequest,
     },
 }
 
