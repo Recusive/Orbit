@@ -278,8 +278,6 @@ export function MissionsSidebar(): React.JSX.Element | null {
   const missionList = useMissionsStore((s) => s.missionList);
   const missionListLoading = useMissionsStore((s) => s.missionListLoading);
   const createNewMission = useMissionsStore((s) => s.createNewMission);
-  // Note: loadMission is for loading full mission data - clicking list items needs storage integration
-  // const loadMission = useMissionsStore((s) => s.loadMission);
 
   // UI store state
   const leftSidebarWidth = useMissionsUIStore((s) => s.leftSidebarWidth);
@@ -298,9 +296,6 @@ export function MissionsSidebar(): React.JSX.Element | null {
   const handleNewMission = useCallback(() => {
     createNewMission(`Mission ${String(Date.now())}`, 'user');
   }, [createNewMission]);
-
-  // TODO: Add handleMissionClick when storage integration lands
-  // Will call: loadMission(missionData, agents, connections)
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent): void => {
@@ -468,16 +463,20 @@ export function MissionsSidebar(): React.JSX.Element | null {
             missionList.map((mission) => {
               const isActive = mission.id === activeMission?.id;
               const isHovered = mission.id === hoveredMissionId;
+              // Non-active missions are disabled until storage-based loading is implemented
+              const isClickable = isActive;
 
-              // TODO: Add onClick={handleMissionClick} when storage integration lands
               return (
                 <div
                   key={mission.id}
+                  role="button"
+                  aria-disabled={!isClickable}
+                  tabIndex={isClickable ? 0 : -1}
                   style={{
                     ...styles.missionItem,
                     ...(isActive ? styles.missionItemActive : {}),
-                    ...(isHovered && !isActive ? styles.missionItemHover : {}),
-                    ...(!isActive ? { opacity: 0.6, cursor: 'not-allowed' } : {}),
+                    ...(isHovered && isClickable ? styles.missionItemHover : {}),
+                    ...(!isClickable ? { opacity: 0.6, cursor: 'not-allowed' } : {}),
                   }}
                   onMouseEnter={(): void => {
                     setHoveredMissionId(mission.id);
@@ -485,7 +484,7 @@ export function MissionsSidebar(): React.JSX.Element | null {
                   onMouseLeave={(): void => {
                     setHoveredMissionId(null);
                   }}
-                  title="Mission loading not available yet"
+                  title={isClickable ? mission.name : 'Mission loading not available yet'}
                 >
                   <span style={styles.missionName}>{mission.name}</span>
                   <span style={styles.missionCount}>{mission.agentCount}</span>

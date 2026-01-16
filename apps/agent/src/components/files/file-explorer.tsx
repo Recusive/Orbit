@@ -4,6 +4,7 @@
  * NOTE: Git status styling comes from @/lib/utils/constants.
  * To change git status colors or labels, update GIT_STATUS_STYLES in constants.ts.
  */
+import { createLogger } from '@orbit/common/lib';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   AlertCircle,
@@ -29,6 +30,8 @@ import { cn } from '@/lib/utils/utils';
 import { useFileStore } from '@/stores/file/file-store';
 import { selectFileStatus, useGitStore } from '@/stores/git/git-store';
 import { useUIStore } from '@/stores/ui/ui-store';
+
+const logger = createLogger('FileExplorer');
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -238,7 +241,7 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
         useUIStore.getState().setConversations(toConversationSummaries(conversations));
       }
     } catch (err) {
-      console.error('[FileExplorer] Failed to open folder:', err);
+      logger.error('Failed to open folder', err instanceof Error ? err : new Error(String(err)));
     }
   }, [setRootPath, refresh]);
 

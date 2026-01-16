@@ -146,14 +146,26 @@ export function useBrowser(): void {
           reset();
           break;
 
-        case 'browser:created':
+        case 'browser:created': {
           // Handle browser creation - works in both Tauri and mock mode
           // In Tauri mode, browser-handlers.ts also handles this for lifecycle store
           logger.info('Browser created', { label: message.label, url: message.url });
           setViewId(message.label);
           setCreating(false);
           setError(null);
+
+          // Consume pending navigation URL if browser_open arrived during creation
+          const pendingUrl = useBrowserStore.getState().pendingNavigationUrl;
+          if (pendingUrl) {
+            useBrowserStore.getState().setPendingNavigationUrl(null);
+            postMessage({
+              type: 'browser:navigate',
+              uuid: generateUUID(),
+              url: pendingUrl,
+            });
+          }
           break;
+        }
 
         // Ignore non-browser messages - handled elsewhere
         case 'error':

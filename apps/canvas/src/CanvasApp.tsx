@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import {
   addEdge,
   Background,
@@ -12,6 +13,8 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+const logger = createLogger('CanvasApp');
 
 import { AgentChatPanel } from './components/agent/AgentChatPanel';
 import { CanvasFloatingToolbar } from './components/canvas/CanvasFloatingToolbar';
@@ -515,19 +518,19 @@ function CanvasAppInner(): React.JSX.Element {
     saveState(nodes, edges, viewport);
   }, [nodes, edges, isStateLoaded, saveState, getViewport]);
 
-  // Listen for canvas tool execution messages from extension
-  const { sendPerceptionResult } = useTauriCanvas({
-    onCodeUpdate: (nodeId, code) => {
-      // Handle code updates (from error fixing)
-      setNodes((nds) =>
-        nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, code } } : n))
-      );
-    },
-    onExportResult: (success, _filePath, error) => {
-      if (!success) {
-        console.warn(`[CanvasApp] Export failed: ${error ?? 'Unknown error'}`);
-      }
-    },
+  // Ref to hold the sendPerceptionResult function - avoids circular dependency
+  // between useCanvasToolExecution (needs sendPerceptionResult) and useTauriCanvas (provides it)
+  const sendPerceptionResultRef = useRef<
+    (requestId: string, toolName: string, nodeId: string, result: PerceptionResult) => void
+  >(() => {
+    // sendPerceptionResult not yet initialized
+  });
+
+  // Ref to hold the sendMcpToolResponse function - avoids circular dependency
+  const sendMcpToolResponseRef = useRef<
+    (requestId: string, success: boolean, result?: unknown, error?: string) => void
+  >(() => {
+    // sendMcpToolResponse not yet initialized
   });
 
   // Canvas tool execution hook (old architecture - keeping for backwards compatibility)
@@ -541,15 +544,9 @@ function CanvasAppInner(): React.JSX.Element {
       nodeId: string,
       result: unknown
     ) => {
-      sendPerceptionResult(requestId, toolName, nodeId, result as PerceptionResult);
+      // Use ref to get latest function - breaks circular dependency
+      sendPerceptionResultRef.current(requestId, toolName, nodeId, result as PerceptionResult);
     },
-  });
-
-  // Ref to hold the sendMcpToolResponse function - avoids circular dependency
-  const sendMcpToolResponseRef = useRef<
-    (requestId: string, success: boolean, result?: unknown, error?: string) => void
-  >(() => {
-    // sendMcpToolResponse not yet initialized
   });
 
   // MCP tool execution hook (new architecture with proper Claude SDK integration)
@@ -565,7 +562,7 @@ function CanvasAppInner(): React.JSX.Element {
     sendPerceptionRequest,
   });
 
-  // Update messaging hook to handle both old and new tool execution
+  // Single useTauriCanvas call - handles all canvas tool execution messages from extension
   const messaging = useTauriCanvas({
     onCanvasToolExecute: handleCanvasToolExecute,
     onMcpToolRequest: handleMcpToolRequest,
@@ -576,12 +573,16 @@ function CanvasAppInner(): React.JSX.Element {
     },
     onExportResult: (success, _filePath, error) => {
       if (!success) {
-        console.warn(`[CanvasApp] Export failed: ${error ?? 'Unknown error'}`);
+        logger.warn('Export failed', { error: error ?? 'Unknown error' });
       }
     },
   });
 
-  // Update the ref with the actual sendMcpToolResponse function
+  // Update the refs with the actual functions after useTauriCanvas returns
+  useEffect(() => {
+    sendPerceptionResultRef.current = messaging.sendPerceptionResult;
+  }, [messaging.sendPerceptionResult]);
+
   useEffect(() => {
     sendMcpToolResponseRef.current = messaging.sendMcpToolResponse;
   }, [messaging.sendMcpToolResponse]);

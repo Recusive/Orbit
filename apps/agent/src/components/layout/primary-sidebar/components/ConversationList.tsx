@@ -4,6 +4,9 @@
 import { Plus } from 'lucide-react';
 import { useMemo } from 'react';
 
+/** Indentation for conversation items nested under workspace (px) */
+const CONVERSATION_INDENT_PX = 19;
+
 import { ConversationItem } from './ConversationItem';
 import { WorkspaceItem } from './WorkspaceItem';
 
@@ -78,8 +81,7 @@ export const ConversationList: FC<ConversationListProps> = ({
     if (convList.length === 0) return null;
 
     return (
-      // TODO: Move ml-[19px] to constants - conversation indent
-      <div className="relative ml-[19px] mt-1">
+      <div className="relative mt-1" style={{ marginLeft: CONVERSATION_INDENT_PX }}>
         {/* Vertical timeline line */}
         <div className="absolute left-0 top-0 bottom-2 w-px bg-border/60" />
         {/* Conversations */}

@@ -10,7 +10,10 @@
  * - Get element bounding rectangles
  * - Verify expected elements exist
  */
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
+
+const logger = createLogger('Perception');
 
 // Extend Window interface for dev console access
 declare global {
@@ -117,9 +120,9 @@ export function usePerception(options: UsePerceptionOptions = {}): UsePerception
 
   // Debug logger
   const log = useCallback(
-    (...args: unknown[]): void => {
+    (message: string, data?: Record<string, unknown>): void => {
       if (debug) {
-        console.warn('[Perception]', ...args);
+        logger.debug(message, data);
       }
     },
     [debug]
@@ -129,7 +132,7 @@ export function usePerception(options: UsePerceptionOptions = {}): UsePerception
   const cancelAllRequests = useCallback((): void => {
     for (const [requestId, request] of pendingRequests.current) {
       request.reject(new Error('Request cancelled'));
-      log(`Cancelled request ${requestId}`);
+      log('Cancelled request', { requestId });
     }
     pendingRequests.current.clear();
   }, [log]);
@@ -156,25 +159,25 @@ export function usePerception(options: UsePerceptionOptions = {}): UsePerception
       const payload = msgObj['payload'] as PerceptionResultPayload | undefined;
 
       if (typeof requestId !== 'string') {
-        log('Received perception result without requestId:', msgObj);
+        log('Received perception result without requestId', { msgObj });
         return;
       }
 
       // Find pending request
       const pending = pendingRequests.current.get(requestId);
       if (!pending) {
-        log(`Received result for unknown request ${requestId}`);
+        log('Received result for unknown request', { requestId });
         return;
       }
 
       if (typeof nodeId === 'string' && pending.nodeId !== nodeId) {
-        log(`Node ID mismatch: expected ${pending.nodeId}, got ${nodeId}`);
+        log('Node ID mismatch', { expected: pending.nodeId, got: nodeId });
         return;
       }
 
       // Calculate response time
       const responseTime = Date.now() - pending.timestamp;
-      log(`Received ${messageType} for ${pending.nodeId} in ${String(responseTime)}ms`);
+      log('Received perception result', { messageType, nodeId: pending.nodeId, responseTime });
 
       // Resolve the promise
       pending.resolve(payload ?? {});
@@ -193,7 +196,7 @@ export function usePerception(options: UsePerceptionOptions = {}): UsePerception
       return new Promise((resolve, reject) => {
         const requestId = `perception-${String(Date.now())}-${Math.random().toString(36).slice(2, 9)}`;
 
-        log(`Sending ${requestType} to ${nodeId} (${requestId})`);
+        log('Sending perception request', { requestType, nodeId, requestId });
 
         // Store pending request
         const request: PerceptionRequest = {
@@ -213,7 +216,7 @@ export function usePerception(options: UsePerceptionOptions = {}): UsePerception
         if (iframes.length === 0) {
           pendingRequests.current.delete(requestId);
           const error = new Error(`No iframe found for perception request to node ${nodeId}`);
-          log(error.message);
+          log('No iframe found', { nodeId, requestId });
           reject(error);
           return;
         }
@@ -237,7 +240,7 @@ export function usePerception(options: UsePerceptionOptions = {}): UsePerception
           }
         });
 
-        log(`Sent request to ${String(sentCount)}/${String(iframes.length)} iframes`);
+        log('Sent request to iframes', { sentCount, totalIframes: iframes.length });
 
         // Timeout handling with cleanup
         const timeoutId = setTimeout(() => {
@@ -246,7 +249,7 @@ export function usePerception(options: UsePerceptionOptions = {}): UsePerception
             const error = new Error(
               `Perception request timed out after ${String(timeout)}ms for node ${nodeId} (${requestType})`
             );
-            log(error.message);
+            log('Perception request timed out', { timeout, nodeId, requestType, requestId });
             reject(error);
           }
         }, timeout);
@@ -307,62 +310,60 @@ export function installPerceptionTestHarness(
   sendPerceptionRequest: UsePerceptionResult['sendPerceptionRequest'],
   pendingRequests: UsePerceptionResult['pendingRequests']
 ): void {
-  if (typeof window === 'undefined') return;
+  // Only install in development mode
+  if (typeof window === 'undefined' || import.meta.env.MODE !== 'development') return;
 
   const harness: PerceptionTestHarness = {
     testAriaSnapshot: async (nodeId, includeHidden = false) => {
-      console.warn(`[Perception Test] ARIA snapshot for ${nodeId}`);
+      logger.info('ARIA snapshot test', { nodeId, includeHidden });
       const result = await sendPerceptionRequest(nodeId, 'get-aria-snapshot', { includeHidden });
-      console.warn('[Perception Test] Result:', result);
+      logger.info('ARIA snapshot result', { nodeId, result });
       return result;
     },
 
     testComputedStyles: async (nodeId, selector, properties) => {
-      console.warn(
-        `[Perception Test] Computed styles for ${nodeId}${selector ? ` (${selector})` : ''}`
-      );
+      logger.info('Computed styles test', { nodeId, selector });
       const result = await sendPerceptionRequest(nodeId, 'get-computed-styles', {
         selector,
         properties,
       });
-      console.warn('[Perception Test] Result:', result);
+      logger.info('Computed styles result', { nodeId, result });
       return result;
     },
 
     testElementBounds: async (nodeId, selector, includeChildren = false) => {
-      console.warn(
-        `[Perception Test] Element bounds for ${nodeId}${selector ? ` (${selector})` : ''}`
-      );
+      logger.info('Element bounds test', { nodeId, selector });
       const result = await sendPerceptionRequest(nodeId, 'get-element-bounds', {
         selector,
         includeChildren,
       });
-      console.warn('[Perception Test] Result:', result);
+      logger.info('Element bounds result', { nodeId, result });
       return result;
     },
 
     testVerify: async (nodeId, expectedElements) => {
-      console.warn(`[Perception Test] Verify ${nodeId}`, expectedElements);
+      logger.info('Verify component test', { nodeId, expectedElements });
       const result = await sendPerceptionRequest(nodeId, 'verify-component', { expectedElements });
-      console.warn('[Perception Test] Result:', result);
+      logger.info('Verify component result', { nodeId, result });
       return result;
     },
 
     listPending: () => {
-      console.warn('[Perception Test] Pending requests:');
+      const pendingList: { id: string; toolName: string; nodeId: string; age: number }[] = [];
       for (const [id, req] of pendingRequests) {
         const age = Date.now() - req.timestamp;
-        console.warn(`  ${id}: ${req.toolName} -> ${req.nodeId} (${String(age)}ms ago)`);
+        pendingList.push({ id, toolName: req.toolName, nodeId: req.nodeId, age });
       }
-      if (pendingRequests.size === 0) {
-        console.warn('  (none)');
-      }
+      logger.info('Pending perception requests', {
+        count: pendingRequests.size,
+        requests: pendingList,
+      });
     },
   };
 
   // Expose on window for dev console access
   window.__perception = harness;
-  console.warn(
-    '[Perception] Test harness installed. Use window.__perception.testAriaSnapshot(nodeId) etc.'
-  );
+  logger.info('Perception test harness installed', {
+    usage: 'window.__perception.testAriaSnapshot(nodeId)',
+  });
 }

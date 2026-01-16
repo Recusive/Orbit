@@ -1,6 +1,9 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useState } from 'react';
 
 import { addRecentProject, getRecentProjects } from '@/lib/api';
+
+const logger = createLogger('useRecentProjects');
 
 // Hoisted RegExp for path splitting (avoids recreation on each call)
 const PATH_SEPARATOR_RE = /[/\\]/;
@@ -66,7 +69,10 @@ export function useRecentProjects(): UseRecentProjectsReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load recent projects';
       setError(message);
-      console.error('[useRecentProjects] Error:', err);
+      logger.error(
+        'Failed to load recent projects',
+        err instanceof Error ? err : new Error(String(err))
+      );
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +85,7 @@ export function useRecentProjects(): UseRecentProjectsReturn {
         // Refresh the list after adding
         await refresh();
       } catch (err) {
-        console.error('[useRecentProjects] Failed to add project:', err);
+        logger.error('Failed to add project', err instanceof Error ? err : new Error(String(err)));
       }
     },
     [refresh]
@@ -87,7 +93,12 @@ export function useRecentProjects(): UseRecentProjectsReturn {
 
   // Load recent projects on mount
   useEffect(() => {
-    refresh().catch(console.error);
+    refresh().catch((err: unknown) => {
+      logger.error(
+        'Failed to refresh recent projects',
+        err instanceof Error ? err : new Error(String(err))
+      );
+    });
   }, [refresh]);
 
   return {

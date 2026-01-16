@@ -11,6 +11,9 @@ import { ConversationContextMenu, ConversationDropdownMenu } from '@/components/
 import { TRANSITIONS } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 
+/** Gradient mask for text fade on hover (left-to-right fade at end) */
+const TITLE_HOVER_MASK = 'linear-gradient(to right, black 85%, transparent 98%)';
+
 // Transition string builder
 const getCollapseTransition = (collapsed: boolean): string =>
   collapsed
@@ -134,11 +137,10 @@ export const ConversationItem: FC<ConversationItemProps> = ({
           style={{
             transition: getCollapseTransition(collapsed),
             // Only apply gradient mask when hovered
-            // TODO: Move gradient percentages to constants
             ...(isHovered && !collapsed
               ? {
-                  maskImage: 'linear-gradient(to right, black 85%, transparent 98%)',
-                  WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 98%)',
+                  maskImage: TITLE_HOVER_MASK,
+                  WebkitMaskImage: TITLE_HOVER_MASK,
                 }
               : {}),
           }}

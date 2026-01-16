@@ -294,6 +294,17 @@ const FLOATING_RADIUS = 10;
 // Animation easing
 const EASE_OUT = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
+// Detect Tauri - backdrop-filter and color-mix cause blur issues in WKWebView
+// See CLAUDE.md "Tauri WebView Blur/Rendering Issues" section
+const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+const shouldUseBlur = !isTauri && CSS.supports('backdrop-filter', 'blur(8px)');
+
+// Background colors - use solid colors in Tauri to avoid blur issues
+const floatingBg = shouldUseBlur
+  ? 'color-mix(in oklch, var(--card) 90%, transparent)'
+  : 'var(--card)';
+const floatingBlur = shouldUseBlur ? 'blur(8px)' : undefined;
+
 // Styles using orbit-agent design system
 const styles = {
   toolbar: {
@@ -315,9 +326,9 @@ const styles = {
     height: 35,
     padding: '0 10px 0 10px',
     paddingRight: 6, // Tighter on button side
-    backgroundColor: 'color-mix(in oklch, var(--card) 90%, transparent)',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
+    backgroundColor: floatingBg,
+    backdropFilter: floatingBlur,
+    WebkitBackdropFilter: floatingBlur,
     border: 'none',
     borderRadius: FLOATING_RADIUS,
     boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.1), 0 4px 12px -4px rgba(0, 0, 0, 0.06)',
@@ -376,9 +387,9 @@ const styles = {
     gap: 6,
     height: 35,
     padding: '0 6px',
-    backgroundColor: 'color-mix(in oklch, var(--card) 90%, transparent)',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
+    backgroundColor: floatingBg,
+    backdropFilter: floatingBlur,
+    WebkitBackdropFilter: floatingBlur,
     border: 'none',
     borderRadius: FLOATING_RADIUS,
     boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.1), 0 4px 12px -4px rgba(0, 0, 0, 0.06)',
