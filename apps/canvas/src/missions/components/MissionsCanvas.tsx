@@ -53,8 +53,8 @@ function agentToNode(
   callbacks: {
     onUpdate: (id: string, updates: Partial<AgentCard>) => void;
     onDelete: (id: string) => void;
-    onExecute: (id: string) => void;
-    onStop: (id: string) => void;
+    onExecute?: (id: string) => void; // Optional until wired to agent-bridge
+    onStop?: (id: string) => void; // Optional until wired to agent-bridge
     onConfigure: (id: string) => void;
   }
 ): Node<AgentCardNodeData> {
@@ -66,9 +66,10 @@ function agentToNode(
       agent,
       onUpdate: callbacks.onUpdate,
       onDelete: callbacks.onDelete,
-      onExecute: callbacks.onExecute,
-      onStop: callbacks.onStop,
       onConfigure: callbacks.onConfigure,
+      // Conditionally spread optional callbacks to avoid exactOptionalPropertyTypes issues
+      ...(callbacks.onExecute !== undefined && { onExecute: callbacks.onExecute }),
+      ...(callbacks.onStop !== undefined && { onStop: callbacks.onStop }),
     },
   };
 }
@@ -128,16 +129,13 @@ export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JS
   const showMinimap = useMissionsUIStore((s) => s.showMinimap);
 
   // Callbacks for nodes
+  // NOTE: onExecute/onStop are omitted until agent-bridge integration is complete.
+  // AgentCardNode disables Run/Stop buttons when these are undefined.
   const nodeCallbacks = useMemo(
     () => ({
       onUpdate: updateAgent,
       onDelete: deleteAgent,
-      onExecute: () => {
-        // TODO: Execute single agent - will be wired to agent-bridge
-      },
-      onStop: () => {
-        // TODO: Stop single agent - will be wired to agent-bridge
-      },
+      // onExecute and onStop are intentionally omitted - will be wired to agent-bridge
       onConfigure: (id: string) => {
         setFocusedAgent(id);
       },
@@ -200,19 +198,37 @@ export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JS
     [addConnection]
   );
 
-  // Handle node position changes
+  // Handle node changes (position and deletion)
   const handleNodesChange = useCallback(
     (changes: Parameters<typeof onNodesChange>[0]) => {
       onNodesChange(changes);
 
-      // Update agent positions in store
+      // Sync changes to missions store
       for (const change of changes) {
         if (change.type === 'position' && change.position !== undefined) {
           updateAgent(change.id, { position: change.position });
+        } else if (change.type === 'remove') {
+          // Sync deletion to store (triggered by deleteKeyCode)
+          deleteAgent(change.id);
         }
       }
     },
-    [onNodesChange, updateAgent]
+    [onNodesChange, updateAgent, deleteAgent]
+  );
+
+  // Handle edge changes (deletion)
+  const handleEdgesChange = useCallback(
+    (changes: Parameters<typeof onEdgesChange>[0]) => {
+      onEdgesChange(changes);
+
+      // Sync deletions to missions store
+      for (const change of changes) {
+        if (change.type === 'remove') {
+          deleteConnection(change.id);
+        }
+      }
+    },
+    [onEdgesChange, deleteConnection]
   );
 
   // Handle node selection
@@ -275,7 +291,7 @@ export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JS
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onNodesChange={handleNodesChange}
-          onEdgesChange={onEdgesChange}
+          onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
           onNodeClick={handleNodeClick}
           onPaneClick={handlePaneClick}

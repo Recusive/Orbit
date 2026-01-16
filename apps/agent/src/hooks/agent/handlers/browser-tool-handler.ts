@@ -37,8 +37,12 @@ interface BrowserToolExecutionResult {
   error?: string;
 }
 
-/** Allowed URL protocols for browser navigation (security) */
-const ALLOWED_URL_PROTOCOLS = ['http:', 'https:', 'about:', 'data:'];
+/**
+ * Allowed URL protocols for browser navigation (security).
+ * Note: data: protocol is intentionally excluded as it can be abused for XSS
+ * attacks via data:text/html URLs containing malicious scripts.
+ */
+const ALLOWED_URL_PROTOCOLS = ['http:', 'https:', 'about:'];
 
 /**
  * Validate a URL for browser navigation.
@@ -107,6 +111,15 @@ function resetBrowserApiCache(): void {
     browserReadyAbortController.abort();
     browserReadyAbortController = null;
   }
+}
+
+/**
+ * Reset all module-level state. Useful for HMR and testing.
+ * Exported for use in development environments where module hot reload
+ * may leave state in an inconsistent state.
+ */
+export function resetBrowserToolState(): void {
+  resetBrowserApiCache();
 }
 
 async function detectBrowserTauriApi(): Promise<boolean> {

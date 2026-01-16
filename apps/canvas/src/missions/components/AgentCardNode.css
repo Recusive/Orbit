@@ -325,6 +325,22 @@
   opacity: 0.9;
 }
 
+.agent-card-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-card-action-btn:disabled:hover {
+  background: var(--background);
+  color: var(--muted-foreground);
+}
+
+.agent-card-action-btn--primary:disabled:hover {
+  background: var(--primary);
+  color: white;
+  opacity: 0.5;
+}
+
 .agent-card-action-btn--delete {
   margin-left: auto;
   color: var(--muted-foreground);

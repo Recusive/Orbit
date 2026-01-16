@@ -224,8 +224,9 @@ export async function handleBrowserBounds(
 
   // Skip invalid bounds - can happen during mount before layout is ready
   // or when panel is collapsing. Min size 10px to avoid near-zero dimensions.
-  if (width < 10 || height < 10) {
-    logger.debug('Skipping invalid bounds', { width, height });
+  // Also reject negative coordinates which indicate an invalid viewport state.
+  if (width < 10 || height < 10 || x < 0 || y < 0) {
+    logger.debug('Skipping invalid bounds', { x, y, width, height });
     return;
   }
 

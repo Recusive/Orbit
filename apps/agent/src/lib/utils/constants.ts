@@ -385,7 +385,7 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
     key: 'f',
     cmd: true,
     shift: true,
-    description: 'Find in workspace',
+    description: 'Find in workspace (Quick Open)',
     event: 'findInWorkspace',
   },
 

@@ -97,13 +97,13 @@ export const PermissionModal: FC<PermissionModalProps> = ({ request, onApprove, 
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleDeny}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-muted/50 hover:bg-muted text-foreground"
+            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-muted/50 hover:bg-muted text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             Reject <span className="text-muted-foreground/50 ml-1">⌘⌫</span>
           </button>
           <button
             onClick={handleApprove}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
+            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             Accept <span className="text-primary-foreground/60 ml-1">⌘⏎</span>
           </button>

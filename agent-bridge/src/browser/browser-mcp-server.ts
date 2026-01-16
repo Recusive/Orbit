@@ -16,14 +16,29 @@ const logger = createLogger('BrowserMcpServer');
 
 /**
  * Safely stringify a result for MCP text content.
- * JSON.stringify(undefined) returns undefined (not a string!),
- * which breaks MCP validation that expects text: string.
+ * Handles edge cases that would break MCP validation:
+ * - undefined (JSON.stringify returns undefined, not a string)
+ * - Circular references (throws an error)
+ * - BigInt values (not serializable)
  */
 function safeStringify(value: unknown): string {
   if (value === undefined) {
     return 'null';
   }
-  return JSON.stringify(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    // Handle circular references, BigInt, or other non-serializable values
+    // For primitives, convert directly. For objects, provide a meaningful fallback.
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+    if (typeof value === 'object' && value !== null) {
+      return '[Unserializable Object]';
+    }
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- primitives are safe to stringify
+    return String(value);
+  }
 }
 
 /**
@@ -323,7 +338,7 @@ export function createBrowserMcpServer(
 
     tool(
       'browser_eval',
-      'Execute custom JavaScript in the browser and return the result.',
+      'Execute JavaScript in the browser and return the result. Use `return` to output a value.',
       {
         script: z.string().describe('JavaScript code to execute'),
       },

@@ -299,11 +299,8 @@ export function MissionsSidebar(): React.JSX.Element | null {
     createNewMission(`Mission ${String(Date.now())}`, 'user');
   }, [createNewMission]);
 
-  const handleMissionClick = useCallback((missionId: string): void => {
-    // TODO: Load mission from storage - requires backend integration
-    // This will need to: 1. Fetch full mission data, 2. Call loadMission(mission, agents, connections)
-    void missionId; // Acknowledge parameter for future use
-  }, []);
+  // TODO: Add handleMissionClick when storage integration lands
+  // Will call: loadMission(missionData, agents, connections)
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent): void => {
@@ -472,6 +469,7 @@ export function MissionsSidebar(): React.JSX.Element | null {
               const isActive = mission.id === activeMission?.id;
               const isHovered = mission.id === hoveredMissionId;
 
+              // TODO: Add onClick={handleMissionClick} when storage integration lands
               return (
                 <div
                   key={mission.id}
@@ -479,9 +477,7 @@ export function MissionsSidebar(): React.JSX.Element | null {
                     ...styles.missionItem,
                     ...(isActive ? styles.missionItemActive : {}),
                     ...(isHovered && !isActive ? styles.missionItemHover : {}),
-                  }}
-                  onClick={(): void => {
-                    handleMissionClick(mission.id);
+                    ...(!isActive ? { opacity: 0.6, cursor: 'not-allowed' } : {}),
                   }}
                   onMouseEnter={(): void => {
                     setHoveredMissionId(mission.id);
@@ -489,6 +485,7 @@ export function MissionsSidebar(): React.JSX.Element | null {
                   onMouseLeave={(): void => {
                     setHoveredMissionId(null);
                   }}
+                  title="Mission loading not available yet"
                 >
                   <span style={styles.missionName}>{mission.name}</span>
                   <span style={styles.missionCount}>{mission.agentCount}</span>

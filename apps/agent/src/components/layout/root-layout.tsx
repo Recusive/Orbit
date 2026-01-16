@@ -56,8 +56,8 @@ export const RootLayout: FC = () => {
     openSettings();
   }, [openSettings]);
 
-  // Handle find in workspace - opens quick open for now
-  // TODO: When a dedicated workspace search panel is added, update this to open it instead
+  // Handle find in workspace - opens Quick Open for now.
+  // NOTE: Quick Open serves as workspace search until a dedicated search panel is built.
   const handleFindInWorkspace = useCallback((): void => {
     setQuickOpenVisible(true);
   }, []);

@@ -856,14 +856,30 @@ export const useMissionsStore = create<MissionsState & MissionsActions>()(
         // Apply context flow settings
         let contextText = output;
         if (conn.contextFlow === 'filtered' && conn.contextFilter !== undefined) {
-          // Limit regex pattern length to prevent ReDoS attacks
-          const MAX_REGEX_LENGTH = 500;
-          if (conn.contextFilter.length > MAX_REGEX_LENGTH) {
-            // Pattern too long - fall back to full output
+          // ReDoS protection: limit pattern length and reject dangerous patterns
+          const MAX_REGEX_LENGTH = 200;
+          const filter = conn.contextFilter;
+
+          // Check for potentially dangerous regex patterns that cause exponential backtracking:
+          // - Nested quantifiers like (a+)+ or (a*)*
+          // - Overlapping alternation with quantifiers
+          const DANGEROUS_PATTERN = /(\+|\*|\?|\{)\s*\)(\+|\*|\?|\{)|(\|[^|]*){10,}/;
+          const isDangerous = DANGEROUS_PATTERN.test(filter);
+
+          if (filter.length > MAX_REGEX_LENGTH) {
+            logger.warn('Context filter pattern too long, using full output', {
+              length: filter.length,
+              maxLength: MAX_REGEX_LENGTH,
+            });
+            contextText = output;
+          } else if (isDangerous) {
+            logger.warn(
+              'Context filter pattern contains potentially dangerous constructs, using full output'
+            );
             contextText = output;
           } else {
             try {
-              const regex = new RegExp(conn.contextFilter, 'g');
+              const regex = new RegExp(filter, 'g');
               const matches = output.match(regex);
               contextText = matches !== null ? matches.join('\n') : '';
             } catch {

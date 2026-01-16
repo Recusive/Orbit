@@ -78,6 +78,8 @@ export function AgentCardNode({
   const isRunning = status === 'running' || status === 'streaming';
   const hasOutput = agent.execution.currentOutput.length > 0;
   const modelConfig = getAgentModelConfig(agent.config.model);
+  // Execution is only available when both callbacks are wired
+  const canExecute = onExecute !== undefined && onStop !== undefined;
 
   const handlePromptChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPromptValue(e.target.value);
@@ -204,7 +206,9 @@ export function AgentCardNode({
         <button
           className={`agent-card-action-btn agent-card-action-btn--primary ${isRunning ? 'agent-card-action-btn--running' : ''}`}
           onClick={handleRunClick}
-          title={isRunning ? 'Stop' : 'Run'}
+          disabled={!canExecute}
+          aria-disabled={!canExecute}
+          title={canExecute ? (isRunning ? 'Stop' : 'Run') : 'Execution not available yet'}
         >
           {isRunning ? <StopIcon /> : <PlayIcon />}
           <span>{isRunning ? 'Stop' : 'Run'}</span>

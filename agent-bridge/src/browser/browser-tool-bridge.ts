@@ -111,7 +111,8 @@ export class BrowserToolBridge {
       throw new Error('BrowserToolBridge has been disposed');
     }
 
-    const requestId = `browser-${String(Date.now())}-${Math.random().toString(36).slice(2, 9)}`;
+    // Generate unique request ID with timestamp, random string, and counter to prevent collisions
+    const requestId = `browser-${String(Date.now())}-${Math.random().toString(36).slice(2, 11)}-${String(this.pendingRequests.size)}`;
 
     return new Promise<T>((resolve, reject) => {
       // Set up timeout

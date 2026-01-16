@@ -9,7 +9,7 @@ import { useShallow } from 'zustand/shallow';
 
 import type { FC, KeyboardEvent } from 'react';
 
-import { RESIZE_HANDLE } from '@/lib/utils/constants';
+import { PANEL_SIZES, RESIZE_HANDLE } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -17,11 +17,14 @@ import { useUIStore } from '@/stores/ui/ui-store';
 const KEYBOARD_STEP = 10;
 const KEYBOARD_STEP_LARGE = 50;
 
-/** Panel size constraints */
-const PANEL_CONSTRAINTS = {
-  review: { min: 200, max: 800 },
-  bottom: { min: 100, max: 500 },
-} as const;
+/**
+ * Get panel constraints from PANEL_SIZES for consistency.
+ * 'review' maps to PANEL_SIZES.review, 'bottom' maps to PANEL_SIZES.terminal.
+ */
+function getPanelConstraints(target: 'review' | 'bottom'): { min: number; max: number } {
+  const panelSizes = target === 'review' ? PANEL_SIZES.review : PANEL_SIZES.terminal;
+  return { min: panelSizes.min, max: panelSizes.max };
+}
 
 interface ResizeHandleProps {
   readonly direction: 'horizontal' | 'vertical';
@@ -75,7 +78,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>): void => {
       const step = e.shiftKey ? KEYBOARD_STEP_LARGE : KEYBOARD_STEP;
-      const constraints = PANEL_CONSTRAINTS[target];
+      const constraints = getPanelConstraints(target);
       const currentValue = target === 'review' ? reviewPanelWidth : bottomPanelHeight;
       const setValue = target === 'review' ? setReviewPanelWidth : setBottomPanelHeight;
 
@@ -125,7 +128,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
   const isVertical = direction === 'vertical';
   const handleSize = isHovered || isFocused ? RESIZE_HANDLE.hoverWidth : RESIZE_HANDLE.width;
   const currentValue = target === 'review' ? reviewPanelWidth : bottomPanelHeight;
-  const constraints = PANEL_CONSTRAINTS[target];
+  const constraints = getPanelConstraints(target);
 
   return (
     <div
@@ -141,7 +144,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
         'focus:outline-none focus-visible:z-10',
         isVertical ? 'h-full cursor-col-resize' : 'w-full cursor-row-resize'
       )}
-      style={isVertical ? { width: RESIZE_HANDLE.width } : { height: 4 }}
+      style={isVertical ? { width: RESIZE_HANDLE.width } : { height: RESIZE_HANDLE.width }}
       onMouseDown={handleMouseDown}
       onKeyDown={handleKeyDown}
       onFocus={() => {
