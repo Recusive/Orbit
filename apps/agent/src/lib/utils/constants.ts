@@ -265,6 +265,8 @@ export interface KeyboardShortcutDef {
   event: string;
   /** Whether to prevent default browser behavior (default: true) */
   preventDefault?: boolean;
+  /** Allow shortcut to trigger while typing in inputs/textareas (default: false) */
+  allowInInput?: boolean;
 }
 
 /**
@@ -366,6 +368,7 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
     description: 'Cancel/Close',
     event: 'cancel',
     preventDefault: false,
+    allowInInput: true, // Escape should work in inputs to close dialogs, popovers, etc.
   },
 
   // Navigation & search

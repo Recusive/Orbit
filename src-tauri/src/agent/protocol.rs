@@ -60,6 +60,12 @@ pub struct AttachmentSource {
 // ============================================================================
 
 /// Session configuration
+///
+/// NOTE: We intentionally removed resume_session_id, fork_session, and resume_session_at.
+/// For rewind scenarios, we DON'T use SDK's resume because it loads ALL messages.
+/// Instead, we prepend the truncated conversation history to the first message.
+/// This matches how Claude Code handles rewind - they slice messages BEFORE passing to SDK.
+/// See agent-bridge/src/protocol/schemas.ts for the TypeScript schema.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionConfig {
@@ -79,13 +85,6 @@ pub struct SessionConfig {
     pub model: Option<Model>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_mode: Option<SessionMode>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub resume_session_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fork_session: Option<bool>,
-    /// Resume session at a specific message UUID (for rewinding to a specific point)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub resume_session_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

@@ -23,6 +23,8 @@ export interface KeyboardShortcut {
   handler: (event: KeyboardEvent) => void;
   description?: string;
   preventDefault?: boolean;
+  /** Allow shortcut to trigger while typing in inputs/textareas (default: false) */
+  allowInInput?: boolean;
 }
 
 export interface UseKeyboardShortcutsOptions {
@@ -96,8 +98,9 @@ export function useKeyboardShortcuts(
 
       for (const shortcut of shortcuts) {
         if (matchesShortcut(event, shortcut)) {
-          // Allow shortcuts in input fields if explicitly configured
-          if (isInput && !shortcut.preventDefault) {
+          // Skip shortcuts in input fields unless explicitly allowed
+          // This prevents global shortcuts from hijacking typing (e.g., Cmd+K in input)
+          if (isInput && shortcut.allowInInput !== true) {
             continue;
           }
 
@@ -160,6 +163,7 @@ function createShortcutHandler(def: KeyboardShortcutDef): KeyboardShortcut {
   if (def.shift !== undefined) shortcut.shift = def.shift;
   if (def.alt !== undefined) shortcut.alt = def.alt;
   if (def.preventDefault !== undefined) shortcut.preventDefault = def.preventDefault;
+  if (def.allowInInput !== undefined) shortcut.allowInInput = def.allowInInput;
 
   return shortcut;
 }

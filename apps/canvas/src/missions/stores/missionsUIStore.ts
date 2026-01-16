@@ -106,7 +106,8 @@ export const useMissionsUIStore = create<MissionsUIState & MissionsUIActions>()(
       },
 
       setRightSidebarWidth: (width: number): void => {
-        set({ rightSidebarWidth: Math.max(280, Math.min(480, width)) });
+        // Max width aligned with SIDEBAR_MAX_WIDTH in MissionsRightSidebar.tsx (500px)
+        set({ rightSidebarWidth: Math.max(280, Math.min(500, width)) });
       },
 
       setLeftSidebarCollapsed: (collapsed: boolean): void => {

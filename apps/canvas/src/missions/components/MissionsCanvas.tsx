@@ -9,8 +9,10 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  ReactFlowProvider,
   useEdgesState,
   useNodesState,
+  useReactFlow,
 } from '@xyflow/react';
 import React, { useCallback, useEffect, useMemo } from 'react';
 
@@ -106,7 +108,14 @@ interface MissionsCanvasProps {
   readonly onAgentSelect?: (agentId: string | null) => void;
 }
 
-export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JSX.Element {
+/**
+ * Inner canvas component that has access to useReactFlow() via ReactFlow's context.
+ * The outer MissionsCanvas wraps this in ReactFlowProvider to ensure the context is available.
+ */
+function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.Element {
+  // Get ReactFlow instance for coordinate transforms (zoom/pan-aware positioning)
+  const { screenToFlowPosition } = useReactFlow();
+
   // Store state
   const agents = useMissionsStore((s) => s.agents);
   const connections = useMissionsStore((s) => s.connections);
@@ -169,19 +178,39 @@ export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JS
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync store changes to ReactFlow
+  // Sync store changes to ReactFlow while preserving internal state (selected, dragging)
+  // This is critical because ReactFlow maintains transient state that would be lost
+  // if we simply replaced nodes/edges wholesale during streaming updates.
   useEffect(() => {
-    setNodes(Object.values(agents).map((agent) => agentToNode(agent, nodeCallbacks)));
+    setNodes((prev) => {
+      const prevById = new Map(prev.map((n) => [n.id, n]));
+      return Object.values(agents).map((agent) => {
+        const next = agentToNode(agent, nodeCallbacks);
+        const prevNode = prevById.get(agent.id);
+        // Preserve ReactFlow's transient state (selected, dragging) if node existed before
+        if (prevNode === undefined) return next;
+        // Preserve selected/dragging state with explicit boolean assignments
+        if (prevNode.selected === true) next.selected = true;
+        if (prevNode.dragging === true) next.dragging = true;
+        return next;
+      });
+    });
   }, [agents, nodeCallbacks, setNodes]);
 
   useEffect(() => {
     const runningSet = new Set(runningAgentIds);
-    setEdges(
-      Object.values(connections).map((conn) => {
+    setEdges((prev) => {
+      const prevById = new Map(prev.map((e) => [e.id, e]));
+      return Object.values(connections).map((conn) => {
         const isActive = runningSet.has(conn.sourceAgentId);
-        return connectionToEdge(conn, isActive, edgeCallbacks);
-      })
-    );
+        const next = connectionToEdge(conn, isActive, edgeCallbacks);
+        const prevEdge = prevById.get(conn.id);
+        // Preserve ReactFlow's transient state (selected) if edge existed before
+        if (prevEdge === undefined) return next;
+        if (prevEdge.selected === true) next.selected = true;
+        return next;
+      });
+    });
   }, [connections, runningAgentIds, edgeCallbacks, setEdges]);
 
   // Handle new connections
@@ -247,16 +276,14 @@ export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JS
   }, [setFocusedAgent, onAgentSelect]);
 
   // Handle double-click to add agent
+  // Uses screenToFlowPosition to correctly place agents when canvas is zoomed/panned
   const handleDoubleClick = useCallback(
     (event: React.MouseEvent) => {
-      // Use currentTarget (the element the handler is attached to) for reliable positioning
-      const target = event.currentTarget;
-      if (!(target instanceof HTMLElement)) return;
-      const rect = target.getBoundingClientRect();
-      const position = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      };
+      // Convert screen coordinates to flow coordinates (accounts for zoom/pan)
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
 
       addAgent({
         id: `agent-${String(Date.now())}`,
@@ -265,7 +292,7 @@ export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JS
         name: `Agent ${String(Object.keys(agents).length + 1)}`,
       });
     },
-    [addAgent, agents]
+    [addAgent, agents, screenToFlowPosition]
   );
 
   // Handle add agent from toolbar
@@ -340,5 +367,19 @@ export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JS
       {/* Right Sidebar - Floating overlay */}
       <MissionsRightSidebar />
     </div>
+  );
+}
+
+/**
+ * MissionsCanvas - Main exported component
+ * Wraps MissionsCanvasInner in ReactFlowProvider to enable useReactFlow() hook
+ * for coordinate transforms (screenToFlowPosition).
+ */
+export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JSX.Element {
+  return (
+    <ReactFlowProvider>
+      {/* Spread props to handle exactOptionalPropertyTypes correctly */}
+      <MissionsCanvasInner {...(onAgentSelect !== undefined && { onAgentSelect })} />
+    </ReactFlowProvider>
   );
 }

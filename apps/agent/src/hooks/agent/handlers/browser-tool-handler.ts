@@ -132,7 +132,9 @@ async function detectBrowserTauriApi(): Promise<boolean> {
   // Use ??= to only create promise if none exists
   detectionPromise ??= (async (): Promise<boolean> => {
     try {
-      const raw = await browserEval('return typeof window.__TAURI__ !== "undefined"');
+      // Check for the full Tauri API, not just window.__TAURI__ existence
+      // A page could define window.__TAURI__ without having the actual Tauri API
+      const raw = await browserEval('return typeof window.__TAURI__?.core?.invoke === "function"');
       browserHasTauriApi = parseEvalResult(raw) === true;
     } catch (error) {
       logger.warn('Browser Tauri API probe failed', {
@@ -149,7 +151,19 @@ async function detectBrowserTauriApi(): Promise<boolean> {
 
 async function evalScript(script: string): Promise<string> {
   const hasTauriApi = await detectBrowserTauriApi();
-  return hasTauriApi ? browserEvalAsync(script) : browserEval(script);
+  if (!hasTauriApi) return browserEval(script);
+
+  // Try async eval first, fall back to sync if it fails
+  // This handles edge cases where detection succeeded but API isn't fully available
+  try {
+    return await browserEvalAsync(script);
+  } catch (error) {
+    logger.warn('browserEvalAsync failed, falling back to sync eval', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    resetBrowserApiCache();
+    return browserEval(script);
+  }
 }
 
 async function waitForBrowserReady(timeoutMs: number): Promise<boolean> {
