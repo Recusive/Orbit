@@ -480,7 +480,7 @@ function CanvasAppInner(): React.JSX.Element {
         return { id: n.id, data: { label } };
       })
     );
-  }, [nodes]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [nodes]); // eslint-disable-line react-hooks/exhaustive-deps -- layerManagement.syncFromNodes is stable (see DEPS comment above)
 
   // Load persisted state on mount - initialization pattern
   // DEPS: All functions used (loadState, setNodes, setEdges, setViewport, setIsStateLoaded) are stable:
@@ -507,7 +507,7 @@ function CanvasAppInner(): React.JSX.Element {
       }
     }
     setIsStateLoaded(true);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- all functions are stable (see DEPS comment above)
 
   // Save state when nodes or edges change (debounced)
   useEffect(() => {

@@ -328,14 +328,15 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
 
   // Subscribe to treeNodes keys for detecting cleared folders
   // Use Array.from instead of spread to handle Immer proxies more reliably
-  const treeNodeKeys = useFileStore((s) => Object.keys(s.treeNodes).join(','));
-  const expandedFoldersList = useFileStore((s) => Array.from(s.expandedFolders).join(','));
+  // Use NUL (\0) as delimiter since it cannot appear in file paths (unlike comma)
+  const treeNodeKeys = useFileStore((s) => Object.keys(s.treeNodes).join('\0'));
+  const expandedFoldersList = useFileStore((s) => Array.from(s.expandedFolders).join('\0'));
   const currentRootPath = useFileStore((s) => s.rootPath);
 
   // Re-fetch expanded folders when their children are cleared (e.g., by file watcher)
   useEffect(() => {
-    const currentPaths = new Set(treeNodeKeys.split(',').filter(Boolean));
-    const expandedFolders = new Set(expandedFoldersList.split(',').filter(Boolean));
+    const currentPaths = new Set(treeNodeKeys.split('\0').filter(Boolean));
+    const expandedFolders = new Set(expandedFoldersList.split('\0').filter(Boolean));
 
     // Check for expanded folders that were loaded but now aren't
     for (const folderPath of expandedFolders) {

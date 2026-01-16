@@ -856,8 +856,9 @@ export const useMissionsStore = create<MissionsState & MissionsActions>()(
         // Apply context flow settings
         let contextText = output;
         if (conn.contextFlow === 'filtered' && conn.contextFilter !== undefined) {
-          // ReDoS protection: limit pattern length and reject dangerous patterns
+          // ReDoS protection: limit pattern length, reject dangerous patterns, and cap output length
           const MAX_REGEX_LENGTH = 200;
+          const MAX_OUTPUT_LENGTH = 50_000; // Cap output to prevent UI stalls on large text
           const filter = conn.contextFilter;
 
           // Check for potentially dangerous regex patterns that cause exponential backtracking:
@@ -865,6 +866,16 @@ export const useMissionsStore = create<MissionsState & MissionsActions>()(
           // - Overlapping alternation with quantifiers
           const DANGEROUS_PATTERN = /(\+|\*|\?|\{)\s*\)(\+|\*|\?|\{)|(\|[^|]*){10,}/;
           const isDangerous = DANGEROUS_PATTERN.test(filter);
+
+          // Cap output length to bound worst-case regex runtime
+          const outputForMatch =
+            output.length > MAX_OUTPUT_LENGTH ? output.slice(0, MAX_OUTPUT_LENGTH) : output;
+          if (output.length > MAX_OUTPUT_LENGTH) {
+            logger.warn('Context output truncated for regex filtering', {
+              length: output.length,
+              maxLength: MAX_OUTPUT_LENGTH,
+            });
+          }
 
           if (filter.length > MAX_REGEX_LENGTH) {
             logger.warn('Context filter pattern too long, using full output', {
@@ -880,7 +891,7 @@ export const useMissionsStore = create<MissionsState & MissionsActions>()(
           } else {
             try {
               const regex = new RegExp(filter, 'g');
-              const matches = output.match(regex);
+              const matches = outputForMatch.match(regex);
               contextText = matches !== null ? matches.join('\n') : '';
             } catch {
               // Invalid regex - fall back to full output

@@ -32,20 +32,33 @@ export interface UseRecentProjectsReturn {
 
 /**
  * Extracts project info from a full path.
+ * Handles both Unix (/Users/...) and Windows (C:\Users\...) paths.
  */
 function parseProjectPath(path: string): RecentProject {
   const segments = path.split(PATH_SEPARATOR_RE).filter(Boolean);
   const name = segments[segments.length - 1] ?? path;
   const parentSegments = segments.slice(0, -1);
 
+  // Detect path style: Windows paths have drive letters (e.g., C:)
+  const isWindows = /^[A-Za-z]:/.test(path);
+  const sep = isWindows ? '\\' : '/';
+  const prefix = isWindows ? '' : '/';
+
   // Format parent path nicely (replace home dir with ~)
-  let parentPath = '/' + parentSegments.join('/');
-  const homeDir = '/Users/';
-  if (parentPath.startsWith(homeDir)) {
-    const afterHome = parentPath.slice(homeDir.length);
-    const userEnd = afterHome.indexOf('/');
-    if (userEnd !== -1) {
-      parentPath = '~' + afterHome.slice(userEnd);
+  let parentPath = prefix + parentSegments.join(sep);
+
+  // Handle both macOS (/Users/username) and Windows (C:\Users\username) home directories
+  const homePatterns = [
+    /^\/Users\/[^/]+/, // macOS: /Users/username
+    /^[A-Za-z]:\\Users\\[^\\]+/i, // Windows: C:\Users\username
+  ];
+
+  for (const pattern of homePatterns) {
+    const match = parentPath.match(pattern);
+    if (match) {
+      // Replace home directory with ~, keeping the rest of the path
+      parentPath = '~' + parentPath.slice(match[0].length);
+      break;
     }
   }
 

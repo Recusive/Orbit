@@ -507,9 +507,11 @@ pub async fn browser_eval(
     );
 
     // Execute the wrapped script
-    webview
-        .eval(&wrapped_script)
-        .map_err(|e| format!("JavaScript execution failed: {e}"))?;
+    // If eval fails, cancel the pending request to prevent leaks
+    if let Err(e) = webview.eval(&wrapped_script) {
+        result_state.cancel(&eval_id);
+        return Err(format!("JavaScript execution failed: {e}"));
+    }
 
     // Wait for the result with a timeout
     // The result_rx yields Result<String, String> where:
@@ -629,9 +631,11 @@ pub async fn browser_eval_async(
         }})();"
     );
 
-    webview
-        .eval(&wrapped)
-        .map_err(|e| format!("JavaScript execution failed: {e}"))?;
+    // If eval fails, cancel the pending request to prevent leaks
+    if let Err(e) = webview.eval(&wrapped) {
+        result_state.cancel(&request_id);
+        return Err(format!("JavaScript execution failed: {e}"));
+    }
 
     // Wait for result with timeout
     // Note: browser_js_callback uses complete_ok for all results, so JS errors
