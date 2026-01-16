@@ -2,7 +2,7 @@ import { SectionDivider, SectionHeader, ShortcutItem } from '../components';
 
 import type { FC } from 'react';
 
-import { getModifierSymbols } from '@/lib/utils/utils';
+import { getModifierSymbols } from '@/lib/utils';
 
 export const ShortcutsSettings: FC = () => {
   const mod = getModifierSymbols();

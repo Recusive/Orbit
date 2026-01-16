@@ -26,8 +26,7 @@ import { ContextMenuTrigger } from '@/components/ui/context-menu';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTerminalInstanceManager } from '@/hooks/terminal/use-terminal-instance-manager';
-import { HEIGHTS } from '@/lib/utils/constants';
-import { cn, getCommandKey } from '@/lib/utils/utils';
+import { cn, getCommandKey, HEIGHTS } from '@/lib/utils';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
 import {
   useUIStore,

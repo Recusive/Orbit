@@ -3,7 +3,14 @@
  */
 
 // General utilities
-export { cn, formatTimestamp, truncatePath } from './utils';
+export {
+  cn,
+  formatTimestamp,
+  truncatePath,
+  isMac,
+  getCommandKey,
+  getModifierSymbols,
+} from './utils';
 
 // Diff utilities
 export { computeSimpleDiff, getLanguageFromPath } from './diff-utils';

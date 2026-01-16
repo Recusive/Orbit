@@ -11,8 +11,7 @@ import type { FC } from 'react';
 
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { SIDEBAR } from '@/lib/utils/constants';
-import { cn, getModifierSymbols } from '@/lib/utils/utils';
+import { cn, getModifierSymbols, SIDEBAR } from '@/lib/utils';
 import { useActivityTab, useUIStore } from '@/stores/ui/ui-store';
 
 interface ActionButtonProps {
