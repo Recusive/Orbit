@@ -124,7 +124,10 @@
   position: absolute;
 }
 
-.terminal-wrapper .xterm-screen .xterm-decoration-container .xterm-decoration.xterm-decoration-top-layer {
+.terminal-wrapper
+  .xterm-screen
+  .xterm-decoration-container
+  .xterm-decoration.xterm-decoration-top-layer {
   z-index: 7;
 }
 
