@@ -220,6 +220,17 @@ export async function executeBrowserTool(
           useBrowserStore.getState().setPendingNavigationUrl(url);
         }
 
+        // Re-inject console capture after navigation (new page wipes window.__orbitConsoleLogs)
+        if (await waitForBrowserReady(BROWSER_READY_TIMEOUT_MS)) {
+          try {
+            await ensureConsoleCapture();
+          } catch (error) {
+            logger.warn('Console capture injection failed after navigate', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+
         return { success: true, result: { navigated: true } };
       }
 
@@ -284,6 +295,23 @@ export async function executeBrowserTool(
       }
 
       case 'browser_console_logs': {
+        // Check if console capture exists, if not inject it first
+        // This handles cases where user navigated via clicking links
+        const checkScript = 'return typeof window.__orbitConsoleLogs !== "undefined"';
+        const checkRaw = await evalScript(checkScript);
+        const hasCapture = parseEvalResult(checkRaw);
+
+        if (hasCapture !== true) {
+          logger.info('Console capture not found, injecting now (future logs will be captured)');
+          try {
+            await ensureConsoleCapture();
+          } catch (error) {
+            logger.warn('Console capture injection failed', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+
         const raw = await evalScript('return window.__orbitConsoleLogs || []');
         const logs = parseEvalResult(raw);
         return { success: true, result: logs };
@@ -318,6 +346,19 @@ export async function executeBrowserTool(
 
       case 'browser_reload': {
         await browserReload();
+        resetBrowserApiCache();
+
+        // Re-inject console capture after reload (page reload wipes window.__orbitConsoleLogs)
+        if (await waitForBrowserReady(BROWSER_READY_TIMEOUT_MS)) {
+          try {
+            await ensureConsoleCapture();
+          } catch (error) {
+            logger.warn('Console capture injection failed after reload', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+
         return { success: true };
       }
 

@@ -38,10 +38,24 @@ export async function handleBrowserCreate(
   const lifecycleStore = useBrowserLifecycleStore.getState();
   const browserStore = useBrowserStore.getState();
 
+  // Guard: Don't create if already creating or active
+  if (lifecycleStore.state === 'starting' || lifecycleStore.state === 'active') {
+    logger.debug('Browser creation skipped - already starting or active', {
+      state: lifecycleStore.state,
+    });
+    return;
+  }
+
+  // Guard: Skip invalid bounds (viewport hasn't rendered yet)
+  const { x, y, width, height, url } = message.bounds;
+  if (width < 10 || height < 10) {
+    logger.debug('Browser creation skipped - invalid bounds', { width, height });
+    return;
+  }
+
   lifecycleStore.setState('starting');
 
   try {
-    const { x, y, width, height, url } = message.bounds;
     const info = await browserCreate(x, y, width, height, url);
     logger.info('Embedded browser created', { label: info.label });
 
@@ -93,6 +107,18 @@ export async function handleBrowserCreate(
         : typeof err === 'string'
           ? err
           : JSON.stringify(err) || 'Failed to create browser';
+
+    // Check if this is an "already exists" error - don't reset state in that case
+    // The browser was successfully created by a previous call
+    const isAlreadyExists = errorMessage.includes('already exists');
+
+    if (isAlreadyExists) {
+      logger.debug('Browser already exists (race condition handled)', { error: errorMessage });
+      // Don't reset state - browser is already running
+      browserStore.setCreating(false);
+      return;
+    }
+
     logger.error('Browser creation failed', { error: err, message: errorMessage });
 
     lifecycleStore.setError(errorMessage);

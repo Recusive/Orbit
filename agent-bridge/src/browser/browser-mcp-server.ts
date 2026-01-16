@@ -15,6 +15,18 @@ import type { BrowserToolBridge } from './browser-tool-bridge.js';
 const logger = createLogger('BrowserMcpServer');
 
 /**
+ * Safely stringify a result for MCP text content.
+ * JSON.stringify(undefined) returns undefined (not a string!),
+ * which breaks MCP validation that expects text: string.
+ */
+function safeStringify(value: unknown): string {
+  if (value === undefined) {
+    return 'null';
+  }
+  return JSON.stringify(value);
+}
+
+/**
  * Create the Browser MCP server with all browser tools.
  */
 export function createBrowserMcpServer(
@@ -32,7 +44,7 @@ export function createBrowserMcpServer(
         try {
           const result = await bridge.sendRequest('browser_open', args);
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+            content: [{ type: 'text' as const, text: safeStringify(result) }],
           };
         } catch (error: unknown) {
           return {
@@ -86,7 +98,7 @@ export function createBrowserMcpServer(
         try {
           const result = await bridge.sendRequest('browser_click', args);
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+            content: [{ type: 'text' as const, text: safeStringify(result) }],
           };
         } catch (error: unknown) {
           return {
@@ -114,7 +126,7 @@ export function createBrowserMcpServer(
         try {
           const result = await bridge.sendRequest('browser_type', args);
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+            content: [{ type: 'text' as const, text: safeStringify(result) }],
           };
         } catch (error: unknown) {
           return {
@@ -139,9 +151,9 @@ export function createBrowserMcpServer(
       async (args) => {
         logger.debug({ selector: args.selector }, 'Getting page text');
         try {
-          const result = await bridge.sendRequest<string>('browser_get_text', args);
+          const result = await bridge.sendRequest<string | undefined>('browser_get_text', args);
           return {
-            content: [{ type: 'text' as const, text: result }],
+            content: [{ type: 'text' as const, text: result ?? '' }],
           };
         } catch (error: unknown) {
           return {
@@ -166,9 +178,9 @@ export function createBrowserMcpServer(
       async (args) => {
         logger.debug({ selector: args.selector }, 'Getting page HTML');
         try {
-          const result = await bridge.sendRequest<string>('browser_get_html', args);
+          const result = await bridge.sendRequest<string | undefined>('browser_get_html', args);
           return {
-            content: [{ type: 'text' as const, text: result }],
+            content: [{ type: 'text' as const, text: result ?? '' }],
           };
         } catch (error: unknown) {
           return {
@@ -193,7 +205,7 @@ export function createBrowserMcpServer(
         try {
           const result = await bridge.sendRequest('browser_screenshot', {});
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+            content: [{ type: 'text' as const, text: safeStringify(result) }],
           };
         } catch (error: unknown) {
           return {
@@ -214,7 +226,7 @@ export function createBrowserMcpServer(
       try {
         const result = await bridge.sendRequest('browser_console_logs', {});
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+          content: [{ type: 'text' as const, text: safeStringify(result) }],
         };
       } catch (error: unknown) {
         return {
@@ -320,7 +332,7 @@ export function createBrowserMcpServer(
         try {
           const result = await bridge.sendRequest('browser_eval', args);
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+            content: [{ type: 'text' as const, text: safeStringify(result) }],
           };
         } catch (error: unknown) {
           return {

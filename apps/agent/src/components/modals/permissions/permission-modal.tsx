@@ -1,4 +1,4 @@
-import { File, Loader2, Terminal } from 'lucide-react';
+import { File, Globe, Loader2, Terminal } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
 
 import type { PermissionRequest } from '@/stores/agent/tool-store';
@@ -11,8 +11,56 @@ interface PermissionModalProps {
   readonly onOpenFile?: (path: string) => void;
 }
 
+// Format MCP tool names like "mcp__orbit-browser__browser_open" to "Browser: Open"
+function formatMcpToolName(toolName: string): string | null {
+  if (!toolName.startsWith('mcp__')) {
+    return null;
+  }
+
+  const parts = toolName.split('__');
+  const provider = parts[1];
+  const actionParts = parts.slice(2);
+
+  if (!provider || actionParts.length === 0) {
+    return null;
+  }
+
+  const action = actionParts.join('__'); // e.g., "browser_open"
+
+  // Map provider names to display names
+  const providerDisplayNames: Record<string, string> = {
+    'orbit-browser': 'Browser',
+    'claude-in-chrome': 'Browser',
+    plugin_playwright_playwright: 'Playwright',
+  };
+
+  const displayProvider = providerDisplayNames[provider] ?? provider;
+
+  // Extract action name (remove provider prefix if present)
+  // e.g., "browser_open" → "open", "browser_navigate" → "navigate"
+  let actionName = action;
+  if (action.startsWith('browser_')) {
+    actionName = action.slice(8); // Remove "browser_" prefix
+  }
+
+  // Capitalize and format action name
+  // e.g., "open" → "Open", "take_screenshot" → "Take Screenshot"
+  const formattedAction = actionName
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+  return `${displayProvider}: ${formattedAction}`;
+}
+
 // Get confirmation action label
 function getConfirmLabel(toolName: string): string {
+  // Try to format as MCP tool first
+  const mcpLabel = formatMcpToolName(toolName);
+  if (mcpLabel) {
+    return mcpLabel;
+  }
+
   const name = toolName.toLowerCase();
   switch (name) {
     case 'bash':
@@ -32,9 +80,18 @@ function getConfirmLabel(toolName: string): string {
   }
 }
 
+// Check if tool is a browser-related MCP tool
+function isBrowserTool(toolName: string): boolean {
+  const name = toolName.toLowerCase();
+  return (
+    name.includes('browser') || name.includes('orbit-browser') || name.includes('claude-in-chrome')
+  );
+}
+
 export const PermissionModal: FC<PermissionModalProps> = ({ request, onApprove, onDeny }) => {
   const confirmLabel = getConfirmLabel(request.toolName);
   const isBash = request.toolName.toLowerCase() === 'bash';
+  const isBrowser = isBrowserTool(request.toolName);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -72,6 +129,8 @@ export const PermissionModal: FC<PermissionModalProps> = ({ request, onApprove, 
         <div className="w-6 h-6 rounded-md flex items-center justify-center bg-primary/10">
           {isBash ? (
             <Terminal className="h-3.5 w-3.5 text-primary/70" />
+          ) : isBrowser ? (
+            <Globe className="h-3.5 w-3.5 text-primary/70" />
           ) : (
             <File className="h-3.5 w-3.5 text-primary/70" />
           )}

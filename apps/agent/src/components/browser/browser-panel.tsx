@@ -69,7 +69,16 @@ export const BrowserPanel: FC = () => {
 
   // Launch embedded browser - creates a webview within the Orbit window
   const handleLaunchBrowser = useCallback((): void => {
+    // Guard: Check all possible states that should prevent creation
     if (!viewportRef.current || isActive || isCreating) return;
+    if (lifecycleState === 'starting' || lifecycleState === 'active') return;
+
+    // Guard: Check bounds are valid (viewport has rendered)
+    const rect = viewportRef.current.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) {
+      // Viewport hasn't rendered yet, skip
+      return;
+    }
 
     // Use pending URL from AI request, or default
     const initialUrl = pendingUrl ?? 'https://example.com';
@@ -79,7 +88,7 @@ export const BrowserPanel: FC = () => {
 
     // Get viewport bounds for initial webview position
     // Apply inset to prevent webview from overlapping panel borders
-    const rect = viewportRef.current.getBoundingClientRect();
+    // Note: rect was already fetched above for validation
     const bounds = {
       x: Math.round(rect.x) + WEBVIEW_BORDER_INSET,
       y: Math.round(rect.y),
@@ -94,7 +103,7 @@ export const BrowserPanel: FC = () => {
       uuid: generateUUID(),
       bounds,
     });
-  }, [isActive, isCreating, postMessage, pendingUrl]);
+  }, [isActive, isCreating, lifecycleState, postMessage, pendingUrl]);
 
   // Close browser handler
   const handleCloseBrowser = useCallback((): void => {
