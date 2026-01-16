@@ -24,7 +24,12 @@ const DEFAULT_OPEN_URL = 'about:blank';
 const BROWSER_READY_TIMEOUT_MS = 10000;
 const BROWSER_READY_POLL_MS = 250;
 
+// Browser API detection state with promise coalescing to prevent race conditions
 let browserHasTauriApi: boolean | null = null;
+let detectionPromise: Promise<boolean> | null = null;
+
+// AbortController for canceling browser ready polling
+let browserReadyAbortController: AbortController | null = null;
 
 interface BrowserToolExecutionResult {
   success: boolean;
@@ -32,12 +37,12 @@ interface BrowserToolExecutionResult {
   error?: string;
 }
 
-function escapeForSingleQuote(value: string): string {
-  return value
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/\r/g, '\\r')
-    .replace(/\n/g, '\\n');
+/**
+ * Safely serialize a value for injection into JavaScript.
+ * Uses JSON.stringify which handles all escaping cases properly.
+ */
+function safeStringify(value: string): string {
+  return JSON.stringify(value);
 }
 
 function parseEvalResult(raw: string): unknown {
@@ -51,24 +56,37 @@ function parseEvalResult(raw: string): unknown {
 
 function resetBrowserApiCache(): void {
   browserHasTauriApi = null;
+  detectionPromise = null;
+  // Cancel any pending browser ready polling
+  if (browserReadyAbortController) {
+    browserReadyAbortController.abort();
+    browserReadyAbortController = null;
+  }
 }
 
 async function detectBrowserTauriApi(): Promise<boolean> {
+  // Return cached result if available
   if (browserHasTauriApi !== null) {
     return browserHasTauriApi;
   }
 
-  try {
-    const raw = await browserEval('return typeof window.__TAURI__ !== "undefined"');
-    browserHasTauriApi = parseEvalResult(raw) === true;
-  } catch (error) {
-    logger.warn('Browser Tauri API probe failed', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    browserHasTauriApi = false;
-  }
+  // Coalesce concurrent detection calls to prevent race conditions
+  // Use ??= to only create promise if none exists
+  detectionPromise ??= (async (): Promise<boolean> => {
+    try {
+      const raw = await browserEval('return typeof window.__TAURI__ !== "undefined"');
+      browserHasTauriApi = parseEvalResult(raw) === true;
+    } catch (error) {
+      logger.warn('Browser Tauri API probe failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      browserHasTauriApi = false;
+    }
+    // browserHasTauriApi is guaranteed to be boolean at this point
+    return browserHasTauriApi;
+  })();
 
-  return browserHasTauriApi;
+  return detectionPromise;
 }
 
 async function evalScript(script: string): Promise<string> {
@@ -77,8 +95,19 @@ async function evalScript(script: string): Promise<string> {
 }
 
 async function waitForBrowserReady(timeoutMs: number): Promise<boolean> {
+  // Cancel any previous polling
+  if (browserReadyAbortController) {
+    browserReadyAbortController.abort();
+  }
+  browserReadyAbortController = new AbortController();
+  const signal = browserReadyAbortController.signal;
+
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    // Check if aborted (e.g., browser closed, navigation changed)
+    if (signal.aborted) {
+      return false;
+    }
     try {
       if (await browserHas()) {
         return true;
@@ -94,16 +123,36 @@ async function waitForBrowserReady(timeoutMs: number): Promise<boolean> {
 }
 
 async function ensureConsoleCapture(): Promise<void> {
+  // Console capture script with circular reference handling
   const captureScript = `
     if (!window.__orbitConsoleLogs) {
       window.__orbitConsoleLogs = [];
       const orig = { ...console };
+
+      // Safe stringify that handles circular references
+      const safeStringify = (obj) => {
+        if (obj === null || obj === undefined) return String(obj);
+        if (typeof obj !== 'object') return String(obj);
+        try {
+          return JSON.stringify(obj);
+        } catch {
+          // Handle circular references, DOM nodes, etc.
+          if (obj instanceof Error) {
+            return obj.stack || obj.message || String(obj);
+          }
+          if (obj instanceof Element) {
+            return obj.outerHTML.slice(0, 200) + (obj.outerHTML.length > 200 ? '...' : '');
+          }
+          return '[Object with circular reference]';
+        }
+      };
+
       ['log', 'warn', 'error', 'info', 'debug'].forEach((m) => {
         console[m] = (...args) => {
           window.__orbitConsoleLogs.push({
             type: m,
             timestamp: Date.now(),
-            args: args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))),
+            args: args.map(safeStringify),
           });
           if (window.__orbitConsoleLogs.length > 1000) {
             window.__orbitConsoleLogs.shift();
@@ -178,9 +227,10 @@ export async function executeBrowserTool(
         if (typeof toolInput['selector'] !== 'string') {
           return { success: false, error: 'Missing selector for browser_click' };
         }
-        const selector = escapeForSingleQuote(toolInput['selector']);
+        // Use JSON.stringify for defense-in-depth escaping
+        const selectorJson = safeStringify(toolInput['selector']);
         const script = `
-          const el = document.querySelector('${selector}');
+          const el = document.querySelector(${selectorJson});
           if (el instanceof HTMLElement) {
             el.click();
             return true;
@@ -196,13 +246,14 @@ export async function executeBrowserTool(
         if (typeof toolInput['selector'] !== 'string' || typeof toolInput['text'] !== 'string') {
           return { success: false, error: 'Missing selector or text for browser_type' };
         }
-        const selector = escapeForSingleQuote(toolInput['selector']);
-        const text = escapeForSingleQuote(toolInput['text']);
+        // Use JSON.stringify for defense-in-depth escaping
+        const selectorJson = safeStringify(toolInput['selector']);
+        const textJson = safeStringify(toolInput['text']);
         const script = `
-          const el = document.querySelector('${selector}');
+          const el = document.querySelector(${selectorJson});
           if (el && 'value' in el) {
             el.focus?.();
-            el.value = '${text}';
+            el.value = ${textJson};
             el.dispatchEvent(new Event('input', { bubbles: true }));
             el.dispatchEvent(new Event('change', { bubbles: true }));
             return true;
@@ -216,7 +267,8 @@ export async function executeBrowserTool(
 
       case 'browser_get_text': {
         const selector = typeof toolInput['selector'] === 'string' ? toolInput['selector'] : 'body';
-        const script = `return document.querySelector('${escapeForSingleQuote(selector)}')?.innerText ?? ''`;
+        const selectorJson = safeStringify(selector);
+        const script = `return document.querySelector(${selectorJson})?.innerText ?? ''`;
         const raw = await evalScript(script);
         const text = parseEvalResult(raw);
         return { success: true, result: text };
@@ -224,7 +276,8 @@ export async function executeBrowserTool(
 
       case 'browser_get_html': {
         const selector = typeof toolInput['selector'] === 'string' ? toolInput['selector'] : 'body';
-        const script = `return document.querySelector('${escapeForSingleQuote(selector)}')?.innerHTML ?? ''`;
+        const selectorJson = safeStringify(selector);
+        const script = `return document.querySelector(${selectorJson})?.innerHTML ?? ''`;
         const raw = await evalScript(script);
         const html = parseEvalResult(raw);
         return { success: true, result: html };

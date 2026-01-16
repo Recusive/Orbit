@@ -460,12 +460,22 @@ pub async fn browser_eval(
     // 3. Navigates to a special URL that gets intercepted by on_navigation
     //
     // We use navigation interception because child webviews don't have IPC
+    //
+    // IMPORTANT: We use `?? null` to handle undefined results (JSON.stringify(undefined)
+    // returns undefined, not a string, which breaks JSON.parse on the receiving end).
+    // We also check payload size to avoid URL length limits causing silent failures.
     let wrapped_script = format!(
         "(async () => {{
             const __evalId = {eval_id_json};
             try {{
                 const __result = await (async () => {{ {script} }})();
-                const __data = encodeURIComponent(JSON.stringify(__result));
+                const __json = JSON.stringify(__result ?? null);
+                if (__json.length > 100000) {{
+                    const __errorMsg = encodeURIComponent(`Result too large (${{__json.length}} chars, max 100000)`);
+                    window.location.href = `orbit-eval://result?id=${{__evalId}}&success=false&error=${{__errorMsg}}`;
+                    return;
+                }}
+                const __data = encodeURIComponent(__json);
                 window.location.href = `orbit-eval://result?id=${{__evalId}}&success=true&data=${{__data}}`;
             }} catch (__error) {{
                 const __errorMsg = encodeURIComponent(__error.message || String(__error));
@@ -641,31 +651,29 @@ pub async fn browser_eval_async(
 ///
 /// # Note
 ///
-/// This command uses `browser_eval_async` which requires `window.__TAURI__`
-/// to be available. For external sites, consider using `browser_eval` instead.
+/// This command uses `browser_eval` (navigation-based) which works on both
+/// Tauri-enabled and external sites. No `window.__TAURI__` required.
 #[tauri::command]
 pub async fn browser_screenshot(
     app: AppHandle,
     state: State<'_, Arc<EmbeddedBrowserState>>,
     result_state: State<'_, Arc<BrowserResultState>>,
 ) -> Result<String> {
-    // Use browser_eval_async to capture page info
+    // Use browser_eval (navigation-based) which works on external sites
     // Full screenshot would require html2canvas or native webview API
     let script = "
-        return await new Promise((resolve) => {
-            resolve({
-                url: window.location.href,
-                title: document.title,
-                width: window.innerWidth,
-                height: window.innerHeight,
-                scrollX: window.scrollX,
-                scrollY: window.scrollY,
-                devicePixelRatio: window.devicePixelRatio
-            });
-        });
+        return {
+            url: window.location.href,
+            title: document.title,
+            width: window.innerWidth,
+            height: window.innerHeight,
+            scrollX: window.scrollX,
+            scrollY: window.scrollY,
+            devicePixelRatio: window.devicePixelRatio
+        };
     ";
 
-    browser_eval_async(script.to_owned(), Some(10000), app, state, result_state).await
+    browser_eval(script.to_owned(), app, state, result_state).await
 }
 
 /// Open DevTools for the embedded browser.
