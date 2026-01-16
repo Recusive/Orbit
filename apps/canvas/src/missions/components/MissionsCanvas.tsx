@@ -14,7 +14,7 @@ import {
   useNodesState,
   useReactFlow,
 } from '@xyflow/react';
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ErrorBoundary } from '../../components/shared/ErrorBoundary';
 import {
@@ -25,6 +25,7 @@ import {
 } from '../stores';
 
 import { AgentCardNode } from './AgentCardNode';
+import { AgentExpandedView } from './AgentExpandedView';
 import { MissionEdge } from './MissionEdge';
 import { MissionsFloatingToolbar } from './MissionsFloatingToolbar';
 import { MissionsRightSidebar } from './MissionsRightSidebar';
@@ -59,6 +60,7 @@ function agentToNode(
     onExecute?: (id: string) => void; // Optional until wired to agent-bridge
     onStop?: (id: string) => void; // Optional until wired to agent-bridge
     onConfigure: (id: string) => void;
+    onExpand: (id: string) => void;
   }
 ): Node<AgentCardNodeData> {
   return {
@@ -70,6 +72,7 @@ function agentToNode(
       onUpdate: callbacks.onUpdate,
       onDelete: callbacks.onDelete,
       onConfigure: callbacks.onConfigure,
+      onExpand: callbacks.onExpand,
       // Conditionally spread optional callbacks to avoid exactOptionalPropertyTypes issues
       ...(callbacks.onExecute !== undefined && { onExecute: callbacks.onExecute }),
       ...(callbacks.onStop !== undefined && { onStop: callbacks.onStop }),
@@ -138,6 +141,12 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
   const rightSidebarVisualWidth = useMissionsUIStore(selectRightSidebarVisualWidth);
   const showMinimap = useMissionsUIStore((s) => s.showMinimap);
 
+  // Expanded agent state - when set, shows full agent view overlay
+  const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
+
+  // Get the expanded agent data (undefined if agent was deleted while expanded)
+  const expandedAgent = expandedAgentId !== null ? (agents[expandedAgentId] ?? null) : null;
+
   // Callbacks for nodes
   // NOTE: onExecute/onStop are omitted until agent-bridge integration is complete.
   // AgentCardNode disables Run/Stop buttons when these are undefined.
@@ -148,6 +157,9 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
       // onExecute and onStop are intentionally omitted - will be wired to agent-bridge
       onConfigure: (id: string) => {
         setFocusedAgent(id);
+      },
+      onExpand: (id: string) => {
+        setExpandedAgentId(id);
       },
     }),
     [updateAgent, deleteAgent, setFocusedAgent]
@@ -367,6 +379,17 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
 
       {/* Right Sidebar - Floating overlay */}
       <MissionsRightSidebar />
+
+      {/* Expanded Agent View - Full screen overlay */}
+      {expandedAgent !== null ? (
+        <AgentExpandedView
+          agent={expandedAgent}
+          onClose={() => {
+            setExpandedAgentId(null);
+          }}
+          onUpdate={updateAgent}
+        />
+      ) : null}
     </div>
   );
 }

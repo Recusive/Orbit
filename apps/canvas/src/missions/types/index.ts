@@ -99,11 +99,32 @@ export interface AgentExecutionResult {
 }
 
 /**
+ * Activity log entry status
+ */
+export type ActivityLogStatus =
+  | 'in_progress' // Currently doing this
+  | 'completed' // Done
+  | 'needs_input' // Waiting for user input
+  | 'error' // Failed
+  | 'cancelled'; // User cancelled
+
+/**
+ * Single activity log entry showing what the agent is doing
+ */
+export interface ActivityLogEntry {
+  id: string;
+  message: string;
+  status: ActivityLogStatus;
+  timestamp: number;
+}
+
+/**
  * Execution state for tracking streaming progress
  */
 export interface AgentExecutionState {
   status: AgentStatus;
   currentOutput: string; // Streaming buffer
+  activityLog: ActivityLogEntry[]; // Live activity feed
   lastResult?: AgentExecutionResult;
   executionHistory: AgentExecutionResult[];
   errorMessage?: string;
@@ -182,6 +203,7 @@ export const DEFAULT_AGENT_CARD: Omit<AgentCard, 'id' | 'createdAt' | 'updatedAt
   execution: {
     status: 'idle',
     currentOutput: '',
+    activityLog: [],
     executionHistory: [],
   },
   inheritParentContext: true,
@@ -366,6 +388,7 @@ export interface AgentCardNodeData {
   onExecute?: (agentId: string) => void;
   onStop?: (agentId: string) => void;
   onConfigure?: (agentId: string) => void;
+  onExpand?: (agentId: string) => void;
   // Index signature for ReactFlow compatibility
   [key: string]: unknown;
 }

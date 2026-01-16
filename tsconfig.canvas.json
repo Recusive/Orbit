@@ -32,10 +32,11 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
 
-    /* Paths - Canvas specific */
+    /* Paths - Canvas specific (includes agent paths for embedded components) */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./apps/canvas/src/*"],
+      "@/*": ["./apps/canvas/src/*", "./apps/agent/src/*"],
+      "@canvas/*": ["./apps/canvas/src/*"],
       "@orbit/common": ["./apps/common/src/index.ts"],
       "@orbit/common/*": ["./apps/common/src/*"]
     }

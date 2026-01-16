@@ -165,7 +165,8 @@
   background-color: var(--accent) !important;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - using solid oklch() values instead of color-mix()
+   to avoid GPU compositing bugs in Tauri WebView */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -176,16 +177,16 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in oklch, var(--muted-foreground) 40%, transparent);
+  background: oklch(0.55 0.02 60 / 50%);
   border-radius: var(--radius-sm);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in oklch, var(--muted-foreground) 60%, transparent);
+  background: oklch(0.55 0.02 60 / 70%);
 }
 
 /* Firefox scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 40%, transparent) transparent;
+  scrollbar-color: oklch(0.55 0.02 60 / 50%) transparent;
 }

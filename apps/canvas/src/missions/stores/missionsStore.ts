@@ -550,6 +550,7 @@ export const useMissionsStore = create<MissionsState & MissionsActions>()(
       const newExecution: AgentExecutionState = {
         status: 'idle',
         currentOutput: '',
+        activityLog: [],
         executionHistory: agent.execution.executionHistory,
       };
       // Only copy lastResult if it exists
@@ -656,6 +657,7 @@ export const useMissionsStore = create<MissionsState & MissionsActions>()(
         const newExecution: AgentExecutionState = {
           status: 'pending',
           currentOutput: '',
+          activityLog: [],
           executionHistory: agent.execution.executionHistory,
         };
         // Only copy lastResult if it exists

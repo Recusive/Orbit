@@ -9,6 +9,7 @@
   width: 100%;
   overflow: hidden;
   background: var(--background);
+  position: relative;
 }
 
 .missions-canvas-main {

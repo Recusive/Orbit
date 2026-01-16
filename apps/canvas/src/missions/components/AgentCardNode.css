@@ -1,7 +1,15 @@
 /**
  * AgentCardNode Styles
- * Styling for agent cards in missions mode
- * Note: Avoid backdrop-filter, color-mix(), and transitions for Tauri WebView compatibility
+ * Design system aligned styling for agent cards in missions mode
+ *
+ * Design Tokens:
+ * - Border radius: 8px (--radius-lg)
+ * - Typography: 13px body, 11px secondary, 10px tiny
+ * - Shadows: Subtle elevation (0 1px 3px)
+ * - Spacing: 4px, 6px, 8px, 12px, 16px
+ *
+ * Note: Avoid backdrop-filter, color-mix(), and complex transitions
+ * for Tauri WebView compatibility
  */
 
 /* ============================================================================
@@ -9,66 +17,71 @@
    ============================================================================ */
 
 .agent-card-node {
+  --card-width: 280px;
+  --radius: 8px;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.12);
+
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  min-width: 320px;
-  max-width: 400px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius);
+  width: var(--card-width);
+  box-shadow: var(--shadow-sm);
   font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+.agent-card-node:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .agent-card-node--selected {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary);
+  box-shadow: var(--shadow-sm), 0 0 0 2px var(--primary);
 }
 
+/* Status border colors */
 .agent-card-node[data-status='running'],
 .agent-card-node[data-status='streaming'] {
-  border-color: var(--blue-500);
+  border-color: var(--info);
 }
 
 .agent-card-node[data-status='complete'] {
-  border-color: var(--green-500);
+  border-color: var(--success);
 }
 
 .agent-card-node[data-status='error'] {
-  border-color: var(--red-500);
+  border-color: var(--destructive);
+}
+
+.agent-card-node[data-status='pending'] {
+  border-color: var(--warning);
 }
 
 /* ============================================================================
    Handles
    ============================================================================ */
 
-/* Handle base styling - centered on node border like workflow */
 .agent-card-handle {
   position: absolute !important;
-  width: 10px !important;
-  height: 10px !important;
+  width: 8px !important;
+  height: 8px !important;
   background: var(--muted-foreground) !important;
-  border: 2px solid var(--border) !important;
+  border: 2px solid var(--card) !important;
   border-radius: 50% !important;
   top: 50% !important;
 }
 
 .agent-card-handle:hover {
   background: var(--primary) !important;
-  border-color: var(--primary) !important;
-  transform: translate(-50%, -50%) scale(1.2) !important;
+  /* No scale transform - causes blur in Tauri WebView */
 }
 
-/* Input handle - left side, centered on border */
 .agent-card-handle--input {
   left: 0 !important;
-  right: auto !important;
   transform: translate(-50%, -50%) !important;
 }
 
-.agent-card-handle--input:hover {
-  transform: translate(-50%, -50%) scale(1.2) !important;
-}
-
-/* Output handle - right side, centered on border */
 .agent-card-handle--output {
   right: 0 !important;
   left: auto !important;
@@ -76,7 +89,7 @@
 }
 
 .agent-card-handle--output:hover {
-  transform: translate(50%, -50%) scale(1.2) !important;
+  /* No scale transform - causes blur in Tauri WebView */
 }
 
 /* ============================================================================
@@ -87,268 +100,333 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   gap: 8px;
 }
 
-.agent-card-header-left {
+.agent-card-header-content {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-}
-
-.agent-card-header-right {
-  flex-shrink: 0;
+  flex: 1;
 }
 
 .agent-card-name {
-  font-weight: 500;
-  font-size: 14px;
+  font-weight: 600;
+  font-size: 13px;
   color: var(--foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: default;
+  letter-spacing: -0.01em;
+}
+
+.agent-card-name:hover {
+  color: var(--primary);
+}
+
+.agent-card-name-input {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--foreground);
+  background: var(--background);
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  padding: 2px 6px;
+  outline: none;
+  min-width: 60px;
+  max-width: 120px;
 }
 
 .agent-card-model-badge {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
-  padding: 2px 8px;
+  padding: 2px 6px;
   border-radius: 4px;
   background: var(--muted);
   color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
 }
 
 /* ============================================================================
-   Status Dot
+   Status Badge
    ============================================================================ */
 
+.agent-card-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
 .agent-card-status-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.agent-card-status-dot--animating {
-  animation: agent-card-pulse 1.5s ease-in-out infinite;
+.agent-card-status-label {
+  line-height: 1;
 }
 
-@keyframes agent-card-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
-}
-
-/* ============================================================================
-   Prompt Section
-   ============================================================================ */
-
-.agent-card-prompt-section {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-.agent-card-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--muted-foreground);
-  margin-bottom: 6px;
-}
-
-.agent-card-prompt-input {
-  width: 100%;
-  min-height: 60px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--background);
-  color: var(--foreground);
-  font-size: 13px;
-  font-family: inherit;
-  line-height: 1.4;
-  resize: vertical;
-}
-
-.agent-card-prompt-input:focus {
-  outline: none;
-  border-color: var(--primary);
-}
-
-.agent-card-prompt-input::placeholder {
+/* Status variants */
+.agent-card-status-badge--idle {
+  background: rgba(107, 114, 128, 0.15);
   color: var(--muted-foreground);
 }
 
-.agent-card-prompt-display {
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  min-height: 40px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--foreground);
-  cursor: text;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+.agent-card-status-badge--idle .agent-card-status-dot {
+  background: var(--muted-foreground);
 }
 
-.agent-card-prompt-display:hover {
-  background: var(--muted);
+.agent-card-status-badge--pending {
+  background: rgba(234, 179, 8, 0.15);
+  color: #b59200;
 }
 
-/* ============================================================================
-   Output Section
-   ============================================================================ */
-
-.agent-card-output-section {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
-  max-height: 200px;
-  overflow-y: auto;
+.agent-card-status-badge--pending .agent-card-status-dot {
+  background: #eab308;
 }
 
-.agent-card-output {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--foreground);
-  white-space: pre-wrap;
-  word-wrap: break-word;
+.agent-card-status-badge--running,
+.agent-card-status-badge--streaming {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
 }
 
-.agent-card-cursor {
-  display: inline-block;
-  animation: agent-card-blink 1s step-end infinite;
-  color: var(--primary);
+.agent-card-status-badge--running .agent-card-status-dot,
+.agent-card-status-badge--streaming .agent-card-status-dot {
+  background: #3b82f6;
 }
 
-@keyframes agent-card-blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0;
-  }
+.agent-card-status-badge--complete {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.agent-card-status-badge--complete .agent-card-status-dot {
+  background: #22c55e;
+}
+
+.agent-card-status-badge--error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+.agent-card-status-badge--error .agent-card-status-dot {
+  background: #ef4444;
 }
 
 /* ============================================================================
-   Error Section
+   Body / Activity Section
    ============================================================================ */
 
-.agent-card-error-section {
+.agent-card-body {
+  padding: 10px 12px;
+  min-height: 48px;
+}
+
+/* Idle state */
+.agent-card-idle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.agent-card-idle-icon {
+  font-size: 8px;
+  color: var(--muted-foreground);
+  opacity: 0.5;
+}
+
+.agent-card-idle-text {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+/* ============================================================================
+   Steps List
+   ============================================================================ */
+
+.agent-card-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agent-card-step {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 10px 14px;
-  background: var(--red-500);
-  color: white;
   font-size: 12px;
   line-height: 1.4;
 }
 
-.agent-card-error-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
+.agent-card-step-bullet {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: white;
-  color: var(--red-500);
-  font-weight: bold;
-  font-size: 10px;
+  background: currentColor;
   flex-shrink: 0;
+  margin-top: 5px;
 }
 
-.agent-card-error-message {
+.agent-card-step-text {
   flex: 1;
+  color: inherit;
+}
+
+/* Step status variants */
+/* Note: No animations - causes blur in Tauri WebView */
+.agent-card-step--in_progress {
+  color: #3b82f6;
+}
+
+.agent-card-step--completed {
+  color: #22c55e;
+}
+
+.agent-card-step--needs_input {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+.agent-card-step--error {
+  color: #ef4444;
+}
+
+.agent-card-step--cancelled {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
 }
 
 /* ============================================================================
-   Actions
+   Error Banner
+   ============================================================================ */
+
+.agent-card-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-top: 1px solid rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.agent-card-error svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ============================================================================
+   Action Bar
    ============================================================================ */
 
 .agent-card-actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
   gap: 6px;
-  padding: 10px 14px;
 }
 
-.agent-card-action-btn {
+.agent-card-actions-secondary {
   display: flex;
   align-items: center;
+  gap: 2px;
+}
+
+/* Button base */
+.agent-card-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 6px;
-  background: var(--background);
-  color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
+  outline: none;
 }
 
-.agent-card-action-btn:hover {
-  background: var(--muted);
-  color: var(--foreground);
+.agent-card-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--primary);
 }
 
-.agent-card-action-btn--primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: white;
-}
-
-.agent-card-action-btn--primary:hover {
-  background: var(--primary);
-  opacity: 0.9;
-  color: white;
-}
-
-.agent-card-action-btn--running {
-  background: var(--red-500);
-  border-color: var(--red-500);
-}
-
-.agent-card-action-btn--running:hover {
-  background: var(--red-500);
-  opacity: 0.9;
-}
-
-.agent-card-action-btn:disabled {
+.agent-card-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.agent-card-action-btn:disabled:hover {
-  background: var(--background);
-  color: var(--muted-foreground);
-}
-
-.agent-card-action-btn--primary:disabled:hover {
+/* Primary button (Run/Stop) */
+.agent-card-btn--primary {
+  padding: 5px 10px;
   background: var(--primary);
   color: white;
-  opacity: 0.5;
 }
 
-.agent-card-action-btn--delete {
-  margin-left: auto;
+.agent-card-btn--primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.agent-card-btn--primary:active:not(:disabled) {
+  /* No scale transform - causes blur in Tauri WebView */
+}
+
+.agent-card-btn--stop {
+  background: #ef4444;
+}
+
+/* Icon buttons */
+.agent-card-btn--icon {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
   color: var(--muted-foreground);
-  padding: 6px 8px;
 }
 
-.agent-card-action-btn--delete:hover {
-  background: var(--red-500);
-  border-color: var(--red-500);
-  color: white;
+.agent-card-btn--icon:hover:not(:disabled) {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.agent-card-btn--icon:active:not(:disabled) {
+  /* No scale transform - causes blur in Tauri WebView */
+}
+
+/* Danger variant */
+.agent-card-btn--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+/* Demo button (temporary - remove when backend connected) */
+.agent-card-btn--demo {
+  padding: 5px 8px;
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  font-size: 10px;
+}
+
+.agent-card-btn--demo:hover {
+  background: rgba(168, 85, 247, 0.25);
 }
