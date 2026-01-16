@@ -233,7 +233,10 @@ export function MissionsCanvas({ onAgentSelect }: MissionsCanvasProps): React.JS
   // Handle double-click to add agent
   const handleDoubleClick = useCallback(
     (event: React.MouseEvent) => {
-      const rect = (event.target as HTMLElement).getBoundingClientRect();
+      // Use currentTarget (the element the handler is attached to) for reliable positioning
+      const target = event.currentTarget;
+      if (!(target instanceof HTMLElement)) return;
+      const rect = target.getBoundingClientRect();
       const position = {
         x: event.clientX - rect.left,
         y: event.clientY - rect.top,

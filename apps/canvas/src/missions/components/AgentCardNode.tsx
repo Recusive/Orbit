@@ -85,8 +85,8 @@ export function AgentCardNode({
 
   const handlePromptBlur = useCallback(() => {
     setIsEditing(false);
-    if (promptValue !== agent.prompt && onUpdate !== undefined) {
-      onUpdate(agent.id, { prompt: promptValue });
+    if (promptValue !== agent.prompt) {
+      onUpdate?.(agent.id, { prompt: promptValue });
     }
   }, [agent.id, agent.prompt, onUpdate, promptValue]);
 
@@ -161,9 +161,18 @@ export function AgentCardNode({
           />
         ) : (
           <div
+            role="button"
+            tabIndex={0}
+            aria-label={agent.prompt.length > 0 ? 'Edit prompt' : 'Add prompt'}
             className="agent-card-prompt-display"
             onClick={() => {
               setIsEditing(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsEditing(true);
+              }
             }}
           >
             {agent.prompt.length > 0 ? agent.prompt : 'Click to add prompt...'}

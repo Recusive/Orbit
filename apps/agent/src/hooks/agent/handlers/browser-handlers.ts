@@ -28,6 +28,13 @@ import { useBrowserStore } from '@/stores/browser/browser-store';
 const logger = createLogger('BrowserHandlers');
 
 /**
+ * Delay before triggering WKWebView repaint after creation.
+ * WKWebView sometimes doesn't render properly on initial creation;
+ * a resize "kick" after this delay forces it to repaint.
+ */
+const WKWEBVIEW_REPAINT_DELAY_MS = 200;
+
+/**
  * Handle browser:create - create an embedded browser webview.
  *
  * Creates a true embedded browser within the Orbit window.
@@ -71,7 +78,6 @@ export async function handleBrowserCreate(
 
     // Delayed resize to force WKWebView repaint
     // Manual resize works because it happens AFTER webview initialization
-    // We simulate this with a 200ms delay then resize
     const currentLabel = info.label;
     setTimeout(() => {
       // Guard: Check if browser is still active with the same label
@@ -87,7 +93,7 @@ export async function handleBrowserCreate(
         .catch(() => {
           // Ignore errors - this is just to trigger repaint
         });
-    }, 200);
+    }, WKWEBVIEW_REPAINT_DELAY_MS);
 
     window.postMessage(
       {

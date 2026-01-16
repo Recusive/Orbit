@@ -51,3 +51,6 @@ export {
 // Event batching utilities
 export { debounce, throttle, rafBatch, createCheckpointBatcher } from './event-batcher';
 export type { RafBatchHandler, CheckpointBatch, ToolEventBatch } from './event-batcher';
+
+// MCP tool utilities
+export { formatMcpToolName, isBrowserTool, isMcpTool, getMcpToolProvider } from './mcp-tools';

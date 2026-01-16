@@ -4,53 +4,12 @@ import { useCallback, useEffect } from 'react';
 import type { PermissionRequest } from '@/stores/agent/tool-store';
 import type { FC } from 'react';
 
+import { formatMcpToolName, isBrowserTool } from '@/lib/utils';
+
 interface PermissionModalProps {
   readonly request: PermissionRequest;
   readonly onApprove: (requestId: string, always?: boolean) => void;
   readonly onDeny: (requestId: string) => void;
-  readonly onOpenFile?: (path: string) => void;
-}
-
-// Format MCP tool names like "mcp__orbit-browser__browser_open" to "Browser: Open"
-function formatMcpToolName(toolName: string): string | null {
-  if (!toolName.startsWith('mcp__')) {
-    return null;
-  }
-
-  const parts = toolName.split('__');
-  const provider = parts[1];
-  const actionParts = parts.slice(2);
-
-  if (!provider || actionParts.length === 0) {
-    return null;
-  }
-
-  const action = actionParts.join('__'); // e.g., "browser_open"
-
-  // Map provider names to display names
-  const providerDisplayNames: Record<string, string> = {
-    'orbit-browser': 'Browser',
-    'claude-in-chrome': 'Browser',
-    plugin_playwright_playwright: 'Playwright',
-  };
-
-  const displayProvider = providerDisplayNames[provider] ?? provider;
-
-  // Extract action name (remove provider prefix if present)
-  // e.g., "browser_open" → "open", "browser_navigate" → "navigate"
-  let actionName = action;
-  if (action.startsWith('browser_')) {
-    actionName = action.slice(8); // Remove "browser_" prefix
-  }
-
-  // Capitalize and format action name
-  // e.g., "open" → "Open", "take_screenshot" → "Take Screenshot"
-  const formattedAction = actionName
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-
-  return `${displayProvider}: ${formattedAction}`;
 }
 
 // Get confirmation action label
@@ -78,14 +37,6 @@ function getConfirmLabel(toolName: string): string {
     default:
       return `Confirm ${toolName.toLowerCase()}`;
   }
-}
-
-// Check if tool is a browser-related MCP tool
-function isBrowserTool(toolName: string): boolean {
-  const name = toolName.toLowerCase();
-  return (
-    name.includes('browser') || name.includes('orbit-browser') || name.includes('claude-in-chrome')
-  );
 }
 
 export const PermissionModal: FC<PermissionModalProps> = ({ request, onApprove, onDeny }) => {

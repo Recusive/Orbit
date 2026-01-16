@@ -3,6 +3,7 @@
  * Zustand store for missions state management with execution tracking
  */
 
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
@@ -20,6 +21,8 @@ import type {
   MissionRun,
   MissionStatus,
 } from '../types';
+
+const logger = createLogger('MissionsStore');
 
 // ============================================================================
 // Sync State Types
@@ -227,7 +230,16 @@ function topologicalSort(
 
   // Check for cycles
   if (result.length !== agentIds.length) {
-    // Has cycles - return partial order (skip cyclic nodes)
+    // Has cycles - identify and warn about cyclic agents
+    const processedSet = new Set(result);
+    const cyclicAgentIds = agentIds.filter((id) => !processedSet.has(id));
+    const cyclicAgentNames = cyclicAgentIds.map((id) => agents[id]?.name ?? id).join(', ');
+
+    logger.warn(
+      `Cycle detected in agent graph. The following agents are in a cycle and will be skipped: ${cyclicAgentNames}`,
+      { cyclicAgentIds, totalAgents: agentIds.length, processedAgents: result.length }
+    );
+
     return result;
   }
 
@@ -844,12 +856,20 @@ export const useMissionsStore = create<MissionsState & MissionsActions>()(
         // Apply context flow settings
         let contextText = output;
         if (conn.contextFlow === 'filtered' && conn.contextFilter !== undefined) {
-          try {
-            const regex = new RegExp(conn.contextFilter, 'g');
-            const matches = output.match(regex);
-            contextText = matches !== null ? matches.join('\n') : '';
-          } catch {
+          // Limit regex pattern length to prevent ReDoS attacks
+          const MAX_REGEX_LENGTH = 500;
+          if (conn.contextFilter.length > MAX_REGEX_LENGTH) {
+            // Pattern too long - fall back to full output
             contextText = output;
+          } else {
+            try {
+              const regex = new RegExp(conn.contextFilter, 'g');
+              const matches = output.match(regex);
+              contextText = matches !== null ? matches.join('\n') : '';
+            } catch {
+              // Invalid regex - fall back to full output
+              contextText = output;
+            }
           }
         }
 

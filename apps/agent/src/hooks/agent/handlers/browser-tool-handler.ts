@@ -37,6 +37,51 @@ interface BrowserToolExecutionResult {
   error?: string;
 }
 
+/** Allowed URL protocols for browser navigation (security) */
+const ALLOWED_URL_PROTOCOLS = ['http:', 'https:', 'about:', 'data:'];
+
+/**
+ * Validate a URL for browser navigation.
+ * Only allows safe protocols to prevent security issues.
+ *
+ * @returns The validated URL or an error message
+ */
+function validateBrowserUrl(
+  url: string
+): { valid: true; url: string } | { valid: false; error: string } {
+  // Allow about:blank and similar special URLs
+  if (url === 'about:blank' || url.startsWith('about:')) {
+    return { valid: true, url };
+  }
+
+  try {
+    const parsed = new URL(url);
+
+    if (!ALLOWED_URL_PROTOCOLS.includes(parsed.protocol)) {
+      return {
+        valid: false,
+        error: `Unsupported URL protocol: ${parsed.protocol}. Allowed: ${ALLOWED_URL_PROTOCOLS.join(', ')}`,
+      };
+    }
+
+    return { valid: true, url: parsed.href };
+  } catch {
+    // If URL parsing fails, try prepending https://
+    try {
+      const withProtocol = `https://${url}`;
+      const parsed = new URL(withProtocol);
+
+      if (!ALLOWED_URL_PROTOCOLS.includes(parsed.protocol)) {
+        return { valid: false, error: `Invalid URL format: ${url}` };
+      }
+
+      return { valid: true, url: parsed.href };
+    } catch {
+      return { valid: false, error: `Invalid URL format: ${url}` };
+    }
+  }
+}
+
 /**
  * Safely serialize a value for injection into JavaScript.
  * Uses JSON.stringify which handles all escaping cases properly.
@@ -178,7 +223,15 @@ export async function executeBrowserTool(
 
     switch (toolName) {
       case 'browser_open': {
-        const url = typeof toolInput['url'] === 'string' ? toolInput['url'] : DEFAULT_OPEN_URL;
+        const rawUrl = typeof toolInput['url'] === 'string' ? toolInput['url'] : DEFAULT_OPEN_URL;
+
+        // Validate URL for security (only allow safe protocols)
+        const urlValidation = validateBrowserUrl(rawUrl);
+        if (!urlValidation.valid) {
+          return { success: false, error: urlValidation.error };
+        }
+        const url = urlValidation.url;
+
         const browserState = useBrowserStore.getState();
 
         useUIStore.getState().openBrowserTab();
@@ -200,7 +253,7 @@ export async function executeBrowserTool(
           }
         }
 
-        return { success: true, result: { opened: true } };
+        return { success: true, result: { opened: true, url } };
       }
 
       case 'browser_navigate': {
@@ -208,7 +261,13 @@ export async function executeBrowserTool(
           return { success: false, error: 'Missing url for browser_navigate' };
         }
 
-        const url = toolInput['url'];
+        // Validate URL for security (only allow safe protocols)
+        const urlValidation = validateBrowserUrl(toolInput['url']);
+        if (!urlValidation.valid) {
+          return { success: false, error: urlValidation.error };
+        }
+        const url = urlValidation.url;
+
         const browserState = useBrowserStore.getState();
 
         useUIStore.getState().openBrowserTab();
@@ -231,7 +290,7 @@ export async function executeBrowserTool(
           }
         }
 
-        return { success: true, result: { navigated: true } };
+        return { success: true, result: { navigated: true, url } };
       }
 
       case 'browser_click': {
