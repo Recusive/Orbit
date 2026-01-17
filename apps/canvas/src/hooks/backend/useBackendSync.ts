@@ -200,8 +200,7 @@ export function useBackendSync(): UseBackendSyncReturn {
   const browseFileResolverRef = useRef<((path: string | undefined) => void) | null>(null);
   // Ref to hold performSave function to break dependency cascade
   // This prevents scheduleSave from recreating when performSave changes
-  // eslint-disable-next-line @typescript-eslint/no-empty-function -- Placeholder replaced immediately after
-  const performSaveRef = useRef<() => void>(() => {});
+  const performSaveRef = useRef<(() => void) | null>(null);
 
   // Get stable references to store actions (these don't change)
   const activeWorkflow = useWorkflowStore((state) => state.activeWorkflow);
@@ -318,7 +317,7 @@ export function useBackendSync(): UseBackendSyncReturn {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
-    performSaveRef.current();
+    performSaveRef.current?.();
   }, []);
 
   // ================================================================
@@ -340,7 +339,7 @@ export function useBackendSync(): UseBackendSyncReturn {
     // Schedule new save - use ref to avoid dependency cascade
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
-      performSaveRef.current();
+      performSaveRef.current?.();
     }, SAVE_DEBOUNCE_MS);
   }, [syncState.status]); // Removed performSave - use ref instead
 
