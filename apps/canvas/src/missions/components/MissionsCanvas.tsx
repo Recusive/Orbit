@@ -147,6 +147,26 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
   // Get the expanded agent data (undefined if agent was deleted while expanded)
   const expandedAgent = expandedAgentId !== null ? (agents[expandedAgentId] ?? null) : null;
 
+  // Clean up expanded view if the agent is deleted while expanded
+  useEffect(() => {
+    if (expandedAgentId !== null && expandedAgent === null) {
+      // Agent was deleted while expanded view was open - close the view
+      setExpandedAgentId(null);
+    }
+  }, [expandedAgentId, expandedAgent]);
+
+  // Stable callbacks for node interactions (extracted to prevent re-renders)
+  const handleConfigure = useCallback(
+    (id: string): void => {
+      setFocusedAgent(id);
+    },
+    [setFocusedAgent]
+  );
+
+  const handleExpand = useCallback((id: string): void => {
+    setExpandedAgentId(id);
+  }, []);
+
   // Callbacks for nodes
   // NOTE: onExecute/onStop are omitted until agent-bridge integration is complete.
   // AgentCardNode disables Run/Stop buttons when these are undefined.
@@ -155,14 +175,10 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
       onUpdate: updateAgent,
       onDelete: deleteAgent,
       // onExecute and onStop are intentionally omitted - will be wired to agent-bridge
-      onConfigure: (id: string) => {
-        setFocusedAgent(id);
-      },
-      onExpand: (id: string) => {
-        setExpandedAgentId(id);
-      },
+      onConfigure: handleConfigure,
+      onExpand: handleExpand,
     }),
-    [updateAgent, deleteAgent, setFocusedAgent]
+    [updateAgent, deleteAgent, handleConfigure, handleExpand]
   );
 
   // Callbacks for edges
@@ -381,14 +397,35 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
       <MissionsRightSidebar />
 
       {/* Expanded Agent View - Full screen overlay */}
+      {/* Wrapped in ErrorBoundary because it imports heavy components (ChatArea, ActionsBar) */}
       {expandedAgent !== null ? (
-        <AgentExpandedView
-          agent={expandedAgent}
-          onClose={() => {
-            setExpandedAgentId(null);
-          }}
-          onUpdate={updateAgent}
-        />
+        <ErrorBoundary
+          fallback={(error, reset) => (
+            <div className="agent-expanded-error">
+              <div className="agent-expanded-error-content">
+                <h3>Agent View Error</h3>
+                <p>{error.message}</p>
+                <div className="agent-expanded-error-actions">
+                  <button onClick={reset}>Try Again</button>
+                  <button
+                    onClick={() => {
+                      setExpandedAgentId(null);
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        >
+          <AgentExpandedView
+            agent={expandedAgent}
+            onClose={() => {
+              setExpandedAgentId(null);
+            }}
+          />
+        </ErrorBoundary>
       ) : null}
     </div>
   );

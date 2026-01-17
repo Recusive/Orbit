@@ -6,15 +6,15 @@
  * This renders the same UI as the main agent page, minus the primary sidebar and headers.
  */
 
-import { Minimize2, X } from 'lucide-react';
-import React, { useCallback, useEffect, useState } from 'react';
+import { X } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AgentCard } from '../types';
 
 // Import actual agent components - these work because canvas is embedded in agent app
 import { ActionsBar } from '@/components/layout/actions-bar';
 import { ChatArea } from '@/components/layout/chat-area';
-import { useReviewPanelOpen } from '@/stores/ui/ui-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 import './AgentExpandedView.css';
 
@@ -23,9 +23,9 @@ import './AgentExpandedView.css';
 // ============================================================================
 
 interface AgentExpandedViewProps {
+  /** The agent card to display - currently used for header info only */
   readonly agent: AgentCard;
   readonly onClose: () => void;
-  readonly onUpdate?: (agentId: string, updates: Partial<AgentCard>) => void;
 }
 
 // ============================================================================
@@ -34,17 +34,28 @@ interface AgentExpandedViewProps {
 
 export function AgentExpandedView({ agent, onClose }: AgentExpandedViewProps): React.JSX.Element {
   const [isClosing, setIsClosing] = useState(false);
-  const rightSidebarOpen = useReviewPanelOpen();
+  const rightSidebarOpen = useUIStore((state) => state.rightSidebarOpen);
+  const setChatAreaDetached = useUIStore((state) => state.setChatAreaDetached);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Detach the ChatArea in RootLayout while this expanded view is open.
+  // This prevents duplicate listeners, backend requests, and localStorage races.
+  useEffect(() => {
+    setChatAreaDetached(true);
+    return () => {
+      setChatAreaDetached(false);
+    };
+  }, [setChatAreaDetached]);
 
   const handleClose = useCallback((): void => {
     setIsClosing(true);
-    // Wait for animation to complete
-    setTimeout(() => {
+    // Wait for animation to complete before calling onClose
+    closeTimeoutRef.current = setTimeout(() => {
       onClose();
     }, 200);
   }, [onClose]);
 
-  // Handle keyboard shortcuts
+  // Handle keyboard shortcuts and cleanup timeout on unmount
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       // Only close on Escape if not typing in an input
@@ -60,6 +71,10 @@ export function AgentExpandedView({ agent, onClose }: AgentExpandedViewProps): R
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      // Clean up any pending close timeout to prevent memory leak
+      if (closeTimeoutRef.current !== undefined) {
+        clearTimeout(closeTimeoutRef.current);
+      }
     };
   }, [handleClose]);
 
@@ -77,14 +92,6 @@ export function AgentExpandedView({ agent, onClose }: AgentExpandedViewProps): R
           </div>
           <div className="agent-expanded-header-right">
             <button
-              className="agent-expanded-header-btn"
-              onClick={handleClose}
-              title="Collapse (Esc)"
-              aria-label="Collapse agent view"
-            >
-              <Minimize2 size={16} />
-            </button>
-            <button
               className="agent-expanded-header-btn agent-expanded-header-btn--close"
               onClick={handleClose}
               title="Close (Esc)"
@@ -97,7 +104,15 @@ export function AgentExpandedView({ agent, onClose }: AgentExpandedViewProps): R
 
         {/* Main Content - Actual Agent UI */}
         <div className="agent-expanded-content">
-          {/* ChatArea includes: ChatHeader, ChatContent, ActivityPanel, TerminalPanel */}
+          {/*
+           * TODO: ChatArea currently shows the main app's conversation, NOT this agent's data.
+           * To properly integrate agent-specific chat:
+           * 1. Create an agent session context provider that sets the active session ID
+           * 2. Pass agent.sessionId (need to add to AgentCard type) to switch conversations
+           * 3. Or implement a separate AgentChat component that takes agent context
+           *
+           * For now, this expanded view shows the main conversation as a placeholder.
+           */}
           <ChatArea />
 
           {/* ActionsBar - Activity Panel tab switcher (only when panel is open) */}

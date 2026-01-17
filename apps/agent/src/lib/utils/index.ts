@@ -10,6 +10,7 @@ export {
   isMac,
   getCommandKey,
   getModifierSymbols,
+  omit,
 } from './utils';
 
 // Diff utilities

@@ -243,6 +243,8 @@ export const DEFAULT_UI_STATE = {
   rightSidebarOpen: true,
   bottomPanelOpen: false,
   bottomPanelHeight: PANEL_SIZES.terminal.default,
+  /** When true, ChatArea is "detached" and rendered elsewhere (e.g., canvas expanded view) */
+  chatAreaDetached: false,
 } as const;
 
 /**

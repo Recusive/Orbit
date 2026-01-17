@@ -124,6 +124,8 @@ interface UIState {
   worktrees: WorktreeUIState[];
   activeWorktreePath: string | null;
   createWorktreeDialogOpen: boolean;
+  // Chat detachment (for canvas expanded view)
+  chatAreaDetached: boolean;
 }
 
 interface UIActions {
@@ -173,6 +175,8 @@ interface UIActions {
   setActiveWorktree: (path: string | null) => void;
   toggleWorktreeExpanded: (path: string) => void;
   setCreateWorktreeDialogOpen: (open: boolean) => void;
+  // Chat detachment
+  setChatAreaDetached: (detached: boolean) => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -293,6 +297,8 @@ export const useUIStore = create<UIStore>()(
     worktrees: loadWorktreesFromStorage(),
     activeWorktreePath: loadActiveWorktreeFromStorage(),
     createWorktreeDialogOpen: false,
+    // Chat detachment
+    chatAreaDetached: DEFAULT_UI_STATE.chatAreaDetached,
 
     setContainerDimensions: (width: number, height: number): void => {
       set((state) => {
@@ -612,6 +618,12 @@ export const useUIStore = create<UIStore>()(
     setCreateWorktreeDialogOpen: (open: boolean): void => {
       set((state) => {
         state.createWorktreeDialogOpen = open;
+      });
+    },
+
+    setChatAreaDetached: (detached: boolean): void => {
+      set((state) => {
+        state.chatAreaDetached = detached;
       });
     },
   }))

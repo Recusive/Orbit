@@ -212,38 +212,6 @@ export function AgentCardNode({
     }
   }, [agent.id, isRunning, onExecute, onStop]);
 
-  // Demo button - add mock activity entries to preview the UI
-  const handleDemoClick = useCallback(() => {
-    const now = Date.now();
-    const mockActivities = [
-      {
-        id: `demo-${String(now)}-1`,
-        message: 'Creating files',
-        status: 'completed' as const,
-        timestamp: now - 3000,
-      },
-      {
-        id: `demo-${String(now)}-2`,
-        message: 'Adding global.css',
-        status: 'completed' as const,
-        timestamp: now - 2000,
-      },
-      {
-        id: `demo-${String(now)}-3`,
-        message: 'Editing config',
-        status: 'in_progress' as const,
-        timestamp: now - 1000,
-      },
-    ];
-    onUpdate?.(agent.id, {
-      execution: {
-        ...agent.execution,
-        status: 'running',
-        activityLog: mockActivities,
-      },
-    });
-  }, [agent.id, agent.execution, onUpdate]);
-
   const handleConfigureClick = useCallback(() => {
     onConfigure?.(agent.id);
   }, [agent.id, onConfigure]);
@@ -257,8 +225,13 @@ export function AgentCardNode({
   }, [agent.id, onExpand]);
 
   // Handle double-click to expand
+  // Ignore when: editing name, clicking buttons, or clicking the name (for rename)
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent): void => {
+      // Don't expand while editing name - prevents race condition
+      if (isEditingName) {
+        return;
+      }
       const target = e.target as HTMLElement;
       if (
         target.closest('button') !== null ||
@@ -270,7 +243,7 @@ export function AgentCardNode({
       e.stopPropagation();
       onExpand?.(agent.id);
     },
-    [agent.id, onExpand]
+    [agent.id, isEditingName, onExpand]
   );
 
   // ============================================================================
@@ -354,18 +327,12 @@ export function AgentCardNode({
           {isRunning ? <StopIcon /> : <PlayIcon />}
           <span>{isRunning ? 'Stop' : 'Run'}</span>
         </button>
-        <button
-          className="agent-card-btn agent-card-btn--demo"
-          onClick={handleDemoClick}
-          title="Show demo activity"
-        >
-          Demo
-        </button>
         <div className="agent-card-actions-secondary">
           <button
             className="agent-card-btn agent-card-btn--icon"
             onClick={handleExpandClick}
             title="Expand"
+            aria-label="Expand agent"
           >
             <ExpandIcon />
           </button>
@@ -373,6 +340,7 @@ export function AgentCardNode({
             className="agent-card-btn agent-card-btn--icon"
             onClick={handleConfigureClick}
             title="Configure"
+            aria-label="Configure agent"
           >
             <SettingsIcon />
           </button>
@@ -380,6 +348,7 @@ export function AgentCardNode({
             className="agent-card-btn agent-card-btn--icon agent-card-btn--danger"
             onClick={handleDeleteClick}
             title="Delete"
+            aria-label="Delete agent"
           >
             <TrashIcon />
           </button>

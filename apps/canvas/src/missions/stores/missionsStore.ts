@@ -285,7 +285,10 @@ export const useMissionsStore = create<MissionsState & MissionsActions>()(
     ): void => {
       const agentsMap: Record<string, AgentCard> = {};
       for (const agent of agents) {
-        agentsMap[agent.id] = agent;
+        // Normalize defaults for backward compatibility (e.g., activityLog may be missing
+        // in missions created before that field was added). createAgentCard merges with
+        // DEFAULT_AGENT_CARD.execution which includes activityLog: [].
+        agentsMap[agent.id] = createAgentCard(agent);
       }
 
       const connectionsMap: Record<string, MissionConnection> = {};
