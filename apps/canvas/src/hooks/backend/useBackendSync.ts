@@ -198,6 +198,10 @@ export function useBackendSync(): UseBackendSyncReturn {
   const pendingSaveRef = useRef<boolean>(false);
   // Ref to hold the resolver for the file browse promise
   const browseFileResolverRef = useRef<((path: string | undefined) => void) | null>(null);
+  // Ref to hold performSave function to break dependency cascade
+  // This prevents scheduleSave from recreating when performSave changes
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- Placeholder replaced immediately after
+  const performSaveRef = useRef<() => void>(() => {});
 
   // Get stable references to store actions (these don't change)
   const activeWorkflow = useWorkflowStore((state) => state.activeWorkflow);
@@ -304,14 +308,18 @@ export function useBackendSync(): UseBackendSyncReturn {
     });
   }, [buildWorkflowData]);
 
+  // Keep performSaveRef updated with the latest performSave function
+  // This allows scheduleSave to be stable (no performSave in deps)
+  performSaveRef.current = performSave;
+
   const saveWorkflow = useCallback((): void => {
     // Clear any pending debounced save
     if (saveTimeoutRef.current !== null) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
-    performSave();
-  }, [performSave]);
+    performSaveRef.current();
+  }, []);
 
   // ================================================================
   // Debounced auto-save
@@ -329,12 +337,12 @@ export function useBackendSync(): UseBackendSyncReturn {
       clearTimeout(saveTimeoutRef.current);
     }
 
-    // Schedule new save
+    // Schedule new save - use ref to avoid dependency cascade
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
-      performSave();
+      performSaveRef.current();
     }, SAVE_DEBOUNCE_MS);
-  }, [syncState.status, performSave]);
+  }, [syncState.status]); // Removed performSave - use ref instead
 
   // Watch for dirty state changes and trigger auto-save
   useEffect(() => {

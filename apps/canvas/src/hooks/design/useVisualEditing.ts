@@ -101,6 +101,12 @@ export function useVisualEditing(options: UseVisualEditingOptions = {}): UseVisu
   const startPositionRef = useRef<Point | null>(null);
   const startRectRef = useRef<SelectionRect | null>(null);
 
+  // RAF throttling to prevent excessive repaints during drag/resize
+  const rafIdRef = useRef<number | null>(null);
+
+  // Cached container bounds to prevent layout thrashing from repeated getBoundingClientRect calls
+  const cachedBoundsRef = useRef<DOMRect | null>(null);
+
   // Selection
   const selectElement = useCallback((element: SelectedElement) => {
     setState((prev) => ({
@@ -247,6 +253,9 @@ export function useVisualEditing(options: UseVisualEditingOptions = {}): UseVisu
       startRectRef.current = { ...rect };
       currentPositionRef.current = { x: rect.x, y: rect.y };
 
+      // Cache container bounds at drag start to avoid repeated layout calculations
+      cachedBoundsRef.current = containerRef?.current?.getBoundingClientRect() ?? null;
+
       setState((prev) => ({
         ...prev,
         isDragging: true,
@@ -256,49 +265,66 @@ export function useVisualEditing(options: UseVisualEditingOptions = {}): UseVisu
         },
       }));
     },
-    [state.selectedElement]
+    [state.selectedElement, containerRef]
   );
 
   const updateDrag = useCallback(
     (e: MouseEvent) => {
       if (!state.isDragging || !startPositionRef.current || !startRectRef.current) return;
 
-      const deltaX = e.clientX - startPositionRef.current.x;
-      const deltaY = e.clientY - startPositionRef.current.y;
+      // Skip if a RAF is already pending (throttle to ~60fps max)
+      if (rafIdRef.current !== null) return;
 
-      const newX = startRectRef.current.x + deltaX;
-      const newY = startRectRef.current.y + deltaY;
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null;
 
-      const containerBounds = containerRef?.current?.getBoundingClientRect();
+        // Guard against stale closure - re-check refs
+        if (!startPositionRef.current || !startRectRef.current) return;
 
-      // Create new rect and apply snapping
-      let newRect: SelectionRect = {
-        x: newX,
-        y: newY,
-        width: startRectRef.current.width,
-        height: startRectRef.current.height,
-      };
+        const deltaX = e.clientX - startPositionRef.current.x;
+        const deltaY = e.clientY - startPositionRef.current.y;
 
-      newRect = applySnapping(newRect, containerBounds);
-      const guides = calculateSnapGuides(newRect, containerBounds);
+        const newX = startRectRef.current.x + deltaX;
+        const newY = startRectRef.current.y + deltaY;
 
-      currentPositionRef.current = { x: newRect.x, y: newRect.y };
+        // Use cached bounds instead of calling getBoundingClientRect on every frame
+        const containerBounds = cachedBoundsRef.current ?? undefined;
 
-      setState((prev) => ({
-        ...prev,
-        snapGuides: guides,
-        selectedElement: prev.selectedElement
-          ? {
-              ...prev.selectedElement,
-              rect: newRect,
-            }
-          : null,
-      }));
+        // Create new rect and apply snapping
+        let newRect: SelectionRect = {
+          x: newX,
+          y: newY,
+          width: startRectRef.current.width,
+          height: startRectRef.current.height,
+        };
+
+        newRect = applySnapping(newRect, containerBounds);
+        const guides = calculateSnapGuides(newRect, containerBounds);
+
+        currentPositionRef.current = { x: newRect.x, y: newRect.y };
+
+        setState((prev) => ({
+          ...prev,
+          snapGuides: guides,
+          selectedElement: prev.selectedElement
+            ? {
+                ...prev.selectedElement,
+                rect: newRect,
+              }
+            : null,
+        }));
+      });
     },
-    [state.isDragging, containerRef, applySnapping, calculateSnapGuides]
+    [state.isDragging, applySnapping, calculateSnapGuides]
   );
 
   const endDrag = useCallback(() => {
+    // Cancel any pending RAF to prevent state updates after drag ends
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+
     if (state.isDragging && state.selectedElement && currentPositionRef.current) {
       onPositionChange?.(state.selectedElement.layerId, currentPositionRef.current);
     }
@@ -306,6 +332,7 @@ export function useVisualEditing(options: UseVisualEditingOptions = {}): UseVisu
     startPositionRef.current = null;
     startRectRef.current = null;
     currentPositionRef.current = null;
+    cachedBoundsRef.current = null;
 
     setState((prev) => ({
       ...prev,
@@ -326,13 +353,16 @@ export function useVisualEditing(options: UseVisualEditingOptions = {}): UseVisu
       currentSizeRef.current = { width: rect.width, height: rect.height };
       currentPositionRef.current = { x: rect.x, y: rect.y };
 
+      // Cache container bounds at resize start to avoid repeated layout calculations
+      cachedBoundsRef.current = containerRef?.current?.getBoundingClientRect() ?? null;
+
       setState((prev) => ({
         ...prev,
         isResizing: true,
         resizeHandle: handle,
       }));
     },
-    [state.selectedElement]
+    [state.selectedElement, containerRef]
   );
 
   const updateResize = useCallback(
@@ -346,92 +376,111 @@ export function useVisualEditing(options: UseVisualEditingOptions = {}): UseVisu
         return;
       }
 
-      const deltaX = e.clientX - startPositionRef.current.x;
-      const deltaY = e.clientY - startPositionRef.current.y;
-      const startRect = startRectRef.current;
+      // Skip if a RAF is already pending (throttle to ~60fps max)
+      if (rafIdRef.current !== null) return;
+
+      // Capture values for RAF callback
       const handle = state.resizeHandle;
 
-      let newX = startRect.x;
-      let newY = startRect.y;
-      let newWidth = startRect.width;
-      let newHeight = startRect.height;
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null;
 
-      // Calculate new dimensions based on which handle is being dragged
-      switch (handle) {
-        case 'n':
-          newY = startRect.y + deltaY;
-          newHeight = startRect.height - deltaY;
-          break;
-        case 's':
-          newHeight = startRect.height + deltaY;
-          break;
-        case 'e':
-          newWidth = startRect.width + deltaX;
-          break;
-        case 'w':
-          newX = startRect.x + deltaX;
-          newWidth = startRect.width - deltaX;
-          break;
-        case 'nw':
-          newX = startRect.x + deltaX;
-          newY = startRect.y + deltaY;
-          newWidth = startRect.width - deltaX;
-          newHeight = startRect.height - deltaY;
-          break;
-        case 'ne':
-          newY = startRect.y + deltaY;
-          newWidth = startRect.width + deltaX;
-          newHeight = startRect.height - deltaY;
-          break;
-        case 'se':
-          newWidth = startRect.width + deltaX;
-          newHeight = startRect.height + deltaY;
-          break;
-        case 'sw':
-          newX = startRect.x + deltaX;
-          newWidth = startRect.width - deltaX;
-          newHeight = startRect.height + deltaY;
-          break;
-      }
+        // Guard against stale closure - re-check refs
+        if (!startPositionRef.current || !startRectRef.current) return;
 
-      // Enforce minimum size
-      const minSize = 20;
-      if (newWidth < minSize) {
-        if (handle.includes('w')) {
-          newX = startRect.x + startRect.width - minSize;
+        const deltaX = e.clientX - startPositionRef.current.x;
+        const deltaY = e.clientY - startPositionRef.current.y;
+        const startRect = startRectRef.current;
+
+        let newX = startRect.x;
+        let newY = startRect.y;
+        let newWidth = startRect.width;
+        let newHeight = startRect.height;
+
+        // Calculate new dimensions based on which handle is being dragged
+        switch (handle) {
+          case 'n':
+            newY = startRect.y + deltaY;
+            newHeight = startRect.height - deltaY;
+            break;
+          case 's':
+            newHeight = startRect.height + deltaY;
+            break;
+          case 'e':
+            newWidth = startRect.width + deltaX;
+            break;
+          case 'w':
+            newX = startRect.x + deltaX;
+            newWidth = startRect.width - deltaX;
+            break;
+          case 'nw':
+            newX = startRect.x + deltaX;
+            newY = startRect.y + deltaY;
+            newWidth = startRect.width - deltaX;
+            newHeight = startRect.height - deltaY;
+            break;
+          case 'ne':
+            newY = startRect.y + deltaY;
+            newWidth = startRect.width + deltaX;
+            newHeight = startRect.height - deltaY;
+            break;
+          case 'se':
+            newWidth = startRect.width + deltaX;
+            newHeight = startRect.height + deltaY;
+            break;
+          case 'sw':
+            newX = startRect.x + deltaX;
+            newWidth = startRect.width - deltaX;
+            newHeight = startRect.height + deltaY;
+            break;
         }
-        newWidth = minSize;
-      }
-      if (newHeight < minSize) {
-        if (handle.includes('n')) {
-          newY = startRect.y + startRect.height - minSize;
+
+        // Enforce minimum size
+        const minSize = 20;
+        if (newWidth < minSize) {
+          if (handle.includes('w')) {
+            newX = startRect.x + startRect.width - minSize;
+          }
+          newWidth = minSize;
         }
-        newHeight = minSize;
-      }
+        if (newHeight < minSize) {
+          if (handle.includes('n')) {
+            newY = startRect.y + startRect.height - minSize;
+          }
+          newHeight = minSize;
+        }
 
-      const containerBounds = containerRef?.current?.getBoundingClientRect();
-      let newRect: SelectionRect = { x: newX, y: newY, width: newWidth, height: newHeight };
-      newRect = applySnapping(newRect, containerBounds);
-      const guides = calculateSnapGuides(newRect, containerBounds);
+        // Use cached bounds instead of calling getBoundingClientRect on every frame
+        const containerBounds = cachedBoundsRef.current ?? undefined;
+        let newRect: SelectionRect = { x: newX, y: newY, width: newWidth, height: newHeight };
+        newRect = applySnapping(newRect, containerBounds);
+        const guides = calculateSnapGuides(newRect, containerBounds);
 
-      currentPositionRef.current = { x: newRect.x, y: newRect.y };
-      currentSizeRef.current = { width: newRect.width, height: newRect.height };
+        currentPositionRef.current = { x: newRect.x, y: newRect.y };
+        currentSizeRef.current = { width: newRect.width, height: newRect.height };
 
-      setState((prev) => ({
-        ...prev,
-        snapGuides: guides,
-        selectedElement: prev.selectedElement
-          ? {
-              ...prev.selectedElement,
-              rect: newRect,
-            }
-          : null,
-      }));
+        setState((prev) => ({
+          ...prev,
+          snapGuides: guides,
+          selectedElement: prev.selectedElement
+            ? {
+                ...prev.selectedElement,
+                rect: newRect,
+              }
+            : null,
+        }));
+      });
     },
-    [state.isResizing, state.resizeHandle, containerRef, applySnapping, calculateSnapGuides]
+    [state.isResizing, state.resizeHandle, applySnapping, calculateSnapGuides]
   );
 
   const endResize = useCallback(() => {
+    // Cancel any pending RAF to prevent state updates after resize ends
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+
     if (state.isResizing && state.selectedElement) {
       if (currentPositionRef.current) {
         onPositionChange?.(state.selectedElement.layerId, currentPositionRef.current);
@@ -445,6 +494,7 @@ export function useVisualEditing(options: UseVisualEditingOptions = {}): UseVisu
     startRectRef.current = null;
     currentPositionRef.current = null;
     currentSizeRef.current = null;
+    cachedBoundsRef.current = null;
 
     setState((prev) => ({
       ...prev,
@@ -482,6 +532,16 @@ export function useVisualEditing(options: UseVisualEditingOptions = {}): UseVisu
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [state.isDragging, state.isResizing, updateDrag, updateResize, endDrag, endResize]);
+
+  // Cleanup RAF on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+    };
+  }, []);
 
   // Compute current rect (accounts for drag/resize in progress)
   const currentRect = state.selectedElement?.rect ?? null;

@@ -87,29 +87,57 @@ export function useDesignEffects(options: UseDesignEffectsOptions): UseDesignEff
   // =========================================================================
 
   /**
-   * Calculate absolute position by walking up the parent chain.
-   * Design nodes store relative positions; this converts to canvas coordinates.
+   * Memoized cache of absolute positions for all nodes.
+   * This prevents O(n×depth) computation by calculating all positions in a single pass.
+   * Uses a Map for O(1) lookups when building the ReactFlow nodes list.
+   */
+  const absolutePositionsCache = useMemo(() => {
+    const cache = new Map<string, { x: number; y: number }>();
+
+    // Helper to compute position with memoization
+    const computePosition = (nodeId: string): { x: number; y: number } => {
+      // Return cached result if available
+      const cached = cache.get(nodeId);
+      if (cached !== undefined) return cached;
+
+      const node = designTree.tree.nodes.get(nodeId);
+      if (node === undefined) {
+        const fallback = { x: 0, y: 0 };
+        cache.set(nodeId, fallback);
+        return fallback;
+      }
+
+      // Base case: root node (no parent)
+      if (node.parentId === null) {
+        const pos = { x: node.x, y: node.y };
+        cache.set(nodeId, pos);
+        return pos;
+      }
+
+      // Recursive case: add parent's absolute position
+      const parentPos = computePosition(node.parentId);
+      const pos = { x: node.x + parentPos.x, y: node.y + parentPos.y };
+      cache.set(nodeId, pos);
+      return pos;
+    };
+
+    // Pre-compute all positions
+    for (const nodeId of designTree.tree.nodes.keys()) {
+      computePosition(nodeId);
+    }
+
+    return cache;
+  }, [designTree.tree.nodes]);
+
+  /**
+   * Get absolute position for a design node.
+   * Uses the memoized cache for O(1) lookup.
    */
   const getAbsolutePosition = useCallback(
     (nodeId: string): { x: number; y: number } => {
-      const node = designTree.tree.nodes.get(nodeId);
-      if (node === undefined) return { x: 0, y: 0 };
-
-      let x = node.x;
-      let y = node.y;
-      let parentId = node.parentId;
-
-      while (parentId !== null) {
-        const parent = designTree.tree.nodes.get(parentId);
-        if (parent === undefined) break;
-        x += parent.x;
-        y += parent.y;
-        parentId = parent.parentId;
-      }
-
-      return { x, y };
+      return absolutePositionsCache.get(nodeId) ?? { x: 0, y: 0 };
     },
-    [designTree.tree.nodes]
+    [absolutePositionsCache]
   );
 
   // =========================================================================
@@ -119,6 +147,7 @@ export function useDesignEffects(options: UseDesignEffectsOptions): UseDesignEff
   /**
    * Convert design tree nodes to ReactFlow nodes (for design primitives).
    * Component nodes are handled separately via Sandpack nodes.
+   * Uses absolutePositionsCache for O(1) position lookups instead of O(depth) per node.
    */
   const designNodesList = useMemo((): Node[] => {
     const rfNodes: Node[] = [];
@@ -126,8 +155,8 @@ export function useDesignEffects(options: UseDesignEffectsOptions): UseDesignEff
       // Skip component nodes (they are synced to Sandpack nodes)
       if (designNode.type === 'component') continue;
 
-      // Calculate absolute position for all nodes (including children)
-      const absolutePos = getAbsolutePosition(id);
+      // O(1) lookup from pre-computed cache instead of walking parent chain
+      const absolutePos = absolutePositionsCache.get(id) ?? { x: 0, y: 0 };
 
       rfNodes.push({
         id: `design-${id}`,
@@ -145,7 +174,7 @@ export function useDesignEffects(options: UseDesignEffectsOptions): UseDesignEff
       });
     }
     return rfNodes;
-  }, [designTree.tree.nodes, onDesignNodeUpdate, onStartTextEdit, getAbsolutePosition]);
+  }, [designTree.tree.nodes, onDesignNodeUpdate, onStartTextEdit, absolutePositionsCache]);
 
   /**
    * Combine Sandpack/Page nodes with design nodes for unified rendering.
