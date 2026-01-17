@@ -289,6 +289,30 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     }
   }, [sessionId, workspacePath, postMessage]);
 
+  // Load messages from backend when switching to a session with empty local cache
+  // This handles the case where:
+  // - User sends messages in Canvas ChatArea (separate component instance)
+  // - User switches back to Agent tab
+  // - Agent ChatArea has the correct sessionId (from localStorage) but empty message cache
+  // - Messages need to be loaded from backend to display
+  const loadedSessionsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    // Skip if no sessionId, or if we already have messages, or if already loaded this session
+    if (!sessionId || messages.length > 0 || loadedSessionsRef.current.has(sessionId)) {
+      return;
+    }
+
+    // Mark as loading to prevent duplicate requests
+    loadedSessionsRef.current.add(sessionId);
+
+    // Load from backend - conversation:loaded handler will populate messages
+    postMessage({
+      type: 'conversation:load',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+    });
+  }, [sessionId, messages.length, postMessage]);
+
   // Request file list for @ mentions
   useEffect(() => {
     postMessage({

@@ -34,6 +34,8 @@ import { MissionsSidebar } from './MissionsSidebar';
 import type { AgentCard, AgentCardNodeData, MissionConnection, MissionEdgeData } from '../types';
 import type { Connection, Edge, EdgeTypes, Node, NodeTypes, OnConnect } from '@xyflow/react';
 
+import { useUIStore } from '@/stores/ui/ui-store';
+
 import './MissionsCanvas.css';
 
 // ============================================================================
@@ -144,6 +146,10 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
   // Expanded agent state - when set, shows full agent view overlay
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
 
+  // Subscribe to activeTab to close expanded view when leaving Canvas
+  // This prevents chatAreaDetached from staying true when switching tabs
+  const activeTab = useUIStore((s) => s.activeTab);
+
   // Get the expanded agent data (undefined if agent was deleted while expanded)
   const expandedAgent = expandedAgentId !== null ? (agents[expandedAgentId] ?? null) : null;
 
@@ -154,6 +160,14 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
       setExpandedAgentId(null);
     }
   }, [expandedAgentId, expandedAgent]);
+
+  // Close expanded view when switching away from Canvas tab
+  // This is critical to reset chatAreaDetached=false so Agent tab's ChatArea renders
+  useEffect(() => {
+    if (activeTab !== 'canvas' && expandedAgentId !== null) {
+      setExpandedAgentId(null);
+    }
+  }, [activeTab, expandedAgentId]);
 
   // Stable callbacks for node interactions (extracted to prevent re-renders)
   const handleConfigure = useCallback(

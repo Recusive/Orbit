@@ -4,10 +4,18 @@
  * Uses the actual agent app components (ChatArea, ActionsBar) for identical UI.
  *
  * This renders the same UI as the main agent page, minus the primary sidebar and headers.
+ *
+ * Each agent node has its own persistent conversation:
+ * - First expand → Creates new conversation (appears in Agent sidebar as "Mission: {agent.name}")
+ * - Re-expand same node → Loads existing conversation
+ * - Multiple nodes = Multiple separate conversations, all visible in the Agent sidebar
  */
 
+import { createLogger } from '@orbit/common/lib';
 import { X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+
+import { useAgentConversation } from '../hooks';
 
 import type { AgentCard } from '../types';
 
@@ -17,6 +25,8 @@ import { ChatArea } from '@/components/layout/chat-area';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 import './AgentExpandedView.css';
+
+const logger = createLogger('AgentExpandedView');
 
 // ============================================================================
 // Types
@@ -37,6 +47,22 @@ export function AgentExpandedView({ agent, onClose }: AgentExpandedViewProps): R
   const rightSidebarOpen = useUIStore((state) => state.rightSidebarOpen);
   const setChatAreaDetached = useUIStore((state) => state.setChatAreaDetached);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Initialize or load this agent's conversation.
+  // - If agent.sessionId exists: loads that conversation
+  // - If not: creates a new conversation and saves sessionId to agent
+  // This ensures each agent node has its own persistent chat history.
+  //
+  // Returns sessionId locally tracked so it updates immediately when created,
+  // unlike agent.sessionId prop which updates after parent re-renders.
+  const { isInitializing, sessionId } = useAgentConversation({
+    agent,
+    onReady: (readySessionId) => {
+      // Conversation is ready - ChatArea will automatically display it
+      // since the conversation:created/loaded handlers update the global session state
+      logger.debug('Conversation ready', { sessionId: readySessionId });
+    },
+  });
 
   // Detach the ChatArea in RootLayout while this expanded view is open.
   // This prevents duplicate listeners, backend requests, and localStorage races.
@@ -104,16 +130,18 @@ export function AgentExpandedView({ agent, onClose }: AgentExpandedViewProps): R
 
         {/* Main Content - Actual Agent UI */}
         <div className="agent-expanded-content">
-          {/*
-           * TODO: ChatArea currently shows the main app's conversation, NOT this agent's data.
-           * To properly integrate agent-specific chat:
-           * 1. Create an agent session context provider that sets the active session ID
-           * 2. Pass agent.sessionId (need to add to AgentCard type) to switch conversations
-           * 3. Or implement a separate AgentChat component that takes agent context
-           *
-           * For now, this expanded view shows the main conversation as a placeholder.
-           */}
-          <ChatArea />
+          {/* Show loading indicator while conversation is being created/loaded */}
+          {isInitializing ? (
+            <div className="agent-expanded-loading">
+              <span>Loading conversation...</span>
+            </div>
+          ) : (
+            // KEY PROP: Forces ChatArea to completely remount when sessionId changes.
+            // This is critical because ChatArea's internal useChatMessages hook has
+            // its own message state that reads from localStorage on mount.
+            // Without the key, switching sessions wouldn't reset the internal state.
+            <ChatArea key={sessionId} />
+          )}
 
           {/* ActionsBar - Activity Panel tab switcher (only when panel is open) */}
           {rightSidebarOpen ? <ActionsBar /> : null}

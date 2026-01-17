@@ -171,3 +171,16 @@
   flex: 1;
   min-width: 0;
 }
+
+/* ============================================================================
+   Loading State - Shown while conversation is being created/loaded
+   ============================================================================ */
+
+.agent-expanded-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}

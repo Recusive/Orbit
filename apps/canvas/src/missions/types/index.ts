@@ -160,6 +160,9 @@ export interface AgentCard {
   id: string;
   name: string;
 
+  // Conversation association
+  sessionId?: string; // Links this agent node to its conversation in the Agent sidebar
+
   // Prompt configuration
   prompt: string; // The user instruction for this agent
   promptMode: 'static' | 'template'; // Static prompt or template with {{context}}

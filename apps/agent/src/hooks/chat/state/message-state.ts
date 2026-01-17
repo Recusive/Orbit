@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { ChatMessage } from '@/components/chat';
 
-import { StoredChatMessageArraySchema } from '@/types/protocol';
-
 interface UseMessageStateReturn {
   messages: ChatMessage[];
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
@@ -12,30 +10,42 @@ interface UseMessageStateReturn {
 }
 
 export function useMessageState(sessionId: string): UseMessageStateReturn {
-  // Restore state from localStorage on mount (survives webview reloads)
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    try {
-      const saved = localStorage.getItem('orbit-messages');
-      if (saved === null) {
-        return [];
-      }
-      const json: unknown = JSON.parse(saved);
-      const result = StoredChatMessageArraySchema.safeParse(json);
-      if (!result.success) {
-        return [];
-      }
-      return result.data;
-    } catch {
-      return [];
-    }
-  });
+  // CRITICAL: Always start empty - do NOT read from global localStorage
+  // Global localStorage was causing stale messages from previous sessions to appear
+  // when new Canvas agent nodes created conversations. The backend is the source of
+  // truth for messages, and conversation:loaded populates messages for existing sessions.
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // Cache messages by sessionId to preserve state when switching conversations
+  // Cache messages by sessionId for fast in-memory switching (not persistence)
   const messagesCache = useRef<Map<string, ChatMessage[]>>(new Map());
 
   // Refs to track current state (for use in callbacks without deps issues)
   const messagesRef = useRef<ChatMessage[]>(messages);
   messagesRef.current = messages;
+
+  // Track the previous sessionId to detect session switches
+  const prevSessionIdRef = useRef<string>(sessionId);
+
+  // Session-aware initialization: when sessionId changes, check cache or start empty
+  useEffect(() => {
+    // Only react to sessionId changes, not the initial mount (handled by conversation:loaded)
+    if (prevSessionIdRef.current === sessionId) {
+      return;
+    }
+    prevSessionIdRef.current = sessionId;
+
+    if (!sessionId) {
+      setMessages([]);
+      return;
+    }
+
+    // Check in-memory cache for fast session switching
+    const cached = messagesCache.current.get(sessionId);
+    if (cached) {
+      setMessages(cached);
+    }
+    // For new sessions, messages stay empty - conversation:created/loaded will populate if needed
+  }, [sessionId]);
 
   // Save messages to cache whenever they change (for conversation switching)
   useEffect(() => {
@@ -44,14 +54,11 @@ export function useMessageState(sessionId: string): UseMessageStateReturn {
     }
   }, [sessionId, messages]);
 
-  // Persist messages to localStorage (survives webview reloads)
-  useEffect(() => {
-    try {
-      localStorage.setItem('orbit-messages', JSON.stringify(messages));
-    } catch {
-      // Ignore storage errors
-    }
-  }, [messages]);
+  // NOTE: localStorage persistence REMOVED
+  // The backend stores all messages per-session in ~/Library/Application Support/orbit/
+  // Removing localStorage fixes the race condition where new Canvas agent nodes would
+  // display stale messages from the global 'orbit-messages' key before setMessages([])
+  // from conversation:created could take effect.
 
   // Animation interval removed for performance - streaming effect now achieved
   // through backend batching (50ms) + Streamdown's incremental markdown rendering.

@@ -561,6 +561,14 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           messagesCache.current.set(oldSessionId, oldMessages);
         }
 
+        // CRITICAL: Clear messages FIRST before session transition
+        // This prevents race conditions where ChatArea remounts with key={newSessionId}
+        // and reads stale messages before the setMessages([]) async state update completes.
+        // The in-memory cache in useMessageState will be empty for this new session,
+        // ensuring the component starts fresh.
+        setMessages([]);
+
+        // Now update session state (triggers ChatArea remount via key prop)
         setSessionId(message.session_id);
         setActiveConversation(message.session_id, message.title);
         addConversation({
@@ -570,7 +578,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           messageCount: 0,
           ...(message.workspace_path ? { workspacePath: message.workspace_path } : {}),
         });
-        setMessages([]);
         switchSession(message.session_id); // Switch to new session (resets usage for new conversation)
         onSessionCreated?.(message.session_id, message.title);
         break;
