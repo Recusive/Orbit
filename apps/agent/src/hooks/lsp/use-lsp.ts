@@ -257,9 +257,10 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
       return;
     }
 
-    // New/uninitialized workspace: reset readiness until init completes
-    // This prevents stale isWorkspaceReady=true from previous workspace
+    // New/uninitialized workspace: reset readiness and clear stale errors
+    // This prevents stale isWorkspaceReady=true and error states from previous workspace
     setIsWorkspaceReady(false);
+    setError(null);
 
     // Register listener to be notified when initialization completes
     // This handles the case where another hook instance is initializing

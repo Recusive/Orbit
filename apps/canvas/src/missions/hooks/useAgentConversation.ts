@@ -28,6 +28,19 @@ import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('AgentConversation');
 
+/**
+ * Generate a unique conversation title for an agent.
+ * Includes agent.id suffix to prevent title collisions when agents have the same name.
+ * The suffix is short (last 8 chars of ID) to keep the sidebar readable.
+ *
+ * @param agentId - The agent's unique ID
+ * @param agentName - The agent's display name
+ */
+function generateAgentConversationTitle(agentId: string, agentName: string): string {
+  const idSuffix = agentId.slice(-8);
+  return `Mission: ${agentName} (${idSuffix})`;
+}
+
 interface UseAgentConversationOptions {
   /** The agent card to manage conversation for */
   agent: AgentCard;
@@ -70,11 +83,10 @@ export function useAgentConversation({
       if (message.type === 'conversation:created') {
         // Check if this is the response to OUR creation request
         // NOTE: We match by title because the backend generates a new UUID for responses
-        // (message.uuid !== request UUID). Title matching has edge cases with duplicate
-        // agent names, but works for the common case. A proper fix would require the
-        // backend to echo the request UUID in the response.
+        // (message.uuid !== request UUID). We include agent.id in the title to ensure
+        // uniqueness even when multiple agents have the same name.
         if (pendingCreateUuidRef.current !== null) {
-          const expectedTitle = `Mission: ${agent.name}`;
+          const expectedTitle = generateAgentConversationTitle(agent.id, agent.name);
           if (message.title === expectedTitle) {
             logger.info('Conversation created for agent', {
               agentId: agent.id,
@@ -207,7 +219,7 @@ export function useAgentConversation({
       postMessage({
         type: 'conversation:create',
         uuid: createUuid,
-        title: `Mission: ${agent.name}`,
+        title: generateAgentConversationTitle(agent.id, agent.name),
         workspace_path: workspacePath ?? undefined,
       });
     }
