@@ -15,7 +15,7 @@ import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { FC } from 'react';
 
 import { TextShimmer } from '@/components/ui/text-shimmer';
-import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils/constants';
+import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
 // Rotating loading messages - fun tech-themed phrases
 const LOADING_MESSAGES = [

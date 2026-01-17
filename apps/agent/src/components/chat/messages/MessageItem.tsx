@@ -20,7 +20,7 @@ import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files';
 import { ErrorBoundary } from '@/components/shared';
-import { CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils/constants';
+import { CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
 // Stable plugin arrays - defined outside component to prevent recreation on each render
 // This is critical for Streamdown performance as it compares plugin arrays by reference

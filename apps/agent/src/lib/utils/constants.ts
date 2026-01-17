@@ -7,7 +7,7 @@
  * DO NOT hardcode magic numbers in components - import from here instead.
  *
  * USAGE:
- *   import { SIDEBAR, CHAT_WIDTH, KEYBOARD_SHORTCUTS } from '@/lib/utils/constants';
+ *   import { SIDEBAR, CHAT_WIDTH, KEYBOARD_SHORTCUTS } from '@/lib/utils';
  *
  * WHEN TO ADD HERE:
  *   - Layout dimensions (widths, heights, padding)

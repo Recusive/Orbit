@@ -296,6 +296,20 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   // - Agent ChatArea has the correct sessionId (from localStorage) but empty message cache
   // - Messages need to be loaded from backend to display
   const loadedSessionsRef = useRef<Set<string>>(new Set());
+
+  // Track previous message count to detect when messages are cleared
+  // This allows reloading if messages were explicitly cleared after being loaded
+  const prevMessagesLengthRef = useRef<number>(messages.length);
+  useEffect(() => {
+    // If messages went from non-empty to empty while sessionId stayed the same,
+    // clear the loaded flag so we can reload from backend if needed
+    // This fixes a race condition where messages could be cleared but never reloaded
+    if (prevMessagesLengthRef.current > 0 && messages.length === 0 && sessionId) {
+      loadedSessionsRef.current.delete(sessionId);
+    }
+    prevMessagesLengthRef.current = messages.length;
+  }, [sessionId, messages.length]);
+
   useEffect(() => {
     // Skip if no sessionId, or if we already have messages, or if already loaded this session
     if (!sessionId || messages.length > 0 || loadedSessionsRef.current.has(sessionId)) {

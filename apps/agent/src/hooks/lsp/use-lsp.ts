@@ -147,6 +147,24 @@ const initializingWorkspaces = new Set<string>();
  */
 const workspaceReadyListeners = new Map<string, Set<() => void>>();
 
+/**
+ * Reference count for each workspace path.
+ * When the count drops to 0, we clean up module-level state for that workspace
+ * to prevent memory leaks from workspaces that are no longer in use.
+ */
+const workspaceRefCounts = new Map<string, number>();
+
+/**
+ * Clean up module-level state for a workspace when no longer in use.
+ * Called when the last hook instance for a workspace unmounts.
+ */
+function cleanupWorkspace(path: string): void {
+  initializedWorkspaces.delete(path);
+  initializingWorkspaces.delete(path);
+  workspaceReadyListeners.delete(path);
+  workspaceRefCounts.delete(path);
+}
+
 // ============================================
 // Hook
 // ============================================
@@ -197,6 +215,30 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
   // This avoids stale closure issues where cleanup runs with old state
   const isWorkspaceReadyRef = useRef(isWorkspaceReady);
   isWorkspaceReadyRef.current = isWorkspaceReady;
+
+  // ============================================
+  // Workspace reference counting (memory leak prevention)
+  // ============================================
+
+  useEffect(() => {
+    if (!rootPath) return;
+
+    // Increment ref count for this workspace
+    workspaceRefCounts.set(rootPath, (workspaceRefCounts.get(rootPath) ?? 0) + 1);
+
+    return () => {
+      // Decrement ref count on unmount
+      const count = workspaceRefCounts.get(rootPath) ?? 1;
+      if (count <= 1) {
+        // Last instance for this workspace - clean up module-level state
+        // This prevents memory leaks from workspaces that are no longer in use
+        cleanupWorkspace(rootPath);
+        logger.debug('Cleaned up LSP workspace state (last instance unmounted)', { rootPath });
+      } else {
+        workspaceRefCounts.set(rootPath, count - 1);
+      }
+    };
+  }, [rootPath]);
 
   // ============================================
   // Reactive workspace initialization

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import type { CSSProperties, JSX } from 'react';
 
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 // Extend CSSProperties to include CSS custom properties
 interface ShimmerStyle extends CSSProperties {

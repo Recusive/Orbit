@@ -3,7 +3,7 @@ import { createContext, useContext } from 'react';
 import type { CSSProperties, FC, ReactNode } from 'react';
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 // Token usage from AI SDK
 interface TokenUsage {

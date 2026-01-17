@@ -12,7 +12,7 @@ import { useCallback } from 'react';
 import type { FC } from 'react';
 
 import { useDiagnostics } from '@/hooks/lsp/use-diagnostics';
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 import { useActiveFile, useCursorPosition } from '@/stores/file/file-viewer-store';
 import {
   selectAhead,

@@ -16,8 +16,7 @@ import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Switch } from '@/components/ui/switch';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { lspDidClose, lspDidOpen } from '@/lib/api';
-import { TERMINAL_PANEL, ACTIVITY_PANEL } from '@/lib/utils/constants';
-import { cn } from '@/lib/utils/utils';
+import { ACTIVITY_PANEL, cn, TERMINAL_PANEL } from '@/lib/utils';
 import { useBrowserIsActive } from '@/stores/browser/browser-store';
 import {
   useFileViewerStore,

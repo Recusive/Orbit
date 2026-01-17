@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 
 import type { FC } from 'react';
 
+import { cn } from '@/lib/utils';
 import { getFolderIconName } from '@/lib/utils/iconMap';
-import { cn } from '@/lib/utils/utils';
 
 export interface FolderIconProps {
   readonly folderName: string;

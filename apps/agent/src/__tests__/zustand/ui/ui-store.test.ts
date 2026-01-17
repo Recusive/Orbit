@@ -18,7 +18,7 @@ import type {
 } from '@/stores/ui/ui-store';
 
 // Import constants for validation
-import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/utils/constants';
+import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 // Mock localStorage using globalThis assignment

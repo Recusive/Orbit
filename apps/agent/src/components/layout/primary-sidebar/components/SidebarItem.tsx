@@ -5,8 +5,7 @@ import type { SidebarItemProps } from '../types';
 import type { FC } from 'react';
 
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
-import { SIDEBAR, TRANSITIONS } from '@/lib/utils/constants';
-import { cn } from '@/lib/utils/utils';
+import { cn, SIDEBAR, TRANSITIONS } from '@/lib/utils';
 
 // Transition string builder
 const getCollapseTransition = (collapsed: boolean): string =>

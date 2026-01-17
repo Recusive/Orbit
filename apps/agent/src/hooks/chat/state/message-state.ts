@@ -48,9 +48,17 @@ export function useMessageState(sessionId: string): UseMessageStateReturn {
   }, [sessionId]);
 
   // Save messages to cache whenever they change (for conversation switching)
+  // IMPORTANT: Also clear cache when messages become empty to prevent stale restores
+  // after rewind operations or explicit message clearing
   useEffect(() => {
-    if (sessionId && messages.length > 0) {
-      messagesCache.current.set(sessionId, messages);
+    if (sessionId) {
+      if (messages.length > 0) {
+        messagesCache.current.set(sessionId, messages);
+      } else {
+        // Clear cache entry when messages are empty - prevents stale messages
+        // from being restored when switching back to this session
+        messagesCache.current.delete(sessionId);
+      }
     }
   }, [sessionId, messages]);
 

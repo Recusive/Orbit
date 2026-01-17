@@ -8,9 +8,9 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect } from 'react';
 
-import type { KeyboardShortcutDef } from '@/lib/utils/constants';
+import type { KeyboardShortcutDef } from '@/lib/utils';
 
-import { KEYBOARD_SHORTCUTS } from '@/lib/utils/constants';
+import { KEYBOARD_SHORTCUTS } from '@/lib/utils';
 
 const logger = createLogger('KeyboardShortcuts');
 

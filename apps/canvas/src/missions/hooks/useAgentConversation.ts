@@ -69,58 +69,60 @@ export function useAgentConversation({
       // Handle conversation:created response
       if (message.type === 'conversation:created') {
         // Check if this is the response to OUR creation request
-        // We match by checking if we have a pending create and the title matches our agent
-        if (pendingCreateUuidRef.current !== null) {
-          const expectedTitle = `Mission: ${agent.name}`;
-          if (message.title === expectedTitle) {
-            logger.info('Conversation created for agent', {
-              agentId: agent.id,
-              agentName: agent.name,
-              sessionId: message.session_id,
-            });
+        // Match by UUID (not title) to avoid mis-assigning sessions when:
+        // - Two agents have the same name (title collision)
+        // - Agent name changes while request is in-flight
+        if (
+          pendingCreateUuidRef.current !== null &&
+          message.uuid === pendingCreateUuidRef.current
+        ) {
+          logger.info('Conversation created for agent', {
+            agentId: agent.id,
+            agentName: agent.name,
+            sessionId: message.session_id,
+          });
 
-            // Save the sessionId to the agent card (persists in missions store)
-            updateAgent(agent.id, { sessionId: message.session_id });
+          // Save the sessionId to the agent card (persists in missions store)
+          updateAgent(agent.id, { sessionId: message.session_id });
 
-            // Update local state immediately - this is what ChatArea will use as key
-            setLocalSessionId(message.session_id);
+          // Update local state immediately - this is what ChatArea will use as key
+          setLocalSessionId(message.session_id);
 
-            // Update global UI state - this is what useChatMessages normally does
-            // Without this, ChatArea would show the wrong conversation
-            const uiStore = useUIStore.getState();
-            uiStore.setActiveConversation(message.session_id, message.title);
-            uiStore.addConversation({
-              sessionId: message.session_id,
-              title: message.title,
-              updatedAt: Date.now(),
-              messageCount: 0,
-              ...(message.workspace_path ? { workspacePath: message.workspace_path } : {}),
-            });
+          // Update global UI state - this is what useChatMessages normally does
+          // Without this, ChatArea would show the wrong conversation
+          const uiStore = useUIStore.getState();
+          uiStore.setActiveConversation(message.session_id, message.title);
+          uiStore.addConversation({
+            sessionId: message.session_id,
+            title: message.title,
+            updatedAt: Date.now(),
+            messageCount: 0,
+            ...(message.workspace_path ? { workspacePath: message.workspace_path } : {}),
+          });
 
-            // Switch tool store session (for usage tracking)
-            const toolStore = useToolStore.getState();
-            toolStore.switchSession(message.session_id);
+          // Switch tool store session (for usage tracking)
+          const toolStore = useToolStore.getState();
+          toolStore.switchSession(message.session_id);
 
-            // CRITICAL: Update localStorage BEFORE setIsInitializing(false)
-            // When Canvas is open, the Agent's ChatArea is detached (chatAreaDetached=true),
-            // so the Agent's message-handler.ts is NOT running. We are the ONLY handler
-            // processing conversation:created. ChatArea's useSessionState reads from
-            // localStorage on mount, so we must update it BEFORE allowing ChatArea to mount.
-            try {
-              localStorage.setItem('orbit-sessionId', message.session_id);
-            } catch {
-              // Ignore storage errors - ChatArea will still work via key={sessionId} remount
-            }
-
-            // Clear pending state
-            pendingCreateUuidRef.current = null;
-
-            // NOW allow ChatArea to mount (it will read the correct sessionId from localStorage)
-            setIsInitializing(false);
-
-            // Notify caller
-            onReady?.(message.session_id);
+          // CRITICAL: Update localStorage BEFORE setIsInitializing(false)
+          // When Canvas is open, the Agent's ChatArea is detached (chatAreaDetached=true),
+          // so the Agent's message-handler.ts is NOT running. We are the ONLY handler
+          // processing conversation:created. ChatArea's useSessionState reads from
+          // localStorage on mount, so we must update it BEFORE allowing ChatArea to mount.
+          try {
+            localStorage.setItem('orbit-sessionId', message.session_id);
+          } catch {
+            // Ignore storage errors - ChatArea will still work via key={sessionId} remount
           }
+
+          // Clear pending state
+          pendingCreateUuidRef.current = null;
+
+          // NOW allow ChatArea to mount (it will read the correct sessionId from localStorage)
+          setIsInitializing(false);
+
+          // Notify caller
+          onReady?.(message.session_id);
         }
       }
 

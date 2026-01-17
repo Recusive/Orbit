@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getCrashLogPath } from '@/lib/api';
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 interface CrashNotificationProps {
   /** Whether the dialog is open */

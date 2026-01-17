@@ -7,7 +7,7 @@ import type { FC } from 'react';
 
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn, getCommandKey } from '@/lib/utils/utils';
+import { cn, getCommandKey } from '@/lib/utils';
 import { useUIStore, useWorkspaceName, useActiveTab, useHasWorkspace } from '@/stores/ui/ui-store';
 
 type Theme = 'light' | 'dark';

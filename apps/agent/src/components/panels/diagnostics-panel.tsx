@@ -12,7 +12,7 @@ import type { Diagnostic } from '@/lib/api';
 import type { FC } from 'react';
 
 import { useDiagnostics } from '@/hooks/lsp/use-diagnostics';
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 interface DiagnosticsPanelProps {
   /** Called when a diagnostic is clicked (can be async) */

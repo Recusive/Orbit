@@ -14,7 +14,7 @@ import { immer } from 'zustand/middleware/immer';
 import type { SettingsSection } from '@/components/modals/settings';
 import type { StoredConversationSummary } from '@/types/protocol';
 
-import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/utils/constants';
+import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/utils';
 import { StoredConversationSummaryArraySchema } from '@/types/protocol';
 
 const logger = createLogger('UIStore');

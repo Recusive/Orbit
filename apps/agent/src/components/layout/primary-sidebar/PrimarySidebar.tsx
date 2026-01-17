@@ -23,8 +23,7 @@ import { FileExplorer } from '@/components/files';
 import { ConversationDeleteDialog, CreateWorktreeDialog } from '@/components/modals';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { HEIGHTS, SIDEBAR } from '@/lib/utils/constants';
-import { cn, getCommandKey } from '@/lib/utils/utils';
+import { cn, getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
 import {
   useUIStore,
   useIsLeftSidebarCollapsed,

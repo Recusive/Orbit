@@ -13,7 +13,7 @@ import { DiffViewer } from './diff-viewer';
 import type { FileChange } from '@/stores/file/file-store';
 
 import { FileIcon } from '@/components/files/file-icon';
-import { HEIGHTS } from '@/lib/utils/constants';
+import { HEIGHTS } from '@/lib/utils';
 
 export interface FileChangeItemProps {
   readonly file: FileChange;

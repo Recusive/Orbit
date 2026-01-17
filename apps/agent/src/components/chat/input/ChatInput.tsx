@@ -17,7 +17,7 @@ import type { ChatInputProps } from './types';
 import type { FC } from 'react';
 
 import { ElementContextList } from '@/components/browser';
-import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils/constants';
+import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils';
 
 export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   inputMode,

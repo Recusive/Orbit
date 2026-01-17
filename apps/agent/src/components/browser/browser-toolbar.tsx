@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { FC, KeyboardEvent } from 'react';
 
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 import { useBrowserNavigation, useIsSelectingElement } from '@/stores/browser/browser-store';
 
 export interface BrowserToolbarProps {

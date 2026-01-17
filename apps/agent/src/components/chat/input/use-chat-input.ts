@@ -9,8 +9,8 @@ import type { SlashCommand, UseChatInputOptions, UseChatInputReturn } from './ty
 import type { ContextItem, FileEntry } from '@/types/agent/context';
 import type { InputMode } from '@/types/protocol';
 
+import { cn } from '@/lib/utils';
 import { compressImage } from '@/lib/utils/image-utils';
-import { cn } from '@/lib/utils/utils';
 import { useSlashCommands, useCommandsStore } from '@/stores/agent';
 import { useElementContexts, useBrowserStore } from '@/stores/browser/browser-store';
 

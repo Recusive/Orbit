@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ShellType, TerminalCapabilitiesState } from '@/types/protocol';
 
-import { TERMINAL } from '@/lib/utils/constants';
+import { TERMINAL } from '@/lib/utils';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
 
 // Mock Date.now and Math.random for consistent IDs

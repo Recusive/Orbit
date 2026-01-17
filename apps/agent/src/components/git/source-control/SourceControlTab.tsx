@@ -21,7 +21,7 @@ import { useSourceControl } from './hooks/use-source-control';
 
 import type { SourceControlTabProps } from './types';
 
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = '' }) => {
