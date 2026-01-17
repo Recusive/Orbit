@@ -364,7 +364,11 @@ export const useToolStore = create<ToolState>()(
 
       addPermissionRequest: (request: PermissionRequest) => {
         set((state) => {
-          state.pendingPermissions.push(request);
+          // Deduplicate by requestId - prevent duplicate permission modals
+          const exists = state.pendingPermissions.some((p) => p.requestId === request.requestId);
+          if (!exists) {
+            state.pendingPermissions.push(request);
+          }
         });
       },
 

@@ -124,6 +124,9 @@ export default defineConfig({
   },
   // Optimize dependencies - pre-bundle to avoid duplicate instances
   optimizeDeps: {
+    // Force re-optimization on every dev server start to avoid stale cache issues
+    // This adds ~2s to startup but prevents "504 Outdated Optimize Dep" errors
+    force: true,
     include: [
       'streamdown',
       'shiki',
