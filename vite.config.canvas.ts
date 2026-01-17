@@ -11,7 +11,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './apps/canvas/src'),
+      // @/ resolves to agent src (for shared modules like ui-store, tool-store)
+      // Canvas-specific imports use @canvas/ prefix
+      '@': path.resolve(__dirname, './apps/agent/src'),
+      '@canvas': path.resolve(__dirname, './apps/canvas/src'),
       '@orbit/common': path.resolve(__dirname, './apps/common/src'),
     },
   },
