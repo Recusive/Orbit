@@ -4,17 +4,17 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-// Canvas app vite configuration
+// Canvas UI Builder vite configuration
 // https://vite.dev/config/
 export default defineConfig({
-  root: './apps/canvas',
+  root: './apps/Canvas-UI-Builder',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       // @/ resolves to agent src (for shared modules like ui-store, tool-store)
       // Canvas-specific imports use @canvas/ prefix
       '@': path.resolve(__dirname, './apps/agent/src'),
-      '@canvas': path.resolve(__dirname, './apps/canvas/src'),
+      '@canvas': path.resolve(__dirname, './apps/Canvas-UI-Builder/src'),
       '@orbit/common': path.resolve(__dirname, './apps/common/src'),
     },
   },

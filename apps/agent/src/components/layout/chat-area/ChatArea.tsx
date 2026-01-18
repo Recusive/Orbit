@@ -19,7 +19,7 @@ import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { FileEntry } from '@/types/agent/context';
 import type { ExtensionMessage } from '@/types/protocol';
 import type { AllotmentHandle } from 'allotment';
-import type { FC } from 'react';
+import type { FC, JSX } from 'react';
 
 import { ChatHeader, useQueuedMessageHandler } from '@/components/chat';
 import { ActivityPanel } from '@/components/panels';

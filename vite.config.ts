@@ -37,7 +37,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './apps/agent/src'),
-      '@canvas': path.resolve(__dirname, './apps/canvas/src'),
+      '@canvas': path.resolve(__dirname, './apps/Canvas-UI-Builder/src'),
       '@editor': path.resolve(__dirname, './apps/editor/src'),
       '@orbit/common': path.resolve(__dirname, './apps/common/src'),
     },

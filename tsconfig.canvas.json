@@ -32,15 +32,15 @@
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
 
-    /* Paths - Canvas specific */
+    /* Paths - Canvas UI Builder specific */
     /* @/ resolves to agent (shared modules), @canvas/ for canvas-specific */
     "baseUrl": ".",
     "paths": {
       "@/*": ["./apps/agent/src/*"],
-      "@canvas/*": ["./apps/canvas/src/*"],
+      "@canvas/*": ["./apps/Canvas-UI-Builder/src/*"],
       "@orbit/common": ["./apps/common/src/index.ts"],
       "@orbit/common/*": ["./apps/common/src/*"]
     }
   },
-  "include": ["apps/canvas/src/**/*"]
+  "include": ["apps/Canvas-UI-Builder/src/**/*"]
 }

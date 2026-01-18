@@ -93,10 +93,10 @@ if [ "$RUST_ONLY" = false ]; then
   bun run typecheck
   print_success "Agent TypeScript OK"
 
-  # Canvas app
-  print_step "Checking apps/canvas..."
+  # Canvas UI Builder app
+  print_step "Checking apps/Canvas-UI-Builder..."
   bun run canvas:typecheck
-  print_success "Canvas TypeScript OK"
+  print_success "Canvas UI Builder TypeScript OK"
 
   # Common library
   print_step "Checking apps/common..."
