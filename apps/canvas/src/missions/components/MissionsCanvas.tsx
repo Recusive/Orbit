@@ -6,8 +6,6 @@
 import {
   Background,
   BackgroundVariant,
-  Controls,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
@@ -17,12 +15,7 @@ import {
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ErrorBoundary } from '../../components/shared/ErrorBoundary';
-import {
-  useMissionsStore,
-  useMissionsUIStore,
-  selectLeftSidebarVisualWidth,
-  selectRightSidebarVisualWidth,
-} from '../stores';
+import { useMissionsStore } from '../stores';
 
 import { AgentCardNode } from './AgentCardNode';
 import { AgentExpandedView } from './AgentExpandedView';
@@ -135,13 +128,6 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
   const updateConnection = useMissionsStore((s) => s.updateConnection);
   const deleteConnection = useMissionsStore((s) => s.deleteConnection);
   const setFocusedAgent = useMissionsStore((s) => s.setFocusedAgent);
-
-  // UI store - sidebar state for Controls/MiniMap positioning
-  const leftSidebarCollapsed = useMissionsUIStore((s) => s.leftSidebarCollapsed);
-  const leftSidebarVisualWidth = useMissionsUIStore(selectLeftSidebarVisualWidth);
-  const rightSidebarCollapsed = useMissionsUIStore((s) => s.rightSidebarCollapsed);
-  const rightSidebarVisualWidth = useMissionsUIStore(selectRightSidebarVisualWidth);
-  const showMinimap = useMissionsUIStore((s) => s.showMinimap);
 
   // Expanded agent state - when set, shows full agent view overlay
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
@@ -373,34 +359,6 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
         >
           {/* Background - hidden like workflow mode */}
           <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="transparent" />
-          <Controls
-            showZoom
-            showFitView
-            showInteractive={false}
-            position="bottom-left"
-            style={{
-              backgroundColor: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              left: leftSidebarCollapsed ? 8 : leftSidebarVisualWidth + 16,
-              transition: 'left 280ms cubic-bezier(0.16, 1, 0.3, 1)',
-            }}
-          />
-          {showMinimap ? (
-            <MiniMap
-              style={{
-                backgroundColor: 'var(--card)',
-                border: '1px solid var(--border)',
-                borderRadius: 8,
-                overflow: 'hidden',
-                width: 120,
-                height: 80,
-                right: rightSidebarCollapsed ? 8 : rightSidebarVisualWidth + 16,
-                transition: 'right 280ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-              maskColor="rgba(0, 0, 0, 0.5)"
-            />
-          ) : null}
         </ReactFlow>
 
         {/* Floating Toolbar */}

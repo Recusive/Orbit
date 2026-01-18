@@ -1,12 +1,10 @@
 /**
- * AgentCardNode Styles
- * Design system aligned styling for agent cards in missions mode
+ * AgentCardNode Styles - Clean Minimal Design
  *
- * Design Tokens:
- * - Border radius: 8px (--radius-lg)
- * - Typography: 13px body, 11px secondary, 10px tiny
- * - Shadows: Subtle elevation (0 1px 3px)
- * - Spacing: 4px, 6px, 8px, 12px, 16px
+ * Design inspired by modern workflow builders with:
+ * - Status indicated via colored icon background (not border)
+ * - Subtle consistent handles and border (same for all states)
+ * - Clean rounded icon container
  *
  * Note: Avoid backdrop-filter, color-mix(), and complex transitions
  * for Tauri WebView compatibility
@@ -17,95 +15,91 @@
    ============================================================================ */
 
 .agent-card-node {
-  --card-width: 280px;
-  --radius: 8px;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --card-width: 200px;
+  --radius: 10px;
 
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   width: var(--card-width);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   font-family: var(--font-sans);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .agent-card-node:hover {
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .agent-card-node--selected {
-  border-color: var(--primary);
-  box-shadow: var(--shadow-sm), 0 0 0 2px var(--primary);
+  border-color: light-dark(var(--muted-foreground), oklch(0.5 0.01 58));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
-/* Status border colors */
-.agent-card-node[data-status='running'],
-.agent-card-node[data-status='streaming'] {
-  border-color: var(--info);
+.agent-card-node--selected:hover {
+  border-color: light-dark(var(--muted-foreground), oklch(0.5 0.01 58));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
-.agent-card-node[data-status='complete'] {
-  border-color: var(--success);
-}
-
-.agent-card-node[data-status='error'] {
-  border-color: var(--destructive);
-}
-
-.agent-card-node[data-status='pending'] {
-  border-color: var(--warning);
+/* Remove ReactFlow's default focus outline */
+.react-flow__node-agent:focus,
+.react-flow__node-agent:focus-visible,
+.react-flow__node-agent.selected {
+  outline: none;
 }
 
 /* ============================================================================
-   Handles
+   Handles - Subtle consistent style for all states
    ============================================================================ */
 
+/* Agent card handles - styles defined in canvas/globals.css for proper cascade */
 .agent-card-handle {
-  position: absolute !important;
-  width: 8px !important;
-  height: 8px !important;
-  background: var(--muted-foreground) !important;
-  border: 2px solid var(--card) !important;
-  border-radius: 50% !important;
-  top: 50% !important;
+  box-sizing: border-box !important;
+}
+
+/* Handle border matches node border when selected */
+.agent-card-node--selected .react-flow__handle,
+.agent-card-node--selected .agent-card-handle {
+  border-color: var(--muted-foreground) !important;
 }
 
 .agent-card-handle:hover {
-  background: var(--primary) !important;
-  /* No scale transform - causes blur in Tauri WebView */
+  width: 12px !important;
+  height: 12px !important;
+  background: var(--card) !important;
+  border: 2px solid var(--border) !important;
 }
 
+/* Override ReactFlow default handle positioning */
+.agent-card-node .react-flow__handle-left,
 .agent-card-handle--input {
+  top: 50% !important;
   left: 0 !important;
+  right: auto !important;
   transform: translate(-50%, -50%) !important;
 }
 
+.agent-card-node .react-flow__handle-right,
 .agent-card-handle--output {
+  top: 50% !important;
   right: 0 !important;
   left: auto !important;
   transform: translate(50%, -50%) !important;
 }
 
-.agent-card-handle--output:hover {
-  /* No scale transform - causes blur in Tauri WebView */
-}
-
 /* ============================================================================
-   Header
+   Header - Status Icon + Name + Actions
    ============================================================================ */
 
 .agent-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  gap: 8px;
+  padding: 8px 10px;
+  gap: 6px;
 }
 
-.agent-card-header-content {
+.agent-card-header-left {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -113,9 +107,39 @@
   flex: 1;
 }
 
+.agent-card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Status Icon with colored background */
+.agent-card-status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  /* Use light-dark() for theme-aware icon background */
+  background: light-dark(var(--icon-bg-light), var(--icon-bg-dark));
+  color: var(--icon-color);
+}
+
+.agent-card-name-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
 .agent-card-name {
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 300;
+  font-stretch: 100%;
+  font-size: 12px;
   color: var(--foreground);
   white-space: nowrap;
   overflow: hidden;
@@ -129,188 +153,134 @@
 }
 
 .agent-card-name-input {
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 300;
+  font-size: 12px;
   color: var(--foreground);
   background: var(--background);
   border: 1px solid var(--primary);
   border-radius: 4px;
-  padding: 2px 6px;
+  padding: 1px 4px;
   outline: none;
-  min-width: 60px;
-  max-width: 120px;
+  min-width: 50px;
+  max-width: 100px;
 }
 
 .agent-card-model-badge {
-  font-size: 10px;
-  font-weight: 500;
-  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 300;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Action buttons in header */
+.agent-card-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
   border-radius: 4px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.agent-card-action-btn:hover {
   background: var(--muted);
-  color: var(--muted-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  flex-shrink: 0;
+  color: var(--foreground);
+}
+
+.agent-card-action-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary);
+}
+
+.agent-card-action-btn--danger:hover {
+  background: oklch(from var(--destructive) l c h / 15%);
+  color: var(--destructive);
 }
 
 /* ============================================================================
-   Status Badge
+   Task Name
    ============================================================================ */
 
-.agent-card-status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 10px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  flex-shrink: 0;
-}
-
-.agent-card-status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.agent-card-status-label {
-  line-height: 1;
-}
-
-/* Status variants */
-.agent-card-status-badge--idle {
-  background: rgba(107, 114, 128, 0.15);
+.agent-card-task {
+  padding: 0 10px 6px;
+  font-size: 11px;
   color: var(--muted-foreground);
-}
-
-.agent-card-status-badge--idle .agent-card-status-dot {
-  background: var(--muted-foreground);
-}
-
-.agent-card-status-badge--pending {
-  background: rgba(234, 179, 8, 0.15);
-  color: #b59200;
-}
-
-.agent-card-status-badge--pending .agent-card-status-dot {
-  background: #eab308;
-}
-
-.agent-card-status-badge--running,
-.agent-card-status-badge--streaming {
-  background: rgba(59, 130, 246, 0.15);
-  color: #2563eb;
-}
-
-.agent-card-status-badge--running .agent-card-status-dot,
-.agent-card-status-badge--streaming .agent-card-status-dot {
-  background: #3b82f6;
-}
-
-.agent-card-status-badge--complete {
-  background: rgba(34, 197, 94, 0.15);
-  color: #16a34a;
-}
-
-.agent-card-status-badge--complete .agent-card-status-dot {
-  background: #22c55e;
-}
-
-.agent-card-status-badge--error {
-  background: rgba(239, 68, 68, 0.15);
-  color: #dc2626;
-}
-
-.agent-card-status-badge--error .agent-card-status-dot {
-  background: #ef4444;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: italic;
 }
 
 /* ============================================================================
-   Body / Activity Section
+   Progress Bar
    ============================================================================ */
 
-.agent-card-body {
-  padding: 10px 12px;
-  min-height: 48px;
-}
-
-/* Idle state */
-.agent-card-idle {
+.agent-card-progress {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 32px;
-}
-
-.agent-card-idle-icon {
-  font-size: 8px;
-  color: var(--muted-foreground);
-  opacity: 0.5;
-}
-
-.agent-card-idle-text {
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
-
-/* ============================================================================
-   Steps List
-   ============================================================================ */
-
-.agent-card-steps {
-  display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  padding: 0 10px 6px;
   gap: 6px;
 }
 
-.agent-card-step {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 12px;
-  line-height: 1.4;
+.agent-card-progress-bar {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  font-size: 10px;
+  color: var(--primary);
+  letter-spacing: 0;
+  line-height: 1;
 }
 
-.agent-card-step-bullet {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+.agent-card-progress-pct {
+  font-size: 10px;
+  font-weight: 300;
+  color: var(--muted-foreground);
   flex-shrink: 0;
-  margin-top: 5px;
+}
+
+/* ============================================================================
+   Current Step
+   ============================================================================ */
+
+.agent-card-step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 10px 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.3;
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+.agent-card-step-prefix {
+  flex-shrink: 0;
+  font-weight: 300;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 }
 
 .agent-card-step-text {
   flex: 1;
-  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Step status variants */
-/* Note: No animations - causes blur in Tauri WebView */
-.agent-card-step--in_progress {
-  color: #3b82f6;
-}
-
-.agent-card-step--completed {
-  color: #22c55e;
-}
-
-.agent-card-step--needs_input {
-  color: #ef4444;
-  font-weight: 500;
-}
-
-.agent-card-step--error {
-  color: #ef4444;
-}
-
-.agent-card-step--cancelled {
-  color: var(--muted-foreground);
-  text-decoration: line-through;
+/* Running state indicator
+   NOTE: Animation removed - causes blur in Tauri WebView (WKWebView)
+   when elements are inside ReactFlow's transformed viewport.
+   See CLAUDE-CONTINUOUS.md "Tauri WebView Blur" section for details.
+   Using static styling instead. */
+.agent-card-step--animated .agent-card-step-prefix {
+  /* Using a brighter color to indicate active state. */
+  font-weight: 300;
 }
 
 /* ============================================================================
@@ -320,12 +290,12 @@
 .agent-card-error {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
-  padding: 8px 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border-top: 1px solid rgba(239, 68, 68, 0.2);
-  color: #dc2626;
-  font-size: 11px;
+  gap: 4px;
+  padding: 6px 10px;
+  background: oklch(from var(--destructive) l c h / 10%);
+  border-top: 1px solid oklch(from var(--destructive) l c h / 20%);
+  color: var(--destructive);
+  font-size: 10px;
   line-height: 1.3;
 }
 
@@ -334,99 +304,3 @@
   margin-top: 1px;
 }
 
-/* ============================================================================
-   Action Bar
-   ============================================================================ */
-
-.agent-card-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-top: 1px solid var(--border);
-  gap: 6px;
-}
-
-.agent-card-actions-secondary {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-/* Button base */
-.agent-card-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  border: none;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  outline: none;
-}
-
-.agent-card-btn:focus-visible {
-  box-shadow: 0 0 0 2px var(--primary);
-}
-
-.agent-card-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Primary button (Run/Stop) */
-.agent-card-btn--primary {
-  padding: 5px 10px;
-  background: var(--primary);
-  color: white;
-}
-
-.agent-card-btn--primary:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-.agent-card-btn--primary:active:not(:disabled) {
-  /* No scale transform - causes blur in Tauri WebView */
-}
-
-.agent-card-btn--stop {
-  background: #ef4444;
-}
-
-/* Icon buttons */
-.agent-card-btn--icon {
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  background: transparent;
-  color: var(--muted-foreground);
-}
-
-.agent-card-btn--icon:hover:not(:disabled) {
-  background: var(--muted);
-  color: var(--foreground);
-}
-
-.agent-card-btn--icon:active:not(:disabled) {
-  /* No scale transform - causes blur in Tauri WebView */
-}
-
-/* Danger variant */
-.agent-card-btn--danger:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-}
-
-/* Demo button (temporary - remove when backend connected) */
-.agent-card-btn--demo {
-  padding: 5px 8px;
-  background: rgba(168, 85, 247, 0.15);
-  color: #a855f7;
-  font-size: 10px;
-}
-
-.agent-card-btn--demo:hover {
-  background: rgba(168, 85, 247, 0.25);
-}

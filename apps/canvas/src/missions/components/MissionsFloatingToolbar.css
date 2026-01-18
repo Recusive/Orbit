@@ -28,7 +28,7 @@
   background: var(--background);
   color: var(--foreground);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 300;
   cursor: pointer;
 }
 
@@ -95,4 +95,25 @@
   50% {
     opacity: 0.5;
   }
+}
+
+/* Demo button - purple accent */
+.missions-floating-btn--demo {
+  background: oklch(from var(--brand-heather) l c h / 15%);
+  border-color: var(--brand-heather);
+  color: var(--brand-heather);
+}
+
+.missions-floating-btn--demo:hover {
+  background: oklch(from var(--brand-heather) l c h / 25%);
+}
+
+.missions-floating-btn--demo-active {
+  background: var(--brand-heather);
+  color: white;
+}
+
+.missions-floating-btn--demo-active:hover {
+  background: var(--brand-heather);
+  opacity: 0.9;
 }

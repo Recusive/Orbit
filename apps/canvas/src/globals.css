@@ -142,6 +142,26 @@
   background: var(--foreground) !important;
 }
 
+/* Agent card handles - override above styles */
+.agent-card-handle {
+  width: 8px !important;
+  height: 8px !important;
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 100% !important;
+}
+
+.agent-card-handle:hover {
+  width: 12px !important;
+  height: 12px !important;
+  background: var(--card) !important;
+  border: 2px solid var(--border) !important;
+}
+
+.agent-card-node--selected .agent-card-handle {
+  border-color: var(--muted-foreground) !important;
+}
+
 .react-flow__minimap {
   background-color: var(--card) !important;
   border: 1px solid var(--border) !important;

@@ -26,7 +26,7 @@
   gap: 8px;
   margin: 0;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 300;
   color: var(--foreground);
 }
 
@@ -57,7 +57,7 @@
 
 .missions-sidebar-active-label {
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 300;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--muted-foreground);
@@ -66,7 +66,7 @@
 
 .missions-sidebar-active-name {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 300;
   color: var(--foreground);
   margin-bottom: 4px;
 }
@@ -91,7 +91,7 @@
   justify-content: space-between;
   padding: 12px 16px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 300;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--muted-foreground);

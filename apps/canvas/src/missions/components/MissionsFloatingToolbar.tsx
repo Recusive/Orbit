@@ -3,9 +3,12 @@
  * Floating toolbar for missions mode - add agents, run mission
  */
 
-import React, { useCallback } from 'react';
+import { FlaskConical } from 'lucide-react';
+import React, { useCallback, useRef, useState } from 'react';
 
 import { useMissionsStore } from '../stores';
+
+import type { AgentStatus } from '../types';
 
 import './MissionsFloatingToolbar.css';
 
@@ -53,6 +56,10 @@ interface MissionsFloatingToolbarProps {
   readonly onAddAgent?: () => void;
 }
 
+// Demo: cycle through all agent states to preview the card design
+const DEMO_STATES: AgentStatus[] = ['idle', 'pending', 'running', 'streaming', 'complete', 'error'];
+const DEMO_INTERVAL_MS = 1500;
+
 export function MissionsFloatingToolbar({
   onAddAgent,
 }: MissionsFloatingToolbarProps): React.JSX.Element {
@@ -60,9 +67,18 @@ export function MissionsFloatingToolbar({
   const agents = useMissionsStore((s) => s.agents);
   const startMissionRun = useMissionsStore((s) => s.startMissionRun);
   const completeMissionRun = useMissionsStore((s) => s.completeMissionRun);
+  const addAgent = useMissionsStore((s) => s.addAgent);
+  const setAgentStatus = useMissionsStore((s) => s.setAgentStatus);
+  const updateAgent = useMissionsStore((s) => s.updateAgent);
 
   const isRunning = activeMission?.status === 'running';
   const agentCount = Object.keys(agents).length;
+
+  // Demo state
+  const [isDemoRunning, setIsDemoRunning] = useState(false);
+  const [demoStateIndex, setDemoStateIndex] = useState(0);
+  const demoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const demoAgentIdRef = useRef<string | null>(null);
 
   const handleRunClick = useCallback(() => {
     if (isRunning) {
@@ -77,6 +93,99 @@ export function MissionsFloatingToolbar({
   const handleAddClick = useCallback(() => {
     onAddAgent?.();
   }, [onAddAgent]);
+
+  // Demo button handler: cycles an agent through all states
+  const handleDemoClick = useCallback(() => {
+    if (isDemoRunning) {
+      // Stop the demo
+      if (demoIntervalRef.current !== null) {
+        clearInterval(demoIntervalRef.current);
+        demoIntervalRef.current = null;
+      }
+      setIsDemoRunning(false);
+      setDemoStateIndex(0);
+      return;
+    }
+
+    // Get or create a demo agent
+    const agentIds = Object.keys(agents);
+    let agentId: string;
+
+    const firstAgentId = agentIds[0];
+    if (firstAgentId === undefined) {
+      // Create a demo agent
+      const newAgent = addAgent({
+        id: `demo-agent-${String(Date.now())}`,
+        createdBy: 'demo',
+        position: { x: 300, y: 200 },
+        name: 'Demo Agent',
+        prompt: 'Implement user authentication',
+      });
+      agentId = newAgent.id;
+    } else {
+      // Use the first agent
+      agentId = firstAgentId;
+    }
+
+    demoAgentIdRef.current = agentId;
+
+    // Add a demo activity log entry for running states
+    const existingAgent = agents[agentId];
+    updateAgent(agentId, {
+      prompt: existingAgent?.prompt ?? 'Implement user authentication',
+      execution: {
+        ...(agents[agentId]?.execution ?? {
+          status: 'idle',
+          currentOutput: '',
+          activityLog: [],
+          executionHistory: [],
+        }),
+        activityLog: [
+          {
+            id: 'demo-step-1',
+            message: 'Adding JWT validation',
+            status: 'in_progress',
+            timestamp: Date.now(),
+          },
+        ],
+      },
+    });
+
+    // Start cycling through states
+    setIsDemoRunning(true);
+    setDemoStateIndex(0);
+    const initialStatus = DEMO_STATES[0] ?? 'idle';
+    setAgentStatus(agentId, initialStatus);
+
+    demoIntervalRef.current = setInterval(() => {
+      setDemoStateIndex((prevIndex) => {
+        const nextIndex = (prevIndex + 1) % DEMO_STATES.length;
+        const nextStatus = DEMO_STATES[nextIndex] ?? 'idle';
+
+        if (demoAgentIdRef.current !== null) {
+          setAgentStatus(demoAgentIdRef.current, nextStatus);
+
+          // Update error message for error state
+          if (nextStatus === 'error') {
+            updateAgent(demoAgentIdRef.current, {
+              execution: {
+                ...(agents[demoAgentIdRef.current]?.execution ?? {
+                  status: 'error',
+                  currentOutput: '',
+                  activityLog: [],
+                  executionHistory: [],
+                }),
+                status: 'error',
+                errorMessage: 'Connection timeout - retrying...',
+              },
+            });
+          }
+        }
+
+        return nextIndex;
+      });
+    }, DEMO_INTERVAL_MS);
+  }, [isDemoRunning, agents, addAgent, setAgentStatus, updateAgent]);
 
   return (
     <div className="missions-floating-toolbar">
@@ -98,6 +207,19 @@ export function MissionsFloatingToolbar({
       >
         {isRunning ? <StopIcon /> : <PlayIcon />}
         <span>{isRunning ? 'Stop' : 'Run Mission'}</span>
+      </button>
+
+      {/* Divider */}
+      <div className="missions-floating-divider" />
+
+      {/* Demo Button - cycles through all agent states */}
+      <button
+        className={`missions-floating-btn missions-floating-btn--demo ${isDemoRunning ? 'missions-floating-btn--demo-active' : ''}`}
+        onClick={handleDemoClick}
+        title={isDemoRunning ? `Stop Demo (${String(DEMO_STATES[demoStateIndex])})` : 'Demo States'}
+      >
+        <FlaskConical size={16} />
+        <span>{isDemoRunning ? DEMO_STATES[demoStateIndex] : 'Demo'}</span>
       </button>
 
       {/* Status */}

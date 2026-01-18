@@ -10,6 +10,9 @@
   overflow: hidden;
   background: var(--background);
   position: relative;
+  /* Light font styling for entire missions mode */
+  font-weight: 300;
+  font-stretch: 100%;
 }
 
 .missions-canvas-main {
@@ -27,35 +30,6 @@
 .missions-canvas-main .react-flow__viewport {
   /* Prevent blur issues in Tauri WebView */
   transform-style: flat;
-}
-
-/* Controls styling */
-.missions-canvas-main .react-flow__controls {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.missions-canvas-main .react-flow__controls-button {
-  background: var(--card);
-  border-color: var(--border);
-  color: var(--foreground);
-}
-
-.missions-canvas-main .react-flow__controls-button:hover {
-  background: var(--muted);
-}
-
-.missions-canvas-main .react-flow__controls-button svg {
-  fill: var(--foreground);
-}
-
-/* Minimap styling */
-.missions-canvas-main .react-flow__minimap {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
 }
 
 /* Edge styling */
@@ -118,7 +92,7 @@
 .missions-canvas-error-content h3 {
   margin: 0 0 8px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 300;
   color: var(--destructive);
 }
 
@@ -135,7 +109,7 @@
   border: none;
   border-radius: 6px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 300;
   cursor: pointer;
 }
 
@@ -166,7 +140,7 @@
 .agent-expanded-error-content h3 {
   margin: 0 0 8px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 300;
   color: var(--destructive);
 }
 
@@ -189,7 +163,7 @@
   border: none;
   border-radius: 6px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 300;
   cursor: pointer;
 }
 
