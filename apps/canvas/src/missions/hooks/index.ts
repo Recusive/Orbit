@@ -3,3 +3,4 @@
  */
 
 export { useAgentConversation } from './useAgentConversation';
+export { isReviewAgentConfig, useAutoStartAgent } from './useAutoStartAgent';

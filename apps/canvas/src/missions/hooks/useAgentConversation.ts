@@ -130,6 +130,16 @@ export function useAgentConversation({
             // Clear pending state
             pendingCreateUuidRef.current = null;
 
+            // Set input mode in tool store for Plan agents
+            // This ensures ensureSession() creates the SDK session with planEnabled: true
+            // when the first message is sent. The mode indicator will also reflect this.
+            if (agent.agentTypeConfig.agentType === 'plan') {
+              logger.info('Setting plan mode in store for Plan agent', {
+                sessionId: message.session_id,
+              });
+              toolStore.setInputMode('plan');
+            }
+
             // NOW allow ChatArea to mount (it will read the correct sessionId from localStorage)
             setIsInitializing(false);
 
@@ -167,12 +177,22 @@ export function useAgentConversation({
             // Ignore storage errors
           }
 
+          // Set input mode in tool store for Plan agents when re-opening conversation
+          // This ensures ensureSession() creates the SDK session with planEnabled: true
+          // when the next message is sent (the SDK session might not exist if app was restarted)
+          if (agent.agentTypeConfig.agentType === 'plan') {
+            logger.info('Setting plan mode in store for Plan agent', {
+              sessionId: message.session_id,
+            });
+            toolStore.setInputMode('plan');
+          }
+
           setIsInitializing(false);
           onReady?.(message.session_id);
         }
       }
     },
-    [agent.id, agent.name, agent.sessionId, updateAgent, onReady]
+    [agent.id, agent.name, agent.sessionId, agent.agentTypeConfig, updateAgent, onReady]
   );
 
   const { postMessage } = useTauri({ onMessage: handleMessage });

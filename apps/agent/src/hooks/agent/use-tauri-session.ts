@@ -2,6 +2,7 @@ import type { RewindContextMessage } from './types/tauri-types';
 import type { SessionConfig } from '@/lib/api';
 
 import { agentCreateSession, getWorkspacePath } from '@/lib/api';
+import { useToolStore } from '@/stores/agent/tool-store';
 
 // ═══════════════════════════════════════════════════════════════
 // Session State
@@ -92,13 +93,17 @@ export async function ensureSession(sessionId: string): Promise<void> {
   // Get current workspace for session config
   const cwd = await getWorkspacePath();
 
-  // Build config with optional cwd
-  // Start in default mode (requires permission approval for each tool)
+  // Get current mode settings from tool store
+  // This ensures Plan agents (and any user-selected mode) are applied at session creation
+  const toolState = useToolStore.getState();
+  const inputMode = toolState.inputMode;
+
+  // Build config with optional cwd and current mode settings
   const config: SessionConfig = {
-    model: 'sonnet',
-    thinkingEnabled: false,
-    acceptEnabled: false,
-    planEnabled: false,
+    model: toolState.model,
+    thinkingEnabled: toolState.thinkingMode !== 'off',
+    acceptEnabled: inputMode === 'accept',
+    planEnabled: inputMode === 'plan',
   };
   if (cwd) {
     config.cwd = cwd;

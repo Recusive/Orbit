@@ -8,6 +8,10 @@ import * as path from 'node:path';
 
 import { createLogger } from '../../common/logging/logger.js';
 
+import { REVIEW_BRANCH_PROMPT } from './prompts/review-branch.js';
+import { REVIEW_PR_PROMPT } from './prompts/review-pr.js';
+import { REVIEW_UNCOMMITTED_PROMPT } from './prompts/review-uncommitted.js';
+
 const logger = createLogger('CommandDefinitions');
 
 // Command scope: where the command comes from
@@ -56,19 +60,31 @@ const BUILTIN_COMMANDS: SlashCommandDefinition[] = [
  * Default commands shipped with Orbit (read-only)
  */
 const DEFAULT_COMMANDS: SlashCommandDefinition[] = [
+  // ============================================================================
+  // Review Commands - Used by Review agents in Canvas
+  // ============================================================================
+  {
+    name: 'review-uncommitted',
+    description: 'Review all uncommitted changes in the working directory',
+    content: REVIEW_UNCOMMITTED_PROMPT,
+    allowedTools: ['Read', 'Grep', 'Glob', 'Bash'],
+    scope: 'default',
+    readonly: true,
+  },
+  {
+    name: 'review-branch',
+    description: 'Review all changes on the current branch vs main',
+    argumentHint: '[base-branch]',
+    content: REVIEW_BRANCH_PROMPT,
+    allowedTools: ['Read', 'Grep', 'Glob', 'Bash'],
+    scope: 'default',
+    readonly: true,
+  },
   {
     name: 'review-pr',
-    description: 'Review the current pull request',
-    content: `Review the current pull request thoroughly.
-
-## Review Checklist
-1. Code quality and readability
-2. Security vulnerabilities
-3. Performance implications
-4. Test coverage
-5. Documentation completeness
-
-Provide specific, actionable feedback organized by priority.`,
+    description: 'Review a GitHub Pull Request',
+    argumentHint: '<pr-number>',
+    content: REVIEW_PR_PROMPT,
     allowedTools: ['Read', 'Grep', 'Glob', 'Bash'],
     scope: 'default',
     readonly: true,

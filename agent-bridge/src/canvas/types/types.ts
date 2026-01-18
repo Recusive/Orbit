@@ -149,6 +149,8 @@ export interface CanvasSessionConfig {
   cwd?: string;
   model?: string;
   thinkingEnabled?: boolean;
+  /** Enable plan mode - restricts agent to read-only tools for planning */
+  planModeEnabled?: boolean;
 }
 
 /**

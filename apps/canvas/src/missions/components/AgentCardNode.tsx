@@ -13,15 +13,22 @@
  */
 
 import { Handle, Position } from '@xyflow/react';
-import { Trash2 } from 'lucide-react';
+import { Code, ListTodo, Search, Trash2 } from 'lucide-react';
 import React, { useCallback, useRef, useState } from 'react';
 
-import { getAgentModelConfig } from '../types';
+import { getAgentModelConfig, getAgentTypeDisplayConfig } from '../types';
 
 import { formatProgressBar, getStateConfig, isActiveState } from './agent-states';
 
-import type { AgentCardNodeData } from '../types';
+import type { AgentCardNodeData, AgentType } from '../types';
 import type { Node, NodeProps } from '@xyflow/react';
+
+// Icon mapping for agent types
+const AGENT_TYPE_ICONS: Record<AgentType, React.ComponentType<{ size: number }>> = {
+  full: Code,
+  review: Search,
+  plan: ListTodo,
+};
 
 import './AgentCardNode.css';
 
@@ -45,6 +52,11 @@ export function AgentCardNode({
   const stateConfig = getStateConfig(status);
   const modelConfig = getAgentModelConfig(agent.config.model);
   const isRunning = isActiveState(status);
+
+  // Agent type configuration
+  const agentType = agent.agentTypeConfig.agentType;
+  const agentTypeConfig = getAgentTypeDisplayConfig(agentType);
+  const AgentTypeIcon = AGENT_TYPE_ICONS[agentType];
 
   // Get current step from activity log (last in-progress entry)
   const currentStep =
@@ -163,9 +175,18 @@ export function AgentCardNode({
 
   const ActionIcon = stateConfig.actionIcon;
 
+  // Build class names
+  const cardClasses = [
+    'agent-card-node',
+    `agent-card-node--${agentType}`,
+    selected ? 'agent-card-node--selected' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div
-      className={`agent-card-node ${selected ? 'agent-card-node--selected' : ''}`}
+      className={cardClasses}
       data-status={status}
       data-id={agent.id}
       onDoubleClick={handleDoubleClick}
@@ -190,7 +211,7 @@ export function AgentCardNode({
         <div className="agent-card-header-left">
           {/* Status Icon with colored background */}
           <div className="agent-card-status-icon">
-            <StatusIcon size={14} />
+            <StatusIcon size={16} />
           </div>
 
           <div className="agent-card-name-section">
@@ -213,7 +234,24 @@ export function AgentCardNode({
                 {agent.name}
               </span>
             )}
-            <span className="agent-card-model-badge">{modelConfig.label}</span>
+            <div className="agent-card-badges">
+              {/* Agent Type Badge */}
+              <span
+                className="agent-card-type-badge"
+                style={
+                  {
+                    '--type-color': agentTypeConfig.color,
+                    '--type-color-dark': agentTypeConfig.colorDark,
+                  } as React.CSSProperties
+                }
+                title={agentTypeConfig.description}
+              >
+                <AgentTypeIcon size={10} />
+                <span>{agentTypeConfig.shortLabel}</span>
+              </span>
+              {/* Model Badge */}
+              <span className="agent-card-model-badge">{modelConfig.label}</span>
+            </div>
           </div>
         </div>
         <div className="agent-card-header-right">
@@ -256,9 +294,15 @@ export function AgentCardNode({
       {/* Current Step - Always visible with placeholder when no step */}
       <div
         className={`agent-card-step ${stateConfig.isAnimated ? 'agent-card-step--animated' : ''}`}
-        style={{ color: stateConfig.textColor }}
+        style={
+          {
+            '--step-icon-color': stateConfig.iconColor,
+          } as React.CSSProperties
+        }
       >
-        <span className="agent-card-step-prefix">{stateConfig.stepPrefix}</span>
+        <span className="agent-card-step-icon">
+          <StatusIcon size={12} />
+        </span>
         <span className="agent-card-step-text">{currentStep ?? stateConfig.stepPlaceholder}</span>
       </div>
 

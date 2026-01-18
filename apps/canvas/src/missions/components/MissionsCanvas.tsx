@@ -15,8 +15,10 @@ import {
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ErrorBoundary } from '../../components/shared/ErrorBoundary';
-import { useMissionsStore } from '../stores';
+import { isReviewAgentConfig, useAutoStartAgent } from '../hooks';
+import { useMissionsStore, useMissionsUIStore } from '../stores';
 
+import { AddAgentDialog } from './AddAgentDialog';
 import { AgentCardNode } from './AgentCardNode';
 import { AgentExpandedView } from './AgentExpandedView';
 import { MissionEdge } from './MissionEdge';
@@ -24,7 +26,13 @@ import { MissionsFloatingToolbar } from './MissionsFloatingToolbar';
 import { MissionsRightSidebar } from './MissionsRightSidebar';
 import { MissionsSidebar } from './MissionsSidebar';
 
-import type { AgentCard, AgentCardNodeData, MissionConnection, MissionEdgeData } from '../types';
+import type {
+  AgentCard,
+  AgentCardNodeData,
+  AgentTypeConfig,
+  MissionConnection,
+  MissionEdgeData,
+} from '../types';
 import type { Connection, Edge, EdgeTypes, Node, NodeTypes, OnConnect } from '@xyflow/react';
 
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -128,6 +136,14 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
   const updateConnection = useMissionsStore((s) => s.updateConnection);
   const deleteConnection = useMissionsStore((s) => s.deleteConnection);
   const setFocusedAgent = useMissionsStore((s) => s.setFocusedAgent);
+
+  // Add Agent Dialog state (from UI store)
+  const addAgentDialogOpen = useMissionsUIStore((s) => s.addAgentDialogOpen);
+  const openAddAgentDialog = useMissionsUIStore((s) => s.openAddAgentDialog);
+  const closeAddAgentDialog = useMissionsUIStore((s) => s.closeAddAgentDialog);
+
+  // Auto-start hook for review agents
+  const { autoStartReviewAgent } = useAutoStartAgent();
 
   // Expanded agent state - when set, shows full agent view overlay
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
@@ -324,15 +340,41 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
     [addAgent, agents, screenToFlowPosition]
   );
 
-  // Handle add agent from toolbar
-  const handleAddAgent = useCallback(() => {
-    addAgent({
-      id: `agent-${String(Date.now())}`,
-      createdBy: 'user',
-      position: { x: 200, y: 200 },
-      name: `Agent ${String(Object.keys(agents).length + 1)}`,
-    });
-  }, [addAgent, agents]);
+  // Handle add agent from toolbar - opens the type selection dialog
+  const handleAddAgentClick = useCallback(() => {
+    openAddAgentDialog();
+  }, [openAddAgentDialog]);
+
+  // Handle adding agent with type config from dialog
+  const handleAddAgentWithConfig = useCallback(
+    (typeConfig: AgentTypeConfig, name: string): void => {
+      const newAgent = addAgent({
+        id: typeConfig.id,
+        createdBy: 'user',
+        position: { x: 200, y: 200 },
+        name,
+        agentTypeConfig: typeConfig,
+      });
+
+      // Auto-start review agents immediately after adding
+      if (isReviewAgentConfig(typeConfig)) {
+        autoStartReviewAgent(newAgent, typeConfig);
+      }
+    },
+    [addAgent, autoStartReviewAgent]
+  );
+
+  // Handle dialog open/close
+  const handleDialogOpenChange = useCallback(
+    (open: boolean): void => {
+      if (open) {
+        openAddAgentDialog();
+      } else {
+        closeAddAgentDialog();
+      }
+    },
+    [openAddAgentDialog, closeAddAgentDialog]
+  );
 
   return (
     <div className="missions-canvas-container">
@@ -362,7 +404,7 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
         </ReactFlow>
 
         {/* Floating Toolbar */}
-        <MissionsFloatingToolbar onAddAgent={handleAddAgent} />
+        <MissionsFloatingToolbar onAddAgent={handleAddAgentClick} />
       </div>
 
       {/* Right Sidebar - Floating overlay */}
@@ -399,6 +441,13 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
           />
         </ErrorBoundary>
       ) : null}
+
+      {/* Add Agent Dialog */}
+      <AddAgentDialog
+        open={addAgentDialogOpen}
+        onOpenChange={handleDialogOpenChange}
+        onAddAgent={handleAddAgentWithConfig}
+      />
     </div>
   );
 }

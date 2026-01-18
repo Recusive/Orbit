@@ -41,6 +41,49 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
+/* ============================================================================
+   Agent Type Variants - Dotted borders for Plan and Review
+   ============================================================================ */
+
+/* Full Agent - solid border (default, no changes needed) */
+.agent-card-node--full {
+  /* Uses default solid border */
+}
+
+/* Plan Agent - green dotted border */
+.agent-card-node--plan {
+  border-style: dashed;
+  border-color: light-dark(
+    oklch(0.65 0.08 145),
+    oklch(0.40 0.06 145)
+  );
+}
+
+.agent-card-node--plan:hover,
+.agent-card-node--plan.agent-card-node--selected {
+  border-color: light-dark(
+    oklch(0.45 0.15 145),
+    oklch(0.60 0.12 145)
+  );
+}
+
+/* Review Agent - purple dotted border */
+.agent-card-node--review {
+  border-style: dashed;
+  border-color: light-dark(
+    oklch(0.65 0.08 300),
+    oklch(0.40 0.06 300)
+  );
+}
+
+.agent-card-node--review:hover,
+.agent-card-node--review.agent-card-node--selected {
+  border-color: light-dark(
+    oklch(0.45 0.15 300),
+    oklch(0.60 0.12 300)
+  );
+}
+
 /* Remove ReactFlow's default focus outline */
 .react-flow__node-agent:focus,
 .react-flow__node-agent:focus-visible,
@@ -93,16 +136,16 @@
 
 .agent-card-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 8px 10px;
-  gap: 6px;
+  padding: 10px 10px 6px;
+  gap: 8px;
 }
 
 .agent-card-header-left {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
   flex: 1;
 }
@@ -112,40 +155,53 @@
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  opacity: 0;
 }
 
-/* Status Icon with colored background */
+/* Show actions on card hover */
+.agent-card-node:hover .agent-card-header-right,
+.agent-card-node--selected .agent-card-header-right {
+  opacity: 1;
+}
+
+/* Status Icon - Clean rounded square with colored background */
 .agent-card-status-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   flex-shrink: 0;
   /* Use light-dark() for theme-aware icon background */
   background: light-dark(var(--icon-bg-light), var(--icon-bg-dark));
   color: var(--icon-color);
 }
 
+.agent-card-status-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .agent-card-name-section {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
   flex: 1;
+  padding-top: 2px;
 }
 
 .agent-card-name {
-  font-weight: 300;
-  font-stretch: 100%;
-  font-size: 12px;
+  font-weight: 500;
+  font-size: 13px;
   color: var(--foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: default;
   letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
 .agent-card-name:hover {
@@ -153,8 +209,8 @@
 }
 
 .agent-card-name-input {
-  font-weight: 300;
-  font-size: 12px;
+  font-weight: 500;
+  font-size: 13px;
   color: var(--foreground);
   background: var(--background);
   border: 1px solid var(--primary);
@@ -162,15 +218,46 @@
   padding: 1px 4px;
   outline: none;
   min-width: 50px;
-  max-width: 100px;
+  max-width: 120px;
+}
+
+.agent-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agent-card-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 8px;
+  font-weight: 500;
+  padding: 1px 4px;
+  border-radius: 3px;
+  /* Use light-dark() for theme-aware type badge colors */
+  background: light-dark(
+    oklch(from var(--type-color) 0.94 0.03 h),
+    oklch(from var(--type-color-dark) 0.22 0.05 h)
+  );
+  color: light-dark(var(--type-color), var(--type-color-dark));
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.agent-card-type-badge svg {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
 }
 
 .agent-card-model-badge {
-  font-size: 9px;
-  font-weight: 300;
+  font-size: 8px;
+  font-weight: 400;
   color: var(--muted-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  text-transform: capitalize;
+  letter-spacing: 0.01em;
 }
 
 /* Action buttons in header */
@@ -178,14 +265,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
+}
+
+.agent-card-action-btn svg {
+  width: 12px;
+  height: 12px;
 }
 
 .agent-card-action-btn:hover {
@@ -199,7 +291,10 @@
 }
 
 .agent-card-action-btn--danger:hover {
-  background: oklch(from var(--destructive) l c h / 15%);
+  background: light-dark(
+    oklch(from var(--destructive) 0.95 0.04 h),
+    oklch(from var(--destructive) 0.25 0.08 h)
+  );
   color: var(--destructive);
 }
 
@@ -251,19 +346,26 @@
 .agent-card-step {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin: 0 10px 8px;
-  padding: 4px 8px;
+  gap: 8px;
+  margin: 0 10px 10px;
+  padding: 8px 10px;
   font-size: 11px;
   line-height: 1.3;
   background: var(--muted);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
-.agent-card-step-prefix {
+.agent-card-step-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  font-weight: 300;
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  color: var(--step-icon-color, var(--muted-foreground));
+}
+
+.agent-card-step-icon svg {
+  width: 12px;
+  height: 12px;
 }
 
 .agent-card-step-text {
@@ -271,6 +373,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--muted-foreground);
+  font-weight: 400;
 }
 
 /* Running state indicator
@@ -278,9 +382,9 @@
    when elements are inside ReactFlow's transformed viewport.
    See CLAUDE-CONTINUOUS.md "Tauri WebView Blur" section for details.
    Using static styling instead. */
-.agent-card-step--animated .agent-card-step-prefix {
-  /* Using a brighter color to indicate active state. */
-  font-weight: 300;
+.agent-card-step--animated .agent-card-step-text {
+  /* Using foreground color to indicate active state */
+  color: var(--foreground);
 }
 
 /* ============================================================================

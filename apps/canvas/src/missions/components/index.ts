@@ -9,6 +9,8 @@ export { MissionEdge } from './MissionEdge';
 export { MissionsSidebar } from './MissionsSidebar';
 export { MissionsRightSidebar } from './MissionsRightSidebar';
 export { MissionsFloatingToolbar } from './MissionsFloatingToolbar';
+export { AddAgentDialog } from './AddAgentDialog';
+export { ReviewScopePicker } from './ReviewScopePicker';
 
 // Agent state configuration and helpers
 export {

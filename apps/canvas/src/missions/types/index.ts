@@ -3,6 +3,12 @@
  * Types for the AI Agent Orchestration canvas with connected agent cards
  */
 
+// Re-export agent types for convenience
+export * from './agent-types';
+
+// Import types for use in this file (needed for inline import() replacement)
+import type { AgentTypeConfig, FullAgentTypeConfig } from './agent-types';
+
 // ============================================================================
 // Agent Status
 // ============================================================================
@@ -163,6 +169,9 @@ export interface AgentCard {
   // Conversation association
   sessionId?: string; // Links this agent node to its conversation in the Agent sidebar
 
+  // Agent type configuration (full, review, plan)
+  agentTypeConfig: AgentTypeConfig;
+
   // Prompt configuration
   prompt: string; // The user instruction for this agent
   promptMode: 'static' | 'template'; // Static prompt or template with {{context}}
@@ -194,7 +203,10 @@ export interface AgentCard {
 /**
  * Default values for creating a new agent card
  */
-export const DEFAULT_AGENT_CARD: Omit<AgentCard, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'> = {
+export const DEFAULT_AGENT_CARD: Omit<
+  AgentCard,
+  'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'agentTypeConfig'
+> = {
   name: 'New Agent',
   prompt: '',
   promptMode: 'static',
@@ -438,14 +450,44 @@ export function createAgentCard(
   partial: Partial<AgentCard> & { id: string; createdBy: string }
 ): AgentCard {
   const now = Date.now();
-  return {
-    ...DEFAULT_AGENT_CARD,
-    ...partial,
+
+  // Default to full agent if no type config provided
+  const defaultTypeConfig: FullAgentTypeConfig = {
+    id: partial.id,
+    name: partial.name ?? DEFAULT_AGENT_CARD.name,
+    agentType: 'full',
+  };
+
+  const result: AgentCard = {
+    // Required fields first
+    id: partial.id,
+    name: partial.name ?? DEFAULT_AGENT_CARD.name,
+    agentTypeConfig: partial.agentTypeConfig ?? defaultTypeConfig,
+    prompt: partial.prompt ?? DEFAULT_AGENT_CARD.prompt,
+    promptMode: partial.promptMode ?? DEFAULT_AGENT_CARD.promptMode,
     config: { ...DEFAULT_AGENT_CONFIG, ...partial.config },
+    position: partial.position ?? DEFAULT_AGENT_CARD.position,
+    size: partial.size ?? DEFAULT_AGENT_CARD.size,
+    collapsed: partial.collapsed ?? DEFAULT_AGENT_CARD.collapsed,
+    locked: partial.locked ?? DEFAULT_AGENT_CARD.locked,
     execution: { ...DEFAULT_AGENT_CARD.execution, ...partial.execution },
+    inheritParentContext: partial.inheritParentContext ?? DEFAULT_AGENT_CARD.inheritParentContext,
+    contextSummaryMode: partial.contextSummaryMode ?? DEFAULT_AGENT_CARD.contextSummaryMode,
+    tags: partial.tags ?? DEFAULT_AGENT_CARD.tags,
     createdAt: partial.createdAt ?? now,
     updatedAt: partial.updatedAt ?? now,
+    createdBy: partial.createdBy,
   };
+
+  // Add optional fields if they exist
+  if (partial.sessionId !== undefined) {
+    result.sessionId = partial.sessionId;
+  }
+  if (partial.customContextTemplate !== undefined) {
+    result.customContextTemplate = partial.customContextTemplate;
+  }
+
+  return result;
 }
 
 /**

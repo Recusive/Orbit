@@ -11,6 +11,7 @@ import { BrowserToolBridge, createBrowserMcpServer } from '../../browser/index.j
 import { ClaudeCredentials } from '../../common/auth/credentials.js';
 import { createLogger } from '../../common/logging/logger.js';
 import { withRetry, RetryPresets } from '../../common/retry/retry.js';
+import { listCommands } from '../definitions/index.js';
 import { PermissionManager } from '../permissions/permissions.js';
 import { getAllowedToolsForMode } from '../session/session-mode.js';
 import { buildContentBlocks } from '../utils/content.js';
@@ -989,6 +990,21 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       throw new Error('Session not started. Call startSession() first.');
     }
 
+    // Expand custom slash commands before sending to SDK
+    // The SDK only knows about commands in .claude/commands/ on disk,
+    // but our built-in/default commands are defined in code
+    let expandedMessage = message;
+    if (message.startsWith('/')) {
+      const expanded = this.expandSlashCommand(message);
+      if (expanded !== null) {
+        expandedMessage = expanded;
+        logger.info(
+          { originalCommand: message.split(' ')[0], expandedLength: expanded.length },
+          'Expanded slash command to prompt content'
+        );
+      }
+    }
+
     // Log comprehensive SDK settings for each message
     const thinkingModeName =
       this._thinkingMode && this._thinkingBudget > 0
@@ -1009,13 +1025,76 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         acceptMode: this._acceptMode,
         critiqueMode: this._critiqueMode,
         sessionMode: this._sessionMode,
-        messagePreview: message.substring(0, 80) + (message.length > 80 ? '...' : ''),
+        messagePreview:
+          expandedMessage.substring(0, 80) + (expandedMessage.length > 80 ? '...' : ''),
         attachmentCount: attachments?.length ?? 0,
       },
       // allow-any-unicode-next-line
       'Sending message to Claude'
     );
-    this.messageQueue.add(message, attachments);
+    this.messageQueue.add(expandedMessage, attachments);
+  }
+
+  /**
+   * Expand a slash command to its prompt content.
+   * Returns null if command is not found (pass through to SDK).
+   */
+  private expandSlashCommand(message: string): string | null {
+    // Parse command name and arguments
+    // Format: /command-name arg1 arg2 ...
+    const parts = message.trim().split(/\s+/);
+    const commandWithSlash = parts[0];
+    if (commandWithSlash === undefined) return null;
+
+    const commandName = commandWithSlash.slice(1); // Remove leading /
+    const args = parts.slice(1);
+
+    // Skip built-in SDK commands that should pass through
+    const sdkBuiltinCommands = ['compact', 'clear', 'help'];
+    if (sdkBuiltinCommands.includes(commandName)) {
+      return null;
+    }
+
+    // Look up command in our definitions
+    const commands = listCommands(this.cwd);
+    const command = commands.find((cmd) => cmd.name === commandName);
+
+    if (command === undefined) {
+      logger.debug({ commandName }, 'Command not found in definitions, passing through to SDK');
+      return null;
+    }
+
+    // Expand the command content
+    let content = command.content;
+
+    // Replace template variables with arguments
+    // Supports: $1, $2, ... for positional args
+    // Supports: $ARGUMENTS for all args joined
+    // Supports: {{VAR:default}} for optional vars with defaults
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i];
+      if (arg !== undefined) {
+        content = content.replace(new RegExp(`\\$${String(i + 1)}`, 'g'), arg);
+      }
+    }
+    content = content.replace(/\$ARGUMENTS/g, args.join(' '));
+
+    // Replace {{VAR:default}} patterns with args or defaults
+    // e.g., {{BASE_BRANCH:main}} → first arg or "main"
+    content = content.replace(
+      /\{\{([^:}]+):([^}]+)\}\}/g,
+      (_match, _varName, defaultValue: string) => {
+        // For now, use the first argument if provided, otherwise the default
+        return args[0] ?? defaultValue;
+      }
+    );
+
+    logger.info(
+      { commandName, commandScope: command.scope, argsCount: args.length },
+      'Slash command expanded'
+    );
+
+    return content;
   }
 
   async *receiveResponse(): AsyncGenerator<SDKMessage, void, unknown> {
