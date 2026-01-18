@@ -1,17 +1,13 @@
 /*---------------------------------------------------------------------------------------------
- *  /review-pr - Senior-level code review of a GitHub Pull Request
+ *  /review-staged - Senior-level code review of staged changes only
  *--------------------------------------------------------------------------------------------*/
 
-export const REVIEW_PR_PROMPT = `<task>
-You are conducting a senior-level code review of a GitHub Pull Request. Your goal is to ensure the code is correct, follows best practices, and is production-ready for merge.
+export const REVIEW_STAGED_PROMPT = `<task>
+You are conducting a senior-level code review of staged changes only. Your goal is to ensure the code is correct, follows best practices, and is ready to commit.
 </task>
 
 <context>
-{{#if PR_NUMBER}}
-Review scope: Pull Request #{{PR_NUMBER}}
-{{else}}
-Review scope: The pull request for the current branch (auto-detect using \`gh pr view\`)
-{{/if}}
+Review scope: Only staged changes (git diff --cached). Unstaged changes are intentionally excluded.
 
 Before reviewing, detect the project context:
 - Read package.json, Cargo.toml, pyproject.toml, go.mod, or equivalent to identify the tech stack
@@ -25,29 +21,12 @@ Apply the detected standards and patterns throughout your review.
 Think step by step. Follow these steps exactly:
 
 STEP 1: DISCOVERY
-{{#if PR_NUMBER}}
 Run these commands to understand the scope:
-- \`gh pr view {{PR_NUMBER}}\` - get PR title, description, and metadata
-- \`gh pr diff {{PR_NUMBER}}\` - see the full diff
-- \`gh pr view {{PR_NUMBER}} --json commits --jq '.commits[].messageHeadline'\` - understand commit history
+- \`git diff --cached --name-only\` - list all staged files
+- \`git diff --cached\` - see staged changes only (NOT unstaged)
+- \`git status\` - understand overall state
 
-If gh CLI is unavailable, use git commands:
-- \`git fetch origin pull/{{PR_NUMBER}}/head:pr-{{PR_NUMBER}}\` - fetch the PR
-- \`git diff {{BASE_BRANCH:main}}...pr-{{PR_NUMBER}}\` - see the diff
-- \`git log {{BASE_BRANCH:main}}..pr-{{PR_NUMBER}} --oneline\` - see commits
-{{else}}
-First, detect the PR for the current branch:
-- \`gh pr view\` - this auto-detects the PR for your current branch and shows title, description, metadata
-- If no PR exists for this branch, inform the user and stop
-
-Once you have the PR number from the output above, run:
-- \`gh pr diff\` - see the full diff (uses current branch's PR)
-- \`gh pr view --json number,commits --jq '.number, .commits[].messageHeadline'\` - get PR number and commit history
-
-If gh CLI is unavailable, use git commands with the detected base branch:
-- \`git log --oneline origin/main..HEAD\` - see commits on this branch
-- \`git diff origin/main...HEAD\` - see the diff
-{{/if}}
+IMPORTANT: Only review what's in \`git diff --cached\`. Do NOT include unstaged changes.
 
 Read each modified file completely. Do NOT skip this step or make assumptions about code you haven't read.
 
@@ -69,7 +48,7 @@ Do NOT review changes in isolation. For each changed file:
 Ask yourself: "Do I understand the complete data flow and logic flow that touches this change?" If no, keep reading related files until you do.
 
 STEP 4: UNDERSTAND INTENT
-Before critiquing, understand what the code is trying to accomplish. Use the PR title, description, commit messages, and code changes to infer intent. Trace the logic flow end-to-end across all affected files. If the intent is unclear, say so.
+Before critiquing, understand what the code is trying to accomplish. Trace the logic flow end-to-end across all affected files. If the intent is unclear, say so.
 
 STEP 5: EVALUATE
 Review against these criteria:
@@ -125,11 +104,6 @@ For EVERY function, component, and code path, ask: "What could go wrong?"
 - N+1 queries or redundant operations
 - Algorithmic complexity concerns
 
-**PR Quality**
-- Is the PR appropriately scoped? (single concern, not too large)
-- Are commits logical and well-messaged?
-- Does the PR description explain the "why"?
-
 STEP 6: REPORT
 </instructions>
 
@@ -144,16 +118,15 @@ For each issue, provide:
 If you don't have enough context to evaluate something, say "INSUFFICIENT CONTEXT" and explain what you'd need to know.
 
 After individual issues:
-1. **PR Summary**: What this PR is trying to accomplish (from description, commits, and code)
+1. **Review Summary**: What these staged changes are trying to accomplish
 2. **Detected Stack**: Tech stack, frameworks, and standards detected
-3. **Files Changed**: List all files in the PR
+3. **Files Staged**: List from git diff --cached --name-only
 4. **Related Files Read**: List files read for context
 5. **Quality Score**: 1-10 with brief justification
 6. **Top 3 Priority Fixes**: in order of importance
 7. **Edge Cases Missing**: List specific scenarios not handled
 8. **Integration Concerns**: any risks to existing functionality
-9. **PR Feedback**: Comments on PR scope, commit quality, description clarity
-10. **Merge Recommendation**: APPROVE | REQUEST CHANGES | NEEDS REWORK
+9. **Commit Recommendation**: READY TO COMMIT | NEEDS CHANGES | NEEDS REWORK
 </output_format>
 
 <red_flags>
@@ -173,9 +146,4 @@ Flag immediately if you see:
 - Assumptions about data shape without validation
 </red_flags>
 
-{{#if PR_NUMBER}}
-Begin by running \`gh pr view {{PR_NUMBER}}\` to understand the PR context, then \`gh pr diff {{PR_NUMBER}}\` to see all changes.
-{{else}}
-Begin by running \`gh pr view\` to detect and understand the PR for the current branch, then \`gh pr diff\` to see all changes.
-{{/if}}
-Detect the project context by reading config files. Read related files to understand full context before making any judgments.`;
+Begin by running \`git diff --cached --name-only\` to see staged files, then \`git diff --cached\` to see the staged changes. Detect the project context by reading config files. Read related files to understand full context before making any judgments.`;

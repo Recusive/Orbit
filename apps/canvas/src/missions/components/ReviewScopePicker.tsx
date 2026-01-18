@@ -4,7 +4,7 @@
  * User picks what to review, then we send the appropriate slash command.
  */
 
-import { GitBranch, GitPullRequest, FileEdit } from 'lucide-react';
+import { FileCheck, GitBranch, GitCommit, GitPullRequest, FileEdit } from 'lucide-react';
 import React, { useCallback, useState } from 'react';
 
 import type { ReviewScope } from '../types/agent-types';
@@ -35,6 +35,13 @@ const REVIEW_OPTIONS: ReviewOption[] = [
     slashCommand: '/review-uncommitted',
   },
   {
+    scope: 'staged',
+    label: 'Staged Only',
+    description: 'Review only staged changes (git diff --cached)',
+    icon: FileCheck,
+    slashCommand: '/review-staged',
+  },
+  {
     scope: 'branch',
     label: 'Current Branch',
     description: 'Review all changes on the current branch compared to main',
@@ -47,12 +54,22 @@ const REVIEW_OPTIONS: ReviewOption[] = [
   {
     scope: 'pr',
     label: 'Pull Request',
-    description: 'Review a specific GitHub pull request by number',
+    description: 'Review a GitHub pull request (leave empty for current branch)',
     icon: GitPullRequest,
     slashCommand: '/review-pr',
     requiresInput: true,
-    inputLabel: 'PR number',
-    inputPlaceholder: '123',
+    inputLabel: 'PR number or URL (optional)',
+    inputPlaceholder: 'Leave empty for current branch PR',
+  },
+  {
+    scope: 'commit',
+    label: 'Specific Commit',
+    description: 'Review a specific commit or commit range',
+    icon: GitCommit,
+    slashCommand: '/review-commit',
+    requiresInput: true,
+    inputLabel: 'Commit SHA or range',
+    inputPlaceholder: 'abc123 or abc123..def456',
   },
 ];
 
@@ -95,6 +112,7 @@ export function ReviewScopePicker({ onSelect }: ReviewScopePickerProps): React.J
       // Default to main for branch review
       command = `${selectedOption.slashCommand} main`;
     }
+    // Note: PR scope with empty input is valid - the command will auto-detect current branch's PR
 
     onSelect(command);
   }, [selectedOption, inputValue, onSelect]);

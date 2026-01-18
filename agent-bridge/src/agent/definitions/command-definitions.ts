@@ -9,7 +9,9 @@ import * as path from 'node:path';
 import { createLogger } from '../../common/logging/logger.js';
 
 import { REVIEW_BRANCH_PROMPT } from './prompts/review-branch.js';
+import { REVIEW_COMMIT_PROMPT } from './prompts/review-commit.js';
 import { REVIEW_PR_PROMPT } from './prompts/review-pr.js';
+import { REVIEW_STAGED_PROMPT } from './prompts/review-staged.js';
 import { REVIEW_UNCOMMITTED_PROMPT } from './prompts/review-uncommitted.js';
 
 const logger = createLogger('CommandDefinitions');
@@ -72,6 +74,14 @@ const DEFAULT_COMMANDS: SlashCommandDefinition[] = [
     readonly: true,
   },
   {
+    name: 'review-staged',
+    description: 'Review staged changes only (git diff --cached)',
+    content: REVIEW_STAGED_PROMPT,
+    allowedTools: ['Read', 'Grep', 'Glob', 'Bash'],
+    scope: 'default',
+    readonly: true,
+  },
+  {
     name: 'review-branch',
     description: 'Review all changes on the current branch vs main',
     argumentHint: '[base-branch]',
@@ -82,9 +92,18 @@ const DEFAULT_COMMANDS: SlashCommandDefinition[] = [
   },
   {
     name: 'review-pr',
-    description: 'Review a GitHub Pull Request',
-    argumentHint: '<pr-number>',
+    description: 'Review a GitHub Pull Request (uses current branch PR if no number specified)',
+    argumentHint: '[pr-number]',
     content: REVIEW_PR_PROMPT,
+    allowedTools: ['Read', 'Grep', 'Glob', 'Bash'],
+    scope: 'default',
+    readonly: true,
+  },
+  {
+    name: 'review-commit',
+    description: 'Review a specific commit or commit range',
+    argumentHint: '<sha|sha1..sha2>',
+    content: REVIEW_COMMIT_PROMPT,
     allowedTools: ['Read', 'Grep', 'Glob', 'Bash'],
     scope: 'default',
     readonly: true,

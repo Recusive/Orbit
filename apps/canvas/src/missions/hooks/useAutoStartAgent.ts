@@ -13,13 +13,18 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
 
-import { fetchDiffForReview, getReviewScopeDescription } from '../lib/git-diff';
+import {
+  clearPendingAutoStart,
+  registerPendingAutoStart,
+  registerPendingMessagePersistence,
+} from '../lib/auto-start-registry';
 import { useMissionsStore } from '../stores/missionsStore';
 
-import type { AgentCard, AgentTypeConfig, ReviewAgentTypeConfig } from '../types';
+import type { AgentCard, AgentTypeConfig, ReviewAgentTypeConfig, ReviewScope } from '../types';
 import type { ExtensionMessage } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
+import { conversationAddMessage } from '@/lib/api';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -50,51 +55,37 @@ function generateAgentConversationTitle(agentId: string, agentName: string): str
 }
 
 /**
- * Build the initial review message with diff context
+ * Map review scope to slash command.
+ * This mirrors the mapping in AgentExpandedView.tsx.
  */
-function buildReviewMessage(
-  diffResult: {
-    success: boolean;
-    diff: string;
-    description: string;
-    filesChanged: number;
-    linesAdded: number;
-    linesRemoved: number;
-  },
-  scopeDescription: string
-): string {
-  if (!diffResult.success || diffResult.diff.length === 0) {
-    return `## Code Review Request
+const REVIEW_SCOPE_SLASH_COMMANDS: Record<ReviewScope, string> = {
+  uncommitted: '/review-uncommitted',
+  staged: '/review-staged',
+  branch: '/review-branch',
+  pr: '/review-pr',
+  commit: '/review-commit',
+};
 
-No changes found for ${scopeDescription}.
+/**
+ * Build the slash command string for a review scope.
+ * Just like typing it manually in the Agent tab.
+ */
+function buildSlashCommand(typeConfig: ReviewAgentTypeConfig): string {
+  const baseCommand = REVIEW_SCOPE_SLASH_COMMANDS[typeConfig.reviewScope];
 
-Please let me know if you'd like me to review something specific.`;
+  // Add arguments based on scope type
+  switch (typeConfig.reviewScope) {
+    case 'branch':
+      return typeConfig.baseBranch ? `${baseCommand} ${typeConfig.baseBranch}` : baseCommand;
+    case 'pr':
+      return typeConfig.prRef ? `${baseCommand} ${typeConfig.prRef}` : baseCommand;
+    case 'commit':
+      return typeConfig.commitSha ? `${baseCommand} ${typeConfig.commitSha}` : baseCommand;
+    case 'uncommitted':
+    case 'staged':
+    default:
+      return baseCommand;
   }
-
-  return `## Code Review Request
-
-I need you to review ${scopeDescription}.
-
-### Statistics
-- Files changed: ${String(diffResult.filesChanged)}
-- Lines added: +${String(diffResult.linesAdded)}
-- Lines removed: -${String(diffResult.linesRemoved)}
-
-### Diff
-\`\`\`diff
-${diffResult.diff}
-\`\`\`
-
----
-
-Please provide a thorough code review covering:
-1. **Bugs & Logic Errors** - Any potential bugs or incorrect logic
-2. **Security Issues** - Any security vulnerabilities
-3. **Performance** - Any performance concerns
-4. **Code Quality** - Readability, maintainability, best practices
-5. **Suggestions** - Specific improvements with code examples
-
-Focus on actionable feedback. If the code looks good, say so briefly.`;
 }
 
 /**
@@ -113,9 +104,7 @@ function validateReviewConfig(typeConfig: ReviewAgentTypeConfig): {
 } {
   switch (typeConfig.reviewScope) {
     case 'pr':
-      if (typeConfig.prRef === undefined || typeConfig.prRef.trim().length === 0) {
-        return { valid: false, error: 'PR reference is required for PR review scope' };
-      }
+      // PR number is optional - if empty, /review-pr will use current branch's PR
       return { valid: true };
     case 'commit':
       if (typeConfig.commitSha === undefined || typeConfig.commitSha.trim().length === 0) {
@@ -168,7 +157,8 @@ export function useAutoStartAgent(options: UseAutoStartAgentOptions = {}): UseAu
   // Ref to store postMessage function to avoid circular dependency
   const postMessageRef = useRef<PostMessageFn | null>(null);
 
-  // Process conversation creation - this is async but wrapped to be called from sync handler
+  // Process conversation creation
+  // NOTE: This is async to properly await message persistence before sending
   const processConversationCreated = useCallback(
     async (message: ExtensionMessage & { type: 'conversation:created' }): Promise<void> => {
       // Find the pending auto-start that matches this conversation
@@ -201,7 +191,33 @@ export function useAutoStartAgent(options: UseAutoStartAgentOptions = {}): UseAu
       // Remove from pending
       pendingAutoStartsRef.current.delete(agentId);
 
-      // Save sessionId to agent
+      // Build the slash command - just like the user would type it
+      // The skill system handles fetching diffs, building context, etc.
+      const slashCommand = buildSlashCommand(typeConfig);
+
+      logger.info('Sending slash command for review agent', {
+        agentId,
+        sessionId,
+        slashCommand,
+      });
+
+      // Set agent to running
+      setAgentStatus(agentId, 'running');
+
+      // Generate a stable user message ID for both persistence and checkpoint tracking
+      const userMessageId = crypto.randomUUID();
+
+      // Start persistence immediately and register it BEFORE exposing sessionId to other hooks.
+      // This prevents conversation:load from racing ahead of the persisted message.
+      const persistPromise = conversationAddMessage(sessionId, {
+        id: userMessageId,
+        role: 'user',
+        content: slashCommand,
+        createdAt: Date.now(),
+      });
+      registerPendingMessagePersistence(sessionId, persistPromise);
+
+      // Save sessionId to agent (after persistence is registered to avoid races)
       updateAgent(agentId, { sessionId });
 
       // Update global UI state
@@ -218,68 +234,55 @@ export function useAutoStartAgent(options: UseAutoStartAgentOptions = {}): UseAu
       const toolStore = useToolStore.getState();
       toolStore.switchSession(sessionId);
 
-      // Now fetch the diff and send the first message
-      const repoPath = workspacePath ?? process.cwd();
+      // Clear auto-start pending once the session is registered
+      clearPendingAutoStart(agentId);
 
-      logger.info('Fetching diff for review agent', {
-        agentId,
-        repoPath,
-        reviewScope: typeConfig.reviewScope,
-      });
-
+      // CRITICAL: Persist user message to backend BEFORE sending to agent.
+      // We MUST await this to prevent a race condition where:
+      // 1. message:send is sent immediately
+      // 2. Agent starts streaming response
+      // 3. User expands agent view, triggers conversation:load
+      // 4. Backend returns empty messages because conversationAddMessage() hasn't completed
+      //
+      // By awaiting, we guarantee the user message is persisted before the agent starts,
+      // so when ChatArea mounts and loads the conversation, the user message will be there.
       try {
-        const diffResult = await fetchDiffForReview(repoPath, typeConfig);
-        const scopeDescription = getReviewScopeDescription(typeConfig.reviewScope, typeConfig);
-        const reviewMessage = buildReviewMessage(diffResult, scopeDescription);
-
-        logger.info('Sending initial review message', {
+        await persistPromise;
+      } catch (error) {
+        logger.error('Failed to persist user message for auto-start', {
           agentId,
           sessionId,
-          filesChanged: diffResult.filesChanged,
-          messageLength: reviewMessage.length,
+          error,
         });
-
-        // Set agent to running
-        setAgentStatus(agentId, 'running');
-
-        // Send the message via postMessage
-        // This will trigger the agent execution via the normal flow
-        if (postMessageRef.current) {
-          postMessageRef.current({
-            type: 'message:send',
-            uuid: crypto.randomUUID(),
-            session_id: sessionId,
-            content: reviewMessage,
-          });
-        }
-
-        onAutoStartComplete?.(agentId, sessionId);
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        logger.error('Failed to auto-start review agent', { agentId, error: errorMsg });
-
-        setAgentStatus(agentId, 'error');
-        setAgentError(agentId, `Failed to start review: ${errorMsg}`);
-
-        onAutoStartError?.(agentId, errorMsg);
+        // Continue anyway - the message will be sent, just not persisted
+        // User will see it in the current session, but may lose it on refresh
       }
+
+      // Send the slash command via postMessage
+      // The skill/command system will handle expansion, diff fetching, etc.
+      // Just like when the user types the command manually in the Agent tab
+      if (postMessageRef.current) {
+        postMessageRef.current({
+          type: 'message:send',
+          uuid: userMessageId,
+          session_id: sessionId,
+          content: slashCommand,
+        });
+      }
+
+      onAutoStartComplete?.(agentId, sessionId);
     },
-    [
-      updateAgent,
-      setAgentStatus,
-      setAgentError,
-      workspacePath,
-      onAutoStartComplete,
-      onAutoStartError,
-    ]
+    [updateAgent, setAgentStatus, onAutoStartComplete]
   );
 
-  // Handle incoming messages - sync wrapper around async processing
+  // Handle incoming messages
   const handleMessage = useCallback(
     (message: ExtensionMessage): void => {
       // Handle conversation:created - this is when we send the first message
+      // NOTE: processConversationCreated is async to await message persistence,
+      // but we can't make handleMessage async. We use void to acknowledge
+      // the promise is intentionally not awaited (the async work runs independently).
       if (message.type === 'conversation:created') {
-        // Fire and forget - errors are handled inside
         void processConversationCreated(message);
       }
     },
@@ -305,12 +308,14 @@ export function useAutoStartAgent(options: UseAutoStartAgentOptions = {}): UseAu
       // Validate required fields before auto-starting
       const validation = validateReviewConfig(typeConfig);
       if (!validation.valid) {
+        const errorMsg = validation.error ?? 'Invalid review configuration';
         logger.error('Auto-start validation failed', {
           agentId: agent.id,
-          error: validation.error,
+          error: errorMsg,
         });
         setAgentStatus(agent.id, 'error');
-        setAgentError(agent.id, validation.error ?? 'Invalid review configuration');
+        setAgentError(agent.id, errorMsg);
+        onAutoStartError?.(agent.id, errorMsg);
         return;
       }
 
@@ -319,6 +324,7 @@ export function useAutoStartAgent(options: UseAutoStartAgentOptions = {}): UseAu
 
       // Track this pending auto-start
       const createUuid = crypto.randomUUID();
+      registerPendingAutoStart(agent.id);
       pendingAutoStartsRef.current.set(agent.id, {
         agentId: agent.id,
         typeConfig,
@@ -333,13 +339,16 @@ export function useAutoStartAgent(options: UseAutoStartAgentOptions = {}): UseAu
         workspace_path: workspacePath ?? undefined,
       });
     },
-    [postMessage, setAgentStatus, setAgentError, workspacePath]
+    [postMessage, setAgentStatus, setAgentError, workspacePath, onAutoStartError]
   );
 
   // Cleanup on unmount
   useEffect(() => {
     const pendingMap = pendingAutoStartsRef.current;
     return () => {
+      for (const pending of pendingMap.values()) {
+        clearPendingAutoStart(pending.agentId);
+      }
       pendingMap.clear();
     };
   }, []);

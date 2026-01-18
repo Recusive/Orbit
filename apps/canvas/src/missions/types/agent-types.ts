@@ -113,8 +113,8 @@ export const REVIEW_SCOPE_CONFIGS: Record<ReviewScope, ReviewScopeConfig> = {
     label: 'Pull Request',
     description: 'Analyze a specific pull request',
     requiresAdditionalInput: true,
-    inputLabel: 'PR Number or URL',
-    inputPlaceholder: '123 or https://github.com/org/repo/pull/123',
+    inputLabel: 'PR Number or URL (optional)',
+    inputPlaceholder: 'Leave empty for current branch PR',
   },
   commit: {
     scope: 'commit',

@@ -831,8 +831,17 @@ export class SessionManager extends Disposable {
 
               const initialStatus = wasAlreadyApproved ? 'running' : 'awaiting-permission';
 
+              // CRITICAL: Flush buffered text BEFORE calculating contentOffset.
+              // The text batcher accumulates text at 50ms intervals. If we calculate
+              // contentOffset without flushing, it includes buffered text that hasn't
+              // been emitted yet. The frontend would receive tool:start BEFORE the
+              // text chunks, causing contentOffset > displayedContent.length → text
+              // split mid-word. Flushing ensures frontend has all text before tool arrives.
+              this.textBatcher.flushSession(sessionId);
+
               // Get the current accumulated text length - this is where the tool
               // appears in the stream. Used by frontend to interleave tool widgets.
+              // After flushing, accumulatedLength equals what frontend has received.
               const contentOffset = currentMessageId
                 ? this.textBatcher.getAccumulatedLength(sessionId, currentMessageId)
                 : 0;
@@ -843,6 +852,8 @@ export class SessionManager extends Disposable {
                   toolName,
                   toolId,
                   toolInputKeys: Object.keys(toolInput),
+                  contentOffset,
+                  messageId: currentMessageId,
                 },
                 'Tool use block received from SDK'
               );

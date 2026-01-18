@@ -26,10 +26,10 @@ import type { ReviewScope } from '../types/agent-types';
 // Map review scope to slash command
 const REVIEW_SCOPE_SLASH_COMMANDS: Record<ReviewScope, string> = {
   uncommitted: '/review-uncommitted',
-  staged: '/review-uncommitted', // Uses same command, filters staged only
+  staged: '/review-staged',
   branch: '/review-branch',
   pr: '/review-pr',
-  commit: '/review-branch', // Uses branch command with commit range
+  commit: '/review-commit',
 };
 
 // Import actual agent components - these work because canvas is embedded in agent app
@@ -59,7 +59,6 @@ interface AgentExpandedViewProps {
 export function AgentExpandedView({ agent, onClose }: AgentExpandedViewProps): React.JSX.Element {
   const [isClosing, setIsClosing] = useState(false);
   const rightSidebarOpen = useUIStore((state) => state.rightSidebarOpen);
-  const setChatAreaDetached = useUIStore((state) => state.setChatAreaDetached);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // For Review agents: check if review scope was pre-configured in AddAgentDialog
@@ -162,14 +161,10 @@ export function AgentExpandedView({ agent, onClose }: AgentExpandedViewProps): R
     handleReviewSelect,
   ]);
 
-  // Detach the ChatArea in RootLayout while this expanded view is open.
-  // This prevents duplicate listeners, backend requests, and localStorage races.
-  useEffect(() => {
-    setChatAreaDetached(true);
-    return () => {
-      setChatAreaDetached(false);
-    };
-  }, [setChatAreaDetached]);
+  // NOTE: We used to detach the ChatArea here, but MissionsCanvas now handles it.
+  // MissionsCanvas sets chatAreaDetached=true for the entire Canvas tab, which is needed
+  // for auto-start agents that run before AgentExpandedView opens.
+  // See MissionsCanvas.tsx for the effect that manages chatAreaDetached.
 
   const handleClose = useCallback((): void => {
     setIsClosing(true);

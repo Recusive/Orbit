@@ -3,6 +3,7 @@
  *
  * Helper functions for message rendering and memoization.
  */
+
 import type { ChatMessage, MessageItemProps, Segment } from './types';
 import type { ToolExecution } from '@/stores/agent/tool-store';
 

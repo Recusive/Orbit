@@ -151,6 +151,7 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
   // Subscribe to activeTab to close expanded view when leaving Canvas
   // This prevents chatAreaDetached from staying true when switching tabs
   const activeTab = useUIStore((s) => s.activeTab);
+  const setChatAreaDetached = useUIStore((s) => s.setChatAreaDetached);
 
   // Get the expanded agent data (undefined if agent was deleted while expanded)
   const expandedAgent = expandedAgentId !== null ? (agents[expandedAgentId] ?? null) : null;
@@ -170,6 +171,21 @@ function MissionsCanvasInner({ onAgentSelect }: MissionsCanvasProps): React.JSX.
       setExpandedAgentId(null);
     }
   }, [activeTab, expandedAgentId]);
+
+  // Detach Agent tab's ChatArea while on Canvas tab.
+  // This prevents the Agent tab's ChatArea from consuming messages meant for Canvas agents.
+  // Without this, when auto-start creates a conversation and updates UIStore.activeConversation,
+  // the Agent tab's ChatArea would react to the session change and consume streaming messages,
+  // leaving nothing for the Canvas ChatArea when it eventually mounts.
+  useEffect(() => {
+    if (activeTab !== 'canvas') {
+      return;
+    }
+    setChatAreaDetached(true);
+    return (): void => {
+      setChatAreaDetached(false);
+    };
+  }, [activeTab, setChatAreaDetached]);
 
   // Stable callbacks for node interactions (extracted to prevent re-renders)
   const handleConfigure = useCallback(

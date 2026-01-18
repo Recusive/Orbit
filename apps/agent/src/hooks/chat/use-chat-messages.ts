@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { createChatActions } from './handlers/chat-actions';
 import { createMessageHandler } from './handlers/message-handler';
@@ -10,6 +10,7 @@ import type { Model, ReactElementContext, ThinkingMode } from '@/types/protocol'
 
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { conversationAddMessage, conversationLoad } from '@/lib/api';
+import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useQueuedMessageStore } from '@/stores/chat/queued-message-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -278,6 +279,48 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
 
   const { postMessage, isMockMode } = useTauri({ onMessage: messageHandler.handleMessage });
 
+  // ─────────────────────────────────────────────────────────────
+  // Buffer Hydration for Auto-Start Agents
+  // ─────────────────────────────────────────────────────────────
+  // When ChatArea mounts, hydrate any buffered messages that arrived while unmounted.
+  // This solves the auto-start agent problem where Claude starts streaming before
+  // the user expands the agent view.
+  //
+  // IMPORTANT: We use useLayoutEffect instead of useEffect to minimize the race window.
+  // useLayoutEffect runs synchronously after DOM mutations but before paint, so we
+  // mark the session as consuming as early as possible. This prevents messages from
+  // being incorrectly buffered during the brief window between mount and effect execution.
+  useLayoutEffect(() => {
+    if (!sessionId) return;
+
+    const bufferStore = useMessageBufferStore.getState();
+
+    // Mark session as consuming and get any buffered messages
+    // This is atomic - once this returns, new messages will be dispatched directly
+    const bufferedMessages = bufferStore.startConsuming(sessionId);
+
+    if (bufferedMessages.length > 0) {
+      // Process each buffered message through the handler synchronously
+      // This ensures all buffered messages are processed before any new messages
+      // can arrive (JavaScript is single-threaded, no new events during this loop)
+      for (const { message } of bufferedMessages) {
+        messageHandler.handleMessage(message);
+      }
+
+      // CRITICAL: Force-flush the RAF batchers synchronously.
+      // agent:chunk messages queue to RAF batcher, which normally fires on next animation frame.
+      // Without this flush, the conversation:load effect would send the request BEFORE
+      // RAF fires, causing conversation:loaded to see an empty cache. The flush ensures
+      // all streaming content is in React state before conversation:load is sent.
+      messageHandler.flush();
+    }
+
+    // Cleanup: stop consuming when unmounting so future messages get buffered
+    return (): void => {
+      bufferStore.stopConsuming(sessionId);
+    };
+  }, [sessionId, messageHandler]);
+
   // Request conversation list when session is ready or workspace changes
   useEffect(() => {
     if (sessionId || workspacePath) {
@@ -311,21 +354,36 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   }, [sessionId, messages.length]);
 
   useEffect(() => {
-    // Skip if no sessionId, or if we already have messages, or if already loaded this session
-    if (!sessionId || messages.length > 0 || loadedSessionsRef.current.has(sessionId)) {
+    // Skip if no sessionId, or if already loaded this session
+    // NOTE: We don't skip based on messages.length because buffer hydration may have
+    // added streaming response messages WITHOUT the user message. We still need to
+    // load from backend to get the full conversation history (including user messages).
+    if (!sessionId || loadedSessionsRef.current.has(sessionId)) {
       return;
     }
 
-    // Mark as loading to prevent duplicate requests
+    // Check if another component (e.g., useAgentConversation) already has a pending load
+    // This prevents duplicate conversation:load requests that cause message duplicates
+    const bufferStore = useMessageBufferStore.getState();
+    if (bufferStore.hasLoadPending(sessionId)) {
+      // Another component is handling the load - just mark as loaded locally
+      // to prevent retrying on next render
+      loadedSessionsRef.current.add(sessionId);
+      return;
+    }
+
+    // Mark as loading to prevent duplicate requests (both local ref and global store)
     loadedSessionsRef.current.add(sessionId);
+    bufferStore.markLoadPending(sessionId);
 
     // Load from backend - conversation:loaded handler will populate messages
+    // This will merge with any buffered messages that were hydrated earlier
     postMessage({
       type: 'conversation:load',
       uuid: crypto.randomUUID(),
       session_id: sessionId,
     });
-  }, [sessionId, messages.length, postMessage]);
+  }, [sessionId, postMessage]);
 
   // Request file list for @ mentions
   useEffect(() => {

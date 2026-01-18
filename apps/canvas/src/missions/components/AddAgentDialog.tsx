@@ -145,7 +145,8 @@ export function AddAgentDialog({
 
     switch (reviewScope) {
       case 'pr':
-        return prRef.trim().length > 0;
+        // PR number is optional - if empty, will use current branch's PR
+        return true;
       case 'commit':
         return commitSha.trim().length > 0;
       case 'branch':

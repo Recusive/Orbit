@@ -17,12 +17,14 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { isAutoStartPending, waitForPendingMessagePersistence } from '../lib/auto-start-registry';
 import { useMissionsStore } from '../stores/missionsStore';
 
 import type { AgentCard } from '../types';
 import type { ExtensionMessage } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
+import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -151,6 +153,10 @@ export function useAgentConversation({
 
       // Handle conversation:loaded response
       if (message.type === 'conversation:loaded') {
+        // Clear pending load flag for any conversation:loaded
+        // (even if not for our session, the load completed)
+        useMessageBufferStore.getState().clearLoadPending(message.session_id);
+
         // Check if this is for our agent's session
         if (agent.sessionId && message.session_id === agent.sessionId) {
           logger.info('Conversation loaded for agent', {
@@ -168,6 +174,9 @@ export function useAgentConversation({
           // Switch tool store session
           const toolStore = useToolStore.getState();
           toolStore.switchSession(message.session_id);
+
+          // Update local session ID for ChatArea keying
+          setLocalSessionId(message.session_id);
 
           // CRITICAL: Update localStorage BEFORE setIsInitializing(false)
           // Same reasoning as conversation:created - ChatArea reads localStorage on mount
@@ -203,14 +212,35 @@ export function useAgentConversation({
     if (hasInitializedRef.current) {
       return;
     }
+    // If auto-start is still creating the conversation, wait for sessionId to land
+    if (!agent.sessionId && isAutoStartPending(agent.id)) {
+      return;
+    }
+
     hasInitializedRef.current = true;
 
     if (agent.sessionId) {
+      // Capture sessionId before async closure (TypeScript loses narrowing in closures)
+      const sessionId = agent.sessionId;
+
+      // Check if load is already pending (prevents duplicate requests when both
+      // useAgentConversation and useChatMessages try to load the same session)
+      const bufferStore = useMessageBufferStore.getState();
+      if (bufferStore.hasLoadPending(sessionId)) {
+        logger.debug('Load already pending, skipping', {
+          agentId: agent.id,
+          sessionId,
+        });
+        // Still need to wait for the existing load to complete
+        // isInitializing stays true until conversation:loaded handler fires
+        return;
+      }
+
       // Agent already has a conversation - load it
       logger.info('Loading existing conversation for agent', {
         agentId: agent.id,
         agentName: agent.name,
-        sessionId: agent.sessionId,
+        sessionId,
       });
 
       setIsInitializing(true);
@@ -220,11 +250,23 @@ export function useAgentConversation({
       uiStore.setLoadingConversation(true);
       uiStore.setConversationTransitioning(true);
 
-      postMessage({
-        type: 'conversation:load',
-        uuid: crypto.randomUUID(),
-        session_id: agent.sessionId,
-      });
+      // Mark load as pending BEFORE starting async work
+      bufferStore.markLoadPending(sessionId);
+
+      void (async (): Promise<void> => {
+        try {
+          await waitForPendingMessagePersistence(sessionId);
+        } catch (error) {
+          // Continue even if persistence failed - load whatever exists
+          // Log for debugging - this shouldn't happen in normal operation
+          logger.warn('Pending message persistence failed, loading anyway', { sessionId, error });
+        }
+        postMessage({
+          type: 'conversation:load',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+        });
+      })();
     } else {
       // Agent doesn't have a conversation - create one
       logger.info('Creating new conversation for agent', {
