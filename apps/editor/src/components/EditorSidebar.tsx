@@ -11,11 +11,11 @@
  * - Inbox
  * - Start conversation button
  */
-import { FlaskConical, FolderTree, GitBranch, Settings } from 'lucide-react';
+import { FlaskConical, FolderTree, GitBranch, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 
 import type { SettingsDialogProps } from '@/components/modals/settings';
-import type { FC } from 'react';
+import type { ComponentType, FC } from 'react';
 
 import { FileExplorer } from '@/components/files';
 import { SourceControlTab } from '@/components/git';
@@ -67,7 +67,7 @@ const SidebarIconButton: FC<SidebarIconButtonProps> = ({ icon: Icon, label, acti
 );
 
 interface EditorSidebarItemProps {
-  readonly icon: typeof Settings;
+  readonly icon: ComponentType<{ className?: string }>;
   readonly label: string;
   readonly isCollapsed: boolean;
   readonly shortcut?: readonly string[];
@@ -257,7 +257,7 @@ export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
         style={isCollapsed ? { width: SIDEBAR.iconColumnWidth } : undefined}
       >
         <EditorSidebarItem
-          icon={Settings}
+          icon={Settings2}
           label="Settings"
           isCollapsed={isCollapsed}
           shortcut={['⌘', ',']}

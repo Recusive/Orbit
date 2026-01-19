@@ -75,6 +75,7 @@ opencode-reference/
 
 # Reference repos (cloned for development reference)
 xyflow/
+ui/
 
 # Code review outputs (local only)
 reviews/

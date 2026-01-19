@@ -2,7 +2,8 @@
 
 import { Allotment } from 'allotment';
 import { forwardRef } from 'react';
-import 'allotment/dist/style.css';
+
+// Note: Allotment CSS is imported in main.tsx for proper override order
 
 import type { AllotmentHandle, AllotmentProps } from 'allotment';
 import type { ReactNode } from 'react';

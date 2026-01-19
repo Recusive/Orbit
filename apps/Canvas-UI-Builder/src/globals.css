@@ -1,2 +1,53 @@
 /* Canvas UI Builder - imports all styles from agent */
 @import '../../agent/src/globals.css';
+
+/* ============================================
+   Allotment Sash Overrides
+   Match the agent's sidebar resize handle styling:
+   - Thin 1px visual line (same as agent's RESIZE_HANDLE.width)
+   - Keep 8px hit area for usability
+   - Coral color on hover (matches "Open in Agent" button)
+
+   Note: Allotment sets --focus-border: #007fd4 (blue) on its
+   sash container and uses `background: var(--focus-border)` on hover.
+   We must override both the variable AND the background property.
+   ============================================ */
+
+/* Override Allotment's default blue focus-border color at multiple specificity levels */
+:root {
+  --focus-border: oklch(0.6902 0.1346 45); /* Coral */
+}
+
+.allotment-module_splitView__L-yRc > .allotment-module_sashContainer__fzwJF > [class*='sash-module_sash'] {
+  --focus-border: oklch(0.6902 0.1346 45) !important; /* Coral */
+}
+
+/* Override Allotment sash visual line to 1px */
+[class*='sash-module_sash'] {
+  --sash-hover-size: 1px !important;
+  --focus-border: oklch(0.6902 0.1346 45) !important; /* Coral */
+}
+
+/* Make the visual line always visible with border color */
+[class*='sash-module_sash']::before {
+  background: var(--border) !important;
+  opacity: 1 !important;
+}
+
+/* Hover state - override Allotment's `background: var(--focus-border)` with coral */
+[class*='sash-module_sash']:hover::before,
+[class*='sash-module_sash'][class*='hover']::before {
+  background: oklch(0.6902 0.1346 45) !important; /* Coral #E07A6B */
+}
+
+/* Active/dragging state */
+[class*='sash-module_sash']:active::before,
+[class*='sash-module_sash'][class*='active']::before {
+  background: oklch(0.6902 0.1346 45) !important; /* Coral #E07A6B */
+}
+
+/* Fallback: Force coral on any sash focus state */
+[class*='sash-module_sash']:focus::before,
+[class*='sash-module_sash'][class*='focus']::before {
+  background: oklch(0.6902 0.1346 45) !important; /* Coral #E07A6B */
+}

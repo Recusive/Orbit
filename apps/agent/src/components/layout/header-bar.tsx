@@ -1,10 +1,11 @@
 import { IconSquareGridCircle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSquareGridCircle';
-import { Moon, Search, Sun } from 'lucide-react';
+import { Moon, Redo2, Search, Sun, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, getCommandKey } from '@/lib/utils';
@@ -107,19 +108,23 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
     <header
       data-tauri-drag-region
       className={cn(
-        'h-[35px] flex items-center justify-between pr-4 border-y border-divider shrink-0',
+        'h-[35px] grid grid-cols-[1fr_auto_1fr] items-center pr-4 border-y border-divider shrink-0',
         'bg-card shadow-lg',
         // Left padding for macOS traffic light buttons (matches Cursor: x:11 + ~69px for 3 buttons)
         'pl-[80px]',
         className
       )}
     >
-      {/* Left spacer for balance (reduced since we have traffic light padding) */}
-      <div className="w-[122px]" />
+      {/* Left section - empty, just for grid balance */}
+      <div />
 
-      {/* Center tabs - only show when workspace is open */}
+      {/* Center tabs - always centered regardless of left/right content */}
       {hasWorkspace ? (
-        <div className="flex items-center gap-0.5" role="tablist" aria-orientation="horizontal">
+        <div
+          className="flex items-center justify-center gap-0.5"
+          role="tablist"
+          aria-orientation="horizontal"
+        >
           <TabButton
             label="Agent"
             active={activeTab === 'agent'}
@@ -148,11 +153,14 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
 
       {/* Right section: Search + Action buttons - only show when workspace is open */}
       {workspaceName ? (
-        <div className="flex items-center gap-2">
-          {/* Search button - VS Code style command palette */}
+        <div className="flex items-center justify-end gap-2">
+          {/* Search button - VS Code style command palette (moves left on canvas) */}
           <button
             data-tauri-drag-region={false}
-            className="flex items-center gap-2 h-6 px-2 rounded-md text-foreground hover:text-foreground overflow-hidden bg-muted hover:bg-muted/80 transition-colors duration-200"
+            className={cn(
+              'flex items-center gap-2 h-6 px-2 rounded-md text-foreground hover:text-foreground overflow-hidden bg-muted hover:bg-muted/80 transition-colors duration-200',
+              activeTab === 'canvas' && 'order-first'
+            )}
             title="Search files (⌘P)"
             onClick={handleOpenSearch}
           >
@@ -166,89 +174,132 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
             </KbdGroup>
           </button>
 
-          <div className="flex items-center gap-1">
-            {/* Theme Toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  data-tauri-drag-region={false}
-                  onClick={toggleTheme}
-                  className="h-7 w-7 flex items-center justify-center rounded-md opacity-60 hover:opacity-100 hover:bg-muted/60 active:scale-95 transition-[background-color,opacity,transform] duration-150"
-                >
-                  {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</TooltipContent>
-            </Tooltip>
+          {/* Canvas-specific buttons */}
+          {activeTab === 'canvas' ? (
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs rounded-md [&_svg]:size-3"
+                onClick={(): void => {
+                  // TODO: Implement undo for canvas
+                }}
+              >
+                <Undo2 />
+                <span>Undo</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-xs rounded-md [&_svg]:size-3"
+                onClick={(): void => {
+                  // TODO: Implement redo for canvas
+                }}
+              >
+                <Redo2 />
+                <span>Redo</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2.5 text-xs rounded-md"
+                onClick={(): void => {
+                  // TODO: Implement export for canvas
+                }}
+              >
+                Export
+              </Button>
+              <Button size="sm" className="h-6 px-2.5 text-xs rounded-md">
+                Open in Agent
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              {/* Theme Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    data-tauri-drag-region={false}
+                    onClick={toggleTheme}
+                    className="h-7 w-7 flex items-center justify-center rounded-md opacity-60 hover:opacity-100 hover:bg-muted/60 active:scale-95 transition-[background-color,opacity,transform] duration-150"
+                  >
+                    {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</TooltipContent>
+              </Tooltip>
 
-            {/* Activity Panel Toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  data-tauri-drag-region={false}
-                  onClick={toggleReviewPanel}
-                  className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150',
-                    reviewPanelOpen
-                      ? 'text-foreground'
-                      : 'text-muted-foreground/80 hover:text-foreground'
-                  )}
-                >
-                  <div className="rotate-180">
-                    <svg
-                      aria-hidden="true"
-                      width="16"
-                      height="16"
-                      viewBox="1 1 22 22"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
-                        fill="currentColor"
-                      />
-                      <rect
-                        x="7"
-                        y="7"
-                        width={reviewPanelOpen ? 5 : 2}
-                        height="10"
-                        rx="1"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  </div>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="flex items-center gap-2">
-                <span>{reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}</span>
-                <KbdGroup>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">{getCommandKey()}</Kbd>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">B</Kbd>
-                </KbdGroup>
-              </TooltipContent>
-            </Tooltip>
+              {/* Activity Panel Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    data-tauri-drag-region={false}
+                    onClick={toggleReviewPanel}
+                    className={cn(
+                      'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150',
+                      reviewPanelOpen
+                        ? 'text-foreground'
+                        : 'text-muted-foreground/80 hover:text-foreground'
+                    )}
+                  >
+                    <div className="rotate-180">
+                      <svg
+                        aria-hidden="true"
+                        width="16"
+                        height="16"
+                        viewBox="1 1 22 22"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
+                          fill="currentColor"
+                        />
+                        <rect
+                          x="7"
+                          y="7"
+                          width={reviewPanelOpen ? 5 : 2}
+                          height="10"
+                          rx="1"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    </div>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="flex items-center gap-2">
+                  <span>{reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}</span>
+                  <KbdGroup>
+                    <Kbd className="bg-white/15 text-inherit border-white/20">
+                      {getCommandKey()}
+                    </Kbd>
+                    <Kbd className="bg-white/15 text-inherit border-white/20">B</Kbd>
+                  </KbdGroup>
+                </TooltipContent>
+              </Tooltip>
 
-            {/* Actions Bar Toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  data-tauri-drag-region={false}
-                  onClick={toggleRightSidebar}
-                  className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150',
-                    rightSidebarOpen
-                      ? 'text-foreground'
-                      : 'text-muted-foreground/80 hover:text-foreground'
-                  )}
-                >
-                  <IconSquareGridCircle className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
-              </TooltipContent>
-            </Tooltip>
-          </div>
+              {/* Actions Bar Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    data-tauri-drag-region={false}
+                    onClick={toggleRightSidebar}
+                    className={cn(
+                      'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150',
+                      rightSidebarOpen
+                        ? 'text-foreground'
+                        : 'text-muted-foreground/80 hover:text-foreground'
+                    )}
+                  >
+                    <IconSquareGridCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          )}
         </div>
       ) : (
         <div className="w-[122px]" />

@@ -5,7 +5,7 @@
  * To change header heights, sidebar widths, or transition durations,
  * update HEIGHTS, SIDEBAR, and TRANSITIONS in constants.ts - DO NOT hardcode here.
  */
-import { FlaskConical, Inbox, Plus, Search, Settings } from 'lucide-react';
+import { FlaskConical, Inbox, Plus, Search, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
@@ -310,7 +310,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {/* Utilities */}
       <div className={cn('flex flex-col shrink-0', isCollapsed ? 'gap-0 py-0' : 'gap-1 py-1.5')}>
         <SidebarItem
-          icon={Settings}
+          icon={Settings2}
           label="Settings"
           collapsed={isCollapsed}
           equalSpacing={isCollapsed}
