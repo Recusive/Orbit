@@ -7,6 +7,8 @@ export type CanvasSidebarTab = 'components' | 'files';
 
 export interface CanvasLeftSidebarProps {
   readonly width: number;
+  /** Callback when a component is selected from the sidebar */
+  readonly onComponentSelect?: (componentName: string) => void;
 }
 
 export interface CanvasRightSidebarProps {

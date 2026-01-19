@@ -96,7 +96,7 @@ const COMPONENTS = [
   'Tooltip',
 ];
 
-export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width }) => {
+export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onComponentSelect }) => {
   const {
     toggleLeftSidebar,
     settingsDialogOpen,
@@ -288,6 +288,7 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width }) => {
                   isLast={index === BLOCKS.length - 1}
                   onClick={() => {
                     setActiveItem(item);
+                    onComponentSelect?.(item);
                   }}
                 />
               ))}
@@ -303,6 +304,7 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width }) => {
                   isLast={index === COMPONENTS.length - 1}
                   onClick={() => {
                     setActiveItem(item);
+                    onComponentSelect?.(item);
                   }}
                 />
               ))}
