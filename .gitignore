@@ -78,3 +78,7 @@ xyflow/
 
 # Code review outputs (local only)
 reviews/
+
+# Local development/experiment directories
+json-render/
+ui/
