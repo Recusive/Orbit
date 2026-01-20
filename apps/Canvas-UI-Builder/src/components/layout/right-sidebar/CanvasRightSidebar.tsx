@@ -8,11 +8,10 @@ import { Box, Code, Layers, Palette } from 'lucide-react';
 import { useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
+import { PropertiesPanel } from '../../inspector';
 import { SidebarItem } from '../left-sidebar/components/SidebarItem';
 import { SidebarToggleIcon } from '../left-sidebar/components/SidebarToggleIcon';
 import { TabButton } from '../left-sidebar/components/TabButton';
-
-import { PropertiesPanel } from './PropertiesPanel';
 
 import type { FC } from 'react';
 
@@ -53,16 +52,12 @@ const CodePanel: FC<CodePanelProps> = ({ selectedComponentName }) => {
     <div className="p-3">
       <div className="flex items-center gap-2 mb-3">
         <Code className="h-4 w-4" />
-        <span className="text-sm font-medium text-foreground">
-          {selectedComponentName}.tsx
-        </span>
+        <span className="text-sm font-medium text-foreground">{selectedComponentName}.tsx</span>
       </div>
       <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
         <div className="p-4 text-center text-muted-foreground">
           <p className="text-xs mb-2">Source code viewing coming soon</p>
-          <p className="text-xs opacity-70">
-            Preview the {displayName} component in the canvas
-          </p>
+          <p className="text-xs opacity-70">Preview the {displayName} component in the canvas</p>
         </div>
       </div>
     </div>
@@ -74,7 +69,10 @@ interface CanvasRightSidebarProps {
   readonly selectedComponentName: string | null;
 }
 
-export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({ width, selectedComponentName }) => {
+export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({
+  width,
+  selectedComponentName,
+}) => {
   const { toggleCanvasRightSidebar } = useUIStore(
     useShallow((s) => ({
       toggleCanvasRightSidebar: s.toggleCanvasRightSidebar,

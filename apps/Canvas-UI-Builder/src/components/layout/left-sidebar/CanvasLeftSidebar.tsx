@@ -2,10 +2,11 @@
  * CanvasLeftSidebar - Left navigation sidebar for Canvas UI Builder
  *
  * Shows the available shadcn components for preview.
- * Uses a static list of components that will be loaded from ~/.orbit/canvas.
+ * Loads components dynamically from the local registry (~/.orbit/canvas/registry.json).
  */
-import { FlaskConical, FolderOpen, Layers, Plus, Search, Settings } from 'lucide-react';
-import { lazy, Suspense, useState } from 'react';
+import { useComponentRegistry } from '@canvas/hooks/use-component-registry';
+import { FlaskConical, FolderOpen, Layers, Loader2, Plus, Search, Settings } from 'lucide-react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import {
@@ -26,25 +27,19 @@ import { cn, getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
 import { useIsLeftSidebarCollapsed, useUIStore } from '@/stores/ui/ui-store';
 
 // ============================================
-// Static Component List
+// Utilities
 // ============================================
 
 /**
- * Available UI components for preview.
- * These will be loaded dynamically from ~/.orbit/canvas in the future.
+ * Converts a kebab-case component name to a human-readable label.
+ * Example: "dropdown-menu" → "Dropdown Menu"
  */
-const UI_COMPONENTS = [
-  { name: 'button', label: 'Button' },
-  { name: 'input', label: 'Input' },
-  { name: 'textarea', label: 'Textarea' },
-  { name: 'switch', label: 'Switch' },
-  { name: 'select', label: 'Select' },
-  { name: 'tooltip', label: 'Tooltip' },
-  { name: 'dialog', label: 'Dialog' },
-  { name: 'dropdown-menu', label: 'Dropdown Menu' },
-  { name: 'scroll-area', label: 'Scroll Area' },
-  { name: 'kbd', label: 'Kbd' },
-] as const;
+function formatComponentLabel(name: string): string {
+  return name
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
 
 // Lazy load heavy components
 const LazySettingsDialog = lazy(() =>
@@ -80,9 +75,31 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
   );
   const isCollapsed = useIsLeftSidebarCollapsed();
 
+  // Fetch component registry from ~/.orbit/canvas/registry.json
+  const { uiComponents, customComponents, loading: registryLoading } = useComponentRegistry();
+
   // Local state for selected component and active tab
   const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CanvasSidebarTab>('components');
+
+  // Memoize formatted component list to avoid recalculating on every render
+  const formattedUIComponents = useMemo(
+    () =>
+      uiComponents.map((c) => ({
+        name: c.name,
+        label: formatComponentLabel(c.name),
+      })),
+    [uiComponents]
+  );
+
+  const formattedCustomComponents = useMemo(
+    () =>
+      customComponents.map((c) => ({
+        name: c.name,
+        label: formatComponentLabel(c.name),
+      })),
+    [customComponents]
+  );
 
   const handleComponentSelect = (name: string): void => {
     setSelectedComponent(name);
@@ -250,20 +267,47 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
               isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
             )}
           >
-            {/* UI Components Group */}
-            <CollapsibleGroup label="UI Components" defaultOpen={true}>
-              {UI_COMPONENTS.map((component, index) => (
-                <SidebarMenuItem
-                  key={component.name}
-                  label={component.label}
-                  active={selectedComponent === component.name}
-                  isLast={index === UI_COMPONENTS.length - 1}
-                  onClick={() => {
-                    handleComponentSelect(component.name);
-                  }}
-                />
-              ))}
-            </CollapsibleGroup>
+            {registryLoading ? (
+              /* Loading state */
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                <span className="text-sm">Loading components...</span>
+              </div>
+            ) : (
+              <>
+                {/* UI Components Group */}
+                <CollapsibleGroup label="UI Components" defaultOpen={true}>
+                  {formattedUIComponents.map((component, index) => (
+                    <SidebarMenuItem
+                      key={component.name}
+                      label={component.label}
+                      active={selectedComponent === component.name}
+                      isLast={index === formattedUIComponents.length - 1}
+                      onClick={() => {
+                        handleComponentSelect(component.name);
+                      }}
+                    />
+                  ))}
+                </CollapsibleGroup>
+
+                {/* Custom Components Group (only show if there are custom components) */}
+                {formattedCustomComponents.length > 0 && (
+                  <CollapsibleGroup label="Custom Components" defaultOpen={true}>
+                    {formattedCustomComponents.map((component, index) => (
+                      <SidebarMenuItem
+                        key={component.name}
+                        label={component.label}
+                        active={selectedComponent === component.name}
+                        isLast={index === formattedCustomComponents.length - 1}
+                        onClick={() => {
+                          handleComponentSelect(component.name);
+                        }}
+                      />
+                    ))}
+                  </CollapsibleGroup>
+                )}
+              </>
+            )}
           </div>
         ) : (
           /* Files Tab Content */
