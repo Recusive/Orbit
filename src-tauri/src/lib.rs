@@ -6,6 +6,7 @@
 pub mod agent;
 pub mod commands;
 pub mod core;
+pub mod utils;
 
 use std::env;
 use std::path::PathBuf;
@@ -15,9 +16,11 @@ use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
 use commands::canvas::download as canvas_download;
 use commands::canvas::lifecycle as canvas_cmd;
+use commands::canvas::persist as canvas_persist;
 use commands::canvas::preview as canvas_preview;
 use commands::canvas::save as canvas_save;
 use commands::canvas::setup as canvas_setup;
+use commands::canvas::transform as canvas_transform;
 use commands::canvas::PreviewServerState;
 use commands::common::{
     browser::{self, BrowserResultState, EmbeddedBrowserState},
@@ -320,6 +323,18 @@ pub fn run() {
             // Canvas save/export commands
             canvas_save::canvas_save_custom_component,
             canvas_save::canvas_export_component,
+            // Canvas persist commands
+            canvas_persist::canvas_read_component_source,
+            canvas_persist::canvas_write_component_source,
+            canvas_persist::canvas_restore_backup,
+            canvas_persist::canvas_list_backups,
+            canvas_persist::canvas_get_file_hash,
+            canvas_persist::canvas_get_component_path,
+            canvas_persist::canvas_get_globals_path,
+            canvas_persist::canvas_read_file,
+            canvas_persist::canvas_write_file,
+            // Canvas transform commands
+            canvas_transform::canvas_persist_styles,
             // File commands
             files::read_file,
             files::read_file_bytes,

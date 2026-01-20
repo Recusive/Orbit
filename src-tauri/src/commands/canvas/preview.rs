@@ -499,8 +499,8 @@ createRoot(document.getElementById('root')!).render(
     std::fs::write(preview_path.join("src/main.tsx"), main_tsx)
         .map_err(|e| format!("Failed to write main.tsx: {e}"))?;
 
-    // 6. src/Preview.tsx
-    let preview_tsx = r##"import { useState, useEffect, ComponentType } from 'react';
+    // 6. src/Preview.tsx - with CSS injection for instant preview updates
+    let preview_tsx = r##"import { useState, useEffect, useMemo, ComponentType } from 'react';
 
 interface PreviewMessage {
   type: 'preview:load' | 'preview:update-styles' | 'preview:update-props' | 'preview:clear' | 'preview:set-theme';
@@ -531,6 +531,101 @@ function setTheme(theme: 'light' | 'dark') {
   }
 }
 
+/**
+ * Convert camelCase to kebab-case for CSS custom properties
+ * e.g., 'fontSize' -> 'font-size', 'backgroundColor' -> 'background-color'
+ */
+function camelToKebab(str: string): string {
+  return str.replace(/([A-Z])/g, '-$1').toLowerCase();
+}
+
+/**
+ * Generate injected CSS for instant preview updates.
+ *
+ * Architecture:
+ * - Sets CSS custom properties on :root for debugging visibility
+ * - Uses positive selector list (not *) to exclude SVG elements
+ * - Uses :where() for lower specificity so component styles can win
+ * - Adds hover/focus-visible states for interactivity feedback
+ * - Typography rules only target text-containing elements
+ */
+function generateInjectedCSS(styles: Record<string, string>): string {
+  if (Object.keys(styles).length === 0) return '';
+
+  // Generate CSS custom properties for debugging visibility in DevTools
+  const customProps = Object.entries(styles)
+    .map(([prop, value]) => `  --preview-${camelToKebab(prop)}: ${value};`)
+    .join('\n');
+
+  // Positive selector list - excludes SVG elements by NOT including them
+  // Uses :where() for 0 specificity so component styles can override
+  const selectorBase = `#preview-component-wrapper > *,
+#preview-component-wrapper > * :where(
+  div, span, p, section, article, aside, header, footer, main, nav,
+  button, a, input, textarea, select, option, label, form, fieldset,
+  table, thead, tbody, tr, td, th,
+  ul, ol, li, dl, dt, dd,
+  h1, h2, h3, h4, h5, h6,
+  img, figure, figcaption,
+  details, summary, dialog,
+  [role="button"], [role="link"], [role="checkbox"], [role="radio"],
+  [role="tab"], [role="tabpanel"], [role="menu"], [role="menuitem"]
+)`;
+
+  // Text-containing elements for typography rules
+  const textElements = `#preview-component-wrapper > * :where(
+  p, span, h1, h2, h3, h4, h5, h6, a, button, label,
+  li, td, th, dt, dd, summary, figcaption, option
+)`;
+
+  // Build the CSS rules
+  const rules: string[] = [];
+
+  // Layout, spacing, border, and effects properties
+  const layoutProps = ['padding', 'margin', 'gap', 'borderRadius', 'borderWidth', 'borderColor', 'borderStyle', 'opacity', 'boxShadow', 'backgroundColor'];
+  const layoutRules = layoutProps
+    .filter(prop => styles[prop] !== undefined)
+    .map(prop => `  ${camelToKebab(prop)}: ${styles[prop]} !important;`)
+    .join('\n');
+
+  if (layoutRules) {
+    rules.push(`${selectorBase} {\n${layoutRules}\n}`);
+  }
+
+  // Typography properties - only on text elements
+  const typographyProps = ['fontSize', 'fontWeight', 'fontFamily', 'letterSpacing', 'color', 'lineHeight', 'textAlign'];
+  const typographyRules = typographyProps
+    .filter(prop => styles[prop] !== undefined)
+    .map(prop => `  ${camelToKebab(prop)}: ${styles[prop]} !important;`)
+    .join('\n');
+
+  if (typographyRules) {
+    rules.push(`${textElements} {\n${typographyRules}\n}`);
+  }
+
+  // Hover state with brightness filter for interactive feedback
+  if (styles.backgroundColor || styles.borderColor) {
+    rules.push(`${selectorBase}:hover {
+  filter: brightness(0.9);
+  transition: filter 150ms ease-out;
+}`);
+  }
+
+  // Focus-visible outline styling for accessibility
+  rules.push(`${selectorBase}:focus-visible {
+  outline: 2px solid var(--ring, oklch(0.56 0.18 35));
+  outline-offset: 2px;
+}`);
+
+  return `/* Preview CSS Injection - Custom Properties for DevTools */
+:root {
+${customProps}
+}
+
+/* Generated style rules */
+${rules.join('\n\n')}`;
+}
+
 export function Preview() {
   const [Component, setComponent] = useState<ComponentType<any> | null>(null);
   const [componentName, setComponentName] = useState<string>('');
@@ -538,6 +633,9 @@ export function Preview() {
   const [styles, setStyles] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Memoize the injected CSS to avoid re-computation on every render
+  const injectedCSS = useMemo(() => generateInjectedCSS(styles), [styles]);
 
   const loadComponent = async (name: string, type: string = 'ui') => {
     setLoading(true);
@@ -634,14 +732,22 @@ export function Preview() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background p-8">
-      <div className="flex flex-col items-center gap-4">
-        <p className="text-sm text-muted-foreground font-mono">{componentName}</p>
-        <div className="p-6 rounded-lg border border-border bg-card">
-          <Component {...props} style={styles} />
+    <>
+      {/* Inject dynamic CSS styles */}
+      {injectedCSS && <style>{injectedCSS}</style>}
+
+      <div className="flex items-center justify-center min-h-screen bg-background p-8">
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-sm text-muted-foreground font-mono">{componentName}</p>
+          <div className="p-6 rounded-lg border border-border bg-card">
+            {/* Wrapper with ID for CSS injection targeting - contents class ensures no layout impact */}
+            <div id="preview-component-wrapper" className="contents">
+              <Component {...props} />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 "##;
