@@ -85,8 +85,17 @@ Orbit/
 │   │   │   └── providers/          # Context providers
 │   │   └── index.html
 │   │
-│   ├── canvas/                     # Canvas/Design app (stub)
+│   ├── Canvas-UI-Builder/          # Canvas UI Builder app (Active)
 │   │   └── src/
+│   │       ├── components/
+│   │       │   ├── setup/          # Setup wizard
+│   │       │   ├── inspector/      # Props editor panel
+│   │       │   ├── preview/        # Live preview panel
+│   │       │   ├── sidebar/        # Component library
+│   │       │   ├── dialogs/        # Save component dialog
+│   │       │   └── layout/         # Layout components
+│   │       ├── hooks/              # Canvas-specific hooks
+│   │       └── stores/             # Canvas Zustand stores
 │   │
 │   └── editor/                     # Editor app (stub)
 │       └── src/
@@ -124,7 +133,12 @@ Orbit/
 │   │   │   │   ├── agent.rs
 │   │   │   │   ├── ai.rs
 │   │   │   │   └── conversations.rs
-│   │   │   ├── canvas/             # Canvas commands (stub)
+│   │   │   ├── canvas/             # Canvas UI Builder commands
+│   │   │   │   ├── setup.rs        # ~/.orbit/canvas directory management
+│   │   │   │   ├── download.rs     # Download shadcn components
+│   │   │   │   ├── save.rs         # Save/export customized components
+│   │   │   │   ├── preview.rs      # Vite preview server lifecycle
+│   │   │   │   └── tests.rs        # Type serialization tests
 │   │   │   └── editor/             # Editor commands (stub)
 │   │   ├── agent/                  # Agent bridge (Rust side)
 │   │   ├── lib.rs
@@ -424,135 +438,9 @@ This project includes AI coding assistant skills adapted from [Vercel's agent-sk
 - `anim-transform-origin` - Animate from contextually meaningful locations
 - `anim-interruptible` - Ensure animations can be smoothly interrupted
 
-### Quick Reference
-
-```typescript
-// ✅ Parallel async operations
-const [files, status] = await Promise.all([
-  invoke('list_directory', { path }),
-  invoke('get_git_status', { path })
-])
-
-// ✅ Dynamic import for heavy components
-const CodeMirrorEditor = React.lazy(() => import('./CodeMirrorEditor'))
-
-// ✅ Stable callback with functional setState
-const increment = useCallback(() => setCount(c => c + 1), [])
-
-// ✅ Read state in handler without subscribing
-const handleSave = () => {
-  const { activeFile } = useFileStore.getState()
-  // ...
-}
-
-// ✅ Accessible icon button
-<button aria-label="Close dialog" onClick={onClose}>
-  <X className="h-4 w-4" />
-</button>
-
-// ✅ Animation: only transform/opacity, custom easing, reduced motion
-.button {
-  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@media (prefers-reduced-motion: reduce) {
-  .button { transition: none; }
-}
-
-// ✅ Framer Motion with reduced motion support
-const shouldReduceMotion = useReducedMotion();
-<motion.div
-  animate={{ scale: 1 }}
-  transition={{ duration: shouldReduceMotion ? 0.01 : 0.2 }}
-/>
-```
-
-See `.claude/skills/` for the complete guidelines with all rules and examples.
+See `.claude/skills/` for complete guidelines. Code examples in `CLAUDE-CONTINUOUS.md`.
 
 ## Module Organization Patterns
-
-### Frontend (TypeScript) - Barrel Pattern
-
-Use `index.ts` barrel files to organize exports. Every folder with multiple files should have an `index.ts`.
-
-**Structure:**
-
-```text
-components/chat/messages/
-├── index.ts              ← Barrel file (exports all public items)
-├── MessageItem.tsx       ← Main component
-├── ToolWidgetRenderer.tsx
-├── message-utils.ts      ← Utilities
-└── types.ts              ← Types
-```
-
-**Barrel file pattern:**
-
-```typescript
-// index.ts
-export { MessageItem } from './MessageItem';
-export { ToolWidgetRenderer } from './ToolWidgetRenderer';
-export type { ChatMessage, MessageItemProps } from './types';
-export { buildSegments } from './message-utils';
-```
-
-**For folders with subfolders** (e.g., `components/`, `hooks/`):
-
-```text
-primary-sidebar/
-├── index.ts              ← Imports from subfolders
-├── PrimarySidebar.tsx
-├── types.ts
-├── components/
-│   ├── index.ts          ← Subfolder barrel
-│   └── *.tsx
-└── hooks/
-    ├── index.ts          ← Subfolder barrel
-    └── *.ts
-```
-
-**Two valid sub-patterns:**
-
-| Pattern         | When to Use                             | Example                                   |
-| --------------- | --------------------------------------- | ----------------------------------------- |
-| **Full export** | Reusable component libraries            | `chat/tools/` - all widgets exported      |
-| **Facade**      | Complex modules with single entry point | `chat/input/` - only `ChatInput` exported |
-
-### Backend (Rust) - Explicit Paths
-
-For Tauri commands, use **explicit module paths** (no barrel re-exports). This is appropriate because:
-
-1. Commands are registered by function reference, not imported by users
-2. Frontend calls commands by string name via `invoke('command_name')`
-3. Explicit paths make code easier to trace
-
-**Structure:**
-
-```rust
-// commands/mod.rs - Just declare modules
-pub mod agent;
-pub mod common;
-
-// commands/common/mod.rs - Declare submodules
-pub mod files;
-pub mod git;
-pub mod terminal;
-
-// No `pub use` needed - commands use full paths
-```
-
-**For shared types in crates**, use selective re-exports:
-
-```rust
-// crates/common/core/src/lib.rs
-pub mod types;
-pub mod error;
-
-// Re-export commonly used types for convenience
-pub use error::{Error, Result};
-pub use types::{FileStatus, GitStatus};
-```
-
-**Summary:**
 
 | Layer              | Pattern                 | Reason                            |
 | ------------------ | ----------------------- | --------------------------------- |
@@ -560,15 +448,21 @@ pub use types::{FileStatus, GitStatus};
 | Tauri commands     | **Explicit paths**      | Internal, registered by function  |
 | Shared Rust crates | **Selective re-export** | Convenience for cross-crate types |
 
+- **Frontend:** Every folder with multiple files should have an `index.ts` barrel
+- **Rust commands:** Use explicit `pub mod` declarations, no re-exports
+- **Shared crates:** Re-export commonly used types at crate root
+
+See `CLAUDE-CONTINUOUS.md` for detailed examples.
+
 ## Monorepo Structure
 
 ### Apps (`apps/`)
 
-| App      | Description                | Status |
-| -------- | -------------------------- | ------ |
-| `agent`  | Chat/AI agent interface    | Active |
-| `canvas` | Design canvas (Figma-like) | Stub   |
-| `editor` | Code editor                | Stub   |
+| App                 | Description                          | Status |
+| ------------------- | ------------------------------------ | ------ |
+| `agent`             | Chat/AI agent interface              | Active |
+| `Canvas-UI-Builder` | Visual component builder with shadcn | Active |
+| `editor`            | Code editor                          | Stub   |
 
 ### Shared Crates (`crates/common/`)
 
@@ -584,12 +478,12 @@ pub use types::{FileStatus, GitStatus};
 
 ### Commands (`src-tauri/src/commands/`)
 
-| Folder    | Description                                  |
-| --------- | -------------------------------------------- |
-| `common/` | Shared commands (files, terminal, git, etc.) |
-| `agent/`  | Agent-specific commands (ai, conversations)  |
-| `canvas/` | Canvas-specific commands (stub)              |
-| `editor/` | Editor-specific commands (stub)              |
+| Folder    | Description                                        |
+| --------- | -------------------------------------------------- |
+| `common/` | Shared commands (files, terminal, git, etc.)       |
+| `agent/`  | Agent-specific commands (ai, conversations)        |
+| `canvas/` | Canvas UI Builder (setup, download, save, preview) |
+| `editor/` | Editor-specific commands (stub)                    |
 
 ## Implementation Status
 
@@ -607,10 +501,10 @@ pub use types::{FileStatus, GitStatus};
 - [x] Bun workspace management
 - [x] CI/CD with GitHub Actions
 - [x] Embedded browser panel (WebKit via Tauri multiwebview)
+- [x] Canvas UI Builder (setup, download, preview, save, export)
 
 ### In Progress
 
-- [ ] Canvas app implementation
 - [ ] Editor app implementation
 - [ ] Shared packages extraction
 
@@ -624,36 +518,12 @@ pub use types::{FileStatus, GitStatus};
 
 ### Zod Schema Validation Errors
 
-**IMPORTANT:** If you encounter runtime errors or unexpected behavior with data parsing/validation, **check the Zod schemas first** before debugging elsewhere.
-
-Common symptoms:
-
-- "Invalid credentials" or "No credentials found" errors
-- Data parsing silently returning `null`
-- "Unrecognized keys" or "Invalid input: expected X, received Y" in logs
-
-**Root cause:** Schemas using `.strict()` will reject data with extra fields, and type mismatches (e.g., `number` vs `string`) cause validation failures.
-
-**Where to look:**
+If you see "Invalid credentials", "Unrecognized keys", or parsing errors, **check Zod schemas first**:
 
 - `agent-bridge/src/schemas.ts` - Bridge IPC schemas
 - `packages/shared-schemas/` - Shared validation schemas
 
-**Quick fix pattern:**
-
-- For **external data** (APIs, Keychain, SDK responses): Use `.loose()` instead of `.strict()`
-- For **type mismatches**: Use `z.union([z.number(), z.string()])` for flexible types
-- For **internal data** (your own code): `.strict()` is fine
-
-**Example fix (from KeychainCredentialsSchema):**
-
-```typescript
-// BAD: Too strict for external data
-.object({ expiresAt: z.string() }).strict()
-
-// GOOD: Flexible for external data that may change
-.object({ expiresAt: z.union([z.number(), z.string()]) }).loose()
-```
+**Quick fix:** Use `.loose()` for external data, `.strict()` for internal. See `CLAUDE-CONTINUOUS.md` for examples.
 
 ### Integration Test Coverage
 
@@ -683,116 +553,21 @@ Common symptoms:
 
 ### Mandatory Test Requirements
 
-**CRITICAL:** Tests are not optional. We follow **real integration testing**, not unit testing with mocks.
+**CRITICAL:** We follow **real integration testing**, not unit testing with mocks.
 
-#### Testing Philosophy
+| ❌ DO NOT                        | ✅ DO                                |
+| -------------------------------- | ------------------------------------ |
+| Mock the Claude SDK              | Use REAL Claude API calls            |
+| Test single files in isolation   | Test full module integration         |
+| Use fake data that always passes | Use real data through real pipelines |
 
-1. **NO MOCK DATA** - Tests must use real systems, real API calls, real data flows
-2. **NO FAKE PASSES** - A test that just "passes" without exercising real code paths is worthless
-3. **FULL INTEGRATION** - Test the entire system flow, not isolated files
-4. **INDUSTRY STANDARD** - Follow proper integration testing practices used in production systems
-
-#### What We Test
-
-| ❌ DO NOT                        | ✅ DO                                    |
-| -------------------------------- | ---------------------------------------- |
-| Mock the Claude SDK              | Use REAL Claude API calls                |
-| Test single files in isolation   | Test full module integration             |
-| Use fake data that always passes | Use real data through real pipelines     |
-| Skip API calls to "save time"    | Make actual API calls to verify behavior |
-| Test only the happy path         | Test error paths, edge cases, cleanup    |
-
-#### Test Structure
-
-```text
-agent-bridge/src/__tests__/
-├── canvas-e2e.test.ts       # Full Canvas integration (REAL SDK, REAL sessions)
-├── canvas-types.test.ts     # Type/schema validation
-└── [feature]-e2e.test.ts    # Each feature gets E2E tests
-```
-
-#### When Adding/Modifying Code
-
-1. **When creating a new file:**
-   - Add tests to the relevant E2E test file (e.g., `canvas-e2e.test.ts`)
-   - Tests must exercise the FULL flow through real systems
-   - Run the complete test suite to verify integration
-   - Add the ⚠️ TESTED comment to the source file
-
-2. **When modifying a file that has existing tests:**
-   - Find the E2E test file for that module
-   - **ADD NEW TESTS** that cover your new functionality
-   - Tests must verify the new code integrates with existing systems
-   - Do NOT just run existing tests - that defeats the purpose
-   - Run the FULL test suite to verify nothing broke
-
-3. **When modifying a file without existing tests:**
-   - Create E2E tests if the module doesn't have them
-   - Tests must cover the full integration path
-
-#### Test Checklist Before PR
-
-- [ ] Added tests for ALL new functionality
-- [ ] Tests use REAL systems (no mocks for core functionality)
-- [ ] Tests verify FULL integration flow
-- [ ] Tests cover error cases and cleanup
-- [ ] Ran complete test suite: `cd agent-bridge && bun test`
-- [ ] All tests pass with real API calls
-
-#### Running Tests Locally (IMPORTANT)
-
-**Integration tests MUST be run locally** - they will NOT pass in GitHub Actions CI.
-
-**Why?** The integration tests require Claude API credentials, which are provided via OAuth through the Claude Code CLI. OAuth credentials are stored in the macOS Keychain and are only available on local development machines. GitHub Actions runners don't have access to this keychain, so integration tests are automatically skipped in CI.
+**Running Tests:**
 
 ```bash
-# Run tests locally (OAuth credentials available via Claude Code CLI)
-cd agent-bridge
-bun test
-
-# All integration tests will run with real Claude SDK connections
-# ✅ Pass = Code works with real Claude API
+cd agent-bridge && bun test   # Integration tests (run locally, skipped in CI)
 ```
 
-**Test Skip Logic:**
-
-Tests use `describe.skipIf(process.env.GITHUB_ACTIONS === 'true')` to:
-
-- **Run locally**: OAuth from Claude Code CLI keychain is available
-- **Skip in CI**: GitHub Actions has no OAuth access, tests would fail with "No credentials found"
-
-**If tests fail locally with "No credentials found":**
-
-1. Ensure Claude Code CLI is installed and authenticated
-2. Run `claude --version` to verify CLI is working
-3. The CLI stores OAuth tokens in macOS Keychain automatically
-
-### Tauri WebView Blur/Rendering Issues
-
-**IMPORTANT:** Tauri's WebView (WKWebView on macOS) has different rendering behavior than Chrome/Electron. Certain CSS properties cause blurry/fuzzy text and elements during interactions (hover, click, transitions).
-
-#### CSS Properties That Cause Blur in Tauri WebView
-
-The following CSS properties trigger GPU compositing issues that result in momentary or persistent blur:
-
-| Property                                       | Effect                                             | Solution                                                  |
-| ---------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------- |
-| `backdrop-filter: blur()`                      | Causes blur on the element and surrounding content | Remove entirely or use solid backgrounds                  |
-| `color-mix()` CSS function                     | Triggers repaints that cause momentary blur        | Replace with solid CSS variables or `rgba()`              |
-| `transition` on hover/click                    | GPU compositing during transition causes blur      | Remove transitions or use only on non-critical elements   |
-| `animation` with `scale()`                     | Scale transforms cause blur during animation       | Remove scale animations or use opacity-only               |
-| `opacity` transitions combined with transforms | Compound effect causes severe blur                 | Avoid combining opacity transitions with other transforms |
-
-#### Quick Checklist for Tauri-Compatible CSS
-
-- [ ] No `backdrop-filter: blur()` on interactive elements
-- [ ] No `color-mix()` function - use CSS variables or `rgba()` instead
-- [ ] No `transition` on elements inside ReactFlow's transformed viewport
-- [ ] No `animation` on elements inside ReactFlow's transformed viewport
-- [ ] Avoid combining `opacity` transitions with other transforms
-- [ ] Test in Tauri app, not just browser (blur won't appear in browser)
-
-**Note:** `will-change: transform` does NOT fix blur. Remove transitions/animations entirely for ReactFlow viewport elements.
+**Note:** Tests require Claude Code CLI OAuth credentials (macOS Keychain). They auto-skip in GitHub Actions.
 
 ### Known Security Vulnerabilities
 
@@ -812,14 +587,13 @@ CVE-2026-0621: ReDoS in UriTemplate. Low practical risk (local sidecar only). Up
 
 ```text
 apps/
-├── agent/src/globals.css     ← SOURCE OF TRUTH for all colors
-└── canvas/src/globals.css    ← Canvas-specific styles only (NO color definitions)
+├── agent/src/globals.css              ← SOURCE OF TRUTH for all colors
+└── Canvas-UI-Builder/src/globals.css  ← Canvas-specific styles only (NO color definitions)
 ```
 
 ### Import Order (apps/agent/src/main.tsx)
 
 ```typescript
-import '@xyflow/react/dist/style.css'; // ReactFlow base styles
 import './globals.css'; // Agent colors (source of truth)
 import '@canvas/globals.css'; // Canvas styles (no color overrides)
 ```
@@ -852,49 +626,97 @@ All color variables are defined in `apps/agent/src/globals.css`:
 2. Add the Tailwind mapping in `@theme inline { }` block
 3. Canvas will automatically have access to the new variable
 
-## Canvas App
+## Canvas UI Builder
 
-The Canvas app is embedded within the Agent app as a mode/tab (not a separate Tauri window).
+The Canvas UI Builder is a visual component customization tool that lets you browse, customize, and export shadcn/ui components.
 
 ### Architecture
 
 ```text
-┌─────────────────────────────────────────────────┐
-│  Orbit App (Single Tauri Window)                │
-│  ┌───────────────────────────────────────────┐  │
-│  │  HeaderBar [Agent] [Canvas] [Editor]      │  │
-│  └───────────────────────────────────────────┘  │
-│  ┌───────────────────────────────────────────┐  │
-│  │  activeTab === 'agent'  → RootLayout      │  │
-│  │  activeTab === 'canvas' → CanvasApp       │  │
-│  │  activeTab === 'editor' → EditorMode      │  │
-│  └───────────────────────────────────────────┘  │
-│  ┌───────────────────────────────────────────┐  │
-│  │  StatusBar                                │  │
-│  └───────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  Canvas UI Builder                                               │
+│  ┌─────────────┬──────────────────────┬───────────────────────┐ │
+│  │ Left Sidebar│   Preview Panel      │   Inspector Panel     │ │
+│  │             │                      │                       │ │
+│  │ Component   │   Live component     │   Props Editor        │ │
+│  │ Library     │   preview via Vite   │   (variant, size,     │ │
+│  │             │   dev server         │    disabled, etc.)    │ │
+│  │             │                      │                       │ │
+│  │ [Button]    │   ┌──────────────┐   │   Variant: [default]  │ │
+│  │ [Card]      │   │   Button     │   │   Size: [md]          │ │
+│  │ [Dialog]    │   │   Preview    │   │   Disabled: [ ]       │ │
+│  │ [Input]     │   └──────────────┘   │                       │ │
+│  │ ...         │                      │   [Save Component]    │ │
+│  └─────────────┴──────────────────────┴───────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Canvas Libraries
+### First-Run Setup
 
-- **@xyflow/react** (ReactFlow) - Node-based canvas
-- **@codesandbox/sandpack-react** - Code playground integration
-- **Zustand** - State management (`apps/canvas/src/stores/`)
+On first launch, the `CanvasSetupWizard` initializes `~/.orbit/canvas/`:
+
+1. Creates directory structure
+2. Downloads shadcn/ui components from registry
+3. Sets up Vite preview server config
+4. Installs npm dependencies
+
+### Backend Commands (Rust)
+
+| Command                       | Description                              |
+| ----------------------------- | ---------------------------------------- |
+| `canvas_check_setup`          | Check if ~/.orbit/canvas is initialized  |
+| `canvas_initialize`           | Create directory structure               |
+| `canvas_download_components`  | Download shadcn components from registry |
+| `canvas_start_preview_server` | Start Vite dev server for live preview   |
+| `canvas_stop_preview_server`  | Stop the preview server                  |
+| `canvas_save_component`       | Save customized component to registry    |
+| `canvas_export_to_project`    | Export component to external project     |
+
+### Frontend Hooks
+
+| Hook                   | Description                         |
+| ---------------------- | ----------------------------------- |
+| `useCanvasSetup`       | Setup state and initialization flow |
+| `useComponentRegistry` | Local component registry CRUD       |
+| `usePreviewServer`     | Preview server lifecycle management |
 
 ### Canvas Directory Structure
 
 ```text
-apps/canvas/src/
-├── components/          # React components (nodes, panels, toolbars)
-├── hooks/               # Custom React hooks
-├── lib/                 # Utilities and design tokens
-├── types/               # TypeScript type definitions
-├── config/              # Configuration files
-├── sandpack/            # Sandpack integration
-├── stores/              # Zustand stores
-├── main.tsx             # Entry point (standalone mode only)
-├── globals.css          # Canvas styles (no colors!)
-└── CanvasApp.tsx        # Root component (imported by agent)
+apps/Canvas-UI-Builder/src/
+├── components/
+│   ├── setup/              # CanvasSetupWizard
+│   ├── inspector/          # InspectorPanel, PropsEditor
+│   ├── preview/            # PreviewPanel (Vite iframe)
+│   ├── sidebar/            # ComponentList
+│   ├── dialogs/            # SaveComponentDialog
+│   └── layout/             # CanvasRootLayout, sidebars
+├── hooks/
+│   ├── use-canvas-setup.ts
+│   ├── use-component-registry.ts
+│   └── use-preview-server.ts
+├── stores/
+│   ├── css-customization-store.ts
+│   └── design-tokens-store.ts
+├── CanvasApp.tsx           # Root component
+└── globals.css             # Canvas styles (no colors!)
+```
+
+### ~/.orbit/canvas Structure
+
+```text
+~/.orbit/canvas/
+├── components/
+│   └── ui/                 # Downloaded shadcn components
+│       ├── button.tsx
+│       ├── card.tsx
+│       └── ...
+├── lib/
+│   └── utils.ts            # cn() utility
+├── registry/
+│   └── local.json          # Saved customized components
+├── package.json            # Dependencies
+└── vite.config.ts          # Preview server config
 ```
 
 ---
@@ -914,18 +736,9 @@ For detailed documentation on specific features, see the `docs/` folder:
 
 ### January 2026
 
-- **Added Agent Skills** - Integrated Vercel's agent-skills for React best practices and web design guidelines
-  - `.claude/skills/react-best-practices.md` - 45 rules across 8 categories from Vercel Engineering
-  - `.claude/skills/web-design-guidelines.md` - 100+ accessibility, UX, and performance rules
-  - Source: [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills)
-- **Embedded browser panel** - True embedded WebKit browser via Tauri's `unstable` feature (multiwebview)
-  - See `docs/architecture/EMBEDDED_BROWSER.md` for implementation details and known issues
-- **Migrated from pnpm to Bun** - All package management now uses Bun for faster installs and unified tooling
-  - Removed `pnpm-workspace.yaml` - workspaces defined in `package.json`
-  - Removed `pnpm-lock.yaml` - replaced by `bun.lockb`
-  - Updated all scripts, CI workflows, and husky hooks to use `bun`
-  - Added comprehensive `lint-all.sh` script for running all checks
-- **Added comprehensive audit** - Aligned all linting, TypeScript, and CI checks across the monorepo
-- **Documented module organization patterns** - Barrel pattern for frontend, explicit paths for Rust backend
-  - Frontend: Every folder with multiple files gets an `index.ts` barrel
-  - Backend: Tauri commands use explicit paths, shared crates use selective re-exports
+- **Canvas UI Builder** - Visual component builder with shadcn/ui (Rust backend + React frontend)
+- **Agent Skills** - Vercel's react-best-practices and web-design-guidelines
+- **Embedded browser** - WebKit via Tauri multiwebview
+- **pnpm → Bun** migration
+
+See `CLAUDE-CONTINUOUS.md` for detailed changelog.

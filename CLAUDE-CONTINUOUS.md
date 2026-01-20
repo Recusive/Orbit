@@ -114,6 +114,16 @@ it('should route simple requests to fast path via real session', async () => {
 
 ## Tauri WebView Blur - Detailed Examples
 
+### Quick Reference
+
+Tauri's WKWebView has rendering quirks. **Avoid these CSS properties** on interactive elements:
+
+- `backdrop-filter: blur()` → Use solid backgrounds
+- `color-mix()` → Use CSS variables or `rgba()`
+- `transition` / `animation` inside ReactFlow viewport → Remove entirely
+
+**Note:** `will-change: transform` does NOT fix blur.
+
 ### Example: Fixing Blurry Nodes in ReactFlow
 
 **Problem:** Workflow nodes in Canvas app appeared blurry in Tauri but crisp in browser.
@@ -195,10 +205,173 @@ bun pm view @modelcontextprotocol/sdk version  # Check latest version
 
 ---
 
+## Agent Skills - Extended Code Examples
+
+### Quick Reference (moved from CLAUDE.md)
+
+```typescript
+// ✅ Parallel async operations
+const [files, status] = await Promise.all([
+  invoke('list_directory', { path }),
+  invoke('get_git_status', { path })
+])
+
+// ✅ Dynamic import for heavy components
+const CodeMirrorEditor = React.lazy(() => import('./CodeMirrorEditor'))
+
+// ✅ Stable callback with functional setState
+const increment = useCallback(() => setCount(c => c + 1), [])
+
+// ✅ Read state in handler without subscribing
+const handleSave = () => {
+  const { activeFile } = useFileStore.getState()
+  // ...
+}
+
+// ✅ Accessible icon button
+<button aria-label="Close dialog" onClick={onClose}>
+  <X className="h-4 w-4" />
+</button>
+```
+
+### Animation Examples
+
+```css
+/* ✅ Animation: only transform/opacity, custom easing, reduced motion */
+.button {
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+}
+```
+
+```typescript
+// ✅ Framer Motion with reduced motion support
+const shouldReduceMotion = useReducedMotion();
+<motion.div
+  animate={{ scale: 1 }}
+  transition={{ duration: shouldReduceMotion ? 0.01 : 0.2 }}
+/>
+```
+
+---
+
+## Module Organization - Extended Examples
+
+### Frontend Barrel Pattern (Detailed)
+
+**Structure:**
+
+```text
+components/chat/messages/
+├── index.ts              ← Barrel file (exports all public items)
+├── MessageItem.tsx       ← Main component
+├── ToolWidgetRenderer.tsx
+├── message-utils.ts      ← Utilities
+└── types.ts              ← Types
+```
+
+**Barrel file pattern:**
+
+```typescript
+// index.ts
+export { MessageItem } from './MessageItem';
+export { ToolWidgetRenderer } from './ToolWidgetRenderer';
+export type { ChatMessage, MessageItemProps } from './types';
+export { buildSegments } from './message-utils';
+```
+
+**For folders with subfolders** (e.g., `components/`, `hooks/`):
+
+```text
+primary-sidebar/
+├── index.ts              ← Imports from subfolders
+├── PrimarySidebar.tsx
+├── types.ts
+├── components/
+│   ├── index.ts          ← Subfolder barrel
+│   └── *.tsx
+└── hooks/
+    ├── index.ts          ← Subfolder barrel
+    └── *.ts
+```
+
+### Backend Rust Pattern (Detailed)
+
+```rust
+// commands/mod.rs - Just declare modules
+pub mod agent;
+pub mod common;
+
+// commands/common/mod.rs - Declare submodules
+pub mod files;
+pub mod git;
+pub mod terminal;
+
+// No `pub use` needed - commands use full paths
+```
+
+**For shared types in crates:**
+
+```rust
+// crates/common/core/src/lib.rs
+pub mod types;
+pub mod error;
+
+// Re-export commonly used types for convenience
+pub use error::{Error, Result};
+pub use types::{FileStatus, GitStatus};
+```
+
+---
+
+## Zod Schema - Extended Examples
+
+### Example Fix (from KeychainCredentialsSchema)
+
+```typescript
+// BAD: Too strict for external data
+.object({ expiresAt: z.string() }).strict()
+
+// GOOD: Flexible for external data that may change
+.object({ expiresAt: z.union([z.number(), z.string()]) }).loose()
+```
+
+### Common Patterns
+
+```typescript
+// For API responses with unknown extra fields
+const ApiResponseSchema = z
+  .object({
+    data: z.unknown(),
+    status: z.number(),
+  })
+  .passthrough(); // or .loose()
+
+// For internal data with strict shape
+const InternalStateSchema = z
+  .object({
+    count: z.number(),
+    items: z.array(z.string()),
+  })
+  .strict();
+```
+
+---
+
 ## Changelog - Extended History
 
 ### January 2026
 
+- **Canvas UI Builder** - Complete visual component builder with shadcn/ui integration
+  - Rust backend: setup, download, save, preview, export commands in `src-tauri/src/commands/canvas/`
+  - React frontend: setup wizard, inspector panel, live preview, component library
+  - First-run setup initializes `~/.orbit/canvas/` with shadcn components
+  - Vite-based live preview server for real-time component rendering
+  - Save customized components to local registry, export to external projects
 - **Added Agent Skills** - Integrated Vercel's agent-skills for React best practices and web design guidelines
   - `.claude/skills/react-best-practices.md` - 45 rules across 8 categories from Vercel Engineering
   - `.claude/skills/web-design-guidelines.md` - 100+ accessibility, UX, and performance rules
