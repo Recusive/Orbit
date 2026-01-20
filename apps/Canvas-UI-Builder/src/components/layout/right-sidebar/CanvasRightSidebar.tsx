@@ -2,14 +2,17 @@
  * CanvasRightSidebar - Right properties/layers sidebar for Canvas UI Builder
  *
  * Shows properties panel for selected elements and layers panel for canvas hierarchy.
+ * The Properties tab contains the CSS property editor for live preview editing.
  */
-import { Box, Layers, Palette, Settings2 } from 'lucide-react';
+import { Box, Code, Layers, Palette } from 'lucide-react';
 import { useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import { SidebarItem } from '../left-sidebar/components/SidebarItem';
 import { SidebarToggleIcon } from '../left-sidebar/components/SidebarToggleIcon';
 import { TabButton } from '../left-sidebar/components/TabButton';
+
+import { PropertiesPanel } from './PropertiesPanel';
 
 import type { FC } from 'react';
 
@@ -18,13 +21,60 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn, getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui/ui-store';
 
-type RightSidebarTab = 'properties' | 'layers';
+type RightSidebarTab = 'properties' | 'code' | 'layers';
+
+// ============================================
+// CodePanel - Source Code Viewer
+// ============================================
+
+interface CodePanelProps {
+  readonly selectedComponentName: string | null;
+}
+
+const CodePanel: FC<CodePanelProps> = ({ selectedComponentName }) => {
+  if (!selectedComponentName) {
+    return (
+      <div className="p-3">
+        <div className="text-sm text-muted-foreground text-center py-8">
+          <Code className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p className="text-xs">Select a component to view its source code</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Format component name for display
+  const displayName = selectedComponentName
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+
+  return (
+    <div className="p-3">
+      <div className="flex items-center gap-2 mb-3">
+        <Code className="h-4 w-4" />
+        <span className="text-sm font-medium text-foreground">
+          {selectedComponentName}.tsx
+        </span>
+      </div>
+      <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
+        <div className="p-4 text-center text-muted-foreground">
+          <p className="text-xs mb-2">Source code viewing coming soon</p>
+          <p className="text-xs opacity-70">
+            Preview the {displayName} component in the canvas
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface CanvasRightSidebarProps {
   readonly width: number;
+  readonly selectedComponentName: string | null;
 }
 
-export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({ width }) => {
+export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({ width, selectedComponentName }) => {
   const { toggleCanvasRightSidebar } = useUIStore(
     useShallow((s) => ({
       toggleCanvasRightSidebar: s.toggleCanvasRightSidebar,
@@ -110,6 +160,13 @@ export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({ width }) => {
           }}
         />
         <TabButton
+          label="Code"
+          active={activeTab === 'code'}
+          onClick={() => {
+            setActiveTab('code');
+          }}
+        />
+        <TabButton
           label="Layers"
           active={activeTab === 'layers'}
           onClick={() => {
@@ -147,39 +204,18 @@ export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({ width }) => {
         )}
       >
         {activeTab === 'properties' ? (
-          /* Properties Tab Content */
+          /* Properties Tab Content - CSS Editor */
           <div
             className={cn(
-              'p-3 transition-opacity duration-150',
+              'transition-opacity duration-150',
               isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
             )}
           >
-            <div className="text-sm text-muted-foreground">
-              <div className="flex items-center gap-2 mb-3">
-                <Settings2 className="h-4 w-4" />
-                <span className="font-medium text-foreground">Properties</span>
-              </div>
-              <p className="text-xs mb-3">Select an element to view its properties</p>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span>Width</span>
-                  <span className="text-foreground/60">—</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span>Height</span>
-                  <span className="text-foreground/60">—</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span>X Position</span>
-                  <span className="text-foreground/60">—</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span>Y Position</span>
-                  <span className="text-foreground/60">—</span>
-                </div>
-              </div>
-            </div>
+            <PropertiesPanel selectedComponentName={selectedComponentName} />
           </div>
+        ) : activeTab === 'code' ? (
+          /* Code Tab Content - Source Code Viewer */
+          <CodePanel selectedComponentName={selectedComponentName} />
         ) : (
           /* Layers Tab Content */
           <div

@@ -7,6 +7,7 @@
  * - Right sidebar (properties, layers)
  * - No activity panel, terminal, or editor
  */
+import { useCSSOverrides } from '@canvas/stores';
 import { useCallback, useEffect, useState } from 'react';
 
 import { CanvasInputArea } from './canvas-input';
@@ -55,6 +56,7 @@ export const CanvasRootLayout: FC = () => {
   const leftSidebarWidth = useUIStore((state) => state.leftSidebarWidth);
   const canvasRightSidebarWidth = useUIStore((state) => state.canvasRightSidebarWidth);
   const theme = useEffectiveTheme();
+  const cssOverrides = useCSSOverrides();
 
   // Selected component name for preview
   const [selectedComponentName, setSelectedComponentName] = useState<string | null>(null);
@@ -80,7 +82,7 @@ export const CanvasRootLayout: FC = () => {
             className="relative rounded-lg border border-border/40 overflow-hidden"
             style={{ width: '100%', height: '100%', maxWidth: '800px', maxHeight: '600px' }}
           >
-            <ComponentPreview componentName={selectedComponentName} theme={theme} />
+            <ComponentPreview componentName={selectedComponentName} theme={theme} cssOverrides={cssOverrides} />
           </div>
         </div>
 
@@ -92,7 +94,7 @@ export const CanvasRootLayout: FC = () => {
       <RightResizeHandle />
 
       {/* Right Sidebar - Properties, layers, components */}
-      <CanvasRightSidebar width={canvasRightSidebarWidth} />
+      <CanvasRightSidebar width={canvasRightSidebarWidth} selectedComponentName={selectedComponentName} />
     </div>
   );
 };

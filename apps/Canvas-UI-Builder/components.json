@@ -1,0 +1,23 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@canvas/components",
+    "utils": "@canvas/lib/utils",
+    "ui": "@canvas/components/ui",
+    "lib": "@canvas/lib",
+    "hooks": "@canvas/hooks",
+    "blocks": "@canvas/components/blocks"
+  },
+  "registries": {}
+}

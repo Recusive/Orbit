@@ -81,4 +81,4 @@ reviews/
 
 # Local development/experiment directories
 json-render/
-ui/
+/ui/

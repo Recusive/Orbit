@@ -1,8 +1,8 @@
 /**
  * CanvasLeftSidebar - Left navigation sidebar for Canvas UI Builder
  *
- * Based on PrimarySidebar from Agent app with Canvas-specific branding.
- * Shows sessions, file explorer, and settings.
+ * Shows the available shadcn components for preview.
+ * Uses a static list of components that match DirectPreview's supported components.
  */
 import { FlaskConical, FolderOpen, Layers, Plus, Search, Settings } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
@@ -23,7 +23,28 @@ import type { FC } from 'react';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
-import { useUIStore, useIsLeftSidebarCollapsed } from '@/stores/ui/ui-store';
+import { useIsLeftSidebarCollapsed, useUIStore } from '@/stores/ui/ui-store';
+
+// ============================================
+// Static Component List
+// ============================================
+
+/**
+ * Available UI components for preview.
+ * These match the components supported by DirectPreview.
+ */
+const UI_COMPONENTS = [
+  { name: 'button', label: 'Button' },
+  { name: 'input', label: 'Input' },
+  { name: 'textarea', label: 'Textarea' },
+  { name: 'switch', label: 'Switch' },
+  { name: 'select', label: 'Select' },
+  { name: 'tooltip', label: 'Tooltip' },
+  { name: 'dialog', label: 'Dialog' },
+  { name: 'dropdown-menu', label: 'Dropdown Menu' },
+  { name: 'scroll-area', label: 'Scroll Area' },
+  { name: 'kbd', label: 'Kbd' },
+] as const;
 
 // Lazy load heavy components
 const LazySettingsDialog = lazy(() =>
@@ -37,64 +58,9 @@ const SettingsDialog: FC<SettingsDialogProps> = (props) => (
   </Suspense>
 );
 
-// Component library items
-const BLOCKS = ['Home', 'Elevenlabs', 'GitHub', 'Vercel', 'ChatGPT'];
-const COMPONENTS = [
-  'Accordion',
-  'Alert',
-  'Alert Dialog',
-  'Aspect Ratio',
-  'Avatar',
-  'Badge',
-  'Breadcrumb',
-  'Button',
-  'Button Group',
-  'Calendar',
-  'Card',
-  'Carousel',
-  'Chart',
-  'Checkbox',
-  'Collapsible',
-  'Combobox',
-  'Command',
-  'Context Menu',
-  'Dialog',
-  'Drawer',
-  'Dropdown Menu',
-  'Empty',
-  'Field',
-  'Hover Card',
-  'Input',
-  'Input Group',
-  'Input OTP',
-  'Item',
-  'Kbd',
-  'Label',
-  'Menubar',
-  'Native Select',
-  'Navigation Menu',
-  'Pagination',
-  'Popover',
-  'Progress',
-  'Radio Group',
-  'Resizable',
-  'Scroll Area',
-  'Select',
-  'Separator',
-  'Sheet',
-  'Sidebar',
-  'Skeleton',
-  'Slider',
-  'Sonner',
-  'Spinner',
-  'Switch',
-  'Table',
-  'Tabs',
-  'Textarea',
-  'Toggle',
-  'Toggle Group',
-  'Tooltip',
-];
+// ============================================
+// Component
+// ============================================
 
 export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onComponentSelect }) => {
   const {
@@ -114,8 +80,14 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
   );
   const isCollapsed = useIsLeftSidebarCollapsed();
 
+  // Local state for selected component and active tab
+  const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CanvasSidebarTab>('components');
-  const [activeItem, setActiveItem] = useState<string | null>(null);
+
+  const handleComponentSelect = (name: string): void => {
+    setSelectedComponent(name);
+    onComponentSelect?.(name);
+  };
 
   return (
     <aside
@@ -278,33 +250,16 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
               isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
             )}
           >
-            {/* Blocks Group */}
-            <CollapsibleGroup label="Blocks" defaultOpen={true}>
-              {BLOCKS.map((item, index) => (
+            {/* UI Components Group */}
+            <CollapsibleGroup label="UI Components" defaultOpen={true}>
+              {UI_COMPONENTS.map((component, index) => (
                 <SidebarMenuItem
-                  key={item}
-                  label={item}
-                  active={activeItem === item}
-                  isLast={index === BLOCKS.length - 1}
+                  key={component.name}
+                  label={component.label}
+                  active={selectedComponent === component.name}
+                  isLast={index === UI_COMPONENTS.length - 1}
                   onClick={() => {
-                    setActiveItem(item);
-                    onComponentSelect?.(item);
-                  }}
-                />
-              ))}
-            </CollapsibleGroup>
-
-            {/* Components Group */}
-            <CollapsibleGroup label="Components" defaultOpen={true}>
-              {COMPONENTS.map((item, index) => (
-                <SidebarMenuItem
-                  key={item}
-                  label={item}
-                  active={activeItem === item}
-                  isLast={index === COMPONENTS.length - 1}
-                  onClick={() => {
-                    setActiveItem(item);
-                    onComponentSelect?.(item);
+                    handleComponentSelect(component.name);
                   }}
                 />
               ))}

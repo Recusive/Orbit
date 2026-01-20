@@ -45,6 +45,7 @@ aes-gcm = { workspace = true }
 sha2 = { workspace = true }
 rand = { workspace = true }
 dirs = { workspace = true }
+reqwest = { workspace = true }
 crossbeam-channel = { workspace = true }
 hashbrown = { workspace = true }
 hostname = "0.4"  # For non-macOS device ID generation
