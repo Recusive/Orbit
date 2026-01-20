@@ -2,7 +2,7 @@
  * CanvasLeftSidebar - Left navigation sidebar for Canvas UI Builder
  *
  * Shows the available shadcn components for preview.
- * Uses a static list of components that match DirectPreview's supported components.
+ * Uses a static list of components that will be loaded from ~/.orbit/canvas.
  */
 import { FlaskConical, FolderOpen, Layers, Plus, Search, Settings } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
@@ -31,7 +31,7 @@ import { useIsLeftSidebarCollapsed, useUIStore } from '@/stores/ui/ui-store';
 
 /**
  * Available UI components for preview.
- * These match the components supported by DirectPreview.
+ * These will be loaded dynamically from ~/.orbit/canvas in the future.
  */
 const UI_COMPONENTS = [
   { name: 'button', label: 'Button' },

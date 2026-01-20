@@ -14,8 +14,5 @@ export { CanvasRightSidebar } from './right-sidebar';
 // Input area
 export { CanvasInputArea } from './canvas-input';
 
-// Preview area
-export { ComponentPreview, DirectPreview } from './canvas-preview';
-
 // Resize handles
 export { LeftResizeHandle, RightResizeHandle } from './resize-handles';

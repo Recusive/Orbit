@@ -7,11 +7,9 @@
  * - Right sidebar (properties, layers)
  * - No activity panel, terminal, or editor
  */
-import { useCSSOverrides } from '@canvas/stores';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { CanvasInputArea } from './canvas-input';
-import { ComponentPreview } from './canvas-preview';
 import { CanvasLeftSidebar } from './left-sidebar';
 import { LeftResizeHandle, RightResizeHandle } from './resize-handles';
 import { CanvasRightSidebar } from './right-sidebar';
@@ -21,33 +19,6 @@ import type { FC } from 'react';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 /**
- * Hook to track the current theme by watching the `dark` class on <html>.
- */
-function useEffectiveTheme(): 'light' | 'dark' {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
-    document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-  );
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      const isDark = document.documentElement.classList.contains('dark');
-      setTheme(isDark ? 'dark' : 'light');
-    });
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    });
-
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-
-  return theme;
-}
-
-/**
  * CanvasRootLayout is the Canvas mode content.
  * Renders left sidebar, canvas area with input, and right sidebar.
  * HeaderBar and StatusBar are rendered by App.tsx.
@@ -55,8 +26,6 @@ function useEffectiveTheme(): 'light' | 'dark' {
 export const CanvasRootLayout: FC = () => {
   const leftSidebarWidth = useUIStore((state) => state.leftSidebarWidth);
   const canvasRightSidebarWidth = useUIStore((state) => state.canvasRightSidebarWidth);
-  const theme = useEffectiveTheme();
-  const cssOverrides = useCSSOverrides();
 
   // Selected component name for preview
   const [selectedComponentName, setSelectedComponentName] = useState<string | null>(null);
@@ -76,13 +45,20 @@ export const CanvasRootLayout: FC = () => {
 
       {/* Canvas Area - Main design canvas with input */}
       <div className="flex-1 min-w-0 h-full flex flex-col bg-chat-area">
-        {/* Component Preview */}
+        {/* Component Preview - Will connect to ~/.orbit/canvas */}
         <div className="flex-1 flex items-center justify-center overflow-hidden p-4">
           <div
-            className="relative rounded-lg border border-border/40 overflow-hidden"
+            className="relative rounded-lg border border-border/40 overflow-hidden flex items-center justify-center bg-muted/30"
             style={{ width: '100%', height: '100%', maxWidth: '800px', maxHeight: '600px' }}
           >
-            <ComponentPreview componentName={selectedComponentName} theme={theme} cssOverrides={cssOverrides} />
+            <div className="text-center text-muted-foreground p-8">
+              <p className="text-lg font-medium mb-2">Preview will load from ~/.orbit/canvas</p>
+              <p className="text-sm opacity-70">
+                {selectedComponentName
+                  ? `Selected: ${selectedComponentName}`
+                  : 'Select a component from the sidebar'}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -94,7 +70,10 @@ export const CanvasRootLayout: FC = () => {
       <RightResizeHandle />
 
       {/* Right Sidebar - Properties, layers, components */}
-      <CanvasRightSidebar width={canvasRightSidebarWidth} selectedComponentName={selectedComponentName} />
+      <CanvasRightSidebar
+        width={canvasRightSidebarWidth}
+        selectedComponentName={selectedComponentName}
+      />
     </div>
   );
 };
