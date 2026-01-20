@@ -12,22 +12,39 @@ export async function handleFileTreeRequest(
 ): Promise<void> {
   try {
     // Get workspace path or use provided path
-    // Default to home directory if no path set
     let targetPath: string | undefined = message.path;
     if (targetPath === undefined || targetPath === '') {
       const storedPath = await getWorkspacePath();
       if (!storedPath) {
-        // No workspace path set - try to get home directory
-        try {
-          const { homeDir } = await import('@tauri-apps/api/path');
-          targetPath = await homeDir();
-        } catch {
-          // Fallback to root if home dir fails
-          targetPath = '/';
-        }
-      } else {
-        targetPath = storedPath;
+        // ─────────────────────────────────────────────────────────────────────
+        // WORKSPACE SANDBOXING (January 2026)
+        // ─────────────────────────────────────────────────────────────────────
+        // The Rust backend now enforces workspace sandboxing via ensure_workspace_paths()
+        // in src-tauri/src/commands/common/files.rs. All file operations MUST be within
+        // the workspace directory set via set_workspace_path().
+        //
+        // Previously this code fell back to homeDir() or '/', but that will now fail
+        // with "Workspace path not set" or "PermissionDenied" errors.
+        //
+        // If you're seeing file listing failures on app startup:
+        // 1. Ensure WelcomePage calls setWorkspacePath() before any file operations
+        // 2. Check that the user has selected a workspace folder
+        // 3. If you need to access paths outside workspace (e.g., ~/.orbit), add them
+        //    to an allow-list in the Rust ensure_within_workspace() function
+        // ─────────────────────────────────────────────────────────────────────
+        window.postMessage(
+          {
+            type: 'file:tree:response',
+            uuid: crypto.randomUUID(),
+            request_uuid: message.uuid,
+            path: '',
+            children: [],
+          },
+          '*'
+        );
+        return;
       }
+      targetPath = storedPath;
     }
 
     // Only update UI store workspace on initial load (when no specific path was requested)
@@ -121,23 +138,23 @@ export async function handleFileListRequest(
 ): Promise<void> {
   try {
     const storedPath = await getWorkspacePath();
-    let workspacePath: string;
     if (!storedPath) {
-      // No workspace path set - try to get home directory
-      try {
-        const { homeDir } = await import('@tauri-apps/api/path');
-        workspacePath = await homeDir();
-      } catch {
-        // Fallback to root if home dir fails
-        workspacePath = '/';
-      }
-    } else {
-      workspacePath = storedPath;
+      // No workspace set - return empty list (see WORKSPACE SANDBOXING comment above)
+      window.postMessage(
+        {
+          type: 'file:list:response',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          files: [],
+        },
+        '*'
+      );
+      return;
     }
 
     // Get all files recursively (flatten the tree)
     // For now, just list the root directory files
-    const entries = await listDirectory(workspacePath, false);
+    const entries = await listDirectory(storedPath, false);
     const files = entries
       .filter((entry: FileEntry) => !entry.isDir)
       .map((entry: FileEntry) => ({

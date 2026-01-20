@@ -7,6 +7,25 @@ import { createLogger } from '../logging/logger.js';
 
 const logger = createLogger('ClaudeCredentials');
 
+function parseExpiryMs(expiresAt: number | string): number | null {
+  if (typeof expiresAt === 'number') {
+    return Number.isFinite(expiresAt) ? expiresAt : null;
+  }
+
+  const trimmed = expiresAt.trim();
+  if (trimmed === '') return null;
+
+  // If it's all digits, treat as a millisecond timestamp string.
+  if (/^\d+$/.test(trimmed)) {
+    const asNumber = Number.parseInt(trimmed, 10);
+    return Number.isFinite(asNumber) ? asNumber : null;
+  }
+
+  // Otherwise, attempt to parse as ISO or RFC date.
+  const parsed = Date.parse(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 /**
  * Reads OAuth token from macOS Keychain where Claude Code CLI stores credentials
  * @returns OAuth access token if valid and not expired, null otherwise
@@ -65,8 +84,11 @@ function getOAuthTokenFromKeychain(): string | null {
 
     // Validate token expiration (expiresAt can be number or string)
     if (expiresAt !== undefined && expiresAt !== '') {
-      // Handle both number (timestamp) and string (may need parsing)
-      const expiryMs = typeof expiresAt === 'number' ? expiresAt : parseInt(expiresAt, 10);
+      const expiryMs = parseExpiryMs(expiresAt);
+      if (expiryMs === null) {
+        logger.warn({ expiresAt }, 'Invalid OAuth token expiry value');
+        return null;
+      }
       const expiryDate = new Date(expiryMs);
       const now = new Date();
 

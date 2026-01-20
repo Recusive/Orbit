@@ -159,8 +159,9 @@ function calculateDimensions(
 function checkTransparency(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): boolean {
   // Sample a grid of pixels to check for transparency (faster than checking all)
   const sampleSize = 10;
-  const stepX = Math.floor(canvas.width / sampleSize);
-  const stepY = Math.floor(canvas.height / sampleSize);
+  // Clamp step sizes to avoid zero-step infinite loops on tiny images.
+  const stepX = Math.max(1, Math.floor(canvas.width / sampleSize));
+  const stepY = Math.max(1, Math.floor(canvas.height / sampleSize));
 
   for (let x = 0; x < canvas.width; x += stepX) {
     for (let y = 0; y < canvas.height; y += stepY) {

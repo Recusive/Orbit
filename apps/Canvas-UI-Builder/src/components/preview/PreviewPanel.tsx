@@ -83,6 +83,13 @@ export const PreviewPanel: FC<PreviewPanelProps> = ({
   // Derived state to avoid Object.keys() in useEffect dependencies (rule: rerender-derived-state)
   const hasStyles = useMemo(() => Object.keys(styles).length > 0, [styles]);
   const hasProps = useMemo(() => Object.keys(props).length > 0, [props]);
+  const previewOrigin = useMemo(() => {
+    try {
+      return new URL(serverUrl).origin;
+    } catch {
+      return '';
+    }
+  }, [serverUrl]);
 
   // Get current theme from document
   const getCurrentTheme = useCallback((): 'light' | 'dark' => {
@@ -163,8 +170,8 @@ export const PreviewPanel: FC<PreviewPanelProps> = ({
   // Listen for messages from iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent<PreviewResponse>): void => {
-      // Verify origin for security (preview server runs on localhost:5199-5209)
-      if (!event.origin.includes('localhost:51')) return;
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      if (event.origin !== previewOrigin) return;
 
       const { type, error, exports: componentExports } = event.data;
 
@@ -186,7 +193,7 @@ export const PreviewPanel: FC<PreviewPanelProps> = ({
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [onReady, onError, onLoaded]);
+  }, [onReady, onError, onLoaded, previewOrigin]);
 
   // Load component when name changes
   useEffect(() => {
