@@ -130,6 +130,8 @@ export default defineConfig({
     include: [
       'streamdown',
       'shiki',
+      // lucide-react has 1,500+ icons - pre-bundling speeds up dev server imports
+      'lucide-react',
       // CodeMirror packages must be bundled together to avoid duplicate @codemirror/state instances
       '@codemirror/autocomplete',
       '@codemirror/commands',

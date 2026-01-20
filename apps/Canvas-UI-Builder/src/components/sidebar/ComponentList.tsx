@@ -55,6 +55,7 @@ const ComponentItem: FC<ComponentItemProps> = ({ component, isSelected, onClick 
       onClick={onClick}
       className={`
         w-full px-2 py-1.5 text-left text-sm rounded-md transition-colors
+        focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary
         ${isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted text-foreground'}
       `}
     >
@@ -86,7 +87,11 @@ export const ComponentList: FC<ComponentListProps> = ({ onSelectComponent, selec
   if (loading) {
     return (
       <div className="flex items-center justify-center p-4">
-        <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
+        <div
+          className="animate-spin motion-reduce:animate-none w-6 h-6 border-2 border-primary border-t-transparent rounded-full"
+          aria-hidden="true"
+        />
+        <span className="sr-only">Loading components…</span>
       </div>
     );
   }
@@ -101,11 +106,13 @@ export const ComponentList: FC<ComponentListProps> = ({ onSelectComponent, selec
       {/* Search Input */}
       <div className="p-3 border-b border-border">
         <Input
-          placeholder="Search components..."
+          placeholder="Search components…"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
           }}
+          autoComplete="off"
+          aria-label="Search components"
           className="h-8"
         />
       </div>

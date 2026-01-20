@@ -44,15 +44,18 @@ interface TabButtonProps {
 const TabButton: FC<TabButtonProps> = ({ active, onClick, icon, label }) => (
   <button
     onClick={onClick}
+    aria-selected={active}
+    role="tab"
     className={cn(
       'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors',
       'border-b-2 -mb-px',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
       active
         ? 'border-primary text-foreground'
         : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
     )}
   >
-    {icon}
+    <span aria-hidden="true">{icon}</span>
     {label}
   </button>
 );

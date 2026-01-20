@@ -39,6 +39,7 @@ export const SidebarMenuItem: FC<SidebarMenuItemProps> = ({
         className={cn(
           'w-full text-left px-2 py-1 rounded-md',
           'text-sm transition-colors duration-150',
+          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary',
           active
             ? 'bg-accent text-foreground font-medium'
             : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'

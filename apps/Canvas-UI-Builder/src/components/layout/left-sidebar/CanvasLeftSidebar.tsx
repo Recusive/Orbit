@@ -124,7 +124,8 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleLeftSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground"
+                  aria-label="Expand sidebar"
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <SidebarToggleIcon expanded={false} />
                 </button>
@@ -154,7 +155,8 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleLeftSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground"
+                  aria-label="Collapse sidebar"
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <SidebarToggleIcon expanded={true} />
                 </button>
@@ -183,19 +185,21 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
         }}
       >
         <button
-          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border border-border/50 w-full bg-muted/40 hover:bg-muted/60 hover:border-border/60 transition-[background-color,border-color,color] duration-200"
-          title="Search components..."
+          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border border-border/50 w-full bg-muted/40 hover:bg-muted/60 hover:border-border/60 transition-[background-color,border-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="Search components"
+          role="searchbox"
+          aria-readonly="true"
         >
           {/* Fixed-width icon column - never moves */}
           <div
             className="flex items-center justify-center shrink-0"
             style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
           >
-            <Search className="h-4 w-4 shrink-0" />
+            <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
           </div>
           {/* Text that slides in */}
           <span className="text-xs whitespace-nowrap overflow-hidden w-auto opacity-100">
-            Search...
+            Search…
           </span>
           <KbdGroup className="ml-auto mr-2">
             <Kbd className="bg-foreground/10 text-inherit border-foreground/15">⌘</Kbd>
@@ -270,8 +274,13 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
             {registryLoading ? (
               /* Loading state */
               <div className="flex items-center justify-center py-8 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                <span className="text-sm">Loading components...</span>
+                <Loader2
+                  className="h-5 w-5 animate-spin motion-reduce:animate-none mr-2"
+                  aria-hidden="true"
+                />
+                <span className="text-sm" aria-live="polite">
+                  Loading components…
+                </span>
               </div>
             ) : (
               <>

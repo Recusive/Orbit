@@ -11,7 +11,7 @@
  * - Number inputs for numeric props
  */
 import { Sliders } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import type { FC, ReactNode } from 'react';
 
@@ -140,8 +140,10 @@ const PropInput: FC<PropInputProps> = ({ definition, value, onChange }) => {
             onChange={(e) => {
               onChange(e.target.value);
             }}
+            autoComplete="off"
+            aria-label={name}
             className="h-8 text-sm font-mono"
-            placeholder={`Enter ${name}...`}
+            placeholder={`Enter ${name}…`}
           />
         );
 
@@ -153,6 +155,8 @@ const PropInput: FC<PropInputProps> = ({ definition, value, onChange }) => {
             onChange={(e) => {
               onChange(Number(e.target.value));
             }}
+            autoComplete="off"
+            aria-label={name}
             className="h-8 text-sm font-mono w-24"
           />
         );
@@ -220,11 +224,15 @@ export interface PropsEditorProps {
 export const PropsEditor: FC<PropsEditorProps> = ({ componentName, props, onChange }) => {
   const propDefs = componentName ? (COMPONENT_PROPS[componentName] ?? []) : [];
 
+  // Use ref to hold latest props to avoid callback recreation (rule: advanced-use-latest)
+  const propsRef = useRef(props);
+  propsRef.current = props;
+
   const updateProp = useCallback(
     (name: string, value: unknown): void => {
-      onChange({ ...props, [name]: value });
+      onChange({ ...propsRef.current, [name]: value });
     },
-    [props, onChange]
+    [onChange] // Only depends on onChange, not props
   );
 
   // No component selected

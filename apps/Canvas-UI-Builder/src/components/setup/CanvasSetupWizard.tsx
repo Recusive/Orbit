@@ -390,11 +390,18 @@ export const CanvasSetupWizard: FC<CanvasSetupWizardProps> = ({ orbitPath, onCom
         </div>
       </div>
 
-      {/* CSS for shimmer animation */}
+      {/* CSS for shimmer animation - respects reduced motion preference */}
       <style>{`
         @keyframes shimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(400%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-\\[shimmer_1\\.5s_ease-in-out_infinite\\] {
+            animation: none;
+            width: 100% !important;
+            opacity: 0.5;
+          }
         }
       `}</style>
     </div>

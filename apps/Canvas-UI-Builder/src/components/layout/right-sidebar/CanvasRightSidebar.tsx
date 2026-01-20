@@ -100,7 +100,8 @@ export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleCanvasRightSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground"
+                  aria-label="Expand sidebar"
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <SidebarToggleIcon expanded={false} direction="right" />
                 </button>
@@ -122,7 +123,8 @@ export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleCanvasRightSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground"
+                  aria-label="Collapse sidebar"
+                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <SidebarToggleIcon expanded={true} direction="right" />
                 </button>
@@ -228,18 +230,33 @@ export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({
                 <span className="font-medium text-foreground">Layers</span>
               </div>
               <p className="text-xs mb-3">Canvas layer hierarchy</p>
-              <ul className="space-y-1 text-xs">
-                <li className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer">
-                  <Box className="h-3 w-3" />
-                  <span>Frame 1</span>
+              <ul className="space-y-1 text-xs" role="tree">
+                <li role="treeitem">
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                  >
+                    <Box className="h-3 w-3" aria-hidden="true" />
+                    <span>Frame 1</span>
+                  </button>
                 </li>
-                <li className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer ml-3">
-                  <Box className="h-3 w-3" />
-                  <span>Button</span>
+                <li role="treeitem">
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer ml-3 w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                  >
+                    <Box className="h-3 w-3" aria-hidden="true" />
+                    <span>Button</span>
+                  </button>
                 </li>
-                <li className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer ml-3">
-                  <Box className="h-3 w-3" />
-                  <span>Text</span>
+                <li role="treeitem">
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer ml-3 w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                  >
+                    <Box className="h-3 w-3" aria-hidden="true" />
+                    <span>Text</span>
+                  </button>
                 </li>
               </ul>
             </div>

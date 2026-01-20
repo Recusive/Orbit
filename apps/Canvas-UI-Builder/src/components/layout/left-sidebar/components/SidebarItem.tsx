@@ -33,12 +33,13 @@ export const SidebarItem: FC<SidebarItemProps> = ({
         <button
           className={cn(
             'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
             active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
           )}
-          title={label}
+          aria-label={label}
           onClick={onClick}
         >
-          <Icon className={cn('shrink-0', small ? 'h-3 w-3' : 'h-4 w-4')} />
+          <Icon className={cn('shrink-0', small ? 'h-3 w-3' : 'h-4 w-4')} aria-hidden="true" />
         </button>
       </div>
     );
@@ -48,9 +49,10 @@ export const SidebarItem: FC<SidebarItemProps> = ({
     <button
       className={cn(
         'flex items-center h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-muted/50 active:scale-[0.98] transition-[background-color,color,transform] duration-200',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
         active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
       )}
-      title={collapsed ? label : undefined}
+      aria-label={collapsed ? label : undefined}
       onClick={onClick}
     >
       {/* Fixed-width icon column - never moves */}
@@ -58,7 +60,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
         className="flex items-center justify-center shrink-0"
         style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
       >
-        <Icon className={cn('shrink-0', small ? 'h-3 w-3' : 'h-4 w-4')} />
+        <Icon className={cn('shrink-0', small ? 'h-3 w-3' : 'h-4 w-4')} aria-hidden="true" />
       </div>
       {/* Text that slides in */}
       <span

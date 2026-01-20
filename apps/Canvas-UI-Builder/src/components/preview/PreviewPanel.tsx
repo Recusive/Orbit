@@ -8,7 +8,7 @@
  */
 
 import { RotateCw } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { FC } from 'react';
 
@@ -79,6 +79,10 @@ export const PreviewPanel: FC<PreviewPanelProps> = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isReady, setIsReady] = useState(false);
   const prevUrlRef = useRef(serverUrl);
+
+  // Derived state to avoid Object.keys() in useEffect dependencies (rule: rerender-derived-state)
+  const hasStyles = useMemo(() => Object.keys(styles).length > 0, [styles]);
+  const hasProps = useMemo(() => Object.keys(props).length > 0, [props]);
 
   // Get current theme from document
   const getCurrentTheme = useCallback((): 'light' | 'dark' => {
@@ -197,23 +201,23 @@ export const PreviewPanel: FC<PreviewPanelProps> = ({
 
   // Update styles when they change
   useEffect(() => {
-    if (isReady && componentName && Object.keys(styles).length > 0) {
+    if (isReady && componentName && hasStyles) {
       sendMessage({
         type: 'preview:update-styles',
         styles,
       });
     }
-  }, [isReady, componentName, styles, sendMessage]);
+  }, [isReady, componentName, hasStyles, styles, sendMessage]);
 
   // Update props when they change
   useEffect(() => {
-    if (isReady && componentName && Object.keys(props).length > 0) {
+    if (isReady && componentName && hasProps) {
       sendMessage({
         type: 'preview:update-props',
         props,
       });
     }
-  }, [isReady, componentName, props, sendMessage]);
+  }, [isReady, componentName, hasProps, props, sendMessage]);
 
   return (
     <div className="relative w-full h-full bg-chat-area rounded-lg border border-border/40 overflow-hidden">
@@ -225,15 +229,23 @@ export const PreviewPanel: FC<PreviewPanelProps> = ({
               <button
                 onClick={handleRestart}
                 disabled={isRestarting}
+                aria-label={isRestarting ? 'Restarting preview server' : 'Restart preview server'}
                 className={cn(
                   'h-8 w-8 flex items-center justify-center rounded-md',
                   'bg-card/80 backdrop-blur-sm border border-border/50',
                   'text-muted-foreground hover:text-foreground hover:bg-card',
                   'transition-colors duration-150',
-                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
                 )}
               >
-                <RotateCw className={cn('h-4 w-4', isRestarting && 'animate-spin')} />
+                <RotateCw
+                  className={cn(
+                    'h-4 w-4',
+                    isRestarting && 'animate-spin motion-reduce:animate-none'
+                  )}
+                  aria-hidden="true"
+                />
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
@@ -254,9 +266,12 @@ export const PreviewPanel: FC<PreviewPanelProps> = ({
       {!isReady || isRestarting ? (
         <div className="absolute inset-0 flex items-center justify-center bg-chat-area">
           <div className="flex flex-col items-center gap-2">
-            <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
-            <p className="text-sm text-muted-foreground">
-              {isRestarting ? 'Restarting preview server...' : 'Connecting to preview...'}
+            <div
+              className="animate-spin motion-reduce:animate-none w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+              aria-hidden="true"
+            />
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              {isRestarting ? 'Restarting preview server…' : 'Connecting to preview…'}
             </p>
           </div>
         </div>

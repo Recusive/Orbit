@@ -291,9 +291,9 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
         // Notify all waiting hook instances
         const callbacks = workspaceReadyListeners.get(rootPath);
         if (callbacks) {
-          callbacks.forEach((cb) => {
+          for (const cb of callbacks) {
             cb();
-          });
+          }
         }
       })
       .catch((err: unknown) => {

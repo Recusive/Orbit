@@ -68,14 +68,21 @@ interface ModeButtonProps {
 const ModeButton: FC<ModeButtonProps> = ({ active, onClick, icon, label, description }) => (
   <button
     onClick={onClick}
+    aria-pressed={active}
     className={cn(
       'flex-1 flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
       active
         ? 'border-primary bg-primary/5 text-foreground'
         : 'border-border bg-transparent text-muted-foreground hover:border-primary/50 hover:bg-primary/5'
     )}
   >
-    <span className={cn('p-2 rounded-full', active ? 'bg-primary/10' : 'bg-muted')}>{icon}</span>
+    <span
+      className={cn('p-2 rounded-full', active ? 'bg-primary/10' : 'bg-muted')}
+      aria-hidden="true"
+    >
+      {icon}
+    </span>
     <span className="font-medium text-sm">{label}</span>
     <span className="text-xs text-muted-foreground text-center">{description}</span>
   </button>
@@ -243,6 +250,7 @@ export const SaveComponentDialog: FC<SaveComponentDialogProps> = ({
                   setCustomName(e.target.value);
                 }}
                 placeholder="my-custom-button"
+                autoComplete="off"
                 className="font-mono"
               />
               <p className="text-xs text-muted-foreground">

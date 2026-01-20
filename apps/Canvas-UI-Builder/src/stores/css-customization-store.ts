@@ -212,10 +212,21 @@ export const CSS_PROPERTIES: CSSProperty[] = [
     label: 'Shadow',
     category: 'effects',
     type: 'select',
-    options: ['none', '0 1px 2px rgba(0,0,0,0.05)', '0 4px 6px rgba(0,0,0,0.1)', '0 10px 15px rgba(0,0,0,0.1)'],
+    options: [
+      'none',
+      '0 1px 2px rgba(0,0,0,0.05)',
+      '0 4px 6px rgba(0,0,0,0.1)',
+      '0 10px 15px rgba(0,0,0,0.1)',
+    ],
     defaultValue: 'none',
   },
 ];
+
+/**
+ * Index Map for O(1) property lookups by name.
+ * Built once at module load time for performance (rule: js-index-maps).
+ */
+const CSS_PROPERTIES_BY_NAME = new Map(CSS_PROPERTIES.map((p) => [p.name, p]));
 
 /**
  * Get CSS properties by category
@@ -261,8 +272,8 @@ export const useCSSCustomizationStore = create<CSSCustomizationStore>()(
       const cssOverrides: Record<string, string> = {};
 
       for (const [property, value] of Object.entries(overrides)) {
-        // Find the property definition to add units if needed
-        const propDef = CSS_PROPERTIES.find((p) => p.name === property);
+        // O(1) lookup via index Map (rule: js-index-maps)
+        const propDef = CSS_PROPERTIES_BY_NAME.get(property);
         if (propDef?.unit && !value.includes(propDef.unit)) {
           cssOverrides[property] = `${value}${propDef.unit}`;
         } else {
@@ -287,10 +298,11 @@ export function useCSSOverrides(): Record<string, string> {
   const overrides = useCSSCustomizationStore(useShallow((state) => state.overrides));
 
   // Memoize the computed result with units added
+  // Uses O(1) Map lookup instead of O(n) find (rule: js-index-maps)
   return useMemo(() => {
     const result: Record<string, string> = {};
     for (const [property, value] of Object.entries(overrides)) {
-      const propDef = CSS_PROPERTIES.find((p) => p.name === property);
+      const propDef = CSS_PROPERTIES_BY_NAME.get(property);
       if (propDef?.unit && !value.includes(propDef.unit)) {
         result[property] = `${value}${propDef.unit}`;
       } else {

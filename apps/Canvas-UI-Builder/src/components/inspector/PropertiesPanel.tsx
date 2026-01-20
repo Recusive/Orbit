@@ -35,6 +35,7 @@ const ColorInput: FC<PropertyInputProps> = ({ property, value, onChange }) => (
       onChange={(e) => {
         onChange(e.target.value);
       }}
+      aria-label={`${property.label} color picker`}
       className="w-8 h-8 rounded border border-border cursor-pointer"
     />
     <input
@@ -43,6 +44,8 @@ const ColorInput: FC<PropertyInputProps> = ({ property, value, onChange }) => (
       onChange={(e) => {
         onChange(e.target.value);
       }}
+      aria-label={`${property.label} color value`}
+      autoComplete="off"
       className="flex-1 h-8 px-2 text-xs bg-muted/50 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
       placeholder={property.defaultValue}
     />
@@ -60,6 +63,7 @@ const SizeInput: FC<PropertyInputProps> = ({ property, value, onChange }) => (
       onChange={(e) => {
         onChange(e.target.value);
       }}
+      aria-label={`${property.label} slider`}
       className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer"
     />
     <div className="flex items-center gap-1 min-w-[60px]">
@@ -72,6 +76,8 @@ const SizeInput: FC<PropertyInputProps> = ({ property, value, onChange }) => (
         onChange={(e) => {
           onChange(e.target.value);
         }}
+        aria-label={`${property.label} value`}
+        autoComplete="off"
         className="w-12 h-7 px-1 text-xs text-center bg-muted/50 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
       />
       {property.unit ? (
@@ -87,6 +93,7 @@ const SelectInput: FC<PropertyInputProps> = ({ property, value, onChange }) => (
     onChange={(e) => {
       onChange(e.target.value);
     }}
+    aria-label={property.label}
     className="w-full h-8 px-2 text-xs bg-muted/50 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
   >
     {property.options?.map((option) => (
@@ -108,6 +115,7 @@ const NumberInput: FC<PropertyInputProps> = ({ property, value, onChange }) => (
       onChange={(e) => {
         onChange(e.target.value);
       }}
+      aria-label={`${property.label} slider`}
       className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer"
     />
     <input
@@ -119,6 +127,8 @@ const NumberInput: FC<PropertyInputProps> = ({ property, value, onChange }) => (
       onChange={(e) => {
         onChange(e.target.value);
       }}
+      aria-label={`${property.label} value`}
+      autoComplete="off"
       className="w-16 h-7 px-2 text-xs text-center bg-muted/50 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
     />
   </div>
@@ -179,10 +189,10 @@ const PropertyRow: FC<PropertyRowProps> = ({ property }) => {
             onClick={() => {
               resetProperty(property.name);
             }}
-            className="p-0.5 text-muted-foreground hover:text-foreground rounded"
-            title="Reset to default"
+            className="p-0.5 text-muted-foreground hover:text-foreground rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            aria-label={`Reset ${property.label} to default`}
           >
-            <RotateCcw className="h-3 w-3" />
+            <RotateCcw className="h-3 w-3" aria-hidden="true" />
           </button>
         ) : null}
       </div>
@@ -298,9 +308,9 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({ selectedComponentNam
         {hasChanges ? (
           <button
             onClick={resetAll}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted rounded transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
           >
-            <RotateCcw className="h-3 w-3" />
+            <RotateCcw className="h-3 w-3" aria-hidden="true" />
             Reset
           </button>
         ) : null}
@@ -313,23 +323,23 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({ selectedComponentNam
             onClick={() => {
               setShowSaveDialog(true);
             }}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 rounded transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
           >
-            <Save className="h-3 w-3" />
+            <Save className="h-3 w-3" aria-hidden="true" />
             Save Token
           </button>
           <button
             onClick={handleCopyCSS}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
           >
-            <Copy className="h-3 w-3" />
+            <Copy className="h-3 w-3" aria-hidden="true" />
             Copy CSS
           </button>
           <button
             onClick={handleCopyForAI}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
           >
-            <Download className="h-3 w-3" />
+            <Download className="h-3 w-3" aria-hidden="true" />
             For AI
           </button>
           {copyFeedback ? (
@@ -341,14 +351,18 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({ selectedComponentNam
       {/* Save Token Dialog */}
       {showSaveDialog ? (
         <div className="p-3 bg-muted/50 rounded-lg border border-border">
-          <label className="text-xs text-muted-foreground block mb-1.5">Token Name</label>
+          <label htmlFor="token-name-input" className="text-xs text-muted-foreground block mb-1.5">
+            Token Name
+          </label>
           <input
+            id="token-name-input"
             type="text"
             value={tokenName}
             onChange={(e) => {
               setTokenName(e.target.value);
             }}
             placeholder="e.g., Primary Button"
+            autoComplete="off"
             className="w-full h-8 px-2 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary mb-2"
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSaveToken();
@@ -360,7 +374,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({ selectedComponentNam
             <button
               onClick={handleSaveToken}
               disabled={!tokenName.trim()}
-              className="flex-1 px-2 py-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 rounded transition-colors"
+              className="flex-1 px-2 py-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
             >
               Save
             </button>
@@ -368,7 +382,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({ selectedComponentNam
               onClick={() => {
                 setShowSaveDialog(false);
               }}
-              className="px-2 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded transition-colors"
+              className="px-2 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
             >
               Cancel
             </button>

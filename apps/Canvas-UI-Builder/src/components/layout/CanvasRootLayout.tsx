@@ -86,8 +86,13 @@ export const CanvasRootLayout: FC = () => {
     return (
       <div className="h-full w-full flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-2">
-          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
-          <p className="text-sm text-muted-foreground">Checking Canvas setup...</p>
+          <div
+            className="animate-spin motion-reduce:animate-none w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+            aria-hidden="true"
+          />
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            Checking Canvas setup…
+          </p>
         </div>
       </div>
     );
@@ -134,8 +139,13 @@ export const CanvasRootLayout: FC = () => {
     if (serverState === 'starting') {
       return (
         <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
-          <p className="text-sm">Starting preview server...</p>
+          <div
+            className="animate-spin motion-reduce:animate-none w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+            aria-hidden="true"
+          />
+          <p className="text-sm" aria-live="polite">
+            Starting preview server…
+          </p>
         </div>
       );
     }
