@@ -16,6 +16,7 @@ export interface SidebarItemProps {
   readonly collapsed: boolean;
   readonly active?: boolean;
   readonly small?: boolean;
+  readonly large?: boolean;
   readonly equalSpacing?: boolean;
   readonly shortcut?: string[];
   readonly onClick?: () => void;

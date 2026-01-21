@@ -60,6 +60,7 @@ export const useSidebarActions = ({
     setEditingConversationId,
     updateConversationTitle,
     removeConversation,
+    setVaultOpen,
   } = useUIStore();
   const { postMessage } = useTauri();
 
@@ -101,6 +102,8 @@ export const useSidebarActions = ({
   }, [loadWorktrees]);
 
   const handleStartConversation = useCallback((): void => {
+    // Close vault if open
+    setVaultOpen(false);
     // Skip if current conversation is empty (title still "Untitled" means no message sent)
     const activeConv = conversations.find((c) => c.sessionId === activeConversationId);
     if (activeConv?.title === 'Untitled') {
@@ -112,10 +115,12 @@ export const useSidebarActions = ({
       title: 'Untitled',
       workspace_path: workspacePath ?? undefined,
     });
-  }, [conversations, activeConversationId, workspacePath, postMessage]);
+  }, [conversations, activeConversationId, workspacePath, postMessage, setVaultOpen]);
 
   const handleLoadConversation = useCallback(
     (sessionId: string): void => {
+      // Close vault if open
+      setVaultOpen(false);
       // Skip if already viewing this conversation
       if (sessionId === activeConversationId) {
         return;
@@ -131,7 +136,13 @@ export const useSidebarActions = ({
         session_id: sessionId,
       });
     },
-    [activeConversationId, setLoadingConversation, setConversationTransitioning, postMessage]
+    [
+      activeConversationId,
+      setLoadingConversation,
+      setConversationTransitioning,
+      postMessage,
+      setVaultOpen,
+    ]
   );
 
   const handleOpenQuickSearch = useCallback((): void => {

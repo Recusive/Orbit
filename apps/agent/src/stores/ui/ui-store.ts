@@ -129,6 +129,8 @@ interface UIState {
   // Canvas mode specific
   canvasRightSidebarWidth: number;
   lastExpandedCanvasRightSidebarWidth: number;
+  // Vault page
+  vaultOpen: boolean;
 }
 
 interface UIActions {
@@ -183,6 +185,9 @@ interface UIActions {
   // Canvas mode actions
   toggleCanvasRightSidebar: () => void;
   setCanvasRightSidebarWidth: (width: number) => void;
+  // Vault actions
+  setVaultOpen: (open: boolean) => void;
+  toggleVault: () => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -308,6 +313,8 @@ export const useUIStore = create<UIStore>()(
     // Canvas mode specific
     canvasRightSidebarWidth: SIDEBAR.expanded,
     lastExpandedCanvasRightSidebarWidth: SIDEBAR.expanded,
+    // Vault page
+    vaultOpen: false,
 
     setContainerDimensions: (width: number, height: number): void => {
       set((state) => {
@@ -666,6 +673,18 @@ export const useUIStore = create<UIStore>()(
         }
       });
     },
+
+    setVaultOpen: (open: boolean): void => {
+      set((state) => {
+        state.vaultOpen = open;
+      });
+    },
+
+    toggleVault: (): void => {
+      set((state) => {
+        state.vaultOpen = !state.vaultOpen;
+      });
+    },
   }))
 );
 
@@ -782,4 +801,8 @@ export const useBottomPanelHeight = (): number => {
 
 export const useEditorChatPanelOpen = (): boolean => {
   return useUIStore((state) => state.editorChatPanelOpen);
+};
+
+export const useVaultOpen = (): boolean => {
+  return useUIStore((state) => state.vaultOpen);
 };
