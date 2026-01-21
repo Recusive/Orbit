@@ -2,18 +2,14 @@
  * PropertiesPanel - CSS Property Editor
  *
  * Provides UI controls for editing CSS properties.
- * Changes are reflected live in the component preview.
- * Users can save customizations as design tokens for export.
+ * Changes are reflected live in the component preview via CSS injection (temporary).
+ * Users can save customized components to their project's .orbit folder.
  *
  * Features:
- * - Live CSS overrides for instant preview
- * - "Apply to Component" persists changes to source via AST transformation
- * - External modification detection with conflict resolution
- * - Undo support via backup restoration
- * - Semantic color detection with global token update option
+ * - Live CSS overrides for instant preview (temporary, not persisted)
+ * - "Save to Project" exports customized component to <project>/.orbit/
+ * - Base shadcn components remain untouched
  */
-import { useFileWatcher, useSemanticColors, useStylePersistence } from '@canvas/hooks';
-import { getTokenDisplayName, isColorProperty } from '@canvas/lib/semantic-colors';
 import {
   getPropertiesByCategory,
   useCSSCustomizationStore,
@@ -21,36 +17,12 @@ import {
   useHasChanges,
 } from '@canvas/stores/css-customization-store';
 import { useDesignTokensStore } from '@canvas/stores/design-tokens-store';
-import {
-  AlertTriangle,
-  Copy,
-  Download,
-  FileWarning,
-  Globe,
-  Loader2,
-  Paintbrush,
-  RefreshCw,
-  RotateCcw,
-  Save,
-  Type,
-  Undo2,
-} from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+import { Copy, Download, FolderOpen, Loader2, RotateCcw, Save, Type } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { SemanticColorUsage } from '@canvas/lib/semantic-colors';
 import type { CSSCategory, CSSProperty } from '@canvas/stores/css-customization-store';
 import type { FC, ReactNode } from 'react';
-
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 // ============================================
 // Property Input Components
@@ -60,9 +32,7 @@ interface PropertyInputProps {
   readonly property: CSSProperty;
   readonly value: string;
   readonly onChange: (value: string) => void;
-  /** Called for immediate updates (select, discrete changes) */
   readonly onImmediateChange?: (value: string) => void;
-  /** Called for debounced updates (sliders during drag) */
   readonly onDebouncedChange?: (value: string) => void;
   readonly disabled?: boolean;
 }
@@ -76,7 +46,7 @@ const ColorInput: FC<PropertyInputProps> = ({ property, value, onChange, disable
         onChange(e.target.value);
       }}
       aria-label={`${property.label} color picker`}
-      className="w-8 h-8 rounded border border-border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+      className="h-8 w-8 cursor-pointer rounded border border-border disabled:cursor-not-allowed disabled:opacity-50"
       disabled={disabled}
     />
     <input
@@ -87,7 +57,7 @@ const ColorInput: FC<PropertyInputProps> = ({ property, value, onChange, disable
       }}
       aria-label={`${property.label} color value`}
       autoComplete="off"
-      className="flex-1 h-8 px-2 text-xs bg-muted/50 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+      className="h-8 flex-1 rounded border border-border bg-muted/50 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
       placeholder={property.defaultValue}
       disabled={disabled}
     />
@@ -102,7 +72,6 @@ const SizeInput: FC<PropertyInputProps> = ({
   onImmediateChange,
   disabled,
 }) => {
-  // Use debounced change for slider (rapid updates), immediate for number input (discrete)
   const handleSliderChange = (newValue: string): void => {
     if (onDebouncedChange) {
       onDebouncedChange(newValue);
@@ -131,10 +100,10 @@ const SizeInput: FC<PropertyInputProps> = ({
           handleSliderChange(e.target.value);
         }}
         aria-label={`${property.label} slider`}
-        className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-muted disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
       />
-      <div className="flex items-center gap-1 min-w-[60px]">
+      <div className="flex min-w-[60px] items-center gap-1">
         <input
           type="number"
           min={property.min}
@@ -146,7 +115,7 @@ const SizeInput: FC<PropertyInputProps> = ({
           }}
           aria-label={`${property.label} value`}
           autoComplete="off"
-          className="w-12 h-7 px-1 text-xs text-center bg-muted/50 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-7 w-12 rounded border border-border bg-muted/50 px-1 text-center text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
           disabled={disabled}
         />
         {property.unit ? (
@@ -164,7 +133,7 @@ const SelectInput: FC<PropertyInputProps> = ({ property, value, onChange, disabl
       onChange(e.target.value);
     }}
     aria-label={property.label}
-    className="w-full h-8 px-2 text-xs bg-muted/50 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+    className="h-8 w-full cursor-pointer rounded border border-border bg-muted/50 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
     disabled={disabled}
   >
     {property.options?.map((option) => (
@@ -183,7 +152,6 @@ const NumberInput: FC<PropertyInputProps> = ({
   onImmediateChange,
   disabled,
 }) => {
-  // Use debounced change for slider (rapid updates), immediate for number input
   const handleSliderChange = (newValue: string): void => {
     if (onDebouncedChange) {
       onDebouncedChange(newValue);
@@ -212,7 +180,7 @@ const NumberInput: FC<PropertyInputProps> = ({
           handleSliderChange(e.target.value);
         }}
         aria-label={`${property.label} slider`}
-        className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-muted disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
       />
       <input
@@ -226,7 +194,7 @@ const NumberInput: FC<PropertyInputProps> = ({
         }}
         aria-label={`${property.label} value`}
         autoComplete="off"
-        className="w-16 h-7 px-2 text-xs text-center bg-muted/50 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        className="h-7 w-16 rounded border border-border bg-muted/50 px-2 text-center text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
       />
     </div>
@@ -239,11 +207,8 @@ const NumberInput: FC<PropertyInputProps> = ({
 
 interface PropertyRowProps {
   readonly property: CSSProperty;
-  /** Whether inputs should be disabled (e.g., during persist) */
   readonly disabled?: boolean | undefined;
-  /** Debounced change handler for sliders */
   readonly onDebouncedChange?: ((property: string, value: string) => void) | undefined;
-  /** Immediate change handler for discrete inputs */
   readonly onImmediateChange?: ((property: string, value: string) => void) | undefined;
 }
 
@@ -307,7 +272,7 @@ const PropertyRow: FC<PropertyRowProps> = ({
             onChange={(e) => {
               handleChange(e.target.value);
             }}
-            className="w-full h-8 px-2 text-xs bg-muted/50 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-8 w-full rounded border border-border bg-muted/50 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
             disabled={disabled}
           />
         );
@@ -323,7 +288,7 @@ const PropertyRow: FC<PropertyRowProps> = ({
             onClick={() => {
               resetProperty(property.name);
             }}
-            className="p-0.5 text-muted-foreground hover:text-foreground rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50"
+            className="rounded p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50"
             aria-label={`Reset ${property.label} to default`}
             disabled={disabled}
           >
@@ -344,12 +309,9 @@ interface CategorySectionProps {
   readonly category: CSSCategory;
   readonly label: string;
   readonly icon: ReactNode;
-  /** Whether inputs should be disabled (e.g., during persist) */
-  readonly disabled?: boolean | undefined;
-  /** Debounced change handler for sliders */
-  readonly onDebouncedChange?: ((property: string, value: string) => void) | undefined;
-  /** Immediate change handler for discrete inputs */
-  readonly onImmediateChange?: ((property: string, value: string) => void) | undefined;
+  readonly disabled?: boolean;
+  readonly onDebouncedChange?: (property: string, value: string) => void;
+  readonly onImmediateChange?: (property: string, value: string) => void;
 }
 
 const CategorySection: FC<CategorySectionProps> = ({
@@ -373,7 +335,7 @@ const CategorySection: FC<CategorySectionProps> = ({
           <PropertyRow
             key={property.name}
             property={property}
-            disabled={disabled}
+            disabled={disabled ?? false}
             onDebouncedChange={onDebouncedChange}
             onImmediateChange={onImmediateChange}
           />
@@ -388,19 +350,8 @@ const CategorySection: FC<CategorySectionProps> = ({
 // ============================================
 
 export interface PropertiesPanelProps {
-  /** Name of the selected component (e.g., 'button', 'input') */
   readonly selectedComponentName: string | null;
-  /** Type of component - 'ui' for shadcn, 'custom' for user-created */
   readonly componentType?: 'ui' | 'custom';
-}
-
-/**
- * State for semantic color conflict dialog
- */
-interface SemanticDialogState {
-  open: boolean;
-  usage: SemanticColorUsage | null;
-  pendingValue: string;
 }
 
 export const PropertiesPanel: FC<PropertiesPanelProps> = ({
@@ -410,165 +361,107 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
   const hasChanges = useHasChanges();
   const overrides = useCSSCustomizationStore((state) => state.overrides);
   const resetAll = useCSSCustomizationStore((state) => state.resetAll);
-  const canUndo = useCSSCustomizationStore((state) => state.canUndo);
   const saveToken = useDesignTokensStore((state) => state.saveToken);
   const exportForAI = useDesignTokensStore((state) => state.exportForAI);
-
-  // Style persistence hook
-  const {
-    isPersisting,
-    persistState,
-    lastResult,
-    error: persistError,
-    hmrFailed,
-    persistStyles,
-    restoreBackup,
-    updateDesignToken,
-  } = useStylePersistence();
-
-  // Semantic colors detection hook
-  const { checkProperty } = useSemanticColors({
-    componentName: selectedComponentName,
-    componentType,
-    enabled: Boolean(selectedComponentName),
-  });
-
-  // Semantic color dialog state
-  const [semanticDialog, setSemanticDialog] = useState<SemanticDialogState>({
-    open: false,
-    usage: null,
-    pendingValue: '',
-  });
-
-  // File watcher for external modifications
-  const { externallyModified, acknowledgeChange, refreshHash, isWatching } = useFileWatcher({
-    componentName: selectedComponentName ?? '',
-    componentType,
-    enabled: Boolean(selectedComponentName),
-  });
 
   // Debounced CSS updates for sliders
   const { setDebounced, setImmediate } = useDebouncedCSSUpdate();
 
-  // Auto-apply debounce timer ref
-  const autoApplyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastOverridesRef = useRef<string>('');
+  // Track previous component to reset overrides on switch
+  const prevComponentRef = useRef<string | null>(null);
 
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [tokenName, setTokenName] = useState('');
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  /**
-   * Check if any changed color properties use semantic tokens
-   */
-  const findSemanticColorConflict = useCallback((): {
-    usage: SemanticColorUsage;
-    value: string;
-  } | null => {
-    for (const [property, value] of Object.entries(overrides)) {
-      if (isColorProperty(property)) {
-        const usage = checkProperty(property);
-        if (usage) {
-          return { usage, value };
-        }
-      }
+  // Reset overrides when switching to a different component
+  useEffect(() => {
+    if (prevComponentRef.current !== null && prevComponentRef.current !== selectedComponentName) {
+      resetAll();
     }
-    return null;
-  }, [overrides, checkProperty]);
+    prevComponentRef.current = selectedComponentName;
+  }, [selectedComponentName, resetAll]);
 
   /**
-   * Apply changes to this component only (replace semantic class with arbitrary color)
+   * Save the customized component to the current project's .orbit folder
    */
-  const applyComponentOnly = useCallback(async (): Promise<void> => {
-    if (!selectedComponentName) return;
-    setSemanticDialog({ open: false, usage: null, pendingValue: '' });
-    const success = await persistStyles(selectedComponentName, componentType);
-    if (success) {
-      setCopyFeedback('Applied!');
+  const handleSaveToProject = useCallback(async (): Promise<void> => {
+    if (!selectedComponentName || Object.keys(overrides).length === 0) return;
+
+    setIsSaving(true);
+    try {
+      // Get the current workspace/project path
+      const workspacePath = await invoke<string | null>('get_workspace_path');
+      if (!workspacePath) {
+        setCopyFeedback('No project open');
+        setTimeout(() => {
+          setCopyFeedback(null);
+        }, 2000);
+        return;
+      }
+
+      // Export to <project>/.orbit/components/ui/
+      const destDir = `${workspacePath}/.orbit/components/ui`;
+
+      // Save a custom component with the styles applied
+      const saveInput = {
+        name: selectedComponentName,
+        sourceName: selectedComponentName,
+        sourceType: componentType,
+        styles: Object.fromEntries(
+          Object.entries(overrides).map(([key, value]) => [
+            key.replace(/([A-Z])/g, '-$1').toLowerCase(),
+            value,
+          ])
+        ),
+        props: {},
+      };
+
+      const saveResult = await invoke<{ success: boolean; path?: string; error?: string }>(
+        'canvas_save_custom_component',
+        { input: saveInput }
+      );
+
+      if (!saveResult.success) {
+        setCopyFeedback(saveResult.error ?? 'Save failed');
+        setTimeout(() => {
+          setCopyFeedback(null);
+        }, 3000);
+        return;
+      }
+
+      // Export that custom component to the project
+      const exportResult = await invoke<{ success: boolean; path?: string; error?: string }>(
+        'canvas_export_component',
+        {
+          componentName: selectedComponentName,
+          componentType: 'custom',
+          destinationDir: destDir,
+        }
+      );
+
+      if (exportResult.success) {
+        setCopyFeedback('Saved to project!');
+        resetAll();
+      } else {
+        setCopyFeedback(exportResult.error ?? 'Export failed');
+      }
       setTimeout(() => {
         setCopyFeedback(null);
       }, 2000);
-      // Refresh the hash after our own write
-      void refreshHash();
+    } catch {
+      setCopyFeedback('Error saving');
+      setTimeout(() => {
+        setCopyFeedback(null);
+      }, 2000);
+    } finally {
+      setIsSaving(false);
     }
-  }, [selectedComponentName, componentType, persistStyles, refreshHash]);
-
-  /**
-   * Apply styles to component, checking for semantic color conflicts first
-   */
-  const handleApplyToComponent = useCallback(async (): Promise<void> => {
-    // Check for semantic color conflicts
-    const conflict = findSemanticColorConflict();
-    if (conflict) {
-      // Show dialog to let user choose
-      setSemanticDialog({
-        open: true,
-        usage: conflict.usage,
-        pendingValue: conflict.value,
-      });
-      return;
-    }
-
-    // No conflicts, proceed with normal persist
-    await applyComponentOnly();
-  }, [findSemanticColorConflict, applyComponentOnly]);
-
-  /**
-   * Auto-apply effect: watches for changes and persists after 800ms of inactivity.
-   * This provides a smooth "auto-save" experience without requiring manual button clicks.
-   */
-  useEffect(() => {
-    // Skip if no component selected or already persisting
-    if (!selectedComponentName || isPersisting) return;
-
-    // Serialize overrides for comparison
-    const currentOverrides = JSON.stringify(overrides);
-
-    // Skip if nothing changed
-    if (currentOverrides === lastOverridesRef.current) return;
-    lastOverridesRef.current = currentOverrides;
-
-    // Skip if no overrides to persist
-    if (Object.keys(overrides).length === 0) return;
-
-    // Clear previous timer
-    if (autoApplyTimeoutRef.current) {
-      clearTimeout(autoApplyTimeoutRef.current);
-    }
-
-    // Set new timer - 800ms debounce for auto-apply
-    autoApplyTimeoutRef.current = setTimeout(() => {
-      void handleApplyToComponent();
-    }, 800);
-
-    // Cleanup on unmount or re-trigger
-    return () => {
-      if (autoApplyTimeoutRef.current) {
-        clearTimeout(autoApplyTimeoutRef.current);
-      }
-    };
-  }, [overrides, selectedComponentName, isPersisting, handleApplyToComponent]);
-
-  // No component selected - early return AFTER all hooks
-  if (!selectedComponentName) {
-    return (
-      <div className="p-3">
-        <div className="text-sm text-muted-foreground text-center py-8">
-          <Type className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p className="text-xs">Select a component to edit its properties</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Format component name for display
-  const displayName = selectedComponentName
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
+  }, [selectedComponentName, componentType, overrides, resetAll]);
 
   const handleSaveToken = (): void => {
-    if (!tokenName.trim()) return;
+    if (!tokenName.trim() || !selectedComponentName) return;
     saveToken(tokenName.trim(), selectedComponentName, overrides);
     setTokenName('');
     setShowSaveDialog(false);
@@ -579,6 +472,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
   };
 
   const handleCopyForAI = (): void => {
+    if (!selectedComponentName) return;
     const aiExport = exportForAI(selectedComponentName);
     void navigator.clipboard.writeText(aiExport);
     setCopyFeedback('Copied for AI!');
@@ -598,146 +492,38 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
     }, 2000);
   };
 
-  /**
-   * Update the global design token instead of just this component
-   */
-  const applyTokenGlobally = async (): Promise<void> => {
-    if (!semanticDialog.usage) return;
+  // No component selected
+  if (!selectedComponentName) {
+    return (
+      <div className="p-3">
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          <Type className="mx-auto mb-2 h-8 w-8 opacity-50" />
+          <p className="text-xs">Select a component to edit its properties</p>
+        </div>
+      </div>
+    );
+  }
 
-    const tokenName = semanticDialog.usage.semanticToken;
-    const newValue = semanticDialog.pendingValue;
-
-    setSemanticDialog({ open: false, usage: null, pendingValue: '' });
-
-    const success = await updateDesignToken(tokenName, newValue);
-    if (success) {
-      setCopyFeedback('Token Updated!');
-      setTimeout(() => {
-        setCopyFeedback(null);
-      }, 2000);
-    }
-  };
-
-  /**
-   * Close the semantic dialog without taking action
-   */
-  const cancelSemanticDialog = (): void => {
-    setSemanticDialog({ open: false, usage: null, pendingValue: '' });
-  };
-
-  const handleUndo = async (): Promise<void> => {
-    const success = await restoreBackup(selectedComponentName, componentType);
-    if (success) {
-      setCopyFeedback('Restored!');
-      setTimeout(() => {
-        setCopyFeedback(null);
-      }, 2000);
-    }
-  };
-
-  const handleReloadAndDiscard = async (): Promise<void> => {
-    // Refresh hash to get latest file state
-    await refreshHash();
-    // Clear local overrides since we're discarding them
-    resetAll();
-    acknowledgeChange();
-  };
-
-  // Derive disabled state from persistence operation
-  const inputsDisabled = isPersisting;
+  const displayName = selectedComponentName
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 
   return (
-    <div className="p-3 space-y-4">
-      {/* External Modification Warning */}
-      {externallyModified ? (
-        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                File Modified Externally
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                This component was modified outside the Canvas UI Builder.
-              </p>
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => {
-                    void handleReloadAndDiscard();
-                  }}
-                  className="flex items-center gap-1 px-2 py-1 text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 rounded transition-colors"
-                >
-                  <RefreshCw className="h-3 w-3" />
-                  Reload & Discard
-                </button>
-                <button
-                  onClick={acknowledgeChange}
-                  className="px-2 py-1 text-xs bg-muted hover:bg-muted/80 rounded transition-colors"
-                >
-                  Keep My Changes
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Persist Error Display */}
-      {persistError ? (
-        <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
-          <div className="flex items-start gap-2">
-            <FileWarning className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-destructive">Failed to Apply Changes</p>
-              <p className="text-xs text-muted-foreground mt-0.5 break-words">{persistError}</p>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* HMR Warning (file saved but HMR failed) */}
-      {hmrFailed ? (
-        <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-          <p className="text-xs text-amber-600 dark:text-amber-400">
-            <AlertTriangle className="h-3 w-3 inline mr-1" />
-            Changes saved but preview may not reflect updates. Try refreshing.
-          </p>
-        </div>
-      ) : null}
-
-      {/* Transform Warnings */}
-      {lastResult?.warnings && lastResult.warnings.length > 0 ? (
-        <div className="p-2.5 bg-muted/50 border border-border rounded-lg">
-          <p className="text-xs font-medium text-muted-foreground mb-1">Transform Warnings:</p>
-          <ul className="text-xs text-muted-foreground space-y-0.5">
-            {lastResult.warnings.map((warning, idx) => (
-              <li key={idx} className="flex items-start gap-1">
-                <span className="text-amber-500">•</span>
-                <span>{warning}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
+    <div className="space-y-4 p-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-medium text-foreground">{displayName}</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Edit CSS properties
-            {isWatching ? (
-              <span className="ml-1.5 text-green-500" title="Watching for external changes">
-                •
-              </span>
-            ) : null}
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Edit CSS properties • Changes preview live
           </p>
         </div>
         {hasChanges ? (
           <button
             onClick={resetAll}
-            disabled={inputsDisabled}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50"
+            disabled={isSaving}
+            className="flex items-center gap-1 rounded bg-muted/50 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50"
           >
             <RotateCcw className="h-3 w-3" aria-hidden="true" />
             Reset
@@ -745,42 +531,32 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
         ) : null}
       </div>
 
-      {/* Auto-save Status Indicator */}
-      {hasChanges || isPersisting ? (
-        <div className="flex items-center justify-between px-2 py-1.5 bg-muted/30 rounded-md">
-          <span className="text-xs text-muted-foreground">
-            {isPersisting ? (
-              <span className="flex items-center gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                {persistState === 'validating' && 'Validating...'}
-                {persistState === 'reading' && 'Reading...'}
-                {persistState === 'transforming' && 'Saving...'}
-                {persistState === 'writing' && 'Writing...'}
-                {persistState === 'waiting_hmr' && 'Updating preview...'}
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-muted-foreground/70">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                Auto-saving in 800ms...
-              </span>
-            )}
-          </span>
-          {copyFeedback ? <span className="text-xs text-green-500">{copyFeedback}</span> : null}
-        </div>
+      {/* Save to Project Button */}
+      {hasChanges ? (
+        <button
+          onClick={() => void handleSaveToProject()}
+          disabled={isSaving}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>Saving...</span>
+            </>
+          ) : (
+            <>
+              <FolderOpen className="h-3.5 w-3.5" />
+              Save to Project
+            </>
+          )}
+        </button>
       ) : null}
 
-      {/* Undo Button */}
-      {canUndo() ? (
-        <button
-          onClick={() => {
-            void handleUndo();
-          }}
-          disabled={isPersisting}
-          className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs bg-muted hover:bg-muted/80 disabled:opacity-50 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-        >
-          <Undo2 className="h-3 w-3" />
-          Undo Last Apply
-        </button>
+      {/* Feedback */}
+      {copyFeedback ? (
+        <div className="rounded-md bg-muted/50 px-2 py-1.5 text-center text-xs text-green-500">
+          {copyFeedback}
+        </div>
       ) : null}
 
       {/* Export Actions */}
@@ -790,24 +566,24 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
             onClick={() => {
               setShowSaveDialog(true);
             }}
-            disabled={inputsDisabled}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs bg-muted hover:bg-muted/80 disabled:opacity-50 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            disabled={isSaving}
+            className="flex items-center gap-1 rounded bg-muted px-2 py-1.5 text-xs transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50"
           >
             <Save className="h-3 w-3" aria-hidden="true" />
             Save Token
           </button>
           <button
             onClick={handleCopyCSS}
-            disabled={inputsDisabled}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs bg-muted hover:bg-muted/80 disabled:opacity-50 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            disabled={isSaving}
+            className="flex items-center gap-1 rounded bg-muted px-2 py-1.5 text-xs transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50"
           >
             <Copy className="h-3 w-3" aria-hidden="true" />
             Copy CSS
           </button>
           <button
             onClick={handleCopyForAI}
-            disabled={inputsDisabled}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs bg-muted hover:bg-muted/80 disabled:opacity-50 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            disabled={isSaving}
+            className="flex items-center gap-1 rounded bg-muted px-2 py-1.5 text-xs transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-50"
           >
             <Download className="h-3 w-3" aria-hidden="true" />
             For AI
@@ -817,8 +593,8 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
 
       {/* Save Token Dialog */}
       {showSaveDialog ? (
-        <div className="p-3 bg-muted/50 rounded-lg border border-border">
-          <label htmlFor="token-name-input" className="text-xs text-muted-foreground block mb-1.5">
+        <div className="rounded-lg border border-border bg-muted/50 p-3">
+          <label htmlFor="token-name-input" className="mb-1.5 block text-xs text-muted-foreground">
             Token Name
           </label>
           <input
@@ -830,19 +606,19 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
             }}
             placeholder="e.g., Primary Button"
             autoComplete="off"
-            className="w-full h-8 px-2 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary mb-2"
+            className="mb-2 h-8 w-full rounded border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSaveToken();
               if (e.key === 'Escape') setShowSaveDialog(false);
             }}
             autoFocus
-            disabled={inputsDisabled}
+            disabled={isSaving}
           />
           <div className="flex gap-2">
             <button
               onClick={handleSaveToken}
-              disabled={!tokenName.trim() || inputsDisabled}
-              className="flex-1 px-2 py-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+              disabled={!tokenName.trim() || isSaving}
+              className="flex-1 rounded bg-primary px-2 py-1.5 text-xs text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 disabled:opacity-50"
             >
               Save
             </button>
@@ -850,7 +626,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
               onClick={() => {
                 setShowSaveDialog(false);
               }}
-              className="px-2 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+              className="rounded bg-muted px-2 py-1.5 text-xs transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
             >
               Cancel
             </button>
@@ -864,7 +640,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
           category="typography"
           label="Typography"
           icon={<Type className="h-3.5 w-3.5" />}
-          disabled={inputsDisabled}
+          disabled={isSaving}
           onDebouncedChange={setDebounced}
           onImmediateChange={setImmediate}
         />
@@ -874,7 +650,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
           icon={
             <div className="h-3.5 w-3.5 rounded-full bg-gradient-to-br from-red-500 via-green-500 to-blue-500" />
           }
-          disabled={inputsDisabled}
+          disabled={isSaving}
           onDebouncedChange={setDebounced}
           onImmediateChange={setImmediate}
         />
@@ -893,7 +669,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
               <path d="M9 9h6v6H9z" />
             </svg>
           }
-          disabled={inputsDisabled}
+          disabled={isSaving}
           onDebouncedChange={setDebounced}
           onImmediateChange={setImmediate}
         />
@@ -911,7 +687,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
               <rect x="3" y="3" width="18" height="18" rx="2" />
             </svg>
           }
-          disabled={inputsDisabled}
+          disabled={isSaving}
           onDebouncedChange={setDebounced}
           onImmediateChange={setImmediate}
         />
@@ -930,71 +706,11 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
               <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
             </svg>
           }
-          disabled={inputsDisabled}
+          disabled={isSaving}
           onDebouncedChange={setDebounced}
           onImmediateChange={setImmediate}
         />
       </div>
-
-      {/* Semantic Color Conflict Dialog */}
-      <AlertDialog
-        open={semanticDialog.open}
-        onOpenChange={(open) => {
-          if (!open) cancelSemanticDialog();
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Paintbrush className="h-5 w-5 text-primary" />
-              Semantic Color Detected
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>
-                This component uses the{' '}
-                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                  {semanticDialog.usage?.className}
-                </code>{' '}
-                class, which is tied to the{' '}
-                <strong>
-                  {semanticDialog.usage
-                    ? getTokenDisplayName(semanticDialog.usage.semanticToken)
-                    : ''}
-                </strong>{' '}
-                design token.
-              </p>
-              <p>How would you like to apply this color change?</p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
-            <AlertDialogAction
-              onClick={() => {
-                void applyTokenGlobally();
-              }}
-              className="w-full justify-start gap-2"
-            >
-              <Globe className="h-4 w-4" />
-              Update token globally
-              <span className="ml-auto text-xs text-primary-foreground/70">
-                (affects all components)
-              </span>
-            </AlertDialogAction>
-            <AlertDialogAction
-              onClick={() => {
-                void applyComponentOnly();
-              }}
-              className="w-full justify-start gap-2 bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            >
-              <Paintbrush className="h-4 w-4" />
-              This component only
-              <span className="ml-auto text-xs text-muted-foreground">
-                (replaces semantic class)
-              </span>
-            </AlertDialogAction>
-            <AlertDialogCancel className="w-full">Cancel</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

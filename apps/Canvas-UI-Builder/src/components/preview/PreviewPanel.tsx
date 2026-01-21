@@ -195,25 +195,48 @@ export const PreviewPanel: FC<PreviewPanelProps> = ({
     };
   }, [onReady, onError, onLoaded, previewOrigin]);
 
-  // Load component when name changes
+  // Track previous component name to detect when it's cleared or changed
+  const prevComponentNameRef = useRef(componentName);
+
+  // Load component when name changes, or clear when deselected
   useEffect(() => {
-    if (isReady && componentName) {
-      sendMessage({
-        type: 'preview:load',
-        componentName,
-        componentType,
-      });
+    if (isReady) {
+      const prevName = prevComponentNameRef.current;
+
+      if (componentName) {
+        // If switching FROM a different component, clear first to reset styles
+        if (prevName && prevName !== componentName) {
+          sendMessage({ type: 'preview:clear' });
+        }
+        // Load new component
+        sendMessage({
+          type: 'preview:load',
+          componentName,
+          componentType,
+        });
+      } else if (prevName) {
+        // Component was deselected - send clear to reset the preview
+        sendMessage({ type: 'preview:clear' });
+      }
     }
+    prevComponentNameRef.current = componentName;
   }, [isReady, componentName, componentType, sendMessage]);
 
-  // Update styles when they change
+  // Track previous hasStyles to detect when styles are cleared
+  const prevHasStylesRef = useRef(hasStyles);
+
+  // Update styles when they change (including when cleared to empty)
   useEffect(() => {
-    if (isReady && componentName && hasStyles) {
-      sendMessage({
-        type: 'preview:update-styles',
-        styles,
-      });
+    if (isReady && componentName) {
+      // Send update when we have styles OR when styles were just cleared
+      if (hasStyles || prevHasStylesRef.current) {
+        sendMessage({
+          type: 'preview:update-styles',
+          styles,
+        });
+      }
     }
+    prevHasStylesRef.current = hasStyles;
   }, [isReady, componentName, hasStyles, styles, sendMessage]);
 
   // Update props when they change

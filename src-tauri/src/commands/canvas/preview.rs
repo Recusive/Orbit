@@ -543,45 +543,29 @@ function camelToKebab(str: string): string {
  * Generate injected CSS for instant preview updates.
  *
  * Architecture:
- * - Sets CSS custom properties on :root for debugging visibility
- * - Uses positive selector list (not *) to exclude SVG elements
- * - Uses :where() for lower specificity so component styles can win
- * - Adds hover/focus-visible states for interactivity feedback
- * - Typography rules only target text-containing elements
+ * - Targets ONLY elements with [data-slot] attribute (shadcn component roots)
+ * - Does NOT style demo wrapper divs or layout containers
+ * - Uses :where() for lower specificity so component styles can override
+ * - Typography cascades to text content within components
+ * - Returns empty string when no styles are set
  */
 function generateInjectedCSS(styles: Record<string, string>): string {
   if (Object.keys(styles).length === 0) return '';
 
-  // Generate CSS custom properties for debugging visibility in DevTools
-  const customProps = Object.entries(styles)
-    .map(([prop, value]) => `  --preview-${camelToKebab(prop)}: ${value};`)
-    .join('\n');
+  // Target ONLY shadcn component roots (elements with data-slot attribute)
+  // This excludes demo wrapper divs like <div class="flex flex-wrap gap-2">
+  // and only styles the actual components (Button, Badge, Card, etc.)
+  const componentSelector = `#preview-component-wrapper [data-slot]`;
 
-  // Positive selector list - excludes SVG elements by NOT including them
-  // Uses :where() for 0 specificity so component styles can override
-  const selectorBase = `#preview-component-wrapper > *,
-#preview-component-wrapper > * :where(
-  div, span, p, section, article, aside, header, footer, main, nav,
-  button, a, input, textarea, select, option, label, form, fieldset,
-  table, thead, tbody, tr, td, th,
-  ul, ol, li, dl, dt, dd,
-  h1, h2, h3, h4, h5, h6,
-  img, figure, figcaption,
-  details, summary, dialog,
-  [role="button"], [role="link"], [role="checkbox"], [role="radio"],
-  [role="tab"], [role="tabpanel"], [role="menu"], [role="menuitem"]
-)`;
-
-  // Text-containing elements for typography rules
-  const textElements = `#preview-component-wrapper > * :where(
-  p, span, h1, h2, h3, h4, h5, h6, a, button, label,
-  li, td, th, dt, dd, summary, figcaption, option
-)`;
+  // For typography, also target text content within components
+  // Uses :where() for lower specificity
+  const textSelector = `#preview-component-wrapper [data-slot],
+#preview-component-wrapper [data-slot] :where(span, p, h1, h2, h3, h4, h5, h6)`;
 
   // Build the CSS rules
   const rules: string[] = [];
 
-  // Layout, spacing, border, and effects properties
+  // Layout, spacing, border, and effects properties - component roots only
   const layoutProps = ['padding', 'margin', 'gap', 'borderRadius', 'borderWidth', 'borderColor', 'borderStyle', 'opacity', 'boxShadow', 'backgroundColor'];
   const layoutRules = layoutProps
     .filter(prop => styles[prop] !== undefined)
@@ -589,10 +573,10 @@ function generateInjectedCSS(styles: Record<string, string>): string {
     .join('\n');
 
   if (layoutRules) {
-    rules.push(`${selectorBase} {\n${layoutRules}\n}`);
+    rules.push(`${componentSelector} {\n${layoutRules}\n}`);
   }
 
-  // Typography properties - only on text elements
+  // Typography properties - cascades to text within components
   const typographyProps = ['fontSize', 'fontWeight', 'fontFamily', 'letterSpacing', 'color', 'lineHeight', 'textAlign'];
   const typographyRules = typographyProps
     .filter(prop => styles[prop] !== undefined)
@@ -600,29 +584,18 @@ function generateInjectedCSS(styles: Record<string, string>): string {
     .join('\n');
 
   if (typographyRules) {
-    rules.push(`${textElements} {\n${typographyRules}\n}`);
+    rules.push(`${textSelector} {\n${typographyRules}\n}`);
   }
 
   // Hover state with brightness filter for interactive feedback
   if (styles.backgroundColor || styles.borderColor) {
-    rules.push(`${selectorBase}:hover {
+    rules.push(`${componentSelector}:hover {
   filter: brightness(0.9);
   transition: filter 150ms ease-out;
 }`);
   }
 
-  // Focus-visible outline styling for accessibility
-  rules.push(`${selectorBase}:focus-visible {
-  outline: 2px solid var(--ring, oklch(0.56 0.18 35));
-  outline-offset: 2px;
-}`);
-
-  return `/* Preview CSS Injection - Custom Properties for DevTools */
-:root {
-${customProps}
-}
-
-/* Generated style rules */
+  return `/* Preview CSS Injection - Targets [data-slot] components only */
 ${rules.join('\n\n')}`;
 }
 
