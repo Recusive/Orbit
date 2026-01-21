@@ -10,6 +10,7 @@
  * - "Save to Project" exports customized component to <project>/.orbit/
  * - Base shadcn components remain untouched
  */
+import { useOptimisticSlider } from '@canvas/hooks/use-optimistic-slider';
 import {
   getPropertiesByCategory,
   useCSSCustomizationStore,
@@ -72,21 +73,12 @@ const SizeInput: FC<PropertyInputProps> = ({
   onImmediateChange,
   disabled,
 }) => {
-  const handleSliderChange = (newValue: string): void => {
-    if (onDebouncedChange) {
-      onDebouncedChange(newValue);
-    } else {
-      onChange(newValue);
-    }
-  };
-
-  const handleInputChange = (newValue: string): void => {
-    if (onImmediateChange) {
-      onImmediateChange(newValue);
-    } else {
-      onChange(newValue);
-    }
-  };
+  const { localValue, handleSliderChange, handleInputChange } = useOptimisticSlider(
+    value,
+    property.defaultValue,
+    onDebouncedChange ?? onChange,
+    onImmediateChange ?? onChange
+  );
 
   return (
     <div className="flex items-center gap-2">
@@ -95,7 +87,7 @@ const SizeInput: FC<PropertyInputProps> = ({
         min={property.min ?? 0}
         max={property.max ?? 100}
         step={property.step ?? 1}
-        value={value || property.defaultValue}
+        value={localValue}
         onChange={(e) => {
           handleSliderChange(e.target.value);
         }}
@@ -109,7 +101,7 @@ const SizeInput: FC<PropertyInputProps> = ({
           min={property.min}
           max={property.max}
           step={property.step}
-          value={value || property.defaultValue}
+          value={localValue}
           onChange={(e) => {
             handleInputChange(e.target.value);
           }}
@@ -152,21 +144,12 @@ const NumberInput: FC<PropertyInputProps> = ({
   onImmediateChange,
   disabled,
 }) => {
-  const handleSliderChange = (newValue: string): void => {
-    if (onDebouncedChange) {
-      onDebouncedChange(newValue);
-    } else {
-      onChange(newValue);
-    }
-  };
-
-  const handleInputChange = (newValue: string): void => {
-    if (onImmediateChange) {
-      onImmediateChange(newValue);
-    } else {
-      onChange(newValue);
-    }
-  };
+  const { localValue, handleSliderChange, handleInputChange } = useOptimisticSlider(
+    value,
+    property.defaultValue,
+    onDebouncedChange ?? onChange,
+    onImmediateChange ?? onChange
+  );
 
   return (
     <div className="flex items-center gap-2">
@@ -175,7 +158,7 @@ const NumberInput: FC<PropertyInputProps> = ({
         min={property.min ?? 0}
         max={property.max ?? 100}
         step={property.step ?? 1}
-        value={value || property.defaultValue}
+        value={localValue}
         onChange={(e) => {
           handleSliderChange(e.target.value);
         }}
@@ -188,7 +171,7 @@ const NumberInput: FC<PropertyInputProps> = ({
         min={property.min}
         max={property.max}
         step={property.step}
-        value={value || property.defaultValue}
+        value={localValue}
         onChange={(e) => {
           handleInputChange(e.target.value);
         }}
