@@ -30,13 +30,15 @@ export function isDev(): boolean {
       return __DEV__;
     }
     // Fallback to import.meta.env
-    const mode = import.meta.env['MODE'];
+    const mode = import.meta.env.MODE;
     if (typeof mode === 'string') {
       return mode === 'development';
     }
-    return process.env.NODE_ENV !== 'production';
+    // Assume production if MODE is not set
+    return false;
   } catch {
-    return process.env.NODE_ENV !== 'production';
+    // Assume production in non-Vite environments
+    return false;
   }
 }
 

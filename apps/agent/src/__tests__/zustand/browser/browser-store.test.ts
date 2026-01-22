@@ -4,7 +4,6 @@
  * Purpose: Manages webview browser state - session, navigation, element selection.
  * Persisted to localStorage for viewId and isActive (survives webview reloads).
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ReactElementContext } from '@/types/protocol';
 

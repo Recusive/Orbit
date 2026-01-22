@@ -4,7 +4,6 @@
  * Purpose: Global UI state management - panels, sidebars, conversations, dialogs, worktrees.
  * Uses immer middleware and manual localStorage persistence for conversations and worktrees.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { SettingsSection } from '@/components/modals/settings';
 import type {

@@ -6,8 +6,6 @@
  * Run with: bun run test:canvas
  */
 
-import { describe, expect, it } from 'vitest';
-
 import { createMockInvoke, resetMocks } from '../test-setup';
 
 import type { CanvasSetupState, UseCanvasSetupResult } from '../hooks/use-canvas-setup';

@@ -5,7 +5,6 @@
  * and session caching. Uses immer middleware with Set support.
  */
 import { enableMapSet } from 'immer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Enable immer's MapSet plugin for Set<string> support (processedMessageIds)
 enableMapSet();

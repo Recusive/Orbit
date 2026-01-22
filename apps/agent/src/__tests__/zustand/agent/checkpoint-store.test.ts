@@ -6,7 +6,6 @@
  * 1. Turn Start: User message UUID for SDK fork point
  * 2. Turn End: State after tools completed (for file restoration)
  */
-import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 

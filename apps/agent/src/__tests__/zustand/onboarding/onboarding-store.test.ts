@@ -4,7 +4,6 @@
  * Purpose: Tracks first-launch setup flow state.
  * Persisted to localStorage to remember if user completed onboarding.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useOnboardingStore } from '@/stores/onboarding/onboarding-store';
 

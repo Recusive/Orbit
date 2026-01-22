@@ -5,7 +5,6 @@
  * command detection, flow control, and session lifecycle.
  * Uses immer middleware for immutable state updates.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ShellType, TerminalCapabilitiesState } from '@/types/protocol';
 

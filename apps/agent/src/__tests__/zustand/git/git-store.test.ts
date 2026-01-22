@@ -4,7 +4,6 @@
  * Purpose: Manages git repository state - status, branches, loading/fetch states.
  * Uses subscribeWithSelector middleware for optimized subscriptions.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { GitStatus, StatusEntry } from '@/stores/git/git-store';
 

@@ -44,15 +44,15 @@ interface LogEntry {
 const isDev = (): boolean => {
   try {
     // Vite sets MODE to 'development' or 'production'
-    const mode = import.meta.env['MODE'];
+    const mode = import.meta.env.MODE;
     if (typeof mode === 'string') {
       return mode === 'development';
     }
-    // Fallback to NODE_ENV
-    return process.env.NODE_ENV !== 'production';
+    // Fallback: assume production if MODE is not set
+    return false;
   } catch {
-    // Fallback for non-Vite environments
-    return process.env.NODE_ENV !== 'production';
+    // Fallback for non-Vite environments: assume production
+    return false;
   }
 };
 

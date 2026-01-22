@@ -20,9 +20,7 @@
  * ```
  */
 
-import { vi } from 'vitest';
-
-import type { Mock } from 'vitest';
+// vi is available as a global via vitest/globals (configured in root tsconfig.json)
 
 // =============================================================================
 // Types
@@ -34,9 +32,16 @@ import type { Mock } from 'vitest';
 export type MockResponseMap = Record<string, unknown>;
 
 /**
- * Mock invoke function type
+ * Mock invoke function type - matches Tauri's invoke signature
+ * Uses intersection to provide both mock methods and invoke signature
  */
-export type MockInvokeFn = Mock<(command: string, args?: unknown) => Promise<unknown>>;
+export interface MockInvokeFn {
+  (cmd: string, args?: unknown): Promise<unknown>;
+  mockImplementation: (fn: (cmd: string, args?: unknown) => Promise<unknown>) => void;
+  getMockImplementation: () => ((cmd: string, args?: unknown) => Promise<unknown>) | undefined;
+  mockClear: () => void;
+  mockReset: () => void;
+}
 
 // =============================================================================
 // Mock Creators
@@ -90,16 +95,16 @@ export function createMockInvoke(responses: MockResponseMap): MockInvokeFn {
  * import { invoke } from '@tauri-apps/api/core';
  *
  * // In your test
- * mockTauriCommand('read_file', 'custom file content');
+ * await mockTauriCommand('read_file', 'custom file content');
  *
  * // The next call to invoke('read_file') will return 'custom file content'
  * const content = await invoke('read_file', { path: '/test.txt' });
  * ```
  */
-export function mockTauriCommand(command: string, response: unknown): void {
-  // Import the mocked invoke
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { invoke } = require('@tauri-apps/api/core') as { invoke: MockInvokeFn };
+export async function mockTauriCommand(command: string, response: unknown): Promise<void> {
+  // Dynamic import to get the mocked invoke - cast through unknown since
+  // in tests the module is mocked and invoke has mock methods attached
+  const { invoke } = (await import('@tauri-apps/api/core')) as unknown as { invoke: MockInvokeFn };
 
   const originalImpl = invoke.getMockImplementation();
 

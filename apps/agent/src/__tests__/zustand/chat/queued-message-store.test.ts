@@ -4,7 +4,6 @@
  * Purpose: Temporary buffer for pending chat messages before sending to agent.
  * Allows queuing a message that will be sent when conditions are met.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 

@@ -4,7 +4,6 @@
  * Purpose: Manages AI provider configurations (Claude, OpenAI, Google).
  * Persisted to localStorage to remember user's provider setup.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProviderStatus, ProviderType } from '@/stores/onboarding/provider-store';
 

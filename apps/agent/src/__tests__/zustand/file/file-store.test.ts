@@ -4,7 +4,6 @@
  * Purpose: Manages file changes tracking and file tree explorer state.
  * Uses immer with enableMapSet() for Map/Set support.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { FileChange, FileChangeStatus, FileChangeType } from '@/stores/file/file-store';
 import type { FileNode } from '@/types/protocol';

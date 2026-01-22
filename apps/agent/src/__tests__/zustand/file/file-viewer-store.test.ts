@@ -5,7 +5,6 @@
  * navigation history, search state, and goto functionality.
  * Uses immer middleware for immutable state updates.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { FileDiff, DiffLine } from '@/stores/file/file-store';
 import type { ViewedFileDiff } from '@/stores/file/file-viewer-store';
