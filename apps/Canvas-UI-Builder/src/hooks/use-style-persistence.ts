@@ -203,8 +203,8 @@ export function useStylePersistence(): UseStylePersistenceReturn {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      if (hmrTimeoutRef.current) clearTimeout(hmrTimeoutRef.current);
-      if (successResetRef.current) clearTimeout(successResetRef.current);
+      if (hmrTimeoutRef.current !== null) clearTimeout(hmrTimeoutRef.current);
+      if (successResetRef.current !== null) clearTimeout(successResetRef.current);
     };
   }, []);
 
@@ -348,7 +348,7 @@ export function useStylePersistence(): UseStylePersistenceReturn {
 
           // Cleanup function
           const cleanup = (): void => {
-            if (hmrTimeoutRef.current) {
+            if (hmrTimeoutRef.current !== null) {
               clearTimeout(hmrTimeoutRef.current);
               hmrTimeoutRef.current = null;
             }

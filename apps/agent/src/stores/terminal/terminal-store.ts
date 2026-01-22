@@ -191,8 +191,8 @@ export const useTerminalStore = create<TerminalState>()(
       });
 
       set((state) => {
-        const processExists = typeof process !== 'undefined';
-        const defaultCwd = processExists && typeof process.cwd === 'function' ? process.cwd() : '~';
+        // In Tauri/browser context, use '~' as default (actual cwd is set by PTY backend)
+        const defaultCwd = '~';
 
         const newSession: TerminalSession = {
           id,

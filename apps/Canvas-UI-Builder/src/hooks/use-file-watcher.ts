@@ -189,7 +189,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
       logger.debug('File change detected', { event: event.type });
 
       // Clear existing debounce timer
-      if (debounceTimerRef.current) {
+      if (debounceTimerRef.current !== null) {
         clearTimeout(debounceTimerRef.current);
       }
 
@@ -303,7 +303,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
     return () => {
       state.cancelled = true;
 
-      if (debounceTimerRef.current) {
+      if (debounceTimerRef.current !== null) {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
       }

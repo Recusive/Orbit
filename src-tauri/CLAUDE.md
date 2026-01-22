@@ -631,6 +631,63 @@ let repo_path = git_discover(&path).map_err(to_error)?;
 
 ---
 
+## Testing
+
+The Tauri backend uses **Cargo test** for Rust unit and integration tests.
+
+### Commands
+
+```bash
+# From project root
+cargo test                  # Run all Rust tests
+cargo test --workspace      # All workspace crates
+cargo test -p orbit-git     # Specific crate
+cargo test canvas           # Tests matching "canvas"
+
+# With output
+cargo test -- --nocapture   # Show println! output
+```
+
+### Test Organization
+
+Tests are located alongside the code they test:
+
+```rust
+// src-tauri/src/commands/canvas/tests.rs
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serialization() {
+        // Test Serde serialization
+    }
+}
+```
+
+### Workspace Crate Tests
+
+Each crate in `crates/common/` has its own tests:
+
+```bash
+cargo test -p orbit-core    # Core types
+cargo test -p orbit-fs      # File system ops
+cargo test -p orbit-git     # Git operations
+cargo test -p orbit-terminal # PTY tests
+```
+
+### Integration Tests
+
+For full end-to-end testing with the Claude SDK, use agent-bridge tests:
+
+```bash
+cd agent-bridge && bun test
+```
+
+These require OAuth credentials and auto-skip in CI.
+
+---
+
 ## Changelog
 
 ### January 2026
@@ -639,3 +696,4 @@ let repo_path = git_discover(&path).map_err(to_error)?;
 - Documented agent bridge architecture
 - Added command organization reference
 - Documented protocol types and events
+- Added testing section

@@ -3,18 +3,18 @@
  *
  * Tests for Canvas types and setup logic.
  *
- * Run with: bun run canvas:test
+ * Run with: bun run test:canvas
  */
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'vitest';
 
 import { createMockInvoke, resetMocks } from '../test-setup';
 
 import type { CanvasSetupState, UseCanvasSetupResult } from '../hooks/use-canvas-setup';
 
-// ============================================================================
+// =============================================================================
 // Type Tests
-// ============================================================================
+// =============================================================================
 
 describe('Canvas Types', () => {
   it('CanvasSetupState should be a valid union type', () => {
@@ -45,9 +45,9 @@ describe('Canvas Types', () => {
   });
 });
 
-// ============================================================================
+// =============================================================================
 // Mock Tests
-// ============================================================================
+// =============================================================================
 
 describe('Test Setup Mocks', () => {
   it('createMockInvoke should return expected responses', async () => {
@@ -76,27 +76,15 @@ describe('Test Setup Mocks', () => {
       canvas_check_setup: new Error('Tauri error'),
     });
 
-    let thrownError: unknown = null;
-    try {
-      await mockInvoke('canvas_check_setup');
-    } catch (err) {
-      thrownError = err;
-    }
-    expect(thrownError).toBeInstanceOf(Error);
-    expect((thrownError as Error).message).toBe('Tauri error');
+    await expect(mockInvoke('canvas_check_setup')).rejects.toThrow('Tauri error');
   });
 
   it('createMockInvoke should throw for unknown commands', async () => {
     const mockInvoke = createMockInvoke({});
 
-    let thrownError: unknown = null;
-    try {
-      await mockInvoke('unknown_command');
-    } catch (err) {
-      thrownError = err;
-    }
-    expect(thrownError).toBeInstanceOf(Error);
-    expect((thrownError as Error).message).toBe('No mock response for command: unknown_command');
+    await expect(mockInvoke('unknown_command')).rejects.toThrow(
+      'No mock response for command: unknown_command'
+    );
   });
 
   it('resetMocks should clear mock call counts', () => {
@@ -107,9 +95,9 @@ describe('Test Setup Mocks', () => {
   });
 });
 
-// ============================================================================
+// =============================================================================
 // Integration Test Stubs
-// ============================================================================
+// =============================================================================
 // These tests use mocks to test the expected behavior of Tauri commands.
 
 describe('Canvas Setup Flow (with mocks)', () => {
