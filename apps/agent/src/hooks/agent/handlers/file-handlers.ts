@@ -3,7 +3,13 @@ import { initFileWatcher } from '../use-tauri-file-watcher';
 import type { FileEntry } from '@/lib/api';
 import type { WebviewMessage } from '@/types/protocol';
 
-import { conversationList, getWorkspacePath, listDirectory, readFile } from '@/lib/api';
+import {
+  buildFileIndex,
+  conversationList,
+  getWorkspacePath,
+  listDirectory,
+  readFile,
+} from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -68,6 +74,11 @@ export async function handleFileTreeRequest(
       initFileWatcher(targetPath).catch((err: unknown) => {
         console.warn('[Orbit] Failed to initialize file watcher:', err);
       });
+
+      // Build file index for fuzzy search (@ mentions)
+      buildFileIndex(targetPath).catch((err: unknown) => {
+        console.warn('[Orbit] Failed to build file index:', err);
+      });
     }
 
     const entries = await listDirectory(targetPath, false);
@@ -127,59 +138,6 @@ export async function handleFileRead(
         type: 'error',
         uuid: crypto.randomUUID(),
         message: errorMessage,
-      },
-      '*'
-    );
-  }
-}
-
-export async function handleFileListRequest(
-  message: Extract<WebviewMessage, { type: 'file:list:request' }>
-): Promise<void> {
-  try {
-    const storedPath = await getWorkspacePath();
-    if (!storedPath) {
-      // No workspace set - return empty list (see WORKSPACE SANDBOXING comment above)
-      window.postMessage(
-        {
-          type: 'file:list:response',
-          uuid: crypto.randomUUID(),
-          request_uuid: message.uuid,
-          files: [],
-        },
-        '*'
-      );
-      return;
-    }
-
-    // Get all files recursively (flatten the tree)
-    // For now, just list the root directory files
-    const entries = await listDirectory(storedPath, false);
-    const files = entries
-      .filter((entry: FileEntry) => !entry.isDir)
-      .map((entry: FileEntry) => ({
-        name: entry.name,
-        path: entry.path,
-      }));
-
-    window.postMessage(
-      {
-        type: 'file:list:response',
-        uuid: crypto.randomUUID(),
-        request_uuid: message.uuid,
-        files,
-      },
-      '*'
-    );
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to list files';
-    console.error('[Orbit] File list error:', errorMessage);
-    window.postMessage(
-      {
-        type: 'file:list:response',
-        uuid: crypto.randomUUID(),
-        request_uuid: message.uuid,
-        files: [],
       },
       '*'
     );

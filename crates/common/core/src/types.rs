@@ -501,3 +501,21 @@ pub struct FileChangeEvent {
     /// New path (for renames)
     pub new_path: Option<String>,
 }
+
+/// Fuzzy file search result from Nucleo matcher.
+///
+/// Used by the @ mention file picker to display ranked file matches
+/// with highlighting support for matched characters.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FuzzySearchResult {
+    /// File path relative to workspace root.
+    pub path: String,
+    /// Filename only (for display).
+    pub name: String,
+    /// Match score from Nucleo (higher = better match).
+    pub score: u32,
+    /// Character indices in `name` where the pattern matched.
+    /// Used for highlighting matched characters in the UI.
+    pub match_indices: Vec<u32>,
+}

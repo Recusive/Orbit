@@ -73,10 +73,6 @@ const CommandList = React.forwardRef<
   <CommandPrimitive.List
     ref={ref}
     className={cn('max-h-[320px] overflow-y-auto overflow-x-hidden', className)}
-    style={{
-      scrollbarWidth: 'thin',
-      scrollbarColor: 'hsl(var(--border) / 0.4) transparent',
-    }}
     {...props}
   />
 ));

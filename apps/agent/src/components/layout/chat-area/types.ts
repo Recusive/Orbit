@@ -2,7 +2,6 @@ import type { ImageAttachment } from '@/components/chat/input/types';
 import type { ChatMessage } from '@/components/chat/messages';
 import type { PermissionRequest, ToolExecution, UsageData } from '@/stores/agent/tool-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
-import type { FileEntry } from '@/types/agent/context';
 import type { InputMode, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 
 /** Props for PermissionBar component */
@@ -30,8 +29,6 @@ export interface ChatContentProps {
   readonly queuedMessage: QueuedMessage | null;
   /** Pending permission requests */
   readonly pendingPermissions: readonly PermissionRequest[];
-  /** File list for @ mentions - mutable for ChatInput compatibility */
-  readonly fileList: FileEntry[];
   /** Current input mode */
   readonly inputMode: InputMode;
   /** Current thinking mode */

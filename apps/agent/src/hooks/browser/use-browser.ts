@@ -200,7 +200,6 @@ export function useBrowser(): void {
         case 'file:written':
         case 'file:tree:response':
         case 'file:tree:error':
-        case 'file:list:response':
         case 'conversation:list':
         case 'conversation:created':
         case 'conversation:deleted':

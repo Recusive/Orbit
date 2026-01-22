@@ -12,6 +12,9 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use orbit_search::FileIndex;
+use parking_lot::RwLock;
+
 use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
 use commands::canvas::download as canvas_download;
@@ -24,8 +27,9 @@ use commands::canvas::transform as canvas_transform;
 use commands::canvas::PreviewServerState;
 use commands::common::{
     browser::{self, BrowserResultState, EmbeddedBrowserState},
-    credentials, dev_monitor, diagnostics, files, git, lsp, providers, search, settings, terminal,
-    workspace,
+    credentials, dev_monitor, diagnostics, files, git, lsp, providers,
+    search::{self, FileIndexState},
+    settings, terminal, workspace,
 };
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
@@ -261,6 +265,9 @@ pub fn run() {
     let browser_state = Arc::new(EmbeddedBrowserState::new());
     let browser_result_state = Arc::new(BrowserResultState::new());
 
+    // Initialize file index state (empty until workspace is opened)
+    let file_index_state: FileIndexState = Arc::new(RwLock::new(Option::<FileIndex>::None));
+
     let result = tauri::Builder::default()
         // Managed state
         .manage(settings_manager)
@@ -269,6 +276,7 @@ pub fn run() {
         .manage(browser_state)
         .manage(browser_result_state)
         .manage(PreviewServerState::new())
+        .manage(file_index_state)
         // Plugins
         .plugin(build_log_plugin().build())
         .plugin(tauri_plugin_fs::init())
@@ -452,6 +460,10 @@ pub fn run() {
             // Search commands
             search::search_files,
             search::search_text,
+            // Fuzzy file index commands
+            search::build_file_index,
+            search::fuzzy_search_files,
+            search::clear_file_index,
             // Workspace commands
             workspace::get_workspace_path,
             workspace::set_workspace_path,

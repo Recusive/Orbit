@@ -35,7 +35,7 @@ import {
   handleConversationUpdateTitle,
   handleConversationRewind,
 } from './conversation-handlers';
-import { handleFileTreeRequest, handleFileRead, handleFileListRequest } from './file-handlers';
+import { handleFileTreeRequest, handleFileRead } from './file-handlers';
 import {
   handleSubagentsList,
   handleSubagentsCreate,
@@ -131,12 +131,6 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
   //     Test file: src/__tests__/combined-rewind.test.ts
   if (message.type === 'conversation:rewind') {
     await handleConversationRewind(message);
-    return;
-  }
-
-  // Handle file list request (for file search/picker)
-  if (message.type === 'file:list:request') {
-    await handleFileListRequest(message);
     return;
   }
 

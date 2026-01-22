@@ -39,6 +39,7 @@ import {
   onTerminalOutput,
   watchPath,
   getWorkspacePath,
+  buildFileIndex,
 } from '@/lib/api';
 import { WebviewMessageSchema } from '@/types/protocol';
 
@@ -209,6 +210,36 @@ async function setupFileWatcher(controller: ListenerAbortController): Promise<vo
     if (!controller.isAborted()) {
       logger.error(
         'Failed to setup file watcher',
+        err instanceof Error ? err : new Error(String(err))
+      );
+    }
+  }
+}
+
+/**
+ * Build the fuzzy file search index for the workspace.
+ *
+ * This enables the @ mention file picker to perform fast fuzzy searches.
+ * The index is built asynchronously on app startup and incrementally
+ * updated when files change (handled by the Rust file watcher).
+ */
+async function setupFileIndex(controller: ListenerAbortController): Promise<void> {
+  // Check abort state before starting
+  if (controller.isAborted()) return;
+
+  try {
+    const workspacePath = await getWorkspacePath();
+
+    // Check again after await - cleanup may have been called
+    if (!workspacePath || controller.isAborted()) return;
+
+    await buildFileIndex(workspacePath);
+    logger.info('File index built for fuzzy search', { workspacePath });
+  } catch (err: unknown) {
+    // Only log errors if we weren't aborted (avoids noise during cleanup)
+    if (!controller.isAborted()) {
+      logger.error(
+        'Failed to build file index',
         err instanceof Error ? err : new Error(String(err))
       );
     }
@@ -662,10 +693,11 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
         );
       }
 
-      // File watcher (separate because it depends on workspace path)
-      // Use a separate async function to handle abort checks cleanly
+      // File watcher and index (separate because they depend on workspace path)
+      // Use separate async functions to handle abort checks cleanly
       // The controller.isAborted() state CAN change during await (cleanup called from React)
-      await setupFileWatcher(controller);
+      // Run both in parallel for faster initialization
+      await Promise.all([setupFileWatcher(controller), setupFileIndex(controller)]);
 
       if (!controller.isAborted()) {
         logger.info('All Tauri event listeners initialized');

@@ -18,9 +18,9 @@ import {
   addSshHost,
   conversationList,
   getSshHosts,
+  initializeWorkspace,
   openFileDialog,
   removeSshHost,
-  setWorkspacePath,
 } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { useFileStore } from '@/stores/file/file-store';
@@ -144,8 +144,8 @@ export const SSHConnectionDialog: FC<SSHConnectionDialogProps> = ({ open, onOpen
           return;
         }
 
-        // Set the workspace to transition to main view
-        await setWorkspacePath(selected);
+        // Set the workspace and build file index for fuzzy search
+        await initializeWorkspace(selected);
         useUIStore.getState().setWorkspace(selected);
         setRootPath(selected);
 

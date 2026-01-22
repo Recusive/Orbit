@@ -11,17 +11,14 @@
  * - ActivityPanel (file viewer, git changes)
  * - Terminal (that's in EditorCenter)
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 
 import type { ChatMessage } from '@/components/chat/messages';
 import type { PermissionRequest } from '@/stores/agent/tool-store';
-import type { FileEntry } from '@/types/agent/context';
-import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { ChatHeader, ChatMessages, ChatInput, useQueuedMessageHandler } from '@/components/chat';
 import { PermissionModal } from '@/components/modals';
-import { useTauri } from '@/hooks/agent/use-tauri';
 import { useChatMessages } from '@/hooks/chat/use-chat-messages';
 import { cn } from '@/lib/utils/utils';
 import {
@@ -68,7 +65,6 @@ export const EditorChatPanel: FC = () => {
   const sessionUsage = useSessionUsage();
   const maxTokens = useMaxTokens();
   const getToolsForMessage = useGetToolsForMessage();
-  const [fileList, setFileList] = useState<FileEntry[]>([]);
 
   const {
     messages,
@@ -112,31 +108,6 @@ export const EditorChatPanel: FC = () => {
   // Only show queued message if it belongs to current session
   const queuedMessage = rawQueuedMessage?.sessionId === sessionId ? rawQueuedMessage : null;
 
-  // Handle file list response for @ mentions
-  // Protocol layer (Zod schema) validates file entry shape
-  const handleFileListMessage = (message: ExtensionMessage): void => {
-    if (message.type === 'file:list:response' && Array.isArray(message.files)) {
-      setFileList(
-        message.files.map((f) => ({
-          path: f.path,
-          name: f.name,
-          isDirectory: f.isDirectory ?? false,
-        }))
-      );
-    }
-  };
-
-  // Subscribe to file list messages
-  useTauri({ onMessage: handleFileListMessage });
-
-  // Request file list for @ mentions on mount
-  useEffect(() => {
-    postMessage({
-      type: 'file:list:request',
-      uuid: crypto.randomUUID(),
-    });
-  }, [postMessage]);
-
   // Handle feedback click - dispatches event to focus input
   const handleFeedback = useCallback((): void => {
     window.dispatchEvent(new CustomEvent('focusChatInput'));
@@ -149,7 +120,6 @@ export const EditorChatPanel: FC = () => {
     inputMode,
     thinkingMode,
     isAgentRunning,
-    fileList,
     usage: sessionUsage,
     maxTokens,
     hasPermissionPending: pendingPermissions.length > 0,

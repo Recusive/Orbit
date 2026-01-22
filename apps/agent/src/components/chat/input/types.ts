@@ -17,7 +17,6 @@ export interface ChatInputProps {
   readonly inputMode: InputMode;
   readonly thinkingMode: ThinkingMode;
   readonly isAgentRunning: boolean;
-  readonly fileList: FileEntry[];
   readonly usage: UsageData;
   readonly maxTokens: number;
   readonly hasPermissionPending?: boolean;
@@ -65,7 +64,6 @@ export interface UseChatInputOptions {
   readonly inputMode: InputMode;
   readonly thinkingMode: ThinkingMode;
   readonly isAgentRunning: boolean;
-  readonly fileList: FileEntry[];
   readonly onSend: ChatInputProps['onSend'];
   readonly onStop: () => void;
   readonly onModeChange: (mode: InputMode) => void;

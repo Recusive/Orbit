@@ -947,7 +947,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       case 'panel:visible':
       case 'file:tree:response':
       case 'file:tree:error':
-      case 'file:list:response':
       case 'thinking:changed':
       case 'browser:open':
       case 'browser:close':

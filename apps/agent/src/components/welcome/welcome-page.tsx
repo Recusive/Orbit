@@ -7,7 +7,7 @@ import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { CloneRepositoryDialog } from '@/components/modals/git';
 import { SSHConnectionDialog } from '@/components/modals/ssh';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
-import { addRecentProject, conversationList, openFileDialog, setWorkspacePath } from '@/lib/api';
+import { addRecentProject, conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { cn } from '@/lib/utils';
 import { useFileStore } from '@/stores/file/file-store';
@@ -30,8 +30,8 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
   const openProject = useCallback(
     async (path: string): Promise<void> => {
       try {
-        // Persist workspace path to backend
-        await setWorkspacePath(path);
+        // Persist workspace path to backend and build file index for fuzzy search
+        await initializeWorkspace(path);
         // Add to recent projects (moves to top if already exists)
         await addRecentProject(path);
         // Update UI store with workspace name

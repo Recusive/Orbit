@@ -385,14 +385,6 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     });
   }, [sessionId, postMessage]);
 
-  // Request file list for @ mentions
-  useEffect(() => {
-    postMessage({
-      type: 'file:list:request',
-      uuid: crypto.randomUUID(),
-    });
-  }, [postMessage]);
-
   // Send pending message when session becomes available
   useEffect(() => {
     if (sessionId && pendingMessage) {

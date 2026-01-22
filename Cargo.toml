@@ -59,6 +59,10 @@ lsp-types = "0.97"
 # Search
 grep = "0.3"
 ignore = "0.4"
+nucleo-matcher = "0.3"
+
+# Testing
+tempfile = "3"
 
 # HTTP client (for AI)
 reqwest = { version = "0.12", features = ["json", "stream"] }
