@@ -65,6 +65,7 @@
     "canvas:lint": "eslint apps/Canvas-UI-Builder/src --max-warnings=0",
     "canvas:lint:fix": "eslint apps/Canvas-UI-Builder/src --fix",
     "canvas:check": "bun run canvas:typecheck && bun run canvas:lint",
+    "canvas:test": "vitest run apps/Canvas-UI-Builder",
     "knip": "knip -W . -W apps/agent -W apps/Canvas-UI-Builder -W apps/editor -W apps/common -W packages/shared-schemas",
     "knip:fix": "knip -W . -W apps/agent -W apps/Canvas-UI-Builder -W apps/editor -W apps/common -W packages/shared-schemas --fix",
     "knip:watch": "knip -W . -W apps/agent -W apps/Canvas-UI-Builder -W apps/editor -W apps/common -W packages/shared-schemas --watch"
