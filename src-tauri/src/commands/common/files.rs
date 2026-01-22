@@ -1,6 +1,7 @@
 //! File system commands for Tauri
 //!
 //! These commands wrap the orbit-fs crate for use in the frontend.
+//! Errors are captured to Sentry for monitoring via the `SentryCapture` trait.
 
 #![allow(
     clippy::needless_pass_by_value,
@@ -21,6 +22,7 @@ use tauri::{async_runtime, AppHandle, Emitter as _};
 use tokio::time::sleep;
 
 use super::workspace;
+use crate::core::sentry_utils::SentryCapture as _;
 // ============================================
 // Basic File Operations
 // ============================================
@@ -29,28 +31,34 @@ use super::workspace;
 #[tauri::command]
 pub async fn read_file(path: String) -> Result<String> {
     ensure_workspace_paths(&[&path])?;
-    orbit_fs::read_file(&path).await
+    orbit_fs::read_file(&path).await.capture("read_file")
 }
 
 /// Read file contents as bytes (base64 encoded for transport)
 #[tauri::command]
 pub async fn read_file_bytes(path: String) -> Result<Vec<u8>> {
     ensure_workspace_paths(&[&path])?;
-    orbit_fs::read_file_bytes(&path).await
+    orbit_fs::read_file_bytes(&path)
+        .await
+        .capture("read_file_bytes")
 }
 
 /// Write content to a file
 #[tauri::command]
 pub async fn write_file(path: String, content: String) -> Result<()> {
     ensure_workspace_paths(&[&path])?;
-    orbit_fs::write_file(&path, &content).await
+    orbit_fs::write_file(&path, &content)
+        .await
+        .capture("write_file")
 }
 
 /// Write bytes to a file
 #[tauri::command]
 pub async fn write_file_bytes(path: String, content: Vec<u8>) -> Result<()> {
     ensure_workspace_paths(&[&path])?;
-    orbit_fs::write_file_bytes(&path, &content).await
+    orbit_fs::write_file_bytes(&path, &content)
+        .await
+        .capture("write_file_bytes")
 }
 
 /// List directory contents
@@ -62,42 +70,48 @@ pub async fn write_file_bytes(path: String, content: Vec<u8>) -> Result<()> {
 #[tauri::command]
 pub async fn list_directory(path: String, show_hidden: Option<bool>) -> Result<Vec<FileEntry>> {
     ensure_workspace_paths(&[&path])?;
-    orbit_fs::list_directory(&path, show_hidden.unwrap_or(false)).await
+    orbit_fs::list_directory(&path, show_hidden.unwrap_or(false))
+        .await
+        .capture("list_directory")
 }
 
 /// Create an empty file
 #[tauri::command]
 pub async fn create_file(path: String) -> Result<()> {
     ensure_workspace_paths(&[&path])?;
-    orbit_fs::create_file(&path).await
+    orbit_fs::create_file(&path).await.capture("create_file")
 }
 
 /// Create a directory (and parents if needed)
 #[tauri::command]
 pub async fn create_directory(path: String) -> Result<()> {
     ensure_workspace_paths(&[&path])?;
-    orbit_fs::create_directory(&path).await
+    orbit_fs::create_directory(&path)
+        .await
+        .capture("create_directory")
 }
 
 /// Delete a file or directory
 #[tauri::command]
 pub async fn delete_file(path: String) -> Result<()> {
     ensure_workspace_paths(&[&path])?;
-    orbit_fs::delete_file(&path).await
+    orbit_fs::delete_file(&path).await.capture("delete_file")
 }
 
 /// Rename or move a file
 #[tauri::command]
 pub async fn rename_file(old_path: String, new_path: String) -> Result<()> {
     ensure_workspace_paths(&[&old_path, &new_path])?;
-    orbit_fs::rename_file(&old_path, &new_path).await
+    orbit_fs::rename_file(&old_path, &new_path)
+        .await
+        .capture("rename_file")
 }
 
 /// Copy a file
 #[tauri::command]
 pub async fn copy_file(from: String, to: String) -> Result<()> {
     ensure_workspace_paths(&[&from, &to])?;
-    orbit_fs::copy_file(&from, &to).await
+    orbit_fs::copy_file(&from, &to).await.capture("copy_file")
 }
 
 /// Check if a file exists
@@ -122,7 +136,9 @@ pub async fn is_directory(path: String) -> bool {
 #[tauri::command]
 pub async fn get_file_info(path: String) -> Result<FileInfo> {
     ensure_workspace_paths(&[&path])?;
-    orbit_fs::get_file_info(&path).await
+    orbit_fs::get_file_info(&path)
+        .await
+        .capture("get_file_info")
 }
 
 // ============================================
@@ -344,59 +360,63 @@ fn start_event_forwarder(app: AppHandle) {
 /// - The path cannot be watched
 #[tauri::command]
 pub fn watch_path(path: String, app: AppHandle) -> Result<()> {
-    ensure_workspace_paths(&[&path])?;
-    // Normalize the path for consistent comparison
-    let normalized_path = normalize_path(&path);
-    let path_obj = Path::new(&normalized_path);
+    // Wrap the implementation in a closure for Sentry capture
+    (|| {
+        ensure_workspace_paths(&[&path])?;
+        // Normalize the path for consistent comparison
+        let normalized_path = normalize_path(&path);
+        let path_obj = Path::new(&normalized_path);
 
-    // Validate path exists
-    if !path_obj.exists() {
-        return Err(Error::FileNotFound(normalized_path));
-    }
-
-    let state = get_watcher_state();
-
-    // Check if already watching this path
-    {
-        let paths = state.watched_paths.lock();
-        if paths.contains(&normalized_path) {
-            log::debug!("Path already being watched: {normalized_path}");
-            return Ok(());
-        }
-    }
-
-    // Add to watched paths
-    let _was_new = state.watched_paths.lock().insert(normalized_path.clone());
-
-    // Ensure watcher exists and watch the path
-    {
-        let mut watcher_guard = state.watcher.lock();
-
-        // Initialize watcher if needed
-        if watcher_guard.is_none() {
-            let new_watcher = FileWatcher::new().map_err(|e| {
-                // Remove from watched_paths on failure
-                let _removed = state.watched_paths.lock().remove(&normalized_path);
-                Error::Other(format!("Failed to create file watcher: {e}"))
-            })?;
-            *watcher_guard = Some(new_watcher);
+        // Validate path exists
+        if !path_obj.exists() {
+            return Err(Error::FileNotFound(normalized_path));
         }
 
-        // Watch the path
-        if let Some(watcher) = watcher_guard.as_mut() {
-            if let Err(e) = watcher.watch(path_obj) {
-                // Remove from watched_paths on failure
-                let _removed = state.watched_paths.lock().remove(&normalized_path);
-                return Err(e);
+        let state = get_watcher_state();
+
+        // Check if already watching this path
+        {
+            let paths = state.watched_paths.lock();
+            if paths.contains(&normalized_path) {
+                log::debug!("Path already being watched: {normalized_path}");
+                return Ok(());
             }
         }
-    }
 
-    // Start forwarder if not running
-    start_event_forwarder(app);
+        // Add to watched paths
+        let _was_new = state.watched_paths.lock().insert(normalized_path.clone());
 
-    log::debug!("Started watching path: {normalized_path}");
-    Ok(())
+        // Ensure watcher exists and watch the path
+        {
+            let mut watcher_guard = state.watcher.lock();
+
+            // Initialize watcher if needed
+            if watcher_guard.is_none() {
+                let new_watcher = FileWatcher::new().map_err(|e| {
+                    // Remove from watched_paths on failure
+                    let _removed = state.watched_paths.lock().remove(&normalized_path);
+                    Error::Other(format!("Failed to create file watcher: {e}"))
+                })?;
+                *watcher_guard = Some(new_watcher);
+            }
+
+            // Watch the path
+            if let Some(watcher) = watcher_guard.as_mut() {
+                if let Err(e) = watcher.watch(path_obj) {
+                    // Remove from watched_paths on failure
+                    let _removed = state.watched_paths.lock().remove(&normalized_path);
+                    return Err(e);
+                }
+            }
+        }
+
+        // Start forwarder if not running
+        start_event_forwarder(app);
+
+        log::debug!("Started watching path: {normalized_path}");
+        Ok(())
+    })()
+    .capture("watch_path")
 }
 
 /// Stop watching a path for file changes.
@@ -404,34 +424,38 @@ pub fn watch_path(path: String, app: AppHandle) -> Result<()> {
 /// This is idempotent - calling it on a path that isn't being watched is a no-op.
 #[tauri::command]
 pub fn unwatch_path(path: String) -> Result<()> {
-    ensure_workspace_paths(&[&path])?;
-    // Normalize the path for consistent comparison
-    let normalized_path = normalize_path(&path);
+    // Wrap the implementation in a closure for Sentry capture
+    (|| {
+        ensure_workspace_paths(&[&path])?;
+        // Normalize the path for consistent comparison
+        let normalized_path = normalize_path(&path);
 
-    let state = get_watcher_state();
+        let state = get_watcher_state();
 
-    // Check if we're actually watching this path
-    let was_watching = {
-        let mut paths = state.watched_paths.lock();
-        paths.remove(&normalized_path)
-    };
+        // Check if we're actually watching this path
+        let was_watching = {
+            let mut paths = state.watched_paths.lock();
+            paths.remove(&normalized_path)
+        };
 
-    if !was_watching {
-        log::debug!("Path was not being watched: {normalized_path}");
-        return Ok(());
-    }
+        if !was_watching {
+            log::debug!("Path was not being watched: {normalized_path}");
+            return Ok(());
+        }
 
-    // Unwatch from the watcher (ignore errors - path might already be gone)
-    {
-        let mut watcher_guard = state.watcher.lock();
-        if let Some(ref mut watcher) = *watcher_guard {
-            // Log but don't fail if unwatch errors (path may have been deleted)
-            if let Err(e) = watcher.unwatch(Path::new(&normalized_path)) {
-                log::debug!("Unwatch returned error (path may have been deleted): {e}");
+        // Unwatch from the watcher (ignore errors - path might already be gone)
+        {
+            let mut watcher_guard = state.watcher.lock();
+            if let Some(ref mut watcher) = *watcher_guard {
+                // Log but don't fail if unwatch errors (path may have been deleted)
+                if let Err(e) = watcher.unwatch(Path::new(&normalized_path)) {
+                    log::debug!("Unwatch returned error (path may have been deleted): {e}");
+                }
             }
         }
-    }
 
-    log::debug!("Stopped watching path: {normalized_path}");
-    Ok(())
+        log::debug!("Stopped watching path: {normalized_path}");
+        Ok(())
+    })()
+    .capture("unwatch_path")
 }

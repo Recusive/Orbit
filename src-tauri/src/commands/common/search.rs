@@ -1,8 +1,12 @@
 //! Search commands
+//!
+//! Errors are captured to Sentry for monitoring via the `SentryCapture` trait.
 
 use orbit_core::{Result, SearchOptions, SearchResult, TextSearchResult};
 use orbit_search::SearchManager;
 use std::sync::OnceLock;
+
+use crate::core::sentry_utils::SentryCapture as _;
 
 static SEARCH_MANAGER: OnceLock<SearchManager> = OnceLock::new();
 
@@ -37,6 +41,7 @@ pub async fn search_files(
     get_search_manager()
         .search_files(&root_path, &query, Some(options))
         .await
+        .capture("search_files")
 }
 
 /// Search for text within files
@@ -66,4 +71,5 @@ pub async fn search_text(
     get_search_manager()
         .search_text(&root_path, &pattern, Some(options))
         .await
+        .capture("search_text")
 }

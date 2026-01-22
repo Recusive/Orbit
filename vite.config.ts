@@ -1,5 +1,6 @@
 import path from 'path';
 
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
@@ -33,6 +34,28 @@ export default defineConfig({
       gzipSize: true,
       brotliSize: true,
     }),
+    // Sentry source maps upload - only in production builds
+    // Only enable when SENTRY_AUTH_TOKEN is set to avoid local build failures
+    ...(process.env.SENTRY_AUTH_TOKEN
+      ? [
+          sentryVitePlugin({
+            org: 'recursive-labs',
+            project: 'javascript-react',
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            // Release must match the frontend SDK's release name exactly
+            // Otherwise source maps won't resolve to the correct release
+            release: {
+              name: `orbit@${pkg.version}`,
+            },
+            sourcemaps: {
+              // Delete source maps after upload to prevent exposure in production bundle
+              filesToDeleteAfterUpload: ['./dist/**/*.map'],
+            },
+            // Disable telemetry
+            telemetry: false,
+          }),
+        ]
+      : []),
   ],
   resolve: {
     alias: {

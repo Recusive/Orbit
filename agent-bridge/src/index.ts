@@ -62,6 +62,7 @@ import {
 import { CanvasSessionManager } from './canvas/index.js';
 import { createLogger } from './common/logging/logger.js';
 import { BridgeRequestSchema } from './protocol/schemas.js';
+import { captureAgentError, captureFatalError, initSentry } from './sentry/index.js';
 
 import type {
   BridgeCommandResponse,
@@ -96,9 +97,35 @@ function sendEvent(event: BridgeEvent): void {
 }
 
 /**
+ * Setup global error handlers for unhandled rejections and exceptions.
+ * These ensure process-level errors are captured to Sentry before exit.
+ */
+function setupGlobalErrorHandlers(): void {
+  process.on('unhandledRejection', (reason: unknown) => {
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    logger.error({ error }, 'Unhandled promise rejection');
+    captureAgentError(error, { source: 'unhandled_rejection' });
+  });
+
+  process.on('uncaughtException', (error: Error) => {
+    logger.error({ error }, 'Uncaught exception');
+    // Capture and flush before exit
+    void captureFatalError(error, 'uncaught_exception').finally(() => {
+      process.exit(1);
+    });
+  });
+}
+
+/**
  * Main entry point
  */
 function main(): void {
+  // Initialize Sentry FIRST for early error capture
+  initSentry();
+
+  // Setup global error handlers for process-level errors
+  setupGlobalErrorHandlers();
+
   logger.info('Agent Bridge starting...');
 
   // Invalidate session cache to ensure fresh state on restart
@@ -157,6 +184,13 @@ function main(): void {
   });
 
   sessionManager.onError((error) => {
+    // Capture session errors to Sentry using the centralized error handler
+    const sentryError = new Error(error.message);
+    if (error.stack) {
+      sentryError.stack = error.stack;
+    }
+    captureAgentError(sentryError, { source: 'session_manager' });
+
     sendEvent({
       type: 'error_event',
       error,
@@ -200,6 +234,12 @@ function main(): void {
   });
 
   canvasSessionManager.onError((data) => {
+    // Capture canvas errors to Sentry using the centralized error handler
+    captureAgentError(data.error, {
+      sessionId: data.sessionId,
+      source: 'canvas_session_manager',
+    });
+
     sendEvent({
       type: 'canvas:error',
       sessionId: data.sessionId,
@@ -226,6 +266,11 @@ function main(): void {
       if (!result.success) {
         const errorMessage = formatZodError(result.error);
         logger.error({ error: errorMessage, line }, 'Invalid request schema');
+        // Capture schema validation errors to Sentry
+        captureAgentError(new Error(`Invalid request schema: ${errorMessage}`), {
+          source: 'ipc_validation',
+          extra: { line: line.substring(0, 500) }, // Truncate to avoid huge payloads
+        });
         sendResponse({
           type: 'error',
           requestType: 'unknown',
@@ -236,6 +281,12 @@ function main(): void {
       request = result.data;
     } catch (error) {
       logger.error({ error, line }, 'Failed to parse request JSON');
+      // Capture JSON parse errors to Sentry
+      const parseError = error instanceof Error ? error : new Error(String(error));
+      captureAgentError(parseError, {
+        source: 'ipc_json_parse',
+        extra: { line: line.substring(0, 500) }, // Truncate to avoid huge payloads
+      });
       sendResponse({
         type: 'error',
         requestType: 'unknown',
@@ -249,6 +300,12 @@ function main(): void {
     handleRequest(request, sessionManager, canvasSessionManager).catch((error: unknown) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error({ requestType: request.type, error: errorMessage }, 'Error handling request');
+      // Capture request handler errors to Sentry
+      const handlerError = error instanceof Error ? error : new Error(errorMessage);
+      captureAgentError(handlerError, {
+        source: 'request_handler',
+        extra: { requestType: request.type },
+      });
       sendResponse({
         type: 'error',
         requestType: request.type,
@@ -549,10 +606,13 @@ async function handleRequest(
   }
 }
 
-// Run main
+// Run main with Sentry error capture
 try {
   main();
 } catch (error: unknown) {
-  logger.error({ error }, 'Fatal error');
-  process.exit(1);
+  // Capture fatal error and flush Sentry before exit
+  void captureFatalError(error, 'startup').finally(() => {
+    logger.error({ error }, 'Fatal error');
+    process.exit(1);
+  });
 }

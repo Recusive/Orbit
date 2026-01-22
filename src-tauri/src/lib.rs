@@ -190,8 +190,48 @@ fn resolve_sidecar_path() -> PathBuf {
     reason = "Tauri app setup requires listing all commands in one invoke_handler"
 )]
 pub fn run() {
-    // Install panic handler FIRST - before any other initialization
-    // This ensures all panics are logged, even during startup
+    // Initialize Sentry FIRST - before any other initialization
+    // This ensures all panics and errors are captured from the very start.
+    // The guard must be kept alive for the entire application lifetime.
+    let _sentry_guard = sentry::init((
+        "https://9d8148a41d5c12f753d58eff8784806a@o4510750911037440.ingest.us.sentry.io/4510751422480384",
+        sentry::ClientOptions {
+            // ============================================
+            // Release Health Configuration
+            // ============================================
+            // Ties sessions, errors, and crashes to specific app versions
+            // Format: "orbit@version" - must match frontend naming for correlation
+            release: Some(format!("orbit@{}", env!("CARGO_PKG_VERSION")).into()),
+            // Environment for filtering in Sentry dashboard
+            environment: Some(
+                if cfg!(debug_assertions) {
+                    "development".into()
+                } else {
+                    "production".into()
+                },
+            ),
+            // Session tracking for Release Health metrics
+            // Tracks: active users, crash-free sessions, adoption rates
+            auto_session_tracking: true,
+            // ============================================
+            // Privacy
+            // ============================================
+            // Don't send PII (user IPs, etc.) by default for privacy
+            send_default_pii: false,
+            // ============================================
+            // Integrations
+            // ============================================
+            // Enable default integrations including PanicIntegration
+            // This ensures panics are captured and sent to Sentry
+            default_integrations: true,
+            ..Default::default()
+        },
+    ));
+
+    // Install local crash handler AFTER Sentry init
+    // The crash handler chains to Sentry's panic hook, so panics:
+    // 1. Write to local crash.log (for offline recovery)
+    // 2. Send to Sentry (via chained hook)
     core::crash::init();
 
     // Initialize settings manager and load settings
@@ -430,6 +470,8 @@ pub fn run() {
             diagnostics::check_previous_crash,
             diagnostics::clear_crash_log,
             diagnostics::get_crash_log_path,
+            diagnostics::sentry_test_capture,
+            diagnostics::sentry_test_error,
             // Conversation commands
             conversations::conversation_create,
             conversations::conversation_list,

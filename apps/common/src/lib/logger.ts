@@ -11,15 +11,11 @@
  *   - debug: Development only, filtered in production
  *   - info: General operational messages
  *   - warn: Potential issues that don't break functionality
- *   - error: Errors that need attention
+ *   - error: Errors that need attention (automatically reported to Sentry in production)
  *
- * TODO: Production Telemetry
- * When ready for production monitoring:
- * 1. Add Sentry SDK for error tracking + performance monitoring
- * 2. Add LogTransport interface to abstract log destinations
- * 3. Create SentryTransport that pipes logs to Sentry dashboard
- * 4. Keep ConsoleTransport for local development debugging
- * 5. Add logger.time() / logger.timeEnd() for performance measurement
+ * Sentry Integration:
+ * Error-level logs are automatically reported to Sentry in production when
+ * Sentry has been initialized. The error, context, and metadata are included.
  */
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -145,6 +141,7 @@ export class Logger {
 
   /**
    * Log an error message with optional Error object.
+   * In production, errors are automatically reported to Sentry.
    */
   error(message: string, error?: unknown, meta?: LogMeta): void {
     const entry: LogEntry = {
@@ -166,10 +163,37 @@ export class Logger {
       console.error(formatted);
     }
 
-    // Future: Send to error tracking service (Sentry, LogRocket, etc.)
-    // if (!isDev()) {
-    //   sendToErrorTracking(entry);
-    // }
+    // Report to Sentry in production
+    // Uses dynamic import to avoid bundling Sentry in the common package
+    if (!isDev() && typeof window !== 'undefined') {
+      void this.reportToSentry(message, error, meta);
+    }
+  }
+
+  /**
+   * Report error to Sentry (async, fire-and-forget).
+   * Only called in production browser environments.
+   */
+  private async reportToSentry(message: string, error: unknown, meta?: LogMeta): Promise<void> {
+    try {
+      // Dynamic import to avoid bundling Sentry in common package
+      const Sentry = await import('@sentry/react');
+
+      const errorObj = error instanceof Error ? error : new Error(message);
+
+      Sentry.captureException(errorObj, {
+        tags: {
+          logger_context: this.context,
+        },
+        extra: {
+          message,
+          ...meta,
+        },
+      });
+    } catch {
+      // Silently fail if Sentry is not available
+      // This can happen if Sentry wasn't initialized
+    }
   }
 }
 

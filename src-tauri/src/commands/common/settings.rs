@@ -1,6 +1,7 @@
 //! Settings commands for Tauri
 //!
 //! These commands provide settings management operations.
+//! Errors are captured to Sentry for monitoring via the `SentryCapture` trait.
 
 #![allow(
     clippy::needless_pass_by_value,
@@ -13,6 +14,8 @@ use orbit_core::Result;
 use orbit_settings::{Settings, SettingsManager};
 use tauri::State;
 
+use crate::core::sentry_utils::SentryCapture as _;
+
 /// Get all settings.
 #[tauri::command]
 pub fn get_settings(manager: State<'_, SettingsManager>) -> Result<Settings> {
@@ -22,13 +25,15 @@ pub fn get_settings(manager: State<'_, SettingsManager>) -> Result<Settings> {
 /// Update all settings.
 #[tauri::command]
 pub fn update_settings(settings: Settings, manager: State<'_, SettingsManager>) -> Result<()> {
-    manager.update(&settings)
+    manager.update(&settings).capture("update_settings")
 }
 
 /// Add a project to the recent projects list.
 #[tauri::command]
 pub fn add_recent_project(path: String, manager: State<'_, SettingsManager>) -> Result<()> {
-    manager.add_recent_project(Path::new(&path))
+    manager
+        .add_recent_project(Path::new(&path))
+        .capture("add_recent_project")
 }
 
 /// Get the list of recent projects.
@@ -44,7 +49,9 @@ pub fn get_recent_projects(manager: State<'_, SettingsManager>) -> Result<Vec<St
 /// Clear all recent projects.
 #[tauri::command]
 pub fn clear_recent_projects(manager: State<'_, SettingsManager>) -> Result<()> {
-    manager.clear_recent_projects()
+    manager
+        .clear_recent_projects()
+        .capture("clear_recent_projects")
 }
 
 /// Get the settings file path.
@@ -60,7 +67,7 @@ pub fn get_settings_path(manager: State<'_, SettingsManager>) -> String {
 /// Add an SSH host to the recent hosts list.
 #[tauri::command]
 pub fn add_ssh_host(host: String, manager: State<'_, SettingsManager>) -> Result<()> {
-    manager.add_ssh_host(&host)
+    manager.add_ssh_host(&host).capture("add_ssh_host")
 }
 
 /// Get the list of recent SSH hosts.
@@ -72,11 +79,11 @@ pub fn get_ssh_hosts(manager: State<'_, SettingsManager>) -> Result<Vec<String>>
 /// Remove an SSH host from the recent hosts list.
 #[tauri::command]
 pub fn remove_ssh_host(host: String, manager: State<'_, SettingsManager>) -> Result<()> {
-    manager.remove_ssh_host(&host)
+    manager.remove_ssh_host(&host).capture("remove_ssh_host")
 }
 
 /// Clear all SSH hosts.
 #[tauri::command]
 pub fn clear_ssh_hosts(manager: State<'_, SettingsManager>) -> Result<()> {
-    manager.clear_ssh_hosts()
+    manager.clear_ssh_hosts().capture("clear_ssh_hosts")
 }
