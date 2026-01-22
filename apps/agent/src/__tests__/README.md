@@ -4,7 +4,7 @@ This directory contains all tests for the Agent app, organized by **test type fi
 
 ## Directory Structure
 
-```
+```text
 __tests__/
 ├── unit/           # Isolated tests with mocked dependencies
 │   ├── components/ # React component tests
@@ -113,12 +113,13 @@ Ask yourself:
 
 1. Create the file mirroring the source structure:
 
-   ```
+   ```text
    src/stores/git/git-store.ts
    → __tests__/unit/stores/git/git-store.test.ts
    ```
 
 2. Add the test type marker in the docstring:
+
    ```typescript
    /**
     * Unit tests for git-store.ts

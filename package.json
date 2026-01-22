@@ -189,8 +189,8 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
-    "@vitest/coverage-v8": "^4.0.16",
-    "@vitest/ui": "^4.0.16",
+    "@vitest/coverage-v8": "^4.0.17",
+    "@vitest/ui": "^4.0.17",
     "jsdom": "^26.1.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9.39.2",
@@ -208,7 +208,7 @@
     "typescript-eslint": "^8.52.0",
     "unimported": "^1.31.1",
     "vite": "^7.3.1",
-    "vitest": "^4.0.16"
+    "vitest": "^4.0.17"
   },
   "overrides": {
     "qs": ">=6.14.1",
