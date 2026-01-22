@@ -7,7 +7,7 @@
 //!
 //! For ergonomic use in commands, use the `SentryCapture` extension trait:
 //!
-//! ```rust
+//! ```ignore
 //! use crate::core::sentry_utils::SentryCapture;
 //!
 //! #[tauri::command]
@@ -19,7 +19,7 @@
 //!
 //! Or for Result<T, String> commands:
 //!
-//! ```rust
+//! ```ignore
 //! #[tauri::command]
 //! pub fn my_command() -> Result<String, String> {
 //!     do_something()
