@@ -8,7 +8,7 @@
 import type { FileChange, FileChangeStatus, FileChangeType } from '@/stores/file/file-store';
 import type { FileNode } from '@/types/protocol';
 
-import { flattenFileTree, useFileStore } from '@/stores/file/file-store';
+import { flattenFileTree, getChangedFiles, useFileStore } from '@/stores/file/file-store';
 
 // Mock Date.now for consistent IDs
 let mockTime = 1704067200000;
@@ -41,17 +41,21 @@ function createFileNode(name: string, path: string, isDirectory = false): FileNo
 
 /** Reset the store to initial state */
 function resetStore(): void {
-  // Use setState to reset all state fields
-  useFileStore.setState({
-    changedFiles: [],
-    selectedFile: null,
-    filterStatus: 'all',
-    rootPath: null,
-    treeNodes: {},
-    expandedFolders: new Set<string>(),
-    selectedTreePath: null,
-    loadingPaths: new Set<string>(),
-    errorPaths: new Map<string, string>(),
+  // Use callback-style setState to work with Immer properly
+  // This allows us to mutate the draft state, including clearing Maps/Sets
+  useFileStore.setState((state) => {
+    // Clear file change records (use {} in tests - paths are controlled)
+    state.filesById = {};
+    state.pathToId = {};
+    state.selectedFile = null;
+    state.filterStatus = 'all';
+    // Clear file tree state
+    state.rootPath = null;
+    state.treeNodes = {};
+    state.expandedFolders.clear();
+    state.selectedTreePath = null;
+    state.loadingPaths.clear();
+    state.errorPaths.clear();
   });
 }
 
@@ -68,7 +72,7 @@ describe('file-store', () => {
 
   describe('initial state', () => {
     it('should start with empty changed files', () => {
-      expect(useFileStore.getState().changedFiles).toEqual([]);
+      expect(getChangedFiles()).toEqual([]);
     });
 
     it('should start with null selected file', () => {
@@ -104,7 +108,7 @@ describe('file-store', () => {
 
       expect(id).toMatch(/^file_\d+_[a-z0-9]+$/);
 
-      const change = useFileStore.getState().changedFiles[0];
+      const change = getChangedFiles()[0];
       expect(change).toBeDefined();
       if (change) {
         expect(change.path).toBe('/src/file.ts');
@@ -126,6 +130,7 @@ describe('file-store', () => {
       const { addFileChange } = useFileStore.getState();
 
       addFileChange(createFileChange('/src/first.ts'));
+      mockTime += 1; // Ensure unique ID for second file
       addFileChange(createFileChange('/src/second.ts'));
 
       expect(useFileStore.getState().selectedFile).toBe('/src/first.ts');
@@ -138,9 +143,9 @@ describe('file-store', () => {
       mockTime += 1000;
       addFileChange(createFileChange('/src/file.ts', 'modified'));
 
-      expect(useFileStore.getState().changedFiles).toHaveLength(1);
-      expect(useFileStore.getState().changedFiles[0]?.type).toBe('modified');
-      expect(useFileStore.getState().changedFiles[0]?.timestamp).toBe(mockTime);
+      expect(getChangedFiles()).toHaveLength(1);
+      expect(getChangedFiles()[0]?.type).toBe('modified');
+      expect(getChangedFiles()[0]?.timestamp).toBe(mockTime);
     });
   });
 
@@ -155,7 +160,7 @@ describe('file-store', () => {
       const id = addFileChange(createFileChange('/src/file.ts'));
       updateFileChange(id, { type: 'deleted' });
 
-      expect(useFileStore.getState().changedFiles[0]?.type).toBe('deleted');
+      expect(getChangedFiles()[0]?.type).toBe('deleted');
     });
 
     it('should be safe for non-existent id', () => {
@@ -178,7 +183,7 @@ describe('file-store', () => {
       addFileChange(createFileChange('/src/file.ts'));
       acceptFile('/src/file.ts');
 
-      expect(useFileStore.getState().changedFiles[0]?.status).toBe('accepted');
+      expect(getChangedFiles()[0]?.status).toBe('accepted');
     });
 
     it('should reject file by path', () => {
@@ -187,7 +192,7 @@ describe('file-store', () => {
       addFileChange(createFileChange('/src/file.ts'));
       rejectFile('/src/file.ts');
 
-      expect(useFileStore.getState().changedFiles[0]?.status).toBe('rejected');
+      expect(getChangedFiles()[0]?.status).toBe('rejected');
     });
   });
 
@@ -203,7 +208,7 @@ describe('file-store', () => {
 
       acceptAllFiles();
 
-      const statuses = useFileStore.getState().changedFiles.map((f) => f.status);
+      const statuses = getChangedFiles().map((f) => f.status);
       expect(statuses).toEqual(['accepted', 'accepted', 'accepted']);
     });
 
@@ -221,7 +226,7 @@ describe('file-store', () => {
 
       acceptAllFiles();
 
-      const files = useFileStore.getState().changedFiles;
+      const files = getChangedFiles();
       expect(files.find((f) => f.path === '/src/a.ts')?.status).toBe('accepted');
       expect(files.find((f) => f.path === '/src/b.ts')?.status).toBe('rejected'); // Unchanged
       expect(files.find((f) => f.path === '/src/c.ts')?.status).toBe('accepted');
@@ -236,7 +241,7 @@ describe('file-store', () => {
 
       rejectAllFiles();
 
-      const statuses = useFileStore.getState().changedFiles.map((f) => f.status);
+      const statuses = getChangedFiles().map((f) => f.status);
       expect(statuses).toEqual(['rejected', 'rejected']);
     });
   });
@@ -252,7 +257,7 @@ describe('file-store', () => {
       addFileChange(createFileChange('/src/file.ts'));
       removeFile('/src/file.ts');
 
-      expect(useFileStore.getState().changedFiles).toHaveLength(0);
+      expect(getChangedFiles()).toHaveLength(0);
     });
 
     it('should update selection to next file', () => {
@@ -287,7 +292,7 @@ describe('file-store', () => {
 
       clearFiles();
 
-      expect(useFileStore.getState().changedFiles).toHaveLength(0);
+      expect(getChangedFiles()).toHaveLength(0);
     });
 
     it('should clear only files with specific status', () => {
@@ -301,8 +306,8 @@ describe('file-store', () => {
 
       clearFiles('accepted');
 
-      expect(useFileStore.getState().changedFiles).toHaveLength(1);
-      expect(useFileStore.getState().changedFiles[0]?.path).toBe('/src/b.ts');
+      expect(getChangedFiles()).toHaveLength(1);
+      expect(getChangedFiles()[0]?.path).toBe('/src/b.ts');
     });
   });
 
@@ -585,6 +590,435 @@ describe('file-store', () => {
         { name: 'helpers.ts', path: '/workspace/src/utils/helpers.ts' },
         { name: 'README.md', path: '/workspace/README.md' },
       ]);
+    });
+  });
+
+  // ============================================================================
+  // O(1) Lookups (Record-based storage)
+  // ============================================================================
+
+  describe('O(1) lookups', () => {
+    describe('getFileByPath', () => {
+      it('should return file when found', () => {
+        const { addFileChange, getFileByPath } = useFileStore.getState();
+
+        addFileChange(createFileChange('/src/app.ts', 'modified'));
+
+        const file = getFileByPath('/src/app.ts');
+        expect(file).toBeDefined();
+        expect(file?.path).toBe('/src/app.ts');
+        expect(file?.type).toBe('modified');
+      });
+
+      it('should return undefined when not found', () => {
+        const { getFileByPath } = useFileStore.getState();
+
+        const file = getFileByPath('/nonexistent/path.ts');
+        expect(file).toBeUndefined();
+      });
+
+      it('should return correct file among multiple', () => {
+        const { addFileChange, getFileByPath } = useFileStore.getState();
+
+        addFileChange(createFileChange('/src/a.ts', 'created'));
+        mockTime += 1;
+        addFileChange(createFileChange('/src/b.ts', 'modified'));
+        mockTime += 1;
+        addFileChange(createFileChange('/src/c.ts', 'deleted'));
+
+        const file = getFileByPath('/src/b.ts');
+        expect(file?.path).toBe('/src/b.ts');
+        expect(file?.type).toBe('modified');
+      });
+    });
+
+    describe('getFileById', () => {
+      it('should return file when found', () => {
+        const { addFileChange, getFileById } = useFileStore.getState();
+
+        const id = addFileChange(createFileChange('/src/app.ts', 'modified'));
+
+        const file = getFileById(id);
+        expect(file).toBeDefined();
+        expect(file?.id).toBe(id);
+        expect(file?.path).toBe('/src/app.ts');
+      });
+
+      it('should return undefined when not found', () => {
+        const { getFileById } = useFileStore.getState();
+
+        const file = getFileById('nonexistent_id');
+        expect(file).toBeUndefined();
+      });
+
+      it('should return correct file among multiple', () => {
+        const { addFileChange, getFileById } = useFileStore.getState();
+
+        addFileChange(createFileChange('/src/a.ts'));
+        mockTime += 1;
+        const targetId = addFileChange(createFileChange('/src/b.ts', 'modified'));
+        mockTime += 1;
+        addFileChange(createFileChange('/src/c.ts'));
+
+        const file = getFileById(targetId);
+        expect(file?.id).toBe(targetId);
+        expect(file?.path).toBe('/src/b.ts');
+        expect(file?.type).toBe('modified');
+      });
+    });
+  });
+
+  // ============================================================================
+  // Mutation Propagation (Record -> Derived Array)
+  // ============================================================================
+
+  describe('mutation propagation', () => {
+    it('should propagate status change to both lookup and derived array', () => {
+      const { addFileChange, acceptFile, getFileByPath } = useFileStore.getState();
+
+      addFileChange(createFileChange('/src/app.ts'));
+
+      // Mutate via acceptFile
+      acceptFile('/src/app.ts');
+
+      // Verify via O(1) lookup
+      const fileByPath = getFileByPath('/src/app.ts');
+      expect(fileByPath?.status).toBe('accepted');
+
+      // Verify via derived array
+      const files = getChangedFiles();
+      const fileInArray = files.find((f) => f.path === '/src/app.ts');
+      expect(fileInArray?.status).toBe('accepted');
+    });
+
+    it('should propagate reject status to both lookup and derived array', () => {
+      const { addFileChange, rejectFile, getFileByPath } = useFileStore.getState();
+
+      addFileChange(createFileChange('/src/app.ts'));
+
+      rejectFile('/src/app.ts');
+
+      // Verify via O(1) lookup
+      expect(getFileByPath('/src/app.ts')?.status).toBe('rejected');
+
+      // Verify via derived array
+      const files = getChangedFiles();
+      expect(files.find((f) => f.path === '/src/app.ts')?.status).toBe('rejected');
+    });
+
+    it('should propagate bulk accept to all files', () => {
+      const { addFileChange, acceptAllFiles, getFileByPath } = useFileStore.getState();
+
+      addFileChange(createFileChange('/src/a.ts'));
+      mockTime += 1;
+      addFileChange(createFileChange('/src/b.ts'));
+      mockTime += 1;
+      addFileChange(createFileChange('/src/c.ts'));
+
+      acceptAllFiles();
+
+      // Verify via lookups
+      expect(getFileByPath('/src/a.ts')?.status).toBe('accepted');
+      expect(getFileByPath('/src/b.ts')?.status).toBe('accepted');
+      expect(getFileByPath('/src/c.ts')?.status).toBe('accepted');
+
+      // Verify via derived array
+      const files = getChangedFiles();
+      expect(files.every((f) => f.status === 'accepted')).toBe(true);
+    });
+
+    it('should propagate updateFileChange to both lookup and derived array', () => {
+      const { addFileChange, updateFileChange, getFileById } = useFileStore.getState();
+
+      const id = addFileChange(createFileChange('/src/app.ts', 'created'));
+
+      updateFileChange(id, { type: 'modified', newContent: 'updated content' });
+
+      // Verify via O(1) lookup
+      const file = getFileById(id);
+      expect(file?.type).toBe('modified');
+      expect(file?.newContent).toBe('updated content');
+
+      // Verify via derived array
+      const files = getChangedFiles();
+      const fileInArray = files.find((f) => f.id === id);
+      expect(fileInArray?.type).toBe('modified');
+      expect(fileInArray?.newContent).toBe('updated content');
+    });
+  });
+
+  // ============================================================================
+  // addFileChange ID Handling
+  // ============================================================================
+
+  describe('addFileChange ID handling', () => {
+    it('should return existing ID when updating same path', () => {
+      const { addFileChange } = useFileStore.getState();
+
+      const firstId = addFileChange(createFileChange('/src/app.ts', 'created'));
+      mockTime += 1000;
+      const secondId = addFileChange(createFileChange('/src/app.ts', 'modified'));
+
+      // Should return the SAME id, not a new one
+      expect(secondId).toBe(firstId);
+    });
+
+    it('should preserve status when updating existing file', () => {
+      const { addFileChange, acceptFile, getFileByPath } = useFileStore.getState();
+
+      addFileChange(createFileChange('/src/app.ts', 'created'));
+      acceptFile('/src/app.ts');
+
+      // Verify status is 'accepted'
+      expect(getFileByPath('/src/app.ts')?.status).toBe('accepted');
+
+      // Update the file (simulates another write to same path)
+      mockTime += 1000;
+      addFileChange(createFileChange('/src/app.ts', 'modified'));
+
+      // Status should still be 'accepted' (preserved)
+      const file = getFileByPath('/src/app.ts');
+      expect(file?.status).toBe('accepted');
+      expect(file?.type).toBe('modified'); // But type is updated
+    });
+
+    it('should generate unique IDs for different paths', () => {
+      const { addFileChange } = useFileStore.getState();
+
+      const id1 = addFileChange(createFileChange('/src/a.ts'));
+      mockTime += 1; // Ensure unique timestamp
+      const id2 = addFileChange(createFileChange('/src/b.ts'));
+      mockTime += 1;
+      const id3 = addFileChange(createFileChange('/src/c.ts'));
+
+      // All IDs should be different
+      expect(id1).not.toBe(id2);
+      expect(id2).not.toBe(id3);
+      expect(id1).not.toBe(id3);
+    });
+
+    it('should update timestamp when updating existing file', () => {
+      const { addFileChange, getFileByPath } = useFileStore.getState();
+
+      addFileChange(createFileChange('/src/app.ts'));
+      const originalTime = mockTime;
+
+      mockTime += 5000; // 5 seconds later
+      addFileChange(createFileChange('/src/app.ts', 'modified'));
+
+      const file = getFileByPath('/src/app.ts');
+      expect(file?.timestamp).toBe(originalTime + 5000);
+    });
+  });
+
+  // ============================================================================
+  // updateFileChange Path Change (pathToId Maintenance)
+  // ============================================================================
+
+  describe('updateFileChange path change', () => {
+    it('should update pathToId index when path changes', () => {
+      const { addFileChange, updateFileChange, getFileByPath, getFileById } =
+        useFileStore.getState();
+
+      const id = addFileChange(createFileChange('/src/old.ts'));
+
+      // Rename the file
+      updateFileChange(id, { path: '/src/new.ts' });
+
+      // Old path should no longer find the file
+      expect(getFileByPath('/src/old.ts')).toBeUndefined();
+
+      // New path should find the file with same ID
+      const file = getFileByPath('/src/new.ts');
+      expect(file).toBeDefined();
+      expect(file?.id).toBe(id);
+
+      // ID lookup should still work
+      expect(getFileById(id)?.path).toBe('/src/new.ts');
+    });
+
+    it('should update selectedFile when renamed file was selected', () => {
+      const { addFileChange, updateFileChange, selectFile } = useFileStore.getState();
+
+      const id = addFileChange(createFileChange('/src/old.ts'));
+      selectFile('/src/old.ts');
+
+      expect(useFileStore.getState().selectedFile).toBe('/src/old.ts');
+
+      // Rename the file
+      updateFileChange(id, { path: '/src/new.ts' });
+
+      // selectedFile should be updated to new path
+      expect(useFileStore.getState().selectedFile).toBe('/src/new.ts');
+    });
+
+    it('should not update selectedFile when non-selected file is renamed', () => {
+      const { addFileChange, updateFileChange, selectFile } = useFileStore.getState();
+
+      addFileChange(createFileChange('/src/selected.ts'));
+      mockTime += 1;
+      const id2 = addFileChange(createFileChange('/src/other.ts'));
+
+      selectFile('/src/selected.ts');
+
+      // Rename the non-selected file
+      updateFileChange(id2, { path: '/src/renamed.ts' });
+
+      // selectedFile should remain unchanged
+      expect(useFileStore.getState().selectedFile).toBe('/src/selected.ts');
+    });
+
+    it('should block rename if target path already exists', () => {
+      const { addFileChange, updateFileChange, getFileByPath } = useFileStore.getState();
+
+      const idA = addFileChange(createFileChange('/src/a.ts', 'created'));
+      mockTime += 1;
+      addFileChange(createFileChange('/src/b.ts', 'modified'));
+
+      // Try to rename /src/a.ts to /src/b.ts (which exists)
+      updateFileChange(idA, { path: '/src/b.ts' });
+
+      // /src/a.ts should still exist at original path
+      const fileA = getFileByPath('/src/a.ts');
+      expect(fileA).toBeDefined();
+      expect(fileA?.id).toBe(idA);
+      expect(fileA?.type).toBe('created'); // Unchanged
+
+      // /src/b.ts should still be the original file at that path
+      const fileB = getFileByPath('/src/b.ts');
+      expect(fileB?.type).toBe('modified');
+    });
+  });
+
+  // ============================================================================
+  // Stale Index Repair
+  // ============================================================================
+
+  describe('stale index repair', () => {
+    it('should repair stale pathToId entry when adding file', () => {
+      const { addFileChange, getFileByPath, getFileById } = useFileStore.getState();
+
+      // Manually corrupt the pathToId index (simulates bug or crash)
+      useFileStore.setState((state) => {
+        state.pathToId['/src/stale.ts'] = 'nonexistent_id_12345';
+      });
+
+      // Verify corruption exists
+      expect(useFileStore.getState().pathToId['/src/stale.ts']).toBe('nonexistent_id_12345');
+
+      // Add a file at the same path - should repair the index
+      const newId = addFileChange(createFileChange('/src/stale.ts', 'created'));
+
+      // File should be accessible via path lookup
+      const file = getFileByPath('/src/stale.ts');
+      expect(file).toBeDefined();
+      expect(file?.id).toBe(newId);
+      expect(file?.type).toBe('created');
+
+      // File should be accessible via ID lookup
+      expect(getFileById(newId)).toBeDefined();
+
+      // pathToId should now point to the new ID, not the stale one
+      expect(useFileStore.getState().pathToId['/src/stale.ts']).toBe(newId);
+    });
+  });
+
+  // ============================================================================
+  // Derived Array Ordering (Timestamp Descending)
+  // ============================================================================
+
+  describe('derived array ordering', () => {
+    it('should return files sorted by timestamp descending (newest first)', () => {
+      const { addFileChange } = useFileStore.getState();
+
+      // Add files with increasing timestamps
+      addFileChange(createFileChange('/src/oldest.ts'));
+      mockTime += 1000;
+      addFileChange(createFileChange('/src/middle.ts'));
+      mockTime += 1000;
+      addFileChange(createFileChange('/src/newest.ts'));
+
+      const files = getChangedFiles();
+
+      // Should be ordered: newest, middle, oldest
+      expect(files).toHaveLength(3);
+      expect(files[0]?.path).toBe('/src/newest.ts');
+      expect(files[1]?.path).toBe('/src/middle.ts');
+      expect(files[2]?.path).toBe('/src/oldest.ts');
+    });
+
+    it('should maintain order after updates', () => {
+      const { addFileChange } = useFileStore.getState();
+
+      addFileChange(createFileChange('/src/first.ts'));
+      mockTime += 1000;
+      addFileChange(createFileChange('/src/second.ts'));
+      mockTime += 1000;
+
+      // Update the first file (changes its timestamp to newest)
+      addFileChange(createFileChange('/src/first.ts', 'modified'));
+
+      const files = getChangedFiles();
+
+      // first.ts should now be first because it was updated most recently
+      expect(files[0]?.path).toBe('/src/first.ts');
+      expect(files[1]?.path).toBe('/src/second.ts');
+    });
+
+    it('should handle files with same timestamp consistently', () => {
+      const { addFileChange } = useFileStore.getState();
+
+      // Add multiple files with same timestamp (edge case)
+      addFileChange(createFileChange('/src/a.ts'));
+      // Don't increment mockTime - same timestamp
+      vi.spyOn(Math, 'random').mockReturnValue(0.5); // Different random for unique ID
+      addFileChange(createFileChange('/src/b.ts'));
+      vi.spyOn(Math, 'random').mockReturnValue(0.7);
+      addFileChange(createFileChange('/src/c.ts'));
+
+      const files = getChangedFiles();
+
+      // All files should be present (order may vary with same timestamp)
+      expect(files).toHaveLength(3);
+      expect(files.map((f) => f.path).sort()).toEqual(['/src/a.ts', '/src/b.ts', '/src/c.ts']);
+
+      // Reset mock for other tests
+      vi.spyOn(Math, 'random').mockReturnValue(0.123456789);
+    });
+  });
+
+  // ============================================================================
+  // getChangedFiles Non-Memoization (Intentional Behavior)
+  // ============================================================================
+
+  describe('getChangedFiles non-memoization', () => {
+    it('should return new array reference on each call (intentional)', () => {
+      const { addFileChange } = useFileStore.getState();
+
+      addFileChange(createFileChange('/src/app.ts'));
+
+      const files1 = getChangedFiles();
+      const files2 = getChangedFiles();
+
+      // Different references (not memoized - intentional for non-hook usage)
+      expect(files1).not.toBe(files2);
+
+      // But same content
+      expect(files1).toEqual(files2);
+    });
+
+    it('should reflect mutations between calls', () => {
+      const { addFileChange, acceptFile } = useFileStore.getState();
+
+      addFileChange(createFileChange('/src/app.ts'));
+
+      const filesBefore = getChangedFiles();
+      expect(filesBefore[0]?.status).toBe('pending');
+
+      acceptFile('/src/app.ts');
+
+      const filesAfter = getChangedFiles();
+      expect(filesAfter[0]?.status).toBe('accepted');
     });
   });
 });

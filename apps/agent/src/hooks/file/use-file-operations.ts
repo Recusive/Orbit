@@ -5,7 +5,7 @@ import type { FileChange, FileChangeType } from '@/stores/file/file-store';
 import type { FileAccept, FileReject, FileAcceptAll, FileRejectAll } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
-import { useFileStore } from '@/stores/file/file-store';
+import { useChangedFiles, useFileStore } from '@/stores/file/file-store';
 import { generateUUID } from '@/types/protocol';
 
 const logger = createLogger('FileOperations');
@@ -35,7 +35,8 @@ export interface UseFileOperationsReturn {
 export function useFileOperations(): UseFileOperationsReturn {
   const { postMessage } = useTauri();
 
-  const changedFiles = useFileStore((state) => state.changedFiles);
+  // useChangedFiles() provides memoized, sorted file list
+  const changedFiles = useChangedFiles();
   const selectedFile = useFileStore((state) => state.selectedFile);
   const addFileChangeStore = useFileStore((state) => state.addFileChange);
   const selectFileStore = useFileStore((state) => state.selectFile);
