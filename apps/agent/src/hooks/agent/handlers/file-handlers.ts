@@ -1,7 +1,11 @@
+import { createLogger } from '@orbit/common/lib';
+
 import { initFileWatcher } from '../use-tauri-file-watcher';
 
 import type { FileEntry } from '@/lib/api';
 import type { WebviewMessage } from '@/types/protocol';
+
+const logger = createLogger('FileHandlers');
 
 import {
   buildFileIndex,
@@ -19,8 +23,12 @@ export async function handleFileTreeRequest(
   try {
     // Get workspace path or use provided path
     let targetPath: string | undefined = message.path;
+
+    // Get current workspace FIRST to compare later
+    const initialWorkspace = await getWorkspacePath();
+
     if (targetPath === undefined || targetPath === '') {
-      const storedPath = await getWorkspacePath();
+      const storedPath = initialWorkspace;
       if (!storedPath) {
         // ─────────────────────────────────────────────────────────────────────
         // WORKSPACE SANDBOXING (January 2026)
@@ -81,6 +89,20 @@ export async function handleFileTreeRequest(
       });
     }
 
+    // Check if workspace changed during async operations (stale request protection)
+    // This can happen when switching worktrees - a request for the old workspace
+    // might still be in flight when the workspace changes. Skip stale requests
+    // to avoid "Permission denied" errors.
+    const currentWorkspace = await getWorkspacePath();
+    if (currentWorkspace && initialWorkspace && initialWorkspace !== currentWorkspace) {
+      // Workspace changed while processing - this is a stale request, skip it
+      logger.debug('Skipping stale request: workspace changed', {
+        from: initialWorkspace,
+        to: currentWorkspace,
+      });
+      return;
+    }
+
     const entries = await listDirectory(targetPath, false);
 
     // Convert FileEntry to FileNode format
@@ -103,7 +125,9 @@ export async function handleFileTreeRequest(
       '*'
     );
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    // Tauri invoke rejects with a string (not Error), so handle both cases
+    const errorMessage =
+      err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
     window.postMessage(
       {
         type: 'file:tree:error',

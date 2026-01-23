@@ -3,6 +3,7 @@ import type { SessionConfig } from '@/lib/api';
 
 import { agentCreateSession, getWorkspacePath } from '@/lib/api';
 import { useToolStore } from '@/stores/agent/tool-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 // ═══════════════════════════════════════════════════════════════
 // Session State
@@ -91,7 +92,9 @@ export async function ensureSession(sessionId: string): Promise<void> {
   }
 
   // Get current workspace for session config
-  const cwd = await getWorkspacePath();
+  // Prefer active worktree path for multi-agent isolation, fall back to workspace
+  const activeWorktreePath = useUIStore.getState().activeWorktreePath;
+  const cwd = activeWorktreePath ?? (await getWorkspacePath());
 
   // Get current mode settings from tool store
   // This ensures Plan agents (and any user-selected mode) are applied at session creation
@@ -135,6 +138,11 @@ export async function ensureSession(sessionId: string): Promise<void> {
   await agentCreateSession(sessionId, config);
 
   createdSessions.add(sessionId);
+
+  // Record session → worktree association for multi-agent isolation
+  if (activeWorktreePath) {
+    useUIStore.getState().recordSessionWorktree(sessionId, activeWorktreePath);
+  }
 
   // Session is immediately ready to receive messages after agentCreateSession() returns.
   // The SDK's MessageQueue is created and waiting for messages. When we send the first

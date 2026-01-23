@@ -183,6 +183,9 @@ pub struct ConversationDto {
     /// Workspace path
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace_path: Option<String>,
+    /// Worktree path for multi-agent isolation
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree_path: Option<String>,
     /// Forked from session ID
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forked_from: Option<String>,
@@ -197,6 +200,7 @@ impl From<Conversation> for ConversationDto {
             updated_at: conv.updated_at,
             messages: conv.messages.into_iter().map(MessageDto::from).collect(),
             workspace_path: conv.workspace_path,
+            worktree_path: conv.worktree_path,
             forked_from: conv.forked_from,
         }
     }
@@ -217,6 +221,9 @@ pub struct ConversationSummaryDto {
     /// Workspace path
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace_path: Option<String>,
+    /// Worktree path for multi-agent isolation
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree_path: Option<String>,
 }
 
 impl From<ConversationSummary> for ConversationSummaryDto {
@@ -227,6 +234,7 @@ impl From<ConversationSummary> for ConversationSummaryDto {
             updated_at: summary.updated_at,
             message_count: summary.message_count,
             workspace_path: summary.workspace_path,
+            worktree_path: summary.worktree_path,
         }
     }
 }
@@ -241,9 +249,10 @@ pub fn conversation_create(
     session_id: String,
     title: String,
     workspace_path: Option<String>,
+    worktree_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<ConversationDto> {
-    let conv = manager.create(session_id, title, workspace_path)?;
+    let conv = manager.create(session_id, title, workspace_path, worktree_path)?;
     Ok(ConversationDto::from(conv))
 }
 
@@ -295,12 +304,14 @@ pub fn conversation_add_message(
     session_id: String,
     message: MessageDto,
     workspace_path: Option<String>,
+    worktree_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<()> {
     manager.add_message(
         &session_id,
         Message::from(message),
         workspace_path.as_deref(),
+        worktree_path.as_deref(),
     )
 }
 

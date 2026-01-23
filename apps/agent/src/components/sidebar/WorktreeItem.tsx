@@ -32,7 +32,10 @@ interface WorktreeItemProps {
   readonly worktreeState: WorktreeUIState;
   readonly active?: boolean;
   readonly collapsed?: boolean;
+  /** Called when clicking the chevron to expand/collapse conversations */
   readonly onToggle?: () => void;
+  /** Called when clicking the worktree row to switch to this workspace */
+  readonly onSelect?: () => void;
   readonly onRemove?: () => void;
 }
 
@@ -41,6 +44,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
   active = false,
   collapsed = false,
   onToggle,
+  onSelect,
   onRemove,
 }) => {
   const { worktree, isExpanded } = worktreeState;
@@ -53,9 +57,19 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
   // Get branch display name (without refs/heads/)
   const branchName = worktree.branch?.replace(/^refs\/heads\//, '') ?? worktree.shortHead;
 
-  const handleToggle = useCallback((): void => {
-    onToggle?.();
-  }, [onToggle]);
+  // Handle chevron click - toggles expand/collapse
+  const handleChevronClick = useCallback(
+    (e: React.MouseEvent): void => {
+      e.stopPropagation();
+      onToggle?.();
+    },
+    [onToggle]
+  );
+
+  // Handle row click - selects this worktree as active workspace
+  const handleRowClick = useCallback((): void => {
+    onSelect?.();
+  }, [onSelect]);
 
   const handleRemove = useCallback(
     (e: Event): void => {
@@ -78,15 +92,24 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
       <button
         className={cn(
           'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-200 hover:bg-muted/40',
-          active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-          isExpanded && 'bg-muted/40'
+          active ? 'text-foreground bg-muted/50' : 'text-muted-foreground hover:text-foreground',
+          isExpanded && !active && 'bg-muted/40'
         )}
-        onClick={handleToggle}
+        onClick={handleRowClick}
       >
-        {/* Chevron toggle */}
+        {/* Chevron toggle - clickable separately to expand/collapse */}
         <div
-          className="flex items-center justify-center shrink-0"
+          role="button"
+          tabIndex={0}
+          className="flex items-center justify-center shrink-0 hover:bg-muted/60 rounded-md cursor-pointer"
           style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
+          onClick={handleChevronClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onToggle?.();
+            }
+          }}
         >
           <ChevronDown
             className={cn(

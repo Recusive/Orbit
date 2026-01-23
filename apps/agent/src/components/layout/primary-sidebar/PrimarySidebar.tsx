@@ -298,6 +298,9 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               onDeleteConversation={handleOpenDeleteDialog}
               onDuplicateConversation={handleDuplicateConversation}
               onToggleWorktree={toggleWorktreeExpanded}
+              onSelectWorktree={(path) => {
+                useUIStore.getState().setActiveWorktree(path);
+              }}
               onRemoveWorktree={(path) => {
                 void handleRemoveWorktree(path);
               }}
@@ -353,6 +356,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       <CreateWorktreeDialog
         open={createWorktreeDialogOpen}
         onOpenChange={useUIStore.getState().setCreateWorktreeDialogOpen}
+        onCreated={(worktree) => {
+          // Auto-switch to the newly created worktree
+          useUIStore.getState().setActiveWorktree(worktree.path);
+        }}
       />
 
       {/* Delete Conversation Dialog */}

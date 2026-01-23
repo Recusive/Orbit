@@ -321,16 +321,17 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     };
   }, [sessionId, messageHandler]);
 
-  // Request conversation list when session is ready or workspace changes
+  // Request conversation list when session is ready or workspace/worktree changes
   useEffect(() => {
     if (sessionId || workspacePath) {
       postMessage({
         type: 'conversation:list',
         uuid: crypto.randomUUID(),
         workspace_path: workspacePath ?? undefined,
+        worktree_path: activeWorktreePath ?? undefined,
       });
     }
-  }, [sessionId, workspacePath, postMessage]);
+  }, [sessionId, workspacePath, activeWorktreePath, postMessage]);
 
   // Load messages from backend when switching to a session with empty local cache
   // This handles the case where:
@@ -481,9 +482,9 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       isAgentRunning,
       setIsAgentRunning,
       conversations,
-      // Use active worktree path for worktree-based session isolation
-      // Falls back to workspace path if no worktree is active
-      workspacePath: activeWorktreePath ?? workspacePath,
+      // Keep workspace path and worktree path separate for proper grouping
+      workspacePath,
+      activeWorktreePath,
       messagesCache,
       setPendingMessage,
       postMessage,

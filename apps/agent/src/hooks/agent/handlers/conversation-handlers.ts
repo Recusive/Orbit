@@ -22,7 +22,8 @@ export async function handleConversationCreate(
     const sessionId = crypto.randomUUID();
     const title = message.title ?? 'New Conversation';
     const workspacePath = message.workspace_path;
-    await conversationCreate(sessionId, title, workspacePath);
+    const worktreePath = message.worktree_path;
+    await conversationCreate(sessionId, title, workspacePath, worktreePath);
     window.postMessage(
       {
         type: 'conversation:created',
@@ -30,6 +31,7 @@ export async function handleConversationCreate(
         session_id: sessionId,
         title,
         workspace_path: workspacePath,
+        worktree_path: worktreePath,
       },
       '*'
     );
@@ -44,6 +46,7 @@ export async function handleConversationCreate(
         session_id: sessionId,
         title: message.title ?? 'New Conversation',
         workspace_path: message.workspace_path,
+        worktree_path: message.worktree_path,
       },
       '*'
     );
@@ -55,7 +58,8 @@ export async function handleConversationList(
 ): Promise<void> {
   try {
     const workspacePath = message.workspace_path;
-    const conversations = await conversationList(workspacePath);
+    const worktreePath = message.worktree_path;
+    const conversations = await conversationList(workspacePath, worktreePath);
     window.postMessage(
       {
         type: 'conversation:list',
@@ -66,6 +70,7 @@ export async function handleConversationList(
           updated_at: c.updatedAt,
           message_count: c.messageCount,
           workspace_path: c.workspacePath,
+          worktree_path: c.worktreePath,
         })),
       },
       '*'

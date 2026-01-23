@@ -11,6 +11,7 @@ import type {
 
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { useTerminalStore } from '@/stores/terminal/terminal-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 import { generateUUID } from '@/types/protocol';
 
 const logger = createLogger('Terminal');
@@ -56,7 +57,12 @@ export function useTerminal(defaultSessionId?: string): UseTerminalReturn {
 
   const createSession = useCallback(
     (name?: string, cwd?: string): string => {
-      const sessionId = createSessionStore(name, cwd);
+      // Use effective path (activeWorktreePath ?? workspacePath) as default CWD
+      // This ensures new terminals open in the active worktree directory
+      const uiState = useUIStore.getState();
+      const effectiveCwd = cwd ?? uiState.activeWorktreePath ?? uiState.workspacePath ?? undefined;
+
+      const sessionId = createSessionStore(name, effectiveCwd);
 
       // Notify VS Code
       postMessage({
@@ -64,7 +70,7 @@ export function useTerminal(defaultSessionId?: string): UseTerminalReturn {
         uuid: generateUUID(),
         session_id: sessionId,
         name,
-        cwd,
+        cwd: effectiveCwd,
       } satisfies TerminalCreate);
 
       return sessionId;

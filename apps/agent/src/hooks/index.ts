@@ -32,3 +32,6 @@ export * from './terminal';
 
 // UI hooks
 export * from './ui';
+
+// Utility hooks
+export { useEffectivePath } from './use-effective-path';

@@ -71,19 +71,30 @@ export const useSidebarActions = ({
   );
 
   // Load worktrees when workspace changes
+  // NOTE: This should only run when workspacePath changes, not when activeWorktreePath changes.
+  // Including activeWorktreePath would cause all worktrees to reset isExpanded on every selection.
   const loadWorktrees = useCallback(async (): Promise<void> => {
     if (!workspacePath) return;
 
     try {
       const worktreeList = await gitWorktreeList(workspacePath);
+
+      // Preserve existing isExpanded state when refreshing worktree list
+      const existingWorktrees = useUIStore.getState().worktrees;
+      const existingExpandedMap = new Map(
+        existingWorktrees.map((wt) => [wt.worktree.path, wt.isExpanded])
+      );
+
       const worktreeStates: WorktreeUIState[] = worktreeList.map((wt) => ({
         worktree: wt,
-        isExpanded: true,
+        // Preserve existing isExpanded state, default to true for new worktrees
+        isExpanded: existingExpandedMap.get(wt.path) ?? true,
       }));
       setWorktrees(worktreeStates);
 
-      // Set active worktree to main if not set
-      if (!activeWorktreePath) {
+      // Set active worktree to main if not set (check current state, not prop)
+      const currentActiveWorktree = useUIStore.getState().activeWorktreePath;
+      if (!currentActiveWorktree) {
         const mainWorktree = worktreeList.find((wt) => wt.isMain);
         if (mainWorktree) {
           setActiveWorktree(mainWorktree.path);
@@ -94,7 +105,7 @@ export const useSidebarActions = ({
       // Not a git repo or error - clear worktrees
       setWorktrees([]);
     }
-  }, [workspacePath, activeWorktreePath, setWorktrees, setActiveWorktree]);
+  }, [workspacePath, setWorktrees, setActiveWorktree]);
 
   // Auto-load worktrees on workspace change
   useEffect(() => {
@@ -114,8 +125,16 @@ export const useSidebarActions = ({
       uuid: crypto.randomUUID(),
       title: 'Untitled',
       workspace_path: workspacePath ?? undefined,
+      worktree_path: activeWorktreePath ?? undefined,
     });
-  }, [conversations, activeConversationId, workspacePath, postMessage, setVaultOpen]);
+  }, [
+    conversations,
+    activeConversationId,
+    workspacePath,
+    activeWorktreePath,
+    postMessage,
+    setVaultOpen,
+  ]);
 
   const handleLoadConversation = useCallback(
     (sessionId: string): void => {

@@ -72,6 +72,7 @@ interface Conversation {
   updatedAt: number;
   messageCount: number;
   workspacePath?: string | undefined;
+  worktreePath?: string | undefined;
 }
 
 interface MessageHandlerDeps {
@@ -612,6 +613,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           updatedAt: Date.now(),
           messageCount: 0,
           ...(message.workspace_path ? { workspacePath: message.workspace_path } : {}),
+          ...(message.worktree_path ? { worktreePath: message.worktree_path } : {}),
         });
         switchSession(message.session_id); // Switch to new session (resets usage for new conversation)
         onSessionCreated?.(message.session_id, message.title);
@@ -629,6 +631,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               updatedAt: c.updated_at,
               messageCount: c.message_count,
               ...(c.workspace_path ? { workspacePath: c.workspace_path } : {}),
+              ...(c.worktree_path ? { worktreePath: c.worktree_path } : {}),
             }))
           );
         }

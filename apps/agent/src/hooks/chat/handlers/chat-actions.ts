@@ -14,6 +14,7 @@ interface Conversation {
   updatedAt: number;
   messageCount: number;
   workspacePath?: string | undefined;
+  worktreePath?: string | undefined;
 }
 
 interface ChatActionsDeps {
@@ -25,6 +26,7 @@ interface ChatActionsDeps {
   setIsAgentRunning: React.Dispatch<React.SetStateAction<boolean>>;
   conversations: Conversation[];
   workspacePath: string | null;
+  activeWorktreePath: string | null;
   messagesCache: React.RefObject<Map<string, ChatMessage[]>>;
   setPendingMessage: React.Dispatch<
     React.SetStateAction<{
@@ -78,6 +80,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     setIsAgentRunning,
     conversations,
     workspacePath,
+    activeWorktreePath,
     messagesCache,
     setPendingMessage,
     postMessage,
@@ -147,6 +150,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
             uuid: crypto.randomUUID(),
             title: text,
             workspace_path: workspacePath ?? undefined,
+            worktree_path: activeWorktreePath ?? undefined,
           });
           return;
         }

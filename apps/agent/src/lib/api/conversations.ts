@@ -43,6 +43,7 @@ export interface ConversationDto {
   updatedAt: number;
   messages: ConversationMessageDto[];
   workspacePath?: string;
+  worktreePath?: string;
   forkedFrom?: string;
 }
 
@@ -52,6 +53,7 @@ export interface ConversationSummaryDto {
   updatedAt: number;
   messageCount: number;
   workspacePath?: string;
+  worktreePath?: string;
 }
 
 // ============================================
@@ -61,13 +63,22 @@ export interface ConversationSummaryDto {
 export async function conversationCreate(
   sessionId: string,
   title: string,
-  workspacePath?: string
+  workspacePath?: string,
+  worktreePath?: string
 ): Promise<ConversationDto> {
-  return invoke<ConversationDto>('conversation_create', { sessionId, title, workspacePath });
+  return invoke<ConversationDto>('conversation_create', {
+    sessionId,
+    title,
+    workspacePath,
+    worktreePath,
+  });
 }
 
-export async function conversationList(workspacePath?: string): Promise<ConversationSummaryDto[]> {
-  return invoke<ConversationSummaryDto[]>('conversation_list', { workspacePath });
+export async function conversationList(
+  workspacePath?: string,
+  worktreePath?: string
+): Promise<ConversationSummaryDto[]> {
+  return invoke<ConversationSummaryDto[]>('conversation_list', { workspacePath, worktreePath });
 }
 
 export async function conversationLoad(sessionId: string): Promise<ConversationDto | null> {
@@ -85,9 +96,10 @@ export async function conversationUpdateTitle(sessionId: string, title: string):
 export async function conversationAddMessage(
   sessionId: string,
   message: ConversationMessageDto,
-  workspacePath?: string
+  workspacePath?: string,
+  worktreePath?: string
 ): Promise<void> {
-  return invoke('conversation_add_message', { sessionId, message, workspacePath });
+  return invoke('conversation_add_message', { sessionId, message, workspacePath, worktreePath });
 }
 
 export async function conversationFork(

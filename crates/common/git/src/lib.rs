@@ -126,7 +126,7 @@ pub struct WorktreeInfo {
 
 /// Options for creating a new worktree.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct WorktreeAddOptions {
     /// Create a new branch with this name (-b flag).
     pub new_branch: Option<String>,

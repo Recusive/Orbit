@@ -131,6 +131,8 @@ interface UIState {
   lastExpandedCanvasRightSidebarWidth: number;
   // Vault page
   vaultOpen: boolean;
+  // Session → Worktree mapping (for multi-agent isolation)
+  sessionWorktreeMap: Map<string, string>;
 }
 
 interface UIActions {
@@ -188,6 +190,10 @@ interface UIActions {
   // Vault actions
   setVaultOpen: (open: boolean) => void;
   toggleVault: () => void;
+  // Session → Worktree mapping actions
+  recordSessionWorktree: (sessionId: string, worktreePath: string) => void;
+  getSessionWorktree: (sessionId: string) => string | undefined;
+  clearSessionWorktree: (sessionId: string) => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -315,6 +321,8 @@ export const useUIStore = create<UIStore>()(
     lastExpandedCanvasRightSidebarWidth: SIDEBAR.expanded,
     // Vault page
     vaultOpen: false,
+    // Session → Worktree mapping (for multi-agent isolation)
+    sessionWorktreeMap: new Map<string, string>(),
 
     setContainerDimensions: (width: number, height: number): void => {
       set((state) => {
@@ -683,6 +691,25 @@ export const useUIStore = create<UIStore>()(
     toggleVault: (): void => {
       set((state) => {
         state.vaultOpen = !state.vaultOpen;
+      });
+    },
+
+    // Session → Worktree mapping actions
+    recordSessionWorktree: (sessionId: string, worktreePath: string): void => {
+      set((state) => {
+        state.sessionWorktreeMap.set(sessionId, worktreePath);
+      });
+    },
+
+    getSessionWorktree: (sessionId: string): string | undefined => {
+      // Note: This is a getter that reads state synchronously without set()
+      // Use useUIStore.getState().sessionWorktreeMap.get(sessionId) for direct access
+      return useUIStore.getState().sessionWorktreeMap.get(sessionId);
+    },
+
+    clearSessionWorktree: (sessionId: string): void => {
+      set((state) => {
+        state.sessionWorktreeMap.delete(sessionId);
       });
     },
   }))
