@@ -192,7 +192,6 @@ interface UIActions {
   toggleVault: () => void;
   // Session → Worktree mapping actions
   recordSessionWorktree: (sessionId: string, worktreePath: string) => void;
-  getSessionWorktree: (sessionId: string) => string | undefined;
   clearSessionWorktree: (sessionId: string) => void;
 }
 
@@ -282,7 +281,7 @@ const saveActiveWorktreeToStorage = (path: string | null): void => {
 };
 
 export const useUIStore = create<UIStore>()(
-  immer((set, get) => ({
+  immer((set) => ({
     containerWidth: null,
     containerHeight: null,
     workspacePath: null,
@@ -695,15 +694,11 @@ export const useUIStore = create<UIStore>()(
     },
 
     // Session → Worktree mapping actions
+    // NOTE: Immer supports Map mutations natively since v9, so .set()/.delete() work correctly
     recordSessionWorktree: (sessionId: string, worktreePath: string): void => {
       set((state) => {
         state.sessionWorktreeMap.set(sessionId, worktreePath);
       });
-    },
-
-    getSessionWorktree: (sessionId: string): string | undefined => {
-      // Use get() to properly access state within the store (not useUIStore.getState())
-      return get().sessionWorktreeMap.get(sessionId);
     },
 
     clearSessionWorktree: (sessionId: string): void => {
@@ -807,6 +802,25 @@ export const useActiveWorktree = (): WorktreeUIState | null => {
 
 export const useCreateWorktreeDialogOpen = (): boolean => {
   return useUIStore((state) => state.createWorktreeDialogOpen);
+};
+
+/**
+ * Selector hook to get the worktree path associated with a session.
+ * Use this instead of directly accessing sessionWorktreeMap for proper React subscriptions.
+ *
+ * @param sessionId - The session ID to look up
+ * @returns The worktree path for this session, or undefined if not set
+ */
+export const useSessionWorktree = (sessionId: string): string | undefined => {
+  return useUIStore((state) => state.sessionWorktreeMap.get(sessionId));
+};
+
+/**
+ * Non-hook accessor for session worktree (use outside React components).
+ * For use in callbacks, event handlers, or non-React code.
+ */
+export const getSessionWorktree = (sessionId: string): string | undefined => {
+  return useUIStore.getState().sessionWorktreeMap.get(sessionId);
 };
 
 // ============================================

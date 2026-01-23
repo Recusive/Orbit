@@ -18,6 +18,39 @@ import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('PrimarySidebar');
 
+/**
+ * Checks if a conversation belongs to the currently active worktree context.
+ *
+ * This handles three scenarios:
+ * 1. Direct match: conversation's worktreePath equals activeWorktreePath
+ * 2. Legacy fallback: no worktreePath, but workspacePath matches activeWorktreePath
+ * 3. No worktree context: both are null/undefined (worktree feature not active)
+ *
+ * @param conversation - The conversation to check (can be undefined)
+ * @param activeWorktreePath - The currently active worktree path (can be null)
+ * @returns true if the conversation belongs to the current worktree context
+ */
+function conversationBelongsToWorktree(
+  conversation: ConversationSummary | undefined,
+  activeWorktreePath: string | null
+): boolean {
+  if (!conversation) return false;
+
+  const convWorktree = conversation.worktreePath ?? null;
+  const convWorkspace = conversation.workspacePath ?? null;
+
+  // Direct match: worktreePath equals activeWorktreePath
+  if (convWorktree === activeWorktreePath) return true;
+
+  // Legacy fallback: no worktreePath, but workspacePath matches
+  if (convWorktree === null && convWorkspace === activeWorktreePath) return true;
+
+  // No worktree context: both null means conversation belongs to current context
+  if (convWorktree === null && activeWorktreePath === null) return true;
+
+  return false;
+}
+
 interface UseSidebarActionsProps {
   conversations: ConversationSummary[];
   activeConversationId: string | null;
@@ -133,18 +166,10 @@ export const useSidebarActions = ({
     // Skip if current conversation is empty (title still "Untitled" means no message sent)
     // BUT only if it belongs to the current worktree - allow new session after switching worktrees
     const activeConv = conversations.find((c) => c.sessionId === activeConversationId);
-    // Check if conversation belongs to current worktree context:
-    // 1. Direct match: worktreePath equals activeWorktreePath
-    // 2. Legacy fallback: no worktreePath, but workspacePath matches activeWorktreePath
-    // 3. No worktree context: both are null/undefined (no worktree feature active)
-    const convWorktree = activeConv?.worktreePath ?? null;
-    const convWorkspace = activeConv?.workspacePath ?? null;
-    const isActiveConvInCurrentWorktree =
-      convWorktree === activeWorktreePath ||
-      (convWorktree === null && convWorkspace === activeWorktreePath) ||
-      // Handle "no worktree" context - both null means conversation belongs to current context
-      (convWorktree === null && activeWorktreePath === null);
-    if (activeConv?.title === 'Untitled' && isActiveConvInCurrentWorktree) {
+    if (
+      activeConv?.title === 'Untitled' &&
+      conversationBelongsToWorktree(activeConv, activeWorktreePath)
+    ) {
       return;
     }
     postMessage({

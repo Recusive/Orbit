@@ -134,7 +134,17 @@ pub struct Conversation {
 }
 
 impl Conversation {
-    /// Create a new empty conversation
+    /// Create a new empty conversation.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - Unique identifier for this conversation
+    /// * `title` - Display title shown in the sidebar
+    /// * `workspace_path` - Root workspace path (e.g., the main git repo directory)
+    /// * `worktree_path` - Optional git worktree path for multi-agent isolation.
+    ///   When set, this conversation is associated with a specific worktree,
+    ///   enabling developers to work on multiple branches simultaneously with
+    ///   isolated conversation histories per worktree.
     #[must_use]
     pub fn new(
         session_id: String,

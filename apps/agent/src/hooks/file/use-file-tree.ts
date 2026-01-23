@@ -1,5 +1,6 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 
 import type { ExtensionMessage, FileNode } from '@/types/protocol';
 
@@ -42,13 +43,15 @@ export function useWorktreeFileTreeSync(): void {
         })
         .catch((err: unknown) => {
           logger.error('Failed to set initial workspace path for worktree', err);
+          toast.error('Failed to set workspace path. Some file operations may fail.');
+          // Still proceed with file store update - user has been notified
           useFileStore.getState().setRootPath(currentWorktree);
         });
     }
 
     // Subscribe to full state and manually check activeWorktreePath
     // (Zustand doesn't have built-in selector subscriptions without middleware)
-    const unsubscribe = useUIStore.subscribe((state) => {
+    const cleanupWorktreeSubscription = useUIStore.subscribe((state) => {
       const activeWorktree = state.activeWorktreePath;
       const workspacePath = state.workspacePath;
       const prevWorktree = prevWorktreeRef.current;
@@ -82,7 +85,8 @@ export function useWorktreeFileTreeSync(): void {
             })
             .catch((err: unknown) => {
               logger.error('Failed to update workspace path for worktree', err);
-              // Still try to update the file store - error will surface later
+              toast.error('Failed to switch workspace. Some file operations may fail.');
+              // Still proceed with file store update - user has been notified
               useFileStore.getState().setRootPath(effectivePath);
             });
         } else {
@@ -95,7 +99,7 @@ export function useWorktreeFileTreeSync(): void {
       prevWorktreeRef.current = activeWorktree;
     });
 
-    return unsubscribe;
+    return cleanupWorktreeSubscription;
   }, []);
 }
 
@@ -244,6 +248,17 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
               logger.debug('Ignoring orphan tree response (path outside current workspace)', {
                 responsePath: message.path,
                 currentRootPath,
+              });
+            }
+            return;
+          }
+
+          // Check if this is an explicitly marked stale response
+          // (sent when workspace changed during the request)
+          if (message.stale === true) {
+            if (debug) {
+              logger.debug('Ignoring explicitly stale tree response', {
+                responsePath: message.path,
               });
             }
             return;

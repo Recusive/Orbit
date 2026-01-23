@@ -1286,6 +1286,8 @@ export const FileTreeResponseSchema = z
     path: z.string(),
     /** Children of the path */
     children: z.array(FileNodeSchema),
+    /** True if this response is stale (workspace changed during request) */
+    stale: z.boolean().optional(),
   })
   .strict();
 

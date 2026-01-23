@@ -10,7 +10,7 @@ import { markMessagePersisted } from '@/lib/conversation-persistence';
 import { createCheckpointBatcher } from '@/lib/utils/event-batcher';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
-import { useUIStore } from '@/stores/ui/ui-store';
+import { getSessionWorktree, useUIStore } from '@/stores/ui/ui-store';
 import { ExtensionMessageSchema } from '@/types/protocol';
 
 // ═══════════════════════════════════════════════════════════════
@@ -145,7 +145,13 @@ async function persistBufferedAssistantMessage(
 
   try {
     // Get workspace/worktree paths for correct storage (auto-create with context)
+    // CRITICAL: Use session-specific worktree mapping if available.
+    // In parallel-session scenarios, the active worktree may have changed since
+    // this session started. The sessionWorktreeMap records the original worktree.
     const uiState = useUIStore.getState();
+    const sessionWorktree = getSessionWorktree(sessionId);
+    const worktreePath = sessionWorktree ?? uiState.activeWorktreePath ?? undefined;
+
     await conversationAddMessage(
       sessionId,
       {
@@ -158,7 +164,7 @@ async function persistBufferedAssistantMessage(
         ...(toolUses ? { toolUses } : {}),
       },
       uiState.workspacePath ?? undefined,
-      uiState.activeWorktreePath ?? undefined
+      worktreePath
     );
     markMessagePersisted(sessionId, message.message_id);
     return true;

@@ -19,6 +19,20 @@ import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 
 const logger = createLogger('ConversationHandlers');
 
+/**
+ * Creates a new conversation session.
+ *
+ * ID Generation Flow:
+ * - The sessionId is generated HERE in the handler, not by the caller
+ * - The caller sends a 'conversation:create' request without knowing the final ID
+ * - This handler generates the ID, persists the conversation, and emits 'conversation:created'
+ * - The UI receives 'conversation:created' with the new sessionId and updates state
+ *
+ * This pattern ensures:
+ * 1. Single source of ID generation (avoids race conditions)
+ * 2. ID is available to both backend persistence and frontend state
+ * 3. Error fallback can still provide a usable session
+ */
 export async function handleConversationCreate(
   message: Extract<WebviewMessage, { type: 'conversation:create' }>
 ): Promise<void> {
