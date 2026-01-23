@@ -48,8 +48,20 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run lint
 
-  # Note: No "test" job for agent - tests are in canvas:test and bridge:test
-  # Agent app has no unit tests yet (only E2E via Tauri)
+  # Vitest tests for Agent app (unit + integration tests)
+  agent-test:
+    name: Test (Agent)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run test:agent
 
   build:
     name: Build (Agent)
@@ -435,6 +447,7 @@ jobs:
       [
         typecheck,
         lint,
+        agent-test,
         build,
         common-typecheck,
         schemas-typecheck,
@@ -467,6 +480,7 @@ jobs:
           rust="${{ needs.rust-fmt.result }} ${{ needs.rust-clippy.result }} ${{ needs.rust-test.result }}"
           rust+=" ${{ needs.rust-deny.result }} ${{ needs.rust-doc.result }} ${{ needs.rust-msrv.result }}"
           # Test checks (allow skipped - bridge tests skip in CI without API key)
+          agent_test_result="${{ needs.agent-test.result }}"
           canvas_test_result="${{ needs.canvas-test.result }}"
           bridge_test_result="${{ needs.bridge-test.result }}"
           machete_result="${{ needs.rust-machete.result }}"
@@ -477,6 +491,11 @@ jobs:
               exit 1
             fi
           done
+
+          if [[ "$agent_test_result" != "success" && "$agent_test_result" != "skipped" ]]; then
+            echo "[FAIL] Agent tests failed"
+            exit 1
+          fi
 
           if [[ "$canvas_test_result" != "success" && "$canvas_test_result" != "skipped" ]]; then
             echo "[FAIL] Canvas tests failed"

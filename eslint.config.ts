@@ -12,8 +12,7 @@ export default defineConfig(
       'node_modules/',
       '*.config.js',
       '*.config.mjs',
-      '*.config.ts',
-      '**/scripts/',
+      // Note: *.config.ts, scripts/, and vite-plugins/ are now linted
     ],
   },
   eslint.configs.recommended,
@@ -138,6 +137,23 @@ export default defineConfig(
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
+    },
+  },
+  /*
+   * CLI Scripts - Relaxed rules for command-line utilities
+   *
+   * Scripts in scripts/ are CLI tools that:
+   * - Legitimately use console.log for user output
+   * - May use emojis for visual CLI feedback
+   * - Don't need strict template expression types
+   */
+  {
+    files: ['scripts/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+      'no-restricted-syntax': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
+      '@typescript-eslint/prefer-nullish-coalescing': 'off',
     },
   }
 );

@@ -11,8 +11,10 @@
   "include": [
     "vite.config.ts",
     "vite.config.canvas.ts",
+    "vitest.config.ts",
     "eslint.config.ts",
     "knip.config.ts",
-    "vite-plugins/**/*.ts"
+    "vite-plugins/**/*.ts",
+    "scripts/**/*.ts"
   ]
 }

@@ -15,7 +15,6 @@ orbit-core = { path = "../core" }
 ignore = { workspace = true }
 tracing = { workspace = true }
 nucleo-matcher = { workspace = true }
-parking_lot = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

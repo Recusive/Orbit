@@ -47,6 +47,6 @@
       "@orbit/common/*": ["./apps/common/src/*"]
     }
   },
-  "include": ["apps/*/src/**/*", "vitest.d.ts"],
+  "include": ["apps/*/src/**/*", "vitest.d.ts", "vitest.setup.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

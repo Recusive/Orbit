@@ -10,6 +10,13 @@ export default {
     'prettier --write',
   ],
 
+  // Scripts and plugins
+  'scripts/**/*.ts': ['eslint --fix --max-warnings=0', 'prettier --write'],
+  'vite-plugins/**/*.ts': ['eslint --fix --max-warnings=0', 'prettier --write'],
+
+  // Root config files
+  'vitest.setup.ts': ['eslint --fix --max-warnings=0', 'prettier --write'],
+
   // Tauri config (JSON only)
   'src-tauri/**/*.json': ['prettier --write'],
 
