@@ -14,7 +14,7 @@ import { immer } from 'zustand/middleware/immer';
 import type { SettingsSection } from '@/components/modals/settings';
 import type { StoredConversationSummary } from '@/types/protocol';
 
-import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/utils/constants';
+import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/utils';
 import { StoredConversationSummaryArraySchema } from '@/types/protocol';
 
 const logger = createLogger('UIStore');
@@ -124,6 +124,11 @@ interface UIState {
   worktrees: WorktreeUIState[];
   activeWorktreePath: string | null;
   createWorktreeDialogOpen: boolean;
+  // Chat detachment (for canvas expanded view)
+  chatAreaDetached: boolean;
+  // Canvas mode specific
+  canvasRightSidebarWidth: number;
+  lastExpandedCanvasRightSidebarWidth: number;
 }
 
 interface UIActions {
@@ -173,6 +178,11 @@ interface UIActions {
   setActiveWorktree: (path: string | null) => void;
   toggleWorktreeExpanded: (path: string) => void;
   setCreateWorktreeDialogOpen: (open: boolean) => void;
+  // Chat detachment
+  setChatAreaDetached: (detached: boolean) => void;
+  // Canvas mode actions
+  toggleCanvasRightSidebar: () => void;
+  setCanvasRightSidebarWidth: (width: number) => void;
 }
 
 type UIStore = UIState & UIActions;
@@ -293,6 +303,11 @@ export const useUIStore = create<UIStore>()(
     worktrees: loadWorktreesFromStorage(),
     activeWorktreePath: loadActiveWorktreeFromStorage(),
     createWorktreeDialogOpen: false,
+    // Chat detachment
+    chatAreaDetached: DEFAULT_UI_STATE.chatAreaDetached,
+    // Canvas mode specific
+    canvasRightSidebarWidth: SIDEBAR.expanded,
+    lastExpandedCanvasRightSidebarWidth: SIDEBAR.expanded,
 
     setContainerDimensions: (width: number, height: number): void => {
       set((state) => {
@@ -612,6 +627,43 @@ export const useUIStore = create<UIStore>()(
     setCreateWorktreeDialogOpen: (open: boolean): void => {
       set((state) => {
         state.createWorktreeDialogOpen = open;
+      });
+    },
+
+    setChatAreaDetached: (detached: boolean): void => {
+      set((state) => {
+        state.chatAreaDetached = detached;
+      });
+    },
+
+    // Canvas mode actions
+    toggleCanvasRightSidebar: (): void => {
+      set((state) => {
+        if (state.canvasRightSidebarWidth > SIDEBAR.collapsed) {
+          // Collapsing: save current width before collapsing
+          state.lastExpandedCanvasRightSidebarWidth = state.canvasRightSidebarWidth;
+          state.canvasRightSidebarWidth = SIDEBAR.collapsed;
+        } else {
+          // Expanding: restore to last remembered width
+          state.canvasRightSidebarWidth = state.lastExpandedCanvasRightSidebarWidth;
+        }
+      });
+    },
+
+    setCanvasRightSidebarWidth: (width: number): void => {
+      set((state) => {
+        // Clamp to valid range: either collapsed or minUsable-max
+        if (width <= SIDEBAR.collapsed) {
+          state.canvasRightSidebarWidth = SIDEBAR.collapsed;
+        } else {
+          const clampedWidth = Math.max(
+            PANEL_SIZES.sidebar.minUsable,
+            Math.min(PANEL_SIZES.sidebar.max, width)
+          );
+          state.canvasRightSidebarWidth = clampedWidth;
+          // Remember this width for when user toggles via button
+          state.lastExpandedCanvasRightSidebarWidth = clampedWidth;
+        }
       });
     },
   }))

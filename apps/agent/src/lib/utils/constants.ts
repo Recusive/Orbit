@@ -7,7 +7,7 @@
  * DO NOT hardcode magic numbers in components - import from here instead.
  *
  * USAGE:
- *   import { SIDEBAR, CHAT_WIDTH, KEYBOARD_SHORTCUTS } from '@/lib/utils/constants';
+ *   import { SIDEBAR, CHAT_WIDTH, KEYBOARD_SHORTCUTS } from '@/lib/utils';
  *
  * WHEN TO ADD HERE:
  *   - Layout dimensions (widths, heights, padding)
@@ -243,6 +243,8 @@ export const DEFAULT_UI_STATE = {
   rightSidebarOpen: true,
   bottomPanelOpen: false,
   bottomPanelHeight: PANEL_SIZES.terminal.default,
+  /** When true, ChatArea is "detached" and rendered elsewhere (e.g., canvas expanded view) */
+  chatAreaDetached: false,
 } as const;
 
 /**

@@ -8,8 +8,7 @@ import { useShallow } from 'zustand/shallow';
 
 import type { FC, KeyboardEvent } from 'react';
 
-import { PANEL_SIZES, RESIZE_HANDLE, SIDEBAR } from '@/lib/utils/constants';
-import { cn } from '@/lib/utils/utils';
+import { cn, PANEL_SIZES, RESIZE_HANDLE, SIDEBAR } from '@/lib/utils';
 import { useIsLeftSidebarCollapsed, useUIStore } from '@/stores/ui/ui-store';
 
 /** Keyboard resize step in pixels */

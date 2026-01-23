@@ -37,7 +37,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './apps/agent/src'),
-      '@canvas': path.resolve(__dirname, './apps/canvas/src'),
+      '@canvas': path.resolve(__dirname, './apps/Canvas-UI-Builder/src'),
       '@editor': path.resolve(__dirname, './apps/editor/src'),
       '@orbit/common': path.resolve(__dirname, './apps/common/src'),
     },
@@ -124,9 +124,14 @@ export default defineConfig({
   },
   // Optimize dependencies - pre-bundle to avoid duplicate instances
   optimizeDeps: {
+    // Force re-optimization on every dev server start to avoid stale cache issues
+    // This adds ~2s to startup but prevents "504 Outdated Optimize Dep" errors
+    force: true,
     include: [
       'streamdown',
       'shiki',
+      // lucide-react has 1,500+ icons - pre-bundling speeds up dev server imports
+      'lucide-react',
       // CodeMirror packages must be bundled together to avoid duplicate @codemirror/state instances
       '@codemirror/autocomplete',
       '@codemirror/commands',

@@ -2,7 +2,7 @@ import type { PermissionBarProps } from './types';
 import type { FC } from 'react';
 
 import { PermissionModal } from '@/components/modals';
-import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils/constants';
+import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
 /**
  * Permission bar displaying pending permission requests

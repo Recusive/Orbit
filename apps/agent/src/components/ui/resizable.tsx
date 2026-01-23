@@ -7,7 +7,7 @@ import 'allotment/dist/style.css';
 import type { AllotmentHandle, AllotmentProps } from 'allotment';
 import type { ReactNode } from 'react';
 
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 interface ResizablePanelGroupProps extends Omit<AllotmentProps, 'vertical'> {
   direction?: 'horizontal' | 'vertical';

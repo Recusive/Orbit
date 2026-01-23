@@ -9,7 +9,7 @@ import { SSHConnectionDialog } from '@/components/modals/ssh';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, conversationList, openFileDialog, setWorkspacePath } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 

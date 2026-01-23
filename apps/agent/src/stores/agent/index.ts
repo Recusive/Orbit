@@ -1,10 +1,14 @@
 /**
- * Agent stores - Checkpoints, commands, and tool execution
+ * Agent stores - Checkpoints, commands, message buffering, and tool execution
  */
 
 // Checkpoint store
 export { useCheckpointStore } from './checkpoint-store';
 export type { RewindCheckpoints, CheckpointState } from './checkpoint-store';
+
+// Message buffer store
+export { useMessageBufferStore } from './message-buffer-store';
+export type { MessageBufferState, BufferedMessage, SessionBuffer } from './message-buffer-store';
 
 // Commands store
 export {

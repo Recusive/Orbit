@@ -1,0 +1,119 @@
+/**
+ * MissionsFloatingToolbar Styles
+ */
+
+.missions-floating-toolbar {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+}
+
+.missions-floating-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 300;
+  cursor: pointer;
+}
+
+.missions-floating-btn:hover {
+  background: var(--muted);
+}
+
+.missions-floating-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.missions-floating-btn--primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.missions-floating-btn--primary:hover {
+  opacity: 0.9;
+  background: var(--primary);
+  color: white;
+}
+
+.missions-floating-btn--running {
+  background: var(--red-500);
+  border-color: var(--red-500);
+}
+
+.missions-floating-btn--running:hover {
+  opacity: 0.9;
+  background: var(--red-500);
+}
+
+.missions-floating-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+}
+
+.missions-floating-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.missions-floating-status-count {
+  color: var(--foreground);
+}
+
+.missions-floating-status-running {
+  color: var(--blue-500);
+  animation: missions-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes missions-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Demo button - purple accent */
+.missions-floating-btn--demo {
+  background: oklch(from var(--brand-heather) l c h / 15%);
+  border-color: var(--brand-heather);
+  color: var(--brand-heather);
+}
+
+.missions-floating-btn--demo:hover {
+  background: oklch(from var(--brand-heather) l c h / 25%);
+}
+
+.missions-floating-btn--demo-active {
+  background: var(--brand-heather);
+  color: white;
+}
+
+.missions-floating-btn--demo-active:hover {
+  background: var(--brand-heather);
+  opacity: 0.9;
+}

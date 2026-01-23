@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useTauri } from '@/hooks/agent/use-tauri';
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 // Available tools that can be selected
 const AVAILABLE_TOOLS = [

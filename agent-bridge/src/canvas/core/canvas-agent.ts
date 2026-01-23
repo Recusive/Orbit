@@ -200,6 +200,7 @@ export class CanvasAgent {
 
   // Configuration
   private _thinkingMode: boolean;
+  private _planMode: boolean;
   private _model: string | undefined;
 
   // Disposable tracking
@@ -210,6 +211,7 @@ export class CanvasAgent {
     config: CanvasSessionConfig = { thinkingEnabled: false }
   ) {
     this._thinkingMode = config.thinkingEnabled ?? false;
+    this._planMode = config.planModeEnabled ?? false;
     this._model = config.model;
 
     // Wire up tool bridge to emit tool requests
@@ -299,8 +301,24 @@ export class CanvasAgent {
   getConfig(): CanvasSessionConfig {
     return {
       thinkingEnabled: this._thinkingMode,
+      planModeEnabled: this._planMode,
       model: this._model,
     };
+  }
+
+  /**
+   * Set plan mode (requires session restart to take effect)
+   */
+  setPlanMode(enabled: boolean): void {
+    this._planMode = enabled;
+    logger.info({ enabled }, 'Plan mode updated');
+  }
+
+  /**
+   * Get plan mode
+   */
+  getPlanMode(): boolean {
+    return this._planMode;
   }
 
   /**
@@ -523,6 +541,14 @@ export class CanvasAgent {
     if (this._thinkingMode) {
       options.maxThinkingTokens = CanvasAgent.THINKING_BUDGET;
       logger.info({ thinkingBudget: CanvasAgent.THINKING_BUDGET }, 'Extended thinking ENABLED');
+    }
+
+    // Set permission mode based on plan mode
+    // - 'plan' mode restricts agent to read-only tools for planning
+    // - 'default' mode allows all tools
+    if (this._planMode) {
+      options.permissionMode = 'plan';
+      logger.info('Plan mode ENABLED - SDK will restrict to read-only tools');
     }
 
     // Disable all built-in SDK tools - we use custom canvas tools via MCP

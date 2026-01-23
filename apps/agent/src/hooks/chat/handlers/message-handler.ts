@@ -5,9 +5,11 @@ import type { ExtensionMessage, Model } from '@/types/protocol';
 
 import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-handlers';
 import { conversationAddMessage, conversationList } from '@/lib/api';
+import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { toConversationSummaries } from '@/lib/mappers';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { rafBatch } from '@/lib/utils/event-batcher';
+import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
@@ -34,6 +36,17 @@ interface TextChunkEvent {
   messageId: string;
   content: string;
 }
+
+/**
+ * Track pending chunk lengths per message ID.
+ * Used to calculate accurate contentOffset for tool placement.
+ *
+ * Problem: RAF batching causes a lag between when chunks are received and rendered.
+ * When tool:start arrives, `currentMsg.content.length` may not include pending chunks.
+ *
+ * Solution: Track received-but-not-yet-rendered chunk lengths, add to displayed length.
+ */
+const pendingChunkLengths = new Map<string, number>();
 
 interface ToolStartEvent {
   type: 'start';
@@ -134,6 +147,12 @@ export interface MessageHandlerResult {
   handleMessage: (message: ExtensionMessage) => void;
   /** Cleanup function - cancels pending RAF batchers. Call on unmount. */
   cleanup: () => void;
+  /**
+   * Force-flush all pending RAF batchers synchronously.
+   * Call this after buffer hydration to ensure messages are in state before
+   * conversation:load is sent. The batchers remain usable after flushing.
+   */
+  flush: () => void;
 }
 
 export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerResult {
@@ -180,9 +199,12 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
     }
 
     // Apply all accumulated content in a single setMessages call
+    // After applying, clear pending lengths for these messages
     setMessages((prev) => {
       let result = prev;
       for (const [messageId, accumulatedContent] of chunksByMessage) {
+        // Clear pending length for this message - content is now rendered
+        pendingChunkLengths.set(messageId, 0);
         const lastIdx = result.length - 1;
 
         // Sanity check: ensure valid array index before accessing
@@ -368,6 +390,11 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           });
           break;
         }
+        // Track pending chunk length for accurate tool placement
+        // This is read by tool:start to calculate contentOffset that includes unrendered content
+        const pending = pendingChunkLengths.get(message.message_id) ?? 0;
+        pendingChunkLengths.set(message.message_id, pending + message.content.length);
+
         batchedChunkHandler({ messageId: message.message_id, content: message.content });
         break;
       }
@@ -419,6 +446,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // This ensures all streamed content is rendered before the message is finalized.
         // Without this, the last chunk batch could appear AFTER isStreaming is set to false.
         batchedChunkHandler.cancel(FLUSH_PENDING);
+
+        // Clean up pending chunk tracking for this message
+        pendingChunkLengths.delete(message.message_id);
 
         // Calculate final thinking duration if we were tracking it
         const thinkingStart = thinkingStartTimes.current.get(message.message_id);
@@ -481,15 +511,17 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                   }))
                 : undefined;
 
-            void conversationAddMessage(message.session_id, {
-              id: completedMsg.id,
-              role: 'assistant',
-              content: completedMsg.content,
-              ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
-              createdAt: Date.now(),
-              ...(usageDto ? { usage: usageDto } : {}),
-              ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
-            });
+            if (!wasMessagePersisted(message.session_id, completedMsg.id)) {
+              void conversationAddMessage(message.session_id, {
+                id: completedMsg.id,
+                role: 'assistant',
+                content: completedMsg.content,
+                ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
+                createdAt: Date.now(),
+                ...(usageDto ? { usage: usageDto } : {}),
+                ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
+              });
+            }
 
             return [...prev.slice(0, -1), completedMsg];
           }
@@ -518,6 +550,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // Flush any pending text chunks before handling error
         // This ensures partial content is preserved before appending error message
         batchedChunkHandler.cancel(FLUSH_PENDING);
+
+        // Clean up pending chunk tracking for this message
+        pendingChunkLengths.delete(message.message_id);
 
         setIsAgentRunning(false);
         const errorContent = `Error: ${message.error}`;
@@ -561,6 +596,14 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           messagesCache.current.set(oldSessionId, oldMessages);
         }
 
+        // CRITICAL: Clear messages FIRST before session transition
+        // This prevents race conditions where ChatArea remounts with key={newSessionId}
+        // and reads stale messages before the setMessages([]) async state update completes.
+        // The in-memory cache in useMessageState will be empty for this new session,
+        // ensuring the component starts fresh.
+        setMessages([]);
+
+        // Now update session state (triggers ChatArea remount via key prop)
         setSessionId(message.session_id);
         setActiveConversation(message.session_id, message.title);
         addConversation({
@@ -570,7 +613,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           messageCount: 0,
           ...(message.workspace_path ? { workspacePath: message.workspace_path } : {}),
         });
-        setMessages([]);
         switchSession(message.session_id); // Switch to new session (resets usage for new conversation)
         onSessionCreated?.(message.session_id, message.title);
         break;
@@ -605,8 +647,23 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       }
 
       case 'conversation:loaded': {
+        // Clear pending load flag - the load has completed
+        useMessageBufferStore.getState().clearLoadPending(message.session_id);
+
+        // Check cache first for messages, then fall back to messagesRef for current session.
+        // This handles the race condition where buffer hydration called flush() → setMessages(),
+        // but the cache sync useEffect hasn't run yet (cache is populated async via useEffect).
+        // By checking messagesRef for the current session, we capture the freshly-hydrated messages.
+        let cachedMessages = messagesCache.current.get(message.session_id);
+        if (
+          (!cachedMessages || cachedMessages.length === 0) &&
+          sessionIdRef.current === message.session_id &&
+          messagesRef.current.length > 0
+        ) {
+          cachedMessages = messagesRef.current;
+        }
+
         // Prepare new messages (filter out system messages as they're not displayed)
-        const cachedMessages = messagesCache.current.get(message.session_id);
         const backendMessages = message.messages
           .filter(
             (m): m is typeof m & { role: 'user' | 'assistant' } =>
@@ -619,14 +676,43 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             displayedContent: m.content,
           }));
 
-        // Determine which messages to use (prefer cache if it has more messages)
+        // Merge backend and cache messages:
+        // - User messages ONLY come from backend (auto-start saves them immediately)
+        // - Assistant messages prefer cache (may have live streaming content)
+        // This handles the case where buffer hydration added streaming response
+        // but the user message wasn't in the buffer (it's in backend storage)
         let newMessages: typeof backendMessages;
-        if (cachedMessages && cachedMessages.length > 0 && backendMessages.length === 0) {
-          newMessages = cachedMessages;
-        } else if (cachedMessages && cachedMessages.length > backendMessages.length) {
+        if (!cachedMessages || cachedMessages.length === 0) {
+          // No cache - use backend directly
+          newMessages = backendMessages;
+        } else if (backendMessages.length === 0) {
+          // No backend - use cache directly
           newMessages = cachedMessages;
         } else {
-          newMessages = backendMessages;
+          // Both exist - merge: user messages from backend, assistant from cache if exists
+          const cachedById = new Map(cachedMessages.map((m) => [m.id, m]));
+          const backendById = new Map(backendMessages.map((m) => [m.id, m]));
+
+          // Start with all backend messages (this gives us user messages)
+          const merged = new Map(backendById);
+
+          // For each cached message, prefer cache version (has latest streaming content)
+          for (const [id, msg] of cachedById) {
+            merged.set(id, msg);
+          }
+
+          // Also add any cached messages that aren't in backend (new streaming messages)
+          // These might have different IDs if streaming started after backend load
+
+          // Convert to array, preserving order: backend messages first, then any new cached ones
+          const backendOrder = backendMessages.map((m) => m.id);
+          const cachedOrder = cachedMessages.map((m) => m.id);
+
+          // Build ordered result: backend order for backend messages, then append new cached messages
+          const orderedIds = [...new Set([...backendOrder, ...cachedOrder])];
+          newMessages = orderedIds
+            .map((id) => merged.get(id))
+            .filter((m): m is NonNullable<typeof m> => m !== undefined);
         }
 
         // Calculate cumulative usage from persisted messages (for token tracking persistence)
@@ -744,9 +830,18 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           recordBrowserActivityFromAI();
         }
 
-        // Use backend-provided content_offset for accurate tool positioning.
-        // The backend tracks accumulated text length and provides this when emitting tool events.
-        // Only fall back to computed offset if backend didn't provide one (legacy compatibility).
+        // Calculate accurate contentOffset for tool widget placement.
+        //
+        // Challenge: RAF batching causes a lag between when chunks are received and rendered.
+        // When tool:start arrives, `currentMsg.content.length` may not include pending chunks
+        // that have been received but not yet processed by the RAF callback.
+        //
+        // Solution: Track pending chunk lengths in pendingChunkLengths map. The tool position
+        // should be at: displayedLength + pendingLength. This accounts for both rendered AND
+        // received-but-not-yet-rendered content.
+        //
+        // We also clamp to the backend's content_offset when available, taking the minimum
+        // to handle edge cases where frontend tracking might be ahead due to state race.
         //
         // Fast path: check last message first (most common case during streaming)
         // This avoids O(n) scan through all messages when the target is almost always at the end.
@@ -756,7 +851,17 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           lastMsg?.id === message.message_id
             ? lastMsg
             : messages.find((m) => m.id === message.message_id);
-        const contentOffset = message.content_offset ?? currentMsg?.content.length ?? 0;
+
+        const displayedLength = currentMsg?.content.length ?? 0;
+        const pendingLength = pendingChunkLengths.get(message.message_id) ?? 0;
+        const maxKnownLength = displayedLength + pendingLength;
+
+        // Use frontend-calculated length, clamped by backend's offset if available
+        // The min() handles edge cases where backend has flushed but chunks haven't arrived yet
+        const contentOffset =
+          message.content_offset !== undefined
+            ? Math.min(message.content_offset, maxKnownLength)
+            : maxKnownLength;
 
         // Queue tool start to be processed in next RAF (reduces re-renders)
         batchedToolHandler({
@@ -878,5 +983,13 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
     batchedToolHandler.cancel();
   };
 
-  return { handleMessage, cleanup };
+  // Force-flush pending RAF batchers synchronously.
+  // Used after buffer hydration to ensure messages are in React state
+  // before conversation:load effect runs. The batchers remain usable.
+  const flush = (): void => {
+    batchedChunkHandler.cancel(FLUSH_PENDING);
+    batchedToolHandler.cancel(FLUSH_PENDING);
+  };
+
+  return { handleMessage, cleanup, flush };
 }

@@ -19,14 +19,14 @@ import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { FileEntry } from '@/types/agent/context';
 import type { ExtensionMessage } from '@/types/protocol';
 import type { AllotmentHandle } from 'allotment';
-import type { FC } from 'react';
+import type { FC, JSX } from 'react';
 
 import { ChatHeader, useQueuedMessageHandler } from '@/components/chat';
 import { ActivityPanel } from '@/components/panels';
 import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { useChatMessages } from '@/hooks/chat/use-chat-messages';
-import { TERMINAL_PANEL, ACTIVITY_PANEL, CHAT_PANEL } from '@/lib/utils/constants';
+import { TERMINAL_PANEL, ACTIVITY_PANEL, CHAT_PANEL } from '@/lib/utils';
 import {
   useGetToolsForMessage,
   usePendingPermissions,

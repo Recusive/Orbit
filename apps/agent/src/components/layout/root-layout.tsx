@@ -32,6 +32,7 @@ export const RootLayout: FC = () => {
     setTerminalPosition,
     openSettings,
     openSourceControl,
+    chatAreaDetached,
   } = useUIStore();
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
@@ -142,10 +143,12 @@ export const RootLayout: FC = () => {
       <SidebarResizeHandle />
 
       {/* Chat Area - Main chat interface with Activity panel */}
-      <ChatArea />
+      {/* Hidden when detached (e.g., canvas expanded view uses its own ChatArea) */}
+      {!chatAreaDetached ? <ChatArea /> : null}
 
       {/* Actions Bar - Activity Panel tab switcher */}
-      {rightSidebarOpen ? <ActionsBar /> : null}
+      {/* Also hidden when ChatArea is detached to prevent orphaned controls */}
+      {rightSidebarOpen && !chatAreaDetached ? <ActionsBar /> : null}
 
       {/* Quick Open Dialog */}
       <QuickOpen open={quickOpenVisible} onOpenChange={setQuickOpenVisible} />

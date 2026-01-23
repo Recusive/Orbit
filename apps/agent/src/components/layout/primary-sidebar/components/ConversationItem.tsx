@@ -8,8 +8,7 @@ import type { ConversationItemProps } from '../types';
 import type { FC } from 'react';
 
 import { ConversationContextMenu, ConversationDropdownMenu } from '@/components/sidebar';
-import { TRANSITIONS } from '@/lib/utils/constants';
-import { cn } from '@/lib/utils/utils';
+import { cn, TRANSITIONS } from '@/lib/utils';
 
 /** Gradient mask for text fade on hover (left-to-right fade at end) */
 const TITLE_HOVER_MASK = 'linear-gradient(to right, black 85%, transparent 98%)';

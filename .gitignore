@@ -75,3 +75,11 @@ opencode-reference/
 
 # Reference repos (cloned for development reference)
 xyflow/
+
+# Code review outputs (local only)
+reviews/
+audits/
+
+# Local development/experiment directories
+json-render/
+/ui/

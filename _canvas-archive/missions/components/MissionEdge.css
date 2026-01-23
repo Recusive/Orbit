@@ -1,0 +1,91 @@
+/**
+ * MissionEdge Styles
+ */
+
+.mission-edge--active {
+  animation: mission-edge-flow 1s linear infinite;
+}
+
+@keyframes mission-edge-flow {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Accessibility: Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .mission-edge--active {
+    animation: none;
+    /* Use static dashed stroke instead */
+    stroke-dasharray: 8 4;
+  }
+}
+
+.mission-edge-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mission-edge-label-text {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 300;
+  cursor: pointer;
+}
+
+.mission-edge-label-text:hover {
+  background: var(--muted);
+}
+
+.mission-edge-label-add {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.mission-edge-label:hover .mission-edge-label-add,
+.mission-edge-label--selected .mission-edge-label-add {
+  opacity: 1;
+}
+
+.mission-edge-label-add:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.mission-edge-delete-btn {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.mission-edge-delete-btn:hover {
+  background: var(--red-500);
+  border-color: var(--red-500);
+  color: white;
+}

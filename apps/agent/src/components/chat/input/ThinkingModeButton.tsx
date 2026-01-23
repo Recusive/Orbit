@@ -5,7 +5,7 @@ import type { ThinkingModeButtonProps } from './types';
 import type { FC } from 'react';
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 export const ThinkingModeButton: FC<ThinkingModeButtonProps> = ({
   thinkingMode,

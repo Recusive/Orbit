@@ -9,7 +9,7 @@ import type { SettingsDialogProps, SettingsSection } from './types';
 import type { FC, ReactNode } from 'react';
 
 import { Dialog, DialogPortal } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 // Loading fallback for lazy-loaded pages
 const PageLoader: FC = () => (

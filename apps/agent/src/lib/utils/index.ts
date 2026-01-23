@@ -3,7 +3,15 @@
  */
 
 // General utilities
-export { cn, formatTimestamp, truncatePath } from './utils';
+export {
+  cn,
+  formatTimestamp,
+  truncatePath,
+  isMac,
+  getCommandKey,
+  getModifierSymbols,
+  omit,
+} from './utils';
 
 // Diff utilities
 export { computeSimpleDiff, getLanguageFromPath } from './diff-utils';
@@ -29,6 +37,9 @@ export {
   VIRTUALIZATION,
   SCROLL_THRESHOLD,
   TERMINAL,
+  TERMINAL_PANEL,
+  ACTIVITY_PANEL,
+  CHAT_PANEL,
   DEFAULT_UI_STATE,
   KEYBOARD_SHORTCUTS,
   GIT_STATUS_STYLES,

@@ -43,7 +43,8 @@ docs/
 │   └── flash-prevention-guide.md
 │
 └── reference/                        # API & SDK references
-    └── Agent SDK reference - TypeScript.md
+    ├── Agent SDK reference - TypeScript.md
+    └── codex-cli-guide.md
 ```
 
 ---
@@ -96,9 +97,10 @@ UI/UX guidelines and patterns.
 
 API documentation and SDK references.
 
-| Document                                                                                     | Description                |
-| -------------------------------------------------------------------------------------------- | -------------------------- |
-| [Agent SDK reference - TypeScript.md](reference/Agent%20SDK%20reference%20-%20TypeScript.md) | Claude Agent SDK reference |
+| Document                                                                                     | Description                  |
+| -------------------------------------------------------------------------------------------- | ---------------------------- |
+| [Agent SDK reference - TypeScript.md](reference/Agent%20SDK%20reference%20-%20TypeScript.md) | Claude Agent SDK reference   |
+| [codex-cli-guide.md](reference/codex-cli-guide.md)                                           | OpenAI Codex CLI usage guide |
 
 ---
 

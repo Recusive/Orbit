@@ -3,13 +3,7 @@ import { initFileWatcher } from '../use-tauri-file-watcher';
 import type { FileEntry } from '@/lib/api';
 import type { WebviewMessage } from '@/types/protocol';
 
-import {
-  conversationList,
-  getWorkspacePath,
-  listDirectory,
-  lspSetWorkspace,
-  readFile,
-} from '@/lib/api';
+import { conversationList, getWorkspacePath, listDirectory, readFile } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -39,6 +33,9 @@ export async function handleFileTreeRequest(
     // Only update UI store workspace on initial load (when no specific path was requested)
     // This prevents subfolder navigation from overwriting the root workspace
     if (message.path === undefined || message.path === '') {
+      // Update UI store with workspace path
+      // Note: LSP workspace initialization is handled reactively by useLsp hook
+      // when it receives rootPath from the file store
       useUIStore.getState().setWorkspace(targetPath);
 
       // Load conversations for this workspace (Claude Code-style folder isolation)
@@ -49,11 +46,6 @@ export async function handleFileTreeRequest(
         .catch((err: unknown) => {
           console.warn('[Orbit] Failed to load conversations:', err);
         });
-
-      // Set workspace for LSP - this initializes language servers for the workspace
-      lspSetWorkspace(targetPath).catch((err: unknown) => {
-        console.warn('[Orbit] Failed to set LSP workspace:', err);
-      });
 
       // Start watching the workspace for file changes (for auto-refresh)
       initFileWatcher(targetPath).catch((err: unknown) => {

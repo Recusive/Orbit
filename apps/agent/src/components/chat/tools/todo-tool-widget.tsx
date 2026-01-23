@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { FC, ReactElement } from 'react';
 
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 interface TodoItem {
   content: string;

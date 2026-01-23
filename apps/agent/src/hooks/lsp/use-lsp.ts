@@ -12,6 +12,7 @@ import {
   lspDidOpen,
   lspDidSave,
   lspIsRunning,
+  lspSetWorkspace,
   lspStart,
   lspStop,
 } from '@/lib/api';
@@ -93,7 +94,9 @@ function hasLspSupport(language: string | null): boolean {
 // ============================================
 
 export interface UseLspResult {
-  /** Whether the server is running */
+  /** Whether the workspace is initialized in the backend */
+  isWorkspaceReady: boolean;
+  /** Whether the language server is running */
   isRunning: boolean;
   /** Whether we're currently checking server status */
   isChecking: boolean;
@@ -122,14 +125,57 @@ export interface UseLspResult {
 }
 
 // ============================================
+// Module-level state for workspace initialization
+// ============================================
+
+/**
+ * Track which workspace paths have been initialized.
+ * This prevents redundant lspSetWorkspace calls when multiple
+ * useLsp instances exist (e.g., multiple editors).
+ */
+const initializedWorkspaces = new Set<string>();
+
+/**
+ * Track which workspace paths are currently being initialized.
+ * This prevents multiple concurrent initialization attempts.
+ */
+const initializingWorkspaces = new Set<string>();
+
+/**
+ * Callbacks to notify when a workspace becomes ready.
+ * Used to trigger re-renders in all hook instances when initialization completes.
+ */
+const workspaceReadyListeners = new Map<string, Set<() => void>>();
+
+/**
+ * Reference count for each workspace path.
+ * When the count drops to 0, we clean up module-level state for that workspace
+ * to prevent memory leaks from workspaces that are no longer in use.
+ */
+const workspaceRefCounts = new Map<string, number>();
+
+/**
+ * Clean up module-level state for a workspace when no longer in use.
+ * Called when the last hook instance for a workspace unmounts.
+ */
+function cleanupWorkspace(path: string): void {
+  initializedWorkspaces.delete(path);
+  initializingWorkspaces.delete(path);
+  workspaceReadyListeners.delete(path);
+  workspaceRefCounts.delete(path);
+}
+
+// ============================================
 // Hook
 // ============================================
 
 /**
  * Hook for LSP (Language Server Protocol) operations.
  *
- * Provides methods to start/stop language servers and perform
- * code intelligence operations like completion, hover, and go-to-definition.
+ * This hook manages its own workspace initialization reactively:
+ * - When rootPath changes, it automatically calls lspSetWorkspace
+ * - Operations are skipped (with logging) until workspace is ready
+ * - Multiple instances share workspace state to avoid redundant calls
  *
  * @param language - Optional language ID to check running status for
  * @param rootPath - Optional workspace root path for auto-starting
@@ -140,20 +186,24 @@ export interface UseLspResult {
  * function Editor({ file }) {
  *   const lsp = useLsp('typescript', '/path/to/project');
  *
+ *   // No need to check isWorkspaceReady for operations - they handle it
  *   useEffect(() => {
  *     if (file && lsp.isRunning) {
  *       lsp.didOpen(file.path, 'typescript', file.content);
  *     }
  *   }, [file, lsp.isRunning]);
  *
- *   const handleCompletion = async (line: number, col: number) => {
- *     const items = await lsp.getCompletions(file.path, line, col);
- *     // Show completion menu
- *   };
+ *   // UI can show initialization status
+ *   if (!lsp.isWorkspaceReady) {
+ *     return <div>Initializing LSP...</div>;
+ *   }
  * }
  * ```
  */
 export function useLsp(language: string | null, rootPath: string | null): UseLspResult {
+  const [isWorkspaceReady, setIsWorkspaceReady] = useState(
+    rootPath ? initializedWorkspaces.has(rootPath) : false
+  );
   const [isRunning, setIsRunning] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -161,7 +211,110 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
   // Track if a start operation is in progress to prevent race conditions
   const startingRef = useRef(false);
 
-  // Refresh function to sync state with backend
+  // Ref to track current workspace ready state for use in cleanup functions
+  // This avoids stale closure issues where cleanup runs with old state
+  const isWorkspaceReadyRef = useRef(isWorkspaceReady);
+  isWorkspaceReadyRef.current = isWorkspaceReady;
+
+  // ============================================
+  // Workspace reference counting (memory leak prevention)
+  // ============================================
+
+  useEffect(() => {
+    if (!rootPath) return;
+
+    // Increment ref count for this workspace
+    workspaceRefCounts.set(rootPath, (workspaceRefCounts.get(rootPath) ?? 0) + 1);
+
+    return () => {
+      // Decrement ref count on unmount
+      const count = workspaceRefCounts.get(rootPath) ?? 1;
+      if (count <= 1) {
+        // Last instance for this workspace - clean up module-level state
+        // This prevents memory leaks from workspaces that are no longer in use
+        cleanupWorkspace(rootPath);
+        logger.debug('Cleaned up LSP workspace state (last instance unmounted)', { rootPath });
+      } else {
+        workspaceRefCounts.set(rootPath, count - 1);
+      }
+    };
+  }, [rootPath]);
+
+  // ============================================
+  // Reactive workspace initialization
+  // ============================================
+
+  useEffect(() => {
+    // No rootPath = no workspace to initialize
+    if (!rootPath) {
+      setIsWorkspaceReady(false);
+      return;
+    }
+
+    // Already initialized this workspace - just sync state
+    if (initializedWorkspaces.has(rootPath)) {
+      setIsWorkspaceReady(true);
+      return;
+    }
+
+    // New/uninitialized workspace: reset readiness and clear stale errors
+    // This prevents stale isWorkspaceReady=true and error states from previous workspace
+    setIsWorkspaceReady(false);
+    setError(null);
+
+    // Register listener to be notified when initialization completes
+    // This handles the case where another hook instance is initializing
+    if (!workspaceReadyListeners.has(rootPath)) {
+      workspaceReadyListeners.set(rootPath, new Set());
+    }
+    const listeners = workspaceReadyListeners.get(rootPath) ?? new Set();
+    const onReady = (): void => {
+      setIsWorkspaceReady(true);
+    };
+    listeners.add(onReady);
+
+    // Already initializing (by another hook instance) - just wait for notification
+    if (initializingWorkspaces.has(rootPath)) {
+      return () => {
+        listeners.delete(onReady);
+      };
+    }
+
+    // This hook instance will do the initialization
+    initializingWorkspaces.add(rootPath);
+    logger.info('Initializing LSP workspace', { rootPath });
+
+    lspSetWorkspace(rootPath)
+      .then(() => {
+        initializedWorkspaces.add(rootPath);
+        logger.info('LSP workspace ready', { rootPath });
+        // Notify all waiting hook instances
+        const callbacks = workspaceReadyListeners.get(rootPath);
+        if (callbacks) {
+          for (const cb of callbacks) {
+            cb();
+          }
+        }
+      })
+      .catch((err: unknown) => {
+        const error = err instanceof Error ? err : new Error(String(err));
+        logger.error('Failed to initialize LSP workspace', error);
+        setError(error);
+        setIsWorkspaceReady(false);
+      })
+      .finally(() => {
+        initializingWorkspaces.delete(rootPath);
+      });
+
+    return () => {
+      listeners.delete(onReady);
+    };
+  }, [rootPath]);
+
+  // ============================================
+  // Server status checking
+  // ============================================
+
   const refresh = useCallback(async (): Promise<void> => {
     if (!language || !hasLspSupport(language)) {
       setIsRunning(false);
@@ -193,17 +346,21 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
       });
   }, [language]);
 
+  // ============================================
+  // Server lifecycle operations
+  // ============================================
+
   const start = useCallback(
     async (lang: string, root: string): Promise<void> => {
       setError(null);
       try {
-        logger.info(`Starting LSP server`, { language: lang, root });
+        logger.info('Starting LSP server', { language: lang, root });
         await lspStart(lang, root);
         setIsRunning(true);
-        logger.debug(`LSP server started`, { language: lang });
+        logger.debug('LSP server started', { language: lang });
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        logger.error(`Failed to start LSP server`, error);
+        logger.error('Failed to start LSP server', error);
         setError(error);
         // Re-sync state with backend after error
         if (language) {
@@ -225,12 +382,12 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
     async (lang: string): Promise<void> => {
       setError(null);
       try {
-        logger.info(`Stopping LSP server`, { language: lang });
+        logger.info('Stopping LSP server', { language: lang });
         await lspStop(lang);
         setIsRunning(false);
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        logger.error(`Failed to stop LSP server`, error);
+        logger.error('Failed to stop LSP server', error);
         setError(error);
         // Re-sync state with backend after error
         if (language) {
@@ -248,6 +405,10 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
     [language]
   );
 
+  // ============================================
+  // Document notification operations
+  // ============================================
+
   const didOpen = useCallback(
     async (path: string, lang: string, content: string): Promise<void> => {
       // Skip LSP for unsupported languages
@@ -255,62 +416,123 @@ export function useLsp(language: string | null, rootPath: string | null): UseLsp
         return;
       }
 
-      // Auto-start server if not running, with race condition protection
-      if (rootPath && !startingRef.current) {
-        // Check actual backend state, not local state
-        const actuallyRunning = await lspIsRunning(lang).catch(() => false);
-        if (!actuallyRunning) {
-          startingRef.current = true;
-          try {
-            await lspStart(lang, rootPath);
-            setIsRunning(true);
-          } finally {
-            startingRef.current = false;
+      // Skip if workspace not ready - log for observability
+      if (!isWorkspaceReady || !rootPath) {
+        logger.debug('Skipping LSP didOpen - workspace not ready', {
+          path,
+          lang,
+          isWorkspaceReady,
+        });
+        return;
+      }
+
+      try {
+        // Auto-start server if not running, with race condition protection
+        if (!startingRef.current) {
+          const actuallyRunning = await lspIsRunning(lang).catch(() => false);
+          if (!actuallyRunning) {
+            startingRef.current = true;
+            try {
+              await lspStart(lang, rootPath);
+              setIsRunning(true);
+            } finally {
+              startingRef.current = false;
+            }
           }
         }
+        await lspDidOpen(path, lang, content);
+      } catch (err) {
+        // Log but don't throw - LSP errors shouldn't break the editor
+        const error = err instanceof Error ? err : new Error(String(err));
+        logger.warn('LSP didOpen failed', { path, lang, error: error.message });
       }
-      await lspDidOpen(path, lang, content);
     },
-    [rootPath]
+    [isWorkspaceReady, rootPath]
   );
 
   const didChange = useCallback(
     async (path: string, content: string, version: number): Promise<void> => {
+      if (!isWorkspaceReady) {
+        logger.debug('Skipping LSP didChange - workspace not ready', { path });
+        return;
+      }
       await lspDidChange(path, content, version);
     },
-    []
+    [isWorkspaceReady]
   );
 
-  const didSave = useCallback(async (path: string): Promise<void> => {
-    await lspDidSave(path);
-  }, []);
+  const didSave = useCallback(
+    async (path: string): Promise<void> => {
+      if (!isWorkspaceReady) {
+        logger.debug('Skipping LSP didSave - workspace not ready', { path });
+        return;
+      }
+      await lspDidSave(path);
+    },
+    [isWorkspaceReady]
+  );
 
-  const didClose = useCallback(async (path: string): Promise<void> => {
-    await lspDidClose(path);
-  }, []);
+  const didClose = useCallback(
+    async (path: string): Promise<void> => {
+      // Use ref to get CURRENT workspace state, not stale closure state
+      // This is important because didClose is often called from cleanup functions
+      // which may have captured an old isWorkspaceReady value
+      if (!isWorkspaceReadyRef.current) {
+        // Silent skip - no logging for cleanup operations
+        return;
+      }
+      try {
+        await lspDidClose(path);
+      } catch {
+        // Silent fail - file might not have been opened, that's OK
+      }
+    },
+    [] // No deps - uses ref for current state
+  );
+
+  // ============================================
+  // Query operations
+  // ============================================
 
   const completions = useCallback(
     async (path: string, line: number, column: number): Promise<CompletionItem[]> => {
+      if (!isWorkspaceReady) {
+        logger.debug('Skipping LSP completions - workspace not ready', { path });
+        return [];
+      }
       return getCompletions(path, line, column);
     },
-    []
+    [isWorkspaceReady]
   );
 
   const hover = useCallback(
     async (path: string, line: number, column: number): Promise<HoverInfo | null> => {
+      if (!isWorkspaceReady) {
+        logger.debug('Skipping LSP hover - workspace not ready', { path });
+        return null;
+      }
       return getHover(path, line, column);
     },
-    []
+    [isWorkspaceReady]
   );
 
   const definition = useCallback(
     async (path: string, line: number, column: number): Promise<Location | null> => {
+      if (!isWorkspaceReady) {
+        logger.debug('Skipping LSP gotoDefinition - workspace not ready', { path });
+        return null;
+      }
       return gotoDefinition(path, line, column);
     },
-    []
+    [isWorkspaceReady]
   );
 
+  // ============================================
+  // Return value
+  // ============================================
+
   return {
+    isWorkspaceReady,
     isRunning,
     isChecking,
     error,

@@ -5,7 +5,7 @@ import type { KnipConfig } from 'knip';
  *
  * This monorepo has a unique structure:
  * - Root package.json contains ALL dependencies (not per-workspace)
- * - apps/agent and apps/canvas use root deps via imports
+ * - apps/agent and apps/Canvas-UI-Builder use root deps via imports
  * - agent-bridge has its own package.json with separate deps
  * - packages/shared-schemas exports types for IPC
  *
@@ -26,8 +26,8 @@ const config: KnipConfig = {
       ignore: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
     },
 
-    // Canvas app (embedded in agent)
-    'apps/canvas': {
+    // Canvas UI Builder app (embedded in agent)
+    'apps/Canvas-UI-Builder': {
       entry: ['src/main.tsx', 'src/CanvasApp.tsx'],
       project: ['src/**/*.{ts,tsx}'],
       ignore: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
@@ -79,7 +79,7 @@ const config: KnipConfig = {
   // (root deps used by app workspaces, dynamic imports, etc.)
   ignoreDependencies: [
     // === Root package.json dependencies used by apps ===
-    // These are in root package.json but imported by apps/agent and apps/canvas
+    // These are in root package.json but imported by apps/agent and apps/Canvas-UI-Builder
 
     // React ecosystem
     'react',

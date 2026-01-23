@@ -18,7 +18,7 @@ import type { InputControlsProps } from './types';
 import type { FC } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 export const InputControls: FC<InputControlsProps> = memo(function InputControls({
   inputMode,

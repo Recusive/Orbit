@@ -11,7 +11,7 @@ import { immer } from 'zustand/middleware/immer';
 
 import type { ShellType, TerminalCapabilitiesState } from '@/types/protocol';
 
-import { TERMINAL } from '@/lib/utils/constants';
+import { TERMINAL } from '@/lib/utils';
 
 const logger = createLogger('TerminalStore');
 

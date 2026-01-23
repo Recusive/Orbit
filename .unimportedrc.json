@@ -1,5 +1,9 @@
 {
-  "entry": ["apps/agent/src/main.tsx", "apps/canvas/src/main.tsx", "apps/canvas/src/CanvasApp.tsx"],
+  "entry": [
+    "apps/agent/src/main.tsx",
+    "apps/Canvas-UI-Builder/src/main.tsx",
+    "apps/Canvas-UI-Builder/src/CanvasApp.tsx"
+  ],
   "extensions": [".ts", ".tsx"],
   "ignorePatterns": [
     "**/node_modules/**",

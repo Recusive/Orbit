@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SearchResult } from '@/lib/api';
 
 import { searchFiles } from '@/lib/api';
-import { DELAYS } from '@/lib/utils/constants';
+import { DELAYS } from '@/lib/utils';
 
 // ============================================
 // Types

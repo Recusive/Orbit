@@ -9,8 +9,7 @@ import React from 'react';
 
 import type { DisplayFileStatus, FileItem } from '../types';
 
-import { GIT_STATUS_STYLES } from '@/lib/utils/constants';
-import { cn } from '@/lib/utils/utils';
+import { cn, GIT_STATUS_STYLES } from '@/lib/utils';
 
 /** Get status indicator icon/label */
 function getStatusIcon(status: DisplayFileStatus): React.ReactNode {

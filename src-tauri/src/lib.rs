@@ -13,7 +13,12 @@ use std::sync::Arc;
 
 use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
+use commands::canvas::download as canvas_download;
 use commands::canvas::lifecycle as canvas_cmd;
+use commands::canvas::preview as canvas_preview;
+use commands::canvas::save as canvas_save;
+use commands::canvas::setup as canvas_setup;
+use commands::canvas::PreviewServerState;
 use commands::common::{
     browser::{self, BrowserResultState, EmbeddedBrowserState},
     credentials, dev_monitor, diagnostics, files, git, lsp, providers, search, settings, terminal,
@@ -220,6 +225,7 @@ pub fn run() {
         .manage(session_manager_for_state)
         .manage(browser_state)
         .manage(browser_result_state)
+        .manage(PreviewServerState::new())
         // Plugins
         .plugin(build_log_plugin().build())
         .plugin(tauri_plugin_fs::init())
@@ -283,12 +289,37 @@ pub fn run() {
             agent_cmd::agent_rewind_files,
             agent_cmd::agent_generate_agent_definition,
             agent_cmd::agent_generate_command_definition,
-            // Canvas commands
+            // Canvas session commands
             canvas_cmd::canvas_create_session,
             canvas_cmd::canvas_delete_session,
             canvas_cmd::canvas_send_message,
             canvas_cmd::canvas_interrupt,
             canvas_cmd::canvas_tool_response,
+            // Canvas setup commands
+            canvas_setup::canvas_get_orbit_path,
+            canvas_setup::canvas_check_setup,
+            canvas_setup::canvas_initialize_directories,
+            canvas_setup::canvas_mark_ready,
+            canvas_setup::canvas_reset_setup,
+            canvas_setup::canvas_get_registry,
+            canvas_setup::canvas_save_registry,
+            // Canvas error recovery commands
+            canvas_setup::canvas_check_port_available,
+            canvas_setup::canvas_get_download_state,
+            canvas_setup::canvas_resume_download,
+            // Canvas download commands
+            canvas_download::canvas_download_component,
+            canvas_download::canvas_download_utils,
+            canvas_download::canvas_download_all_components,
+            // Canvas preview commands
+            canvas_preview::canvas_setup_preview_server,
+            canvas_preview::canvas_install_preview_deps,
+            canvas_preview::canvas_start_preview_server,
+            canvas_preview::canvas_stop_preview_server,
+            canvas_preview::canvas_preview_server_status,
+            // Canvas save/export commands
+            canvas_save::canvas_save_custom_component,
+            canvas_save::canvas_export_component,
             // File commands
             files::read_file,
             files::read_file_bytes,

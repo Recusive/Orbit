@@ -17,8 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { SIDEBAR, TRANSITIONS } from '@/lib/utils/constants';
-import { cn } from '@/lib/utils/utils';
+import { cn, SIDEBAR, TRANSITIONS } from '@/lib/utils';
 
 // Hoisted RegExp for path splitting (avoids recreation on each render)
 const PATH_SEPARATOR_RE = /[/\\]/;

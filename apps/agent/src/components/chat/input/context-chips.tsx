@@ -4,7 +4,7 @@ import type { ContextItem } from '@/types/agent/context';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files/file-icon';
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 interface ContextChipsProps {
   readonly items: ContextItem[];

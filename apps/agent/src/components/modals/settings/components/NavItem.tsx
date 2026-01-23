@@ -1,7 +1,7 @@
 import type { NavItemProps } from '../types';
 import type { FC } from 'react';
 
-import { cn } from '@/lib/utils/utils';
+import { cn } from '@/lib/utils';
 
 export const NavItem: FC<NavItemProps> = ({ icon, label, isActive, onClick }) => (
   <button
