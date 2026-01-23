@@ -13,6 +13,7 @@
  * 3. Scaffold and install preview server
  */
 import { useCanvasSetup, usePreviewServer } from '@canvas/hooks';
+import { useComponentPropsStore, useCSSOverrides, useSelectedComponentProps } from '@canvas/stores';
 import { useCallback, useEffect, useState } from 'react';
 
 import { PreviewPanel } from '../preview';
@@ -54,6 +55,15 @@ export const CanvasRootLayout: FC = () => {
   // Selected component name for preview
   const [selectedComponentName, setSelectedComponentName] = useState<string | null>(null);
 
+  // Get CSS overrides from store - these are passed to the preview iframe
+  const cssOverrides = useCSSOverrides();
+
+  // Get component props from store - these are passed to the preview iframe
+  const componentProps = useSelectedComponentProps();
+
+  // Get setSelectedComponent action to sync with props store
+  const setSelectedComponent = useComponentPropsStore((state) => state.setSelectedComponent);
+
   // Auto-start preview server once setup is complete
   useEffect(() => {
     if (setupState === 'ready' && serverState === 'stopped') {
@@ -62,9 +72,14 @@ export const CanvasRootLayout: FC = () => {
   }, [setupState, serverState, startServer]);
 
   // Handle component selection from sidebar
-  const handleComponentSelect = useCallback((componentName: string) => {
-    setSelectedComponentName(componentName);
-  }, []);
+  // Updates both local state and the props store
+  const handleComponentSelect = useCallback(
+    (componentName: string) => {
+      setSelectedComponentName(componentName);
+      setSelectedComponent(componentName);
+    },
+    [setSelectedComponent]
+  );
 
   // Handle setup wizard completion
   const handleSetupComplete = useCallback((): void => {
@@ -129,6 +144,8 @@ export const CanvasRootLayout: FC = () => {
           serverUrl={serverUrl}
           componentName={selectedComponentName}
           componentType="ui"
+          styles={cssOverrides}
+          props={componentProps}
           onRestart={handleRestartServer}
           isRestarting={isRestarting || serverState === 'starting'}
         />

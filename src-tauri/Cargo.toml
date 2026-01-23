@@ -50,6 +50,7 @@ chrono = { workspace = true }
 crossbeam-channel = { workspace = true }
 hashbrown = { workspace = true }
 hostname = "0.4"  # For non-macOS device ID generation
+regex = "1"  # Component name validation
 
 # Tauri
 tauri = { workspace = true, features = ["tray-icon"] }

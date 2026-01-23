@@ -18,3 +18,10 @@ export {
   useSelectedToken,
 } from './design-tokens-store';
 export type { DesignToken } from './design-tokens-store';
+
+export {
+  useComponentPropsStore,
+  useHasComponentProps,
+  useSelectedComponent,
+  useSelectedComponentProps,
+} from './component-props-store';

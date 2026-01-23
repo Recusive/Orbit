@@ -24,6 +24,8 @@ type InspectorTab = 'props' | 'styles';
 export interface InspectorPanelProps {
   /** Selected component name (e.g., 'button', 'input') */
   readonly componentName: string | null;
+  /** Type of component - 'ui' for shadcn, 'custom' for user-created */
+  readonly componentType?: 'ui' | 'custom';
   /** Current component props */
   readonly props: Record<string, unknown>;
   /** Called when props change */
@@ -69,6 +71,7 @@ const TabButton: FC<TabButtonProps> = ({ active, onClick, icon, label }) => (
  */
 export const InspectorPanel: FC<InspectorPanelProps> = ({
   componentName,
+  componentType = 'ui',
   props,
   onPropsChange,
 }) => {
@@ -127,7 +130,7 @@ export const InspectorPanel: FC<InspectorPanelProps> = ({
           </div>
         ) : (
           <div className="h-full overflow-y-auto">
-            <PropertiesPanel selectedComponentName={componentName} />
+            <PropertiesPanel selectedComponentName={componentName} componentType={componentType} />
           </div>
         )}
       </div>

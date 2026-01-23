@@ -2,13 +2,21 @@
  * CSS Customization Store
  *
  * Manages CSS property overrides for live component preview.
- * Changes are reflected immediately in the Sandpack preview.
+ * Changes are reflected immediately in the preview via CSS injection.
+ *
+ * Features:
+ * - Live CSS overrides for instant preview
+ * - Persistence tracking (which properties have been saved to source)
+ * - Undo stack (max 10 entries) for reverting changes
+ * - Debounced updates for expensive operations
  */
 
-import { useMemo } from 'react';
+import { useMemo, useRef, useCallback } from 'react';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { useShallow } from 'zustand/shallow';
+
+import type { StyleChange } from '@canvas/lib/ast';
 
 // ============================================
 // Types
@@ -36,20 +44,42 @@ export interface CSSProperty {
 }
 
 /**
+ * Entry in the undo stack for reverting changes
+ */
+export interface UndoEntry {
+  /** Component name that was modified */
+  componentName: string;
+  /** Type of component (ui or custom) */
+  componentType: 'ui' | 'custom';
+  /** Original file content before transformation */
+  previousContent: string;
+  /** Style changes that were applied */
+  changes: StyleChange[];
+  /** Timestamp when the change was made */
+  timestamp: number;
+  /** Path to the backup file */
+  backupPath: string;
+}
+
+/**
  * Store state
  */
 interface CSSCustomizationState {
-  /** Current CSS overrides */
+  /** Current CSS overrides (not yet persisted) */
   overrides: Record<string, string>;
   /** Whether user has made any changes */
   hasChanges: boolean;
+  /** Properties that have been persisted to source code */
+  persistedProperties: Set<string>;
+  /** Undo stack for reverting changes (max 10 entries) */
+  undoStack: UndoEntry[];
 }
 
 /**
  * Store actions
  */
 interface CSSCustomizationActions {
-  /** Set a CSS property value */
+  /** Set a CSS property value (immediate) */
   setProperty: (property: string, value: string) => void;
   /** Reset a single property to default */
   resetProperty: (property: string) => void;
@@ -57,9 +87,32 @@ interface CSSCustomizationActions {
   resetAll: () => void;
   /** Get all overrides as CSS object */
   getOverrides: () => Record<string, string>;
+  /** Mark a property as persisted (removes from overrides) */
+  markPropertyPersisted: (property: string) => void;
+  /** Mark multiple properties as persisted */
+  markPropertiesPersisted: (properties: string[]) => void;
+  /** Clear all persisted property tracking */
+  clearPersistedOverrides: () => void;
+  /** Check if there are unsaved changes */
+  hasUnsavedChanges: () => boolean;
+  /** Push an undo entry onto the stack */
+  pushUndo: (entry: UndoEntry) => void;
+  /** Pop and return the most recent undo entry */
+  popUndo: () => UndoEntry | undefined;
+  /** Check if undo is available */
+  canUndo: () => boolean;
+  /** Get the current undo stack (read-only) */
+  getUndoStack: () => readonly UndoEntry[];
 }
 
 export type CSSCustomizationStore = CSSCustomizationState & CSSCustomizationActions;
+
+// ============================================
+// Constants
+// ============================================
+
+/** Maximum number of undo entries to keep */
+const MAX_UNDO_STACK_SIZE = 10;
 
 // ============================================
 // CSS Property Definitions
@@ -235,6 +288,13 @@ export function getPropertiesByCategory(category: CSSCategory): CSSProperty[] {
   return CSS_PROPERTIES.filter((p) => p.category === category);
 }
 
+/**
+ * Get a CSS property definition by name
+ */
+export function getPropertyByName(name: string): CSSProperty | undefined {
+  return CSS_PROPERTIES_BY_NAME.get(name);
+}
+
 // ============================================
 // Store
 // ============================================
@@ -243,6 +303,8 @@ export const useCSSCustomizationStore = create<CSSCustomizationStore>()(
   immer((set, get) => ({
     overrides: {},
     hasChanges: false,
+    persistedProperties: new Set<string>(),
+    undoStack: [],
 
     setProperty: (property: string, value: string): void => {
       set((state) => {
@@ -283,6 +345,72 @@ export const useCSSCustomizationStore = create<CSSCustomizationStore>()(
 
       return cssOverrides;
     },
+
+    markPropertyPersisted: (property: string): void => {
+      set((state) => {
+        // Add to persisted set
+        state.persistedProperties.add(property);
+        // Remove from current overrides (it's now in the source)
+        state.overrides = Object.fromEntries(
+          Object.entries(state.overrides).filter(([key]) => key !== property)
+        );
+        state.hasChanges = Object.keys(state.overrides).length > 0;
+      });
+    },
+
+    markPropertiesPersisted: (properties: string[]): void => {
+      set((state) => {
+        // Add all to persisted set
+        for (const property of properties) {
+          state.persistedProperties.add(property);
+        }
+        // Remove from current overrides
+        const propertySet = new Set(properties);
+        state.overrides = Object.fromEntries(
+          Object.entries(state.overrides).filter(([key]) => !propertySet.has(key))
+        );
+        state.hasChanges = Object.keys(state.overrides).length > 0;
+      });
+    },
+
+    clearPersistedOverrides: (): void => {
+      set((state) => {
+        state.persistedProperties = new Set();
+      });
+    },
+
+    hasUnsavedChanges: (): boolean => {
+      return Object.keys(get().overrides).length > 0;
+    },
+
+    pushUndo: (entry: UndoEntry): void => {
+      set((state) => {
+        state.undoStack.push(entry);
+        // Keep stack at max size
+        if (state.undoStack.length > MAX_UNDO_STACK_SIZE) {
+          state.undoStack.shift();
+        }
+      });
+    },
+
+    popUndo: (): UndoEntry | undefined => {
+      const { undoStack } = get();
+      if (undoStack.length === 0) return undefined;
+
+      let popped: UndoEntry | undefined;
+      set((state) => {
+        popped = state.undoStack.pop();
+      });
+      return popped;
+    },
+
+    canUndo: (): boolean => {
+      return get().undoStack.length > 0;
+    },
+
+    getUndoStack: (): readonly UndoEntry[] => {
+      return get().undoStack;
+    },
   }))
 );
 
@@ -318,4 +446,77 @@ export function useCSSOverrides(): Record<string, string> {
  */
 export function useHasChanges(): boolean {
   return useCSSCustomizationStore((state) => state.hasChanges);
+}
+
+/**
+ * Get persisted property count
+ */
+export function usePersistedPropertyCount(): number {
+  return useCSSCustomizationStore((state) => state.persistedProperties.size);
+}
+
+/**
+ * Check if undo is available
+ */
+export function useCanUndo(): boolean {
+  return useCSSCustomizationStore((state) => state.undoStack.length > 0);
+}
+
+/**
+ * Hook for debounced CSS property updates
+ *
+ * Use this for sliders and other inputs that fire rapidly.
+ * Uses 16ms debounce (one animation frame) to batch updates.
+ *
+ * @example
+ * const { setDebounced, setImmediate } = useDebouncedCSSUpdate();
+ *
+ * // For sliders (debounced)
+ * <Slider onChange={(value) => setDebounced('borderRadius', value)} />
+ *
+ * // For buttons/selects (immediate)
+ * <Select onChange={(value) => setImmediate('borderStyle', value)} />
+ */
+export function useDebouncedCSSUpdate(): {
+  setDebounced: (property: string, value: string) => void;
+  setImmediate: (property: string, value: string) => void;
+} {
+  const setProperty = useCSSCustomizationStore((state) => state.setProperty);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<Record<string, string>>({});
+
+  const setDebounced = useCallback(
+    (property: string, value: string) => {
+      // Accumulate pending changes
+      pendingRef.current[property] = value;
+
+      // Clear existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      // Schedule flush after 16ms (one animation frame)
+      timeoutRef.current = setTimeout(() => {
+        const pending = pendingRef.current;
+        pendingRef.current = {};
+
+        // Apply all pending changes
+        for (const [prop, val] of Object.entries(pending)) {
+          setProperty(prop, val);
+        }
+      }, 16);
+    },
+    [setProperty]
+  );
+
+  const setImmediate = useCallback(
+    (property: string, value: string) => {
+      // Clear any pending debounced update for this property
+      Reflect.deleteProperty(pendingRef.current, property);
+      setProperty(property, value);
+    },
+    [setProperty]
+  );
+
+  return { setDebounced, setImmediate };
 }

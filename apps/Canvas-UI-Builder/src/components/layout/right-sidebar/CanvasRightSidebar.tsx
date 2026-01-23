@@ -1,14 +1,17 @@
 /**
  * CanvasRightSidebar - Right properties/layers sidebar for Canvas UI Builder
  *
- * Shows properties panel for selected elements and layers panel for canvas hierarchy.
- * The Properties tab contains the CSS property editor for live preview editing.
+ * Shows inspector panels for the selected component:
+ * - Props tab: Edit React component props (variant, size, disabled, etc.)
+ * - Styles tab: Edit CSS properties (colors, spacing, typography, etc.)
+ * - Code tab: View component source code (coming soon)
  */
-import { Box, Code, Layers, Palette } from 'lucide-react';
-import { useState } from 'react';
+import { useComponentPropsStore, useSelectedComponentProps } from '@canvas/stores';
+import { Code, Palette, Settings2 } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
-import { PropertiesPanel } from '../../inspector';
+import { PropertiesPanel, PropsEditor } from '../../inspector';
 import { SidebarItem } from '../left-sidebar/components/SidebarItem';
 import { SidebarToggleIcon } from '../left-sidebar/components/SidebarToggleIcon';
 import { TabButton } from '../left-sidebar/components/TabButton';
@@ -20,7 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn, getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui/ui-store';
 
-type RightSidebarTab = 'properties' | 'code' | 'layers';
+type RightSidebarTab = 'props' | 'styles' | 'code';
 
 // ============================================
 // CodePanel - Source Code Viewer
@@ -79,8 +82,24 @@ export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({
     }))
   );
 
+  // Get component props from store
+  const componentProps = useSelectedComponentProps();
+  const setProps = useComponentPropsStore((state) => state.setProps);
+
+  // Use ref to hold latest props to avoid callback recreation
+  const propsRef = useRef(componentProps);
+  propsRef.current = componentProps;
+
+  // Handle props change - memoized callback
+  const handlePropsChange = useCallback(
+    (newProps: Record<string, unknown>): void => {
+      setProps(newProps);
+    },
+    [setProps]
+  );
+
   const isCollapsed = width <= SIDEBAR.collapsed;
-  const [activeTab, setActiveTab] = useState<RightSidebarTab>('properties');
+  const [activeTab, setActiveTab] = useState<RightSidebarTab>('props');
 
   return (
     <aside
@@ -153,10 +172,17 @@ export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({
         }}
       >
         <TabButton
-          label="Properties"
-          active={activeTab === 'properties'}
+          label="Props"
+          active={activeTab === 'props'}
           onClick={() => {
-            setActiveTab('properties');
+            setActiveTab('props');
+          }}
+        />
+        <TabButton
+          label="Styles"
+          active={activeTab === 'styles'}
+          onClick={() => {
+            setActiveTab('styles');
           }}
         />
         <TabButton
@@ -164,13 +190,6 @@ export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({
           active={activeTab === 'code'}
           onClick={() => {
             setActiveTab('code');
-          }}
-        />
-        <TabButton
-          label="Layers"
-          active={activeTab === 'layers'}
-          onClick={() => {
-            setActiveTab('layers');
           }}
         />
       </div>
@@ -183,8 +202,8 @@ export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({
         )}
       >
         <SidebarItem
-          icon={Box}
-          label="Element"
+          icon={Settings2}
+          label="Props"
           collapsed={isCollapsed}
           equalSpacing={isCollapsed}
         />
@@ -203,8 +222,22 @@ export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({
           isCollapsed ? 'overflow-y-hidden' : 'overflow-y-auto'
         )}
       >
-        {activeTab === 'properties' ? (
-          /* Properties Tab Content - CSS Editor */
+        {activeTab === 'props' ? (
+          /* Props Tab Content - React Props Editor */
+          <div
+            className={cn(
+              'transition-opacity duration-150',
+              isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            )}
+          >
+            <PropsEditor
+              componentName={selectedComponentName}
+              props={componentProps}
+              onChange={handlePropsChange}
+            />
+          </div>
+        ) : activeTab === 'styles' ? (
+          /* Styles Tab Content - CSS Editor */
           <div
             className={cn(
               'transition-opacity duration-150',
@@ -213,53 +246,15 @@ export const CanvasRightSidebar: FC<CanvasRightSidebarProps> = ({
           >
             <PropertiesPanel selectedComponentName={selectedComponentName} />
           </div>
-        ) : activeTab === 'code' ? (
-          /* Code Tab Content - Source Code Viewer */
-          <CodePanel selectedComponentName={selectedComponentName} />
         ) : (
-          /* Layers Tab Content */
+          /* Code Tab Content - Source Code Viewer */
           <div
             className={cn(
-              'p-3 transition-opacity duration-150',
+              'transition-opacity duration-150',
               isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
             )}
           >
-            <div className="text-sm text-muted-foreground">
-              <div className="flex items-center gap-2 mb-3">
-                <Layers className="h-4 w-4" />
-                <span className="font-medium text-foreground">Layers</span>
-              </div>
-              <p className="text-xs mb-3">Canvas layer hierarchy</p>
-              <ul className="space-y-1 text-xs" role="tree">
-                <li role="treeitem">
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                  >
-                    <Box className="h-3 w-3" aria-hidden="true" />
-                    <span>Frame 1</span>
-                  </button>
-                </li>
-                <li role="treeitem">
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer ml-3 w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                  >
-                    <Box className="h-3 w-3" aria-hidden="true" />
-                    <span>Button</span>
-                  </button>
-                </li>
-                <li role="treeitem">
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer ml-3 w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                  >
-                    <Box className="h-3 w-3" aria-hidden="true" />
-                    <span>Text</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
+            <CodePanel selectedComponentName={selectedComponentName} />
           </div>
         )}
       </div>

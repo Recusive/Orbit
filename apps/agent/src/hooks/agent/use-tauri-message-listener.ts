@@ -202,6 +202,10 @@ export function initWindowMessageListener(): void {
   );
 
   const handleWindowMessage = (event: MessageEvent<unknown>): void => {
+    const sameWindow = event.source === window;
+    const sameOrigin = event.origin === window.location.origin || event.origin === 'null';
+    if (!sameWindow || !sameOrigin) return;
+
     const result = ExtensionMessageSchema.safeParse(event.data);
 
     if (!result.success) {

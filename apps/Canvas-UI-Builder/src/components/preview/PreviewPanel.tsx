@@ -83,6 +83,13 @@ export const PreviewPanel: FC<PreviewPanelProps> = ({
   // Derived state to avoid Object.keys() in useEffect dependencies (rule: rerender-derived-state)
   const hasStyles = useMemo(() => Object.keys(styles).length > 0, [styles]);
   const hasProps = useMemo(() => Object.keys(props).length > 0, [props]);
+  const previewOrigin = useMemo(() => {
+    try {
+      return new URL(serverUrl).origin;
+    } catch {
+      return '';
+    }
+  }, [serverUrl]);
 
   // Get current theme from document
   const getCurrentTheme = useCallback((): 'light' | 'dark' => {
@@ -163,8 +170,8 @@ export const PreviewPanel: FC<PreviewPanelProps> = ({
   // Listen for messages from iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent<PreviewResponse>): void => {
-      // Verify origin for security (preview server runs on localhost:5199-5209)
-      if (!event.origin.includes('localhost:51')) return;
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      if (event.origin !== previewOrigin) return;
 
       const { type, error, exports: componentExports } = event.data;
 
@@ -186,27 +193,50 @@ export const PreviewPanel: FC<PreviewPanelProps> = ({
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [onReady, onError, onLoaded]);
+  }, [onReady, onError, onLoaded, previewOrigin]);
 
-  // Load component when name changes
+  // Track previous component name to detect when it's cleared or changed
+  const prevComponentNameRef = useRef(componentName);
+
+  // Load component when name changes, or clear when deselected
   useEffect(() => {
-    if (isReady && componentName) {
-      sendMessage({
-        type: 'preview:load',
-        componentName,
-        componentType,
-      });
+    if (isReady) {
+      const prevName = prevComponentNameRef.current;
+
+      if (componentName) {
+        // If switching FROM a different component, clear first to reset styles
+        if (prevName && prevName !== componentName) {
+          sendMessage({ type: 'preview:clear' });
+        }
+        // Load new component
+        sendMessage({
+          type: 'preview:load',
+          componentName,
+          componentType,
+        });
+      } else if (prevName) {
+        // Component was deselected - send clear to reset the preview
+        sendMessage({ type: 'preview:clear' });
+      }
     }
+    prevComponentNameRef.current = componentName;
   }, [isReady, componentName, componentType, sendMessage]);
 
-  // Update styles when they change
+  // Track previous hasStyles to detect when styles are cleared
+  const prevHasStylesRef = useRef(hasStyles);
+
+  // Update styles when they change (including when cleared to empty)
   useEffect(() => {
-    if (isReady && componentName && hasStyles) {
-      sendMessage({
-        type: 'preview:update-styles',
-        styles,
-      });
+    if (isReady && componentName) {
+      // Send update when we have styles OR when styles were just cleared
+      if (hasStyles || prevHasStylesRef.current) {
+        sendMessage({
+          type: 'preview:update-styles',
+          styles,
+        });
+      }
     }
+    prevHasStylesRef.current = hasStyles;
   }, [isReady, componentName, hasStyles, styles, sendMessage]);
 
   // Update props when they change

@@ -499,8 +499,8 @@ createRoot(document.getElementById('root')!).render(
     std::fs::write(preview_path.join("src/main.tsx"), main_tsx)
         .map_err(|e| format!("Failed to write main.tsx: {e}"))?;
 
-    // 6. src/Preview.tsx
-    let preview_tsx = r##"import { useState, useEffect, ComponentType } from 'react';
+    // 6. src/Preview.tsx - with CSS injection for instant preview updates
+    let preview_tsx = r##"import { useState, useEffect, useMemo, ComponentType } from 'react';
 
 interface PreviewMessage {
   type: 'preview:load' | 'preview:update-styles' | 'preview:update-props' | 'preview:clear' | 'preview:set-theme';
@@ -531,6 +531,74 @@ function setTheme(theme: 'light' | 'dark') {
   }
 }
 
+/**
+ * Convert camelCase to kebab-case for CSS custom properties
+ * e.g., 'fontSize' -> 'font-size', 'backgroundColor' -> 'background-color'
+ */
+function camelToKebab(str: string): string {
+  return str.replace(/([A-Z])/g, '-$1').toLowerCase();
+}
+
+/**
+ * Generate injected CSS for instant preview updates.
+ *
+ * Architecture:
+ * - Targets ONLY elements with [data-slot] attribute (shadcn component roots)
+ * - Does NOT style demo wrapper divs or layout containers
+ * - Uses :where() for lower specificity so component styles can override
+ * - Typography cascades to text content within components
+ * - Returns empty string when no styles are set
+ */
+function generateInjectedCSS(styles: Record<string, string>): string {
+  if (Object.keys(styles).length === 0) return '';
+
+  // Target ONLY shadcn component roots (elements with data-slot attribute)
+  // This excludes demo wrapper divs like <div class="flex flex-wrap gap-2">
+  // and only styles the actual components (Button, Badge, Card, etc.)
+  const componentSelector = `#preview-component-wrapper [data-slot]`;
+
+  // For typography, also target text content within components
+  // Uses :where() for lower specificity
+  const textSelector = `#preview-component-wrapper [data-slot],
+#preview-component-wrapper [data-slot] :where(span, p, h1, h2, h3, h4, h5, h6)`;
+
+  // Build the CSS rules
+  const rules: string[] = [];
+
+  // Layout, spacing, border, and effects properties - component roots only
+  const layoutProps = ['padding', 'margin', 'gap', 'borderRadius', 'borderWidth', 'borderColor', 'borderStyle', 'opacity', 'boxShadow', 'backgroundColor'];
+  const layoutRules = layoutProps
+    .filter(prop => styles[prop] !== undefined)
+    .map(prop => `  ${camelToKebab(prop)}: ${styles[prop]} !important;`)
+    .join('\n');
+
+  if (layoutRules) {
+    rules.push(`${componentSelector} {\n${layoutRules}\n}`);
+  }
+
+  // Typography properties - cascades to text within components
+  const typographyProps = ['fontSize', 'fontWeight', 'fontFamily', 'letterSpacing', 'color', 'lineHeight', 'textAlign'];
+  const typographyRules = typographyProps
+    .filter(prop => styles[prop] !== undefined)
+    .map(prop => `  ${camelToKebab(prop)}: ${styles[prop]} !important;`)
+    .join('\n');
+
+  if (typographyRules) {
+    rules.push(`${textSelector} {\n${typographyRules}\n}`);
+  }
+
+  // Hover state with brightness filter for interactive feedback
+  if (styles.backgroundColor || styles.borderColor) {
+    rules.push(`${componentSelector}:hover {
+  filter: brightness(0.9);
+  transition: filter 150ms ease-out;
+}`);
+  }
+
+  return `/* Preview CSS Injection - Targets [data-slot] components only */
+${rules.join('\n\n')}`;
+}
+
 export function Preview() {
   const [Component, setComponent] = useState<ComponentType<any> | null>(null);
   const [componentName, setComponentName] = useState<string>('');
@@ -538,6 +606,9 @@ export function Preview() {
   const [styles, setStyles] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Memoize the injected CSS to avoid re-computation on every render
+  const injectedCSS = useMemo(() => generateInjectedCSS(styles), [styles]);
 
   const loadComponent = async (name: string, type: string = 'ui') => {
     setLoading(true);
@@ -634,14 +705,22 @@ export function Preview() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background p-8">
-      <div className="flex flex-col items-center gap-4">
-        <p className="text-sm text-muted-foreground font-mono">{componentName}</p>
-        <div className="p-6 rounded-lg border border-border bg-card">
-          <Component {...props} style={styles} />
+    <>
+      {/* Inject dynamic CSS styles */}
+      {injectedCSS && <style>{injectedCSS}</style>}
+
+      <div className="flex items-center justify-center min-h-screen bg-background p-8">
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-sm text-muted-foreground font-mono">{componentName}</p>
+          <div className="p-6 rounded-lg border border-border bg-card">
+            {/* Wrapper with ID for CSS injection targeting - contents class ensures no layout impact */}
+            <div id="preview-component-wrapper" className="contents">
+              <Component {...props} />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 "##;

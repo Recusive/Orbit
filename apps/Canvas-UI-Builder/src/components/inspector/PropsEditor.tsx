@@ -16,7 +16,6 @@ import { useCallback, useRef } from 'react';
 import type { FC, ReactNode } from 'react';
 
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -269,28 +268,26 @@ export const PropsEditor: FC<PropsEditorProps> = ({ componentName, props, onChan
     .join(' ');
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-3 pt-3 pb-2 border-b border-border">
-        <h3 className="text-sm font-medium text-foreground">{displayName}</h3>
-        <p className="text-xs text-muted-foreground mt-0.5">Component Props</p>
+    <div className="p-3 space-y-4">
+      {/* Header - matches PropertiesPanel style */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-medium text-foreground">{displayName}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Component Props</p>
+        </div>
       </div>
 
       {/* Props List */}
-      <ScrollArea className="flex-1">
-        <div className="p-3 space-y-4">
-          {propDefs.map((propDef) => (
-            <PropInput
-              key={propDef.name}
-              definition={propDef}
-              value={props[propDef.name] ?? propDef.default}
-              onChange={(value) => {
-                updateProp(propDef.name, value);
-              }}
-            />
-          ))}
-        </div>
-      </ScrollArea>
+      {propDefs.map((propDef) => (
+        <PropInput
+          key={propDef.name}
+          definition={propDef}
+          value={props[propDef.name] ?? propDef.default}
+          onChange={(value) => {
+            updateProp(propDef.name, value);
+          }}
+        />
+      ))}
     </div>
   );
 };
