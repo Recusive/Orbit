@@ -19,10 +19,12 @@ export const SidebarItem: FC<SidebarItemProps> = ({
   collapsed,
   active,
   small,
+  large,
   equalSpacing,
   shortcut,
   onClick,
 }) => {
+  const iconSizeClass = small ? 'h-3 w-3' : large ? 'h-4.5 w-4.5' : 'h-4 w-4';
   // When collapsed with equalSpacing, render a small square button like the panel toggler
   if (equalSpacing) {
     return (
@@ -38,7 +40,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
           title={label}
           onClick={onClick}
         >
-          <Icon className={cn('shrink-0', small ? 'h-3 w-3' : 'h-4 w-4')} />
+          <Icon className={cn('shrink-0', iconSizeClass)} />
         </button>
       </div>
     );
@@ -47,7 +49,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
   return (
     <button
       className={cn(
-        'flex items-center h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-muted/50 active:scale-[0.98] transition-[background-color,color,transform] duration-200',
+        'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-muted/50 active:scale-[0.98] transition-[background-color,color,transform] duration-200',
         active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
       )}
       title={collapsed ? label : undefined}
@@ -58,7 +60,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
         className="flex items-center justify-center shrink-0"
         style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
       >
-        <Icon className={cn('shrink-0', small ? 'h-3 w-3' : 'h-4 w-4')} />
+        <Icon className={cn('shrink-0', iconSizeClass)} />
       </div>
       {/* Text that slides in */}
       <span

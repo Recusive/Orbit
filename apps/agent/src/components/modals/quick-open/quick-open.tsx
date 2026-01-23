@@ -46,17 +46,13 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
     return new Set(openTabs.map((tab) => tab.path));
   }, [openTabs]);
 
-  // Convert search results to display format and sort (recent first)
+  // Boost recent files to the front while preserving search API relevance order
+  // This uses a stable partition: recent files first (in their original order),
+  // then non-recent files (in their original API-returned order)
   const searchResults = useMemo(() => {
-    return [...results].sort((a, b) => {
-      const aRecent = recentPaths.has(a.path);
-      const bRecent = recentPaths.has(b.path);
-
-      if (aRecent && !bRecent) return -1;
-      if (!aRecent && bRecent) return 1;
-
-      return a.name.localeCompare(b.name);
-    });
+    const recentResults = results.filter((r) => recentPaths.has(r.path));
+    const nonRecentResults = results.filter((r) => !recentPaths.has(r.path));
+    return [...recentResults, ...nonRecentResults];
   }, [results, recentPaths]);
 
   // Recent files from open tabs (shown when no search query)
@@ -69,13 +65,22 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
 
   const { postMessage } = useTauri();
 
-  // Get display path (relative to workspace root)
-  const getDisplayPath = useCallback(
-    (path: string): string => {
+  // Get parent directory path (relative to workspace root)
+  // Returns null if the file is at the workspace root (no parent directory to show)
+  const getParentPath = useCallback(
+    (path: string, filename: string): string | null => {
+      let relativePath = path;
       if (rootPath && path.startsWith(rootPath)) {
-        return path.slice(rootPath.length + 1); // +1 for the trailing slash
+        relativePath = path.slice(rootPath.length + 1); // +1 for the trailing slash
       }
-      return path;
+
+      // If the relative path equals the filename, file is at workspace root
+      if (relativePath === filename) {
+        return null;
+      }
+
+      // Return the full relative path (includes filename for context)
+      return relativePath;
     },
     [rootPath]
   );
@@ -106,7 +111,7 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
   const showRecent = !hasQuery && recentFiles.length > 0;
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
+    <CommandDialog open={open} onOpenChange={onOpenChange} shouldFilter={false}>
       <CommandInput placeholder="Search files..." value={query} onValueChange={setQuery} />
       <CommandList>
         <CommandEmpty>
@@ -120,50 +125,60 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
         {/* Show recent files when no query */}
         {showRecent ? (
           <CommandGroup heading="Recent">
-            {recentFiles.slice(0, 10).map((file) => (
-              <CommandItem
-                key={file.path}
-                value={file.path}
-                onSelect={handleSelect}
-                className="flex items-center gap-3"
-              >
-                <FileIcon
-                  fileName={file.name}
-                  className="h-4 w-4 shrink-0 opacity-70 group-data-[selected=true]:opacity-100"
-                />
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="truncate text-base font-medium">{file.name}</span>
-                  <span className="text-sm text-muted-foreground/50 group-data-[selected=true]:text-muted-foreground/70 truncate">
-                    {getDisplayPath(file.path)}
-                  </span>
-                </div>
-              </CommandItem>
-            ))}
+            {recentFiles.slice(0, 10).map((file) => {
+              const parentPath = getParentPath(file.path, file.name);
+              return (
+                <CommandItem
+                  key={file.path}
+                  value={file.path}
+                  onSelect={handleSelect}
+                  className="flex items-center gap-3"
+                >
+                  <FileIcon
+                    fileName={file.name}
+                    className="h-4 w-4 shrink-0 opacity-70 group-data-[selected=true]:opacity-100"
+                  />
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="truncate text-base font-medium">{file.name}</span>
+                    {parentPath !== null ? (
+                      <span className="text-sm text-muted-foreground/50 group-data-[selected=true]:text-muted-foreground/70 truncate">
+                        {parentPath}
+                      </span>
+                    ) : null}
+                  </div>
+                </CommandItem>
+              );
+            })}
           </CommandGroup>
         ) : null}
 
         {/* Show search results when query is present */}
         {displayResults.length > 0 ? (
           <CommandGroup heading="Files">
-            {displayResults.slice(0, 50).map((file) => (
-              <CommandItem
-                key={file.path}
-                value={file.path}
-                onSelect={handleSelect}
-                className="flex items-center gap-3"
-              >
-                <FileIcon
-                  fileName={file.name}
-                  className="h-4 w-4 shrink-0 opacity-70 group-data-[selected=true]:opacity-100"
-                />
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="truncate text-base font-medium">{file.name}</span>
-                  <span className="text-sm text-muted-foreground/50 group-data-[selected=true]:text-muted-foreground/70 truncate">
-                    {getDisplayPath(file.path)}
-                  </span>
-                </div>
-              </CommandItem>
-            ))}
+            {displayResults.slice(0, 50).map((file) => {
+              const parentPath = getParentPath(file.path, file.name);
+              return (
+                <CommandItem
+                  key={file.path}
+                  value={file.path}
+                  onSelect={handleSelect}
+                  className="flex items-center gap-3"
+                >
+                  <FileIcon
+                    fileName={file.name}
+                    className="h-4 w-4 shrink-0 opacity-70 group-data-[selected=true]:opacity-100"
+                  />
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="truncate text-base font-medium">{file.name}</span>
+                    {parentPath !== null ? (
+                      <span className="text-sm text-muted-foreground/50 group-data-[selected=true]:text-muted-foreground/70 truncate">
+                        {parentPath}
+                      </span>
+                    ) : null}
+                  </div>
+                </CommandItem>
+              );
+            })}
           </CommandGroup>
         ) : null}
       </CommandList>

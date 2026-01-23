@@ -110,5 +110,34 @@ export default defineConfig(
         },
       ],
     },
+  },
+  /*
+   * Test files - Relaxed type checking for Vitest globals
+   *
+   * Why this is needed (not laziness):
+   * - vitest/globals.d.ts uses `typeof import('vitest')['vi']` for type definitions
+   * - With moduleResolution: "bundler", TypeScript can resolve this at compile time
+   * - But ESLint's projectService uses a different resolution that fails
+   * - Result: `tsc --noEmit` passes, but ESLint sees vi/describe/etc as `error` type
+   *
+   * See: https://github.com/vitest-dev/vitest/issues/4321
+   * See: https://typescript-eslint.io/blog/project-service/
+   */
+  {
+    files: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.spec.ts',
+      '**/*.spec.tsx',
+      '**/test-setup.ts',
+      '**/vitest.setup.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+    },
   }
 );

@@ -5,7 +5,9 @@
  * To change header heights, sidebar widths, or transition durations,
  * update HEIGHTS, SIDEBAR, and TRANSITIONS in constants.ts - DO NOT hardcode here.
  */
-import { FlaskConical, Inbox, Plus, Search, Settings } from 'lucide-react';
+import { IconCirclePlus } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconCirclePlus';
+import { IconSearchlinesSparkle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSearchlinesSparkle';
+import { FlaskConical, Inbox, Search, Settings } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
@@ -237,17 +239,27 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           )}
         >
           <SidebarItem
+            icon={IconCirclePlus}
+            label="New Session"
+            collapsed={isCollapsed}
+            equalSpacing={isCollapsed}
+            large
+            onClick={handleStartConversation}
+          />
+          <SidebarItem
             icon={Inbox}
             label="Inbox"
             collapsed={isCollapsed}
             equalSpacing={isCollapsed}
           />
           <SidebarItem
-            icon={Plus}
-            label="Start conversation"
+            icon={IconSearchlinesSparkle}
+            label="Vault"
             collapsed={isCollapsed}
             equalSpacing={isCollapsed}
-            onClick={handleStartConversation}
+            onClick={() => {
+              useUIStore.getState().toggleVault();
+            }}
           />
         </div>
       ) : null}

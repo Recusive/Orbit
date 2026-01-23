@@ -16,7 +16,7 @@ import { useCanvasSetup, usePreviewServer } from '@canvas/hooks';
 import { useComponentPropsStore, useCSSOverrides, useSelectedComponentProps } from '@canvas/stores';
 import { useCallback, useEffect, useState } from 'react';
 
-import { PreviewPanel } from '../preview';
+import { PreviewErrorBoundary, PreviewPanel } from '../preview';
 import { CanvasSetupWizard } from '../setup';
 
 import { CanvasInputArea } from './canvas-input';
@@ -138,17 +138,20 @@ export const CanvasRootLayout: FC = () => {
   const renderPreviewContent = (): React.ReactNode => {
     // If we have a URL (even during restart), keep PreviewPanel mounted
     // PreviewPanel handles its own "restarting" overlay via isRestarting prop
+    // PreviewErrorBoundary catches any render errors in the preview panel
     if (serverUrl) {
       return (
-        <PreviewPanel
-          serverUrl={serverUrl}
-          componentName={selectedComponentName}
-          componentType="ui"
-          styles={cssOverrides}
-          props={componentProps}
-          onRestart={handleRestartServer}
-          isRestarting={isRestarting || serverState === 'starting'}
-        />
+        <PreviewErrorBoundary onRetry={handleRestartServer}>
+          <PreviewPanel
+            serverUrl={serverUrl}
+            componentName={selectedComponentName}
+            componentType="ui"
+            styles={cssOverrides}
+            props={componentProps}
+            onRestart={handleRestartServer}
+            isRestarting={isRestarting || serverState === 'starting'}
+          />
+        </PreviewErrorBoundary>
       );
     }
 

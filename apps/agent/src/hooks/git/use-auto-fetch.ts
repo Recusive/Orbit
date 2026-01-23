@@ -169,7 +169,7 @@ export function useAutoFetch(
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const startPolling = (): void => {
-      if (intervalId) return;
+      if (intervalId !== null) return;
       logger.debug('Starting auto-fetch polling', { intervalSeconds });
       intervalId = setInterval(() => {
         void doFetch(true); // Background fetch - silent errors
@@ -177,7 +177,7 @@ export function useAutoFetch(
     };
 
     const stopPolling = (): void => {
-      if (intervalId) {
+      if (intervalId !== null) {
         logger.debug('Stopping auto-fetch polling');
         clearInterval(intervalId);
         intervalId = null;

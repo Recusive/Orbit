@@ -198,7 +198,51 @@ Orbit/
     <command name="cargo test" description="Run Rust tests"/>
     <command name="cargo clippy" description="Lint Rust code"/>
   </category>
+
+  <category name="Testing">
+    <command name="bun run test" description="Run frontend tests (Vitest)"/>
+    <command name="bun run test:watch" description="Run frontend tests in watch mode"/>
+    <command name="bun run test:ui" description="Open Vitest UI"/>
+    <command name="bun run test:coverage" description="Run tests with coverage report"/>
+    <command name="cd agent-bridge &amp;&amp; bun test" description="Run agent-bridge tests (Bun test)"/>
+    <command name="cargo test" description="Run Rust backend tests"/>
+  </category>
 </commands>
+
+<testing_architecture>
+Different parts of the codebase use different test runners optimized for their runtime:
+
+| Layer         | Location                                                 | Test Runner    | Command                       | Config             |
+| ------------- | -------------------------------------------------------- | -------------- | ----------------------------- | ------------------ |
+| Frontend Apps | `apps/agent/`, `apps/Canvas-UI-Builder/`, `apps/editor/` | **Vitest**     | `bun run test`                | `vitest.config.ts` |
+| Agent Bridge  | `agent-bridge/`                                          | **Bun Test**   | `cd agent-bridge && bun test` | Native Bun         |
+| Rust Backend  | `crates/`, `src-tauri/`                                  | **Cargo Test** | `cargo test`                  | `Cargo.toml`       |
+
+<why_different_runners>
+
+- **Vitest**: Optimized for React/Vite with jsdom environment, fast HMR, component testing with React Testing Library
+- **Bun Test**: Native to Bun runtime, used for agent-bridge since it compiles to a standalone Bun binary
+- **Cargo Test**: Rust's built-in test framework, required for all Rust crates
+  </why_different_runners>
+
+<frontend_test_setup>
+Frontend tests use Vitest with jsdom and these key configurations:
+
+- `vitest.config.ts` - Main config with React plugin and path aliases
+- `vitest.setup.ts` - Global mocks for browser APIs (localStorage, ResizeObserver, etc.) and Tauri APIs
+- `vitest.d.ts` - TypeScript declarations for test globals
+- `tsconfig.json` - Includes `vitest/globals` and `@testing-library/jest-dom` types
+
+Test files: `apps/*/src/**/*.test.{ts,tsx}` or `apps/*/src/**/*.spec.{ts,tsx}`
+</frontend_test_setup>
+
+<eslint_test_override>
+ESLint has relaxed rules for test files due to Vitest 4 + moduleResolution "bundler" incompatibility.
+The `@typescript-eslint/no-unsafe-*` rules are disabled for test files because ESLint's projectService
+cannot resolve Vitest's global types (even though `tsc --noEmit` passes).
+See `eslint.config.ts` for the documented override.
+</eslint_test_override>
+</testing_architecture>
 
 <development_workflow>
 <starting_development command="bunx tauri dev">
@@ -435,6 +479,7 @@ This project includes AI coding assistant skills adapted from Vercel's agent-ski
 <skill name="React Best Practices" file=".claude/skills/react-best-practices.md" apply_when="Writing React components, data fetching, bundle optimization"/>
 <skill name="Web Design Guidelines" file=".claude/skills/web-design-guidelines.md" apply_when="UI review, accessibility checks, form implementation"/>
 <skill name="Web Animation" file=".claude/skills/web-animation-best-practices.md" apply_when="CSS animations, Framer Motion, transitions, micro-interactions"/>
+<skill name="Test Engineer" file=".claude/skills/test-engineer/SKILL.md" apply_when="Write tests for, add test coverage, create tests, TDD, pre-refactor testing" triggers="write tests for, add test coverage, create tests, test this, needs tests"/>
 </available_skills>
 
 <key_rules>

@@ -485,15 +485,77 @@ import { readFile, writeFile } from '@/lib/api/files';
 
 ---
 
-## Testing Notes
+## Testing
 
-When modifying core functionality, run integration tests:
+The agent app uses **Vitest** for frontend testing with React Testing Library.
+
+### Commands
+
+```bash
+# From monorepo root
+bun test                    # Run all frontend tests
+bun test --watch            # Watch mode
+bun test --coverage         # With coverage report
+
+# Run specific test file
+bun test apps/agent/src/__tests__/components/chat/input/input-mode.test.ts
+```
+
+### Test File Location
+
+Tests are located in `apps/agent/src/__tests__/` mirroring the source structure:
+
+```text
+apps/agent/src/__tests__/
+├── components/
+│   └── chat/
+│       └── input/
+│           ├── input-mode.test.tsx      # Mode picker button
+│           └── model-selector.test.tsx  # Model dropdown
+└── ...
+```
+
+### Configuration Files
+
+| File               | Purpose                                              |
+| ------------------ | ---------------------------------------------------- |
+| `vitest.config.ts` | Vitest config (root)                                 |
+| `vitest.setup.ts`  | Global test setup (jsdom, matchers)                  |
+| `tsconfig.json`    | Types: `vitest/globals`, `@testing-library/jest-dom` |
+| `eslint.config.ts` | Test file overrides (relaxed type checking)          |
+
+### Writing Tests
+
+```typescript
+// Note: describe, it, expect, vi are globals via vitest/globals
+// DO NOT import from 'vitest' - use globals
+
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+import { MyComponent } from '@/components/my-component';
+
+describe('MyComponent', () => {
+  it('should render correctly', () => {
+    render(<MyComponent />);
+    expect(screen.getByText('Hello')).toBeInTheDocument();
+  });
+});
+```
+
+### ESLint Override for Test Files
+
+Test files have relaxed `@typescript-eslint/no-unsafe-*` rules due to a known ecosystem incompatibility between Vitest 4 globals and ESLint's projectService. This is documented in `eslint.config.ts`.
+
+### Integration Tests (Agent Bridge)
+
+For testing backend integration (Claude SDK), use the agent-bridge tests:
 
 ```bash
 cd agent-bridge && bun test
 ```
 
-Tests require Claude Code CLI OAuth credentials (macOS Keychain).
+These require Claude Code CLI OAuth credentials (macOS Keychain) and auto-skip in CI.
 
 ---
 

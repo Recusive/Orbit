@@ -6,6 +6,8 @@ import type { FC } from 'react';
 
 import { ChatInput, ChatMessages } from '@/components/chat';
 import { StatusAnnouncer } from '@/components/shared';
+import { VaultPage } from '@/features/vault';
+import { useVaultOpen } from '@/stores/ui/ui-store';
 
 /**
  * Chat content section handling both empty and messages states
@@ -24,7 +26,6 @@ export const ChatContent: FC<ChatContentProps> = ({
   sessionId,
   queuedMessage,
   pendingPermissions,
-  fileList,
   inputMode,
   thinkingMode,
   sessionUsage,
@@ -43,6 +44,7 @@ export const ChatContent: FC<ChatContentProps> = ({
   onPermissionApprove,
   onPermissionDeny,
 }) => {
+  const vaultOpen = useVaultOpen();
   const isEmptyState = messages.length === 0 && !isLoadingConversation;
 
   // Shared input props to avoid duplication
@@ -50,7 +52,6 @@ export const ChatContent: FC<ChatContentProps> = ({
     inputMode,
     thinkingMode,
     isAgentRunning,
-    fileList,
     usage: sessionUsage,
     maxTokens,
     hasPermissionPending: pendingPermissions.length > 0,
@@ -74,7 +75,10 @@ export const ChatContent: FC<ChatContentProps> = ({
         completeMessage={messages.length > 0 ? 'Agent response complete' : 'Ready for input'}
       />
 
-      {isEmptyState ? (
+      {vaultOpen ? (
+        /* Vault page: Note tiles grid */
+        <VaultPage />
+      ) : isEmptyState ? (
         /* Empty state: Input positioned above center */
         <div
           className="flex-1 flex flex-col justify-center"

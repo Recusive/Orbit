@@ -51,7 +51,6 @@ export const CanvasInputArea: FC = () => {
       inputMode={inputMode}
       thinkingMode={thinkingMode}
       isAgentRunning={isAgentRunning}
-      fileList={[]}
       usage={{ inputTokens: 0, outputTokens: 0 }}
       maxTokens={200000}
       onSend={handleSend}

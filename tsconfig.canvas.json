@@ -14,6 +14,9 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
 
+    /* Vitest globals for testing (describe, it, expect, vi) */
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+
     /* Emit */
     "noEmit": true,
 

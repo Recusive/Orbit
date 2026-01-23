@@ -26,3 +26,6 @@ export type {
 
 export { useSearch } from './use-search';
 export type { UseSearchOptions, UseSearchReturn } from './use-search';
+
+export { useMentionSearch } from './use-mention-search';
+export type { UseMentionSearchOptions, UseMentionSearchReturn } from './use-mention-search';

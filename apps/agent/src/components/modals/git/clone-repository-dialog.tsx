@@ -19,8 +19,8 @@ import {
   conversationList,
   fileExists,
   gitClone,
+  initializeWorkspace,
   openFileDialog,
-  setWorkspacePath,
 } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { useFileStore } from '@/stores/file/file-store';
@@ -218,8 +218,8 @@ export const CloneRepositoryDialog: FC<CloneRepositoryDialogProps> = ({ open, on
 
       logger.info('Cloned repository', { url: repoUrl, path: finalPath });
 
-      // Open the cloned project
-      await setWorkspacePath(finalPath);
+      // Open the cloned project and build file index for fuzzy search
+      await initializeWorkspace(finalPath);
       await addRecentProject(finalPath);
       useUIStore.getState().setWorkspace(finalPath);
       setRootPath(finalPath);

@@ -87,3 +87,26 @@ export async function getWorkspacePath(): Promise<string | null> {
 export async function setWorkspacePath(path: string): Promise<void> {
   return invoke('set_workspace_path', { path });
 }
+
+/**
+ * Initialize a workspace by setting the path and building the file index.
+ *
+ * This is the preferred way to open a workspace as it ensures the fuzzy
+ * file search index is built immediately. Use this instead of calling
+ * setWorkspacePath directly.
+ *
+ * @param path - Absolute path to the workspace root
+ */
+export async function initializeWorkspace(path: string): Promise<void> {
+  // Set the workspace path first
+  await setWorkspacePath(path);
+
+  // Build the file index for fuzzy search (@ mentions)
+  // This runs in the background - we don't need to await it
+  // as it can take a few seconds for large projects
+  // Note: Tauri 2.0 auto-converts Rust snake_case to camelCase for frontend
+  invoke('build_file_index', { rootPath: path }).catch((err: unknown) => {
+    // Log but don't fail workspace initialization
+    console.warn('[initializeWorkspace] Failed to build file index:', err);
+  });
+}

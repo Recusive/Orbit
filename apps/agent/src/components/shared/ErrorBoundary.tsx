@@ -4,8 +4,11 @@
  * React error boundaries must be class components (no hooks equivalent).
  * Use this to wrap components that might throw during render, especially
  * those that depend on external/persisted data (localStorage, backend).
+ *
+ * Integrates with Sentry for automatic error reporting.
  */
 import { createLogger } from '@orbit/common/lib';
+import * as Sentry from '@sentry/react';
 import { Component } from 'react';
 
 import type { ErrorInfo, ReactNode } from 'react';
@@ -44,10 +47,26 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    // Log to console via structured logger
     logger.error('Component error caught', {
       error: error.message,
       stack: error.stack,
       componentStack: errorInfo.componentStack,
+    });
+
+    // Log to Sentry's logging feature for searchability
+    Sentry.logger.error('React component error boundary triggered', {
+      error_message: error.message,
+      component_stack: errorInfo.componentStack,
+    });
+
+    // Report to Sentry with component stack context
+    Sentry.captureException(error, {
+      contexts: {
+        react: {
+          componentStack: errorInfo.componentStack,
+        },
+      },
     });
 
     this.props.onError?.(error, errorInfo);
@@ -59,6 +78,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
    */
   resetErrorBoundary: ErrorBoundaryResetFn = (): void => {
     logger.info('Error boundary reset requested');
+    Sentry.logger.info('User triggered error boundary reset');
     this.setState({ hasError: false, error: null });
   };
 

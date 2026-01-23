@@ -12,6 +12,9 @@
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
 
+    /* Vitest globals for testing utilities, Vite for import.meta.env */
+    "types": ["vitest/globals", "vite/client"],
+
     /* Emit (library mode) */
     "declaration": true,
     "declarationMap": true,

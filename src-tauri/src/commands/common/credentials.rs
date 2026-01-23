@@ -2,6 +2,8 @@
 //!
 //! Provides secure storage for user-entered API keys using AES-256-GCM encryption.
 //! Keys are derived from a machine-specific identifier to prevent key portability.
+//!
+//! Errors are captured to Sentry for monitoring credential storage issues.
 
 #![allow(
     clippy::needless_pass_by_value,
@@ -12,6 +14,8 @@ use std::fs;
 use std::path::PathBuf;
 #[cfg(target_os = "macos")]
 use std::process::Command;
+
+use crate::core::sentry_utils::capture_command_error;
 
 use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::aead::Aead as _;
@@ -257,9 +261,13 @@ pub async fn store_api_key(provider: String, key: String) -> StoreResult {
             success: true,
             error: None,
         },
-        Err(e) => StoreResult {
-            success: false,
-            error: Some(e),
+        Err(e) => {
+            // Capture credential storage failures to Sentry (without the key itself)
+            let _ = capture_command_error("store_api_key", &e);
+            StoreResult {
+                success: false,
+                error: Some(e),
+            }
         },
     }
 }
@@ -286,9 +294,13 @@ pub async fn retrieve_api_key(provider: String) -> RetrieveResult {
 
     match result {
         Ok(key) => RetrieveResult { key, error: None },
-        Err(e) => RetrieveResult {
-            key: None,
-            error: Some(e),
+        Err(e) => {
+            // Capture credential retrieval failures to Sentry
+            let _ = capture_command_error("retrieve_api_key", &e);
+            RetrieveResult {
+                key: None,
+                error: Some(e),
+            }
         },
     }
 }
@@ -353,9 +365,13 @@ pub async fn delete_api_key(provider: String) -> StoreResult {
             success: true,
             error: None,
         },
-        Err(e) => StoreResult {
-            success: false,
-            error: Some(e),
+        Err(e) => {
+            // Capture credential deletion failures to Sentry
+            let _ = capture_command_error("delete_api_key", &e);
+            StoreResult {
+                success: false,
+                error: Some(e),
+            }
         },
     }
 }

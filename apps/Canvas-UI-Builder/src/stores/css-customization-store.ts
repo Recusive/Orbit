@@ -491,7 +491,7 @@ export function useDebouncedCSSUpdate(): {
       pendingRef.current[property] = value;
 
       // Clear existing timeout
-      if (timeoutRef.current) {
+      if (timeoutRef.current !== null) {
         clearTimeout(timeoutRef.current);
       }
 

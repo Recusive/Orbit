@@ -4,22 +4,20 @@
  * This file provides mock implementations for Tauri APIs
  * to enable testing React components in a non-Tauri environment.
  *
- * Run tests with: bun run canvas:test
+ * Run tests with: bun run test:canvas
  */
 
-import { mock } from 'bun:test';
-
-// ============================================================================
+// =============================================================================
 // Tauri API Mocks
-// ============================================================================
+// =============================================================================
 
 /**
  * Mock invoke function
  *
  * By default returns empty/success responses.
- * Override in specific tests using mockInvoke.mockImplementation()
+ * Override in specific tests using vi.mocked(invoke).mockImplementation()
  */
-export const mockInvoke = mock((command: string): Promise<unknown> => {
+export const mockInvoke = vi.fn((command: string): Promise<unknown> => {
   switch (command) {
     case 'canvas_check_setup':
       return Promise.resolve({
@@ -46,7 +44,7 @@ export const mockInvoke = mock((command: string): Promise<unknown> => {
  *
  * Returns a cleanup function that does nothing.
  */
-export const mockListen = mock((): Promise<() => void> => {
+export const mockListen = vi.fn((): Promise<() => void> => {
   return Promise.resolve(() => {
     // Cleanup function - no-op in tests
   });
@@ -55,26 +53,22 @@ export const mockListen = mock((): Promise<() => void> => {
 /**
  * Mock emit function
  */
-export const mockEmit = mock((): Promise<void> => {
+export const mockEmit = vi.fn((): Promise<void> => {
   // No-op in tests
   return Promise.resolve();
 });
 
-// ============================================================================
-// Module Mocks
-// ============================================================================
-
-// Note: Bun doesn't have a built-in module mocking system like Jest/Vitest.
-// For hook tests that use dynamic imports, we'll need to use dependency injection
-// or test the hooks differently.
+// =============================================================================
+// Mock Helpers
+// =============================================================================
 
 /**
  * Helper to create a mock invoke function with custom responses
  */
 export function createMockInvoke(
   responses: Record<string, unknown>
-): ReturnType<typeof mock<(command: string, args?: unknown) => Promise<unknown>>> {
-  return mock((command: string): Promise<unknown> => {
+): ReturnType<typeof vi.fn<(command: string, args?: unknown) => Promise<unknown>>> {
+  return vi.fn((command: string): Promise<unknown> => {
     if (command in responses) {
       const response = responses[command];
       if (response instanceof Error) {

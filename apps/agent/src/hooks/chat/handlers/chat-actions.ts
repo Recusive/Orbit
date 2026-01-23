@@ -1,3 +1,5 @@
+import * as Sentry from '@sentry/react';
+
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
 import type { Model, ReactElementContext, ThinkingMode, WebviewMessage } from '@/types/protocol';
 
@@ -96,169 +98,200 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   ): void => {
     if (!text) return;
 
-    // If agent is running, queue the message for later
-    if (isAgentRunning) {
-      storeQueueMessage({
-        text,
-        sessionId,
-        ...(contextFiles ? { contextFiles } : {}),
-        ...(images ? { images } : {}),
-        ...(elements ? { elements } : {}),
-      });
-      return;
-    }
+    // Wrap the entire send operation in a Sentry span for UI interaction tracing
+    Sentry.startSpan(
+      {
+        op: 'ui.action',
+        name: 'Send Message',
+        attributes: {
+          'message.has_files': contextFiles !== undefined && contextFiles.length > 0,
+          'message.has_images': images !== undefined && images.length > 0,
+          'message.has_elements': elements !== undefined && elements.length > 0,
+          'message.length': text.length,
+        },
+      },
+      () => {
+        // If agent is running, queue the message for later
+        if (isAgentRunning) {
+          storeQueueMessage({
+            text,
+            sessionId,
+            ...(contextFiles ? { contextFiles } : {}),
+            ...(images ? { images } : {}),
+            ...(elements ? { elements } : {}),
+          });
+          return;
+        }
 
-    // Check if conversation already exists in sidebar
-    const conversationExists =
-      sessionId !== '' && conversations.some((c) => c.sessionId === sessionId);
+        // Check if conversation already exists in sidebar
+        const conversationExists =
+          sessionId !== '' && conversations.some((c) => c.sessionId === sessionId);
 
-    // Check if we have cached messages for the current session (even if local state is empty)
-    const hasCachedMessages =
-      sessionId !== '' &&
-      messagesCache.current.has(sessionId) &&
-      (messagesCache.current.get(sessionId)?.length ?? 0) > 0;
+        // Check if we have cached messages for the current session (even if local state is empty)
+        const hasCachedMessages =
+          sessionId !== '' &&
+          messagesCache.current.has(sessionId) &&
+          (messagesCache.current.get(sessionId)?.length ?? 0) > 0;
 
-    // If no sessionId OR (first message AND conversation doesn't exist AND no cached messages),
-    // we need to create a conversation first via the backend
-    if (!sessionId || (messages.length === 0 && !conversationExists && !hasCachedMessages)) {
-      // Store text, context files, images, and elements for pending message
-      setPendingMessage({ text, contextFiles, images, elements });
-      // Clear sessionId so the conversation:created handler will set the new one
-      if (sessionId) {
-        setSessionId('');
-      }
-      postMessage({
-        type: 'conversation:create',
-        uuid: crypto.randomUUID(),
-        title: text,
-        workspace_path: workspacePath ?? undefined,
-      });
-      return;
-    }
-
-    // If first message but conversation exists (created via "New conversation" button),
-    // update the title from "Untitled" to the message text
-    if (messages.length === 0 && conversationExists) {
-      updateConversationTitle(sessionId, text);
-      postMessage({
-        type: 'conversation:updateTitle',
-        uuid: crypto.randomUUID(),
-        session_id: sessionId,
-        title: text,
-      });
-    }
-
-    // Always send current thinking mode and model BEFORE message:send
-    // This ensures the session uses the correct settings
-    const toolState = useToolStore.getState();
-    postMessage({
-      type: 'thinking:set',
-      uuid: crypto.randomUUID(),
-      session_id: sessionId,
-      mode: toolState.thinkingMode,
-    });
-    postMessage({
-      type: 'model:set',
-      uuid: crypto.randomUUID(),
-      session_id: sessionId,
-      model: toolState.model,
-    });
-
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: text,
-      displayedContent: text,
-      attachedFiles: contextFiles,
-      attachedImages: images,
-    };
-    setMessages((prev) => [...prev, userMessage]);
-    setIsAgentRunning(true);
-
-    // Persist user message to backend
-    void conversationAddMessage(sessionId, {
-      id: userMessage.id,
-      role: 'user',
-      content: text,
-      createdAt: Date.now(),
-    });
-
-    // Build context object with files, images, and/or elements
-    const hasFiles = contextFiles && contextFiles.length > 0;
-    const hasImages = images && images.length > 0;
-    const hasElements = elements && elements.length > 0;
-    const context =
-      hasFiles || hasImages || hasElements
-        ? {
-            files: hasFiles ? contextFiles : undefined,
-            images: hasImages
-              ? images.map((img) => ({ name: img.name, mimeType: img.mimeType, data: img.data }))
-              : undefined,
-            elements: hasElements ? elements : undefined,
+        // If no sessionId OR (first message AND conversation doesn't exist AND no cached messages),
+        // we need to create a conversation first via the backend
+        if (!sessionId || (messages.length === 0 && !conversationExists && !hasCachedMessages)) {
+          // Store text, context files, images, and elements for pending message
+          setPendingMessage({ text, contextFiles, images, elements });
+          // Clear sessionId so the conversation:created handler will set the new one
+          if (sessionId) {
+            setSessionId('');
           }
-        : undefined;
+          postMessage({
+            type: 'conversation:create',
+            uuid: crypto.randomUUID(),
+            title: text,
+            workspace_path: workspacePath ?? undefined,
+          });
+          return;
+        }
 
-    // IMPORTANT: Use userMessage.id so checkpoints are associated correctly with the rewind target
-    postMessage({
-      type: 'message:send',
-      uuid: userMessage.id,
-      session_id: sessionId,
-      content: text,
-      context,
-    });
+        // If first message but conversation exists (created via "New conversation" button),
+        // update the title from "Untitled" to the message text
+        if (messages.length === 0 && conversationExists) {
+          updateConversationTitle(sessionId, text);
+          postMessage({
+            type: 'conversation:updateTitle',
+            uuid: crypto.randomUUID(),
+            session_id: sessionId,
+            title: text,
+          });
+        }
+
+        // Always send current thinking mode and model BEFORE message:send
+        // This ensures the session uses the correct settings
+        const toolState = useToolStore.getState();
+        postMessage({
+          type: 'thinking:set',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+          mode: toolState.thinkingMode,
+        });
+        postMessage({
+          type: 'model:set',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+          model: toolState.model,
+        });
+
+        const userMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: text,
+          displayedContent: text,
+          attachedFiles: contextFiles,
+          attachedImages: images,
+        };
+        setMessages((prev) => [...prev, userMessage]);
+        setIsAgentRunning(true);
+
+        // Persist user message to backend
+        void conversationAddMessage(sessionId, {
+          id: userMessage.id,
+          role: 'user',
+          content: text,
+          createdAt: Date.now(),
+        });
+
+        // Build context object with files, images, and/or elements
+        const hasFiles = contextFiles && contextFiles.length > 0;
+        const hasImages = images && images.length > 0;
+        const hasElements = elements && elements.length > 0;
+        const context =
+          hasFiles || hasImages || hasElements
+            ? {
+                files: hasFiles ? contextFiles : undefined,
+                images: hasImages
+                  ? images.map((img) => ({
+                      name: img.name,
+                      mimeType: img.mimeType,
+                      data: img.data,
+                    }))
+                  : undefined,
+                elements: hasElements ? elements : undefined,
+              }
+            : undefined;
+
+        // IMPORTANT: Use userMessage.id so checkpoints are associated correctly with the rewind target
+        postMessage({
+          type: 'message:send',
+          uuid: userMessage.id,
+          session_id: sessionId,
+          content: text,
+          context,
+        });
+      }
+    );
   };
 
   const handleStop = (): void => {
     if (!sessionId || !isAgentRunning) return;
 
-    // Send interrupt to stop the agent
-    postMessage({
-      type: 'agent:stop',
-      uuid: crypto.randomUUID(),
-      session_id: sessionId,
-    });
+    // Wrap the stop operation in a Sentry span for UI interaction tracing
+    Sentry.startSpan(
+      {
+        op: 'ui.action',
+        name: 'Stop Agent',
+        attributes: {
+          'session.id': sessionId,
+        },
+      },
+      () => {
+        // Send interrupt to stop the agent
+        postMessage({
+          type: 'agent:stop',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+        });
 
-    // Update local state immediately for responsive UI
-    setIsAgentRunning(false);
+        // Update local state immediately for responsive UI
+        setIsAgentRunning(false);
 
-    // Clear any pending permission requests since agent is stopped
-    clearPermissions();
+        // Clear any pending permission requests since agent is stopped
+        clearPermissions();
 
-    // Mark any streaming message as complete and interrupted, or create one if none exists
-    setMessages((prev) => {
-      const lastMsg = prev[prev.length - 1];
-      if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-        const interruptedMsg = { ...lastMsg, isStreaming: false, isInterrupted: true };
+        // Mark any streaming message as complete and interrupted, or create one if none exists
+        setMessages((prev) => {
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+            const interruptedMsg = { ...lastMsg, isStreaming: false, isInterrupted: true };
 
-        // Persist interrupted assistant message to backend (if it has content)
-        if (interruptedMsg.content) {
-          void conversationAddMessage(sessionId, {
-            id: interruptedMsg.id,
-            role: 'assistant',
-            content: interruptedMsg.content,
-            ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
-            createdAt: Date.now(),
-          });
-        }
+            // Persist interrupted assistant message to backend (if it has content)
+            if (interruptedMsg.content) {
+              void conversationAddMessage(sessionId, {
+                id: interruptedMsg.id,
+                role: 'assistant',
+                content: interruptedMsg.content,
+                ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
+                createdAt: Date.now(),
+              });
+            }
 
-        return [...prev.slice(0, -1), interruptedMsg];
+            return [...prev.slice(0, -1), interruptedMsg];
+          }
+          // If no assistant message exists yet, create an interrupted placeholder
+          if (!lastMsg || lastMsg.role === 'user') {
+            return [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: 'assistant' as const,
+                content: '',
+                displayedContent: '',
+                isStreaming: false,
+                isInterrupted: true,
+              },
+            ];
+          }
+          return prev;
+        });
       }
-      // If no assistant message exists yet, create an interrupted placeholder
-      if (!lastMsg || lastMsg.role === 'user') {
-        return [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            role: 'assistant' as const,
-            content: '',
-            displayedContent: '',
-            isStreaming: false,
-            isInterrupted: true,
-          },
-        ];
-      }
-      return prev;
-    });
+    );
   };
 
   const handleRewind = (messageId: string): void => {
@@ -268,32 +301,45 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     const clickedMessage = messages.find((m) => m.id === messageId);
     if (!clickedMessage) return;
 
-    // We need TWO message IDs:
-    // 1. message_id: The clicked message (for UI fork - includes up to this message)
-    // 2. user_message_id: The user message (for checkpoint lookup - checkpoints stored by user msg)
-    //
-    // If clicked on assistant message: message_id = assistant, user_message_id = preceding user
-    // If clicked on user message: message_id = user_message_id = same
-    let userMessageId = messageId;
-    if (clickedMessage.role === 'assistant') {
-      const messageIndex = messages.findIndex((m) => m.id === messageId);
-      // Look backwards for the preceding user message
-      for (let i = messageIndex - 1; i >= 0; i--) {
-        const prevMessage = messages[i];
-        if (prevMessage?.role === 'user') {
-          userMessageId = prevMessage.id;
-          break;
+    // Wrap the rewind operation in a Sentry span for UI interaction tracing
+    Sentry.startSpan(
+      {
+        op: 'ui.action',
+        name: 'Rewind Conversation',
+        attributes: {
+          'session.id': sessionId,
+          'message.role': clickedMessage.role,
+        },
+      },
+      () => {
+        // We need TWO message IDs:
+        // 1. message_id: The clicked message (for UI fork - includes up to this message)
+        // 2. user_message_id: The user message (for checkpoint lookup - checkpoints stored by user msg)
+        //
+        // If clicked on assistant message: message_id = assistant, user_message_id = preceding user
+        // If clicked on user message: message_id = user_message_id = same
+        let userMessageId = messageId;
+        if (clickedMessage.role === 'assistant') {
+          const messageIndex = messages.findIndex((m) => m.id === messageId);
+          // Look backwards for the preceding user message
+          for (let i = messageIndex - 1; i >= 0; i--) {
+            const prevMessage = messages[i];
+            if (prevMessage?.role === 'user') {
+              userMessageId = prevMessage.id;
+              break;
+            }
+          }
         }
-      }
-    }
 
-    postMessage({
-      type: 'conversation:rewind',
-      uuid: crypto.randomUUID(),
-      session_id: sessionId,
-      message_id: messageId, // Original clicked message (for UI fork)
-      user_message_id: userMessageId, // User message (for checkpoint lookup)
-    });
+        postMessage({
+          type: 'conversation:rewind',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+          message_id: messageId, // Original clicked message (for UI fork)
+          user_message_id: userMessageId, // User message (for checkpoint lookup)
+        });
+      }
+    );
   };
 
   const handlePermissionApprove = (requestId: string, always?: boolean): void => {

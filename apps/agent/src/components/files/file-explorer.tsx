@@ -23,7 +23,7 @@ import type { FC } from 'react';
 
 import { FileIcon, FolderIcon } from '@/components/files';
 import { useFileTree } from '@/hooks/file/use-file-tree';
-import { conversationList, openFileDialog, setWorkspacePath } from '@/lib/api';
+import { conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { cn, GIT_STATUS_STYLES } from '@/lib/utils';
 import { useFileStore } from '@/stores/file/file-store';
@@ -226,8 +226,8 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
       });
 
       if (selected !== null && typeof selected === 'string') {
-        // Persist the workspace path to backend storage
-        await setWorkspacePath(selected);
+        // Persist the workspace path and build file index for fuzzy search
+        await initializeWorkspace(selected);
         // Update UI store with workspace name (for header display)
         useUIStore.getState().setWorkspace(selected);
         // Update the file store to load the new folder

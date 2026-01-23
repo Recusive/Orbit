@@ -1,6 +1,7 @@
 //! LSP commands
 //!
 //! Provides Language Server Protocol integration for code intelligence features.
+//! Errors are captured to Sentry for monitoring via the `SentryCapture` trait.
 
 use futures::StreamExt as _;
 use log::{debug, error};
@@ -11,6 +12,8 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 use tauri::{AppHandle, Emitter as _};
 use tokio::sync::Mutex;
+
+use crate::core::sentry_utils::SentryCapture as _;
 
 static LSP_MANAGER: OnceLock<Mutex<LspManager>> = OnceLock::new();
 
@@ -42,42 +45,57 @@ pub async fn lsp_set_workspace(path: String) -> Result<()> {
 #[tauri::command]
 pub async fn lsp_completions(path: String, line: u32, column: u32) -> Result<Vec<CompletionItem>> {
     let manager = get_lsp_manager().lock().await;
-    manager.get_completions(&path, line, column).await
+    manager
+        .get_completions(&path, line, column)
+        .await
+        .capture("lsp_completions")
 }
 
 /// Get hover information at a position in a file
 #[tauri::command]
 pub async fn lsp_hover(path: String, line: u32, column: u32) -> Result<Option<HoverInfo>> {
     let manager = get_lsp_manager().lock().await;
-    manager.get_hover(&path, line, column).await
+    manager
+        .get_hover(&path, line, column)
+        .await
+        .capture("lsp_hover")
 }
 
 /// Go to the definition of a symbol at a position
 #[tauri::command]
 pub async fn lsp_goto_definition(path: String, line: u32, column: u32) -> Result<Option<Location>> {
     let manager = get_lsp_manager().lock().await;
-    manager.goto_definition(&path, line, column).await
+    manager
+        .goto_definition(&path, line, column)
+        .await
+        .capture("lsp_goto_definition")
 }
 
 /// Find all references to a symbol at a position
 #[tauri::command]
 pub async fn lsp_find_references(path: String, line: u32, column: u32) -> Result<Vec<Location>> {
     let manager = get_lsp_manager().lock().await;
-    manager.find_references(&path, line, column).await
+    manager
+        .find_references(&path, line, column)
+        .await
+        .capture("lsp_find_references")
 }
 
 /// Format a document
 #[tauri::command]
 pub async fn lsp_format(path: String) -> Result<String> {
     let manager = get_lsp_manager().lock().await;
-    manager.format_document(&path).await
+    manager.format_document(&path).await.capture("lsp_format")
 }
 
 /// Get diagnostics for a file
 #[tauri::command]
 pub async fn lsp_diagnostics(path: String) -> Result<Vec<Diagnostic>> {
     let manager = get_lsp_manager().lock().await;
-    manager.get_diagnostics(&path).await
+    manager
+        .get_diagnostics(&path)
+        .await
+        .capture("lsp_diagnostics")
 }
 
 /// Get signature help at a position
@@ -88,35 +106,44 @@ pub async fn lsp_signature_help(
     column: u32,
 ) -> Result<Option<SignatureHelp>> {
     let manager = get_lsp_manager().lock().await;
-    manager.get_signature_help(&path, line, column).await
+    manager
+        .get_signature_help(&path, line, column)
+        .await
+        .capture("lsp_signature_help")
 }
 
 /// Notify that a document was opened
 #[tauri::command]
 pub async fn lsp_did_open(path: String, language: String, content: String) -> Result<()> {
     let manager = get_lsp_manager().lock().await;
-    manager.did_open(&path, &language, &content).await
+    manager
+        .did_open(&path, &language, &content)
+        .await
+        .capture("lsp_did_open")
 }
 
 /// Notify that a document changed
 #[tauri::command]
 pub async fn lsp_did_change(path: String, content: String, version: i32) -> Result<()> {
     let manager = get_lsp_manager().lock().await;
-    manager.did_change(&path, &content, version).await
+    manager
+        .did_change(&path, &content, version)
+        .await
+        .capture("lsp_did_change")
 }
 
 /// Notify that a document was saved
 #[tauri::command]
 pub async fn lsp_did_save(path: String) -> Result<()> {
     let manager = get_lsp_manager().lock().await;
-    manager.did_save(&path).await
+    manager.did_save(&path).await.capture("lsp_did_save")
 }
 
 /// Notify that a document was closed
 #[tauri::command]
 pub async fn lsp_did_close(path: String) -> Result<()> {
     let manager = get_lsp_manager().lock().await;
-    manager.did_close(&path).await
+    manager.did_close(&path).await.capture("lsp_did_close")
 }
 
 /// Start a language server and begin emitting diagnostics events.
@@ -124,7 +151,10 @@ pub async fn lsp_did_close(path: String) -> Result<()> {
 pub async fn lsp_start(language: String, root_path: String, app: AppHandle) -> Result<()> {
     let client = {
         let manager = get_lsp_manager().lock().await;
-        manager.start_server(&language, &root_path).await?
+        manager
+            .start_server(&language, &root_path)
+            .await
+            .capture("lsp_start")?
     };
 
     // If a new client was started, set up diagnostics event emitter
@@ -160,7 +190,7 @@ pub async fn lsp_start(language: String, root_path: String, app: AppHandle) -> R
 #[tauri::command]
 pub async fn lsp_stop(language: String) -> Result<()> {
     let manager = get_lsp_manager().lock().await;
-    manager.stop_server(&language).await
+    manager.stop_server(&language).await.capture("lsp_stop")
 }
 
 /// Check if a language server is running

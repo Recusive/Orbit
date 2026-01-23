@@ -115,7 +115,7 @@ export function useSearch(options: UseSearchOptions): UseSearchReturn {
   // Debounced search effect
   useEffect(() => {
     // Clear any pending debounce
-    if (debounceRef.current) {
+    if (debounceRef.current !== null) {
       clearTimeout(debounceRef.current);
     }
 
@@ -129,7 +129,7 @@ export function useSearch(options: UseSearchOptions): UseSearchReturn {
     }, DELAYS.debounce);
 
     return (): void => {
-      if (debounceRef.current) {
+      if (debounceRef.current !== null) {
         clearTimeout(debounceRef.current);
       }
     };

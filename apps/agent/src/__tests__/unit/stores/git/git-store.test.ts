@@ -1,0 +1,478 @@
+/**
+ * Tests for git-store.ts
+ *
+ * Purpose: Manages git repository state - status, branches, loading/fetch states.
+ * Uses subscribeWithSelector middleware for optimized subscriptions.
+ */
+
+import type { GitStatus, StatusEntry } from '@/stores/git/git-store';
+
+import {
+  selectAhead,
+  selectBehind,
+  selectBranch,
+  selectFileStatus,
+  selectHasConflicts,
+  selectIsClean,
+  selectModifiedCount,
+  selectStagedCount,
+  selectTotalChanges,
+  selectUntrackedCount,
+  useGitStore,
+} from '@/stores/git/git-store';
+
+// Helper to create a minimal status entry
+function createStatusEntry(path: string, status: StatusEntry['status']): StatusEntry {
+  return { path, status, oldPath: null, similarity: null };
+}
+
+// Helper to create a full git status
+function createGitStatus(overrides: Partial<GitStatus> = {}): GitStatus {
+  return {
+    branch: 'main',
+    upstream: 'origin/main',
+    ahead: 0,
+    behind: 0,
+    staged: [],
+    modified: [],
+    untracked: [],
+    conflicted: [],
+    ...overrides,
+  };
+}
+
+describe('git-store', () => {
+  beforeEach(() => {
+    // Reset store to initial state
+    const { reset } = useGitStore.getState();
+    reset();
+    vi.clearAllMocks();
+  });
+
+  // ============================================================================
+  // Initial State
+  // ============================================================================
+
+  describe('initial state', () => {
+    it('should start with null repoPath', () => {
+      expect(useGitStore.getState().repoPath).toBeNull();
+    });
+
+    it('should start with null status', () => {
+      expect(useGitStore.getState().status).toBeNull();
+    });
+
+    it('should start with isLoading false', () => {
+      expect(useGitStore.getState().isLoading).toBe(false);
+    });
+
+    it('should start with null error', () => {
+      expect(useGitStore.getState().error).toBeNull();
+    });
+
+    it('should start with empty branches', () => {
+      expect(useGitStore.getState().branches).toEqual([]);
+    });
+  });
+
+  // ============================================================================
+  // setRepoPath
+  // ============================================================================
+
+  describe('setRepoPath', () => {
+    it('should set repo path', () => {
+      const { setRepoPath } = useGitStore.getState();
+      setRepoPath('/path/to/repo');
+      expect(useGitStore.getState().repoPath).toBe('/path/to/repo');
+    });
+
+    it('should skip update if path unchanged (optimization)', () => {
+      const { setRepoPath } = useGitStore.getState();
+      setRepoPath('/path/to/repo');
+
+      // Get a subscription to track changes
+      let changeCount = 0;
+      const unsubscribe = useGitStore.subscribe(
+        (state) => state.repoPath,
+        () => {
+          changeCount++;
+        }
+      );
+
+      // Set same path again
+      setRepoPath('/path/to/repo');
+
+      // Should not have triggered additional change
+      expect(changeCount).toBe(0);
+
+      unsubscribe();
+    });
+
+    it('should allow setting to null', () => {
+      const { setRepoPath } = useGitStore.getState();
+      setRepoPath('/path/to/repo');
+      setRepoPath(null);
+      expect(useGitStore.getState().repoPath).toBeNull();
+    });
+  });
+
+  // ============================================================================
+  // setStatus
+  // ============================================================================
+
+  describe('setStatus', () => {
+    it('should set git status', () => {
+      const { setStatus } = useGitStore.getState();
+      const status = createGitStatus({ branch: 'feature/test', ahead: 2 });
+
+      setStatus(status);
+
+      const state = useGitStore.getState();
+      expect(state.status).toEqual(status);
+      expect(state.error).toBeNull();
+      expect(state.isLoading).toBe(false);
+      expect(state.lastUpdated).not.toBeNull();
+    });
+
+    it('should skip update if status meaningfully unchanged (optimization)', () => {
+      const { setStatus } = useGitStore.getState();
+
+      // Set initial status
+      const status1 = createGitStatus({ branch: 'main', ahead: 0 });
+      setStatus(status1);
+
+      const firstUpdate = useGitStore.getState().lastUpdated;
+
+      // Set "same" status (different object, same values)
+      const status2 = createGitStatus({ branch: 'main', ahead: 0 });
+      setStatus(status2);
+
+      // Status should be same reference (not updated)
+      expect(useGitStore.getState().status).toBe(status1);
+
+      // lastUpdated should still be updated for background refreshes
+      expect(useGitStore.getState().lastUpdated).toBeGreaterThanOrEqual(firstUpdate ?? 0);
+    });
+
+    it('should update when status meaningfully changes', () => {
+      const { setStatus } = useGitStore.getState();
+
+      setStatus(createGitStatus({ branch: 'main', ahead: 0 }));
+      setStatus(createGitStatus({ branch: 'main', ahead: 2 })); // Changed
+
+      expect(useGitStore.getState().status?.ahead).toBe(2);
+    });
+
+    it('should clear error when status is set', () => {
+      const { setError, setStatus } = useGitStore.getState();
+
+      setError('Previous error');
+      setStatus(createGitStatus());
+
+      expect(useGitStore.getState().error).toBeNull();
+    });
+  });
+
+  // ============================================================================
+  // setLoading
+  // ============================================================================
+
+  describe('setLoading', () => {
+    it('should set loading state', () => {
+      const { setLoading } = useGitStore.getState();
+
+      setLoading(true);
+      expect(useGitStore.getState().isLoading).toBe(true);
+
+      setLoading(false);
+      expect(useGitStore.getState().isLoading).toBe(false);
+    });
+  });
+
+  // ============================================================================
+  // setError
+  // ============================================================================
+
+  describe('setError', () => {
+    it('should set error and clear loading', () => {
+      const { setLoading, setError } = useGitStore.getState();
+
+      setLoading(true);
+      setError('Git command failed');
+
+      const state = useGitStore.getState();
+      expect(state.error).toBe('Git command failed');
+      expect(state.isLoading).toBe(false);
+    });
+
+    it('should clear error when set to null', () => {
+      const { setError } = useGitStore.getState();
+
+      setError('Error');
+      setError(null);
+
+      expect(useGitStore.getState().error).toBeNull();
+    });
+  });
+
+  // ============================================================================
+  // setBranches
+  // ============================================================================
+
+  describe('setBranches', () => {
+    it('should set branches list', () => {
+      const { setBranches } = useGitStore.getState();
+
+      const branches = [
+        { name: 'main', isCurrent: true, isRemote: false },
+        { name: 'feature/test', isCurrent: false, isRemote: false },
+      ];
+
+      setBranches(branches);
+
+      expect(useGitStore.getState().branches).toEqual(branches);
+    });
+  });
+
+  // ============================================================================
+  // Fetch State
+  // ============================================================================
+
+  describe('setFetching', () => {
+    it('should set fetching state', () => {
+      const { setFetching } = useGitStore.getState();
+
+      setFetching(true);
+      expect(useGitStore.getState().isFetching).toBe(true);
+
+      setFetching(false);
+      expect(useGitStore.getState().isFetching).toBe(false);
+    });
+  });
+
+  describe('setLastFetchedAt', () => {
+    it('should set last fetched timestamp', () => {
+      const { setLastFetchedAt } = useGitStore.getState();
+      const timestamp = Date.now();
+
+      setLastFetchedAt(timestamp);
+
+      expect(useGitStore.getState().lastFetchedAt).toBe(timestamp);
+    });
+  });
+
+  // ============================================================================
+  // reset
+  // ============================================================================
+
+  describe('reset', () => {
+    it('should reset all state to initial values', () => {
+      const { setRepoPath, setStatus, setLoading, setError, setBranches, setFetching, reset } =
+        useGitStore.getState();
+
+      // Set up state
+      setRepoPath('/repo');
+      setStatus(createGitStatus());
+      setLoading(true);
+      setError('Error');
+      setBranches([{ name: 'main', isCurrent: true, isRemote: false }]);
+      setFetching(true);
+
+      // Reset
+      reset();
+
+      const state = useGitStore.getState();
+      expect(state.repoPath).toBeNull();
+      expect(state.status).toBeNull();
+      expect(state.isLoading).toBe(false);
+      expect(state.error).toBeNull();
+      expect(state.branches).toEqual([]);
+      expect(state.isFetching).toBe(false);
+      expect(state.lastFetchedAt).toBeNull();
+    });
+  });
+
+  // ============================================================================
+  // Selectors
+  // ============================================================================
+
+  describe('selectors', () => {
+    describe('selectBranch', () => {
+      it('should return null when no status', () => {
+        expect(selectBranch(useGitStore.getState())).toBeNull();
+      });
+
+      it('should return branch name', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(createGitStatus({ branch: 'feature/test' }));
+        expect(selectBranch(useGitStore.getState())).toBe('feature/test');
+      });
+    });
+
+    describe('selectAhead/selectBehind', () => {
+      it('should return 0 when no status', () => {
+        expect(selectAhead(useGitStore.getState())).toBe(0);
+        expect(selectBehind(useGitStore.getState())).toBe(0);
+      });
+
+      it('should return ahead/behind counts', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(createGitStatus({ ahead: 5, behind: 3 }));
+
+        expect(selectAhead(useGitStore.getState())).toBe(5);
+        expect(selectBehind(useGitStore.getState())).toBe(3);
+      });
+    });
+
+    describe('selectIsClean', () => {
+      it('should return true when no status', () => {
+        expect(selectIsClean(useGitStore.getState())).toBe(true);
+      });
+
+      it('should return true when all arrays empty', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(createGitStatus());
+        expect(selectIsClean(useGitStore.getState())).toBe(true);
+      });
+
+      it('should return false when there are changes', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(
+          createGitStatus({
+            modified: [createStatusEntry('file.ts', 'modified')],
+          })
+        );
+        expect(selectIsClean(useGitStore.getState())).toBe(false);
+      });
+    });
+
+    describe('selectHasConflicts', () => {
+      it('should return false when no conflicts', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(createGitStatus());
+        expect(selectHasConflicts(useGitStore.getState())).toBe(false);
+      });
+
+      it('should return true when there are conflicts', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(
+          createGitStatus({
+            conflicted: [createStatusEntry('conflict.ts', 'conflicted')],
+          })
+        );
+        expect(selectHasConflicts(useGitStore.getState())).toBe(true);
+      });
+    });
+
+    describe('selectTotalChanges', () => {
+      it('should return 0 when no status', () => {
+        expect(selectTotalChanges(useGitStore.getState())).toBe(0);
+      });
+
+      it('should sum all change types', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(
+          createGitStatus({
+            staged: [createStatusEntry('a.ts', 'added')],
+            modified: [
+              createStatusEntry('b.ts', 'modified'),
+              createStatusEntry('c.ts', 'modified'),
+            ],
+            untracked: [createStatusEntry('d.ts', 'untracked')],
+            conflicted: [],
+          })
+        );
+        expect(selectTotalChanges(useGitStore.getState())).toBe(4);
+      });
+    });
+
+    describe('selectStagedCount/selectModifiedCount/selectUntrackedCount', () => {
+      it('should return individual counts', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(
+          createGitStatus({
+            staged: [createStatusEntry('a.ts', 'added'), createStatusEntry('b.ts', 'added')],
+            modified: [createStatusEntry('c.ts', 'modified')],
+            untracked: [
+              createStatusEntry('d.ts', 'untracked'),
+              createStatusEntry('e.ts', 'untracked'),
+              createStatusEntry('f.ts', 'untracked'),
+            ],
+          })
+        );
+
+        expect(selectStagedCount(useGitStore.getState())).toBe(2);
+        expect(selectModifiedCount(useGitStore.getState())).toBe(1);
+        expect(selectUntrackedCount(useGitStore.getState())).toBe(3);
+      });
+    });
+
+    describe('selectFileStatus', () => {
+      it('should return null when no status', () => {
+        const selector = selectFileStatus('/path/file.ts');
+        expect(selector(useGitStore.getState())).toBeNull();
+      });
+
+      it('should find file by exact path', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(
+          createGitStatus({
+            modified: [createStatusEntry('src/file.ts', 'modified')],
+          })
+        );
+
+        const selector = selectFileStatus('src/file.ts');
+        expect(selector(useGitStore.getState())).toBe('modified');
+      });
+
+      it('should find file by suffix match', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(
+          createGitStatus({
+            staged: [createStatusEntry('file.ts', 'added')],
+          })
+        );
+
+        const selector = selectFileStatus('/repo/root/file.ts');
+        expect(selector(useGitStore.getState())).toBe('added');
+      });
+
+      it('should return null for non-existent file', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(createGitStatus());
+
+        const selector = selectFileStatus('nonexistent.ts');
+        expect(selector(useGitStore.getState())).toBeNull();
+      });
+    });
+  });
+
+  // ============================================================================
+  // Edge Cases
+  // ============================================================================
+
+  describe('edge cases', () => {
+    it('should handle status with all change types populated', () => {
+      const { setStatus } = useGitStore.getState();
+
+      setStatus(
+        createGitStatus({
+          staged: [createStatusEntry('a.ts', 'added')],
+          modified: [createStatusEntry('b.ts', 'modified')],
+          untracked: [createStatusEntry('c.ts', 'untracked')],
+          conflicted: [createStatusEntry('d.ts', 'conflicted')],
+        })
+      );
+
+      expect(selectTotalChanges(useGitStore.getState())).toBe(4);
+      expect(selectIsClean(useGitStore.getState())).toBe(false);
+      expect(selectHasConflicts(useGitStore.getState())).toBe(true);
+    });
+
+    it('should handle detached HEAD (empty branch)', () => {
+      const { setStatus } = useGitStore.getState();
+      setStatus(createGitStatus({ branch: '' }));
+      expect(selectBranch(useGitStore.getState())).toBe('');
+    });
+  });
+});

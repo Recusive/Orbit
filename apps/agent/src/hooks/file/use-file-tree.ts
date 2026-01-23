@@ -217,7 +217,6 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         case 'terminal:title':
         case 'terminal:foreground':
         case 'file:written':
-        case 'file:list:response':
         case 'conversation:created':
         case 'conversation:deleted':
         case 'conversation:loading':

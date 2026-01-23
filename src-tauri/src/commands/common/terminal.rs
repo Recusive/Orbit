@@ -1,6 +1,7 @@
 //! Terminal commands for Tauri
 //!
 //! These commands provide terminal functionality via PTY sessions.
+//! Errors are captured to Sentry for monitoring via the `SentryCapture` trait.
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -12,6 +13,8 @@ use orbit_terminal::{ForegroundProcess, Signal, TerminalConfig, TerminalManager}
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter as _};
 use tokio::time::sleep;
+
+use crate::core::sentry_utils::SentryCapture as _;
 
 static TERMINAL_MANAGER: OnceLock<TerminalManager> = OnceLock::new();
 
@@ -84,7 +87,9 @@ pub async fn terminal_create(
     }
 
     let manager = get_terminal_manager();
-    let terminal = manager.create(id.clone(), config)?;
+    let terminal = manager
+        .create(id.clone(), config)
+        .capture("terminal_create")?;
     let info = terminal.info();
 
     // Get initial shell name for foreground process
@@ -178,21 +183,23 @@ pub async fn terminal_create(
 #[tauri::command]
 pub async fn terminal_write(id: String, data: String) -> Result<()> {
     let manager = get_terminal_manager();
-    manager.write(&id, data.as_bytes())
+    manager
+        .write(&id, data.as_bytes())
+        .capture("terminal_write")
 }
 
 /// Resize a terminal.
 #[tauri::command]
 pub async fn terminal_resize(id: String, cols: u16, rows: u16) -> Result<()> {
     let manager = get_terminal_manager();
-    manager.resize(&id, cols, rows)
+    manager.resize(&id, cols, rows).capture("terminal_resize")
 }
 
 /// Close a terminal session.
 #[tauri::command]
 pub async fn terminal_close(id: String) -> Result<()> {
     let manager = get_terminal_manager();
-    manager.close(&id)
+    manager.close(&id).capture("terminal_close")
 }
 
 /// List all active terminal IDs.
@@ -217,28 +224,32 @@ pub async fn terminal_signal(id: String, signal: String) -> Result<()> {
     };
 
     let manager = get_terminal_manager();
-    manager.send_signal(&id, signal)
+    manager.send_signal(&id, signal).capture("terminal_signal")
 }
 
 /// Acknowledge data received from a terminal (for flow control).
 #[tauri::command]
 pub async fn terminal_acknowledge(id: String, byte_count: u64) -> Result<()> {
     let manager = get_terminal_manager();
-    manager.acknowledge_data(&id, byte_count)
+    manager
+        .acknowledge_data(&id, byte_count)
+        .capture("terminal_acknowledge")
 }
 
 /// Get pending bytes for a terminal (bytes written but not acknowledged).
 #[tauri::command]
 pub async fn terminal_pending_bytes(id: String) -> Result<u64> {
     let manager = get_terminal_manager();
-    manager.pending_bytes(&id)
+    manager.pending_bytes(&id).capture("terminal_pending_bytes")
 }
 
 /// Get the current foreground process for a terminal.
 #[tauri::command]
 pub async fn terminal_foreground_process(id: String) -> Result<ForegroundProcess> {
     let manager = get_terminal_manager();
-    manager.get_foreground_process(&id)
+    manager
+        .get_foreground_process(&id)
+        .capture("terminal_foreground_process")
 }
 
 /// Prompt event payload (emitted when shell integration detects a prompt).
@@ -261,4 +272,5 @@ pub async fn terminal_emit_prompt(
     let event = TerminalPromptEvent { id, prompt_type };
     app.emit("terminal:prompt", &event)
         .map_err(|e| orbit_core::Error::Terminal(format!("Failed to emit prompt event: {e}")))
+        .capture("terminal_emit_prompt")
 }

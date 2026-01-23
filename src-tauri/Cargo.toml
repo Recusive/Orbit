@@ -34,6 +34,7 @@ orbit-conversations = { path = "../crates/common/conversations" }
 tokio = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
+notify = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 base64 = { workspace = true }
@@ -62,6 +63,9 @@ tauri-plugin-clipboard-manager = { workspace = true }
 whoami = "2.0.0"
 tauri-plugin-decorum = "1.1.1"
 tauri-plugin-window-state = "2"
+
+# Error tracking
+sentry = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.10"

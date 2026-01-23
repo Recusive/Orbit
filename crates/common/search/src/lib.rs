@@ -1,6 +1,21 @@
 //! Orbit Search - File and text search
 //!
 //! This crate provides fast search functionality using ripgrep-like capabilities.
+//!
+//! # Fuzzy File Search
+//!
+//! The [`FileIndex`] provides fast fuzzy file search for the @ mention picker:
+//!
+//! ```ignore
+//! use orbit_search::FileIndex;
+//!
+//! let index = FileIndex::build("/path/to/workspace".into());
+//! let results = index.search("btn", 10); // Find files matching "btn"
+//! ```
+
+mod file_index;
+
+pub use file_index::{FileIndex, IndexEntry, INDEXABLE_EXTENSIONS, INDEXABLE_NAMES};
 
 use std::fs;
 use std::time::Instant;

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { THINKING_MODE_DOTS, THINKING_MODE_INFO, THINKING_MODES } from './constants';
-import { getFilteredFilesCount, getFileAtIndex } from './mention-popover';
 import { getFilteredCommandsCount, getCommandAtIndex } from './slash-command-popover';
 import { usePopoverNavigation, handlePopoverKeyDown } from './use-popover-navigation';
 
@@ -19,7 +18,6 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     inputMode,
     thinkingMode,
     isAgentRunning,
-    fileList,
     onSend,
     onStop,
     onModeChange,
@@ -276,6 +274,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent): void => {
       // Escape stops the agent when running (highest priority)
+      // Note: MentionPopover handles its own keyboard events via global listener
       if (e.key === 'Escape' && isAgentRunning && !popover.slashOpen && !popover.mentionOpen) {
         e.preventDefault();
         onStop();
@@ -304,26 +303,10 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         if (handled) return;
       }
 
-      // Handle mention popover
+      // MentionPopover handles its own keyboard navigation internally
+      // Skip sending message when mention popover is open (it handles Enter)
       if (popover.mentionOpen) {
-        const itemCount = getFilteredFilesCount(fileList, popover.mentionQuery);
-        const handled = handlePopoverKeyDown(e, {
-          itemCount,
-          selectedIndex: popover.mentionSelectedIndex,
-          setSelectedIndex: popover.setMentionSelectedIndex,
-          onSelect: () => {
-            const selectedFile = getFileAtIndex(
-              fileList,
-              popover.mentionQuery,
-              popover.mentionSelectedIndex
-            );
-            if (selectedFile) {
-              handleMentionSelect(selectedFile);
-            }
-          },
-          onClose: popover.closeMentionPopover,
-        });
-        if (handled) return;
+        return;
       }
 
       // Enter sends message
@@ -332,16 +315,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         handleSend();
       }
     },
-    [
-      isAgentRunning,
-      onStop,
-      popover,
-      slashCommands,
-      fileList,
-      handleSlashSelect,
-      handleMentionSelect,
-      handleSend,
-    ]
+    [isAgentRunning, onStop, popover, slashCommands, handleSlashSelect, handleSend]
   );
 
   // Paste handler

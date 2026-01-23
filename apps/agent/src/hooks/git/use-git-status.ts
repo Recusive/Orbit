@@ -221,14 +221,14 @@ export function useGitStatus(
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const startPolling = (): void => {
-      if (intervalId) return;
+      if (intervalId !== null) return;
       intervalId = setInterval(() => {
         void loadStatus(true);
       }, pollInterval);
     };
 
     const stopPolling = (): void => {
-      if (intervalId) {
+      if (intervalId !== null) {
         clearInterval(intervalId);
         intervalId = null;
       }

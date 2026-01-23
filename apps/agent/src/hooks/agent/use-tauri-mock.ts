@@ -184,26 +184,6 @@ export function handleMockMessage(message: WebviewMessage): void {
       break;
     }
 
-    case 'file:list:request': {
-      const mockPath = '/mock/workspace';
-      setTimeout(() => {
-        window.postMessage(
-          {
-            type: 'file:list:response',
-            uuid: crypto.randomUUID(),
-            request_uuid: message.uuid,
-            files: [
-              { name: 'index.ts', path: `${mockPath}/src/index.ts` },
-              { name: 'App.tsx', path: `${mockPath}/src/App.tsx` },
-              { name: 'main.tsx', path: `${mockPath}/src/main.tsx` },
-            ],
-          },
-          '*'
-        );
-      }, delay);
-      break;
-    }
-
     // All other message types don't need mock responses
     case 'webview:ready':
     case 'message:edit':

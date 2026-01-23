@@ -279,3 +279,55 @@ PreviewPanel watches for theme changes on the parent document using a MutationOb
 1. Open DevTools in both parent and preview iframe
 2. Watch for `postMessage` calls with `preview:*` types
 3. Check origin validation (must match localhost:51xx)
+
+---
+
+## Testing
+
+Canvas UI Builder uses **Vitest** for frontend testing (shared config with agent app).
+
+### Commands
+
+```bash
+# From monorepo root
+bun test                    # Run all frontend tests
+bun test --watch            # Watch mode
+
+# Run canvas-specific tests
+bun test apps/Canvas-UI-Builder/src/__tests__/
+```
+
+### Test File Location
+
+```text
+apps/Canvas-UI-Builder/src/__tests__/
+├── placeholder.test.ts     # Initial test file
+└── ...
+```
+
+### Writing Tests
+
+```typescript
+// Note: describe, it, expect, vi are globals via vitest/globals
+// DO NOT import from 'vitest' - use globals
+
+import { render, screen } from '@testing-library/react';
+
+import { MyComponent } from '@canvas/components/my-component';
+
+describe('MyComponent', () => {
+  it('should render correctly', () => {
+    render(<MyComponent />);
+    expect(screen.getByText('Hello')).toBeInTheDocument();
+  });
+});
+```
+
+### Integration Tests
+
+For testing Rust backend commands (setup, download, preview server), use Cargo tests:
+
+```bash
+# From project root
+cargo test canvas
+```

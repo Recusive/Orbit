@@ -4,12 +4,18 @@
  * Catches React errors and provides recovery options:
  * - Reload: Refresh the page to retry
  * - Reset Canvas: Clear all canvas data and start fresh
+ *
+ * Integrates with Sentry for automatic error reporting.
  */
+import { createLogger } from '@orbit/common/lib';
+import * as Sentry from '@sentry/react';
 import { invoke } from '@tauri-apps/api/core';
 import { AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
 import { Component } from 'react';
 
 import type { ErrorInfo, ReactNode } from 'react';
+
+const logger = createLogger('CanvasErrorBoundary');
 
 import { Button } from '@/components/ui/button';
 
@@ -65,9 +71,28 @@ export class CanvasErrorBoundary extends Component<
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Log the error for debugging
-    console.error('[CanvasErrorBoundary] Caught error:', error);
-    console.error('[CanvasErrorBoundary] Component stack:', errorInfo.componentStack);
+    // Log the error using structured logger
+    logger.error('Canvas render error caught', error, {
+      componentStack: errorInfo.componentStack,
+    });
+
+    // Log to Sentry's logging feature for searchability
+    Sentry.logger.error('Canvas error boundary triggered', {
+      error_message: error.message,
+      component_stack: errorInfo.componentStack,
+    });
+
+    // Report to Sentry with component stack context
+    Sentry.captureException(error, {
+      contexts: {
+        react: {
+          componentStack: errorInfo.componentStack,
+        },
+      },
+      tags: {
+        boundary: 'canvas',
+      },
+    });
 
     this.setState({ errorInfo });
   }
@@ -78,6 +103,7 @@ export class CanvasErrorBoundary extends Component<
 
   handleReset = async (): Promise<void> => {
     this.setState({ isResetting: true });
+    Sentry.logger.info('User triggered Canvas reset from error boundary');
 
     try {
       // Stop any running preview server first

@@ -23,7 +23,6 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   inputMode,
   thinkingMode,
   isAgentRunning,
-  fileList,
   usage,
   maxTokens,
   hasPermissionPending = false,
@@ -67,7 +66,6 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     inputMode,
     thinkingMode,
     isAgentRunning,
-    fileList,
     onSend,
     onStop,
     onModeChange,
@@ -112,10 +110,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
           query={popover.mentionQuery}
           onQueryChange={popover.setMentionQuery}
           onSelect={handleMentionSelect}
-          files={fileList}
           anchorRef={inputRef}
-          selectedIndex={popover.mentionSelectedIndex}
-          onSelectedIndexChange={popover.setMentionSelectedIndex}
         />
 
         {/* Slash Command Popover */}

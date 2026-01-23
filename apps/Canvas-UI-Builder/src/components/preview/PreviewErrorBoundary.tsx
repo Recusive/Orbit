@@ -10,6 +10,7 @@
  * the preview component, not the iframe itself.
  */
 import { createLogger } from '@orbit/common/lib';
+import * as Sentry from '@sentry/react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Component } from 'react';
 
@@ -77,6 +78,24 @@ export class PreviewErrorBoundary extends Component<
       componentStack: errorInfo.componentStack,
     });
 
+    // Log to Sentry's logging feature for searchability
+    Sentry.logger.error('Preview error boundary triggered', {
+      error_message: error.message,
+      component_stack: errorInfo.componentStack,
+    });
+
+    // Report to Sentry with component stack context
+    Sentry.captureException(error, {
+      contexts: {
+        react: {
+          componentStack: errorInfo.componentStack,
+        },
+      },
+      tags: {
+        boundary: 'preview',
+      },
+    });
+
     this.setState({ errorInfo });
   }
 
@@ -85,6 +104,7 @@ export class PreviewErrorBoundary extends Component<
    */
   handleRetry = (): void => {
     logger.info('Retrying preview');
+    Sentry.logger.info('User triggered preview retry from error boundary');
 
     // Reset error state
     this.setState({

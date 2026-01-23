@@ -13,6 +13,8 @@
 //!
 //! All webview creation must be async to avoid deadlocks on Windows.
 //! See: <https://docs.rs/tauri/latest/tauri/webview/struct.WebviewBuilder.html>
+//!
+//! Errors are captured to Sentry for monitoring embedded browser issues.
 
 #![allow(
     clippy::needless_pass_by_value,
@@ -36,6 +38,8 @@ use tauri::{
 use tokio::sync::oneshot;
 use tokio::time::timeout;
 use uuid::Uuid;
+
+use crate::core::sentry_utils::SentryCapture as _;
 
 type Result<T> = StdResult<T, String>;
 
@@ -315,6 +319,15 @@ pub async fn browser_navigate(
     url: String,
     app: AppHandle,
     state: State<'_, Arc<EmbeddedBrowserState>>,
+) -> Result<()> {
+    browser_navigate_inner(&url, &app, &state).capture("browser_navigate")
+}
+
+/// Inner implementation to enable `.capture()` on the result.
+fn browser_navigate_inner(
+    url: &str,
+    app: &AppHandle,
+    state: &State<'_, Arc<EmbeddedBrowserState>>,
 ) -> Result<()> {
     let label = state
         .current_label

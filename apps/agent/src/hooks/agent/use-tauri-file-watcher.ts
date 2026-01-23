@@ -263,7 +263,7 @@ class ThrottledWorker {
 
   /** Cleanup for HMR - clears pending timers and buffer */
   dispose(): void {
-    if (this.timeoutId) {
+    if (this.timeoutId !== null) {
       clearTimeout(this.timeoutId);
       this.timeoutId = null;
     }
@@ -399,7 +399,7 @@ export function isFileWatcherInitialized(): boolean {
 
 /** Cleanup for HMR - clears all pending timers and buffers */
 export function disposeFileWatcher(): void {
-  if (batchTimeout) {
+  if (batchTimeout !== null) {
     clearTimeout(batchTimeout);
     batchTimeout = null;
   }

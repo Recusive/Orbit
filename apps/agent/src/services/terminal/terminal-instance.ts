@@ -472,7 +472,7 @@ export class TerminalInstance {
 
         // Clear the in-progress flag and timeout now that PTY creation completed
         this.ptyCreationInProgress = false;
-        if (this.ptyCreationTimeoutId) {
+        if (this.ptyCreationTimeoutId !== null) {
           clearTimeout(this.ptyCreationTimeoutId);
           this.ptyCreationTimeoutId = null;
         }
@@ -721,7 +721,8 @@ export class TerminalInstance {
     this.wrapperElement.addEventListener(
       'keydown',
       (event) => {
-        const isMac = navigator.platform.toUpperCase().includes('MAC');
+        // Detect macOS using userAgent (navigator.platform is deprecated)
+        const isMac = /mac/i.test(navigator.userAgent);
         const modKey = isMac ? event.metaKey : event.ctrlKey;
         const key = event.key.toLowerCase();
 
@@ -1001,7 +1002,7 @@ export class TerminalInstance {
     this.isDisposed = true;
 
     // Clear flow control interval
-    if (this.ackInterval) {
+    if (this.ackInterval !== null) {
       clearInterval(this.ackInterval);
       this.ackInterval = null;
     }
@@ -1019,7 +1020,7 @@ export class TerminalInstance {
     }
 
     // Clear PTY creation timeout (if still waiting)
-    if (this.ptyCreationTimeoutId) {
+    if (this.ptyCreationTimeoutId !== null) {
       clearTimeout(this.ptyCreationTimeoutId);
       this.ptyCreationTimeoutId = null;
     }
