@@ -428,13 +428,20 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setMessages((prev: ChatMessage[]) => [...prev, userMessage]);
       setIsAgentRunning(true);
 
-      // Persist user message to backend
-      void conversationAddMessage(sessionId, {
-        id: userMessage.id,
-        role: 'user',
-        content: text,
-        createdAt: Date.now(),
-      });
+      // Persist user message to backend (include workspace/worktree paths for correct storage)
+      // Read paths via getState() to avoid stale closures and unnecessary dependency triggers
+      const uiState = useUIStore.getState();
+      void conversationAddMessage(
+        sessionId,
+        {
+          id: userMessage.id,
+          role: 'user',
+          content: text,
+          createdAt: Date.now(),
+        },
+        uiState.workspacePath ?? undefined,
+        uiState.activeWorktreePath ?? undefined
+      );
 
       // Build context object with files, images, and/or elements
       const hasFiles = contextFiles && contextFiles.length > 0;

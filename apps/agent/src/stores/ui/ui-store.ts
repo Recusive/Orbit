@@ -282,7 +282,7 @@ const saveActiveWorktreeToStorage = (path: string | null): void => {
 };
 
 export const useUIStore = create<UIStore>()(
-  immer((set) => ({
+  immer((set, get) => ({
     containerWidth: null,
     containerHeight: null,
     workspacePath: null,
@@ -702,9 +702,8 @@ export const useUIStore = create<UIStore>()(
     },
 
     getSessionWorktree: (sessionId: string): string | undefined => {
-      // Note: This is a getter that reads state synchronously without set()
-      // Use useUIStore.getState().sessionWorktreeMap.get(sessionId) for direct access
-      return useUIStore.getState().sessionWorktreeMap.get(sessionId);
+      // Use get() to properly access state within the store (not useUIStore.getState())
+      return get().sessionWorktreeMap.get(sessionId);
     },
 
     clearSessionWorktree: (sessionId: string): void => {

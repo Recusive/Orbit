@@ -1,8 +1,12 @@
+import { createLogger } from '@orbit/common/lib';
+
 import { formatConversationContext } from '../use-tauri-context';
 import { ensureSession, consumeRewindContext } from '../use-tauri-session';
 
 import type { AttachmentContentBlock } from '@/lib/api';
 import type { WebviewMessage } from '@/types/protocol';
+
+const logger = createLogger('AgentSdkHandlers');
 
 import {
   agentSendMessage,
@@ -51,7 +55,7 @@ export async function handleMessageSend(
     if (rewindContext && rewindContext.length > 0) {
       const contextPrefix = formatConversationContext(rewindContext);
       contentToSend = contextPrefix + message.content;
-      console.warn('[Orbit] Prepended rewind context to message:', {
+      logger.debug('Prepended rewind context to message', {
         sessionId: message.session_id,
         contextMessageCount: rewindContext.length,
         originalLength: message.content.length,
@@ -67,7 +71,7 @@ export async function handleMessageSend(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
-    console.error('[Orbit] Agent send message error:', errorMessage);
+    logger.error('Agent send message error', { error: errorMessage });
     window.postMessage(
       {
         type: 'agent:error',
@@ -87,7 +91,7 @@ export async function handleAgentStop(
   try {
     await agentInterrupt(message.session_id);
   } catch (err: unknown) {
-    console.error('[Orbit] Agent interrupt error:', err);
+    logger.error('Agent interrupt error', { error: err });
   }
 }
 
@@ -97,7 +101,7 @@ export async function handlePermissionResponse(
   try {
     await agentRespondPermission(message.request_id, message.decision, message.always ?? false);
   } catch (err: unknown) {
-    console.error('[Orbit] Permission response error:', err);
+    logger.error('Permission response error', { error: err });
   }
 }
 
@@ -116,7 +120,7 @@ export async function handleThinkingSet(
             : undefined;
     await agentSetThinkingMode(message.session_id, enabled, maxTokens);
   } catch (err: unknown) {
-    console.error('[Orbit] Set thinking mode error:', err);
+    logger.error('Set thinking mode error', { error: err });
   }
 }
 
@@ -126,7 +130,7 @@ export async function handleModelSet(
   try {
     await agentSetModel(message.session_id, message.model);
   } catch (err: unknown) {
-    console.error('[Orbit] Set model error:', err);
+    logger.error('Set model error', { error: err });
   }
 }
 
@@ -144,6 +148,6 @@ export async function handleInputModeSet(
       await agentSetAcceptMode(message.session_id, false);
     }
   } catch (err: unknown) {
-    console.error('[Orbit] Set input mode error:', err);
+    logger.error('Set input mode error', { error: err });
   }
 }

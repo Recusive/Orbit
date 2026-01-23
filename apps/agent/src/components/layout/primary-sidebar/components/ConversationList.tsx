@@ -2,7 +2,7 @@
  * ConversationList - Renders worktree groups with nested conversations
  */
 import { Plus } from 'lucide-react';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 /** Indentation for conversation items nested under workspace (px) */
 const CONVERSATION_INDENT_PX = 19;
@@ -78,30 +78,33 @@ export const ConversationList: FC<ConversationListProps> = ({
 
   // Helper to get conversations for a specific worktree path (O(1) lookup)
   // For the main worktree, also includes legacy conversations without worktreePath
-  const getWorktreeConversations = (worktreePath: string): ConversationSummary[] => {
-    const direct = conversationsByWorktree.get(worktreePath) ?? [];
+  const getWorktreeConversations = useCallback(
+    (worktreePath: string): ConversationSummary[] => {
+      const direct = conversationsByWorktree.get(worktreePath) ?? [];
 
-    // For main worktree, include legacy conversations that only have workspacePath
-    // (conversations created before worktreePath support was added)
-    const mainWorktree = worktrees.find((wt) => wt.worktree.isMain);
-    if (mainWorktree?.worktree.path === worktreePath) {
-      // Legacy conversations: have workspacePath matching the main worktree but no worktreePath
-      const legacy = conversations.filter(
-        (c) => !c.worktreePath && c.workspacePath === worktreePath
-      );
-      // Avoid duplicates: legacy conversations are already in `direct` via the fallback grouping
-      // BUT only if worktreePath === workspacePath. If they differ, we need to merge.
-      // Since legacy has no worktreePath, they're grouped by workspacePath in the map.
-      // If worktreePath equals workspacePath for main, they're already in `direct`.
-      // This check handles edge cases where workspace root differs from main worktree path.
-      const firstLegacy = legacy[0];
-      if (firstLegacy !== undefined && !direct.includes(firstLegacy)) {
-        return [...direct, ...legacy];
+      // For main worktree, include legacy conversations that only have workspacePath
+      // (conversations created before worktreePath support was added)
+      const mainWorktree = worktrees.find((wt) => wt.worktree.isMain);
+      if (mainWorktree?.worktree.path === worktreePath) {
+        // Legacy conversations: have workspacePath matching the main worktree but no worktreePath
+        const legacy = conversations.filter(
+          (c) => !c.worktreePath && c.workspacePath === worktreePath
+        );
+        // Avoid duplicates: legacy conversations are already in `direct` via the fallback grouping
+        // BUT only if worktreePath === workspacePath. If they differ, we need to merge.
+        // Since legacy has no worktreePath, they're grouped by workspacePath in the map.
+        // If worktreePath equals workspacePath for main, they're already in `direct`.
+        // This check handles edge cases where workspace root differs from main worktree path.
+        const firstLegacy = legacy[0];
+        if (firstLegacy !== undefined && !direct.includes(firstLegacy)) {
+          return [...direct, ...legacy];
+        }
       }
-    }
 
-    return direct;
-  };
+      return direct;
+    },
+    [conversationsByWorktree, worktrees, conversations]
+  );
 
   // Render conversation items for a given list
   const renderConversations = (convList: ConversationSummary[]): React.ReactNode => {

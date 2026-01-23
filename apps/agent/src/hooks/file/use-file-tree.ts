@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { ExtensionMessage, FileNode } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
-import { lspDidOpen, setWorkspacePath } from '@/lib/api';
+import { initFileWatcher } from '@/hooks/agent/use-tauri-file-watcher';
+import { buildFileIndex, lspDidOpen, setWorkspacePath } from '@/lib/api';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore, getLanguageFromPath } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -17,6 +18,9 @@ import { useUIStore } from '@/stores/ui/ui-store';
  * Hook that syncs activeWorktreePath changes to the file tree.
  * When the user switches worktrees, the file explorer should show
  * the new worktree's directory structure.
+ *
+ * Also reinitializes file watcher and file index when worktree changes
+ * to ensure @-mentions and auto-refresh work in the new directory.
  */
 export function useWorktreeFileTreeSync(): void {
   const prevWorktreeRef = useRef<string | null>(null);
@@ -46,26 +50,45 @@ export function useWorktreeFileTreeSync(): void {
     // (Zustand doesn't have built-in selector subscriptions without middleware)
     const unsubscribe = useUIStore.subscribe((state) => {
       const activeWorktree = state.activeWorktreePath;
+      const workspacePath = state.workspacePath;
       const prevWorktree = prevWorktreeRef.current;
 
-      // Only trigger if the path actually changed and we have a new path
-      if (activeWorktree !== prevWorktree && activeWorktree) {
-        logger.info(`Worktree switched: ${prevWorktree ?? 'none'} → ${activeWorktree}`);
+      // Only trigger if the path actually changed
+      if (activeWorktree !== prevWorktree) {
+        // Determine the effective path: use activeWorktree, or fall back to workspacePath
+        const effectivePath = activeWorktree ?? workspacePath;
 
-        // CRITICAL: Update the Rust backend's workspace path FIRST
-        // The Rust backend has workspace sandboxing that blocks file access
-        // outside the set workspace path. Without this, file operations to
-        // the worktree directory will fail with PermissionDenied.
-        setWorkspacePath(activeWorktree)
-          .then(() => {
-            // setRootPath automatically clears the tree and triggers a refresh
-            useFileStore.getState().setRootPath(activeWorktree);
-          })
-          .catch((err: unknown) => {
-            logger.error('Failed to update workspace path for worktree', err);
-            // Still try to update the file store - error will surface later
-            useFileStore.getState().setRootPath(activeWorktree);
-          });
+        if (effectivePath) {
+          logger.info(`Worktree switched: ${prevWorktree ?? 'none'} → ${effectivePath}`);
+
+          // CRITICAL: Update the Rust backend's workspace path FIRST
+          // The Rust backend has workspace sandboxing that blocks file access
+          // outside the set workspace path. Without this, file operations to
+          // the worktree directory will fail with PermissionDenied.
+          setWorkspacePath(effectivePath)
+            .then(() => {
+              // setRootPath automatically clears the tree and triggers a refresh
+              useFileStore.getState().setRootPath(effectivePath);
+
+              // Reinitialize file watcher for auto-refresh in new directory
+              void initFileWatcher(effectivePath).catch((err: unknown) => {
+                logger.warn('Failed to reinitialize file watcher for worktree', { error: err });
+              });
+
+              // Rebuild file index for @-mentions in new directory
+              void buildFileIndex(effectivePath).catch((err: unknown) => {
+                logger.warn('Failed to rebuild file index for worktree', { error: err });
+              });
+            })
+            .catch((err: unknown) => {
+              logger.error('Failed to update workspace path for worktree', err);
+              // Still try to update the file store - error will surface later
+              useFileStore.getState().setRootPath(effectivePath);
+            });
+        } else {
+          // No effective path available - clear the file store
+          logger.warn('No effective path available after worktree change');
+        }
       }
 
       // Update ref for next comparison

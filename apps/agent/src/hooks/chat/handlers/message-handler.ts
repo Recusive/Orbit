@@ -13,6 +13,7 @@ import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('MessageHandler');
 
@@ -513,15 +514,22 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                 : undefined;
 
             if (!wasMessagePersisted(message.session_id, completedMsg.id)) {
-              void conversationAddMessage(message.session_id, {
-                id: completedMsg.id,
-                role: 'assistant',
-                content: completedMsg.content,
-                ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
-                createdAt: Date.now(),
-                ...(usageDto ? { usage: usageDto } : {}),
-                ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
-              });
+              // Get workspace/worktree paths for correct storage (auto-create with context)
+              const uiState = useUIStore.getState();
+              void conversationAddMessage(
+                message.session_id,
+                {
+                  id: completedMsg.id,
+                  role: 'assistant',
+                  content: completedMsg.content,
+                  ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
+                  createdAt: Date.now(),
+                  ...(usageDto ? { usage: usageDto } : {}),
+                  ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
+                },
+                uiState.workspacePath ?? undefined,
+                uiState.activeWorktreePath ?? undefined
+              );
             }
 
             return [...prev.slice(0, -1), completedMsg];

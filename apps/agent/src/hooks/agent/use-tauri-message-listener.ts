@@ -10,6 +10,7 @@ import { markMessagePersisted } from '@/lib/conversation-persistence';
 import { createCheckpointBatcher } from '@/lib/utils/event-batcher';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 import { ExtensionMessageSchema } from '@/types/protocol';
 
 // ═══════════════════════════════════════════════════════════════
@@ -143,15 +144,22 @@ async function persistBufferedAssistantMessage(
     : undefined;
 
   try {
-    await conversationAddMessage(sessionId, {
-      id: message.message_id,
-      role: 'assistant',
-      content,
-      createdAt: Date.now(),
-      ...(hasThinking ? { thinking } : {}),
-      ...(usageDto ? { usage: usageDto } : {}),
-      ...(toolUses ? { toolUses } : {}),
-    });
+    // Get workspace/worktree paths for correct storage (auto-create with context)
+    const uiState = useUIStore.getState();
+    await conversationAddMessage(
+      sessionId,
+      {
+        id: message.message_id,
+        role: 'assistant',
+        content,
+        createdAt: Date.now(),
+        ...(hasThinking ? { thinking } : {}),
+        ...(usageDto ? { usage: usageDto } : {}),
+        ...(toolUses ? { toolUses } : {}),
+      },
+      uiState.workspacePath ?? undefined,
+      uiState.activeWorktreePath ?? undefined
+    );
     markMessagePersisted(sessionId, message.message_id);
     return true;
   } catch (error) {
@@ -174,7 +182,7 @@ if (import.meta.hot) {
       window.__ORBIT_REMOVE_WINDOW_LISTENER__();
       window.__ORBIT_REMOVE_WINDOW_LISTENER__ = null;
       window.__ORBIT_WINDOW_LISTENER_INITIALIZED__ = false;
-      console.warn('[Orbit] Window message listener cleaned up for HMR');
+      logger.debug('Window message listener cleaned up for HMR');
     }
   });
 }
@@ -218,17 +226,15 @@ export function initWindowMessageListener(): void {
       ) {
         // Log validation failures for debugging
         if (event.data.type.startsWith('conversation:')) {
-          console.error(
-            '[Orbit] Conversation message validation failed:',
-            event.data.type,
-            formatZodError(result.error)
-          );
+          logger.error('Conversation message validation failed', {
+            type: event.data.type,
+            error: formatZodError(result.error),
+          });
         } else if (event.data.type.startsWith('agent:')) {
-          console.warn(
-            '[Orbit] Invalid agent message dropped:',
-            event.data.type,
-            formatZodError(result.error)
-          );
+          logger.warn('Invalid agent message dropped', {
+            type: event.data.type,
+            error: formatZodError(result.error),
+          });
         }
       }
       return; // Invalid message, ignore
@@ -274,7 +280,7 @@ export function initWindowMessageListener(): void {
       // Capture the narrowed type before async closure (TypeScript loses narrowing in closures)
       const completeMessage = result.data;
       const { session_id, message_id } = completeMessage;
-      console.warn('[Orbit] Message complete, waiting for next checkpoint:', {
+      logger.debug('Message complete, waiting for next checkpoint', {
         session_id,
         message_id,
       });
@@ -321,5 +327,5 @@ export function initWindowMessageListener(): void {
     window.removeEventListener('message', handleWindowMessage);
   };
 
-  console.warn('[Orbit] Singleton window message listener initialized');
+  logger.info('Singleton window message listener initialized');
 }

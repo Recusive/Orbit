@@ -1,3 +1,5 @@
+import { createLogger } from '@orbit/common/lib';
+
 import { markSessionAsForked, setRewindContext } from '../use-tauri-session';
 
 import type { RewindContextMessage } from '../types/tauri-types';
@@ -14,6 +16,8 @@ import {
   conversationFork,
 } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
+
+const logger = createLogger('ConversationHandlers');
 
 export async function handleConversationCreate(
   message: Extract<WebviewMessage, { type: 'conversation:create' }>
@@ -36,7 +40,7 @@ export async function handleConversationCreate(
       '*'
     );
   } catch (err: unknown) {
-    console.error('[Orbit] Conversation create error:', err);
+    logger.error('Conversation create error', { error: err });
     // Still emit created event so UI can proceed (will use localStorage fallback)
     const sessionId = crypto.randomUUID();
     window.postMessage(
@@ -76,7 +80,7 @@ export async function handleConversationList(
       '*'
     );
   } catch (err: unknown) {
-    console.error('[Orbit] Conversation list error:', err);
+    logger.error('Conversation list error', { error: err });
     // Return empty list on error (localStorage will still have data)
     window.postMessage(
       {
@@ -128,7 +132,7 @@ export async function handleConversationLoad(
       );
     }
   } catch (err: unknown) {
-    console.error('Conversation load error:', err);
+    logger.error('Conversation load error', { error: err });
     window.postMessage(
       {
         type: 'conversation:loaded',
@@ -156,7 +160,7 @@ export async function handleConversationDelete(
       '*'
     );
   } catch (err: unknown) {
-    console.error('[Orbit] Conversation delete error:', err);
+    logger.error('Conversation delete error', { error: err });
   }
 }
 
@@ -166,7 +170,7 @@ export async function handleConversationUpdateTitle(
   try {
     await conversationUpdateTitle(message.session_id, message.title);
   } catch (err: unknown) {
-    console.error('[Orbit] Conversation title update error:', err);
+    logger.error('Conversation title update error', { error: err });
   }
 }
 
@@ -192,36 +196,36 @@ export async function handleConversationRewind(
 
     // Debug: Log checkpoint state
     const sessionCheckpoints = checkpointStore.getSessionCheckpoints(message.session_id);
-    console.warn('[Orbit] Rewind requested:', {
+    logger.debug('Rewind requested', {
       session_id: message.session_id,
       message_id,
       user_message_id,
-      rewindCheckpoints,
-      sessionCheckpoints,
+      rewindCheckpoints: JSON.stringify(rewindCheckpoints),
+      sessionCheckpointCount: sessionCheckpoints ? Object.keys(sessionCheckpoints).length : 0,
     });
 
     // Step 2: Get SDK session ID BEFORE forking so we can resume from it
     let sdkSessionId: string | null = null;
     try {
       sdkSessionId = await agentGetSdkSessionId(message.session_id);
-      console.warn('[Orbit] Got SDK session ID for resume:', sdkSessionId);
+      logger.debug('Got SDK session ID for resume', { sdkSessionId });
     } catch (sdkErr) {
-      console.error('[Orbit] Could not get SDK session ID:', sdkErr);
+      logger.error('Could not get SDK session ID', { error: sdkErr });
     }
 
     // Step 3: Rewind files to the turn END checkpoint (file state after this message completed)
     // This restores all Write/Edit/NotebookEdit changes made after this point
     if (rewindCheckpoints?.rewindFiles) {
       try {
-        console.warn('[Orbit] Calling agentRewindFiles with turnEnd checkpoint...');
+        logger.debug('Calling agentRewindFiles with turnEnd checkpoint');
         await agentRewindFiles(message.session_id, rewindCheckpoints.rewindFiles);
-        console.warn('[Orbit] Files rewound to checkpoint:', rewindCheckpoints.rewindFiles);
+        logger.info('Files rewound to checkpoint', { checkpoint: rewindCheckpoints.rewindFiles });
       } catch (rewindErr) {
         // Log but continue with conversation fork even if file rewind fails
-        console.error('[Orbit] File rewind failed:', rewindErr);
+        logger.error('File rewind failed', { error: rewindErr });
       }
     } else {
-      console.warn('[Orbit] No checkpoints found for session, skipping file rewind');
+      logger.debug('No checkpoints found for session, skipping file rewind');
     }
 
     // Step 4: Fork the conversation to this point
@@ -242,7 +246,7 @@ export async function handleConversationRewind(
         content: m.content,
       }));
       setRewindContext(forked.sessionId, contextMessages);
-      console.warn('[Orbit] Stored rewind context for forked session:', {
+      logger.debug('Stored rewind context for forked session', {
         sessionId: forked.sessionId,
         messageCount: contextMessages.length,
       });
@@ -251,7 +255,7 @@ export async function handleConversationRewind(
     // Mark session as forked (for file checkpoint tracking, NOT for SDK resume)
     if (sdkSessionId) {
       markSessionAsForked(newSessionId, sdkSessionId);
-      console.warn('[Orbit] Marked forked session (context-based, no SDK resume):', {
+      logger.debug('Marked forked session (context-based, no SDK resume)', {
         newSessionId,
         sdkSessionId,
       });
@@ -290,7 +294,7 @@ export async function handleConversationRewind(
       );
     }
   } catch (err: unknown) {
-    console.error('[Orbit] Conversation rewind error:', err);
+    logger.error('Conversation rewind error', { error: err });
     const newSessionId = crypto.randomUUID();
     window.postMessage(
       {

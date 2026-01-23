@@ -75,31 +75,44 @@ export async function handleFileTreeRequest(
           useUIStore.getState().setConversations(toConversationSummaries(conversations));
         })
         .catch((err: unknown) => {
-          console.warn('[Orbit] Failed to load conversations:', err);
+          logger.warn('Failed to load conversations', { error: err });
         });
 
       // Start watching the workspace for file changes (for auto-refresh)
       initFileWatcher(targetPath).catch((err: unknown) => {
-        console.warn('[Orbit] Failed to initialize file watcher:', err);
+        logger.warn('Failed to initialize file watcher', { error: err });
       });
 
       // Build file index for fuzzy search (@ mentions)
       buildFileIndex(targetPath).catch((err: unknown) => {
-        console.warn('[Orbit] Failed to build file index:', err);
+        logger.warn('Failed to build file index', { error: err });
       });
     }
 
     // Check if workspace changed during async operations (stale request protection)
     // This can happen when switching worktrees - a request for the old workspace
     // might still be in flight when the workspace changes. Skip stale requests
-    // to avoid "Permission denied" errors.
+    // to avoid "Permission denied" errors and prevent overwriting new workspace data.
     const currentWorkspace = await getWorkspacePath();
     if (currentWorkspace && initialWorkspace && initialWorkspace !== currentWorkspace) {
-      // Workspace changed while processing - this is a stale request, skip it
-      logger.debug('Skipping stale request: workspace changed', {
-        from: initialWorkspace,
-        to: currentWorkspace,
+      // Workspace changed while processing - this is a stale request
+      // Send an empty response so the UI doesn't hang waiting, but don't provide stale data
+      logger.debug('Dropping stale file tree request: workspace changed', {
+        requestedPath: initialWorkspace,
+        currentWorkspace,
+        requestUuid: message.uuid,
       });
+      window.postMessage(
+        {
+          type: 'file:tree:response',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          path: initialWorkspace,
+          children: [],
+          stale: true, // Flag for UI to know this was dropped due to staleness
+        },
+        '*'
+      );
       return;
     }
 
