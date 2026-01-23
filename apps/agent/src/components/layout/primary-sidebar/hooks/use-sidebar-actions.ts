@@ -5,6 +5,7 @@ import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import type { WorktreeInfo } from '@/lib/api';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
@@ -59,16 +60,21 @@ interface UseSidebarActionsProps {
 }
 
 interface UseSidebarActionsReturn {
-  // Delete dialog state
+  // Conversation delete dialog state
   deleteDialogOpen: boolean;
   setDeleteDialogOpen: (open: boolean) => void;
   conversationToDelete: ConversationSummary | null;
+  // Worktree delete dialog state
+  worktreeDeleteDialogOpen: boolean;
+  setWorktreeDeleteDialogOpen: (open: boolean) => void;
+  worktreeToDelete: WorktreeInfo | null;
   // Handlers
   handleStartConversation: () => void;
   handleLoadConversation: (sessionId: string) => void;
   handleOpenQuickSearch: () => void;
   handleOpenCreateWorktree: () => void;
-  handleRemoveWorktree: (worktreePath: string) => Promise<void>;
+  handleOpenDeleteWorktreeDialog: (worktree: WorktreeInfo) => void;
+  handleRemoveWorktree: (deleteBranch: boolean) => Promise<void>;
   handleRenameConversation: (sessionId: string, newTitle: string) => Promise<void>;
   handleDeleteConversation: (sessionId: string) => Promise<void>;
   handleOpenDeleteDialog: (conv: ConversationSummary) => void;
@@ -102,6 +108,10 @@ export const useSidebarActions = ({
   const [conversationToDelete, setConversationToDelete] = useState<ConversationSummary | null>(
     null
   );
+
+  // Worktree delete dialog state
+  const [worktreeDeleteDialogOpen, setWorktreeDeleteDialogOpen] = useState(false);
+  const [worktreeToDelete, setWorktreeToDelete] = useState<WorktreeInfo | null>(null);
 
   // Load worktrees when workspace changes
   // NOTE: This should only run when workspacePath changes, not when activeWorktreePath changes.
@@ -224,20 +234,40 @@ export const useSidebarActions = ({
     setCreateWorktreeDialogOpen(true);
   }, [setCreateWorktreeDialogOpen]);
 
+  // Open delete worktree confirmation dialog
+  const handleOpenDeleteWorktreeDialog = useCallback((worktree: WorktreeInfo): void => {
+    setWorktreeToDelete(worktree);
+    setWorktreeDeleteDialogOpen(true);
+  }, []);
+
+  // Remove worktree (called from dialog confirmation)
   const handleRemoveWorktree = useCallback(
-    async (worktreePath: string): Promise<void> => {
-      if (!workspacePath) return;
+    async (deleteBranch: boolean): Promise<void> => {
+      if (!workspacePath || !worktreeToDelete) return;
 
       try {
-        await gitWorktreeRemove(workspacePath, worktreePath, false);
-        removeWorktree(worktreePath);
-        logger.info('Removed worktree', { path: worktreePath });
+        await gitWorktreeRemove(workspacePath, worktreeToDelete.path, {
+          force: false,
+          deleteBranch,
+        });
+        removeWorktree(worktreeToDelete.path);
+        logger.info('Removed worktree', {
+          path: worktreeToDelete.path,
+          deletedBranch: deleteBranch ? worktreeToDelete.branch : null,
+        });
+        setWorktreeDeleteDialogOpen(false);
+        setWorktreeToDelete(null);
+        toast.success(
+          deleteBranch && worktreeToDelete.branch !== null
+            ? `Worktree and branch "${worktreeToDelete.branch}" deleted`
+            : 'Worktree deleted'
+        );
       } catch (err) {
         logger.error('Failed to remove worktree', err);
         toast.error('Failed to remove worktree');
       }
     },
-    [workspacePath, removeWorktree]
+    [workspacePath, worktreeToDelete, removeWorktree]
   );
 
   // Conversation rename handler
@@ -295,10 +325,14 @@ export const useSidebarActions = ({
     deleteDialogOpen,
     setDeleteDialogOpen,
     conversationToDelete,
+    worktreeDeleteDialogOpen,
+    setWorktreeDeleteDialogOpen,
+    worktreeToDelete,
     handleStartConversation,
     handleLoadConversation,
     handleOpenQuickSearch,
     handleOpenCreateWorktree,
+    handleOpenDeleteWorktreeDialog,
     handleRemoveWorktree,
     handleRenameConversation,
     handleDeleteConversation,

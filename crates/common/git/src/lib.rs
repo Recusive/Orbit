@@ -1288,6 +1288,11 @@ pub async fn worktree_add(
         args.push(commit_ish);
     }
 
+    // Prune stale worktree entries before creating to ensure clean state.
+    // This removes any orphaned metadata in .git/worktrees/ from previous
+    // worktrees that were deleted or partially removed.
+    worktree_prune(repo_path).await?;
+
     let output = Command::new("git")
         .args(&args)
         .current_dir(repo_path)
@@ -1300,9 +1305,15 @@ pub async fn worktree_add(
         let msg = stderr.trim();
 
         // Provide user-friendly error messages
+        // Check more specific patterns first to avoid false matches
         if msg.contains("already checked out") {
             return Err(Error::Git(
                 "Branch is already checked out in another worktree.".to_owned(),
+            ));
+        }
+        if msg.contains("branch named") && msg.contains("already exists") {
+            return Err(Error::Git(
+                "A branch with this name already exists. Use a different name or checkout the existing branch.".to_owned(),
             ));
         }
         if msg.contains("already exists") {
@@ -1343,14 +1354,48 @@ pub async fn worktree_add(
 /// * `repo_path` - Path to the main repository
 /// * `worktree_path` - Path to the worktree to remove
 /// * `force` - If true, removes even if dirty/locked
+/// * `delete_branch` - If true, also deletes the associated branch
 ///
 /// # Errors
 /// Returns an error if:
 /// - The worktree doesn't exist
 /// - The worktree is locked (and force=false)
 /// - The worktree has uncommitted changes (and force=false)
-pub async fn worktree_remove(repo_path: &Path, worktree_path: &Path, force: bool) -> Result<()> {
-    info!(?repo_path, ?worktree_path, force, "Removing worktree");
+/// - Branch deletion fails (if delete_branch=true)
+pub async fn worktree_remove(
+    repo_path: &Path,
+    worktree_path: &Path,
+    force: bool,
+    delete_branch: bool,
+) -> Result<()> {
+    info!(
+        ?repo_path,
+        ?worktree_path,
+        force,
+        delete_branch,
+        "Removing worktree"
+    );
+
+    // If we need to delete the branch, get the worktree info first
+    let branch_to_delete = if delete_branch {
+        let worktrees = worktree_list(repo_path).await?;
+        let worktree_path_canonical = worktree_path
+            .canonicalize()
+            .unwrap_or_else(|_| worktree_path.to_path_buf());
+
+        worktrees
+            .into_iter()
+            .find(|wt| {
+                let wt_path = Path::new(&wt.path);
+                let wt_canonical = wt_path
+                    .canonicalize()
+                    .unwrap_or_else(|_| wt_path.to_path_buf());
+                wt_canonical == worktree_path_canonical
+            })
+            .and_then(|wt| wt.branch)
+    } else {
+        None
+    };
 
     let mut args = vec!["worktree", "remove"];
 
@@ -1390,7 +1435,64 @@ pub async fn worktree_remove(repo_path: &Path, worktree_path: &Path, force: bool
         return Err(Error::Git(format!("Failed to remove worktree: {msg}")));
     }
 
+    // Prune stale worktree entries to ensure clean state.
+    // This removes any orphaned metadata in .git/worktrees/ that might
+    // prevent creating a new worktree with the same name.
+    worktree_prune(repo_path).await?;
+
+    // Delete the branch if requested
+    if let Some(branch_name) = branch_to_delete {
+        info!(?branch_name, "Deleting associated branch");
+        // Use -D (force delete) to delete even if branch has unmerged changes
+        // The user explicitly opted in to delete, so we honor that
+        let branch_output = Command::new("git")
+            .args(["branch", "-D", &branch_name])
+            .current_dir(repo_path)
+            .output()
+            .await
+            .map_err(|e| Error::Git(format!("Failed to run git branch -D: {e}")))?;
+
+        if !branch_output.status.success() {
+            let stderr = String::from_utf8_lossy(&branch_output.stderr);
+            // Log warning but don't fail - worktree was already removed
+            error!(?branch_name, stderr = %stderr.trim(), "Failed to delete branch (worktree removed successfully)");
+        } else {
+            info!(?branch_name, "Branch deleted");
+        }
+    }
+
     info!(?worktree_path, "Worktree removed");
+    Ok(())
+}
+
+/// Prune stale worktree information.
+///
+/// Cleans up orphaned entries in `.git/worktrees/` that reference
+/// worktrees whose directories no longer exist. This is useful after
+/// removing worktrees to ensure new worktrees can be created with the
+/// same path.
+///
+/// # Errors
+/// Returns an error if the prune command fails.
+pub async fn worktree_prune(repo_path: &Path) -> Result<()> {
+    debug!(?repo_path, "Pruning stale worktree entries");
+
+    let output = Command::new("git")
+        .args(["worktree", "prune"])
+        .current_dir(repo_path)
+        .output()
+        .await
+        .map_err(|e| Error::Git(format!("Failed to run git worktree prune: {e}")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(Error::Git(format!(
+            "git worktree prune failed: {}",
+            stderr.trim()
+        )));
+    }
+
+    debug!("Worktree prune completed");
     Ok(())
 }
 

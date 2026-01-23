@@ -453,6 +453,7 @@ pub fn run() {
             git::git_worktree_list,
             git::git_worktree_add,
             git::git_worktree_remove,
+            git::git_worktree_prune,
             // AI commands
             ai::ai_chat,
             ai::ai_complete,

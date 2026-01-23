@@ -10,6 +10,7 @@ const CONVERSATION_INDENT_PX = 19;
 import { ConversationItem } from './ConversationItem';
 import { WorkspaceItem } from './WorkspaceItem';
 
+import type { WorktreeInfo } from '@/lib/api';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
@@ -33,7 +34,7 @@ interface ConversationListProps {
   readonly onToggleWorktree: (path: string) => void;
   /** Called when user clicks on a worktree to switch to it as active workspace */
   readonly onSelectWorktree: (path: string) => void;
-  readonly onRemoveWorktree: (path: string) => void;
+  readonly onRemoveWorktree: (worktree: WorktreeInfo) => void;
   readonly onOpenCreateWorktree: () => void;
 }
 
@@ -194,7 +195,7 @@ export const ConversationList: FC<ConversationListProps> = ({
                     onSelectWorktree(wt.worktree.path);
                   }}
                   onRemove={() => {
-                    onRemoveWorktree(wt.worktree.path);
+                    onRemoveWorktree(wt.worktree);
                   }}
                 />
                 {/* Conversations for this worktree */}
