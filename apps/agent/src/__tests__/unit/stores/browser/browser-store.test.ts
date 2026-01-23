@@ -88,8 +88,8 @@ describe('browser-store', () => {
       expect(state.navigation).toEqual({
         url: '',
         title: '',
-        canGoBack: false,
-        canGoForward: false,
+        canGoBack: null, // null = unknown, treated as enabled in UI
+        canGoForward: null,
         isLoading: false,
       });
     });

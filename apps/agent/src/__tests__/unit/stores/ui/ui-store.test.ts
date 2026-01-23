@@ -156,10 +156,10 @@ describe('ui-store', () => {
       expect(state.leftSidebarWidth).toBe(DEFAULT_UI_STATE.leftSidebarWidth);
     });
 
-    it('should start with panels closed', () => {
+    it('should start with expected panel states', () => {
       const state = useUIStore.getState();
       expect(state.reviewPanelOpen).toBe(false);
-      expect(state.rightSidebarOpen).toBe(false);
+      expect(state.rightSidebarOpen).toBe(DEFAULT_UI_STATE.rightSidebarOpen); // true by default
       expect(state.bottomPanelOpen).toBe(false);
     });
 
@@ -539,11 +539,14 @@ describe('ui-store', () => {
       it('should toggle right sidebar open state', () => {
         const { toggleRightSidebar } = useUIStore.getState();
 
-        toggleRightSidebar();
+        // Default is true, so first toggle should close it
         expect(useUIStore.getState().rightSidebarOpen).toBe(true);
 
         toggleRightSidebar();
         expect(useUIStore.getState().rightSidebarOpen).toBe(false);
+
+        toggleRightSidebar();
+        expect(useUIStore.getState().rightSidebarOpen).toBe(true);
       });
     });
   });

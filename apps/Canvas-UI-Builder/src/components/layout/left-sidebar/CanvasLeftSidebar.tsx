@@ -143,7 +143,7 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
           /* Expanded: text on left, button on right */
           <div className="flex items-center justify-between w-full px-3">
             <div className="flex items-center gap-1.5">
-              <span className="text-lg font-semibold whitespace-nowrap">Canvas</span>
+              <span className="text-lg font-semibold whitespace-nowrap">Orbit Canvas</span>
               <span
                 className="bg-primary/8 text-primary/70 rounded-full px-1.5 py-0.5 font-medium tracking-wide whitespace-nowrap"
                 style={{ fontSize: SIDEBAR.previewBadgeFontSize }}

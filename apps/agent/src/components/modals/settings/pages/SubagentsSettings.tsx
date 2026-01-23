@@ -65,7 +65,7 @@ const AgentCard: FC<AgentCardProps> = ({ agent, onEdit, onDelete }) => (
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-medium text-base truncate">{agent.name}</div>
-          <div className="text-sm text-muted-foreground/70 line-clamp-2 mt-1 break-words">
+          <div className="text-sm text-muted-foreground/70 line-clamp-2 mt-1 wrap-break-word">
             {agent.description || 'No description'}
           </div>
           {agent.tools !== undefined && agent.tools.length > 0 && (
