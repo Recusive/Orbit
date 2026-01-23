@@ -19,6 +19,7 @@ import { WelcomePage } from '@/components/welcome';
 import { useBrowser } from '@/hooks/browser/use-browser';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { TauriProvider } from '@/providers/tauri-provider';
+import { ThemeProvider } from '@/providers/theme-provider';
 import { useOnboardingStore } from '@/stores/onboarding/onboarding-store';
 import { useHasWorkspace, useUIStore } from '@/stores/ui/ui-store';
 
@@ -32,37 +33,6 @@ const STYLE_DISPLAY_NONE: CSSProperties = { display: 'none' };
 // ============================================
 // Hooks
 // ============================================
-
-/**
- * Syncs system theme preference to the html element.
- * Uses prefers-color-scheme media query with dark as default.
- */
-function useThemeSync(): void {
-  useEffect(() => {
-    const syncTheme = (isDark: boolean): void => {
-      if (isDark) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    };
-
-    // Check system preference, default to dark
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    syncTheme(mediaQuery.matches);
-
-    // Watch for system theme changes
-    const handleChange = (e: MediaQueryListEvent): void => {
-      syncTheme(e.matches);
-    };
-
-    mediaQuery.addEventListener('change', handleChange);
-
-    return (): void => {
-      mediaQuery.removeEventListener('change', handleChange);
-    };
-  }, []);
-}
 
 /**
  * Tracks which tabs have been visited. Once a tab is visited, it stays
@@ -186,7 +156,6 @@ const EditorMode: FC = () => {
 };
 
 const App: FC = () => {
-  useThemeSync();
   useBrowser(); // Handle browser messages from Tauri backend
   const { hasCrash, crashLog, dismiss, acknowledge } = useCrashCheck();
   const [crashDialogOpen, setCrashDialogOpen] = useState(true);
@@ -212,95 +181,101 @@ const App: FC = () => {
 
   // Show onboarding flow if user hasn't completed it yet
   if (!hasCompletedOnboarding) {
-    return <OnboardingFlow />;
+    return (
+      <ThemeProvider>
+        <OnboardingFlow />
+      </ThemeProvider>
+    );
   }
 
   return (
-    <TauriProvider>
-      <TooltipProvider delayDuration={0}>
-        <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground">
-          {/* Shared header with tabs */}
-          <HeaderBar />
+    <ThemeProvider>
+      <TauriProvider>
+        <TooltipProvider delayDuration={0}>
+          <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground">
+            {/* Shared header with tabs */}
+            <HeaderBar />
 
-          {/* Mode content - show welcome page if no workspace, otherwise show active mode */}
-          {/*
-           * LAZY MOUNT PATTERN: Modes are only mounted when first visited, then kept
-           * alive via CSS display toggling. This prevents:
-           * 1. Layout flashes when switching tabs (no remounting)
-           * 2. Unnecessary memory usage for unvisited modes
-           */}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            {!hasWorkspace ? (
-              <WelcomePage />
-            ) : (
-              <>
-                {/* Agent mode - mounted on first visit, kept alive */}
-                {mounted.agent ? (
-                  <div
-                    className="h-full w-full"
-                    style={activeTab === 'agent' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
-                  >
-                    <ErrorBoundary
-                      fallback={(error, reset) => (
-                        <ModeErrorFallback mode="agent" error={error} onReset={reset} />
-                      )}
+            {/* Mode content - show welcome page if no workspace, otherwise show active mode */}
+            {/*
+             * LAZY MOUNT PATTERN: Modes are only mounted when first visited, then kept
+             * alive via CSS display toggling. This prevents:
+             * 1. Layout flashes when switching tabs (no remounting)
+             * 2. Unnecessary memory usage for unvisited modes
+             */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {!hasWorkspace ? (
+                <WelcomePage />
+              ) : (
+                <>
+                  {/* Agent mode - mounted on first visit, kept alive */}
+                  {mounted.agent ? (
+                    <div
+                      className="h-full w-full"
+                      style={activeTab === 'agent' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
                     >
-                      <AgentMode />
-                    </ErrorBoundary>
-                  </div>
-                ) : null}
-                {/* Canvas mode - mounted on first visit, kept alive */}
-                {mounted.canvas ? (
-                  <div
-                    className="h-full w-full"
-                    style={activeTab === 'canvas' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
-                  >
-                    <ErrorBoundary
-                      fallback={(error, reset) => (
-                        <ModeErrorFallback mode="canvas" error={error} onReset={reset} />
-                      )}
+                      <ErrorBoundary
+                        fallback={(error, reset) => (
+                          <ModeErrorFallback mode="agent" error={error} onReset={reset} />
+                        )}
+                      >
+                        <AgentMode />
+                      </ErrorBoundary>
+                    </div>
+                  ) : null}
+                  {/* Canvas mode - mounted on first visit, kept alive */}
+                  {mounted.canvas ? (
+                    <div
+                      className="h-full w-full"
+                      style={activeTab === 'canvas' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
                     >
-                      <CanvasMode />
-                    </ErrorBoundary>
-                  </div>
-                ) : null}
-                {/* Editor mode - mounted on first visit, kept alive */}
-                {mounted.editor ? (
-                  <div
-                    className="h-full w-full"
-                    style={activeTab === 'editor' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
-                  >
-                    <ErrorBoundary
-                      fallback={(error, reset) => (
-                        <ModeErrorFallback mode="editor" error={error} onReset={reset} />
-                      )}
+                      <ErrorBoundary
+                        fallback={(error, reset) => (
+                          <ModeErrorFallback mode="canvas" error={error} onReset={reset} />
+                        )}
+                      >
+                        <CanvasMode />
+                      </ErrorBoundary>
+                    </div>
+                  ) : null}
+                  {/* Editor mode - mounted on first visit, kept alive */}
+                  {mounted.editor ? (
+                    <div
+                      className="h-full w-full"
+                      style={activeTab === 'editor' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
                     >
-                      <EditorMode />
-                    </ErrorBoundary>
-                  </div>
-                ) : null}
-              </>
-            )}
+                      <ErrorBoundary
+                        fallback={(error, reset) => (
+                          <ModeErrorFallback mode="editor" error={error} onReset={reset} />
+                        )}
+                      >
+                        <EditorMode />
+                      </ErrorBoundary>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </div>
+
+            {/* Status Bar */}
+            <StatusBar />
+
+            {/* Crash notification dialog */}
+            {hasCrash && crashLog ? (
+              <CrashNotification
+                open={crashDialogOpen}
+                onOpenChange={handleOpenChange}
+                crashLog={crashLog}
+                onDismiss={dismiss}
+              />
+            ) : null}
+
+            {/* Toast notifications */}
+            <Toaster position="bottom-right" />
           </div>
-
-          {/* Status Bar */}
-          <StatusBar />
-
-          {/* Crash notification dialog */}
-          {hasCrash && crashLog ? (
-            <CrashNotification
-              open={crashDialogOpen}
-              onOpenChange={handleOpenChange}
-              crashLog={crashLog}
-              onDismiss={dismiss}
-            />
-          ) : null}
-
-          {/* Toast notifications */}
-          <Toaster position="bottom-right" />
-        </div>
-      </TooltipProvider>
-    </TauriProvider>
+        </TooltipProvider>
+      </TauriProvider>
+    </ThemeProvider>
   );
 };
 

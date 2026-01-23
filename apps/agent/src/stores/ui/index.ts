@@ -3,6 +3,17 @@
  */
 
 export {
+  AVAILABLE_THEMES,
+  THEME_BY_ID,
+  selectIconTheme,
+  selectUsesDarkInvert,
+  useCurrentThemeInfo,
+  useIconThemeStore,
+} from './icon-theme-store';
+
+export type { IconThemeDarkMode, IconThemeId, IconThemeInfo } from './icon-theme-store';
+
+export {
   useUIStore,
   useIsLeftSidebarCollapsed,
   useWorkspaceName,

@@ -6,6 +6,9 @@
 // Backend API
 export * from './api';
 
+// Icon utilities
+export * from './icons';
+
 // Utilities
 export * from './utils';
 

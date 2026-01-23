@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { SectionDivider, SectionHeader, SettingItem } from '../components';
 
+import type { IconThemeId } from '@/stores/ui/icon-theme-store';
 import type { FC } from 'react';
 
 import {
@@ -12,13 +13,29 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { useTheme } from '@/providers/theme-provider';
+import { AVAILABLE_THEMES, selectIconTheme, useIconThemeStore } from '@/stores/ui/icon-theme-store';
 
 export const AppearanceSettings: FC = () => {
-  const [theme, setTheme] = useState('system');
+  // Color theme from ThemeProvider (persisted to localStorage)
+  const { theme, setTheme } = useTheme();
+
   const [accentColor, setAccentColor] = useState('coral');
   const [fontSize, setFontSize] = useState('medium');
   const [reduceMotion, setReduceMotion] = useState(false);
   const [compactMode, setCompactMode] = useState(false);
+
+  // Icon theme from Zustand store (persisted)
+  const currentIconTheme = useIconThemeStore(selectIconTheme);
+  const setIconTheme = useIconThemeStore((state) => state.setTheme);
+
+  const handleThemeChange = (value: string): void => {
+    setTheme(value as 'light' | 'dark' | 'system');
+  };
+
+  const handleIconThemeChange = (value: string): void => {
+    setIconTheme(value as IconThemeId);
+  };
 
   return (
     <div>
@@ -26,7 +43,7 @@ export const AppearanceSettings: FC = () => {
 
       <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Color Theme" description="Choose your preferred color theme">
-          <Select value={theme} onValueChange={setTheme}>
+          <Select value={theme} onValueChange={handleThemeChange}>
             <SelectTrigger className="w-32 h-8 text-sm">
               <SelectValue />
             </SelectTrigger>
@@ -49,6 +66,24 @@ export const AppearanceSettings: FC = () => {
               <SelectItem value="green">Green</SelectItem>
               <SelectItem value="purple">Purple</SelectItem>
               <SelectItem value="orange">Orange</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingItem>
+
+        <SettingItem
+          label="File Icon Theme"
+          description="Icons for files and folders in the explorer"
+        >
+          <Select value={currentIconTheme} onValueChange={handleIconThemeChange}>
+            <SelectTrigger className="w-40 h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {AVAILABLE_THEMES.map((iconTheme) => (
+                <SelectItem key={iconTheme.id} value={iconTheme.id}>
+                  {iconTheme.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </SettingItem>

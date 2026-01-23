@@ -1,9 +1,18 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 
 import type { FC } from 'react';
 
+import { hasIconUrl, resolveFolderIconUrl } from '@/lib/icons';
 import { cn } from '@/lib/utils';
-import { getFolderIconName } from '@/lib/utils/iconMap';
+import {
+  selectIconTheme,
+  selectUsesDarkInvert,
+  useIconThemeStore,
+} from '@/stores/ui/icon-theme-store';
+
+// ============================================================================
+// Props Interface
+// ============================================================================
 
 export interface FolderIconProps {
   readonly folderName: string;
@@ -13,37 +22,35 @@ export interface FolderIconProps {
   readonly isSymlink?: boolean;
 }
 
-// Import all icons from the assets directory
-// When using `import: 'default'` with `?url`, Vite returns the URL string directly
-const iconModules = import.meta.glob<string>('/src/assets/icons/*.svg', {
-  eager: true,
-  query: '?url',
-  import: 'default',
-});
+// ============================================================================
+// Component Implementation
+// ============================================================================
 
-// Build a map of icon name to URL
-const iconMap: Record<string, string> = {};
-for (const [path, url] of Object.entries(iconModules)) {
-  const match = /\/([^/]+)\.svg$/.exec(path);
-  if (match?.[1]) {
-    iconMap[match[1]] = url;
-  }
-}
-
-export const FolderIcon: FC<FolderIconProps> = ({
+/**
+ * Renders a folder icon based on the folder name, open state, and current icon theme.
+ *
+ * Uses the icon theme store for theme selection and dark mode strategy.
+ * Falls back to an inline SVG folder icon if no icon URL is found.
+ */
+const FolderIconComponent: FC<FolderIconProps> = ({
   folderName,
   isOpen = false,
   className = '',
   monochrome = true,
   isSymlink = false,
 }) => {
-  const iconName = useMemo(() => getFolderIconName(folderName, isOpen), [folderName, isOpen]);
+  // Granular store subscriptions - only re-render when specific values change
+  const themeId = useIconThemeStore(selectIconTheme);
+  const usesDarkInvert = useIconThemeStore(selectUsesDarkInvert);
 
-  // Try to get the specific folder icon, fall back to default folder
-  const iconUrl = iconMap[iconName] ?? iconMap[isOpen ? 'folder-open' : 'folder'];
+  // Memoize URL resolution - only recalculate when folderName, isOpen, or theme changes
+  const iconUrl = useMemo(
+    () => resolveFolderIconUrl(folderName, isOpen, themeId),
+    [folderName, isOpen, themeId]
+  );
 
-  if (!iconUrl) {
-    // Fallback to a simple folder representation
+  // Fallback to inline SVG when no icon URL is found
+  if (!hasIconUrl(iconUrl)) {
     return (
       <svg
         className={cn('shrink-0', isSymlink && 'opacity-60', className)}
@@ -70,7 +77,7 @@ export const FolderIcon: FC<FolderIconProps> = ({
       alt=""
       className={cn(
         'shrink-0',
-        monochrome && 'dark:invert dark:brightness-90 opacity-80',
+        monochrome && usesDarkInvert && 'dark:invert dark:brightness-90 opacity-80',
         isSymlink && 'opacity-60',
         className
       )}
@@ -78,3 +85,6 @@ export const FolderIcon: FC<FolderIconProps> = ({
     />
   );
 };
+
+export const FolderIcon = memo(FolderIconComponent);
+FolderIcon.displayName = 'FolderIcon';

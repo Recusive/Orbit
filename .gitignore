@@ -75,3 +75,6 @@ reference/
 # Code review outputs (local only)
 reviews/
 audits/
+
+# Personal prompts and notes (local only)
+Prompt and Info/
