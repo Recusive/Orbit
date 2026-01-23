@@ -3676,6 +3676,7 @@ dependencies = [
 name = "orbit-fs"
 version = "0.0.1"
 dependencies = [
+ "git2",
  "grep",
  "ignore",
  "notify",

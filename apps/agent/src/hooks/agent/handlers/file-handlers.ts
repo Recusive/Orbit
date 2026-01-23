@@ -116,7 +116,7 @@ export async function handleFileTreeRequest(
       return;
     }
 
-    const entries = await listDirectory(targetPath, false);
+    const entries = await listDirectory(targetPath, true);
 
     // Convert FileEntry to FileNode format
     const children = entries.map((entry: FileEntry) => ({
@@ -125,6 +125,7 @@ export async function handleFileTreeRequest(
       isDirectory: entry.isDir,
       isFile: !entry.isDir,
       isSymlink: entry.isSymlink,
+      isGitIgnored: entry.isGitIgnored,
     }));
 
     window.postMessage(

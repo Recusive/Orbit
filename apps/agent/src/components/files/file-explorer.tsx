@@ -404,6 +404,9 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
 
     const indentPx = depth * 12 + 8;
 
+    // Check if file is gitignored (files only, not directories)
+    const isGitIgnored = node.isGitIgnored === true;
+
     return (
       <button
         className={cn(
@@ -418,9 +421,11 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
           height,
           transform: `translateY(${String(top)}px)`,
           paddingLeft: indentPx,
+          // Reduce opacity for gitignored files to visually indicate they're not tracked
+          opacity: isGitIgnored ? 0.5 : 1,
         }}
         onClick={handleClick}
-        title={path}
+        title={isGitIgnored ? `${path} (gitignored)` : path}
       >
         {/* Expand/collapse chevron for directories */}
         <span className="w-4 h-4 flex items-center justify-center shrink-0">
@@ -490,11 +495,12 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
       </button>
     );
   },
-  // Custom comparison - re-render if position, identity, or node name changes
+  // Custom comparison - re-render if position, identity, node name, or gitignore status changes
   (prevProps, nextProps) =>
     prevProps.path === nextProps.path &&
     prevProps.depth === nextProps.depth &&
     prevProps.node.name === nextProps.node.name &&
+    prevProps.node.isGitIgnored === nextProps.node.isGitIgnored &&
     prevProps.top === nextProps.top &&
     prevProps.height === nextProps.height
 );

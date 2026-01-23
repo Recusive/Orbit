@@ -18,6 +18,8 @@ pub struct FileEntry {
     pub is_symlink: bool,
     /// Whether this is a hidden file (name starts with dot)
     pub is_hidden: bool,
+    /// Whether this file is ignored by git (.gitignore)
+    pub is_git_ignored: bool,
     /// File size in bytes (None for directories)
     pub size: Option<u64>,
     /// Last modified timestamp (Unix epoch seconds)

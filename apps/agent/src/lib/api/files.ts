@@ -21,6 +21,8 @@ export interface FileEntry {
   isSymlink: boolean;
   /** Whether this is a hidden file (name starts with dot) */
   isHidden: boolean;
+  /** Whether this file is ignored by git (.gitignore) */
+  isGitIgnored: boolean;
   /** File size in bytes (undefined for directories) */
   size?: number;
   /** Last modified timestamp (Unix epoch seconds) */

@@ -109,6 +109,10 @@ pub async fn list_directory(path: &str, show_hidden: bool) -> Result<Vec<FileEnt
         _ => Error::Io(e),
     })?;
 
+    // Try to open a git repository for gitignore checking
+    // This will find the repo if we're inside one, even in subdirectories
+    let git_repo = git2::Repository::discover(path).ok();
+
     while let Some(entry) = dir.next_entry().await? {
         let entry_path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
@@ -165,12 +169,20 @@ pub async fn list_directory(path: &str, show_hidden: bool) -> Result<Vec<FileEnt
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs()))
         });
 
+        // Check if the file is git-ignored
+        // git2's is_path_ignored() handles both absolute and relative paths
+        let is_git_ignored = git_repo
+            .as_ref()
+            .and_then(|repo| repo.is_path_ignored(&entry_path).ok())
+            .unwrap_or(false);
+
         let file_entry = FileEntry {
             path: entry_path.to_string_lossy().into_owned(),
             name,
             is_dir,
             is_symlink,
             is_hidden,
+            is_git_ignored,
             size,
             modified,
         };

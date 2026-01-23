@@ -1274,6 +1274,7 @@ export const FileNodeSchema = z
     isDirectory: z.boolean(),
     isFile: z.boolean(),
     isSymlink: z.boolean().optional(),
+    isGitIgnored: z.boolean().optional(),
   })
   .strict();
 
