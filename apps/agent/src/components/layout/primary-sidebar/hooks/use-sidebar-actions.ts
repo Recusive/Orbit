@@ -92,18 +92,33 @@ export const useSidebarActions = ({
       }));
       setWorktrees(worktreeStates);
 
-      // Set active worktree to main if not set (check current state, not prop)
+      // CRITICAL: Validate activeWorktreePath against the new worktree list.
+      // A stale path from a prior workspace could drive file/git/terminal ops to wrong directory.
       const currentActiveWorktree = useUIStore.getState().activeWorktreePath;
-      if (!currentActiveWorktree) {
+      const worktreePaths = new Set(worktreeList.map((wt) => wt.path));
+      const isActiveWorktreeValid =
+        currentActiveWorktree !== null && worktreePaths.has(currentActiveWorktree);
+
+      if (!isActiveWorktreeValid) {
+        // Reset to main worktree (or first available) when active is invalid/stale
         const mainWorktree = worktreeList.find((wt) => wt.isMain);
-        if (mainWorktree) {
-          setActiveWorktree(mainWorktree.path);
+        const fallbackWorktree = mainWorktree ?? worktreeList[0];
+        if (fallbackWorktree) {
+          logger.info('Resetting stale activeWorktreePath', {
+            stale: currentActiveWorktree,
+            newPath: fallbackWorktree.path,
+          });
+          setActiveWorktree(fallbackWorktree.path);
+        } else {
+          // No worktrees available - clear the active path
+          setActiveWorktree(null);
         }
       }
     } catch {
       logger.warn('Failed to load worktrees (may not be a git repo)');
-      // Not a git repo or error - clear worktrees
+      // Not a git repo or error - clear worktrees and reset active worktree
       setWorktrees([]);
+      setActiveWorktree(null);
     }
   }, [workspacePath, setWorktrees, setActiveWorktree]);
 
@@ -115,11 +130,23 @@ export const useSidebarActions = ({
   const handleStartConversation = useCallback((): void => {
     // Close vault if open
     setVaultOpen(false);
+
     // Skip if current conversation is empty (title still "Untitled" means no message sent)
+    // BUT only if it belongs to the current worktree - allow new sessions after worktree switch
     const activeConv = conversations.find((c) => c.sessionId === activeConversationId);
     if (activeConv?.title === 'Untitled') {
-      return;
+      // Check if the Untitled conversation belongs to current worktree
+      // If worktrees differ, allow creating a new conversation in the new worktree
+      const convWorktree = activeConv.worktreePath ?? null;
+      const currentWorktree = activeWorktreePath ?? null;
+
+      // Both null (no worktree context) OR both match the same worktree = block
+      // Otherwise, allow creating new conversation in the different worktree context
+      if (convWorktree === currentWorktree) {
+        return;
+      }
     }
+
     postMessage({
       type: 'conversation:create',
       uuid: crypto.randomUUID(),

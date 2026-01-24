@@ -1,10 +1,12 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 
 import type { ExtensionMessage, FileNode } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
-import { lspDidOpen, setWorkspacePath } from '@/lib/api';
+import { initFileWatcher } from '@/hooks/agent/use-tauri-file-watcher';
+import { buildFileIndex, lspDidOpen, setWorkspacePath } from '@/lib/api';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore, getLanguageFromPath } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -38,6 +40,7 @@ export function useWorktreeFileTreeSync(): void {
         })
         .catch((err: unknown) => {
           logger.error('Failed to set initial workspace path for worktree', err);
+          toast.error('Failed to set workspace path');
           useFileStore.getState().setRootPath(currentWorktree);
         });
     }
@@ -60,9 +63,24 @@ export function useWorktreeFileTreeSync(): void {
           .then(() => {
             // setRootPath automatically clears the tree and triggers a refresh
             useFileStore.getState().setRootPath(activeWorktree);
+
+            // Reinitialize file watcher for the new worktree
+            // Without this, file changes in the new worktree won't be detected
+            initFileWatcher(activeWorktree).catch((watcherErr: unknown) => {
+              logger.warn('Failed to reinitialize file watcher for worktree', {
+                error: watcherErr,
+              });
+            });
+
+            // Rebuild file index for fuzzy search (@ mentions)
+            // Without this, file search will use stale data from previous worktree
+            buildFileIndex(activeWorktree).catch((indexErr: unknown) => {
+              logger.warn('Failed to rebuild file index for worktree', { error: indexErr });
+            });
           })
           .catch((err: unknown) => {
             logger.error('Failed to update workspace path for worktree', err);
+            toast.error('Failed to switch workspace');
             // Still try to update the file store - error will surface later
             useFileStore.getState().setRootPath(activeWorktree);
           });

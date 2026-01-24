@@ -75,17 +75,17 @@ export async function handleFileTreeRequest(
           useUIStore.getState().setConversations(toConversationSummaries(conversations));
         })
         .catch((err: unknown) => {
-          console.warn('[Orbit] Failed to load conversations:', err);
+          logger.warn('Failed to load conversations', { error: err });
         });
 
       // Start watching the workspace for file changes (for auto-refresh)
       initFileWatcher(targetPath).catch((err: unknown) => {
-        console.warn('[Orbit] Failed to initialize file watcher:', err);
+        logger.warn('Failed to initialize file watcher', { error: err });
       });
 
       // Build file index for fuzzy search (@ mentions)
       buildFileIndex(targetPath).catch((err: unknown) => {
-        console.warn('[Orbit] Failed to build file index:', err);
+        logger.warn('Failed to build file index', { error: err });
       });
     }
 
@@ -103,7 +103,9 @@ export async function handleFileTreeRequest(
       return;
     }
 
-    const entries = await listDirectory(targetPath, false);
+    // Show hidden files (dotfiles like .gitignore, .env, .eslintrc) by default
+    // Developers need to see these files in a code editor
+    const entries = await listDirectory(targetPath, true);
 
     // Convert FileEntry to FileNode format
     const children = entries.map((entry: FileEntry) => ({

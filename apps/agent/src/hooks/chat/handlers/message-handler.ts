@@ -78,6 +78,7 @@ interface Conversation {
 interface MessageHandlerDeps {
   setWorkspace: (path: string) => void;
   workspacePath: string | null;
+  activeWorktreePath: string | null;
   setActiveConversation: (sessionId: string | null, title: string | null) => void;
   setConversationTransitioning: (transitioning: boolean) => void;
   setConversations: (conversations: Conversation[]) => void;
@@ -160,6 +161,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
   const {
     setWorkspace,
     workspacePath,
+    activeWorktreePath,
     setActiveConversation,
     setConversationTransitioning,
     setConversations,
@@ -513,15 +515,22 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                 : undefined;
 
             if (!wasMessagePersisted(message.session_id, completedMsg.id)) {
-              void conversationAddMessage(message.session_id, {
-                id: completedMsg.id,
-                role: 'assistant',
-                content: completedMsg.content,
-                ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
-                createdAt: Date.now(),
-                ...(usageDto ? { usage: usageDto } : {}),
-                ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
-              });
+              // Include workspace/worktree context to ensure auto-created conversations
+              // go to the correct location, not _global
+              void conversationAddMessage(
+                message.session_id,
+                {
+                  id: completedMsg.id,
+                  role: 'assistant',
+                  content: completedMsg.content,
+                  ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
+                  createdAt: Date.now(),
+                  ...(usageDto ? { usage: usageDto } : {}),
+                  ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
+                },
+                workspacePath ?? undefined,
+                activeWorktreePath ?? undefined
+              );
             }
 
             return [...prev.slice(0, -1), completedMsg];

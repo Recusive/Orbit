@@ -194,13 +194,19 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         setMessages((prev) => [...prev, userMessage]);
         setIsAgentRunning(true);
 
-        // Persist user message to backend
-        void conversationAddMessage(sessionId, {
-          id: userMessage.id,
-          role: 'user',
-          content: text,
-          createdAt: Date.now(),
-        });
+        // Persist user message to backend with workspace/worktree context
+        // This ensures auto-created conversations go to the correct location, not _global
+        void conversationAddMessage(
+          sessionId,
+          {
+            id: userMessage.id,
+            role: 'user',
+            content: text,
+            createdAt: Date.now(),
+          },
+          workspacePath ?? undefined,
+          activeWorktreePath ?? undefined
+        );
 
         // Build context object with files, images, and/or elements
         const hasFiles = contextFiles && contextFiles.length > 0;
@@ -267,13 +273,18 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
             // Persist interrupted assistant message to backend (if it has content)
             if (interruptedMsg.content) {
-              void conversationAddMessage(sessionId, {
-                id: interruptedMsg.id,
-                role: 'assistant',
-                content: interruptedMsg.content,
-                ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
-                createdAt: Date.now(),
-              });
+              void conversationAddMessage(
+                sessionId,
+                {
+                  id: interruptedMsg.id,
+                  role: 'assistant',
+                  content: interruptedMsg.content,
+                  ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
+                  createdAt: Date.now(),
+                },
+                workspacePath ?? undefined,
+                activeWorktreePath ?? undefined
+              );
             }
 
             return [...prev.slice(0, -1), interruptedMsg];
@@ -394,13 +405,18 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
         // Persist interrupted assistant message to backend (if it has content)
         if (interruptedMsg.content) {
-          void conversationAddMessage(sessionId, {
-            id: interruptedMsg.id,
-            role: 'assistant',
-            content: interruptedMsg.content,
-            ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
-            createdAt: Date.now(),
-          });
+          void conversationAddMessage(
+            sessionId,
+            {
+              id: interruptedMsg.id,
+              role: 'assistant',
+              content: interruptedMsg.content,
+              ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
+              createdAt: Date.now(),
+            },
+            workspacePath ?? undefined,
+            activeWorktreePath ?? undefined
+          );
         }
 
         return [...prev.slice(0, -1), interruptedMsg];
