@@ -12,6 +12,7 @@ import type { FileStatus as BackendFileStatus, GitSettings } from '@/lib/api';
 
 import { useAutoFetch } from '@/hooks/git/use-auto-fetch';
 import { useGitStatus } from '@/hooks/git/use-git-status';
+import { useEffectivePath } from '@/hooks/use-effective-path';
 import { getSettings } from '@/lib/api';
 
 /** Convert backend status to display status */
@@ -97,6 +98,11 @@ export interface UseSourceControlReturn {
 export function useSourceControl({
   workspacePath,
 }: UseSourceControlOptions): UseSourceControlReturn {
+  // Use the effective path (active worktree or main workspace) for git operations
+  // This ensures git status/commit/push/pull target the correct worktree directory
+  const effectivePath = useEffectivePath();
+  const gitPath = effectivePath ?? workspacePath;
+
   const {
     status,
     repoPath,
@@ -112,7 +118,7 @@ export function useSourceControl({
     branches,
     listBranches,
     checkout: gitCheckout,
-  } = useGitStatus(workspacePath, {
+  } = useGitStatus(gitPath, {
     pollInterval: GIT_STATUS_POLL_INTERVAL, // Extracted constant
   });
 

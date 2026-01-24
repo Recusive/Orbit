@@ -51,6 +51,7 @@ sysinfo = "0.35"
 
 # Git
 gix = { version = "0.69", default-features = false, features = ["basic", "status"] }
+git2 = { version = "0.20", default-features = false }
 
 # LSP
 tower-lsp = "0.20"

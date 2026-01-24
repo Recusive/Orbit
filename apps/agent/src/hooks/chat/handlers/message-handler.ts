@@ -13,6 +13,7 @@ import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('MessageHandler');
 
@@ -72,6 +73,7 @@ interface Conversation {
   updatedAt: number;
   messageCount: number;
   workspacePath?: string | undefined;
+  worktreePath?: string | undefined;
 }
 
 interface MessageHandlerDeps {
@@ -512,15 +514,22 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                 : undefined;
 
             if (!wasMessagePersisted(message.session_id, completedMsg.id)) {
-              void conversationAddMessage(message.session_id, {
-                id: completedMsg.id,
-                role: 'assistant',
-                content: completedMsg.content,
-                ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
-                createdAt: Date.now(),
-                ...(usageDto ? { usage: usageDto } : {}),
-                ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
-              });
+              // Get workspace/worktree paths for correct storage (auto-create with context)
+              const uiState = useUIStore.getState();
+              void conversationAddMessage(
+                message.session_id,
+                {
+                  id: completedMsg.id,
+                  role: 'assistant',
+                  content: completedMsg.content,
+                  ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
+                  createdAt: Date.now(),
+                  ...(usageDto ? { usage: usageDto } : {}),
+                  ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
+                },
+                uiState.workspacePath ?? undefined,
+                uiState.activeWorktreePath ?? undefined
+              );
             }
 
             return [...prev.slice(0, -1), completedMsg];
@@ -612,6 +621,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           updatedAt: Date.now(),
           messageCount: 0,
           ...(message.workspace_path ? { workspacePath: message.workspace_path } : {}),
+          ...(message.worktree_path ? { worktreePath: message.worktree_path } : {}),
         });
         switchSession(message.session_id); // Switch to new session (resets usage for new conversation)
         onSessionCreated?.(message.session_id, message.title);
@@ -629,6 +639,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               updatedAt: c.updated_at,
               messageCount: c.message_count,
               ...(c.workspace_path ? { workspacePath: c.workspace_path } : {}),
+              ...(c.worktree_path ? { worktreePath: c.worktree_path } : {}),
             }))
           );
         }

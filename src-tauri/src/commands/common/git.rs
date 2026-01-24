@@ -192,13 +192,36 @@ pub async fn git_worktree_add(
 }
 
 /// Remove a worktree.
+///
+/// # Arguments
+/// * `repo_path` - Path to the main repository
+/// * `worktree_path` - Path to the worktree to remove
+/// * `force` - Force removal even if worktree has uncommitted changes
+/// * `delete_branch` - Also delete the associated branch
 #[tauri::command]
 pub async fn git_worktree_remove(
     repo_path: String,
     worktree_path: String,
     force: bool,
+    delete_branch: bool,
 ) -> Result<()> {
-    orbit_git::worktree_remove(Path::new(&repo_path), Path::new(&worktree_path), force)
+    orbit_git::worktree_remove(
+        Path::new(&repo_path),
+        Path::new(&worktree_path),
+        force,
+        delete_branch,
+    )
+    .await
+    .capture("git_worktree_remove")
+}
+
+/// Prune stale worktree entries.
+///
+/// Cleans up orphaned entries in `.git/worktrees/` that reference
+/// worktrees whose directories no longer exist.
+#[tauri::command]
+pub async fn git_worktree_prune(repo_path: String) -> Result<()> {
+    orbit_git::worktree_prune(Path::new(&repo_path))
         .await
-        .capture("git_worktree_remove")
+        .capture("git_worktree_prune")
 }

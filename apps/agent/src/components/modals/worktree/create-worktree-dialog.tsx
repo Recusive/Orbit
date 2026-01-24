@@ -52,15 +52,20 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
   const addWorktree = useUIStore((s) => s.addWorktree);
 
   // Form state
-  const [branchName, setBranchName] = useState('');
+  const [newBranchName, setNewBranchName] = useState('');
   const [createNewBranch, setCreateNewBranch] = useState(true);
   const [baseBranch, setBaseBranch] = useState('');
+  const [selectedExistingBranch, setSelectedExistingBranch] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Available branches for base selection
+  // Available branches for selection
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
+
+  // Filter branches that can be checked out (not already in a worktree)
+  // For now, we just filter out the current branch since it's checked out in main worktree
+  const availableBranches = useMemo(() => branches.filter((b) => !b.isCurrent), [branches]);
 
   // Load branches when dialog opens
   useEffect(() => {
@@ -89,15 +94,19 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
-      setBranchName('');
+      setNewBranchName('');
+      setSelectedExistingBranch('');
       setCreateNewBranch(true);
       setError(null);
     }
   }, [open]);
 
+  // Get the effective branch name based on mode
+  const effectiveBranchName = createNewBranch ? newBranchName : selectedExistingBranch;
+
   // Compute worktree path based on branch name
   const worktreePath = useMemo(() => {
-    if (!workspacePath || !branchName) return '';
+    if (!workspacePath || !effectiveBranchName) return '';
 
     // Get parent directory and repo name
     const parts = workspacePath.split(PATH_SEPARATOR_RE);
@@ -105,13 +114,13 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
     const parentDir = parts.join('/');
 
     // Sanitize branch name for filesystem
-    const safeBranchName = branchName.replace(UNSAFE_FS_CHARS_RE, '-');
+    const safeBranchName = effectiveBranchName.replace(UNSAFE_FS_CHARS_RE, '-');
 
     return `${parentDir}/${repoName}-${safeBranchName}`;
-  }, [workspacePath, branchName]);
+  }, [workspacePath, effectiveBranchName]);
 
   const handleCreate = useCallback(async (): Promise<void> => {
-    if (!workspacePath || !branchName || !worktreePath) return;
+    if (!workspacePath || !effectiveBranchName || !worktreePath) return;
 
     setIsCreating(true);
     setError(null);
@@ -120,12 +129,12 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
       // Build options carefully to satisfy exactOptionalPropertyTypes
       const options: Parameters<typeof gitWorktreeAdd>[2] = {};
       if (createNewBranch) {
-        options.newBranch = branchName;
+        options.newBranch = newBranchName;
         if (baseBranch) {
           options.commitIsh = baseBranch;
         }
       } else {
-        options.commitIsh = branchName;
+        options.commitIsh = selectedExistingBranch;
       }
       const worktree = await gitWorktreeAdd(workspacePath, worktreePath, options);
 
@@ -156,7 +165,9 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
     }
   }, [
     workspacePath,
-    branchName,
+    effectiveBranchName,
+    newBranchName,
+    selectedExistingBranch,
     worktreePath,
     createNewBranch,
     baseBranch,
@@ -167,15 +178,15 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>): void => {
-      if (e.key === 'Enter' && branchName) {
+      if (e.key === 'Enter' && effectiveBranchName) {
         e.preventDefault();
         void handleCreate();
       }
     },
-    [branchName, handleCreate]
+    [effectiveBranchName, handleCreate]
   );
 
-  const isValid = branchName.length > 0 && worktreePath.length > 0;
+  const isValid = effectiveBranchName.length > 0 && worktreePath.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -188,56 +199,102 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          {/* Branch name input */}
-          <div className="grid gap-2">
-            <label htmlFor="branch-name" className="text-sm font-medium">
-              Branch Name
-            </label>
-            <div className="relative">
-              <GitBranch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="branch-name"
-                placeholder={createNewBranch ? 'feature/my-feature' : 'existing-branch'}
-                value={branchName}
-                onChange={(e) => {
-                  setBranchName(e.target.value);
-                }}
-                onKeyDown={handleKeyDown}
-                className="pl-9"
-                autoFocus
-              />
-            </div>
-          </div>
-
           {/* Create new branch toggle */}
           <div className="flex items-center justify-between">
-            <span className="text-sm">Create new branch</span>
+            <span className="text-sm font-medium">Create new branch</span>
             <Switch checked={createNewBranch} onCheckedChange={setCreateNewBranch} />
           </div>
 
-          {/* Base branch selector (only when creating new branch) */}
           {createNewBranch ? (
-            <div className="grid gap-2">
-              <label htmlFor="base-branch" className="text-sm font-medium">
-                Base Branch
-              </label>
-              <Select value={baseBranch} onValueChange={setBaseBranch} disabled={loadingBranches}>
-                <SelectTrigger id="base-branch">
-                  <SelectValue
-                    placeholder={loadingBranches ? 'Loading branches...' : 'Select base branch'}
+            /* New branch mode: text input + base branch selector */
+            <>
+              <div className="grid gap-2">
+                <label htmlFor="new-branch-name" className="text-sm font-medium">
+                  New Branch Name
+                </label>
+                <div className="relative">
+                  <GitBranch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="new-branch-name"
+                    placeholder="feature/my-feature"
+                    value={newBranchName}
+                    onChange={(e) => {
+                      setNewBranchName(e.target.value);
+                    }}
+                    onKeyDown={handleKeyDown}
+                    className="pl-9"
+                    autoFocus
                   />
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <label htmlFor="base-branch" className="text-sm font-medium">
+                  Base Branch
+                </label>
+                <Select value={baseBranch} onValueChange={setBaseBranch} disabled={loadingBranches}>
+                  <SelectTrigger id="base-branch">
+                    <SelectValue
+                      placeholder={loadingBranches ? 'Loading branches...' : 'Select base branch'}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.name} value={branch.name}>
+                        {branch.name}
+                        {branch.isCurrent ? ' (current)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : (
+            /* Existing branch mode: dropdown selector */
+            <div className="grid gap-2">
+              <label htmlFor="existing-branch" className="text-sm font-medium">
+                Select Branch
+              </label>
+              <Select
+                value={selectedExistingBranch}
+                onValueChange={setSelectedExistingBranch}
+                disabled={loadingBranches}
+              >
+                <SelectTrigger id="existing-branch">
+                  <div className="flex items-center gap-2">
+                    <GitBranch className="h-4 w-4 text-muted-foreground" />
+                    <SelectValue
+                      placeholder={
+                        loadingBranches
+                          ? 'Loading branches...'
+                          : availableBranches.length === 0
+                            ? 'No branches available'
+                            : 'Select a branch'
+                      }
+                    />
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.name} value={branch.name}>
-                      {branch.name}
-                      {branch.isCurrent ? ' (current)' : ''}
-                    </SelectItem>
-                  ))}
+                  {availableBranches.length === 0 ? (
+                    <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                      All branches are already checked out
+                    </div>
+                  ) : (
+                    availableBranches.map((branch) => (
+                      <SelectItem key={branch.name} value={branch.name}>
+                        {branch.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
+              {availableBranches.length === 0 && !loadingBranches ? (
+                <p className="text-xs text-muted-foreground">
+                  Create a new branch instead, or close worktrees to free up branches.
+                </p>
+              ) : null}
             </div>
-          ) : null}
+          )}
 
           {/* Worktree path preview */}
           <div className="grid gap-2">

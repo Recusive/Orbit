@@ -1,8 +1,13 @@
+import { createLogger } from '@orbit/common/lib';
+
 import type { RewindContextMessage } from './types/tauri-types';
 import type { SessionConfig } from '@/lib/api';
 
 import { agentCreateSession, getWorkspacePath } from '@/lib/api';
 import { useToolStore } from '@/stores/agent/tool-store';
+import { useUIStore } from '@/stores/ui/ui-store';
+
+const logger = createLogger('TauriSession');
 
 // ═══════════════════════════════════════════════════════════════
 // Session State
@@ -48,7 +53,7 @@ export const rewindContextMap = new Map<string, RewindContextMessage[]>();
 /** Mark a session as forked from another SDK session (for file checkpointing only) */
 export function markSessionAsForked(newSessionId: string, resumeFromSdkSessionId: string): void {
   forkedSessionResumeMap.set(newSessionId, { sdkSessionId: resumeFromSdkSessionId });
-  console.warn('[Orbit] Marked session as forked (for checkpointing):', {
+  logger.debug('Marked session as forked (for checkpointing)', {
     newSessionId,
     resumeFromSdkSessionId,
   });
@@ -60,7 +65,7 @@ export function markSessionAsForked(newSessionId: string, resumeFromSdkSessionId
  */
 export function setRewindContext(sessionId: string, messages: RewindContextMessage[]): void {
   rewindContextMap.set(sessionId, messages);
-  console.warn('[Orbit] Stored rewind context:', {
+  logger.debug('Stored rewind context', {
     sessionId,
     messageCount: messages.length,
   });
@@ -75,7 +80,7 @@ export function consumeRewindContext(sessionId: string): RewindContextMessage[] 
   const context = rewindContextMap.get(sessionId);
   if (context) {
     rewindContextMap.delete(sessionId);
-    console.warn('[Orbit] Consuming rewind context:', {
+    logger.debug('Consuming rewind context', {
       sessionId,
       messageCount: context.length,
     });
@@ -91,7 +96,9 @@ export async function ensureSession(sessionId: string): Promise<void> {
   }
 
   // Get current workspace for session config
-  const cwd = await getWorkspacePath();
+  // Prefer active worktree path for multi-agent isolation, fall back to workspace
+  const activeWorktreePath = useUIStore.getState().activeWorktreePath;
+  const cwd = activeWorktreePath ?? (await getWorkspacePath());
 
   // Get current mode settings from tool store
   // This ensures Plan agents (and any user-selected mode) are applied at session creation
@@ -123,7 +130,7 @@ export async function ensureSession(sessionId: string): Promise<void> {
     // For rewind forks, we create a FRESH session (no SDK resume)
     // The conversation context is handled by prepending to the first message
     // File checkpoints were already rewound before the fork was created
-    console.warn('[Orbit] Creating fresh session for rewind fork:', {
+    logger.debug('Creating fresh session for rewind fork', {
       sessionId,
       originalSdkSession: resumeConfig.sdkSessionId,
       note: 'NOT using SDK resume - context will be prepended to first message',
@@ -136,8 +143,13 @@ export async function ensureSession(sessionId: string): Promise<void> {
 
   createdSessions.add(sessionId);
 
+  // Record session → worktree association for multi-agent isolation
+  if (activeWorktreePath) {
+    useUIStore.getState().recordSessionWorktree(sessionId, activeWorktreePath);
+  }
+
   // Session is immediately ready to receive messages after agentCreateSession() returns.
   // The SDK's MessageQueue is created and waiting for messages. When we send the first
   // message, it unblocks the iterator, and the SDK starts processing (including system:init).
-  console.warn('[Orbit] Session created and ready:', sessionId);
+  logger.info('Session created and ready', { sessionId });
 }

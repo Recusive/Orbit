@@ -5,6 +5,7 @@ import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import type { WorktreeInfo } from '@/lib/api';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
@@ -18,6 +19,39 @@ import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('PrimarySidebar');
 
+/**
+ * Checks if a conversation belongs to the currently active worktree context.
+ *
+ * This handles three scenarios:
+ * 1. Direct match: conversation's worktreePath equals activeWorktreePath
+ * 2. Legacy fallback: no worktreePath, but workspacePath matches activeWorktreePath
+ * 3. No worktree context: both are null/undefined (worktree feature not active)
+ *
+ * @param conversation - The conversation to check (can be undefined)
+ * @param activeWorktreePath - The currently active worktree path (can be null)
+ * @returns true if the conversation belongs to the current worktree context
+ */
+function conversationBelongsToWorktree(
+  conversation: ConversationSummary | undefined,
+  activeWorktreePath: string | null
+): boolean {
+  if (!conversation) return false;
+
+  const convWorktree = conversation.worktreePath ?? null;
+  const convWorkspace = conversation.workspacePath ?? null;
+
+  // Direct match: worktreePath equals activeWorktreePath
+  if (convWorktree === activeWorktreePath) return true;
+
+  // Legacy fallback: no worktreePath, but workspacePath matches
+  if (convWorktree === null && convWorkspace === activeWorktreePath) return true;
+
+  // No worktree context: both null means conversation belongs to current context
+  if (convWorktree === null && activeWorktreePath === null) return true;
+
+  return false;
+}
+
 interface UseSidebarActionsProps {
   conversations: ConversationSummary[];
   activeConversationId: string | null;
@@ -26,16 +60,21 @@ interface UseSidebarActionsProps {
 }
 
 interface UseSidebarActionsReturn {
-  // Delete dialog state
+  // Conversation delete dialog state
   deleteDialogOpen: boolean;
   setDeleteDialogOpen: (open: boolean) => void;
   conversationToDelete: ConversationSummary | null;
+  // Worktree delete dialog state
+  worktreeDeleteDialogOpen: boolean;
+  setWorktreeDeleteDialogOpen: (open: boolean) => void;
+  worktreeToDelete: WorktreeInfo | null;
   // Handlers
   handleStartConversation: () => void;
   handleLoadConversation: (sessionId: string) => void;
   handleOpenQuickSearch: () => void;
   handleOpenCreateWorktree: () => void;
-  handleRemoveWorktree: (worktreePath: string) => Promise<void>;
+  handleOpenDeleteWorktreeDialog: (worktree: WorktreeInfo) => void;
+  handleRemoveWorktree: (deleteBranch: boolean) => Promise<void>;
   handleRenameConversation: (sessionId: string, newTitle: string) => Promise<void>;
   handleDeleteConversation: (sessionId: string) => Promise<void>;
   handleOpenDeleteDialog: (conv: ConversationSummary) => void;
@@ -70,31 +109,61 @@ export const useSidebarActions = ({
     null
   );
 
+  // Worktree delete dialog state
+  const [worktreeDeleteDialogOpen, setWorktreeDeleteDialogOpen] = useState(false);
+  const [worktreeToDelete, setWorktreeToDelete] = useState<WorktreeInfo | null>(null);
+
   // Load worktrees when workspace changes
+  // NOTE: This should only run when workspacePath changes, not when activeWorktreePath changes.
+  // Including activeWorktreePath would cause all worktrees to reset isExpanded on every selection.
   const loadWorktrees = useCallback(async (): Promise<void> => {
     if (!workspacePath) return;
 
     try {
       const worktreeList = await gitWorktreeList(workspacePath);
+
+      // Preserve existing isExpanded state when refreshing worktree list
+      const existingWorktrees = useUIStore.getState().worktrees;
+      const existingExpandedMap = new Map(
+        existingWorktrees.map((wt) => [wt.worktree.path, wt.isExpanded])
+      );
+
       const worktreeStates: WorktreeUIState[] = worktreeList.map((wt) => ({
         worktree: wt,
-        isExpanded: true,
+        // Preserve existing isExpanded state, default to true for new worktrees
+        isExpanded: existingExpandedMap.get(wt.path) ?? true,
       }));
       setWorktrees(worktreeStates);
 
-      // Set active worktree to main if not set
-      if (!activeWorktreePath) {
+      // CRITICAL: Validate activeWorktreePath against the new worktree list.
+      // A stale path from a prior workspace could drive file/git/terminal ops to wrong directory.
+      const currentActiveWorktree = useUIStore.getState().activeWorktreePath;
+      const worktreePaths = new Set(worktreeList.map((wt) => wt.path));
+      const isActiveWorktreeValid =
+        currentActiveWorktree !== null && worktreePaths.has(currentActiveWorktree);
+
+      if (!isActiveWorktreeValid) {
+        // Reset to main worktree (or first available) when active is invalid/stale
         const mainWorktree = worktreeList.find((wt) => wt.isMain);
-        if (mainWorktree) {
-          setActiveWorktree(mainWorktree.path);
+        const fallbackWorktree = mainWorktree ?? worktreeList[0];
+        if (fallbackWorktree) {
+          logger.info('Resetting stale activeWorktreePath', {
+            stale: currentActiveWorktree,
+            newPath: fallbackWorktree.path,
+          });
+          setActiveWorktree(fallbackWorktree.path);
+        } else {
+          // No worktrees available - clear the active path
+          setActiveWorktree(null);
         }
       }
     } catch {
       logger.warn('Failed to load worktrees (may not be a git repo)');
-      // Not a git repo or error - clear worktrees
+      // Not a git repo or error - clear worktrees and reset active worktree
       setWorktrees([]);
+      setActiveWorktree(null);
     }
-  }, [workspacePath, activeWorktreePath, setWorktrees, setActiveWorktree]);
+  }, [workspacePath, setWorktrees, setActiveWorktree]);
 
   // Auto-load worktrees on workspace change
   useEffect(() => {
@@ -105,8 +174,12 @@ export const useSidebarActions = ({
     // Close vault if open
     setVaultOpen(false);
     // Skip if current conversation is empty (title still "Untitled" means no message sent)
+    // BUT only if it belongs to the current worktree - allow new session after switching worktrees
     const activeConv = conversations.find((c) => c.sessionId === activeConversationId);
-    if (activeConv?.title === 'Untitled') {
+    if (
+      activeConv?.title === 'Untitled' &&
+      conversationBelongsToWorktree(activeConv, activeWorktreePath)
+    ) {
       return;
     }
     postMessage({
@@ -114,8 +187,16 @@ export const useSidebarActions = ({
       uuid: crypto.randomUUID(),
       title: 'Untitled',
       workspace_path: workspacePath ?? undefined,
+      worktree_path: activeWorktreePath ?? undefined,
     });
-  }, [conversations, activeConversationId, workspacePath, postMessage, setVaultOpen]);
+  }, [
+    conversations,
+    activeConversationId,
+    workspacePath,
+    activeWorktreePath,
+    postMessage,
+    setVaultOpen,
+  ]);
 
   const handleLoadConversation = useCallback(
     (sessionId: string): void => {
@@ -153,20 +234,40 @@ export const useSidebarActions = ({
     setCreateWorktreeDialogOpen(true);
   }, [setCreateWorktreeDialogOpen]);
 
+  // Open delete worktree confirmation dialog
+  const handleOpenDeleteWorktreeDialog = useCallback((worktree: WorktreeInfo): void => {
+    setWorktreeToDelete(worktree);
+    setWorktreeDeleteDialogOpen(true);
+  }, []);
+
+  // Remove worktree (called from dialog confirmation)
   const handleRemoveWorktree = useCallback(
-    async (worktreePath: string): Promise<void> => {
-      if (!workspacePath) return;
+    async (deleteBranch: boolean): Promise<void> => {
+      if (!workspacePath || !worktreeToDelete) return;
 
       try {
-        await gitWorktreeRemove(workspacePath, worktreePath, false);
-        removeWorktree(worktreePath);
-        logger.info('Removed worktree', { path: worktreePath });
+        await gitWorktreeRemove(workspacePath, worktreeToDelete.path, {
+          force: false,
+          deleteBranch,
+        });
+        removeWorktree(worktreeToDelete.path);
+        logger.info('Removed worktree', {
+          path: worktreeToDelete.path,
+          deletedBranch: deleteBranch ? worktreeToDelete.branch : null,
+        });
+        setWorktreeDeleteDialogOpen(false);
+        setWorktreeToDelete(null);
+        toast.success(
+          deleteBranch && worktreeToDelete.branch !== null
+            ? `Worktree and branch "${worktreeToDelete.branch}" deleted`
+            : 'Worktree deleted'
+        );
       } catch (err) {
         logger.error('Failed to remove worktree', err);
         toast.error('Failed to remove worktree');
       }
     },
-    [workspacePath, removeWorktree]
+    [workspacePath, worktreeToDelete, removeWorktree]
   );
 
   // Conversation rename handler
@@ -224,10 +325,14 @@ export const useSidebarActions = ({
     deleteDialogOpen,
     setDeleteDialogOpen,
     conversationToDelete,
+    worktreeDeleteDialogOpen,
+    setWorktreeDeleteDialogOpen,
+    worktreeToDelete,
     handleStartConversation,
     handleLoadConversation,
     handleOpenQuickSearch,
     handleOpenCreateWorktree,
+    handleOpenDeleteWorktreeDialog,
     handleRemoveWorktree,
     handleRenameConversation,
     handleDeleteConversation,

@@ -1,7 +1,11 @@
+import { createLogger } from '@orbit/common/lib';
+
 import { initFileWatcher } from '../use-tauri-file-watcher';
 
 import type { FileEntry } from '@/lib/api';
 import type { WebviewMessage } from '@/types/protocol';
+
+const logger = createLogger('FileHandlers');
 
 import {
   buildFileIndex,
@@ -19,8 +23,12 @@ export async function handleFileTreeRequest(
   try {
     // Get workspace path or use provided path
     let targetPath: string | undefined = message.path;
+
+    // Get current workspace FIRST to compare later
+    const initialWorkspace = await getWorkspacePath();
+
     if (targetPath === undefined || targetPath === '') {
-      const storedPath = await getWorkspacePath();
+      const storedPath = initialWorkspace;
       if (!storedPath) {
         // ─────────────────────────────────────────────────────────────────────
         // WORKSPACE SANDBOXING (January 2026)
@@ -67,21 +75,48 @@ export async function handleFileTreeRequest(
           useUIStore.getState().setConversations(toConversationSummaries(conversations));
         })
         .catch((err: unknown) => {
-          console.warn('[Orbit] Failed to load conversations:', err);
+          logger.warn('Failed to load conversations', { error: err });
         });
 
       // Start watching the workspace for file changes (for auto-refresh)
       initFileWatcher(targetPath).catch((err: unknown) => {
-        console.warn('[Orbit] Failed to initialize file watcher:', err);
+        logger.warn('Failed to initialize file watcher', { error: err });
       });
 
       // Build file index for fuzzy search (@ mentions)
       buildFileIndex(targetPath).catch((err: unknown) => {
-        console.warn('[Orbit] Failed to build file index:', err);
+        logger.warn('Failed to build file index', { error: err });
       });
     }
 
-    const entries = await listDirectory(targetPath, false);
+    // Check if workspace changed during async operations (stale request protection)
+    // This can happen when switching worktrees - a request for the old workspace
+    // might still be in flight when the workspace changes. Skip stale requests
+    // to avoid "Permission denied" errors and prevent overwriting new workspace data.
+    const currentWorkspace = await getWorkspacePath();
+    if (currentWorkspace && initialWorkspace && initialWorkspace !== currentWorkspace) {
+      // Workspace changed while processing - this is a stale request
+      // Send an empty response so the UI doesn't hang waiting, but don't provide stale data
+      logger.debug('Dropping stale file tree request: workspace changed', {
+        requestedPath: initialWorkspace,
+        currentWorkspace,
+        requestUuid: message.uuid,
+      });
+      window.postMessage(
+        {
+          type: 'file:tree:response',
+          uuid: crypto.randomUUID(),
+          request_uuid: message.uuid,
+          path: initialWorkspace,
+          children: [],
+          stale: true, // Flag for UI to know this was dropped due to staleness
+        },
+        '*'
+      );
+      return;
+    }
+
+    const entries = await listDirectory(targetPath, true);
 
     // Convert FileEntry to FileNode format
     const children = entries.map((entry: FileEntry) => ({
@@ -90,6 +125,7 @@ export async function handleFileTreeRequest(
       isDirectory: entry.isDir,
       isFile: !entry.isDir,
       isSymlink: entry.isSymlink,
+      isGitIgnored: entry.isGitIgnored,
     }));
 
     window.postMessage(
@@ -103,7 +139,9 @@ export async function handleFileTreeRequest(
       '*'
     );
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    // Tauri invoke rejects with a string (not Error), so handle both cases
+    const errorMessage =
+      err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
     window.postMessage(
       {
         type: 'file:tree:error',

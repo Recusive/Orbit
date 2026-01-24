@@ -13,6 +13,9 @@ import type { ConversationSummaryDto } from '@/lib/api/conversations';
  *
  * This eliminates code duplication across multiple files that
  * previously had inline `.map()` calls with the same transformation.
+ *
+ * CRITICAL: The worktreePath field must be mapped here for sidebar
+ * grouping by worktree to work correctly.
  */
 export function toConversationSummaries(dtos: ConversationSummaryDto[]): {
   sessionId: string;
@@ -20,6 +23,7 @@ export function toConversationSummaries(dtos: ConversationSummaryDto[]): {
   updatedAt: number;
   messageCount: number;
   workspacePath?: string;
+  worktreePath?: string;
 }[] {
   return dtos.map((c) => ({
     sessionId: c.sessionId,
@@ -27,5 +31,6 @@ export function toConversationSummaries(dtos: ConversationSummaryDto[]): {
     updatedAt: c.updatedAt,
     messageCount: c.messageCount,
     ...(c.workspacePath !== undefined ? { workspacePath: c.workspacePath } : {}),
+    ...(c.worktreePath !== undefined ? { worktreePath: c.worktreePath } : {}),
   }));
 }

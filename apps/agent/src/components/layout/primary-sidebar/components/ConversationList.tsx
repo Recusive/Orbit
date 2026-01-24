@@ -2,7 +2,7 @@
  * ConversationList - Renders worktree groups with nested conversations
  */
 import { Plus } from 'lucide-react';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 /** Indentation for conversation items nested under workspace (px) */
 const CONVERSATION_INDENT_PX = 19;
@@ -10,6 +10,7 @@ const CONVERSATION_INDENT_PX = 19;
 import { ConversationItem } from './ConversationItem';
 import { WorkspaceItem } from './WorkspaceItem';
 
+import type { WorktreeInfo } from '@/lib/api';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
@@ -31,7 +32,9 @@ interface ConversationListProps {
   readonly onDeleteConversation: (conv: ConversationSummary) => void;
   readonly onDuplicateConversation: (sessionId: string) => void;
   readonly onToggleWorktree: (path: string) => void;
-  readonly onRemoveWorktree: (path: string) => void;
+  /** Called when user clicks on a worktree to switch to it as active workspace */
+  readonly onSelectWorktree: (path: string) => void;
+  readonly onRemoveWorktree: (worktree: WorktreeInfo) => void;
   readonly onOpenCreateWorktree: () => void;
 }
 
@@ -50,31 +53,70 @@ export const ConversationList: FC<ConversationListProps> = ({
   onDeleteConversation,
   onDuplicateConversation,
   onToggleWorktree,
+  onSelectWorktree,
   onRemoveWorktree,
   onOpenCreateWorktree,
 }) => {
   // Build a Map of worktree path -> conversations for O(1) lookups
   // This avoids O(n*m) complexity from filtering conversations for each worktree
+  // Also pre-computes legacy conversation handling to avoid O(n) filter on each render
   const conversationsByWorktree = useMemo(() => {
     const map = new Map<string, ConversationSummary[]>();
+    const legacyConversations: ConversationSummary[] = [];
+
+    // Find main worktree path (once, not per-render)
+    const mainWt = worktrees.find((wt) => wt.worktree.isMain);
+    const mainPath = mainWt?.worktree.path ?? null;
+
+    // Build set of all worktree paths for fast lookup
+    const worktreePaths = new Set(worktrees.map((wt) => wt.worktree.path));
+
     for (const conv of conversations) {
-      const path = conv.workspacePath;
-      if (path) {
-        const existing = map.get(path);
+      if (conv.worktreePath) {
+        // Modern conversation with explicit worktreePath
+        const existing = map.get(conv.worktreePath);
         if (existing) {
           existing.push(conv);
         } else {
-          map.set(path, [conv]);
+          map.set(conv.worktreePath, [conv]);
+        }
+      } else if (conv.workspacePath) {
+        // Legacy conversation (no worktreePath)
+        // Check if workspacePath matches any worktree path
+        if (worktreePaths.has(conv.workspacePath)) {
+          // workspacePath matches a worktree - group under that worktree
+          const existing = map.get(conv.workspacePath);
+          if (existing) {
+            existing.push(conv);
+          } else {
+            map.set(conv.workspacePath, [conv]);
+          }
+        } else {
+          // workspacePath doesn't match any worktree - treat as legacy
+          // These will be shown under the main worktree
+          legacyConversations.push(conv);
         }
       }
     }
+
+    // Map all legacy conversations to main worktree
+    // This ensures they're visible even when workspacePath differs from any worktree path
+    if (mainPath && legacyConversations.length > 0) {
+      const mainConversations = map.get(mainPath) ?? [];
+      map.set(mainPath, [...mainConversations, ...legacyConversations]);
+    }
+
     return map;
-  }, [conversations]);
+  }, [conversations, worktrees]);
 
   // Helper to get conversations for a specific worktree path (O(1) lookup)
-  const getWorktreeConversations = (worktreePath: string): ConversationSummary[] => {
-    return conversationsByWorktree.get(worktreePath) ?? [];
-  };
+  // All legacy conversation handling is pre-computed in useMemo above
+  const getWorktreeConversations = useCallback(
+    (worktreePath: string): ConversationSummary[] => {
+      return conversationsByWorktree.get(worktreePath) ?? [];
+    },
+    [conversationsByWorktree]
+  );
 
   // Render conversation items for a given list
   const renderConversations = (convList: ConversationSummary[]): React.ReactNode => {
@@ -149,8 +191,11 @@ export const ConversationList: FC<ConversationListProps> = ({
                   onToggle={() => {
                     onToggleWorktree(wt.worktree.path);
                   }}
+                  onSelect={() => {
+                    onSelectWorktree(wt.worktree.path);
+                  }}
                   onRemove={() => {
-                    onRemoveWorktree(wt.worktree.path);
+                    onRemoveWorktree(wt.worktree);
                   }}
                 />
                 {/* Conversations for this worktree */}

@@ -80,7 +80,7 @@ export const MessageActions: FC<MessageActionsProps> = ({
       </div>
       {showDisclaimer ? (
         <p className="text-sm text-muted-foreground/60">
-          Orbit is AI and can make mistakes. Please double-check responses.
+          AI may make mistakes. Double-check all generated code.
         </p>
       ) : null}
     </div>

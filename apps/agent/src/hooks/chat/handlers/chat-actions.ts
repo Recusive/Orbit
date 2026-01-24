@@ -14,6 +14,7 @@ interface Conversation {
   updatedAt: number;
   messageCount: number;
   workspacePath?: string | undefined;
+  worktreePath?: string | undefined;
 }
 
 interface ChatActionsDeps {
@@ -25,6 +26,7 @@ interface ChatActionsDeps {
   setIsAgentRunning: React.Dispatch<React.SetStateAction<boolean>>;
   conversations: Conversation[];
   workspacePath: string | null;
+  activeWorktreePath: string | null;
   messagesCache: React.RefObject<Map<string, ChatMessage[]>>;
   setPendingMessage: React.Dispatch<
     React.SetStateAction<{
@@ -78,6 +80,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     setIsAgentRunning,
     conversations,
     workspacePath,
+    activeWorktreePath,
     messagesCache,
     setPendingMessage,
     postMessage,
@@ -147,6 +150,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
             uuid: crypto.randomUUID(),
             title: text,
             workspace_path: workspacePath ?? undefined,
+            worktree_path: activeWorktreePath ?? undefined,
           });
           return;
         }
@@ -190,13 +194,18 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         setMessages((prev) => [...prev, userMessage]);
         setIsAgentRunning(true);
 
-        // Persist user message to backend
-        void conversationAddMessage(sessionId, {
-          id: userMessage.id,
-          role: 'user',
-          content: text,
-          createdAt: Date.now(),
-        });
+        // Persist user message to backend (include workspace/worktree paths for correct storage)
+        void conversationAddMessage(
+          sessionId,
+          {
+            id: userMessage.id,
+            role: 'user',
+            content: text,
+            createdAt: Date.now(),
+          },
+          workspacePath ?? undefined,
+          activeWorktreePath ?? undefined
+        );
 
         // Build context object with files, images, and/or elements
         const hasFiles = contextFiles && contextFiles.length > 0;
@@ -263,13 +272,18 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
             // Persist interrupted assistant message to backend (if it has content)
             if (interruptedMsg.content) {
-              void conversationAddMessage(sessionId, {
-                id: interruptedMsg.id,
-                role: 'assistant',
-                content: interruptedMsg.content,
-                ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
-                createdAt: Date.now(),
-              });
+              void conversationAddMessage(
+                sessionId,
+                {
+                  id: interruptedMsg.id,
+                  role: 'assistant',
+                  content: interruptedMsg.content,
+                  ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
+                  createdAt: Date.now(),
+                },
+                workspacePath ?? undefined,
+                activeWorktreePath ?? undefined
+              );
             }
 
             return [...prev.slice(0, -1), interruptedMsg];
@@ -390,13 +404,18 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
         // Persist interrupted assistant message to backend (if it has content)
         if (interruptedMsg.content) {
-          void conversationAddMessage(sessionId, {
-            id: interruptedMsg.id,
-            role: 'assistant',
-            content: interruptedMsg.content,
-            ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
-            createdAt: Date.now(),
-          });
+          void conversationAddMessage(
+            sessionId,
+            {
+              id: interruptedMsg.id,
+              role: 'assistant',
+              content: interruptedMsg.content,
+              ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
+              createdAt: Date.now(),
+            },
+            workspacePath ?? undefined,
+            activeWorktreePath ?? undefined
+          );
         }
 
         return [...prev.slice(0, -1), interruptedMsg];

@@ -321,16 +321,17 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     };
   }, [sessionId, messageHandler]);
 
-  // Request conversation list when session is ready or workspace changes
+  // Request conversation list when session is ready or workspace/worktree changes
   useEffect(() => {
     if (sessionId || workspacePath) {
       postMessage({
         type: 'conversation:list',
         uuid: crypto.randomUUID(),
         workspace_path: workspacePath ?? undefined,
+        worktree_path: activeWorktreePath ?? undefined,
       });
     }
-  }, [sessionId, workspacePath, postMessage]);
+  }, [sessionId, workspacePath, activeWorktreePath, postMessage]);
 
   // Load messages from backend when switching to a session with empty local cache
   // This handles the case where:
@@ -427,13 +428,20 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setMessages((prev: ChatMessage[]) => [...prev, userMessage]);
       setIsAgentRunning(true);
 
-      // Persist user message to backend
-      void conversationAddMessage(sessionId, {
-        id: userMessage.id,
-        role: 'user',
-        content: text,
-        createdAt: Date.now(),
-      });
+      // Persist user message to backend (include workspace/worktree paths for correct storage)
+      // Read paths via getState() to avoid stale closures and unnecessary dependency triggers
+      const uiState = useUIStore.getState();
+      void conversationAddMessage(
+        sessionId,
+        {
+          id: userMessage.id,
+          role: 'user',
+          content: text,
+          createdAt: Date.now(),
+        },
+        uiState.workspacePath ?? undefined,
+        uiState.activeWorktreePath ?? undefined
+      );
 
       // Build context object with files, images, and/or elements
       const hasFiles = contextFiles && contextFiles.length > 0;
@@ -481,9 +489,9 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       isAgentRunning,
       setIsAgentRunning,
       conversations,
-      // Use active worktree path for worktree-based session isolation
-      // Falls back to workspace path if no worktree is active
-      workspacePath: activeWorktreePath ?? workspacePath,
+      // Keep workspace path and worktree path separate for proper grouping
+      workspacePath,
+      activeWorktreePath,
       messagesCache,
       setPendingMessage,
       postMessage,

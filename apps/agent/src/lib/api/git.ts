@@ -260,16 +260,51 @@ export async function gitWorktreeAdd(
   });
 }
 
+/** Options for removing a worktree */
+export interface WorktreeRemoveOptions {
+  /** Force removal even if worktree has uncommitted changes */
+  force?: boolean;
+  /** Also delete the associated branch */
+  deleteBranch?: boolean;
+}
+
 /**
  * Remove a worktree.
+ *
+ * Note: This automatically calls `git worktree prune` after removal to
+ * clean up any stale worktree metadata and prevent "path already exists"
+ * errors when recreating worktrees with the same name.
+ *
  * @param repoPath - Path to the main repository
  * @param worktreePath - Path to the worktree to remove
- * @param force - Force removal even if worktree has uncommitted changes
+ * @param options - Removal options (force, deleteBranch)
  */
 export async function gitWorktreeRemove(
   repoPath: string,
   worktreePath: string,
-  force?: boolean
+  options?: WorktreeRemoveOptions
 ): Promise<void> {
-  return invoke('git_worktree_remove', { repoPath, worktreePath, force: force ?? false });
+  return invoke('git_worktree_remove', {
+    repoPath,
+    worktreePath,
+    force: options?.force ?? false,
+    deleteBranch: options?.deleteBranch ?? false,
+  });
+}
+
+/**
+ * Prune stale worktree entries.
+ *
+ * Cleans up orphaned metadata in `.git/worktrees/` that reference
+ * worktrees whose directories no longer exist. This is useful when
+ * worktrees were deleted manually without using `git worktree remove`.
+ *
+ * Note: `gitWorktreeRemove` automatically calls prune, so you typically
+ * don't need to call this manually unless worktrees were deleted through
+ * other means.
+ *
+ * @param repoPath - Path to the repository
+ */
+export async function gitWorktreePrune(repoPath: string): Promise<void> {
+  return invoke('git_worktree_prune', { repoPath });
 }

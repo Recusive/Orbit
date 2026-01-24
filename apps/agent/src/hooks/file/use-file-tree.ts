@@ -1,13 +1,107 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 
 import type { ExtensionMessage, FileNode } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
-import { lspDidOpen } from '@/lib/api';
+import { initFileWatcher } from '@/hooks/agent/use-tauri-file-watcher';
+import { buildFileIndex, lspDidOpen, setWorkspacePath } from '@/lib/api';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore, getLanguageFromPath } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
+
+// ═══════════════════════════════════════════════════════════════
+// Worktree → File Tree Sync
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Hook that syncs activeWorktreePath changes to the file tree.
+ * When the user switches worktrees, the file explorer should show
+ * the new worktree's directory structure.
+ *
+ * Also reinitializes file watcher and file index when worktree changes
+ * to ensure @-mentions and auto-refresh work in the new directory.
+ */
+export function useWorktreeFileTreeSync(): void {
+  const prevWorktreeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Initialize the ref with current value on mount
+    prevWorktreeRef.current = useUIStore.getState().activeWorktreePath;
+
+    // Handle initial mount - if there's an activeWorktreePath but
+    // the file store doesn't have a rootPath, sync them
+    const currentWorktree = useUIStore.getState().activeWorktreePath;
+    const currentRoot = useFileStore.getState().rootPath;
+
+    if (currentWorktree && currentWorktree !== currentRoot) {
+      // Update Rust workspace path first, then sync file store
+      setWorkspacePath(currentWorktree)
+        .then(() => {
+          useFileStore.getState().setRootPath(currentWorktree);
+        })
+        .catch((err: unknown) => {
+          logger.error('Failed to set initial workspace path for worktree', err);
+          toast.error('Failed to set workspace path. Some file operations may fail.');
+          // Still proceed with file store update - user has been notified
+          useFileStore.getState().setRootPath(currentWorktree);
+        });
+    }
+
+    // Subscribe to full state and manually check activeWorktreePath
+    // (Zustand doesn't have built-in selector subscriptions without middleware)
+    const cleanupWorktreeSubscription = useUIStore.subscribe((state) => {
+      const activeWorktree = state.activeWorktreePath;
+      const workspacePath = state.workspacePath;
+      const prevWorktree = prevWorktreeRef.current;
+
+      // Only trigger if the path actually changed
+      if (activeWorktree !== prevWorktree) {
+        // Determine the effective path: use activeWorktree, or fall back to workspacePath
+        const effectivePath = activeWorktree ?? workspacePath;
+
+        if (effectivePath) {
+          logger.info(`Worktree switched: ${prevWorktree ?? 'none'} → ${effectivePath}`);
+
+          // CRITICAL: Update the Rust backend's workspace path FIRST
+          // The Rust backend has workspace sandboxing that blocks file access
+          // outside the set workspace path. Without this, file operations to
+          // the worktree directory will fail with PermissionDenied.
+          setWorkspacePath(effectivePath)
+            .then(() => {
+              // setRootPath automatically clears the tree and triggers a refresh
+              useFileStore.getState().setRootPath(effectivePath);
+
+              // Reinitialize file watcher for auto-refresh in new directory
+              void initFileWatcher(effectivePath).catch((err: unknown) => {
+                logger.warn('Failed to reinitialize file watcher for worktree', { error: err });
+              });
+
+              // Rebuild file index for @-mentions in new directory
+              void buildFileIndex(effectivePath).catch((err: unknown) => {
+                logger.warn('Failed to rebuild file index for worktree', { error: err });
+              });
+            })
+            .catch((err: unknown) => {
+              logger.error('Failed to update workspace path for worktree', err);
+              toast.error('Failed to switch workspace. Some file operations may fail.');
+              // Still proceed with file store update - user has been notified
+              useFileStore.getState().setRootPath(effectivePath);
+            });
+        } else {
+          // No effective path available - clear the file store
+          logger.warn('No effective path available after worktree change');
+        }
+      }
+
+      // Update ref for next comparison
+      prevWorktreeRef.current = activeWorktree;
+    });
+
+    return cleanupWorktreeSubscription;
+  }, []);
+}
 
 const logger = createLogger('FileTree');
 
@@ -85,9 +179,18 @@ const EMPTY_CHILDREN: readonly FileNode[] = [];
 export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult {
   const { autoLoad = true, debug = false } = options;
 
-  // Track pending requests: path -> { uuid, timeoutId }
+  // Sync activeWorktreePath changes to file tree rootPath
+  // This ensures the file explorer shows the correct directory when worktrees are switched
+  useWorktreeFileTreeSync();
+
+  // Track pending requests: path -> { uuid, timeoutId, rootPath }
+  // The rootPath field allows us to ignore responses from stale requests
+  // when the workspace has changed (e.g., after worktree switch)
   const pendingRequests = useRef(
-    new Map<string, { uuid: string; timeoutId: ReturnType<typeof setTimeout> }>()
+    new Map<
+      string,
+      { uuid: string; timeoutId: ReturnType<typeof setTimeout>; rootPath: string | null }
+    >()
   );
 
   // Track previous treeNodes for detecting cleared cache
@@ -101,6 +204,8 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
     (message: ExtensionMessage): void => {
       switch (message.type) {
         case 'file:tree:response': {
+          const currentRootPath = useFileStore.getState().rootPath;
+
           // Clear pending request and timeout
           // First try by path, then fall back to request_uuid lookup
           // (needed because root requests use path: undefined but are stored as '')
@@ -122,6 +227,41 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
             // Clear loading state using the same key pattern as requestChildren
             const loadingKey = pendingPath || '__root__';
             useFileStore.getState().setLoading(loadingKey, false);
+
+            // CRITICAL: Check if this response is stale (from a different root/workspace)
+            // This prevents race conditions when switching worktrees - old in-flight
+            // requests should be ignored once the workspace has changed.
+            if (pending.rootPath !== currentRootPath) {
+              if (debug) {
+                logger.debug('Ignoring stale tree response (workspace changed)', {
+                  requestRootPath: pending.rootPath,
+                  currentRootPath,
+                  responsePath: message.path,
+                });
+              }
+              return;
+            }
+          } else if (currentRootPath && !message.path.startsWith(currentRootPath)) {
+            // No pending request found and path is outside current workspace.
+            // This is a stale response from a request that was cleared when workspace changed.
+            if (debug) {
+              logger.debug('Ignoring orphan tree response (path outside current workspace)', {
+                responsePath: message.path,
+                currentRootPath,
+              });
+            }
+            return;
+          }
+
+          // Check if this is an explicitly marked stale response
+          // (sent when workspace changed during the request)
+          if (message.stale === true) {
+            if (debug) {
+              logger.debug('Ignoring explicitly stale tree response', {
+                responsePath: message.path,
+              });
+            }
+            return;
           }
 
           if (debug) {
@@ -142,15 +282,53 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         }
 
         case 'file:tree:error': {
+          const currentRootPath = useFileStore.getState().rootPath;
+
           // Find and clear the pending request by request_uuid
+          let foundPending = false;
           for (const [path, pending] of pendingRequests.current.entries()) {
             if (pending.uuid === message.request_uuid) {
+              foundPending = true;
               clearTimeout(pending.timeoutId);
               pendingRequests.current.delete(path);
+
+              // CRITICAL: Check if this error is stale (from a different root/workspace)
+              // This prevents showing errors from old requests after workspace changed.
+              if (pending.rootPath !== currentRootPath) {
+                if (debug) {
+                  logger.debug('Ignoring stale tree error (workspace changed)', {
+                    requestRootPath: pending.rootPath,
+                    currentRootPath,
+                    errorPath: path,
+                    error: message.error,
+                  });
+                }
+                return;
+              }
+
               const loadingKey = path || '__root__';
               useFileStore.getState().setLoading(loadingKey, false);
               useFileStore.getState().setError(loadingKey, message.error);
               break;
+            }
+          }
+
+          // If no pending request was found, this is likely a stale response from a
+          // request that was cleared when the workspace changed. Check if the error
+          // path is outside the current root and ignore if so.
+          if (!foundPending && currentRootPath) {
+            // Extract the path from the error message (format: "Permission denied: /path/to/dir")
+            const permissionDeniedMatch = /Permission denied: (.+)/.exec(message.error);
+            const errorPath = permissionDeniedMatch?.[1];
+            if (errorPath && !errorPath.startsWith(currentRootPath)) {
+              if (debug) {
+                logger.debug('Ignoring orphan tree error (path outside current workspace)', {
+                  errorPath,
+                  currentRootPath,
+                  error: message.error,
+                });
+              }
+              return;
             }
           }
 
@@ -268,6 +446,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
     (path?: string): void => {
       const store = useFileStore.getState();
       const requestPath = path ?? store.rootPath ?? '';
+      const currentRootPath = store.rootPath;
 
       // Don't request if already pending
       if (pendingRequests.current.has(requestPath)) {
@@ -291,7 +470,8 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         }
       }, REQUEST_TIMEOUT_MS);
 
-      pendingRequests.current.set(requestPath, { uuid, timeoutId });
+      // Store rootPath with request so we can detect stale responses after workspace changes
+      pendingRequests.current.set(requestPath, { uuid, timeoutId, rootPath: currentRootPath });
 
       // Clear any previous error and set loading
       useFileStore.getState().clearError(loadingKey);
@@ -376,6 +556,28 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
       requests.clear();
     };
   }, []);
+
+  // Clear pending requests when root path changes (e.g., worktree switch)
+  // This proactively cancels stale requests rather than waiting for them to return
+  const prevRootPathRef = useRef<string | null>(currentRootPath);
+  useEffect(() => {
+    if (prevRootPathRef.current !== currentRootPath && prevRootPathRef.current !== null) {
+      if (debug) {
+        logger.debug('Root path changed, clearing pending requests', {
+          previousRoot: prevRootPathRef.current,
+          newRoot: currentRootPath,
+          pendingCount: pendingRequests.current.size,
+        });
+      }
+
+      // Cancel all pending request timeouts
+      for (const pending of pendingRequests.current.values()) {
+        clearTimeout(pending.timeoutId);
+      }
+      pendingRequests.current.clear();
+    }
+    prevRootPathRef.current = currentRootPath;
+  }, [currentRootPath, debug]);
 
   // Refresh: clear tree and re-fetch
   const refresh = useCallback((): void => {

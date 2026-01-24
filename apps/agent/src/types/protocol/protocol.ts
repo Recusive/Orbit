@@ -127,6 +127,7 @@ export const StoredConversationSummarySchema = z
     updatedAt: z.number(),
     messageCount: z.number(),
     workspacePath: z.string().optional(),
+    worktreePath: z.string().optional(),
   })
   .strict();
 
@@ -240,6 +241,7 @@ export const CreateConversationSchema = z
     uuid: UUIDSchema,
     title: z.string().optional(),
     workspace_path: z.string().optional(),
+    worktree_path: z.string().optional(),
   })
   .strict();
 
@@ -256,6 +258,7 @@ export const GetConversationsSchema = z
     type: z.literal('conversation:list'),
     uuid: UUIDSchema,
     workspace_path: z.string().optional(),
+    worktree_path: z.string().optional(),
   })
   .strict();
 
@@ -1271,6 +1274,7 @@ export const FileNodeSchema = z
     isDirectory: z.boolean(),
     isFile: z.boolean(),
     isSymlink: z.boolean().optional(),
+    isGitIgnored: z.boolean().optional(),
   })
   .strict();
 
@@ -1283,6 +1287,8 @@ export const FileTreeResponseSchema = z
     path: z.string(),
     /** Children of the path */
     children: z.array(FileNodeSchema),
+    /** True if this response is stale (workspace changed during request) */
+    stale: z.boolean().optional(),
   })
   .strict();
 
@@ -1303,6 +1309,7 @@ export const ConversationCreatedSchema = z
     session_id: SessionIdSchema,
     title: z.string(),
     workspace_path: z.string().optional(),
+    worktree_path: z.string().optional(),
   })
   .strict();
 
@@ -1326,6 +1333,7 @@ export const ConversationListSchema = z
           updated_at: z.number(),
           message_count: z.number(),
           workspace_path: z.string().optional(),
+          worktree_path: z.string().optional(),
         })
         .strict()
     ),

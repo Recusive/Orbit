@@ -22,7 +22,11 @@ import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/files';
-import { ConversationDeleteDialog, CreateWorktreeDialog } from '@/components/modals';
+import {
+  ConversationDeleteDialog,
+  CreateWorktreeDialog,
+  DeleteWorktreeDialog,
+} from '@/components/modals';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
@@ -88,10 +92,14 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
     deleteDialogOpen,
     setDeleteDialogOpen,
     conversationToDelete,
+    worktreeDeleteDialogOpen,
+    setWorktreeDeleteDialogOpen,
+    worktreeToDelete,
     handleStartConversation,
     handleLoadConversation,
     handleOpenQuickSearch,
     handleOpenCreateWorktree,
+    handleOpenDeleteWorktreeDialog,
     handleRemoveWorktree,
     handleRenameConversation,
     handleDeleteConversation,
@@ -298,9 +306,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               onDeleteConversation={handleOpenDeleteDialog}
               onDuplicateConversation={handleDuplicateConversation}
               onToggleWorktree={toggleWorktreeExpanded}
-              onRemoveWorktree={(path) => {
-                void handleRemoveWorktree(path);
+              onSelectWorktree={(path) => {
+                useUIStore.getState().setActiveWorktree(path);
               }}
+              onRemoveWorktree={handleOpenDeleteWorktreeDialog}
               onOpenCreateWorktree={handleOpenCreateWorktree}
             />
           </div>
@@ -353,6 +362,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       <CreateWorktreeDialog
         open={createWorktreeDialogOpen}
         onOpenChange={useUIStore.getState().setCreateWorktreeDialogOpen}
+        onCreated={(worktree) => {
+          // Auto-switch to the newly created worktree
+          useUIStore.getState().setActiveWorktree(worktree.path);
+        }}
       />
 
       {/* Delete Conversation Dialog */}
@@ -364,6 +377,16 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           if (conversationToDelete) {
             void handleDeleteConversation(conversationToDelete.sessionId);
           }
+        }}
+      />
+
+      {/* Delete Worktree Dialog */}
+      <DeleteWorktreeDialog
+        open={worktreeDeleteDialogOpen}
+        onOpenChange={setWorktreeDeleteDialogOpen}
+        worktree={worktreeToDelete}
+        onConfirm={(deleteBranch) => {
+          void handleRemoveWorktree(deleteBranch);
         }}
       />
     </aside>

@@ -10,10 +10,10 @@
  * For Tauri-specific mocks, see: apps/common/src/testing/tauri-mocks.ts
  */
 
+/// <reference types="vitest/globals" />
 import '@testing-library/jest-dom/vitest';
 
 import React from 'react';
-import { afterEach, beforeAll, vi } from 'vitest';
 
 // =============================================================================
 // Browser API Mocks
@@ -147,10 +147,6 @@ class IntersectionObserverMock {
   readonly rootMargin: string = '';
   readonly thresholds: readonly number[] = [];
 
-  constructor() {
-    // No-op constructor
-  }
-
   observe(): void {
     // No-op
   }
@@ -179,10 +175,6 @@ Object.defineProperty(globalThis, 'IntersectionObserver', {
  * Used by theme syncing and DOM change detection.
  */
 class MutationObserverMock {
-  constructor() {
-    // No-op constructor
-  }
-
   observe(): void {
     // No-op
   }
@@ -321,7 +313,7 @@ vi.mock('@tauri-apps/api/event', () => ({
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: vi.fn(() => ({
     label: 'main',
-    listen: vi.fn().mockResolvedValue(() => {}),
+    listen: vi.fn().mockResolvedValue((): void => undefined),
     emit: vi.fn().mockResolvedValue(undefined),
     setTitle: vi.fn().mockResolvedValue(undefined),
     setMinSize: vi.fn().mockResolvedValue(undefined),
@@ -403,7 +395,7 @@ vi.mock('@tauri-apps/plugin-log', () => ({
   info: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
-  attachConsole: vi.fn().mockResolvedValue(() => {}),
+  attachConsole: vi.fn().mockResolvedValue((): void => undefined),
 }));
 
 // =============================================================================
@@ -447,7 +439,8 @@ vi.mock('@sentry/react', () => ({
   setUser: vi.fn(),
   setTag: vi.fn(),
   setExtra: vi.fn(),
-  withScope: vi.fn((callback) => {
+  // Simplified type: callback receives a mock scope object
+  withScope: vi.fn((callback: (scope: Record<string, ReturnType<typeof vi.fn>>) => void) => {
     callback({ setTag: vi.fn(), setExtra: vi.fn() });
   }),
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => children,
@@ -496,7 +489,7 @@ beforeAll(() => {
 /**
  * Wait for next tick (useful for async state updates)
  */
-(globalThis as Record<string, unknown>).waitForNextTick = (): Promise<void> =>
+(globalThis as Record<string, unknown>)['waitForNextTick'] = (): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, 0);
   });
@@ -504,7 +497,7 @@ beforeAll(() => {
 /**
  * Wait for specified milliseconds
  */
-(globalThis as Record<string, unknown>).wait = (ms: number): Promise<void> =>
+(globalThis as Record<string, unknown>)['wait'] = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
