@@ -1,6 +1,7 @@
 import { ArrowUp, AtSign, Globe, Image, Square } from 'lucide-react';
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 
+import { MoreActionsMenu } from './MoreActionsMenu';
 import { ThinkingModeButton } from './ThinkingModeButton';
 import { INPUT_MODE_LABELS } from './constants';
 import {
@@ -18,7 +19,8 @@ import type { InputControlsProps } from './types';
 import type { FC } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import { useContainerWidth } from '@/hooks/ui';
+import { cn, INPUT_CONTROLS } from '@/lib/utils';
 
 export const InputControls: FC<InputControlsProps> = memo(function InputControls({
   inputMode,
@@ -41,8 +43,14 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   getThinkingInfo,
   getActiveDots,
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const width = useContainerWidth(containerRef);
+
+  // Only enter compact mode after first measurement (width > 0)
+  const isCompact = width > 0 && width < INPUT_CONTROLS.collapseBreakpoint;
+
   return (
-    <div className="flex w-full items-center justify-between gap-1 px-1 pb-1">
+    <div ref={containerRef} className="flex w-full items-center justify-between gap-1 px-1 pb-1">
       {/* Left Controls - Mode & Model Pickers */}
       <div className="flex items-center gap-0.5">
         {/* Mode Picker */}
@@ -73,79 +81,116 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
 
       {/* Right Controls - Action Buttons */}
       <div className="flex items-center gap-0.5">
-        {/* @ Button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={handleAtClick}
-              aria-label="Add context"
-              className={cn(
-                'h-7 w-7 flex items-center justify-center rounded-lg',
-                'bg-transparent text-muted-foreground/70',
-                'transition-[background-color,color,transform] duration-150',
-                'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
-                'active:scale-95',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
-              )}
-            >
-              <AtSign className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Add context (@)</TooltipContent>
-        </Tooltip>
+        {isCompact ? (
+          // Compact mode: @, Thinking, Globe collapsed into dropdown; Image stays visible
+          <>
+            {/* Image Button - stays visible in compact mode */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleImageClick}
+                  aria-label="Attach image"
+                  className={cn(
+                    'h-7 w-7 flex items-center justify-center rounded-lg',
+                    'bg-transparent text-muted-foreground/70',
+                    'transition-[background-color,color,transform] duration-150',
+                    'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
+                    'active:scale-95',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+                  )}
+                >
+                  <Image className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Attach image</TooltipContent>
+            </Tooltip>
 
-        {/* Thinking Mode Button */}
-        <ThinkingModeButton
-          thinkingMode={thinkingMode}
-          thinkingHoverOpen={thinkingHoverOpen}
-          setThinkingHoverOpen={setThinkingHoverOpen}
-          cycleThinkingMode={cycleThinkingMode}
-          getThinkingInfo={getThinkingInfo}
-          getActiveDots={getActiveDots}
-        />
+            {/* More Actions Dropdown - contains @, Thinking, Globe */}
+            <MoreActionsMenu
+              handleAtClick={handleAtClick}
+              cycleThinkingMode={cycleThinkingMode}
+              thinkingMode={thinkingMode}
+              getThinkingInfo={getThinkingInfo}
+            />
+          </>
+        ) : (
+          // Expanded mode: all buttons inline
+          <>
+            {/* @ Button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleAtClick}
+                  aria-label="Add context"
+                  className={cn(
+                    'h-7 w-7 flex items-center justify-center rounded-lg',
+                    'bg-transparent text-muted-foreground/70',
+                    'transition-[background-color,color,transform] duration-150',
+                    'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
+                    'active:scale-95',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+                  )}
+                >
+                  <AtSign className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Add context (@)</TooltipContent>
+            </Tooltip>
 
-        {/* Globe Button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              aria-label="Open web browser"
-              className={cn(
-                'h-7 w-7 flex items-center justify-center rounded-lg',
-                'bg-transparent text-muted-foreground/70',
-                'transition-[background-color,color,transform] duration-150',
-                'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
-                'active:scale-95',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
-              )}
-            >
-              <Globe className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Web browser</TooltipContent>
-        </Tooltip>
+            {/* Thinking Mode Button */}
+            <ThinkingModeButton
+              thinkingMode={thinkingMode}
+              thinkingHoverOpen={thinkingHoverOpen}
+              setThinkingHoverOpen={setThinkingHoverOpen}
+              cycleThinkingMode={cycleThinkingMode}
+              getThinkingInfo={getThinkingInfo}
+              getActiveDots={getActiveDots}
+            />
 
-        {/* Image Button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={handleImageClick}
-              aria-label="Attach image"
-              className={cn(
-                'h-7 w-7 flex items-center justify-center rounded-lg',
-                'bg-transparent text-muted-foreground/70',
-                'transition-[background-color,color,transform] duration-150',
-                'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
-                'active:scale-95',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
-              )}
-            >
-              <Image className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Attach image</TooltipContent>
-        </Tooltip>
+            {/* Globe Button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  aria-label="Open web browser"
+                  className={cn(
+                    'h-7 w-7 flex items-center justify-center rounded-lg',
+                    'bg-transparent text-muted-foreground/70',
+                    'transition-[background-color,color,transform] duration-150',
+                    'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
+                    'active:scale-95',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+                  )}
+                >
+                  <Globe className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Web browser</TooltipContent>
+            </Tooltip>
 
-        {/* Hidden file input for images */}
+            {/* Image Button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleImageClick}
+                  aria-label="Attach image"
+                  className={cn(
+                    'h-7 w-7 flex items-center justify-center rounded-lg',
+                    'bg-transparent text-muted-foreground/70',
+                    'transition-[background-color,color,transform] duration-150',
+                    'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
+                    'active:scale-95',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+                  )}
+                >
+                  <Image className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Attach image</TooltipContent>
+            </Tooltip>
+          </>
+        )}
+
+        {/* Hidden file input for images - MUST stay outside conditional render */}
         <input
           ref={imageInputRef}
           type="file"

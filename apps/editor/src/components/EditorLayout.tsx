@@ -24,7 +24,7 @@ import { useEditorChatPanelOpen, useUIStore } from '@/stores/ui/ui-store';
 // Editor-specific constants
 const EDITOR_PANEL = {
   CHAT_PANEL_WIDTH: '35%',
-  CHAT_PANEL_MIN_WIDTH: 300,
+  CHAT_PANEL_MIN_WIDTH: 400,
   EDITOR_AREA_MIN_WIDTH: 400,
 } as const;
 

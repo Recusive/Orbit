@@ -481,9 +481,45 @@ export const ACTIVITY_PANEL = {
 
 /**
  * Chat panel sizing constants
+ *
+ * MIN_WIDTH prevents the chat panel from becoming too narrow for the input toolbar.
+ * At widths below INPUT_CONTROLS.collapseBreakpoint (520px), the toolbar collapses
+ * into compact mode but remains functional down to 400px.
  */
 export const CHAT_PANEL = {
-  MIN_WIDTH: 300,
+  MIN_WIDTH: 400,
   /** Width when activity panel is open */
   WITH_ACTIVITY_WIDTH: '65%',
+} as const;
+
+// =============================================================================
+// Input Controls
+// =============================================================================
+
+/**
+ * Input controls responsive behavior
+ *
+ * When the toolbar gets too narrow, secondary buttons (@, Thinking, Globe)
+ * collapse into a "More actions" dropdown menu. The Image button stays
+ * visible for quick attachment access.
+ */
+export const INPUT_CONTROLS = {
+  /**
+   * Width below which secondary buttons collapse into "More actions" menu.
+   *
+   * Calculation:
+   * - Mode Picker: ~70px (varies: "Default"/"Plan"/"Accept")
+   * - Model Selector: ~110px (varies by model name)
+   * - Thinking Button: 28px (h-7)
+   * - More Actions trigger: 28px (h-7 w-7)
+   * - Context Usage: ~60px
+   * - Send Button: 28px (h-7 w-7)
+   * - Gaps: ~14px (gap-0.5 × 7)
+   * - Buffer: ~50px safety margin
+   * Total: ~390px minimum + buffer = ~440px
+   *
+   * Set to 520px to provide comfortable margin.
+   * Verify empirically during testing.
+   */
+  collapseBreakpoint: 520,
 } as const;

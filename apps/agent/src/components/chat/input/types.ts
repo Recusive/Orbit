@@ -138,3 +138,12 @@ export interface ThinkingModeButtonProps {
   readonly getThinkingInfo: () => ThinkingModeInfo;
   readonly getActiveDots: () => number;
 }
+
+export interface MoreActionsMenuProps {
+  readonly handleAtClick: () => void;
+  readonly cycleThinkingMode: () => void;
+  readonly thinkingMode: ThinkingMode;
+  readonly getThinkingInfo: () => ThinkingModeInfo;
+  /** Optional - enable when browser feature is implemented */
+  readonly handleGlobeClick?: () => void;
+}
