@@ -1,3 +1,5 @@
+import { createLogger } from '@orbit/common/lib';
+
 import type { WebviewMessage } from '@/types/protocol';
 
 import {
@@ -8,6 +10,8 @@ import {
   deleteCommand,
   generateCommandDefinition,
 } from '@/lib/api';
+
+const logger = createLogger('CommandHandlers');
 
 export async function handleCommandsList(
   message: Extract<WebviewMessage, { type: 'commands:list' }>
@@ -26,7 +30,7 @@ export async function handleCommandsList(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to list commands';
-    console.error('[Orbit] List commands error:', errorMessage);
+    logger.error('List commands error', { error: errorMessage });
     window.postMessage(
       {
         type: 'commands:error',
@@ -67,7 +71,7 @@ export async function handleCommandsCreate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to create command';
-    console.error('[Orbit] Create command error:', errorMessage);
+    logger.error('Create command error', { error: errorMessage });
     window.postMessage(
       {
         type: 'commands:error',
@@ -108,7 +112,7 @@ export async function handleCommandsUpdate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to update command';
-    console.error('[Orbit] Update command error:', errorMessage);
+    logger.error('Update command error', { error: errorMessage });
     window.postMessage(
       {
         type: 'commands:error',
@@ -138,7 +142,7 @@ export async function handleCommandsDelete(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to delete command';
-    console.error('[Orbit] Delete command error:', errorMessage);
+    logger.error('Delete command error', { error: errorMessage });
     window.postMessage(
       {
         type: 'commands:error',
@@ -167,7 +171,7 @@ export async function handleCommandsGenerate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to generate command';
-    console.error('[Orbit] Generate command error:', errorMessage);
+    logger.error('Generate command error', { error: errorMessage });
     window.postMessage(
       {
         type: 'commands:error',

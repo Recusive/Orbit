@@ -20,6 +20,8 @@ export const AppearanceSettings: FC = () => {
   // Color theme from ThemeProvider (persisted to localStorage)
   const { theme, setTheme } = useTheme();
 
+  // TODO: These settings are placeholder UI - they don't persist or affect the app yet.
+  // Implementation needed: Create a settings store and persist to localStorage or Tauri settings.
   const [accentColor, setAccentColor] = useState('coral');
   const [fontSize, setFontSize] = useState('medium');
   const [reduceMotion, setReduceMotion] = useState(false);

@@ -96,6 +96,10 @@ export const ConversationList: FC<ConversationListProps> = ({
           // These will be shown under the main worktree
           legacyConversations.push(conv);
         }
+      } else {
+        // Conversation with neither worktreePath nor workspacePath
+        // This can happen with very old conversations - show under main worktree
+        legacyConversations.push(conv);
       }
     }
 

@@ -55,6 +55,9 @@ function buildIconMap(modules: Record<string, string>): Readonly<Record<string, 
 /** Material theme icon map - built once at module initialization */
 const materialIconMap = buildIconMap(materialIconModules);
 
+/** Whether material theme has icons (cached to avoid O(n) check on every render) */
+const materialIconMapHasIcons = Object.keys(materialIconMap).length > 0;
+
 /** Empty icon map for 'none' theme - forces fallback to inline SVGs */
 const emptyIconMap: Readonly<Record<string, string>> = Object.freeze({});
 
@@ -65,6 +68,15 @@ const emptyIconMap: Readonly<Record<string, string>> = Object.freeze({});
 const THEME_ICON_MAPS: Readonly<Record<IconThemeId, Readonly<Record<string, string>>>> = {
   material: materialIconMap,
   none: emptyIconMap,
+};
+
+/**
+ * Cached check for whether each theme has icons.
+ * Avoids O(n) Object.keys().length on every icon resolution.
+ */
+const THEME_HAS_ICONS: Readonly<Record<IconThemeId, boolean>> = {
+  material: materialIconMapHasIcons,
+  none: false,
 };
 
 // ============================================================================
@@ -96,12 +108,12 @@ const THEME_ICON_MAPS: Readonly<Record<IconThemeId, Readonly<Record<string, stri
  * resolveFileIconUrl('mystery', 'material') // -> '' (no document icon somehow)
  */
 export function resolveFileIconUrl(fileName: string, themeId: IconThemeId = 'material'): string {
-  const iconMap = THEME_ICON_MAPS[themeId];
-
-  // Guard against missing/empty icon map (shouldn't happen in practice)
-  if (Object.keys(iconMap).length === 0) {
+  // Guard against empty icon map using cached O(1) check
+  if (!THEME_HAS_ICONS[themeId]) {
     return '';
   }
+
+  const iconMap = THEME_ICON_MAPS[themeId];
 
   // Get the icon name from the mapping logic
   const iconName = getFileIconName(fileName);
@@ -139,12 +151,12 @@ export function resolveFolderIconUrl(
   isOpen: boolean,
   themeId: IconThemeId = 'material'
 ): string {
-  const iconMap = THEME_ICON_MAPS[themeId];
-
-  // Guard against missing/empty icon map
-  if (Object.keys(iconMap).length === 0) {
+  // Guard against empty icon map using cached O(1) check
+  if (!THEME_HAS_ICONS[themeId]) {
     return '';
   }
+
+  const iconMap = THEME_ICON_MAPS[themeId];
 
   // Get the icon name from the mapping logic (handles open state internally)
   const iconName = getFolderIconName(folderName, isOpen);
