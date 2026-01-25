@@ -34,6 +34,8 @@ export function useContainerWidth(ref: RefObject<HTMLElement | null>): number {
     return () => {
       observer.disconnect();
     };
+    // Note: ref object is stable (same identity across renders); effect runs once on mount.
+    // ResizeObserver handles subsequent size changes via its callback, not via effect re-runs.
   }, [ref]);
 
   return width;

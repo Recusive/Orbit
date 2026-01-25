@@ -5,7 +5,7 @@
  * To change textarea sizes, chat max-width, or input box dimensions,
  * update CHAT_WIDTH, CHAT_WIDTH_VAR, and INPUT_SIZES in constants.ts.
  */
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 
 import { InputControls } from './InputControls';
 import { ContextChips } from './context-chips';
@@ -18,6 +18,7 @@ import type { FC } from 'react';
 
 import { ElementContextList } from '@/components/browser';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   inputMode,
@@ -71,6 +72,14 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     onModeChange,
     onThinkingModeChange,
   });
+
+  // Get store action for opening browser panel
+  const setActivityTab = useUIStore((state) => state.setActivityTab);
+
+  // Handler to open browser panel
+  const handleGlobeClick = useCallback((): void => {
+    setActivityTab('browser');
+  }, [setActivityTab]);
 
   return (
     <div className="p-4 pt-0 shrink-0 relative">
@@ -139,6 +148,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
           cycleInputMode={cycleInputMode}
           cycleThinkingMode={cycleThinkingMode}
           handleAtClick={handleAtClick}
+          handleGlobeClick={handleGlobeClick}
           handleImageClick={handleImageClick}
           handleImageSelect={handleImageSelect}
           handleSend={handleSend}

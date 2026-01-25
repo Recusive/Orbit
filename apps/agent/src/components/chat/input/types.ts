@@ -122,6 +122,7 @@ export interface InputControlsProps {
   readonly cycleInputMode: () => void;
   readonly cycleThinkingMode: () => void;
   readonly handleAtClick: () => void;
+  readonly handleGlobeClick: () => void;
   readonly handleImageClick: () => void;
   readonly handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   readonly handleSend: () => void;

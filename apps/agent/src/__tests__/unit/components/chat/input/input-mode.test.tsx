@@ -58,6 +58,7 @@ function createDefaultProps(overrides: Partial<InputControlsProps> = {}): InputC
     cycleInputMode: vi.fn(),
     cycleThinkingMode: vi.fn(),
     handleAtClick: vi.fn(),
+    handleGlobeClick: vi.fn(),
     handleImageClick: vi.fn(),
     handleImageSelect: vi.fn(),
     handleSend: vi.fn(),

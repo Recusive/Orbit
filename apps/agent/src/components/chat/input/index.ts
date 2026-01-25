@@ -1,2 +1,3 @@
 export { ChatInput } from './ChatInput';
-export type { ChatInputProps, ImageAttachment, UsageData } from './types';
+export { MoreActionsMenu } from './MoreActionsMenu';
+export type { ChatInputProps, ImageAttachment, MoreActionsMenuProps, UsageData } from './types';

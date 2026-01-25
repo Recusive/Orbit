@@ -1,5 +1,5 @@
 import { ArrowUp, AtSign, Globe, Image, Square } from 'lucide-react';
-import { memo, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 
 import { MoreActionsMenu } from './MoreActionsMenu';
 import { ThinkingModeButton } from './ThinkingModeButton';
@@ -36,6 +36,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   cycleInputMode,
   cycleThinkingMode,
   handleAtClick,
+  handleGlobeClick,
   handleImageClick,
   handleImageSelect,
   handleSend,
@@ -46,8 +47,17 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   const containerRef = useRef<HTMLDivElement>(null);
   const width = useContainerWidth(containerRef);
 
-  // Only enter compact mode after first measurement (width > 0)
-  const isCompact = width > 0 && width < INPUT_CONTROLS.collapseBreakpoint;
+  // Width is 0 before first measurement; avoid entering compact mode prematurely
+  const hasMeasured = width > 0;
+  const isCompact = hasMeasured && width < INPUT_CONTROLS.collapseBreakpoint;
+
+  // Reset thinking hover state when switching to compact mode
+  // Prevents stuck hover card if it was open during resize
+  useEffect(() => {
+    if (isCompact) {
+      setThinkingHoverOpen(false);
+    }
+  }, [isCompact, setThinkingHoverOpen]);
 
   return (
     <div ref={containerRef} className="flex w-full items-center justify-between gap-1 px-1 pb-1">
@@ -111,6 +121,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               cycleThinkingMode={cycleThinkingMode}
               thinkingMode={thinkingMode}
               getThinkingInfo={getThinkingInfo}
+              handleGlobeClick={handleGlobeClick}
             />
           </>
         ) : (
@@ -147,10 +158,11 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               getActiveDots={getActiveDots}
             />
 
-            {/* Globe Button */}
+            {/* Globe Button - opens browser panel */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
+                  onClick={handleGlobeClick}
                   aria-label="Open web browser"
                   className={cn(
                     'h-7 w-7 flex items-center justify-center rounded-lg',

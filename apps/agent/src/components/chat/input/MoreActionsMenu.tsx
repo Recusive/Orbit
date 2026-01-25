@@ -59,7 +59,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
           <span className="text-xs text-muted-foreground">{thinkingInfo.level}</span>
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={handleGlobeClick}
+          onClick={() => handleGlobeClick?.()}
           disabled={handleGlobeClick === undefined}
           className={cn(handleGlobeClick === undefined && 'opacity-50 cursor-not-allowed')}
         >
