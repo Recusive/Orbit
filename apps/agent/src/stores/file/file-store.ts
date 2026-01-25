@@ -233,9 +233,10 @@ export const useFileStore = create<FileState>()(
         }
 
         // Apply all updates to the file object
-        // Note: Destructure out 'id' to prevent overwriting the file's id
-        const { id: _, ...safeUpdates } = updates;
-        void _; // Explicitly mark as intentionally unused
+        // Omit 'id' from updates to prevent overwriting the file's internal id
+        const safeUpdates = Object.fromEntries(
+          Object.entries(updates).filter(([key]) => key !== 'id')
+        );
         Object.assign(file, safeUpdates);
       });
     },

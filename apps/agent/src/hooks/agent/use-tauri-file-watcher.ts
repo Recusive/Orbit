@@ -1,4 +1,8 @@
+import { createLogger } from '@orbit/common/lib';
+
 import { watchPath, onFileChange } from '@/lib/api';
+
+const logger = createLogger('FileWatcher');
 
 // ═══════════════════════════════════════════════════════════════
 // File Watcher Singleton
@@ -218,7 +222,7 @@ class ThrottledWorker {
   work(events: FileChangeEvent[]): void {
     // Drop if buffer is full (prevents memory explosion)
     if (this.buffer.length >= this.config.maxBufferedWork) {
-      console.warn('[FileWatcher] Buffer full, dropping events');
+      logger.warn('Buffer full, dropping events');
       return;
     }
 
@@ -326,9 +330,9 @@ export async function initFileWatcher(workspacePath: string): Promise<void> {
     try {
       const { unwatchPath } = await import('@/lib/api');
       await unwatchPath(watchedWorkspacePath);
-      console.warn('[Orbit] Unwatched old workspace:', watchedWorkspacePath);
+      logger.debug('Unwatched old workspace', { path: watchedWorkspacePath });
     } catch (err) {
-      console.warn('[Orbit] Failed to unwatch old workspace:', err);
+      logger.warn('Failed to unwatch old workspace', { error: err });
     }
   }
 
@@ -369,9 +373,9 @@ export async function initFileWatcher(workspacePath: string): Promise<void> {
         }
       });
 
-      console.warn('[Orbit] File change listener initialized (VS Code-style batching)');
+      logger.debug('File change listener initialized (VS Code-style batching)');
     } catch (err) {
-      console.error('[Orbit] Failed to set up file change listener:', err);
+      logger.error('Failed to set up file change listener', err);
       fileWatcherInitialized = false;
       return;
     }
@@ -381,9 +385,9 @@ export async function initFileWatcher(workspacePath: string): Promise<void> {
   try {
     await watchPath(workspacePath);
     watchedWorkspacePath = workspacePath;
-    console.warn('[Orbit] Watching workspace:', workspacePath);
+    logger.debug('Watching workspace', { path: workspacePath });
   } catch (err) {
-    console.error('[Orbit] Failed to watch workspace:', err);
+    logger.error('Failed to watch workspace', err);
   }
 }
 

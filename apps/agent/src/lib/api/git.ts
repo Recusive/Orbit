@@ -262,6 +262,12 @@ export async function gitWorktreeAdd(
 
 /**
  * Remove a worktree.
+ *
+ * NOTE: The `deleteBranch` option was intentionally removed in the file-store refactor.
+ * Branch deletion after worktree removal is now handled manually if needed, following
+ * Git's recommendation to keep branches for history. This simplifies the API and avoids
+ * accidental branch loss.
+ *
  * @param repoPath - Path to the main repository
  * @param worktreePath - Path to the worktree to remove
  * @param force - Force removal even if worktree has uncommitted changes
