@@ -19,9 +19,6 @@ import { useUIStore } from '@/stores/ui/ui-store';
  * Hook that syncs activeWorktreePath changes to the file tree.
  * When the user switches worktrees, the file explorer should show
  * the new worktree's directory structure.
- *
- * Also reinitializes file watcher and file index when worktree changes
- * to ensure @-mentions and auto-refresh work in the new directory.
  */
 export function useWorktreeFileTreeSync(): void {
   const prevWorktreeRef = useRef<string | null>(null);
@@ -43,63 +40,57 @@ export function useWorktreeFileTreeSync(): void {
         })
         .catch((err: unknown) => {
           logger.error('Failed to set initial workspace path for worktree', err);
-          toast.error('Failed to set workspace path. Some file operations may fail.');
-          // Still proceed with file store update - user has been notified
+          toast.error('Failed to set workspace path');
           useFileStore.getState().setRootPath(currentWorktree);
         });
     }
 
     // Subscribe to full state and manually check activeWorktreePath
     // (Zustand doesn't have built-in selector subscriptions without middleware)
-    const cleanupWorktreeSubscription = useUIStore.subscribe((state) => {
+    const unsubscribe = useUIStore.subscribe((state) => {
       const activeWorktree = state.activeWorktreePath;
-      const workspacePath = state.workspacePath;
       const prevWorktree = prevWorktreeRef.current;
 
-      // Only trigger if the path actually changed
-      if (activeWorktree !== prevWorktree) {
-        // Determine the effective path: use activeWorktree, or fall back to workspacePath
-        const effectivePath = activeWorktree ?? workspacePath;
+      // Only trigger if the path actually changed and we have a new path
+      if (activeWorktree !== prevWorktree && activeWorktree) {
+        logger.info(`Worktree switched: ${prevWorktree ?? 'none'} → ${activeWorktree}`);
 
-        if (effectivePath) {
-          logger.info(`Worktree switched: ${prevWorktree ?? 'none'} → ${effectivePath}`);
+        // CRITICAL: Update the Rust backend's workspace path FIRST
+        // The Rust backend has workspace sandboxing that blocks file access
+        // outside the set workspace path. Without this, file operations to
+        // the worktree directory will fail with PermissionDenied.
+        setWorkspacePath(activeWorktree)
+          .then(() => {
+            // setRootPath automatically clears the tree and triggers a refresh
+            useFileStore.getState().setRootPath(activeWorktree);
 
-          // CRITICAL: Update the Rust backend's workspace path FIRST
-          // The Rust backend has workspace sandboxing that blocks file access
-          // outside the set workspace path. Without this, file operations to
-          // the worktree directory will fail with PermissionDenied.
-          setWorkspacePath(effectivePath)
-            .then(() => {
-              // setRootPath automatically clears the tree and triggers a refresh
-              useFileStore.getState().setRootPath(effectivePath);
-
-              // Reinitialize file watcher for auto-refresh in new directory
-              void initFileWatcher(effectivePath).catch((err: unknown) => {
-                logger.warn('Failed to reinitialize file watcher for worktree', { error: err });
+            // Reinitialize file watcher for the new worktree
+            // Without this, file changes in the new worktree won't be detected
+            initFileWatcher(activeWorktree).catch((watcherErr: unknown) => {
+              logger.warn('Failed to reinitialize file watcher for worktree', {
+                error: watcherErr,
               });
-
-              // Rebuild file index for @-mentions in new directory
-              void buildFileIndex(effectivePath).catch((err: unknown) => {
-                logger.warn('Failed to rebuild file index for worktree', { error: err });
-              });
-            })
-            .catch((err: unknown) => {
-              logger.error('Failed to update workspace path for worktree', err);
-              toast.error('Failed to switch workspace. Some file operations may fail.');
-              // Still proceed with file store update - user has been notified
-              useFileStore.getState().setRootPath(effectivePath);
             });
-        } else {
-          // No effective path available - clear the file store
-          logger.warn('No effective path available after worktree change');
-        }
+
+            // Rebuild file index for fuzzy search (@ mentions)
+            // Without this, file search will use stale data from previous worktree
+            buildFileIndex(activeWorktree).catch((indexErr: unknown) => {
+              logger.warn('Failed to rebuild file index for worktree', { error: indexErr });
+            });
+          })
+          .catch((err: unknown) => {
+            logger.error('Failed to update workspace path for worktree', err);
+            toast.error('Failed to switch workspace');
+            // Still try to update the file store - error will surface later
+            useFileStore.getState().setRootPath(activeWorktree);
+          });
       }
 
       // Update ref for next comparison
       prevWorktreeRef.current = activeWorktree;
     });
 
-    return cleanupWorktreeSubscription;
+    return unsubscribe;
   }, []);
 }
 
@@ -248,17 +239,6 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
               logger.debug('Ignoring orphan tree response (path outside current workspace)', {
                 responsePath: message.path,
                 currentRootPath,
-              });
-            }
-            return;
-          }
-
-          // Check if this is an explicitly marked stale response
-          // (sent when workspace changed during the request)
-          if (message.stale === true) {
-            if (debug) {
-              logger.debug('Ignoring explicitly stale tree response', {
-                responsePath: message.path,
               });
             }
             return;

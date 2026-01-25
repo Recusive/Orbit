@@ -439,10 +439,16 @@ vi.mock('@sentry/react', () => ({
   setUser: vi.fn(),
   setTag: vi.fn(),
   setExtra: vi.fn(),
-  // Simplified type: callback receives a mock scope object
-  withScope: vi.fn((callback: (scope: Record<string, ReturnType<typeof vi.fn>>) => void) => {
-    callback({ setTag: vi.fn(), setExtra: vi.fn() });
-  }),
+  withScope: vi.fn(
+    (
+      callback: (scope: {
+        setTag: ReturnType<typeof vi.fn>;
+        setExtra: ReturnType<typeof vi.fn>;
+      }) => void
+    ) => {
+      callback({ setTag: vi.fn(), setExtra: vi.fn() });
+    }
+  ),
   ErrorBoundary: ({ children }: { children: React.ReactNode }) => children,
 }));
 

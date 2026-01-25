@@ -1,13 +1,12 @@
 import { GitCompareArrows } from 'lucide-react';
 import { useMemo } from 'react';
-import { useShallow } from 'zustand/shallow';
 
 import { FileChangeItem } from './file-change-item';
 
 import type { FileChange } from '@/stores/file/file-store';
 import type { FC } from 'react';
 
-import { useFileStore } from '@/stores/file/file-store';
+import { useChangedFiles, useFileStore } from '@/stores/file/file-store';
 
 export interface FilesChangedListProps {
   readonly className?: string;
@@ -15,13 +14,9 @@ export interface FilesChangedListProps {
 }
 
 export const FilesChangedList: FC<FilesChangedListProps> = ({ className = '', onOpenFile }) => {
-  // Use useShallow to prevent re-renders when unrelated store state changes
-  const { changedFiles, filterStatus } = useFileStore(
-    useShallow((s) => ({
-      changedFiles: s.changedFiles,
-      filterStatus: s.filterStatus,
-    }))
-  );
+  // useChangedFiles() provides memoized, sorted file list
+  const changedFiles = useChangedFiles();
+  const filterStatus = useFileStore((s) => s.filterStatus);
 
   // Memoize the filtered files to avoid recomputation on every render
   const filteredFiles = useMemo(

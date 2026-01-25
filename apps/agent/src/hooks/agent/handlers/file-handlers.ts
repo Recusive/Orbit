@@ -92,30 +92,19 @@ export async function handleFileTreeRequest(
     // Check if workspace changed during async operations (stale request protection)
     // This can happen when switching worktrees - a request for the old workspace
     // might still be in flight when the workspace changes. Skip stale requests
-    // to avoid "Permission denied" errors and prevent overwriting new workspace data.
+    // to avoid "Permission denied" errors.
     const currentWorkspace = await getWorkspacePath();
     if (currentWorkspace && initialWorkspace && initialWorkspace !== currentWorkspace) {
-      // Workspace changed while processing - this is a stale request
-      // Send an empty response so the UI doesn't hang waiting, but don't provide stale data
-      logger.debug('Dropping stale file tree request: workspace changed', {
-        requestedPath: initialWorkspace,
-        currentWorkspace,
-        requestUuid: message.uuid,
+      // Workspace changed while processing - this is a stale request, skip it
+      logger.debug('Skipping stale request: workspace changed', {
+        from: initialWorkspace,
+        to: currentWorkspace,
       });
-      window.postMessage(
-        {
-          type: 'file:tree:response',
-          uuid: crypto.randomUUID(),
-          request_uuid: message.uuid,
-          path: initialWorkspace,
-          children: [],
-          stale: true, // Flag for UI to know this was dropped due to staleness
-        },
-        '*'
-      );
       return;
     }
 
+    // Show hidden files (dotfiles like .gitignore, .env, .eslintrc) by default
+    // Developers need to see these files in a code editor
     const entries = await listDirectory(targetPath, true);
 
     // Convert FileEntry to FileNode format
@@ -125,7 +114,6 @@ export async function handleFileTreeRequest(
       isDirectory: entry.isDir,
       isFile: !entry.isDir,
       isSymlink: entry.isSymlink,
-      isGitIgnored: entry.isGitIgnored,
     }));
 
     window.postMessage(

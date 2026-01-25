@@ -151,5 +151,5 @@ export async function ensureSession(sessionId: string): Promise<void> {
   // Session is immediately ready to receive messages after agentCreateSession() returns.
   // The SDK's MessageQueue is created and waiting for messages. When we send the first
   // message, it unblocks the iterator, and the SDK starts processing (including system:init).
-  logger.info('Session created and ready', { sessionId });
+  logger.debug('Session created and ready', { sessionId });
 }

@@ -5,6 +5,8 @@ import { markSessionAsForked, setRewindContext } from '../use-tauri-session';
 import type { RewindContextMessage } from '../types/tauri-types';
 import type { WebviewMessage } from '@/types/protocol';
 
+const logger = createLogger('ConversationHandlers');
+
 import {
   agentRewindFiles,
   agentGetSdkSessionId,
@@ -17,22 +19,6 @@ import {
 } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 
-const logger = createLogger('ConversationHandlers');
-
-/**
- * Creates a new conversation session.
- *
- * ID Generation Flow:
- * - The sessionId is generated HERE in the handler, not by the caller
- * - The caller sends a 'conversation:create' request without knowing the final ID
- * - This handler generates the ID, persists the conversation, and emits 'conversation:created'
- * - The UI receives 'conversation:created' with the new sessionId and updates state
- *
- * This pattern ensures:
- * 1. Single source of ID generation (avoids race conditions)
- * 2. ID is available to both backend persistence and frontend state
- * 3. Error fallback can still provide a usable session
- */
 export async function handleConversationCreate(
   message: Extract<WebviewMessage, { type: 'conversation:create' }>
 ): Promise<void> {
@@ -54,7 +40,7 @@ export async function handleConversationCreate(
       '*'
     );
   } catch (err: unknown) {
-    logger.error('Conversation create error', { error: err });
+    logger.error('Conversation create error', err);
     // Still emit created event so UI can proceed (will use localStorage fallback)
     const sessionId = crypto.randomUUID();
     window.postMessage(
@@ -94,7 +80,7 @@ export async function handleConversationList(
       '*'
     );
   } catch (err: unknown) {
-    logger.error('Conversation list error', { error: err });
+    logger.error('Conversation list error', err);
     // Return empty list on error (localStorage will still have data)
     window.postMessage(
       {
@@ -146,7 +132,7 @@ export async function handleConversationLoad(
       );
     }
   } catch (err: unknown) {
-    logger.error('Conversation load error', { error: err });
+    logger.error('Conversation load error', err);
     window.postMessage(
       {
         type: 'conversation:loaded',
@@ -174,7 +160,7 @@ export async function handleConversationDelete(
       '*'
     );
   } catch (err: unknown) {
-    logger.error('Conversation delete error', { error: err });
+    logger.error('Conversation delete error', err);
   }
 }
 
@@ -184,7 +170,7 @@ export async function handleConversationUpdateTitle(
   try {
     await conversationUpdateTitle(message.session_id, message.title);
   } catch (err: unknown) {
-    logger.error('Conversation title update error', { error: err });
+    logger.error('Conversation title update error', err);
   }
 }
 
@@ -214,8 +200,8 @@ export async function handleConversationRewind(
       session_id: message.session_id,
       message_id,
       user_message_id,
-      rewindCheckpoints: JSON.stringify(rewindCheckpoints),
-      sessionCheckpointCount: sessionCheckpoints ? Object.keys(sessionCheckpoints).length : 0,
+      rewindCheckpoints,
+      sessionCheckpoints,
     });
 
     // Step 2: Get SDK session ID BEFORE forking so we can resume from it
@@ -224,7 +210,7 @@ export async function handleConversationRewind(
       sdkSessionId = await agentGetSdkSessionId(message.session_id);
       logger.debug('Got SDK session ID for resume', { sdkSessionId });
     } catch (sdkErr) {
-      logger.error('Could not get SDK session ID', { error: sdkErr });
+      logger.error('Could not get SDK session ID', sdkErr);
     }
 
     // Step 3: Rewind files to the turn END checkpoint (file state after this message completed)
@@ -233,10 +219,10 @@ export async function handleConversationRewind(
       try {
         logger.debug('Calling agentRewindFiles with turnEnd checkpoint');
         await agentRewindFiles(message.session_id, rewindCheckpoints.rewindFiles);
-        logger.info('Files rewound to checkpoint', { checkpoint: rewindCheckpoints.rewindFiles });
+        logger.debug('Files rewound to checkpoint', { checkpoint: rewindCheckpoints.rewindFiles });
       } catch (rewindErr) {
         // Log but continue with conversation fork even if file rewind fails
-        logger.error('File rewind failed', { error: rewindErr });
+        logger.error('File rewind failed', rewindErr);
       }
     } else {
       logger.debug('No checkpoints found for session, skipping file rewind');
@@ -308,7 +294,7 @@ export async function handleConversationRewind(
       );
     }
   } catch (err: unknown) {
-    logger.error('Conversation rewind error', { error: err });
+    logger.error('Conversation rewind error', err);
     const newSessionId = crypto.randomUUID();
     window.postMessage(
       {

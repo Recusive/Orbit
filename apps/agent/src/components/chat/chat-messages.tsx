@@ -15,25 +15,26 @@ import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { FC } from 'react';
 
 import { TextShimmer } from '@/components/ui/text-shimmer';
+import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
 // Rotating loading messages - fun tech-themed phrases
 const LOADING_MESSAGES = [
-  'Thinking...',
-  'Generating...',
-  'Computing...',
-  'Brewing code...',
-  'Crunching bits...',
-  'Parsing thoughts...',
-  'Compiling ideas...',
-  'Downloading wisdom...',
-  'Summoning bytes...',
-  'Consulting the cloud...',
-  'Reticulating splines...',
-  'Feeding the hamsters...',
-  'Warming up GPUs...',
-  'Juggling tensors...',
-  'Wrangling tokens...',
+  'Thinking',
+  'Generating',
+  'Computing',
+  'Brewing code',
+  'Crunching bits',
+  'Parsing thoughts',
+  'Compiling ideas',
+  'Downloading wisdom',
+  'Summoning bytes',
+  'Consulting the cloud',
+  'Reticulating splines',
+  'Feeding the hamsters',
+  'Warming up GPUs',
+  'Juggling tensors',
+  'Wrangling tokens',
 ] as const;
 
 function useRotatingMessage(isActive: boolean, intervalMs = 2500): string {
@@ -54,7 +55,7 @@ function useRotatingMessage(isActive: boolean, intervalMs = 2500): string {
     };
   }, [isActive, intervalMs]);
 
-  return LOADING_MESSAGES[index] ?? 'Thinking...';
+  return LOADING_MESSAGES[index] ?? 'Thinking';
 }
 
 interface ChatMessagesProps {
@@ -174,8 +175,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
         {/* Progress indicator - shows while agent is running OR text is still animating */}
         {isLoading ? (
-          <div className="px-3 py-2">
-            <TextShimmer className="text-sm" duration={1.2}>
+          <div className="flex items-center gap-2 px-3 py-2">
+            <ThinkingDots size={20} duration={1.2} />
+            <TextShimmer className="font-mono text-base" duration={1.2}>
               {loadingMessage}
             </TextShimmer>
           </div>

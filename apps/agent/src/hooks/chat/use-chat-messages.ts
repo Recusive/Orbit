@@ -228,6 +228,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     return createMessageHandler({
       setWorkspace: uiActions.setWorkspace,
       workspacePath,
+      activeWorktreePath,
       setActiveConversation: uiActions.setActiveConversation,
       setConversationTransitioning: uiActions.setConversationTransitioning,
       setConversations: uiActions.setConversations,
@@ -254,6 +255,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
   }, [
     // Only reactive dependencies - actions come from getState() inside useMemo
     workspacePath,
+    activeWorktreePath,
     onSessionCreated,
     setSessionId,
     setMessages,
@@ -428,9 +430,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setMessages((prev: ChatMessage[]) => [...prev, userMessage]);
       setIsAgentRunning(true);
 
-      // Persist user message to backend (include workspace/worktree paths for correct storage)
-      // Read paths via getState() to avoid stale closures and unnecessary dependency triggers
-      const uiState = useUIStore.getState();
+      // Persist user message to backend with workspace/worktree context
+      // This ensures auto-created conversations go to the correct location, not _global
       void conversationAddMessage(
         sessionId,
         {
@@ -439,8 +440,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           content: text,
           createdAt: Date.now(),
         },
-        uiState.workspacePath ?? undefined,
-        uiState.activeWorktreePath ?? undefined
+        workspacePath ?? undefined,
+        activeWorktreePath ?? undefined
       );
 
       // Build context object with files, images, and/or elements
@@ -471,7 +472,16 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         context,
       });
     }
-  }, [sessionId, pendingMessage, postMessage, setMessages, setPendingMessage, setIsAgentRunning]);
+  }, [
+    sessionId,
+    pendingMessage,
+    postMessage,
+    setMessages,
+    setPendingMessage,
+    setIsAgentRunning,
+    workspacePath,
+    activeWorktreePath,
+  ]);
 
   // Create chat actions - memoized to prevent unnecessary recreations
   // PERF: Actions are accessed via getState() inside the factory to avoid

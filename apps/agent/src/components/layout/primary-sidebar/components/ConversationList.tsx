@@ -2,7 +2,7 @@
  * ConversationList - Renders worktree groups with nested conversations
  */
 import { Plus } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 
 /** Indentation for conversation items nested under workspace (px) */
 const CONVERSATION_INDENT_PX = 19;
@@ -10,7 +10,6 @@ const CONVERSATION_INDENT_PX = 19;
 import { ConversationItem } from './ConversationItem';
 import { WorkspaceItem } from './WorkspaceItem';
 
-import type { WorktreeInfo } from '@/lib/api';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
@@ -34,7 +33,7 @@ interface ConversationListProps {
   readonly onToggleWorktree: (path: string) => void;
   /** Called when user clicks on a worktree to switch to it as active workspace */
   readonly onSelectWorktree: (path: string) => void;
-  readonly onRemoveWorktree: (worktree: WorktreeInfo) => void;
+  readonly onRemoveWorktree: (path: string) => void;
   readonly onOpenCreateWorktree: () => void;
 }
 
@@ -59,64 +58,50 @@ export const ConversationList: FC<ConversationListProps> = ({
 }) => {
   // Build a Map of worktree path -> conversations for O(1) lookups
   // This avoids O(n*m) complexity from filtering conversations for each worktree
-  // Also pre-computes legacy conversation handling to avoid O(n) filter on each render
+  // Groups by worktreePath first, falling back to workspacePath for legacy conversations
   const conversationsByWorktree = useMemo(() => {
     const map = new Map<string, ConversationSummary[]>();
-    const legacyConversations: ConversationSummary[] = [];
-
-    // Find main worktree path (once, not per-render)
-    const mainWt = worktrees.find((wt) => wt.worktree.isMain);
-    const mainPath = mainWt?.worktree.path ?? null;
-
-    // Build set of all worktree paths for fast lookup
-    const worktreePaths = new Set(worktrees.map((wt) => wt.worktree.path));
-
     for (const conv of conversations) {
-      if (conv.worktreePath) {
-        // Modern conversation with explicit worktreePath
-        const existing = map.get(conv.worktreePath);
+      // Use worktreePath if available, otherwise fall back to workspacePath (legacy)
+      const path = conv.worktreePath ?? conv.workspacePath;
+      if (path) {
+        const existing = map.get(path);
         if (existing) {
           existing.push(conv);
         } else {
-          map.set(conv.worktreePath, [conv]);
-        }
-      } else if (conv.workspacePath) {
-        // Legacy conversation (no worktreePath)
-        // Check if workspacePath matches any worktree path
-        if (worktreePaths.has(conv.workspacePath)) {
-          // workspacePath matches a worktree - group under that worktree
-          const existing = map.get(conv.workspacePath);
-          if (existing) {
-            existing.push(conv);
-          } else {
-            map.set(conv.workspacePath, [conv]);
-          }
-        } else {
-          // workspacePath doesn't match any worktree - treat as legacy
-          // These will be shown under the main worktree
-          legacyConversations.push(conv);
+          map.set(path, [conv]);
         }
       }
     }
-
-    // Map all legacy conversations to main worktree
-    // This ensures they're visible even when workspacePath differs from any worktree path
-    if (mainPath && legacyConversations.length > 0) {
-      const mainConversations = map.get(mainPath) ?? [];
-      map.set(mainPath, [...mainConversations, ...legacyConversations]);
-    }
-
     return map;
-  }, [conversations, worktrees]);
+  }, [conversations]);
 
   // Helper to get conversations for a specific worktree path (O(1) lookup)
-  // All legacy conversation handling is pre-computed in useMemo above
-  const getWorktreeConversations = useCallback(
-    (worktreePath: string): ConversationSummary[] => {
-      return conversationsByWorktree.get(worktreePath) ?? [];
-    },
-    [conversationsByWorktree]
-  );
+  // For the main worktree, also includes legacy conversations without worktreePath
+  const getWorktreeConversations = (worktreePath: string): ConversationSummary[] => {
+    const direct = conversationsByWorktree.get(worktreePath) ?? [];
+
+    // For main worktree, include legacy conversations that only have workspacePath
+    // (conversations created before worktreePath support was added)
+    const mainWorktree = worktrees.find((wt) => wt.worktree.isMain);
+    if (mainWorktree?.worktree.path === worktreePath) {
+      // Legacy conversations: have workspacePath matching the main worktree but no worktreePath
+      const legacy = conversations.filter(
+        (c) => !c.worktreePath && c.workspacePath === worktreePath
+      );
+      // Avoid duplicates: legacy conversations are already in `direct` via the fallback grouping
+      // BUT only if worktreePath === workspacePath. If they differ, we need to merge.
+      // Since legacy has no worktreePath, they're grouped by workspacePath in the map.
+      // If worktreePath equals workspacePath for main, they're already in `direct`.
+      // This check handles edge cases where workspace root differs from main worktree path.
+      const firstLegacy = legacy[0];
+      if (firstLegacy !== undefined && !direct.includes(firstLegacy)) {
+        return [...direct, ...legacy];
+      }
+    }
+
+    return direct;
+  };
 
   // Render conversation items for a given list
   const renderConversations = (convList: ConversationSummary[]): React.ReactNode => {
@@ -195,7 +180,7 @@ export const ConversationList: FC<ConversationListProps> = ({
                     onSelectWorktree(wt.worktree.path);
                   }}
                   onRemove={() => {
-                    onRemoveWorktree(wt.worktree);
+                    onRemoveWorktree(wt.worktree.path);
                   }}
                 />
                 {/* Conversations for this worktree */}

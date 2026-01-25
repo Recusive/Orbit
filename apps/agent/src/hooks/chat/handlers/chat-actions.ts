@@ -194,7 +194,8 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         setMessages((prev) => [...prev, userMessage]);
         setIsAgentRunning(true);
 
-        // Persist user message to backend (include workspace/worktree paths for correct storage)
+        // Persist user message to backend with workspace/worktree context
+        // This ensures auto-created conversations go to the correct location, not _global
         void conversationAddMessage(
           sessionId,
           {

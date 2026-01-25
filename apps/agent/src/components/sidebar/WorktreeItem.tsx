@@ -51,9 +51,8 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
   const [isHovered, setIsHovered] = useState(false);
 
   // Extract workspace name from path (last segment)
-  // Handles edge case: empty path or path with only separators falls back to 'Unknown'
   const workspaceName =
-    worktree.path.split(PATH_SEPARATOR_RE).filter(Boolean).pop() ?? (worktree.path || 'Unknown');
+    worktree.path.split(PATH_SEPARATOR_RE).filter(Boolean).pop() ?? worktree.path;
 
   // Get branch display name (without refs/heads/)
   const branchName = worktree.branch?.replace(/^refs\/heads\//, '') ?? worktree.shortHead;
@@ -108,7 +107,6 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              e.stopPropagation();
               onToggle?.();
             }
           }}

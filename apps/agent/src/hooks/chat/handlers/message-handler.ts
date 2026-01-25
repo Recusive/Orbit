@@ -13,7 +13,6 @@ import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
-import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('MessageHandler');
 
@@ -79,6 +78,7 @@ interface Conversation {
 interface MessageHandlerDeps {
   setWorkspace: (path: string) => void;
   workspacePath: string | null;
+  activeWorktreePath: string | null;
   setActiveConversation: (sessionId: string | null, title: string | null) => void;
   setConversationTransitioning: (transitioning: boolean) => void;
   setConversations: (conversations: Conversation[]) => void;
@@ -161,6 +161,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
   const {
     setWorkspace,
     workspacePath,
+    activeWorktreePath,
     setActiveConversation,
     setConversationTransitioning,
     setConversations,
@@ -514,8 +515,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                 : undefined;
 
             if (!wasMessagePersisted(message.session_id, completedMsg.id)) {
-              // Get workspace/worktree paths for correct storage (auto-create with context)
-              const uiState = useUIStore.getState();
+              // Include workspace/worktree context to ensure auto-created conversations
+              // go to the correct location, not _global
               void conversationAddMessage(
                 message.session_id,
                 {
@@ -527,8 +528,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                   ...(usageDto ? { usage: usageDto } : {}),
                   ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
                 },
-                uiState.workspacePath ?? undefined,
-                uiState.activeWorktreePath ?? undefined
+                workspacePath ?? undefined,
+                activeWorktreePath ?? undefined
               );
             }
 

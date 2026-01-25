@@ -85,12 +85,10 @@ describe('browser-store', () => {
 
     it('should have empty navigation state', () => {
       const state = useBrowserStore.getState();
-      // canGoBack/canGoForward are null (unknown) initially because WebKit's
-      // on_navigation callback doesn't provide history state
       expect(state.navigation).toEqual({
         url: '',
         title: '',
-        canGoBack: null,
+        canGoBack: null, // null = unknown, treated as enabled in UI
         canGoForward: null,
         isLoading: false,
       });

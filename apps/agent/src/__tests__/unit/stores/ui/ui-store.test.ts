@@ -156,11 +156,10 @@ describe('ui-store', () => {
       expect(state.leftSidebarWidth).toBe(DEFAULT_UI_STATE.leftSidebarWidth);
     });
 
-    it('should start with default panel states', () => {
+    it('should start with expected panel states', () => {
       const state = useUIStore.getState();
       expect(state.reviewPanelOpen).toBe(false);
-      // rightSidebarOpen defaults to true (Actions Bar visible by default)
-      expect(state.rightSidebarOpen).toBe(DEFAULT_UI_STATE.rightSidebarOpen);
+      expect(state.rightSidebarOpen).toBe(DEFAULT_UI_STATE.rightSidebarOpen); // true by default
       expect(state.bottomPanelOpen).toBe(false);
     });
 
@@ -540,7 +539,7 @@ describe('ui-store', () => {
       it('should toggle right sidebar open state', () => {
         const { toggleRightSidebar } = useUIStore.getState();
 
-        // Default is true (Actions Bar visible by default)
+        // Default is true, so first toggle should close it
         expect(useUIStore.getState().rightSidebarOpen).toBe(true);
 
         toggleRightSidebar();

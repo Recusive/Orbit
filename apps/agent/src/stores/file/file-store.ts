@@ -1,5 +1,6 @@
 import { createLogger } from '@orbit/common/lib';
 import { enableMapSet } from 'immer';
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
@@ -9,6 +10,22 @@ const logger = createLogger('FileStore');
 
 // Enable Immer support for Map and Set
 enableMapSet();
+
+/**
+ * Creates a prototype-free dictionary safe for arbitrary string keys.
+ *
+ * File paths can legally include keys like `__proto__` or `constructor`
+ * which would collide with Object.prototype. Using Object.create(null)
+ * creates an object with no prototype chain, preventing these collisions.
+ *
+ * @example
+ * const dict = createDict<FileChange>();
+ * dict['__proto__'] = someFile;  // Safe - won't pollute Object.prototype
+ * '__proto__' in dict;           // true - works correctly
+ */
+function createDict<T>(): Record<string, T> {
+  return Object.create(null) as Record<string, T>;
+}
 
 export type FileChangeType = 'created' | 'modified' | 'deleted';
 export type FileChangeStatus = 'pending' | 'accepted' | 'rejected';
@@ -47,12 +64,11 @@ export interface FileChange {
 }
 
 export interface FileState {
-  // File changes (existing)
-  changedFiles: FileChange[];
-  /** Index for O(1) lookup by path - kept in sync with changedFiles */
-  changedFilesByPath: Map<string, FileChange>;
-  /** Index for O(1) lookup by id - kept in sync with changedFiles */
-  changedFilesById: Map<string, FileChange>;
+  // File changes (refactored from array+Map to Record-based)
+  /** Primary storage: file ID → FileChange object */
+  filesById: Record<string, FileChange>;
+  /** Index for O(1) path lookup: file path → file ID */
+  pathToId: Record<string, string>;
   selectedFile: string | null;
   filterStatus: FileChangeStatus | 'all';
 
@@ -103,10 +119,9 @@ export interface FileState {
 
 export const useFileStore = create<FileState>()(
   immer((set, get) => ({
-    // File changes (existing)
-    changedFiles: [],
-    changedFilesByPath: new Map<string, FileChange>(),
-    changedFilesById: new Map<string, FileChange>(),
+    // File changes (refactored from array+Map to Record-based)
+    filesById: createDict<FileChange>(),
+    pathToId: createDict<string>(),
     selectedFile: null,
     filterStatus: 'all',
 
@@ -119,53 +134,110 @@ export const useFileStore = create<FileState>()(
     errorPaths: new Map<string, string>(),
 
     addFileChange: (change: Omit<FileChange, 'id' | 'status' | 'timestamp'>) => {
-      const random = Math.random().toString(36);
-      const id = `file_${String(Date.now())}_${random.slice(2, 11)}`;
+      // Step 1: Check for existing file BEFORE generating new ID
+      // This ensures we return the correct ID (existing or new)
+      const currentState = get();
+      const existingId = currentState.pathToId[change.path];
+      const existingFile = existingId ? currentState.filesById[existingId] : undefined;
 
+      // Determine what ID to use/return
+      let returnId: string;
+
+      if (existingFile) {
+        // File exists - we'll update it and return its existing ID
+        returnId = existingFile.id;
+      } else {
+        // File doesn't exist (or stale index) - generate new ID
+        const random = Math.random().toString(36);
+        returnId = `file_${String(Date.now())}_${random.slice(2, 11)}`;
+      }
+
+      // Step 2: Single set() call for all mutations (transaction)
       set((state) => {
-        // O(1) lookup using Map index
-        const existingFile = state.changedFilesByPath.get(change.path);
+        // Re-lookup inside set() to work with Immer draft
+        const draftExistingId = state.pathToId[change.path];
+        const draftExistingFile = draftExistingId ? state.filesById[draftExistingId] : undefined;
 
-        if (existingFile) {
-          // Update existing file
-          Object.assign(existingFile, {
-            ...change,
-            timestamp: Date.now(),
-          });
-          // Map reference stays valid since we mutate in place
+        if (draftExistingFile) {
+          // Update existing file - preserve id and status
+          draftExistingFile.type = change.type;
+          draftExistingFile.timestamp = Date.now();
+          if (change.diff !== undefined) draftExistingFile.diff = change.diff;
+          if (change.oldContent !== undefined) draftExistingFile.oldContent = change.oldContent;
+          if (change.newContent !== undefined) draftExistingFile.newContent = change.newContent;
+          if (change.language !== undefined) draftExistingFile.language = change.language;
+          // Note: id and status are intentionally NOT updated (preserved)
           return;
         }
 
-        // Add new file
-        const newChange: FileChange = {
+        // Handle stale index: pathToId points to missing file
+        // (draftExistingFile is already known to be falsy at this point)
+        if (draftExistingId) {
+          logger.warn(`Repairing stale pathToId entry: ${change.path} -> ${draftExistingId}`);
+          Reflect.deleteProperty(state.pathToId, change.path);
+        }
+
+        // Create new file
+        const newFile: FileChange = {
           ...change,
-          id,
+          id: returnId,
           status: 'pending',
           timestamp: Date.now(),
         };
 
-        state.changedFiles.push(newChange);
-        // Update indices
-        state.changedFilesByPath.set(change.path, newChange);
-        state.changedFilesById.set(id, newChange);
+        // Add to primary storage and index
+        state.filesById[returnId] = newFile;
+        state.pathToId[change.path] = returnId;
 
-        // Auto-select if it's the first file
-        if (state.changedFiles.length === 1) {
+        // Auto-select if this is the first file
+        const fileCount = Object.keys(state.filesById).length;
+        if (fileCount === 1) {
           state.selectedFile = change.path;
         }
       });
 
-      return id;
+      return returnId;
     },
 
     updateFileChange: (id: string, updates: Partial<FileChange>) => {
       set((state) => {
-        // O(1) lookup using Map index
-        const file = state.changedFilesById.get(id);
-        if (file) {
-          Object.assign(file, updates);
-          // Map references stay valid since we mutate in place
+        const file = state.filesById[id];
+        if (!file) {
+          logger.warn(`updateFileChange: file not found for id=${id}`);
+          return;
         }
+
+        // Handle path changes specially - must update pathToId index
+        if (updates.path !== undefined && updates.path !== file.path) {
+          const newPath = updates.path;
+          const oldPath = file.path;
+
+          // Check if a file already exists at the new path (prevent overwrite)
+          const existingIdAtNewPath = state.pathToId[newPath];
+          if (existingIdAtNewPath && existingIdAtNewPath !== id) {
+            logger.warn(
+              `updateFileChange: cannot rename ${oldPath} to ${newPath} - ` +
+                `file already exists at destination (id=${existingIdAtNewPath})`
+            );
+            return;
+          }
+
+          // Update pathToId index: remove old path, add new path
+          Reflect.deleteProperty(state.pathToId, oldPath);
+          state.pathToId[newPath] = id;
+
+          // Update selectedFile if it pointed to the old path
+          if (state.selectedFile === oldPath) {
+            state.selectedFile = newPath;
+          }
+        }
+
+        // Apply all updates to the file object
+        // Omit 'id' from updates to prevent overwriting the file's internal id
+        const safeUpdates = Object.fromEntries(
+          Object.entries(updates).filter(([key]) => key !== 'id')
+        );
+        Object.assign(file, safeUpdates);
       });
     },
 
@@ -177,57 +249,70 @@ export const useFileStore = create<FileState>()(
 
     acceptFile: (path: string) => {
       set((state) => {
-        // O(1) lookup using Map index
-        const file = state.changedFilesByPath.get(path);
-        if (file) {
-          file.status = 'accepted';
-        }
+        // O(1) lookup: path -> id -> file
+        const id = state.pathToId[path];
+        if (!id) return;
+
+        const file = state.filesById[id];
+        if (!file) return;
+
+        file.status = 'accepted';
       });
     },
 
     rejectFile: (path: string) => {
       set((state) => {
-        // O(1) lookup using Map index
-        const file = state.changedFilesByPath.get(path);
-        if (file) {
-          file.status = 'rejected';
-        }
+        // O(1) lookup: path -> id -> file
+        const id = state.pathToId[path];
+        if (!id) return;
+
+        const file = state.filesById[id];
+        if (!file) return;
+
+        file.status = 'rejected';
       });
     },
 
     acceptAllFiles: () => {
       set((state) => {
-        state.changedFiles.forEach((file) => {
+        // Iterate all files and accept pending ones
+        for (const file of Object.values(state.filesById)) {
           if (file.status === 'pending') {
             file.status = 'accepted';
           }
-        });
+        }
       });
     },
 
     rejectAllFiles: () => {
       set((state) => {
-        state.changedFiles.forEach((file) => {
+        // Iterate all files and reject pending ones
+        for (const file of Object.values(state.filesById)) {
           if (file.status === 'pending') {
             file.status = 'rejected';
           }
-        });
+        }
       });
     },
 
     removeFile: (path: string) => {
       set((state) => {
-        // Get file before removing to update indices
-        const file = state.changedFilesByPath.get(path);
-        if (file) {
-          state.changedFilesByPath.delete(path);
-          state.changedFilesById.delete(file.id);
+        // Look up file ID from path index
+        const id = state.pathToId[path];
+        if (!id) {
+          // File not found at this path - nothing to remove
+          return;
         }
-        state.changedFiles = state.changedFiles.filter((f) => f.path !== path);
+
+        // Delete from both stores (must do both for consistency)
+        Reflect.deleteProperty(state.filesById, id);
+        Reflect.deleteProperty(state.pathToId, path);
 
         // Update selection if the removed file was selected
         if (state.selectedFile === path) {
-          state.selectedFile = state.changedFiles[0]?.path ?? null;
+          // Pick any remaining file (no sorting needed for fallback)
+          const remaining = Object.values(state.filesById)[0];
+          state.selectedFile = remaining?.path ?? null;
         }
       });
     },
@@ -235,23 +320,23 @@ export const useFileStore = create<FileState>()(
     clearFiles: (status?: FileChangeStatus) => {
       set((state) => {
         if (status) {
-          // Remove matching files from indices
-          for (const file of state.changedFiles) {
+          // Remove only files matching the specified status
+          for (const file of Object.values(state.filesById)) {
             if (file.status === status) {
-              state.changedFilesByPath.delete(file.path);
-              state.changedFilesById.delete(file.id);
+              Reflect.deleteProperty(state.filesById, file.id);
+              Reflect.deleteProperty(state.pathToId, file.path);
             }
           }
-          state.changedFiles = state.changedFiles.filter((f) => f.status !== status);
         } else {
-          state.changedFiles = [];
-          state.changedFilesByPath.clear();
-          state.changedFilesById.clear();
+          // Clear ALL files - use createDict() for null-prototype consistency
+          state.filesById = createDict<FileChange>();
+          state.pathToId = createDict<string>();
         }
 
-        // Update selection if it was cleared - O(1) lookup using Map
-        if (state.selectedFile && !state.changedFilesByPath.has(state.selectedFile)) {
-          state.selectedFile = state.changedFiles[0]?.path ?? null;
+        // Update selection if the selected file was removed
+        if (state.selectedFile && !state.pathToId[state.selectedFile]) {
+          const remaining = Object.values(state.filesById)[0];
+          state.selectedFile = remaining?.path ?? null;
         }
       });
     },
@@ -262,14 +347,27 @@ export const useFileStore = create<FileState>()(
       });
     },
 
-    // O(1) lookup by path
+    // O(1) lookup by path (two-step: path -> id -> file)
     getFileByPath: (path: string): FileChange | undefined => {
-      return get().changedFilesByPath.get(path);
+      const state = get();
+      const id = state.pathToId[path];
+      if (id === undefined) return undefined;
+
+      const file = state.filesById[id];
+
+      // Dev-mode assertion to catch index corruption early
+      if (import.meta.env.DEV && file === undefined) {
+        logger.error(
+          `Index corruption: pathToId has ${path}->${id} but filesById[${id}] is missing`
+        );
+      }
+
+      return file;
     },
 
-    // O(1) lookup by id
+    // O(1) lookup by id (direct Record access)
     getFileById: (id: string): FileChange | undefined => {
-      return get().changedFilesById.get(id);
+      return get().filesById[id];
     },
 
     // ═══════════════════════════════════════════════════════════════
@@ -420,7 +518,72 @@ export const useFileStore = create<FileState>()(
 );
 
 // ═══════════════════════════════════════════════════════════════
-// Selector Hooks
+// Derived Selectors for File Changes
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * React hook that returns all changed files sorted by timestamp (most recent first).
+ *
+ * Uses `useMemo` to prevent recomputation on every render. The memoization
+ * key is `filesById`, so the sorted array is only recomputed when files change.
+ *
+ * **BREAKING CHANGE**: Previously, files were returned in insertion order.
+ * Now they are sorted by timestamp descending (most recent first).
+ *
+ * @example
+ * const changedFiles = useChangedFiles();
+ * // Returns FileChange[] sorted by timestamp descending
+ */
+export function useChangedFiles(): FileChange[] {
+  const filesById = useFileStore((state) => state.filesById);
+
+  return useMemo(
+    () => Object.values(filesById).sort((a, b) => b.timestamp - a.timestamp),
+    [filesById]
+  );
+}
+
+/**
+ * Non-hook version for use outside React components (tests, callbacks, event handlers).
+ *
+ * **WARNING**: This function does NOT memoize. Each call creates a new sorted array.
+ * If calling multiple times in the same execution context, cache the result:
+ *
+ * @example
+ * // In an event handler or callback:
+ * const files = getChangedFiles();
+ * files.forEach(file => processFile(file));
+ *
+ * // DON'T do this (creates array twice):
+ * if (getChangedFiles().length > 0) {
+ *   getChangedFiles().forEach(...);  // Wasteful - computes twice
+ * }
+ *
+ * **BREAKING CHANGE**: Previously, files were returned in insertion order.
+ * Now they are sorted by timestamp descending (most recent first).
+ */
+export function getChangedFiles(): FileChange[] {
+  const { filesById } = useFileStore.getState();
+  return Object.values(filesById).sort((a, b) => b.timestamp - a.timestamp);
+}
+
+/**
+ * Efficient hook for getting just the count of changed files.
+ *
+ * More efficient than `useChangedFiles().length` because it doesn't
+ * compute or sort the full array—just counts the keys.
+ *
+ * @example
+ * const count = useChangedFilesCount();
+ * // Use for badges, empty state checks, etc.
+ */
+export function useChangedFilesCount(): number {
+  const filesById = useFileStore((state) => state.filesById);
+  return Object.keys(filesById).length;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// File Tree Selector Hooks
 // ═══════════════════════════════════════════════════════════════
 
 export interface FlattenedFile {

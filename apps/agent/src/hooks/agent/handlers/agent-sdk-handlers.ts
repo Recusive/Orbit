@@ -91,7 +91,7 @@ export async function handleAgentStop(
   try {
     await agentInterrupt(message.session_id);
   } catch (err: unknown) {
-    logger.error('Agent interrupt error', { error: err });
+    logger.error('Agent interrupt error', err);
   }
 }
 
@@ -101,7 +101,7 @@ export async function handlePermissionResponse(
   try {
     await agentRespondPermission(message.request_id, message.decision, message.always ?? false);
   } catch (err: unknown) {
-    logger.error('Permission response error', { error: err });
+    logger.error('Permission response error', err);
   }
 }
 
@@ -120,7 +120,7 @@ export async function handleThinkingSet(
             : undefined;
     await agentSetThinkingMode(message.session_id, enabled, maxTokens);
   } catch (err: unknown) {
-    logger.error('Set thinking mode error', { error: err });
+    logger.error('Set thinking mode error', err);
   }
 }
 
@@ -130,7 +130,7 @@ export async function handleModelSet(
   try {
     await agentSetModel(message.session_id, message.model);
   } catch (err: unknown) {
-    logger.error('Set model error', { error: err });
+    logger.error('Set model error', err);
   }
 }
 
@@ -148,6 +148,6 @@ export async function handleInputModeSet(
       await agentSetAcceptMode(message.session_id, false);
     }
   } catch (err: unknown) {
-    logger.error('Set input mode error', { error: err });
+    logger.error('Set input mode error', err);
   }
 }

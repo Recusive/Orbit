@@ -11,7 +11,7 @@
  * - Inbox
  * - Start conversation button
  */
-import { FlaskConical, FolderTree, GitBranch, Settings } from 'lucide-react';
+import { FlaskConical, Settings } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 
 import type { SettingsDialogProps } from '@/components/modals/settings';
@@ -19,7 +19,7 @@ import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/files';
 import { SourceControlTab } from '@/components/git';
-import { SidebarToggleIcon } from '@/components/layout/primary-sidebar';
+import { SidebarToggleIcon, TabButton } from '@/components/layout/primary-sidebar';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { HEIGHTS, SIDEBAR } from '@/lib/utils/constants';
@@ -39,32 +39,6 @@ const SettingsDialog: FC<SettingsDialogProps> = (props) => (
 );
 
 type EditorSidebarTab = 'explorer' | 'source';
-
-interface SidebarIconButtonProps {
-  readonly icon: typeof FolderTree;
-  readonly label: string;
-  readonly active: boolean;
-  readonly onClick: () => void;
-}
-
-const SidebarIconButton: FC<SidebarIconButtonProps> = ({ icon: Icon, label, active, onClick }) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <button
-        onClick={onClick}
-        className={cn(
-          'h-7 w-7 flex items-center justify-center rounded-md transition-all duration-150',
-          active
-            ? 'text-foreground bg-muted/60'
-            : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
-        )}
-      >
-        <Icon className="h-4 w-4" />
-      </button>
-    </TooltipTrigger>
-    <TooltipContent side="right">{label}</TooltipContent>
-  </Tooltip>
-);
 
 interface EditorSidebarItemProps {
   readonly icon: typeof Settings;
@@ -191,26 +165,25 @@ export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
         )}
       </div>
 
-      {/* Tab Icons - always visible */}
+      {/* Tab Navigation - hidden when collapsed */}
       <div
         className={cn(
-          'flex shrink-0 border-b border-divider',
-          isCollapsed
-            ? 'flex-col items-center justify-center gap-0.5 py-1.5'
-            : 'items-center gap-1 px-2 py-1'
+          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-[height,opacity] duration-150 ease-in-out',
+          isCollapsed ? '' : 'border-b border-divider'
         )}
-        style={isCollapsed ? { width: SIDEBAR.iconColumnWidth } : undefined}
+        style={{
+          height: isCollapsed ? 0 : SIDEBAR.tabNavHeight,
+          opacity: isCollapsed ? 0 : 1,
+        }}
       >
-        <SidebarIconButton
-          icon={FolderTree}
+        <TabButton
           label="Explorer"
           active={activeTab === 'explorer'}
           onClick={() => {
             setActiveTab('explorer');
           }}
         />
-        <SidebarIconButton
-          icon={GitBranch}
+        <TabButton
           label="Source Control"
           active={activeTab === 'source'}
           onClick={() => {

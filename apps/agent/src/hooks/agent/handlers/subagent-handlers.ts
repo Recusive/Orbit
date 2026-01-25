@@ -1,4 +1,8 @@
+import { createLogger } from '@orbit/common/lib';
+
 import type { WebviewMessage } from '@/types/protocol';
+
+const logger = createLogger('SubagentHandlers');
 
 import {
   getWorkspacePath,
@@ -26,7 +30,7 @@ export async function handleSubagentsList(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to list subagents';
-    console.error('[Orbit] List subagents error:', errorMessage);
+    logger.error('List subagents error', undefined, { error: errorMessage });
     window.postMessage(
       {
         type: 'subagents:error',
@@ -65,7 +69,7 @@ export async function handleSubagentsCreate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to create subagent';
-    console.error('[Orbit] Create subagent error:', errorMessage);
+    logger.error('Create subagent error', undefined, { error: errorMessage });
     window.postMessage(
       {
         type: 'subagents:error',
@@ -104,7 +108,7 @@ export async function handleSubagentsUpdate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to update subagent';
-    console.error('[Orbit] Update subagent error:', errorMessage);
+    logger.error('Update subagent error', undefined, { error: errorMessage });
     window.postMessage(
       {
         type: 'subagents:error',
@@ -134,7 +138,7 @@ export async function handleSubagentsDelete(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to delete subagent';
-    console.error('[Orbit] Delete subagent error:', errorMessage);
+    logger.error('Delete subagent error', undefined, { error: errorMessage });
     window.postMessage(
       {
         type: 'subagents:error',
@@ -163,7 +167,7 @@ export async function handleSubagentsGenerate(
     );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to generate subagent';
-    console.error('[Orbit] Generate subagent error:', errorMessage);
+    logger.error('Generate subagent error', undefined, { error: errorMessage });
     window.postMessage(
       {
         type: 'subagents:error',
