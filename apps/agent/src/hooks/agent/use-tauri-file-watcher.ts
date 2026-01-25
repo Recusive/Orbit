@@ -13,6 +13,14 @@ const logger = createLogger('FileWatcher');
 let fileWatcherInitialized = false;
 let watchedWorkspacePath: string | null = null;
 
+/**
+ * Normalize path separators for cross-platform compatibility.
+ * Converts Windows backslashes to forward slashes.
+ */
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
 /** Paths to ignore for file watching (reduces noise) */
 const IGNORED_PATH_PATTERNS = [
   // Version control
@@ -43,9 +51,18 @@ const IGNORED_PATH_PATTERNS = [
   '/.vscode/',
 ];
 
-/** Check if a path should be ignored */
+/**
+ * Check if a path should be ignored.
+ * Normalizes path separators and handles case-insensitivity on macOS/Windows.
+ */
 function shouldIgnorePath(path: string): boolean {
-  return IGNORED_PATH_PATTERNS.some((pattern) => path.includes(pattern));
+  const normalized = normalizePath(path);
+  // Use case-insensitive matching on macOS/Windows (isLinux is set after platform detection)
+  const comparePath = isLinux ? normalized : normalized.toLowerCase();
+  return IGNORED_PATH_PATTERNS.some((pattern) => {
+    const comparePattern = isLinux ? pattern : pattern.toLowerCase();
+    return comparePath.includes(comparePattern);
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -98,12 +115,24 @@ function toKey(path: string): string {
 /**
  * Check if parent is a parent path of child
  * Source: VS Code watcher.ts:460
+ * Normalizes path separators and handles case-insensitivity on macOS/Windows.
  */
 function isParentPath(parent: string, child: string): boolean {
-  const normalizedParent = parent.endsWith('/') ? parent : parent + '/';
-  const normalizedChild = isLinux ? child : child.toLowerCase();
-  const normalizedParentCmp = isLinux ? normalizedParent : normalizedParent.toLowerCase();
-  return normalizedChild.startsWith(normalizedParentCmp);
+  // Normalize path separators for cross-platform support
+  const normalizedParent = normalizePath(parent.endsWith('/') ? parent : parent + '/');
+  const normalizedChild = normalizePath(child);
+  // Case-insensitive on macOS/Windows
+  const parentCmp = isLinux ? normalizedParent : normalizedParent.toLowerCase();
+  const childCmp = isLinux ? normalizedChild : normalizedChild.toLowerCase();
+  return childCmp.startsWith(parentCmp);
+}
+
+/**
+ * Check if a path is within the watched workspace.
+ * Uses case-insensitive comparison on macOS/Windows.
+ */
+function isInWorkspace(eventPath: string, workspace: string): boolean {
+  return isParentPath(workspace, eventPath);
 }
 
 /**
@@ -342,8 +371,8 @@ export async function initFileWatcher(workspacePath: string): Promise<void> {
 
     try {
       await onFileChange((event) => {
-        // Filter: ignore if not in current workspace
-        if (watchedWorkspacePath && !event.path.startsWith(watchedWorkspacePath)) {
+        // Filter: ignore if not in current workspace (case-insensitive on macOS/Windows)
+        if (watchedWorkspacePath && !isInWorkspace(event.path, watchedWorkspacePath)) {
           return;
         }
 
@@ -358,7 +387,7 @@ export async function initFileWatcher(workspacePath: string): Promise<void> {
           // Only emit if newPath is also in workspace and not ignored
           if (
             watchedWorkspacePath &&
-            event.newPath.startsWith(watchedWorkspacePath) &&
+            isInWorkspace(event.newPath, watchedWorkspacePath) &&
             !shouldIgnorePath(event.newPath)
           ) {
             queueFileChange(event.path, 'deleted');

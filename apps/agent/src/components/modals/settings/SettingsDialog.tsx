@@ -10,6 +10,7 @@ import type { SettingsDialogProps, SettingsSection } from './types';
 import type { FC, ReactNode } from 'react';
 
 import { Dialog, DialogPortal } from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
 // Animation configuration for the settings dialog
@@ -48,8 +49,8 @@ const contentVariants = {
 
 // Loading fallback for lazy-loaded pages
 const PageLoader: FC = () => (
-  <div className="flex items-center justify-center h-32">
-    <div className="text-sm text-muted-foreground/60">Loading...</div>
+  <div className="flex items-center justify-center h-full">
+    <Spinner size="lg" className="text-muted-foreground/60" />
   </div>
 );
 

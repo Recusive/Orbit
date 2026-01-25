@@ -22,7 +22,11 @@ import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/files';
-import { ConversationDeleteDialog, CreateWorktreeDialog } from '@/components/modals';
+import {
+  ConversationDeleteDialog,
+  CreateWorktreeDialog,
+  DeleteWorktreeDialog,
+} from '@/components/modals';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
@@ -88,10 +92,14 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
     deleteDialogOpen,
     setDeleteDialogOpen,
     conversationToDelete,
+    worktreeDeleteDialogOpen,
+    setWorktreeDeleteDialogOpen,
+    worktreeToDelete,
     handleStartConversation,
     handleLoadConversation,
     handleOpenQuickSearch,
     handleOpenCreateWorktree,
+    handleOpenDeleteWorktreeDialog,
     handleRemoveWorktree,
     handleRenameConversation,
     handleDeleteConversation,
@@ -301,9 +309,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               onSelectWorktree={(path) => {
                 useUIStore.getState().setActiveWorktree(path);
               }}
-              onRemoveWorktree={(path) => {
-                void handleRemoveWorktree(path);
-              }}
+              onRemoveWorktree={handleOpenDeleteWorktreeDialog}
               onOpenCreateWorktree={handleOpenCreateWorktree}
             />
           </div>
@@ -371,6 +377,16 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           if (conversationToDelete) {
             void handleDeleteConversation(conversationToDelete.sessionId);
           }
+        }}
+      />
+
+      {/* Delete Worktree Dialog */}
+      <DeleteWorktreeDialog
+        open={worktreeDeleteDialogOpen}
+        onOpenChange={setWorktreeDeleteDialogOpen}
+        worktree={worktreeToDelete}
+        onConfirm={(deleteBranch) => {
+          void handleRemoveWorktree(deleteBranch);
         }}
       />
     </aside>
