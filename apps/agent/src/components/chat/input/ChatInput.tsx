@@ -102,6 +102,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
                 request={request}
                 onApprove={onPermissionApprove}
                 onDeny={onPermissionDeny}
+                isFirst={index === 0}
                 isLast={index === permissions.length - 1}
               />
             ))}

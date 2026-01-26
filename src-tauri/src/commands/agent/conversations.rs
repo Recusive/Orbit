@@ -115,8 +115,12 @@ impl From<Message> for MessageDto {
                 MessageRole::User => String::from("user"),
                 MessageRole::Assistant => String::from("assistant"),
                 MessageRole::System => String::from("system"),
-                // Handle future variants
-                _ => String::from("unknown"),
+                // Handle future variants - log at trace level to aid debugging
+                // when upstream adds new MessageRole variants
+                _ => {
+                    log::trace!("Unknown MessageRole variant encountered, treating as 'unknown'");
+                    String::from("unknown")
+                },
             },
             content: msg.content,
             thinking: msg.thinking,

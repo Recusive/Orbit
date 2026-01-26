@@ -385,17 +385,24 @@ export const useFileStore = create<FileState>()(
           return;
         }
 
+        // Detect initial load (first time setting currentSessionId)
+        // This handles the edge case where buffered tool events add file changes
+        // before the first switchSession call (e.g., auto-start agent flow)
+        const isInitialLoad = state.currentSessionId === null;
+        const hasExistingFiles = Object.keys(state.filesById).length > 0;
+
         // Save current session's file changes to cache (if we have a current session with files)
         if (state.currentSessionId !== null) {
-          const hasFiles = Object.keys(state.filesById).length > 0;
-          if (hasFiles) {
+          if (hasExistingFiles) {
             state.sessionCache[state.currentSessionId] = {
               filesById: { ...state.filesById },
               pathToId: { ...state.pathToId },
               selectedFile: state.selectedFile,
             };
           } else {
-            // No files - remove from cache if it exists (clean up empty sessions)
+            // No files - remove from cache if it exists (clean up empty sessions).
+            // Empty sessions don't need cached state since they have nothing to restore.
+            // Note: selectedFile is intentionally not preserved for empty sessions.
             Reflect.deleteProperty(state.sessionCache, state.currentSessionId);
           }
         }
@@ -411,8 +418,14 @@ export const useFileStore = create<FileState>()(
           state.pathToId = { ...cached.pathToId };
           state.selectedFile = cached.selectedFile;
           logger.debug(`Restored ${String(Object.keys(cached.filesById).length)} files from cache`);
+        } else if (isInitialLoad && hasExistingFiles) {
+          // Initial load with existing files (from buffered tool events before session was set)
+          // Adopt these files as belonging to the new session - don't clear them
+          logger.debug(
+            `Initial load: adopting ${String(Object.keys(state.filesById).length)} existing files`
+          );
         } else {
-          // No cached data - start fresh
+          // No cached data and no existing files to adopt - start fresh
           state.filesById = createDict<FileChange>();
           state.pathToId = createDict<string>();
           state.selectedFile = null;

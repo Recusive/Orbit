@@ -816,7 +816,8 @@ html.dark [data-streamdown='code-block-body'] code span::before {
     }
     to {
       opacity: 1;
-      max-height: 56px;
+      /* Use generous max-height to accommodate larger font sizes, system scaling, and localized labels */
+      max-height: 100px;
       padding-top: 8px;
       padding-bottom: 8px;
     }
