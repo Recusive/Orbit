@@ -7,7 +7,7 @@
  */
 import { ChevronDown, ClipboardList, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
@@ -16,6 +16,7 @@ import type { FC } from 'react';
 import { cn } from '@/lib/utils';
 
 // Stable plugin arrays - defined outside component to prevent recreation on each render
+// This is critical for Streamdown performance as it compares plugin arrays by reference
 const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS: never[] = [];
 
@@ -34,18 +35,9 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
   success,
   onOpenFile,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true); // Plans start expanded
-  const wasRunningRef = useRef(isRunning);
+  // Plans start expanded and stay expanded after completion (users want to see the plan)
+  const [isExpanded, setIsExpanded] = useState(true);
   const isFailed = success === false;
-
-  // Auto-collapse when tool finishes (but keep expanded for plans since they're important)
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      // Keep plans expanded after completion - users want to see the plan
-      // setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   const fileName = filePath.split('/').pop() ?? filePath;
 
