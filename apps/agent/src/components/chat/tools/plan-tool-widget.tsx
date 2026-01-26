@@ -7,7 +7,7 @@
  */
 import { ChevronDown, ClipboardList, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
@@ -34,18 +34,9 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
   success,
   onOpenFile,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true); // Plans start expanded
-  const wasRunningRef = useRef(isRunning);
+  // Plans start and stay expanded - users need to review the full plan content
+  const [isExpanded, setIsExpanded] = useState(true);
   const isFailed = success === false;
-
-  // Auto-collapse when tool finishes (but keep expanded for plans since they're important)
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      // Keep plans expanded after completion - users want to see the plan
-      // setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   const fileName = filePath.split('/').pop() ?? filePath;
 
@@ -71,6 +62,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           onClick={() => {
             setIsExpanded(!isExpanded);
           }}
+          aria-expanded={isExpanded}
           className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-muted/40 transition-colors duration-150"
         >
           {/* Icon container - amber/plan mode color */}
@@ -153,7 +145,6 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
                         remarkPlugins={REMARK_PLUGINS}
                         rehypePlugins={REHYPE_PLUGINS}
                         mode="static"
-                        cdnUrl="https://esm.sh/shiki/langs"
                       >
                         {content}
                       </Streamdown>

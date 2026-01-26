@@ -1,5 +1,5 @@
 import { File, Globe, Loader2, Terminal } from 'lucide-react';
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 
 import type { PermissionRequest } from '@/stores/agent/tool-store';
 import type { FC } from 'react';
@@ -13,6 +13,9 @@ interface PermissionModalProps {
   /** Whether this is the last permission in the list (controls bottom separator) */
   readonly isLast?: boolean;
 }
+
+// Note: Keyboard shortcuts (Cmd+Enter, Cmd+Backspace) are handled by the parent
+// ChatInput component to avoid conflicts when multiple permissions are pending.
 
 // Get confirmation action label
 function getConfirmLabel(toolName: string): string {
@@ -50,26 +53,6 @@ export const PermissionModal: FC<PermissionModalProps> = ({
   const confirmLabel = getConfirmLabel(request.toolName);
   const isBash = request.toolName.toLowerCase() === 'bash';
   const isBrowser = isBrowserTool(request.toolName);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.metaKey || e.ctrlKey) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          onApprove(request.requestId);
-        } else if (e.key === 'Backspace') {
-          e.preventDefault();
-          onDeny(request.requestId);
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [request.requestId, onApprove, onDeny]);
 
   const handleApprove = useCallback(() => {
     onApprove(request.requestId);

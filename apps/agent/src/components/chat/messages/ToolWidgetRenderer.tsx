@@ -60,7 +60,8 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
       const content = getStringInput(tool, 'content', '');
 
       // Route plan files to the dedicated PlanToolWidget for markdown preview
-      if (filePath.includes('.claude/plans/')) {
+      // Use path separator prefix to avoid matching unintended paths like "my.claude/plans/"
+      if (filePath.includes('/.claude/plans/') || filePath.includes('\\.claude\\plans\\')) {
         return (
           <PlanToolWidget
             filePath={filePath}

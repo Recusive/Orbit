@@ -5,7 +5,7 @@
  * To change textarea sizes, chat max-width, or input box dimensions,
  * update CHAT_WIDTH, CHAT_WIDTH_VAR, and INPUT_SIZES in constants.ts.
  */
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 
 import { InputControls } from './InputControls';
 import { ContextChips } from './context-chips';
@@ -84,6 +84,34 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     setActivityTab('browser');
   }, [setActivityTab]);
 
+  // Global keyboard shortcuts for permission modals
+  // Handled here to avoid conflicts when multiple permissions are pending
+  useEffect(() => {
+    if (permissions.length === 0 || !onPermissionApprove || !onPermissionDeny) {
+      return;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.metaKey || e.ctrlKey) {
+        const firstPermission = permissions[0];
+        if (firstPermission === undefined) return;
+
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onPermissionApprove(firstPermission.requestId);
+        } else if (e.key === 'Backspace') {
+          e.preventDefault();
+          onPermissionDeny(firstPermission.requestId);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [permissions, onPermissionApprove, onPermissionDeny]);
+
   return (
     <div className="p-4 pt-0 shrink-0 relative">
       <div
@@ -94,7 +122,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
         {permissions.length > 0 &&
         onPermissionApprove !== undefined &&
         onPermissionDeny !== undefined ? (
-          <div role="alert" aria-live="assertive">
+          <div role="status" aria-live="polite">
             {permissions.map((request, index) => (
               <PermissionModal
                 key={request.requestId}
