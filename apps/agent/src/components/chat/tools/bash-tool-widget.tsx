@@ -76,7 +76,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
         className={cn(
           'bg-card overflow-hidden rounded-lg shadow-md',
           isFailed
-            ? 'border-2 border-dashed border-destructive/40 opacity-60'
+            ? 'border-2 border-dotted border-destructive/40 opacity-60'
             : 'border border-border/50'
         )}
       >

@@ -51,7 +51,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
         className={cn(
           'bg-card overflow-hidden transition-[border-color,opacity,box-shadow] duration-200',
           isFailed
-            ? 'border-2 border-dashed border-destructive/40 opacity-60'
+            ? 'border-2 border-dotted border-destructive/40 opacity-60'
             : 'border border-border/50',
           isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
         )}

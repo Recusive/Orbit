@@ -553,13 +553,17 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           return result;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
+          const wasAborted = canUseToolOptions.signal.aborted;
           logger.error(
-            { toolName, error: errorMessage, signalAborted: canUseToolOptions.signal.aborted },
+            { toolName, error: errorMessage, signalAborted: wasAborted },
             `[ERROR] canUseTool error for ${toolName}`
           );
+          // When signal was aborted (user interrupted), tell SDK to stop retrying this tool
+          // This prevents the "tool_use ids must be unique" error when SDK retries with same ID
           return {
             behavior: 'deny' as const,
-            message: 'Permission request failed',
+            message: wasAborted ? 'User interrupted' : 'Permission request failed',
+            interrupt: wasAborted,
           };
         }
       };

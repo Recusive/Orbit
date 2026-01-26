@@ -35,6 +35,9 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   // Refs
   const inputRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  // Guard against ESC key repeat triggering multiple stops
+  // React state updates are async, so isAgentRunning can be true for multiple rapid keydown events
+  const isStoppingRef = useRef(false);
 
   // Popover navigation state
   const popover = usePopoverNavigation();
@@ -59,6 +62,13 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
       window.removeEventListener('focusChatInput', handleFocusEvent);
     };
   }, []);
+
+  // Reset stopping guard when agent stops running
+  useEffect(() => {
+    if (!isAgentRunning) {
+      isStoppingRef.current = false;
+    }
+  }, [isAgentRunning]);
 
   // Input change handler - detects @ mentions and / commands
   const handleInputChange = useCallback(
@@ -251,6 +261,15 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     setAttachedContext((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
+  // Stop handler with guard against rapid calls (ESC key repeat or rapid button clicks)
+  const handleStop = useCallback((): void => {
+    if (isStoppingRef.current) {
+      return;
+    }
+    isStoppingRef.current = true;
+    onStop();
+  }, [onStop]);
+
   // @ button click handler
   const handleAtClick = useCallback((): void => {
     if (inputRef.current) {
@@ -277,7 +296,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
       // Note: MentionPopover handles its own keyboard events via global listener
       if (e.key === 'Escape' && isAgentRunning && !popover.slashOpen && !popover.mentionOpen) {
         e.preventDefault();
-        onStop();
+        handleStop();
         return;
       }
 
@@ -315,7 +334,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         handleSend();
       }
     },
-    [isAgentRunning, onStop, popover, slashCommands, handleSlashSelect, handleSend]
+    [isAgentRunning, handleStop, popover, slashCommands, handleSlashSelect, handleSend]
   );
 
   // Paste handler
@@ -400,6 +419,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     handleSlashSelect,
     handleRemoveContext,
     handleAtClick,
+    handleStop,
     cycleInputMode,
     cycleThinkingMode,
     // Utilities

@@ -57,6 +57,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     handleSlashSelect,
     handleRemoveContext,
     handleAtClick,
+    handleStop,
     cycleInputMode,
     cycleThinkingMode,
     // Utilities
@@ -172,7 +173,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
           handleImageClick={handleImageClick}
           handleImageSelect={handleImageSelect}
           handleSend={handleSend}
-          onStop={onStop}
+          handleStop={handleStop}
           getThinkingInfo={getThinkingInfo}
           getActiveDots={getActiveDots}
         />

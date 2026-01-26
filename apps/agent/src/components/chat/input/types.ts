@@ -96,6 +96,7 @@ export interface UseChatInputReturn {
   handleSlashSelect: (command: SlashCommand) => void;
   handleRemoveContext: (id: string) => void;
   handleAtClick: () => void;
+  handleStop: () => void;
   cycleInputMode: () => void;
   cycleThinkingMode: () => void;
   // Utilities
@@ -135,7 +136,7 @@ export interface InputControlsProps {
   readonly handleImageClick: () => void;
   readonly handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   readonly handleSend: () => void;
-  readonly onStop: () => void;
+  readonly handleStop: () => void;
   readonly getThinkingInfo: () => ThinkingModeInfo;
   readonly getActiveDots: () => number;
 }

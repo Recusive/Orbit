@@ -61,7 +61,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
         className={cn(
           'bg-card overflow-hidden transition-[border-color,opacity,box-shadow] duration-200',
           isFailed
-            ? 'border-2 border-dashed border-destructive/40 opacity-60'
+            ? 'border-2 border-dotted border-destructive/40 opacity-60'
             : 'border-2 border-dotted border-mode-plan/40', // Match input box in plan mode
           isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
         )}

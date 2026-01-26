@@ -1097,6 +1097,13 @@ export class SessionManager extends Disposable {
     if (!agent) {
       throw new Error(`Session ${sessionId} not found`);
     }
+
+    // Flush any pending text events before interrupting
+    this.textBatcher.flushSession(sessionId);
+
+    // Call SDK interrupt - this signals the CLI subprocess to stop
+    // The consumer loop continues processing messages until the SDK naturally stops
+    // We don't set cancelled=true because that would break the session for future messages
     await agent.interrupt();
   }
 

@@ -40,7 +40,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   handleImageClick,
   handleImageSelect,
   handleSend,
-  onStop,
+  handleStop,
   getThinkingInfo,
   getActiveDots,
 }) {
@@ -241,7 +241,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={isAgentRunning && isInputEmpty ? onStop : handleSend}
+              onClick={isAgentRunning && isInputEmpty ? handleStop : handleSend}
               disabled={!isAgentRunning && isInputEmpty}
               aria-label={
                 isAgentRunning && isInputEmpty
