@@ -5,6 +5,7 @@
  * To change message widths or assistant padding, update CHAT_WIDTH,
  * CHAT_WIDTH_VAR, and CHAT_SPACING in constants.ts - DO NOT hardcode here.
  */
+import { mermaid } from '@streamdown/mermaid';
 import { memo, useMemo } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
@@ -26,6 +27,9 @@ import { cn, CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 // This is critical for Streamdown performance as it compares plugin arrays by reference
 const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS: never[] = [];
+
+// Mermaid plugin for diagram rendering - defined outside component for reference stability
+const STREAMDOWN_PLUGINS = { mermaid };
 
 export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
@@ -127,6 +131,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                     <Streamdown
                       remarkPlugins={REMARK_PLUGINS}
                       rehypePlugins={REHYPE_PLUGINS}
+                      plugins={STREAMDOWN_PLUGINS}
                       mode="static"
                     >
                       {segment.text}

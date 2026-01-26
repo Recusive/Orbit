@@ -23,11 +23,29 @@ This document explains Orbit's CSP configuration in `src-tauri/tauri.conf.json`.
 }
 ```
 
-## Why `'unsafe-eval'` is Required
+## Streamdown 2.1.0 Update
 
-### Root Cause
+**As of streamdown 2.1.0** (January 2026), the library moved to a **plugin architecture**:
 
-The `streamdown` library (v2.0.0+) uses `new Function()` for dynamic CDN imports:
+- Mermaid support requires `@streamdown/mermaid` plugin
+- Mermaid is **bundled locally** - no CDN loading needed
+- The `cdnUrl` prop was removed
+- Dynamic `new Function()` imports are no longer used for Mermaid
+
+### CSP Simplification Opportunity
+
+With streamdown 2.1.0 + `@streamdown/mermaid`:
+
+- `https://streamdown.ai` in CSP may no longer be necessary
+- `'unsafe-eval'` may no longer be required
+
+**Note:** Keeping current CSP for backwards compatibility and future features. Can be simplified after thorough testing.
+
+## Historical Context: Why `'unsafe-eval'` Was Added
+
+### Root Cause (streamdown 2.0.x)
+
+The `streamdown` library (v2.0.0-2.0.1) used `new Function()` for dynamic CDN imports:
 
 ```typescript
 // From: node_modules/streamdown/lib/mermaid/utils.ts (line 19-22)
@@ -37,14 +55,15 @@ const dynamicImport = new Function('url', 'return import(url)') as (
 ) => Promise<typeof import('mermaid')>;
 ```
 
-### What Changed
+### Version History
 
-| Version        | Bundle Strategy               | CSP Requirement            |
-| -------------- | ----------------------------- | -------------------------- |
-| streamdown 1.x | Everything bundled statically | No `unsafe-eval` needed    |
-| streamdown 2.x | 98% smaller bundle via CDN    | **Requires `unsafe-eval`** |
+| Version           | Bundle Strategy               | CSP Requirement                    |
+| ----------------- | ----------------------------- | ---------------------------------- |
+| streamdown 1.x    | Everything bundled statically | No `unsafe-eval` needed            |
+| streamdown 2.0.x  | 98% smaller bundle via CDN    | **Requires `unsafe-eval`**         |
+| streamdown 2.1.0+ | Plugin architecture           | May not need `unsafe-eval` anymore |
 
-Streamdown 2.0 reduces bundle size by loading Mermaid/KaTeX assets from `https://streamdown.ai/cdn` at runtime. To bypass bundler static analysis (Vite/Webpack), they use `new Function()` which is functionally equivalent to `eval()`.
+Streamdown 2.0 reduced bundle size by loading Mermaid/KaTeX assets from `https://streamdown.ai/cdn` at runtime. To bypass bundler static analysis (Vite/Webpack), they used `new Function()` which is functionally equivalent to `eval()`.
 
 ### References
 
@@ -119,6 +138,7 @@ Code paths using eval (with unsafe-eval):
 
 ## Changelog
 
+- **January 2026:** Upgraded streamdown to 2.1.0 with `@streamdown/mermaid` plugin - Mermaid now bundled locally, CSP can potentially be simplified
 - **January 2026:** Added `https://streamdown.ai` to CSP directives (script-src, style-src, connect-src, font-src) for Mermaid/KaTeX CDN assets
 - **January 2026:** Added `'unsafe-eval'` after upgrading streamdown 1.6.11 to 2.0.1
 - **January 2026:** Added `ipc://localhost` to `connect-src` for Tauri IPC

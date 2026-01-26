@@ -16,6 +16,7 @@ import type { FC } from 'react';
 import { cn } from '@/lib/utils';
 
 // Stable plugin arrays - defined outside component to prevent recreation on each render
+// This is critical for Streamdown performance as it compares plugin arrays by reference
 const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS: never[] = [];
 
@@ -34,7 +35,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
   success,
   onOpenFile,
 }) => {
-  // Plans start and stay expanded - users need to review the full plan content
+  // Plans start expanded and stay expanded after completion (users want to see the plan)
   const [isExpanded, setIsExpanded] = useState(true);
   const isFailed = success === false;
 
@@ -52,7 +53,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
         className={cn(
           'bg-card overflow-hidden transition-[border-color,opacity,box-shadow] duration-200',
           isFailed
-            ? 'border-2 border-dashed border-destructive/40 opacity-60'
+            ? 'border-2 border-dotted border-destructive/40 opacity-60'
             : 'border-2 border-dotted border-mode-plan/40', // Match input box in plan mode
           isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
         )}

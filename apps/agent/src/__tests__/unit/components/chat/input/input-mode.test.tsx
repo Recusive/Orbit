@@ -62,7 +62,7 @@ function createDefaultProps(overrides: Partial<InputControlsProps> = {}): InputC
     handleImageClick: vi.fn(),
     handleImageSelect: vi.fn(),
     handleSend: vi.fn(),
-    onStop: vi.fn(),
+    handleStop: vi.fn(),
     getThinkingInfo: () => ({ level: 'Off', tokens: '0' }),
     getActiveDots: () => 0,
     ...overrides,

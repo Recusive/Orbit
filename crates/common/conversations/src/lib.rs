@@ -55,6 +55,9 @@ pub struct Message {
     /// Optional thinking content (for assistant messages with extended thinking)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thinking: Option<String>,
+    /// Whether this message was interrupted by the user
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_interrupted: Option<bool>,
     /// Timestamp when the message was created (Unix epoch milliseconds)
     pub created_at: u64,
     /// Tool uses in this message
@@ -822,6 +825,7 @@ mod tests {
             role,
             content: content.to_owned(),
             thinking: None,
+            is_interrupted: None,
             created_at: current_timestamp(),
             tool_uses: Vec::new(),
             usage: None,

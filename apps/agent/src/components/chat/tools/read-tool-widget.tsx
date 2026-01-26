@@ -47,7 +47,7 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
         'w-full flex items-center gap-2 py-1.5 px-2.5',
         'rounded-lg hover:bg-muted/20',
         'transition-[background-color,border-color,opacity] duration-150 group',
-        isFailed && 'border-2 border-dashed border-destructive/40 opacity-60'
+        isFailed && 'border-2 border-dotted border-destructive/40 opacity-60'
       )}
     >
       {/* Icon container */}

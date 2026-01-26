@@ -27,6 +27,9 @@ pub struct MessageDto {
     /// Optional thinking content
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thinking: Option<String>,
+    /// Whether this message was interrupted by the user
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_interrupted: Option<bool>,
     /// Timestamp (Unix epoch ms)
     pub created_at: u64,
     /// Tool uses
@@ -112,11 +115,16 @@ impl From<Message> for MessageDto {
                 MessageRole::User => String::from("user"),
                 MessageRole::Assistant => String::from("assistant"),
                 MessageRole::System => String::from("system"),
-                // Handle future variants
-                _ => String::from("unknown"),
+                // #[non_exhaustive] on MessageRole requires this wildcard arm.
+                // Log when new variants appear so we can add explicit handling.
+                _ => {
+                    log::warn!("Unknown MessageRole variant encountered, treating as 'unknown'");
+                    String::from("unknown")
+                },
             },
             content: msg.content,
             thinking: msg.thinking,
+            is_interrupted: msg.is_interrupted,
             created_at: msg.created_at,
             tool_uses: msg.tool_uses.into_iter().map(ToolUseDto::from).collect(),
             usage: msg.usage.map(TokenUsageDto::from),
@@ -147,6 +155,7 @@ impl From<MessageDto> for Message {
             },
             content: dto.content,
             thinking: dto.thinking,
+            is_interrupted: dto.is_interrupted,
             created_at: dto.created_at,
             tool_uses: dto.tool_uses.into_iter().map(ToolUse::from).collect(),
             usage: dto.usage.map(TokenUsage::from),
