@@ -20,7 +20,7 @@ import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files';
 import { ErrorBoundary } from '@/components/shared';
-import { CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
+import { cn, CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
 // Stable plugin arrays - defined outside component to prevent recreation on each render
 // This is critical for Streamdown performance as it compares plugin arrays by reference
@@ -31,6 +31,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
   tools,
   isLastAssistantMessage,
+  animate,
   onRewind,
   onOpenFile,
   onOpenUrl,
@@ -75,7 +76,10 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
       {message.role === 'user' ? (
         /* User message bubble */
         <div
-          className="p-2 rounded-lg bg-card border border-border/40 shadow-sm"
+          className={cn(
+            'p-2 rounded-lg bg-card border border-border/40 shadow-sm',
+            animate === true && 'animate-message-in'
+          )}
           style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
         >
           <p className="text-base leading-relaxed whitespace-pre-wrap">

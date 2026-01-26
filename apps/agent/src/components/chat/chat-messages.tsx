@@ -84,9 +84,34 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   onFeedback,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const shouldAutoScroll = useRef(true);
   const prevSessionIdRef = useRef(sessionId);
   const hasResetScrollRef = useRef(false);
+
+  // Track message IDs that should animate (newly sent user messages)
+  // We use a Set to track IDs that need animation, cleared after first render
+  const animatingMessageIds = useRef<Set<string>>(new Set());
+  const prevMessageCountRef = useRef(messages.length);
+
+  // Detect newly added user messages and mark them for animation
+  // Only animates messages added since last render (not on initial load)
+  if (messages.length > prevMessageCountRef.current) {
+    // Check new messages (messages added since last render)
+    for (let i = prevMessageCountRef.current; i < messages.length; i++) {
+      const msg = messages[i];
+      // Only animate user messages (not assistant responses)
+      if (msg?.role === 'user') {
+        animatingMessageIds.current.add(msg.id);
+      }
+    }
+  }
+  prevMessageCountRef.current = messages.length;
+
+  // Clear animation state on session change (switching conversations)
+  if (sessionId !== prevSessionIdRef.current) {
+    animatingMessageIds.current.clear();
+  }
 
   // Loading state - shown while agent is running
   // Note: Animation interval was removed for performance. Streaming effect is now
@@ -105,6 +130,20 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     const el = containerRef.current;
     el.scrollTop = el.scrollHeight;
   }, [messages.length, lastMessageContentLength]);
+
+  // Clear animation IDs after animation completes (250ms duration + small buffer)
+  // This ensures each message only animates once when first added
+  useEffect(() => {
+    if (animatingMessageIds.current.size === 0) return;
+
+    const timeoutId = setTimeout(() => {
+      animatingMessageIds.current.clear();
+    }, 300); // 250ms animation + 50ms buffer
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [messages.length]);
 
   // Track manual scrolling - disable auto-scroll if user scrolls up
   useEffect(() => {
@@ -139,6 +178,62 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
   }, [sessionChanged]);
 
+  // ResizeObserver to keep user at bottom when layout changes
+  // Simplified approach: ANY resize + auto-scroll enabled = scroll to bottom
+  // This handles all cases: tool expand/collapse, permission modals, message actions appearing, etc.
+  useEffect(() => {
+    const content = contentRef.current;
+    const container = containerRef.current;
+    if (!content || !container) return;
+
+    let scrollTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    // Debounced smooth scroll - waits for resize events to settle before scrolling
+    // This prevents jarring jumps during Framer Motion animations
+    const scheduleScroll = (): void => {
+      // Skip if auto-scroll is disabled (user scrolled up)
+      if (!shouldAutoScroll.current) return;
+
+      // Clear any pending scroll
+      if (scrollTimeoutId !== null) {
+        clearTimeout(scrollTimeoutId);
+      }
+
+      // Wait for animations to settle, then perform a single smooth scroll
+      scrollTimeoutId = setTimeout(() => {
+        // Double-check auto-scroll is still enabled
+        if (shouldAutoScroll.current) {
+          container.scrollTo({
+            top: container.scrollHeight,
+            behavior: 'smooth',
+          });
+        }
+        scrollTimeoutId = null;
+      }, 50); // Short debounce - smooth scroll handles the animation
+    };
+
+    // Watch content for ANY size changes (expand, collapse, actions appearing, etc.)
+    const contentObserver = new ResizeObserver(() => {
+      scheduleScroll();
+    });
+
+    // Watch container for size changes (PermissionBar appearing/disappearing)
+    const containerObserver = new ResizeObserver(() => {
+      scheduleScroll();
+    });
+
+    contentObserver.observe(content);
+    containerObserver.observe(container);
+
+    return () => {
+      if (scrollTimeoutId !== null) {
+        clearTimeout(scrollTimeoutId);
+      }
+      contentObserver.disconnect();
+      containerObserver.disconnect();
+    };
+  }, []);
+
   return (
     <div
       ref={containerRef}
@@ -146,6 +241,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       style={{ scrollbarGutter: 'stable both-edges' }}
     >
       <div
+        ref={contentRef}
         className="mx-auto flex flex-col gap-3"
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
@@ -154,12 +250,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           const isLastAssistantMessage =
             msg.role === 'assistant' && messages.slice(index + 1).every((m) => m.role === 'user');
 
+          // Check if this message should animate (newly sent user message)
+          const shouldAnimate = animatingMessageIds.current.has(msg.id);
+
           return (
             <MessageItem
               key={msg.id}
               message={msg}
               tools={getToolsForMessage(msg.id)}
               isLastAssistantMessage={isLastAssistantMessage}
+              animate={shouldAnimate}
               onRewind={onRewind}
               onOpenFile={onOpenFile}
               onOpenUrl={onOpenUrl}
