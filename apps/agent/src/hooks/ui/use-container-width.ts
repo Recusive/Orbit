@@ -20,12 +20,17 @@ export function useContainerWidth(ref: RefObject<HTMLElement | null>): number {
     const element = ref.current;
     if (!element) return;
 
-    // Initial measurement
-    setWidth(element.offsetWidth);
+    // Initial measurement using getBoundingClientRect for consistency.
+    // Note: ResizeObserver's contentRect.width gives content-box dimensions,
+    // while getBoundingClientRect gives border-box. For elements without
+    // explicit padding/border (typical for flex containers), these are equivalent.
+    setWidth(element.getBoundingClientRect().width);
 
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) {
+        // contentRect.width is the content-box width (excludes padding/border).
+        // For typical flex containers used with this hook, this matches our needs.
         setWidth(entry.contentRect.width);
       }
     });

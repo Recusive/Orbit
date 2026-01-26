@@ -122,7 +122,12 @@ export interface InputControlsProps {
   readonly cycleInputMode: () => void;
   readonly cycleThinkingMode: () => void;
   readonly handleAtClick: () => void;
-  readonly handleGlobeClick: () => void;
+  /**
+   * Opens the browser panel. Optional - when undefined, the globe button
+   * is disabled. This happens in Editor mode where the Activity panel
+   * (and thus browser panel) is not available.
+   */
+  readonly handleGlobeClick?: () => void;
   readonly handleImageClick: () => void;
   readonly handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   readonly handleSend: () => void;
@@ -145,6 +150,10 @@ export interface MoreActionsMenuProps {
   readonly cycleThinkingMode: () => void;
   readonly thinkingMode: ThinkingMode;
   readonly getThinkingInfo: () => ThinkingModeInfo;
-  /** Optional - enable when browser feature is implemented */
-  readonly handleGlobeClick?: () => void;
+  /**
+   * Opens the browser panel. Optional - when undefined, the globe item
+   * shows "Coming soon" and is disabled. This happens in Editor mode
+   * where the Activity panel is not available.
+   */
+  readonly handleGlobeClick: (() => void) | undefined;
 }

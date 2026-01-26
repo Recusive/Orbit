@@ -1,5 +1,5 @@
 import { IconImagine } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconImagine';
-import { AtSign, Globe, MoreHorizontal } from 'lucide-react';
+import { AtSign, Globe, Settings2 } from 'lucide-react';
 import { memo } from 'react';
 
 import type { MoreActionsMenuProps } from './types';
@@ -45,7 +45,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
             'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
           )}
         >
-          <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+          <Settings2 className="h-4 w-4" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">

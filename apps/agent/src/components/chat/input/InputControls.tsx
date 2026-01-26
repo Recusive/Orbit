@@ -93,7 +93,17 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
       <div className="flex items-center gap-0.5">
         {isCompact ? (
           // Compact mode: @, Thinking, Globe collapsed into dropdown; Image stays visible
+          // Order: Menu → Image → Context → Send
           <>
+            {/* More Actions Dropdown - contains @, Thinking, Globe */}
+            <MoreActionsMenu
+              handleAtClick={handleAtClick}
+              cycleThinkingMode={cycleThinkingMode}
+              thinkingMode={thinkingMode}
+              getThinkingInfo={getThinkingInfo}
+              handleGlobeClick={handleGlobeClick}
+            />
+
             {/* Image Button - stays visible in compact mode */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -114,15 +124,6 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               </TooltipTrigger>
               <TooltipContent>Attach image</TooltipContent>
             </Tooltip>
-
-            {/* More Actions Dropdown - contains @, Thinking, Globe */}
-            <MoreActionsMenu
-              handleAtClick={handleAtClick}
-              cycleThinkingMode={cycleThinkingMode}
-              thinkingMode={thinkingMode}
-              getThinkingInfo={getThinkingInfo}
-              handleGlobeClick={handleGlobeClick}
-            />
           </>
         ) : (
           // Expanded mode: all buttons inline
@@ -158,25 +159,29 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               getActiveDots={getActiveDots}
             />
 
-            {/* Globe Button - opens browser panel */}
+            {/* Globe Button - opens browser panel (disabled when not available) */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  onClick={handleGlobeClick}
+                  onClick={() => handleGlobeClick?.()}
+                  disabled={handleGlobeClick === undefined}
                   aria-label="Open web browser"
                   className={cn(
                     'h-7 w-7 flex items-center justify-center rounded-lg',
                     'bg-transparent text-muted-foreground/70',
                     'transition-[background-color,color,transform] duration-150',
-                    'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
-                    'active:scale-95',
+                    handleGlobeClick === undefined
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08] active:scale-95',
                     'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
                   )}
                 >
                   <Globe className="h-4 w-4" aria-hidden="true" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Web browser</TooltipContent>
+              <TooltipContent>
+                {handleGlobeClick === undefined ? 'Web browser (not available)' : 'Web browser'}
+              </TooltipContent>
             </Tooltip>
 
             {/* Image Button */}

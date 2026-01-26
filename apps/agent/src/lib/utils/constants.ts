@@ -502,24 +502,30 @@ export const CHAT_PANEL = {
  * When the toolbar gets too narrow, secondary buttons (@, Thinking, Globe)
  * collapse into a "More actions" dropdown menu. The Image button stays
  * visible for quick attachment access.
+ *
+ * **Expanded mode** (width >= collapseBreakpoint):
+ *   Mode | Model | @ | Thinking | Globe | Image | Context | Send
+ *
+ * **Compact mode** (width < collapseBreakpoint):
+ *   Mode | Model | MoreActions[⋯] | Image | Context | Send
+ *   (@ / Thinking / Globe are inside the MoreActions dropdown)
  */
 export const INPUT_CONTROLS = {
   /**
    * Width below which secondary buttons collapse into "More actions" menu.
    *
-   * Calculation:
+   * Compact mode calculation (what's visible when collapsed):
    * - Mode Picker: ~70px (varies: "Default"/"Plan"/"Accept")
    * - Model Selector: ~110px (varies by model name)
-   * - Thinking Button: 28px (h-7)
+   * - Image Button: 28px (h-7 w-7)
    * - More Actions trigger: 28px (h-7 w-7)
    * - Context Usage: ~60px
    * - Send Button: 28px (h-7 w-7)
-   * - Gaps: ~14px (gap-0.5 × 7)
+   * - Gaps: ~12px (gap-0.5 × 6)
    * - Buffer: ~50px safety margin
-   * Total: ~390px minimum + buffer = ~440px
+   * Total: ~386px minimum + buffer ≈ 440px
    *
-   * Set to 520px to provide comfortable margin.
-   * Verify empirically during testing.
+   * Set to 400px - tight fit for expanded mode with no buffer.
    */
-  collapseBreakpoint: 520,
+  collapseBreakpoint: 400,
 } as const;
