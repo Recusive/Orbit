@@ -63,7 +63,23 @@ export interface FileChange {
   language?: string;
 }
 
+/**
+ * Cached file change data per session.
+ * Used to preserve file changes when switching between conversations.
+ */
+interface CachedFileData {
+  filesById: Record<string, FileChange>;
+  pathToId: Record<string, string>;
+  selectedFile: string | null;
+}
+
 export interface FileState {
+  // Session tracking for per-conversation file changes
+  /** Current conversation session ID */
+  currentSessionId: string | null;
+  /** Cache of file changes per session */
+  sessionCache: Record<string, CachedFileData>;
+
   // File changes (refactored from array+Map to Record-based)
   /** Primary storage: file ID → FileChange object */
   filesById: Record<string, FileChange>;
@@ -100,6 +116,16 @@ export interface FileState {
   getFileByPath: (path: string) => FileChange | undefined;
   /** O(1) lookup by id */
   getFileById: (id: string) => FileChange | undefined;
+  /**
+   * Switch to a different session (conversation).
+   * Saves current file changes to cache, restores new session from cache.
+   */
+  switchSession: (newSessionId: string) => void;
+  /**
+   * Clear cached file data for a deleted session.
+   * Called when a conversation is deleted to prevent memory leaks.
+   */
+  clearSessionFiles: (sessionId: string) => void;
 
   // File tree actions (new)
   setRootPath: (path: string) => void;
@@ -119,6 +145,10 @@ export interface FileState {
 
 export const useFileStore = create<FileState>()(
   immer((set, get) => ({
+    // Session tracking
+    currentSessionId: null,
+    sessionCache: {},
+
     // File changes (refactored from array+Map to Record-based)
     filesById: createDict<FileChange>(),
     pathToId: createDict<string>(),
@@ -344,6 +374,57 @@ export const useFileStore = create<FileState>()(
     setFilterStatus: (status: FileChangeStatus | 'all') => {
       set((state) => {
         state.filterStatus = status;
+      });
+    },
+
+    switchSession: (newSessionId: string) => {
+      logger.debug(`Switching file session to: ${newSessionId}`);
+      set((state) => {
+        // Skip if already on this session (avoids unnecessary cache operations)
+        if (state.currentSessionId === newSessionId) {
+          return;
+        }
+
+        // Save current session's file changes to cache (if we have a current session with files)
+        if (state.currentSessionId !== null) {
+          const hasFiles = Object.keys(state.filesById).length > 0;
+          if (hasFiles) {
+            state.sessionCache[state.currentSessionId] = {
+              filesById: { ...state.filesById },
+              pathToId: { ...state.pathToId },
+              selectedFile: state.selectedFile,
+            };
+          } else {
+            // No files - remove from cache if it exists (clean up empty sessions)
+            Reflect.deleteProperty(state.sessionCache, state.currentSessionId);
+          }
+        }
+
+        // Update current session ID
+        state.currentSessionId = newSessionId;
+
+        // Check if we have cached data for the new session
+        const cached = state.sessionCache[newSessionId];
+        if (cached) {
+          // Restore cached session data
+          state.filesById = { ...cached.filesById };
+          state.pathToId = { ...cached.pathToId };
+          state.selectedFile = cached.selectedFile;
+          logger.debug(`Restored ${String(Object.keys(cached.filesById).length)} files from cache`);
+        } else {
+          // No cached data - start fresh
+          state.filesById = createDict<FileChange>();
+          state.pathToId = createDict<string>();
+          state.selectedFile = null;
+          logger.debug('No cached files, starting fresh');
+        }
+      });
+    },
+
+    clearSessionFiles: (sessionId: string) => {
+      logger.debug(`Clearing file cache for deleted session: ${sessionId}`);
+      set((state) => {
+        Reflect.deleteProperty(state.sessionCache, sessionId);
       });
     },
 

@@ -617,6 +617,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // ensuring the component starts fresh.
         setMessages([]);
 
+        // Switch file store to new session (saves old files to cache, starts fresh)
+        useFileStore.getState().switchSession(message.session_id);
+
         // Now update session state (triggers ChatArea remount via key prop)
         setSessionId(message.session_id);
         setActiveConversation(message.session_id, message.title);
@@ -665,6 +668,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       case 'conversation:loaded': {
         // Clear pending load flag - the load has completed
         useMessageBufferStore.getState().clearLoadPending(message.session_id);
+
+        // Switch file store to new session (saves old files to cache, restores from cache if exists)
+        useFileStore.getState().switchSession(message.session_id);
 
         // Check cache first for messages, then fall back to messagesRef for current session.
         // This handles the race condition where buffer hydration called flush() → setMessages(),
@@ -804,6 +810,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
 
         // Switch to new session FIRST (clears old tool state)
         switchSession(message.new_session_id);
+
+        // Switch file store to new session (rewind creates a new fork, so start fresh)
+        useFileStore.getState().switchSession(message.new_session_id);
 
         // Set all state atomically - React 18 batches these updates
         setMessages(rewoundMessages);
@@ -953,8 +962,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       case 'file:written':
         break;
       case 'conversation:deleted': {
-        // Clean up tool data for deleted conversation
+        // Clean up cached data for deleted conversation to prevent memory leaks
         clearSessionTools(message.session_id);
+        useFileStore.getState().clearSessionFiles(message.session_id);
         break;
       }
       case 'agent:plan_mode':
