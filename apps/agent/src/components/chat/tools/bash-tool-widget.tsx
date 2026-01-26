@@ -1,11 +1,45 @@
 import { ChevronDown, Loader2, Terminal } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { codeToHtml } from 'shiki';
 
 import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
+
+/**
+ * Subscribe to theme changes on the html element.
+ * Uses MutationObserver to detect when 'dark' class is toggled.
+ */
+function subscribeToTheme(callback: () => void): () => void {
+  const observer = new MutationObserver(callback);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+  return (): void => {
+    observer.disconnect();
+  };
+}
+
+/** Get current dark mode state from DOM */
+function getThemeSnapshot(): boolean {
+  return document.documentElement.classList.contains('dark');
+}
+
+/** Server-side fallback (defaults to dark) */
+function getServerSnapshot(): boolean {
+  return true;
+}
+
+/**
+ * Hook to detect dark mode using React 19's useSyncExternalStore.
+ * This is the correct, concurrency-safe way to subscribe to external DOM state.
+ * Works correctly even inside memoized components.
+ */
+function useIsDarkMode(): boolean {
+  return useSyncExternalStore(subscribeToTheme, getThemeSnapshot, getServerSnapshot);
+}
 
 interface BashToolWidgetProps {
   readonly command: string;
@@ -22,6 +56,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   isRunning = false,
   success,
 }) => {
+  const isDarkMode = useIsDarkMode();
   const isFailed = success === false;
   // Start expanded if running, collapsed if already completed (restored from persistence)
   const [isExpanded, setIsExpanded] = useState(isRunning);
@@ -36,15 +71,16 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
     wasRunningRef.current = isRunning;
   }, [isRunning]);
 
-  // Syntax highlight the command
+  // Syntax highlight the command (responds to theme changes via MutationObserver)
   useEffect(() => {
     let mounted = true;
+    const shikiTheme = isDarkMode ? 'github-dark' : 'github-light';
 
     const highlightCommand = async (): Promise<void> => {
       try {
         const html = await codeToHtml(command, {
           lang: 'bash',
-          theme: 'github-dark',
+          theme: shikiTheme,
         });
         if (mounted) {
           setHighlightedCommand(html);
@@ -62,7 +98,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
     return () => {
       mounted = false;
     };
-  }, [command]);
+  }, [command, isDarkMode]);
 
   // Truncate long output for collapsed view
   const maxCollapsedLines = 10;
