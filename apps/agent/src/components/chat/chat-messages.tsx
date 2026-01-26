@@ -14,11 +14,12 @@ import type { ToolExecution } from '@/stores/agent/tool-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { FC } from 'react';
 
-import { TextShimmer } from '@/components/ui/text-shimmer';
+import { HyperText } from '@/components/ui/hyper-text';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
+import { useToolStore } from '@/stores/agent/tool-store';
 
-// Rotating loading messages - fun tech-themed phrases
+// Rotating loading messages - fun tech-themed phrases (fallback when no tool is running)
 const LOADING_MESSAGES = [
   'Thinking',
   'Generating',
@@ -36,6 +37,56 @@ const LOADING_MESSAGES = [
   'Juggling tensors',
   'Wrangling tokens',
 ] as const;
+
+/**
+ * Maps tool names to user-friendly status messages.
+ * Shows contextual info based on what the agent is actually doing.
+ */
+function getToolStatusMessage(toolName: string, toolInput: Record<string, unknown>): string {
+  const filePath = toolInput['file_path'];
+
+  switch (toolName.toLowerCase()) {
+    case 'bash':
+      return 'Running command';
+    case 'read':
+      if (typeof filePath === 'string') {
+        const fileName = filePath.split('/').pop() ?? 'file';
+        return `Reading ${fileName}`;
+      }
+      return 'Reading file';
+    case 'write':
+      if (typeof filePath === 'string') {
+        const fileName = filePath.split('/').pop() ?? 'file';
+        return `Writing ${fileName}`;
+      }
+      return 'Writing file';
+    case 'edit':
+      if (typeof filePath === 'string') {
+        const fileName = filePath.split('/').pop() ?? 'file';
+        return `Editing ${fileName}`;
+      }
+      return 'Editing file';
+    case 'glob':
+      return 'Searching files';
+    case 'grep':
+      return 'Searching code';
+    case 'task':
+      return 'Running subagent';
+    case 'todowrite':
+      return 'Updating tasks';
+    case 'webfetch':
+      return 'Fetching URL';
+    case 'websearch':
+      return 'Searching web';
+    case 'lsp':
+      return 'Analyzing code';
+    case 'notebookedit':
+      return 'Editing notebook';
+    default:
+      // Capitalize first letter of tool name
+      return `Running ${toolName}`;
+  }
+}
 
 function useRotatingMessage(isActive: boolean, intervalMs = 2500): string {
   const [index, setIndex] = useState(0);
@@ -118,8 +169,17 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // achieved through backend batching (50ms) + Streamdown's incremental markdown rendering.
   const isLoading = isAgentRunning;
 
-  // Rotating loading message for a bit of personality
-  const loadingMessage = useRotatingMessage(isLoading);
+  // Get currently running tool from store for contextual status
+  const activeTools = useToolStore((state) => state.activeTools);
+  const runningTool = Object.values(activeTools).find((t) => t.status === 'running');
+
+  // Rotating loading message for a bit of personality (fallback)
+  const rotatingMessage = useRotatingMessage(isLoading);
+
+  // Show tool-specific message when a tool is running, otherwise rotate
+  const loadingMessage = runningTool
+    ? getToolStatusMessage(runningTool.toolName, runningTool.toolInput)
+    : rotatingMessage;
 
   // Track last message content length for scroll dependency
   const lastMessageContentLength = messages[messages.length - 1]?.displayedContent.length ?? 0;
@@ -273,13 +333,19 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           <QueuedMessageBubble message={queuedMessage} onCancel={onCancelQueue} />
         ) : null}
 
-        {/* Progress indicator - shows while agent is running OR text is still animating */}
+        {/* Progress indicator - shows while agent is running */}
         {isLoading ? (
           <div className="flex items-center gap-2 px-3 py-2">
             <ThinkingDots size={20} duration={1.2} />
-            <TextShimmer className="font-mono text-base" duration={1.2}>
+            <HyperText
+              key={loadingMessage}
+              className="font-mono text-sm text-muted-foreground"
+              duration={1200}
+              loop
+              loopPause={800}
+            >
               {loadingMessage}
-            </TextShimmer>
+            </HyperText>
           </div>
         ) : null}
       </div>

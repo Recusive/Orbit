@@ -1,0 +1,170 @@
+/**
+ * HyperText - Text animation that scrambles letters before revealing final text
+ *
+ * Adapted from Magic UI (https://magicui.design)
+ * Creates a "decoding" effect by cycling through random characters
+ */
+import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useRef, useState } from 'react';
+
+import type { MotionProps } from 'motion/react';
+import type { FC } from 'react';
+
+import { cn } from '@/lib/utils';
+
+type CharacterSet = string[] | readonly string[];
+
+interface HyperTextProps extends MotionProps {
+  /** The text content to be animated */
+  readonly children: string;
+  /** Optional className for styling */
+  readonly className?: string;
+  /** Duration of the animation in milliseconds */
+  readonly duration?: number;
+  /** Delay before animation starts in milliseconds */
+  readonly delay?: number;
+  /** Component to render as - defaults to span */
+  readonly as?: React.ElementType;
+  /** Whether to start animation when element comes into view */
+  readonly startOnView?: boolean;
+  /** Whether to trigger animation on hover */
+  readonly animateOnHover?: boolean;
+  /** Custom character set for scramble effect. Defaults to uppercase alphabet */
+  readonly characterSet?: CharacterSet;
+  /** Whether to loop the animation continuously */
+  readonly loop?: boolean;
+  /** Pause between loops in milliseconds (default: 1000) */
+  readonly loopPause?: number;
+}
+
+const DEFAULT_CHARACTER_SET = Object.freeze('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''));
+
+const getRandomInt = (max: number): number => Math.floor(Math.random() * max);
+
+export const HyperText: FC<HyperTextProps> = ({
+  children,
+  className,
+  duration = 800,
+  delay = 0,
+  as: Component = 'span',
+  startOnView = false,
+  animateOnHover = false,
+  characterSet = DEFAULT_CHARACTER_SET,
+  loop = false,
+  loopPause = 1000,
+  ...props
+}) => {
+  const MotionComponent = motion.create(Component, {
+    forwardMotionProps: true,
+  });
+
+  const [displayText, setDisplayText] = useState<string[]>(() => children.split(''));
+  const [isAnimating, setIsAnimating] = useState(false);
+  const iterationCount = useRef(0);
+  const elementRef = useRef<HTMLElement>(null);
+
+  const handleAnimationTrigger = (): void => {
+    if (animateOnHover && !isAnimating) {
+      iterationCount.current = 0;
+      setIsAnimating(true);
+    }
+  };
+
+  // Handle animation start based on view or delay
+  useEffect(() => {
+    if (!startOnView) {
+      const startTimeout = setTimeout(() => {
+        setIsAnimating(true);
+      }, delay);
+      return () => {
+        clearTimeout(startTimeout);
+      };
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setTimeout(() => {
+            setIsAnimating(true);
+          }, delay);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1, rootMargin: '-30% 0px -30% 0px' }
+    );
+
+    if (elementRef.current) {
+      observer.observe(elementRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [delay, startOnView]);
+
+  // Handle scramble animation
+  useEffect(() => {
+    if (!isAnimating) return;
+
+    const maxIterations = children.length;
+    const startTime = performance.now();
+    let animationFrameId: number;
+    let loopTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const animate = (currentTime: number): void => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      iterationCount.current = progress * maxIterations;
+
+      setDisplayText((currentText) =>
+        currentText.map((letter, index) =>
+          letter === ' '
+            ? letter
+            : index <= iterationCount.current
+              ? (children[index] ?? letter)
+              : (characterSet[getRandomInt(characterSet.length)] ?? letter)
+        )
+      );
+
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        setIsAnimating(false);
+        // If looping, restart after pause
+        if (loop) {
+          loopTimeoutId = setTimeout(() => {
+            iterationCount.current = 0;
+            setIsAnimating(true);
+          }, loopPause);
+        }
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      if (loopTimeoutId !== null) {
+        clearTimeout(loopTimeoutId);
+      }
+    };
+  }, [children, duration, isAnimating, characterSet, loop, loopPause]);
+
+  return (
+    <MotionComponent
+      ref={elementRef}
+      className={cn('overflow-hidden', className)}
+      onMouseEnter={handleAnimationTrigger}
+      {...props}
+    >
+      <AnimatePresence>
+        {displayText.map((letter, index) => (
+          <motion.span key={index} className={cn('font-mono', letter === ' ' ? 'w-3' : '')}>
+            {letter.toUpperCase()}
+          </motion.span>
+        ))}
+      </AnimatePresence>
+    </MotionComponent>
+  );
+};
