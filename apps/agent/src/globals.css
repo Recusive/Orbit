@@ -789,6 +789,22 @@ html.dark [data-streamdown='code-block-body'] code span::before {
       background-position: 0% center;
     }
   }
+
+  /* Message slide-up animation - for newly sent messages */
+  @keyframes message-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-message-in {
+    animation: message-slide-up 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
 }
 
 /* Accessibility: respect reduced motion preference */
@@ -810,6 +826,13 @@ html.dark [data-streamdown='code-block-body'] code span::before {
   .typing-cursor {
     animation: none;
     opacity: 1;
+  }
+
+  /* Message slide-up animation */
+  .animate-message-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -874,6 +897,30 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 /* For chat message items - layout containment */
 .message-item {
   contain: layout style paint;
+}
+
+/* Streaming message - no special CSS performance hints needed
+ *
+ * HISTORY (code review cycle 1, issue #5):
+ * Originally had `will-change: contents` to hint GPU optimization during streaming.
+ * This was REMOVED because:
+ * 1. will-change: contents is expensive - creates new stacking context per element
+ * 2. Can cause GPU memory exhaustion with many messages
+ * 3. RAF batching in message-handler.ts already provides smooth streaming
+ *
+ * The backend batches text chunks at 50ms intervals, and the batchedChunkHandler
+ * uses requestAnimationFrame to coalesce rapid state updates. This achieves
+ * smooth rendering without CSS performance hints.
+ */
+.message-item[data-streaming='true'] {
+  /* Intentionally empty - RAF batching in message-handler.ts handles optimization */
+}
+
+/* Completed messages - enable content-visibility for off-screen optimization */
+.message-item[data-streaming='false'] {
+  /* Delay content-visibility to let scroll animation complete (code review issue #11) */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px; /* Slightly higher estimate (code review issue #13) */
 }
 
 /* For diff viewer lines - tight containment */

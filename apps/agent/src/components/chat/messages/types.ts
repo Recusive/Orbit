@@ -42,6 +42,8 @@ export interface MessageItemProps {
   readonly message: ChatMessage;
   readonly tools: ToolExecution[];
   readonly isLastAssistantMessage: boolean;
+  /** Whether to animate this message sliding in (for newly sent messages) */
+  readonly animate?: boolean | undefined;
   readonly onRewind: (messageId: string) => void;
   readonly onOpenFile: (path: string) => void;
   readonly onOpenUrl: (url: string) => void;

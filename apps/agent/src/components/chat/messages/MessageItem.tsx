@@ -5,7 +5,7 @@
  * To change message widths or assistant padding, update CHAT_WIDTH,
  * CHAT_WIDTH_VAR, and CHAT_SPACING in constants.ts - DO NOT hardcode here.
  */
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
@@ -20,7 +20,7 @@ import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files';
 import { ErrorBoundary } from '@/components/shared';
-import { CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
+import { cn, CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
 // Stable plugin arrays - defined outside component to prevent recreation on each render
 // This is critical for Streamdown performance as it compares plugin arrays by reference
@@ -31,6 +31,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
   tools,
   isLastAssistantMessage,
+  animate,
   onRewind,
   onOpenFile,
   onOpenUrl,
@@ -56,8 +57,12 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   };
 
   // Build interleaved segments for assistant messages
-  // Use animated content for smooth streaming reveal
-  const segments = message.role === 'assistant' ? buildSegments(animatedContent, tools) : [];
+  // Memoized to prevent re-computation on every render - only recomputes when
+  // content or tools change. This is critical for streaming performance.
+  const segments = useMemo(
+    () => (message.role === 'assistant' ? buildSegments(animatedContent, tools) : []),
+    [message.role, animatedContent, tools]
+  );
 
   // Check for attachments
   const hasFiles = (message.attachedFiles?.length ?? 0) > 0;
@@ -70,12 +75,18 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   }
 
   return (
-    <div className="message-item space-y-2">
+    <div
+      className="message-item space-y-2"
+      data-streaming={message.isStreaming === true ? 'true' : 'false'}
+    >
       {/* Message block */}
       {message.role === 'user' ? (
         /* User message bubble */
         <div
-          className="p-2 rounded-lg bg-card border border-border/40 shadow-sm"
+          className={cn(
+            'p-2 rounded-lg bg-card border border-border/40 shadow-sm',
+            animate && 'animate-message-in'
+          )}
           style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
         >
           <p className="text-base leading-relaxed whitespace-pre-wrap">

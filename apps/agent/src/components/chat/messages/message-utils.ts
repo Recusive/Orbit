@@ -128,6 +128,7 @@ export function arePropsEqual(prev: MessageItemProps, next: MessageItemProps): b
 
   // Compare other props
   if (prev.isLastAssistantMessage !== next.isLastAssistantMessage) return false;
+  if (prev.animate !== next.animate) return false;
   if (prev.onRewind !== next.onRewind) return false;
   if (prev.onOpenFile !== next.onOpenFile) return false;
   if (prev.onOpenUrl !== next.onOpenUrl) return false;
@@ -139,10 +140,11 @@ export function arePropsEqual(prev: MessageItemProps, next: MessageItemProps): b
     const prevTool = prev.tools[i];
     const nextTool = next.tools[i];
     if (prevTool === undefined || nextTool === undefined) return false;
-    // Compare by ID and status - if these match, tool is the same
+    // Compare by ID, status, output, and success (code review issue #12)
     if (prevTool.id !== nextTool.id) return false;
     if (prevTool.status !== nextTool.status) return false;
     if (prevTool.toolOutput !== nextTool.toolOutput) return false;
+    if (prevTool.success !== nextTool.success) return false;
   }
 
   return true;
