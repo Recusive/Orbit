@@ -37,17 +37,6 @@ interface TextChunkEvent {
   content: string;
 }
 
-/**
- * Track pending chunk lengths per message ID.
- * Used to calculate accurate contentOffset for tool placement.
- *
- * Problem: RAF batching causes a lag between when chunks are received and rendered.
- * When tool:start arrives, `currentMsg.content.length` may not include pending chunks.
- *
- * Solution: Track received-but-not-yet-rendered chunk lengths, add to displayed length.
- */
-const pendingChunkLengths = new Map<string, number>();
-
 interface ToolStartEvent {
   type: 'start';
   toolId: string;
@@ -185,6 +174,21 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
     messagesCache,
     thinkingStartTimes,
   } = deps;
+
+  // ============================================
+  // Pending Chunk Length Tracking (Instance-Scoped)
+  // ============================================
+  // Track pending chunk lengths per message ID.
+  // Used to calculate accurate contentOffset for tool placement.
+  //
+  // Problem: RAF batching causes a lag between when chunks are received and rendered.
+  // When tool:start arrives, `currentMsg.content.length` may not include pending chunks.
+  //
+  // Solution: Track received-but-not-yet-rendered chunk lengths, add to displayed length.
+  //
+  // NOTE: This Map is scoped to this handler instance to prevent shared state corruption
+  // across component remounts or hot reloads (see code review issue #1).
+  const pendingChunkLengths = new Map<string, number>();
 
   // ============================================
   // RAF-Batched Text Chunk Processor
@@ -992,6 +996,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
   const cleanup = (): void => {
     batchedChunkHandler.cancel();
     batchedToolHandler.cancel();
+    // Clear pending chunk tracking to prevent memory leaks (code review issue #3)
+    pendingChunkLengths.clear();
   };
 
   // Force-flush pending RAF batchers synchronously.

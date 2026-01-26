@@ -140,10 +140,11 @@ export function arePropsEqual(prev: MessageItemProps, next: MessageItemProps): b
     const prevTool = prev.tools[i];
     const nextTool = next.tools[i];
     if (prevTool === undefined || nextTool === undefined) return false;
-    // Compare by ID and status - if these match, tool is the same
+    // Compare by ID, status, output, and success (code review issue #12)
     if (prevTool.id !== nextTool.id) return false;
     if (prevTool.status !== nextTool.status) return false;
     if (prevTool.toolOutput !== nextTool.toolOutput) return false;
+    if (prevTool.success !== nextTool.success) return false;
   }
 
   return true;

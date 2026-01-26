@@ -899,6 +899,21 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   contain: layout style paint;
 }
 
+/* Streaming message - no special hints needed (code review issue #5)
+ * will-change: contents was removed because it's expensive and can cause
+ * GPU memory exhaustion. RAF batching already provides the performance benefit.
+ */
+.message-item[data-streaming='true'] {
+  /* Intentionally empty - RAF batching handles optimization */
+}
+
+/* Completed messages - enable content-visibility for off-screen optimization */
+.message-item[data-streaming='false'] {
+  /* Delay content-visibility to let scroll animation complete (code review issue #11) */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px; /* Slightly higher estimate (code review issue #13) */
+}
+
 /* For diff viewer lines - tight containment */
 .diff-line {
   contain: layout style paint;

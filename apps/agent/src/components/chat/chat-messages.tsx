@@ -139,30 +139,49 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const shouldAutoScroll = useRef(true);
   const prevSessionIdRef = useRef(sessionId);
   const hasResetScrollRef = useRef(false);
+  // Track streaming state for ResizeObserver (code review issue #4)
+  const isStreamingRef = useRef(false);
 
   // Track message IDs that should animate (newly sent user messages)
-  // We use a Set to track IDs that need animation, cleared after first render
+  // We use a Set to track IDs that need animation, cleared after animation completes
   const animatingMessageIds = useRef<Set<string>>(new Set());
-  const prevMessageCountRef = useRef(messages.length);
+  // Track ALL known message IDs to detect truly new messages (code review: Codex #1)
+  // This prevents historical messages from animating during conversation:loaded
+  const knownMessageIds = useRef<Set<string>>(new Set());
 
   // Detect newly added user messages and mark them for animation
-  // Only animates messages added since last render (not on initial load)
-  if (messages.length > prevMessageCountRef.current) {
-    // Check new messages (messages added since last render)
-    for (let i = prevMessageCountRef.current; i < messages.length; i++) {
-      const msg = messages[i];
-      // Only animate user messages (not assistant responses)
-      if (msg?.role === 'user') {
-        animatingMessageIds.current.add(msg.id);
+  // CRITICAL: We track by message ID, not array length. This prevents:
+  // - Historical messages animating on conversation:loaded (bulk load)
+  // - Messages animating on session switch (different conversation with more messages)
+  useEffect(() => {
+    // Find messages that are truly new (not in knownMessageIds)
+    const newUserMessages: string[] = [];
+    for (const msg of messages) {
+      if (!knownMessageIds.current.has(msg.id)) {
+        // Track this ID as known
+        knownMessageIds.current.add(msg.id);
+        // Only animate user messages (not assistant responses)
+        if (msg.role === 'user') {
+          newUserMessages.push(msg.id);
+        }
       }
     }
-  }
-  prevMessageCountRef.current = messages.length;
 
-  // Clear animation state on session change (switching conversations)
-  if (sessionId !== prevSessionIdRef.current) {
-    animatingMessageIds.current.clear();
-  }
+    // Only animate if EXACTLY ONE new user message was added
+    // This filters out bulk loads (conversation:loaded adds many messages at once)
+    if (newUserMessages.length === 1 && newUserMessages[0] !== undefined) {
+      animatingMessageIds.current.add(newUserMessages[0]);
+    }
+  }, [messages]);
+
+  // Clear animation state and known IDs on session change (switching conversations)
+  useEffect(() => {
+    if (sessionId !== prevSessionIdRef.current) {
+      animatingMessageIds.current.clear();
+      knownMessageIds.current.clear();
+      prevSessionIdRef.current = sessionId;
+    }
+  }, [sessionId]);
 
   // Loading state - shown while agent is running
   // Note: Animation interval was removed for performance. Streaming effect is now
@@ -182,28 +201,50 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     : rotatingMessage;
 
   // Track last message content length for scroll dependency
-  const lastMessageContentLength = messages[messages.length - 1]?.displayedContent.length ?? 0;
+  const lastMessage = messages[messages.length - 1];
+  const lastMessageContentLength = lastMessage?.displayedContent.length ?? 0;
 
-  // Auto-scroll to bottom when new content arrives during streaming
+  // Update streaming ref for ResizeObserver (code review issue #4)
+  // Use ref so ResizeObserver callback can access current streaming state
+  isStreamingRef.current = lastMessage?.isStreaming === true;
+
+  // Instant scroll during streaming - this is the PRIMARY scroll mechanism
+  // ResizeObserver below handles layout changes (tool expand/collapse)
   useEffect(() => {
     if (!shouldAutoScroll.current || !containerRef.current) return;
-    const el = containerRef.current;
-    el.scrollTop = el.scrollHeight;
+    containerRef.current.scrollTop = containerRef.current.scrollHeight;
   }, [messages.length, lastMessageContentLength]);
 
+  // Track active animation cleanup timeouts per message ID (code review: Opus #3)
+  // Using individual timeouts prevents rapid messages from clearing each other's animations
+  const animationTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
   // Clear animation IDs after animation completes (250ms duration + small buffer)
-  // This ensures each message only animates once when first added
+  // Each message gets its own timeout for reliable cleanup during rapid sends
   useEffect(() => {
-    if (animatingMessageIds.current.size === 0) return;
+    // Get current animating IDs that don't have a timeout yet
+    for (const messageId of animatingMessageIds.current) {
+      if (!animationTimeouts.current.has(messageId)) {
+        const timeoutId = setTimeout(() => {
+          animatingMessageIds.current.delete(messageId);
+          animationTimeouts.current.delete(messageId);
+        }, 300); // 250ms animation + 50ms buffer
+        animationTimeouts.current.set(messageId, timeoutId);
+      }
+    }
+  }, [messages]);
 
-    const timeoutId = setTimeout(() => {
-      animatingMessageIds.current.clear();
-    }, 300); // 250ms animation + 50ms buffer
-
+  // Cleanup all timeouts on unmount
+  useEffect(() => {
+    // Capture ref value for cleanup (React hooks/exhaustive-deps rule)
+    const timeouts = animationTimeouts.current;
     return () => {
-      clearTimeout(timeoutId);
+      for (const timeoutId of timeouts.values()) {
+        clearTimeout(timeoutId);
+      }
+      timeouts.clear();
     };
-  }, [messages.length]);
+  }, []);
 
   // Track manual scrolling - disable auto-scroll if user scrolls up
   useEffect(() => {
@@ -213,7 +254,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     const handleScroll = (): void => {
       const { scrollHeight, clientHeight, scrollTop } = el;
       const isNearBottom = scrollHeight - clientHeight - scrollTop < 100;
+      const wasNotAutoScrolling = !shouldAutoScroll.current;
       shouldAutoScroll.current = isNearBottom;
+
+      // Catch up when user re-engages auto-scroll (code review issue #10)
+      // This prevents the "jump" when scrolling back down during streaming
+      if (wasNotAutoScrolling && isNearBottom) {
+        el.scrollTop = el.scrollHeight;
+      }
     };
 
     el.addEventListener('scroll', handleScroll, { passive: true });
@@ -222,25 +270,24 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     };
   }, []);
 
-  // Detect session change and reset scroll position
-  const sessionChanged = prevSessionIdRef.current !== sessionId;
-  if (sessionChanged) {
-    prevSessionIdRef.current = sessionId;
-    hasResetScrollRef.current = false;
-  }
-
   // Reset scroll to top on session change
+  // CONSOLIDATED: All session change mutations in single useEffect (code review issue #2)
   useEffect(() => {
-    if (sessionChanged && containerRef.current && !hasResetScrollRef.current) {
+    // Skip initial mount (no actual session change)
+    if (prevSessionIdRef.current === sessionId) return;
+
+    // Session changed - reset scroll position
+    if (containerRef.current) {
       shouldAutoScroll.current = true;
       containerRef.current.scrollTop = 0;
-      hasResetScrollRef.current = true;
     }
-  }, [sessionChanged]);
+    hasResetScrollRef.current = true;
+    // Note: prevSessionIdRef is updated in the animation useEffect above
+  }, [sessionId]);
 
-  // ResizeObserver to keep user at bottom when layout changes
-  // Simplified approach: ANY resize + auto-scroll enabled = scroll to bottom
-  // This handles all cases: tool expand/collapse, permission modals, message actions appearing, etc.
+  // ResizeObserver handles layout changes (tool expand/collapse, permission bar)
+  // NOT for streaming content - the useEffect above handles that with instant scroll
+  // CONSOLIDATED: Single observer watches both elements (code review: Opus #4)
   useEffect(() => {
     const content = contentRef.current;
     const container = containerRef.current;
@@ -248,10 +295,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
     let scrollTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    // Debounced smooth scroll - waits for resize events to settle before scrolling
-    // This prevents jarring jumps during Framer Motion animations
+    // Check prefers-reduced-motion (code review: Codex #2)
+    // Users who opt out of motion should get instant scroll, not smooth
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Debounced scroll for layout changes (not streaming)
+    // Uses smooth scroll unless user prefers reduced motion
     const scheduleScroll = (): void => {
-      // Skip if auto-scroll is disabled (user scrolled up)
       if (!shouldAutoScroll.current) return;
 
       // Clear any pending scroll
@@ -259,38 +309,35 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         clearTimeout(scrollTimeoutId);
       }
 
-      // Wait for animations to settle, then perform a single smooth scroll
+      // Short debounce to let layout settle, then scroll
       scrollTimeoutId = setTimeout(() => {
-        // Double-check auto-scroll is still enabled
         if (shouldAutoScroll.current) {
           container.scrollTo({
             top: container.scrollHeight,
-            behavior: 'smooth',
+            // Respect prefers-reduced-motion: use instant scroll if reduced motion enabled
+            behavior: prefersReducedMotion ? 'auto' : 'smooth',
           });
         }
         scrollTimeoutId = null;
-      }, 50); // Short debounce - smooth scroll handles the animation
+      }, 50);
     };
 
-    // Watch content for ANY size changes (expand, collapse, actions appearing, etc.)
-    const contentObserver = new ResizeObserver(() => {
+    // Single ResizeObserver watching both content and container
+    // The callback receives entries for all observed elements
+    const resizeObserver = new ResizeObserver(() => {
+      // Skip during streaming - the instant scroll useEffect handles that
+      if (isStreamingRef.current) return;
       scheduleScroll();
     });
 
-    // Watch container for size changes (PermissionBar appearing/disappearing)
-    const containerObserver = new ResizeObserver(() => {
-      scheduleScroll();
-    });
-
-    contentObserver.observe(content);
-    containerObserver.observe(container);
+    resizeObserver.observe(content);
+    resizeObserver.observe(container);
 
     return () => {
       if (scrollTimeoutId !== null) {
         clearTimeout(scrollTimeoutId);
       }
-      contentObserver.disconnect();
-      containerObserver.disconnect();
+      resizeObserver.disconnect();
     };
   }, []);
 
