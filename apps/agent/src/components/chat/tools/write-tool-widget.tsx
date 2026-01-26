@@ -198,21 +198,24 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
               }}
               style={{ overflow: 'hidden' }}
             >
-              <div className={cn('overflow-auto', !showAllLines && 'max-h-[300px]')}>
-                {displayLines.map((line, index) => (
-                  <div key={index} className="flex font-mono text-sm leading-4 bg-success/5">
-                    {/* Gutter */}
-                    <div className="w-0.5 bg-success shrink-0" />
-                    {/* Line number */}
-                    <div className="w-8 px-1.5 text-right text-muted-foreground/50 select-none shrink-0 bg-success/10">
-                      {index + 1}
+              <div className={cn('overflow-auto bg-success/5', !showAllLines && 'max-h-[300px]')}>
+                <div className="w-fit min-w-full">
+                  {displayLines.map((line, index) => (
+                    <div key={index} className="flex font-mono text-sm leading-4">
+                      {/* Sticky gutter + line number */}
+                      <div className="sticky left-0 flex shrink-0 bg-success/5">
+                        <div className="w-0.5 bg-success" />
+                        <div className="w-8 px-1.5 text-right text-muted-foreground/50 select-none bg-success/10">
+                          {index + 1}
+                        </div>
+                      </div>
+                      {/* Content */}
+                      <div className="flex-1 px-2 text-foreground whitespace-pre">
+                        {line || ' '}
+                      </div>
                     </div>
-                    {/* Content */}
-                    <div className="flex-1 px-2 text-foreground whitespace-pre overflow-x-auto">
-                      {line || ' '}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
               {/* Show all / Show less toggle button */}

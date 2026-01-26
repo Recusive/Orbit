@@ -4,12 +4,14 @@ import { useCallback, useEffect } from 'react';
 import type { PermissionRequest } from '@/stores/agent/tool-store';
 import type { FC } from 'react';
 
-import { formatMcpToolName, isBrowserTool } from '@/lib/utils';
+import { cn, formatMcpToolName, isBrowserTool } from '@/lib/utils';
 
 interface PermissionModalProps {
   readonly request: PermissionRequest;
   readonly onApprove: (requestId: string, always?: boolean) => void;
   readonly onDeny: (requestId: string) => void;
+  /** Whether this is the last permission in the list (controls bottom separator) */
+  readonly isLast?: boolean;
 }
 
 // Get confirmation action label
@@ -39,7 +41,12 @@ function getConfirmLabel(toolName: string): string {
   }
 }
 
-export const PermissionModal: FC<PermissionModalProps> = ({ request, onApprove, onDeny }) => {
+export const PermissionModal: FC<PermissionModalProps> = ({
+  request,
+  onApprove,
+  onDeny,
+  isLast = true,
+}) => {
   const confirmLabel = getConfirmLabel(request.toolName);
   const isBash = request.toolName.toLowerCase() === 'bash';
   const isBrowser = isBrowserTool(request.toolName);
@@ -73,7 +80,12 @@ export const PermissionModal: FC<PermissionModalProps> = ({ request, onApprove, 
   }, [request.requestId, onDeny]);
 
   return (
-    <div className="rounded-t-xl bg-card border border-border/50 border-b-0 overflow-hidden shadow-up">
+    <div
+      className={cn(
+        'animate-permission-in overflow-hidden',
+        !isLast && 'border-b border-border/30'
+      )}
+    >
       {/* Single row: Icon + Label + Loader + Buttons */}
       <div className="flex items-center gap-2.5 px-3.5 py-2">
         {/* Icon */}

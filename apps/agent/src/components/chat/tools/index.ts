@@ -2,6 +2,7 @@ export { BashToolWidget } from './bash-tool-widget';
 export { EditToolWidget } from './edit-tool-widget';
 export { GlobToolWidget } from './glob-tool-widget';
 export { GrepToolWidget } from './grep-tool-widget';
+export { PlanToolWidget } from './plan-tool-widget';
 export { ReadToolWidget } from './read-tool-widget';
 export { TaskToolWidget } from './task-tool-widget';
 export { TodoToolWidget } from './todo-tool-widget';

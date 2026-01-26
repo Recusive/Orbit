@@ -4,13 +4,6 @@ import type { PermissionRequest, ToolExecution, UsageData } from '@/stores/agent
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { InputMode, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 
-/** Props for PermissionBar component */
-export interface PermissionBarProps {
-  readonly permissions: readonly PermissionRequest[];
-  readonly onApprove: (requestId: string) => void;
-  readonly onDeny: (requestId: string) => void;
-}
-
 /** Props for ChatContent component */
 export interface ChatContentProps {
   /** Ref for stabilization measurement */

@@ -17,6 +17,7 @@ import type { ChatInputProps } from './types';
 import type { FC } from 'react';
 
 import { ElementContextList } from '@/components/browser';
+import { PermissionModal } from '@/components/modals';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -26,7 +27,9 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   isAgentRunning,
   usage,
   maxTokens,
-  hasPermissionPending = false,
+  permissions = [],
+  onPermissionApprove,
+  onPermissionDeny,
   onSend,
   onStop,
   onModeChange,
@@ -84,9 +87,26 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   return (
     <div className="p-4 pt-0 shrink-0 relative">
       <div
-        className={getInputBoxClasses(hasPermissionPending)}
+        className={getInputBoxClasses()}
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
+        {/* Permission Modals - rendered inside the bordered container */}
+        {permissions.length > 0 &&
+        onPermissionApprove !== undefined &&
+        onPermissionDeny !== undefined ? (
+          <div role="alert" aria-live="assertive">
+            {permissions.map((request, index) => (
+              <PermissionModal
+                key={request.requestId}
+                request={request}
+                onApprove={onPermissionApprove}
+                onDeny={onPermissionDeny}
+                isLast={index === permissions.length - 1}
+              />
+            ))}
+          </div>
+        ) : null}
+
         {/* Element Context Chips - selected browser elements */}
         <ElementContextList elements={elementContexts} onRemove={removeElementContext} />
 

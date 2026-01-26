@@ -9,6 +9,7 @@ import {
   EditToolWidget,
   GlobToolWidget,
   GrepToolWidget,
+  PlanToolWidget,
   ReadToolWidget,
   TaskToolWidget,
   TodoToolWidget,
@@ -54,16 +55,33 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
   const statusProps = getStatusProps(tool);
 
   switch (toolName) {
-    case 'write':
+    case 'write': {
+      const filePath = getStringInput(tool, 'file_path', 'unknown');
+      const content = getStringInput(tool, 'content', '');
+
+      // Route plan files to the dedicated PlanToolWidget for markdown preview
+      if (filePath.includes('.claude/plans/')) {
+        return (
+          <PlanToolWidget
+            filePath={filePath}
+            content={content}
+            isRunning={statusProps.isRunning}
+            success={statusProps.success}
+            onOpenFile={onOpenFile}
+          />
+        );
+      }
+
       return (
         <WriteToolWidget
-          filePath={getStringInput(tool, 'file_path', 'unknown')}
-          content={getStringInput(tool, 'content', '')}
+          filePath={filePath}
+          content={content}
           isRunning={statusProps.isRunning}
           success={statusProps.success}
           onOpenFile={onOpenFile}
         />
       );
+    }
 
     case 'edit':
       return (
@@ -172,6 +190,11 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
           success={statusProps.success}
         />
       );
+
+    case 'exitplanmode':
+      // ExitPlanMode is handled by the permission modal in ChatInput
+      // No widget needed - the plan file Write above shows the plan content
+      return null;
 
     default:
       return null;

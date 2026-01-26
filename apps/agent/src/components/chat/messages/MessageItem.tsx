@@ -128,6 +128,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                       remarkPlugins={REMARK_PLUGINS}
                       rehypePlugins={REHYPE_PLUGINS}
                       mode="static"
+                      cdnUrl="https://esm.sh/shiki/langs"
                     >
                       {segment.text}
                     </Streamdown>

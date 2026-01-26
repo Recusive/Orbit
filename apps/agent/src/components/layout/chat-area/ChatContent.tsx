@@ -1,4 +1,3 @@
-import { PermissionBar } from './PermissionBar';
 import { EMPTY_STATE_PADDING_BOTTOM } from './constants';
 
 import type { ChatContentProps } from './types';
@@ -54,7 +53,9 @@ export const ChatContent: FC<ChatContentProps> = ({
     isAgentRunning,
     usage: sessionUsage,
     maxTokens,
-    hasPermissionPending: pendingPermissions.length > 0,
+    permissions: pendingPermissions,
+    onPermissionApprove,
+    onPermissionDeny,
     onSend,
     onStop,
     onModeChange,
@@ -84,11 +85,6 @@ export const ChatContent: FC<ChatContentProps> = ({
           className="flex-1 flex flex-col justify-center"
           style={{ paddingBottom: EMPTY_STATE_PADDING_BOTTOM }}
         >
-          <PermissionBar
-            permissions={pendingPermissions}
-            onApprove={onPermissionApprove}
-            onDeny={onPermissionDeny}
-          />
           <ChatInput {...inputProps} />
         </div>
       ) : (
@@ -105,11 +101,6 @@ export const ChatContent: FC<ChatContentProps> = ({
             onOpenUrl={onOpenUrl}
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
-          />
-          <PermissionBar
-            permissions={pendingPermissions}
-            onApprove={onPermissionApprove}
-            onDeny={onPermissionDeny}
           />
           <ChatInput {...inputProps} />
         </div>

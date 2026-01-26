@@ -1,3 +1,4 @@
+import type { PermissionRequest } from '@/stores/agent/tool-store';
 import type { ContextItem, FileEntry } from '@/types/agent/context';
 import type { InputMode, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 
@@ -19,7 +20,10 @@ export interface ChatInputProps {
   readonly isAgentRunning: boolean;
   readonly usage: UsageData;
   readonly maxTokens: number;
-  readonly hasPermissionPending?: boolean;
+  /** Permission requests to render inside the input container */
+  readonly permissions?: readonly PermissionRequest[];
+  readonly onPermissionApprove?: (requestId: string) => void;
+  readonly onPermissionDeny?: (requestId: string) => void;
   readonly onSend: (
     text: string,
     contextFiles?: string[],
@@ -97,7 +101,7 @@ export interface UseChatInputReturn {
   // Utilities
   getThinkingInfo: () => ThinkingModeInfo;
   getActiveDots: () => number;
-  getInputBoxClasses: (hasPermissionPending: boolean) => string;
+  getInputBoxClasses: () => string;
   // Browser context
   elementContexts: ReactElementContext[];
   removeElementContext: (index: number) => void;

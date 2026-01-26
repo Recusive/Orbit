@@ -197,48 +197,50 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
               style={{ overflow: 'hidden' }}
             >
               <div className={cn('overflow-auto', !showAllLines && 'max-h-[300px]')}>
-                {/* Deleted lines (old) */}
-                {displayOldLines.map((line, index) => (
-                  <div
-                    key={`old-${String(index)}`}
-                    className="flex font-mono text-sm leading-4 bg-destructive/10"
-                  >
-                    {/* Gutter */}
-                    <div className="w-0.5 bg-destructive shrink-0" />
-                    {/* Line indicator */}
-                    <div className="w-5 px-1 text-center text-destructive/70 select-none shrink-0">
-                      -
+                <div className="w-fit min-w-full">
+                  {/* Deleted lines (old) */}
+                  {displayOldLines.map((line, index) => (
+                    <div
+                      key={`old-${String(index)}`}
+                      className="flex font-mono text-sm leading-4 bg-destructive/10"
+                    >
+                      {/* Sticky gutter + indicator */}
+                      <div className="sticky left-0 flex shrink-0 bg-destructive/10">
+                        <div className="w-0.5 bg-destructive" />
+                        <div className="w-5 px-1 text-center text-destructive/70 select-none">
+                          -
+                        </div>
+                      </div>
+                      {/* Content */}
+                      <div className="flex-1 px-2 text-foreground/70 whitespace-pre">
+                        {line || ' '}
+                      </div>
                     </div>
-                    {/* Content */}
-                    <div className="flex-1 px-2 text-foreground/70 whitespace-pre overflow-x-auto">
-                      {line || ' '}
-                    </div>
-                  </div>
-                ))}
+                  ))}
 
-                {/* Separator */}
-                {displayOldLines.length > 0 && displayNewLines.length > 0 ? (
-                  <div className="h-px bg-border/50" />
-                ) : null}
+                  {/* Separator */}
+                  {displayOldLines.length > 0 && displayNewLines.length > 0 ? (
+                    <div className="h-px bg-border/50" />
+                  ) : null}
 
-                {/* Added lines (new) */}
-                {displayNewLines.map((line, index) => (
-                  <div
-                    key={`new-${String(index)}`}
-                    className="flex font-mono text-sm leading-4 bg-success/10"
-                  >
-                    {/* Gutter */}
-                    <div className="w-0.5 bg-success shrink-0" />
-                    {/* Line indicator */}
-                    <div className="w-5 px-1 text-center text-success/70 select-none shrink-0">
-                      +
+                  {/* Added lines (new) */}
+                  {displayNewLines.map((line, index) => (
+                    <div
+                      key={`new-${String(index)}`}
+                      className="flex font-mono text-sm leading-4 bg-success/10"
+                    >
+                      {/* Sticky gutter + indicator */}
+                      <div className="sticky left-0 flex shrink-0 bg-success/10">
+                        <div className="w-0.5 bg-success" />
+                        <div className="w-5 px-1 text-center text-success/70 select-none">+</div>
+                      </div>
+                      {/* Content */}
+                      <div className="flex-1 px-2 text-foreground whitespace-pre">
+                        {line || ' '}
+                      </div>
                     </div>
-                    {/* Content */}
-                    <div className="flex-1 px-2 text-foreground whitespace-pre overflow-x-auto">
-                      {line || ' '}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
               {/* Show all / Show less toggle button */}

@@ -358,26 +358,23 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     return THINKING_MODE_DOTS[thinkingMode];
   }, [thinkingMode]);
 
-  const getInputBoxClasses = useCallback(
-    (hasPermissionPending: boolean): string => {
-      const base = cn(
-        'mx-auto p-1 bg-card border transition-all duration-200',
-        hasPermissionPending ? 'rounded-b-lg rounded-t-none border-t-0' : 'rounded-lg',
-        'shadow-lg',
-        'focus-within:shadow-focus',
-        'dark:shadow-none dark:focus-within:shadow-none'
-      );
-      switch (inputMode) {
-        case 'plan':
-          return `${base} border-2 border-dotted border-mode-plan`;
-        case 'accept':
-          return `${base} border-2 border-dotted border-mode-accept`;
-        case 'default':
-          return `${base} border-border/50 focus-within:border-border/70`;
-      }
-    },
-    [inputMode]
-  );
+  const getInputBoxClasses = useCallback((): string => {
+    const base = cn(
+      'mx-auto p-1 bg-card border transition-all duration-200',
+      'rounded-lg',
+      'shadow-lg',
+      'focus-within:shadow-focus',
+      'dark:shadow-none dark:focus-within:shadow-none'
+    );
+    switch (inputMode) {
+      case 'plan':
+        return `${base} border-2 border-dotted border-mode-plan/40`;
+      case 'accept':
+        return `${base} border-2 border-dotted border-mode-accept/40`;
+      case 'default':
+        return `${base} border-border/50 focus-within:border-border/70`;
+    }
+  }, [inputMode]);
 
   const isInputEmpty = inputText.length === 0;
 
