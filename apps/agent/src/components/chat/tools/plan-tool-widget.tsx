@@ -153,7 +153,6 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
                         remarkPlugins={REMARK_PLUGINS}
                         rehypePlugins={REHYPE_PLUGINS}
                         mode="static"
-                        cdnUrl="https://esm.sh/shiki/langs"
                       >
                         {content}
                       </Streamdown>

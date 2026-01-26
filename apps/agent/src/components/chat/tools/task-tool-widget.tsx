@@ -183,11 +183,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                   </div>
                 ) : output ? (
                   <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none text-sm">
-                    <Streamdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[]}
-                      cdnUrl="https://esm.sh/shiki/langs"
-                    >
+                    <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>
                       {parseTaskOutput(output)}
                     </Streamdown>
                   </div>
