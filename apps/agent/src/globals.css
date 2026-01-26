@@ -899,12 +899,21 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   contain: layout style paint;
 }
 
-/* Streaming message - no special hints needed (code review issue #5)
- * will-change: contents was removed because it's expensive and can cause
- * GPU memory exhaustion. RAF batching already provides the performance benefit.
+/* Streaming message - no special CSS performance hints needed
+ *
+ * HISTORY (code review cycle 1, issue #5):
+ * Originally had `will-change: contents` to hint GPU optimization during streaming.
+ * This was REMOVED because:
+ * 1. will-change: contents is expensive - creates new stacking context per element
+ * 2. Can cause GPU memory exhaustion with many messages
+ * 3. RAF batching in message-handler.ts already provides smooth streaming
+ *
+ * The backend batches text chunks at 50ms intervals, and the batchedChunkHandler
+ * uses requestAnimationFrame to coalesce rapid state updates. This achieves
+ * smooth rendering without CSS performance hints.
  */
 .message-item[data-streaming='true'] {
-  /* Intentionally empty - RAF batching handles optimization */
+  /* Intentionally empty - RAF batching in message-handler.ts handles optimization */
 }
 
 /* Completed messages - enable content-visibility for off-screen optimization */

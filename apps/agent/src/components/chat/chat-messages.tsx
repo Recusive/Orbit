@@ -17,7 +17,7 @@ import type { FC } from 'react';
 import { HyperText } from '@/components/ui/hyper-text';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
-import { useToolStore } from '@/stores/agent/tool-store';
+import { useRunningTool } from '@/stores/agent/tool-store';
 
 // Rotating loading messages - fun tech-themed phrases (fallback when no tool is running)
 const LOADING_MESSAGES = [
@@ -38,6 +38,47 @@ const LOADING_MESSAGES = [
   'Wrangling tokens',
 ] as const;
 
+/** Max characters for file name in loading status (prevents UI overflow) */
+const MAX_FILENAME_LENGTH = 20;
+
+/**
+ * Truncate a file name if it exceeds max length.
+ * Preserves extension when possible (e.g., "very-long-na...tsx")
+ */
+function truncateFileName(fileName: string): string {
+  if (fileName.length <= MAX_FILENAME_LENGTH) {
+    return fileName;
+  }
+
+  // Try to preserve extension
+  const lastDot = fileName.lastIndexOf('.');
+  if (lastDot > 0 && fileName.length - lastDot <= 5) {
+    // Has extension of 5 chars or less (e.g., .tsx, .json)
+    const ext = fileName.slice(lastDot);
+    const nameWithoutExt = fileName.slice(0, lastDot);
+    const maxNameLength = MAX_FILENAME_LENGTH - ext.length - 3; // 3 for "..."
+    if (maxNameLength > 3) {
+      return `${nameWithoutExt.slice(0, maxNameLength)}...${ext}`;
+    }
+  }
+
+  // No extension or too long - just truncate
+  return `${fileName.slice(0, MAX_FILENAME_LENGTH - 3)}...`;
+}
+
+/**
+ * Extract and truncate file name from a path.
+ * Handles both Unix (/) and Windows (\) path separators.
+ * Returns 'file' if path is empty or invalid.
+ * (Code review: Codex cycle 2 #4)
+ */
+function getFileName(filePath: string): string {
+  // Split on both forward and back slashes to handle Unix and Windows paths
+  const parts = filePath.split(/[/\\]/);
+  const fileName = parts.pop() ?? 'file';
+  return truncateFileName(fileName);
+}
+
 /**
  * Maps tool names to user-friendly status messages.
  * Shows contextual info based on what the agent is actually doing.
@@ -50,20 +91,17 @@ function getToolStatusMessage(toolName: string, toolInput: Record<string, unknow
       return 'Running command';
     case 'read':
       if (typeof filePath === 'string') {
-        const fileName = filePath.split('/').pop() ?? 'file';
-        return `Reading ${fileName}`;
+        return `Reading ${getFileName(filePath)}`;
       }
       return 'Reading file';
     case 'write':
       if (typeof filePath === 'string') {
-        const fileName = filePath.split('/').pop() ?? 'file';
-        return `Writing ${fileName}`;
+        return `Writing ${getFileName(filePath)}`;
       }
       return 'Writing file';
     case 'edit':
       if (typeof filePath === 'string') {
-        const fileName = filePath.split('/').pop() ?? 'file';
-        return `Editing ${fileName}`;
+        return `Editing ${getFileName(filePath)}`;
       }
       return 'Editing file';
     case 'glob':
@@ -143,11 +181,35 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const isStreamingRef = useRef(false);
 
   // Track message IDs that should animate (newly sent user messages)
-  // We use a Set to track IDs that need animation, cleared after animation completes
-  const animatingMessageIds = useRef<Set<string>>(new Set());
+  // Using STATE (not ref) ensures animation class is applied on same render (code review: Codex cycle 2 #2)
+  const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
   // Track ALL known message IDs to detect truly new messages (code review: Codex #1)
   // This prevents historical messages from animating during conversation:loaded
   const knownMessageIds = useRef<Set<string>>(new Set());
+
+  // CONSOLIDATED: Handle session changes in one place (code review: Codex cycle 2 #1)
+  // This ensures scroll reset and animation clearing happen atomically
+  useEffect(() => {
+    // Capture previous value BEFORE any mutation
+    const prevSessionId = prevSessionIdRef.current;
+
+    // Skip initial mount (no actual session change)
+    if (prevSessionId === sessionId) return;
+
+    // Session changed - clear animation state
+    setAnimatingMessageIds(new Set());
+    knownMessageIds.current.clear();
+
+    // Reset scroll position
+    if (containerRef.current) {
+      shouldAutoScroll.current = true;
+      containerRef.current.scrollTop = 0;
+    }
+    hasResetScrollRef.current = true;
+
+    // Update ref AFTER all mutations
+    prevSessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   // Detect newly added user messages and mark them for animation
   // CRITICAL: We track by message ID, not array length. This prevents:
@@ -170,18 +232,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     // Only animate if EXACTLY ONE new user message was added
     // This filters out bulk loads (conversation:loaded adds many messages at once)
     if (newUserMessages.length === 1 && newUserMessages[0] !== undefined) {
-      animatingMessageIds.current.add(newUserMessages[0]);
+      const newId = newUserMessages[0];
+      setAnimatingMessageIds((prev) => new Set(prev).add(newId));
     }
   }, [messages]);
-
-  // Clear animation state and known IDs on session change (switching conversations)
-  useEffect(() => {
-    if (sessionId !== prevSessionIdRef.current) {
-      animatingMessageIds.current.clear();
-      knownMessageIds.current.clear();
-      prevSessionIdRef.current = sessionId;
-    }
-  }, [sessionId]);
 
   // Loading state - shown while agent is running
   // Note: Animation interval was removed for performance. Streaming effect is now
@@ -189,8 +243,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const isLoading = isAgentRunning;
 
   // Get currently running tool from store for contextual status
-  const activeTools = useToolStore((state) => state.activeTools);
-  const runningTool = Object.values(activeTools).find((t) => t.status === 'running');
+  // (Uses dedicated selector for better encapsulation - code review cycle 2, issue #1)
+  const runningTool = useRunningTool();
 
   // Rotating loading message for a bit of personality (fallback)
   const rotatingMessage = useRotatingMessage(isLoading);
@@ -223,16 +277,20 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // Each message gets its own timeout for reliable cleanup during rapid sends
   useEffect(() => {
     // Get current animating IDs that don't have a timeout yet
-    for (const messageId of animatingMessageIds.current) {
+    for (const messageId of animatingMessageIds) {
       if (!animationTimeouts.current.has(messageId)) {
         const timeoutId = setTimeout(() => {
-          animatingMessageIds.current.delete(messageId);
+          setAnimatingMessageIds((prev) => {
+            const next = new Set(prev);
+            next.delete(messageId);
+            return next;
+          });
           animationTimeouts.current.delete(messageId);
         }, 300); // 250ms animation + 50ms buffer
         animationTimeouts.current.set(messageId, timeoutId);
       }
     }
-  }, [messages]);
+  }, [animatingMessageIds]);
 
   // Cleanup all timeouts on unmount
   useEffect(() => {
@@ -269,21 +327,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       el.removeEventListener('scroll', handleScroll);
     };
   }, []);
-
-  // Reset scroll to top on session change
-  // CONSOLIDATED: All session change mutations in single useEffect (code review issue #2)
-  useEffect(() => {
-    // Skip initial mount (no actual session change)
-    if (prevSessionIdRef.current === sessionId) return;
-
-    // Session changed - reset scroll position
-    if (containerRef.current) {
-      shouldAutoScroll.current = true;
-      containerRef.current.scrollTop = 0;
-    }
-    hasResetScrollRef.current = true;
-    // Note: prevSessionIdRef is updated in the animation useEffect above
-  }, [sessionId]);
 
   // ResizeObserver handles layout changes (tool expand/collapse, permission bar)
   // NOT for streaming content - the useEffect above handles that with instant scroll
@@ -358,7 +401,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             msg.role === 'assistant' && messages.slice(index + 1).every((m) => m.role === 'user');
 
           // Check if this message should animate (newly sent user message)
-          const shouldAnimate = animatingMessageIds.current.has(msg.id);
+          const shouldAnimate = animatingMessageIds.has(msg.id);
 
           return (
             <MessageItem

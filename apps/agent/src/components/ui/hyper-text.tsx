@@ -3,18 +3,21 @@
  *
  * Adapted from Magic UI (https://magicui.design)
  * Creates a "decoding" effect by cycling through random characters
+ *
+ * Performance optimizations (code review cycle 2):
+ * - Removed per-character motion.span + AnimatePresence (was creating N layout observers)
+ * - Uses simple spans with CSS for character display (no enter/exit animations needed)
+ * - Properly handles children length changes by resetting displayText
  */
-import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { MotionProps } from 'motion/react';
-import type { FC } from 'react';
+import type { FC, HTMLAttributes } from 'react';
 
 import { cn } from '@/lib/utils';
 
 type CharacterSet = string[] | readonly string[];
 
-interface HyperTextProps extends MotionProps {
+interface HyperTextProps extends HTMLAttributes<HTMLSpanElement> {
   /** The text content to be animated */
   readonly children: string;
   /** Optional className for styling */
@@ -23,8 +26,6 @@ interface HyperTextProps extends MotionProps {
   readonly duration?: number;
   /** Delay before animation starts in milliseconds */
   readonly delay?: number;
-  /** Component to render as - defaults to span */
-  readonly as?: React.ElementType;
   /** Whether to start animation when element comes into view */
   readonly startOnView?: boolean;
   /** Whether to trigger animation on hover */
@@ -46,7 +47,6 @@ export const HyperText: FC<HyperTextProps> = ({
   className,
   duration = 800,
   delay = 0,
-  as: Component = 'span',
   startOnView = false,
   animateOnHover = false,
   characterSet = DEFAULT_CHARACTER_SET,
@@ -54,37 +54,55 @@ export const HyperText: FC<HyperTextProps> = ({
   loopPause = 1000,
   ...props
 }) => {
-  const MotionComponent = motion.create(Component, {
-    forwardMotionProps: true,
-  });
-
   const [displayText, setDisplayText] = useState<string[]>(() => children.split(''));
   const [isAnimating, setIsAnimating] = useState(false);
   const iterationCount = useRef(0);
-  const elementRef = useRef<HTMLElement>(null);
+  const elementRef = useRef<HTMLSpanElement>(null);
+  // Track previous children to detect length changes (code review issue #5)
+  const prevChildrenRef = useRef(children);
 
-  const handleAnimationTrigger = (): void => {
+  // Handle children length changes - reset displayText when text changes
+  // This prevents stale characters from persisting when switching messages
+  useEffect(() => {
+    if (prevChildrenRef.current !== children) {
+      prevChildrenRef.current = children;
+      setDisplayText(children.split(''));
+      iterationCount.current = 0;
+      // Restart animation for new text
+      if (loop || !isAnimating) {
+        setIsAnimating(true);
+      }
+    }
+  }, [children, loop, isAnimating]);
+
+  const handleAnimationTrigger = useCallback((): void => {
     if (animateOnHover && !isAnimating) {
       iterationCount.current = 0;
       setIsAnimating(true);
     }
-  };
+  }, [animateOnHover, isAnimating]);
 
   // Handle animation start based on view or delay
+  // Fixed: Track and clean up timeouts to prevent state updates after unmount (code review: Codex cycle 2 #3)
   useEffect(() => {
+    let startTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
     if (!startOnView) {
-      const startTimeout = setTimeout(() => {
+      startTimeoutId = setTimeout(() => {
         setIsAnimating(true);
       }, delay);
       return () => {
-        clearTimeout(startTimeout);
+        if (startTimeoutId !== null) {
+          clearTimeout(startTimeoutId);
+        }
       };
     }
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
-          setTimeout(() => {
+          // Store timeout ID so cleanup can clear it if component unmounts
+          startTimeoutId = setTimeout(() => {
             setIsAnimating(true);
           }, delay);
           observer.disconnect();
@@ -99,6 +117,10 @@ export const HyperText: FC<HyperTextProps> = ({
 
     return () => {
       observer.disconnect();
+      // Clean up the delayed timeout if it was created (code review: Codex cycle 2 #3)
+      if (startTimeoutId !== null) {
+        clearTimeout(startTimeoutId);
+      }
     };
   }, [delay, startOnView]);
 
@@ -117,14 +139,18 @@ export const HyperText: FC<HyperTextProps> = ({
 
       iterationCount.current = progress * maxIterations;
 
-      setDisplayText((currentText) =>
-        currentText.map((letter, index) =>
-          letter === ' '
-            ? letter
-            : index <= iterationCount.current
-              ? (children[index] ?? letter)
-              : (characterSet[getRandomInt(characterSet.length)] ?? letter)
-        )
+      // Build new display text based on animation progress
+      // Characters before iterationCount show final text, after show random scramble
+      setDisplayText(
+        children
+          .split('')
+          .map((letter, index) =>
+            letter === ' '
+              ? letter
+              : index <= iterationCount.current
+                ? (children[index] ?? letter)
+                : (characterSet[getRandomInt(characterSet.length)] ?? letter)
+          )
       );
 
       if (progress < 1) {
@@ -151,20 +177,23 @@ export const HyperText: FC<HyperTextProps> = ({
     };
   }, [children, duration, isAnimating, characterSet, loop, loopPause]);
 
+  // Render as simple spans - no motion components needed for scramble effect
+  // The animation is driven by state updates, not CSS transitions
   return (
-    <MotionComponent
+    <span
       ref={elementRef}
       className={cn('overflow-hidden', className)}
       onMouseEnter={handleAnimationTrigger}
       {...props}
     >
-      <AnimatePresence>
-        {displayText.map((letter, index) => (
-          <motion.span key={index} className={cn('font-mono', letter === ' ' ? 'w-3' : '')}>
-            {letter.toUpperCase()}
-          </motion.span>
-        ))}
-      </AnimatePresence>
-    </MotionComponent>
+      {displayText.map((letter, index) => (
+        <span
+          key={`${String(index)}-${String(displayText.length)}`}
+          className={cn('font-mono', letter === ' ' ? 'inline-block w-2' : '')}
+        >
+          {letter.toUpperCase()}
+        </span>
+      ))}
+    </span>
   );
 };

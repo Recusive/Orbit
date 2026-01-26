@@ -84,6 +84,9 @@ export const ThinkingDots: FC<ThinkingDotsProps> = ({
     };
   }, [letterDuration]);
 
+  // Fallback to 'O' if letterIndex is somehow out of bounds.
+  // This shouldn't happen due to modulo in setLetterIndex, but defensive coding
+  // prevents runtime errors if LETTER_ORDER is ever modified incorrectly.
   const currentLetter = LETTER_ORDER[letterIndex] ?? 'O';
   const animationOrder = LETTER_ANIMATIONS[currentLetter];
 

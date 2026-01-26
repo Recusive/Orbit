@@ -702,3 +702,16 @@ export const useUsedTokens = (): number => useToolStore((state) => state.getUsed
 // Tool lookup selector - stable reference to avoid re-renders
 export const useGetToolsForMessage = (): ((messageId: string) => ToolExecution[]) =>
   useToolStore((state) => state.getToolsForMessage);
+
+/**
+ * Selector for currently running tool (if any).
+ * Used by ChatMessages to show contextual loading status.
+ *
+ * Returns the first tool with status 'running', or undefined if none.
+ * (Code review cycle 2, issue #1: extracted from inline Object.values().find())
+ */
+export const useRunningTool = (): ToolExecution | undefined =>
+  useToolStore((state) => {
+    const tools = Object.values(state.activeTools);
+    return tools.find((t) => t.status === 'running');
+  });
