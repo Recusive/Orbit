@@ -21,12 +21,17 @@ import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files';
 import { ErrorBoundary } from '@/components/shared';
+import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
 import { cn, CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
-// Stable plugin arrays - defined outside component to prevent recreation on each render
-// This is critical for Streamdown performance as it compares plugin arrays by reference
+// Stable plugin arrays - defined outside component to prevent recreation on each render.
+// This is critical for Streamdown performance as it compares plugin arrays by reference.
 const REMARK_PLUGINS = [remarkGfm];
-const REHYPE_PLUGINS: never[] = [];
+
+// Two rehype configurations: streaming wraps text in <span class="flow-token">
+// for per-word blur-in animation; static renders plain text with zero DOM overhead.
+const REHYPE_PLUGINS_STATIC: never[] = [];
+const REHYPE_PLUGINS_STREAMING = [rehypeFlowTokens];
 
 // Mermaid plugin for diagram rendering - defined outside component for reference stability
 const STREAMDOWN_PLUGINS = { mermaid };
@@ -49,6 +54,22 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   // Use displayedContent directly - backend batching (50ms) provides smooth streaming
   // Note: JS animation hooks cause flash when combined with auto-scroll during streaming
   const animatedContent = message.displayedContent;
+
+  // Choose rehype plugins based on streaming state.
+  // During streaming, rehypeFlowTokens wraps words in <span class="flow-token"> for
+  // per-word fade-in animation. Once complete, we switch to the static (empty) pipeline
+  // so completed messages carry zero extra DOM weight.
+  const rehypePlugins = message.isStreaming ? REHYPE_PLUGINS_STREAMING : REHYPE_PLUGINS_STATIC;
+
+  // Dynamic animation speed: short responses get slower, more visible animations;
+  // long responses speed up so animation doesn't impede reading.
+  // Content naturally grows during streaming, so this accelerates organically.
+  //   0 chars   → 0.8s  (short reply, savor each word)
+  //   400 chars → 0.6s  (medium, balanced)
+  //   800+ chars → 0.4s (long output, stay out of the way)
+  const flowDuration = message.isStreaming
+    ? `${String(Math.max(0.4, Math.min(0.8, 0.8 - (animatedContent.length / 800) * 0.4)))}s`
+    : undefined;
 
   // Handle clicks on links in markdown content
   const handleContentClick = (e: React.MouseEvent<HTMLDivElement>): void => {
@@ -82,6 +103,11 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
     <div
       className="message-item space-y-2"
       data-streaming={message.isStreaming === true ? 'true' : 'false'}
+      style={
+        flowDuration !== undefined
+          ? ({ '--flow-duration': flowDuration } as React.CSSProperties)
+          : undefined
+      }
     >
       {/* Message block */}
       {message.role === 'user' ? (
@@ -130,7 +156,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                   >
                     <Streamdown
                       remarkPlugins={REMARK_PLUGINS}
-                      rehypePlugins={REHYPE_PLUGINS}
+                      rehypePlugins={rehypePlugins}
                       plugins={STREAMDOWN_PLUGINS}
                       mode="static"
                     >
