@@ -91,7 +91,10 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
         className={getInputBoxClasses()}
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
-        {/* Permission Modals - rendered inside the bordered container */}
+        {/* Permission Modals - rendered inside the bordered container
+            Using role="alert" because permissions require immediate user attention
+            (they block agent execution until approved/denied). The container announces
+            once when permissions appear; individual modals don't trigger announcements. */}
         {permissions.length > 0 &&
         onPermissionApprove !== undefined &&
         onPermissionDeny !== undefined ? (

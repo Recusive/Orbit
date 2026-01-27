@@ -27,6 +27,21 @@ function createDict<T>(): Record<string, T> {
   return Object.create(null) as Record<string, T>;
 }
 
+/**
+ * Creates a shallow copy of a dictionary while preserving the null-prototype guarantee.
+ *
+ * Using object spread `{ ...dict }` creates a regular object with Object.prototype,
+ * which would reintroduce the prototype pollution vulnerability. This function
+ * ensures copies remain safe for arbitrary string keys.
+ *
+ * @example
+ * const copy = cloneDict(original);  // Safe copy with no prototype
+ * copy['__proto__'] = value;         // Still safe
+ */
+function cloneDict<T>(source: Record<string, T>): Record<string, T> {
+  return Object.assign(createDict<T>(), source);
+}
+
 export type FileChangeType = 'created' | 'modified' | 'deleted';
 export type FileChangeStatus = 'pending' | 'accepted' | 'rejected';
 
@@ -394,9 +409,10 @@ export const useFileStore = create<FileState>()(
         // Save current session's file changes to cache (if we have a current session with files)
         if (state.currentSessionId !== null) {
           if (hasExistingFiles) {
+            // Use cloneDict to preserve null-prototype guarantee for safe arbitrary key handling
             state.sessionCache[state.currentSessionId] = {
-              filesById: { ...state.filesById },
-              pathToId: { ...state.pathToId },
+              filesById: cloneDict(state.filesById),
+              pathToId: cloneDict(state.pathToId),
               selectedFile: state.selectedFile,
             };
           } else {
@@ -413,9 +429,9 @@ export const useFileStore = create<FileState>()(
         // Check if we have cached data for the new session
         const cached = state.sessionCache[newSessionId];
         if (cached) {
-          // Restore cached session data
-          state.filesById = { ...cached.filesById };
-          state.pathToId = { ...cached.pathToId };
+          // Restore cached session data (cloneDict preserves null-prototype guarantee)
+          state.filesById = cloneDict(cached.filesById);
+          state.pathToId = cloneDict(cached.pathToId);
           state.selectedFile = cached.selectedFile;
           logger.debug(`Restored ${String(Object.keys(cached.filesById).length)} files from cache`);
         } else if (isInitialLoad && hasExistingFiles) {
