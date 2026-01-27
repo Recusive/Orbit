@@ -1,5 +1,5 @@
 import { File, Globe, Loader2, Terminal } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 
 import type { PermissionRequest } from '@/stores/agent/tool-store';
 import type { FC } from 'react';
@@ -10,6 +10,8 @@ interface PermissionModalProps {
   readonly request: PermissionRequest;
   readonly onApprove: (requestId: string, always?: boolean) => void;
   readonly onDeny: (requestId: string) => void;
+  /** Whether this is the first permission in the list (controls keyboard shortcuts) */
+  readonly isFirst?: boolean;
   /** Whether this is the last permission in the list (controls bottom separator) */
   readonly isLast?: boolean;
 }
@@ -48,11 +50,35 @@ export const PermissionModal: FC<PermissionModalProps> = ({
   request,
   onApprove,
   onDeny,
+  isFirst = false,
   isLast = true,
 }) => {
   const confirmLabel = getConfirmLabel(request.toolName);
   const isBash = request.toolName.toLowerCase() === 'bash';
   const isBrowser = isBrowserTool(request.toolName);
+
+  // Keyboard shortcuts - only the first permission modal handles global shortcuts
+  // to prevent multiple permissions being approved/denied by a single keypress
+  useEffect(() => {
+    if (!isFirst) return;
+
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onApprove(request.requestId);
+        } else if (e.key === 'Backspace') {
+          e.preventDefault();
+          onDeny(request.requestId);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFirst, request.requestId, onApprove, onDeny]);
 
   const handleApprove = useCallback(() => {
     onApprove(request.requestId);

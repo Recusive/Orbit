@@ -814,7 +814,10 @@ html.dark [data-streamdown='code-block-body'] code span::before {
     }
     to {
       opacity: 1;
-      max-height: 80px; /* Increased to accommodate varying content heights */
+      /* Use generous max-height to accommodate larger font sizes, system scaling, and localized labels */
+      max-height: 100px;
+      padding-top: 8px;
+      padding-bottom: 8px;
     }
   }
 
@@ -855,7 +858,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
   /* Permission expand animation */
   .animate-permission-in {
     animation: none;
-    max-height: 80px;
+    max-height: none;
     opacity: 1;
   }
 }

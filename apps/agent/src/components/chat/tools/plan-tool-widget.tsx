@@ -35,8 +35,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
   success,
   onOpenFile,
 }) => {
-  // Plans start expanded and stay expanded after completion (users want to see the plan)
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(true); // Plans start expanded
   const isFailed = success === false;
 
   const fileName = filePath.split('/').pop() ?? filePath;

@@ -15,6 +15,8 @@ import {
   gitWorktreeList,
   gitWorktreeRemove,
 } from '@/lib/api';
+import { useToolStore } from '@/stores/agent/tool-store';
+import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('PrimarySidebar');
@@ -294,6 +296,12 @@ export const useSidebarActions = ({
         removeConversation(sessionId);
         setDeleteDialogOpen(false);
         setConversationToDelete(null);
+
+        // Clean up cached session data to prevent memory leaks
+        // (mirrors cleanup in message-handler.ts conversation:deleted handler)
+        useToolStore.getState().clearSessionTools(sessionId);
+        useFileStore.getState().clearSessionFiles(sessionId);
+
         // Persist to backend
         await conversationDelete(sessionId);
         toast.success('Conversation deleted');

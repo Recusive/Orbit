@@ -115,10 +115,10 @@ impl From<Message> for MessageDto {
                 MessageRole::User => String::from("user"),
                 MessageRole::Assistant => String::from("assistant"),
                 MessageRole::System => String::from("system"),
-                // #[non_exhaustive] on MessageRole requires this wildcard arm.
-                // Log when new variants appear so we can add explicit handling.
+                // Handle future variants - log at trace level to aid debugging
+                // when upstream adds new MessageRole variants
                 _ => {
-                    log::warn!("Unknown MessageRole variant encountered, treating as 'unknown'");
+                    log::trace!("Unknown MessageRole variant encountered, treating as 'unknown'");
                     String::from("unknown")
                 },
             },
