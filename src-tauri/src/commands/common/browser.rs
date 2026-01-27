@@ -218,7 +218,19 @@ pub async fn browser_create(
     // Note: Child webviews don't have IPC, so we use navigation interception
     // for receiving JS eval results via special URLs
     let webview_builder = WebviewBuilder::new(label, webview_url)
-        .auto_resize()
+        // NOTE: Do NOT use .auto_resize() here.
+        // auto_resize() makes the webview fill the entire parent window whenever
+        // a layout change occurs (including opening DevTools). Since this is an
+        // *embedded* panel — not the main content — we manage bounds explicitly
+        // via browser_set_bounds from the frontend.
+        //
+        // Block DevTools keyboard shortcuts in the embedded browser.
+        // On macOS, WebKit shares a single Web Inspector per window — if the
+        // embedded browser triggers DevTools, it hijacks the inspector from the
+        // main webview and overlaps the entire app. The Tauri ACL also blocks
+        // `internal_toggle_devtools` for non-local URLs, causing unhandled
+        // promise rejections. This script prevents both issues.
+        .initialization_script(include_str!("browser_init.js"))
         .on_navigation(move |url| {
             let url_str = url.to_string();
 
@@ -721,7 +733,11 @@ pub async fn browser_screenshot(
 /// Open DevTools for the embedded browser.
 ///
 /// Only available in debug builds (`debug_assertions`).
-/// On macOS, this uses a private API and won't work in App Store builds.
+///
+/// On macOS, the inspector opens in a separate window because WebKit does
+/// not support docking the Web Inspector for child webviews (only the
+/// primary webview of a window can dock). We close the main webview's
+/// inspector first to prevent two inspectors from colliding.
 #[tauri::command]
 pub async fn browser_open_devtools(
     app: AppHandle,
@@ -735,17 +751,24 @@ pub async fn browser_open_devtools(
 
     let webview = app.get_webview(&label).ok_or("Browser webview not found")?;
 
-    // open_devtools is only available in debug builds
     #[cfg(debug_assertions)]
     {
+        // Close the main webview's DevTools first to prevent the shared
+        // WebKit inspector from colliding.
+        if let Some(main_webview) = app.get_webview("main") {
+            if main_webview.is_devtools_open() {
+                main_webview.close_devtools();
+            }
+        }
+
         webview.open_devtools();
-        log::info!("Opened DevTools for embedded browser");
+        log::info!("Opened DevTools for embedded browser: {label}");
         Ok(())
     }
 
     #[cfg(not(debug_assertions))]
     {
-        let _ = webview; // Silence unused warning
+        let _ = webview;
         Err("DevTools is only available in debug builds".to_owned())
     }
 }

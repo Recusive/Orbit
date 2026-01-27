@@ -135,7 +135,7 @@ async function main() {
 
   // Get latest stable version
   console.log('  Fetching latest version...');
-  const version = (await fetchText(`${DIST_BASE}/stable`)).trim();
+  const version = (await fetchText(`${DIST_BASE}/latest`)).trim();
   console.log(`  Latest version: ${version}\n`);
 
   // Get manifest with checksums
