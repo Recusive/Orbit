@@ -59,7 +59,7 @@ tauri-plugin-fs = { workspace = true }
 tauri-plugin-shell = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
 tauri-plugin-clipboard-manager = { workspace = true }
-whoami = "2.0.0"
+whoami = "2.1"
 # Local fork with fix for decoration-less windows (original crashes)
 orbit-plugin-decorum = { path = "../crates/plugins/decorum" }
 tauri-plugin-window-state = "2"
