@@ -17,7 +17,7 @@ use parking_lot::RwLock;
 
 use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
-use commands::browser::{self, BrowserResultState, EmbeddedBrowserState};
+use commands::browser::{self, BrowserResultState, BrowserWindowState};
 use commands::canvas::download as canvas_download;
 use commands::canvas::lifecycle as canvas_cmd;
 use commands::canvas::persist as canvas_persist;
@@ -261,8 +261,8 @@ pub fn run() {
     // Clone for .manage() before moving into .setup()
     let session_manager_for_state = Arc::clone(&session_manager);
 
-    // Initialize embedded browser state
-    let browser_state = Arc::new(EmbeddedBrowserState::new());
+    // Initialize browser window state
+    let browser_state = Arc::new(BrowserWindowState::new());
     let browser_result_state = Arc::new(BrowserResultState::new());
 
     // Initialize file index state (empty until workspace is opened)
@@ -283,7 +283,11 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_decorum::init())
+        // NOTE: We intentionally do NOT call tauri_plugin_decorum::init() here.
+        // The init() hook fires on ALL windows and crashes when a window has
+        // decorations(false) because it tries to position non-existent traffic lights.
+        // We only need the WebviewWindowExt trait for set_traffic_lights_inset(),
+        // which works independently without the plugin init.
         .plugin(tauri_plugin_window_state::Builder::new().build())
         // Setup event callbacks for agent and configure window
         .setup(move |app| {
