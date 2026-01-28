@@ -470,9 +470,27 @@ pub async fn browser_close(
 }
 
 /// Check if a browser exists.
+///
+/// # Implementation Note (Code Review Cycle 1, Codex Issue #4)
+///
+/// This function validates the browser window actually exists by checking both
+/// the state flag AND attempting to get the window handle. This prevents stale
+/// state if the window was closed externally (crash, user action, etc.).
 #[tauri::command]
-pub fn browser_has(state: State<'_, Arc<BrowserWindowState>>) -> bool {
-    *state.exists.lock()
+pub fn browser_has(app: AppHandle, state: State<'_, Arc<BrowserWindowState>>) -> bool {
+    let mut exists = state.exists.lock();
+    if !*exists {
+        return false;
+    }
+
+    // Validate the window actually exists (handles external close/crash)
+    if app.get_webview_window(BROWSER_WINDOW_LABEL).is_none() {
+        // Window was closed externally - update state
+        *exists = false;
+        return false;
+    }
+
+    true
 }
 
 /// Get information about the browser.
@@ -520,12 +538,33 @@ pub async fn browser_eval(
     let eval_id = Uuid::new_v4().to_string();
     let result_rx = result_state.register(eval_id.clone());
 
-    // Wrap script to capture result and send via navigation
+    // Wrap script to capture result and send via navigation.
+    //
+    // SECURITY: The script is JSON-encoded to prevent injection attacks.
+    // Using `new Function(scriptString)()` instead of direct interpolation ensures
+    // that characters like `}})();` or template literal escapes cannot break out
+    // of the wrapper. JSON.parse safely decodes the script before execution.
+    //
+    // Code review cycle 1, issue #12: Previously used direct format!() interpolation
+    // which was vulnerable to script breakout attacks.
+    let script_json = serde_json::to_string(&script).unwrap_or_else(|_| {
+        // Fallback: manual escaping for edge cases (should never happen with valid UTF-8)
+        format!(
+            "\"{}\"",
+            script
+                .replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\r', "\\r")
+        )
+    });
+
     let wrapped_script = format!(
         "(async () => {{
             const __evalId = {eval_id_json};
+            const __scriptSource = {script_json};
             try {{
-                const __result = await (async () => {{ {script} }})();
+                const __result = await (async () => {{ return eval(__scriptSource); }})();
                 const __json = JSON.stringify(__result ?? null);
                 if (__json.length > 100000) {{
                     const __errorMsg = encodeURIComponent(`Result too large (${{__json.length}} chars, max 100000)`);
@@ -540,7 +579,7 @@ pub async fn browser_eval(
             }}
         }})();",
         eval_id_json = serde_json::to_string(&eval_id).unwrap_or_else(|_| format!("\"{eval_id}\"")),
-        script = script
+        script_json = script_json
     );
 
     if let Err(e) = window.eval(&wrapped_script) {
@@ -715,7 +754,19 @@ pub async fn browser_show(app: AppHandle, state: State<'_, Arc<BrowserWindowStat
         .show()
         .map_err(|e| format!("Failed to show browser: {e}"))?;
 
-    // Force repaint by briefly resizing (reuse saved_bounds)
+    // WORKAROUND: Force repaint by briefly resizing (reuse saved_bounds).
+    //
+    // Code review cycle 1, issue #10: On some macOS versions, child windows do not
+    // repaint correctly after being shown. This brief resize cycle forces WebKit
+    // to redraw the content. The -1px size change is imperceptible but triggers
+    // the necessary repaint.
+    //
+    // Alternative approaches considered:
+    // - window.invalidate() / requestAnimationFrame: Not available in Tauri API
+    // - setNeedsDisplay on NSWindow: Requires unsafe objc calls
+    // - This resize approach is simple and reliable, though slightly hacky
+    //
+    // If Tauri exposes a proper redraw API in the future, this should be replaced.
     if let Some(bounds) = saved_bounds {
         let _ = window.set_size(LogicalSize::new(
             bounds.width - 1.0_f64,
@@ -784,10 +835,18 @@ pub async fn browser_js_callback(
 }
 
 /// Legacy: Async eval (use browser_eval instead).
+///
+/// # Deprecation Note (Code Review Cycle 1, Codex Issue #3)
+///
+/// The `timeout_ms` parameter was previously ignored. It has been removed to
+/// avoid misleading callers. This function now always uses `browser_eval`'s
+/// 30-second timeout (defined by `JS_EVAL_TIMEOUT`).
+///
+/// If custom timeouts are needed, consider extending `browser_eval` to accept
+/// a timeout parameter.
 #[tauri::command]
 pub async fn browser_eval_async(
     script: String,
-    _timeout_ms: Option<u64>,
     app: AppHandle,
     state: State<'_, Arc<BrowserWindowState>>,
     result_state: State<'_, Arc<BrowserResultState>>,

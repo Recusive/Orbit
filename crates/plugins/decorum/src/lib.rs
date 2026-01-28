@@ -114,9 +114,20 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .build()
 }
 
+/// Check if we're on the main thread.
+///
+/// # Implementation (Code Review Cycle 1, Issue #7)
+///
+/// Previously used `thread.name() == Some("main")` which is fragile because:
+/// - Tauri/Rust may not always name the main thread "main"
+/// - Thread names are optional and platform-dependent
+///
+/// Now uses `MainThreadMarker::new()` from `objc2_foundation`, which is the
+/// canonical way to check for main thread in Apple frameworks. This uses
+/// `NSThread.isMainThread` internally, which is authoritative.
 #[cfg(target_os = "macos")]
 fn is_main_thread() -> bool {
-    std::thread::current().name() == Some("main")
+    objc2_foundation::MainThreadMarker::new().is_some()
 }
 
 #[cfg(target_os = "macos")]

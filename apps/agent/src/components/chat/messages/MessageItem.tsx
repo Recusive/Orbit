@@ -54,7 +54,7 @@ function calculateFlowDuration(contentLength: number): string {
 
   const ratio = Math.min(contentLength / THRESHOLD_CHARS, 1);
   const duration = MAX_DURATION - ratio * (MAX_DURATION - MIN_DURATION);
-  return `${String(duration)}s`;
+  return `${duration.toString()}s`;
 }
 
 export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({

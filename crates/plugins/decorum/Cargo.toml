@@ -126,6 +126,9 @@ string_add = "deny"
 tauri = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# parking_lot::RwLock for thread-safe global offset storage (required by project clippy rules)
+parking_lot = "0.12"
+
 # Modern objc2 ecosystem (type-safe, actively maintained)
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = [

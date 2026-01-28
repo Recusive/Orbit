@@ -8,9 +8,18 @@
 //! - Compile-time selector verification via `define_class!`
 //! - Automatic retain/release via `Retained<T>` smart pointer
 //! - No more null pointer checks that fail on garbage pointers
+//!
+//! # Offset Persistence (Code Review Cycle 1, Codex Issue #1)
+//!
+//! Traffic light offsets are stored in a global `RwLock` so that:
+//! - `set_traffic_lights_inset()` can update the offsets from any thread
+//! - The delegate can read the current offsets on resize/fullscreen events
+//! - Offsets persist correctly across window state changes
 
 use std::cell::Cell;
 use std::ffi::c_void;
+
+use parking_lot::RwLock;
 
 use objc2::rc::{Allocated, Retained};
 use objc2::runtime::ProtocolObject;
@@ -20,8 +29,34 @@ use objc2_core_foundation::CGPoint;
 use objc2_foundation::{MainThreadMarker, NSNotification, NSObject, NSObjectProtocol};
 use tauri::{Emitter, Manager, Runtime, Window};
 
-const WINDOW_CONTROL_PAD_X: f64 = 12.0;
-const WINDOW_CONTROL_PAD_Y: f64 = 16.0;
+/// Default traffic light offsets (used until `set_traffic_lights_inset` is called).
+const DEFAULT_OFFSET_X: f64 = 12.0;
+const DEFAULT_OFFSET_Y: f64 = 16.0;
+
+/// Global storage for traffic light offsets.
+///
+/// Using `RwLock` because:
+/// - Reads (from delegate on main thread) are frequent and shouldn't block each other
+/// - Writes (from `set_traffic_lights_inset`) are rare
+/// - `RwLock` allows multiple concurrent readers
+///
+/// For Orbit's single-window design, a simple tuple suffices. If multiple windows
+/// with different offsets are ever needed, this could be changed to a
+/// `HashMap<String, (f64, f64)>` keyed by window label.
+static TRAFFIC_LIGHT_OFFSETS: RwLock<(f64, f64)> =
+    RwLock::new((DEFAULT_OFFSET_X, DEFAULT_OFFSET_Y));
+
+/// Get the current traffic light offsets.
+fn get_offsets() -> (f64, f64) {
+    // parking_lot::RwLock doesn't use poisoning - returns guard directly
+    *TRAFFIC_LIGHT_OFFSETS.read()
+}
+
+/// Set the traffic light offsets.
+fn set_offsets(x: f64, y: f64) {
+    // parking_lot::RwLock doesn't use poisoning - returns guard directly
+    *TRAFFIC_LIGHT_OFFSETS.write() = (x, y);
+}
 
 /// Type-safe wrapper for `NSWindow` handle.
 /// Uses `Retained<NSWindow>` for automatic memory management.
@@ -122,22 +157,43 @@ pub(crate) fn position_traffic_lights(window_handle: &WindowHandle, x: f64, y: f
 // ============================================================================
 
 /// Instance variables stored in the delegate object.
+///
+/// # Thread Safety (Code Review Cycle 1, Issue #8)
+///
+/// This struct contains raw pointers wrapped in `Cell`, which are not inherently
+/// thread-safe. The `Send` and `Sync` implementations below are safe because:
+///
+/// 1. The delegate is created on the main thread (enforced by `MainThreadMarker`)
+/// 2. All `NSWindowDelegate` methods are called by `AppKit` on the main thread
+/// 3. The struct is marked `#[thread_kind = MainThreadOnly]` in `define_class!`
+///
+/// Debug builds include runtime assertions to verify main thread access.
+///
+/// # Note on Traffic Light Offsets
+///
+/// Traffic light offsets are NOT stored in ivars. They're stored in the global
+/// `TRAFFIC_LIGHT_OFFSETS` so that `set_traffic_lights_inset()` can update them
+/// and the delegate will read the current values. (Code Review Cycle 1, Codex Issue #1)
 pub(crate) struct DelegateIvars {
     /// The Tauri window label for identification
     window_label: String,
-    /// X offset for traffic lights
-    traffic_light_x: Cell<f64>,
-    /// Y offset for traffic lights
-    traffic_light_y: Cell<f64>,
     /// Raw pointer to the original delegate (we forward calls to it)
     super_delegate: Cell<*mut objc2::runtime::AnyObject>,
     /// Raw pointer to the `NSWindow`
     ns_window_ptr: Cell<*mut c_void>,
-    /// Raw pointer to app handle for emitting events
+    /// Raw pointer to app handle for emitting events.
+    ///
+    /// # Memory Management (Code Review Cycle 1, Issue #1)
+    ///
+    /// This pointer is created via `Box::into_raw()` and intentionally leaked.
+    /// See `setup_traffic_light_positioner` for the rationale.
     app_handle_ptr: Cell<*mut c_void>,
 }
 
-// SAFETY: The delegate is only accessed from the main thread
+// SAFETY: The delegate is only accessed from the main thread.
+// All NSWindowDelegate callbacks are dispatched by AppKit on the main thread,
+// and we enforce MainThreadMarker at creation time.
+// See struct-level documentation for detailed safety analysis.
 unsafe impl Send for DelegateIvars {}
 unsafe impl Sync for DelegateIvars {}
 
@@ -227,8 +283,6 @@ define_class! {
 /// Configuration for creating a new delegate.
 struct DelegateConfig {
     window_label: String,
-    traffic_light_x: f64,
-    traffic_light_y: f64,
     super_delegate: *mut objc2::runtime::AnyObject,
     ns_window_ptr: *mut c_void,
     app_handle_ptr: *mut c_void,
@@ -240,8 +294,6 @@ impl TrafficLightDelegate {
         let this: Allocated<Self> = mtm.alloc();
         let this = this.set_ivars(DelegateIvars {
             window_label: config.window_label,
-            traffic_light_x: Cell::new(config.traffic_light_x),
-            traffic_light_y: Cell::new(config.traffic_light_y),
             super_delegate: Cell::new(config.super_delegate),
             ns_window_ptr: Cell::new(config.ns_window_ptr),
             app_handle_ptr: Cell::new(config.app_handle_ptr),
@@ -249,7 +301,10 @@ impl TrafficLightDelegate {
         unsafe { msg_send![super(this), init] }
     }
 
-    /// Reposition the traffic lights using stored coordinates.
+    /// Reposition the traffic lights using the global offset storage.
+    ///
+    /// Reads offsets from `TRAFFIC_LIGHT_OFFSETS` to ensure consistency with
+    /// any values set via `set_traffic_lights_inset()`.
     fn reposition_traffic_lights(&self) {
         let ivars = self.ivars();
         let ns_window_ptr = ivars.ns_window_ptr.get();
@@ -257,25 +312,38 @@ impl TrafficLightDelegate {
             return;
         }
 
+        // Read from global storage (set by set_traffic_lights_inset)
+        let (x, y) = get_offsets();
+
         // SAFETY: We stored a valid NSWindow pointer
         if let Some(handle) = unsafe { WindowHandle::from_raw(ns_window_ptr) } {
-            position_traffic_lights(
-                &handle,
-                ivars.traffic_light_x.get(),
-                ivars.traffic_light_y.get(),
-            );
+            position_traffic_lights(&handle, x, y);
         }
     }
 
     /// Emit a Tauri event (fullscreen changes, etc.)
     fn emit_event(&self, event_name: &str) {
+        // Code Review Cycle 1, Issue #8: Verify main thread access in debug builds
+        debug_assert!(
+            MainThreadMarker::new().is_some(),
+            "DelegateIvars accessed from non-main thread"
+        );
+
         let ivars = self.ivars();
         let app_handle_ptr = ivars.app_handle_ptr.get();
         if app_handle_ptr.is_null() {
             return;
         }
 
-        // SAFETY: We stored a valid AppHandle pointer
+        // SAFETY (Code Review Cycle 1, Issue #3):
+        // The pointer was created from a valid `Box<AppHandle>` in `setup_traffic_light_positioner`.
+        // It remains valid because:
+        // 1. The Box is leaked (never deallocated) for the window's lifetime
+        // 2. AppHandle is reference-counted internally and stays valid
+        // 3. This method is only called from NSWindowDelegate callbacks on the main thread
+        //
+        // If the app is shutting down, the delegate may be called after AppHandle is invalid,
+        // but Tauri's event emission will simply fail gracefully (we ignore the Result).
         let app_handle: &tauri::AppHandle<tauri::Wry> =
             unsafe { &*app_handle_ptr.cast::<tauri::AppHandle<tauri::Wry>>() };
 
@@ -284,6 +352,12 @@ impl TrafficLightDelegate {
     }
 
     /// Forward a message to the super delegate.
+    ///
+    /// # Safety Note (Code Review Cycle 1, Codex Issue #2)
+    ///
+    /// We check `respondsToSelector:` before calling `performSelector:withObject:`
+    /// to avoid crashes if the original delegate doesn't implement an optional
+    /// `NSWindowDelegate` method.
     fn forward_to_super(&self, selector: objc2::runtime::Sel, arg: *mut c_void) {
         let super_del = self.ivars().super_delegate.get();
         if super_del.is_null() {
@@ -291,18 +365,47 @@ impl TrafficLightDelegate {
         }
 
         unsafe {
-            let _: () = msg_send![super_del, performSelector: selector, withObject: arg];
+            // Check if delegate implements this method before calling
+            let responds: bool = msg_send![super_del, respondsToSelector: selector];
+            if responds {
+                let _: () = msg_send![super_del, performSelector: selector, withObject: arg];
+            }
         }
     }
 
     /// Forward a message to the super delegate, returning a bool.
-    fn forward_to_super_bool(&self, selector: objc2::runtime::Sel, arg: *mut c_void) -> bool {
-        let super_del = self.ivars().super_delegate.get();
-        if super_del.is_null() {
-            return true; // Default to allowing close
-        }
+    ///
+    /// # Known Limitation (Code Review Cycle 1, Issue #11)
+    ///
+    /// This method cannot properly forward boolean return values from the super
+    /// delegate. The `performSelector:withObject:` method returns `id` (object
+    /// pointer) regardless of the underlying method's return type. When the
+    /// actual method returns `BOOL`, interpreting the result as a pointer and
+    /// then as bool is undefined behavior.
+    ///
+    /// **Current behavior**: We always return `true` (allow the operation).
+    /// This is safe because:
+    /// - `windowShouldClose:` returning `true` allows the window to close
+    /// - Tauri's default delegate typically allows close
+    /// - If a delegate wanted to prevent close, it would need custom handling
+    ///
+    /// **Proper fix** (if needed): Use `objc2::runtime::MethodImplementation` to
+    /// get the actual IMP and call it with the correct signature. This is complex
+    /// and not worth it for our single-window use case.
+    const fn forward_to_super_bool(
+        &self,
+        _selector: objc2::runtime::Sel,
+        _arg: *mut c_void,
+    ) -> bool {
+        // Acknowledge self to satisfy clippy::unused_self - kept as method for
+        // API consistency with forward_to_super() so callers use self.forward_*()
+        let _ = self;
 
-        unsafe { msg_send![super_del, performSelector: selector, withObject: arg] }
+        // We intentionally don't forward to super_delegate for bool-returning methods.
+        // See doc comment above for rationale.
+        //
+        // Always allow the operation (e.g., allow window close).
+        true
     }
 }
 
@@ -347,8 +450,9 @@ pub(crate) fn setup_traffic_light_positioner<R: Runtime>(window: &Window<R>) {
         return;
     }
 
-    // Do the initial positioning
-    position_traffic_lights(&window_handle, WINDOW_CONTROL_PAD_X, WINDOW_CONTROL_PAD_Y);
+    // Do the initial positioning using current global offsets
+    let (x, y) = get_offsets();
+    position_traffic_lights(&window_handle, x, y);
 
     // Get the current delegate to forward calls to
     let current_delegate: *mut objc2::runtime::AnyObject = unsafe {
@@ -356,8 +460,29 @@ pub(crate) fn setup_traffic_light_positioner<R: Runtime>(window: &Window<R>) {
         msg_send![ns_window, delegate]
     };
 
-    // Store app handle for event emission
-    // We need to leak it to get a stable pointer
+    // Store app handle for event emission.
+    //
+    // INTENTIONAL MEMORY LEAK (Code Review Cycle 1, Issues #1 and #2):
+    //
+    // We leak the AppHandle via `Box::into_raw()` to get a stable pointer that
+    // the Objective-C delegate can hold. This is intentional and acceptable because:
+    //
+    // 1. **Single Window Assumption**: Orbit creates exactly ONE main window that
+    //    lives for the entire application lifetime. The window is never closed
+    //    and recreated, so this leak happens exactly once (~64 bytes).
+    //
+    // 2. **Delegate Lifetime**: The delegate (also leaked below) must outlive the
+    //    window. Since the window lives forever, we can't free these resources
+    //    without complex ref-counting that isn't worth the ~100 bytes saved.
+    //
+    // 3. **Alternative Approaches Considered**:
+    //    - Weak references: objc2 doesn't provide easy weak ref patterns for this
+    //    - Arc with prevent-drop: More complex, same effective behavior
+    //    - Store in window user data: NSWindow user data API is cumbersome
+    //
+    // If Orbit ever supports multiple main windows or window recreation, this
+    // should be revisited. The delegate would need to release these resources
+    // in `windowWillClose:` or use Arc-based reference counting.
     let app_handle = Box::new(window.app_handle().clone());
     let app_handle_ptr = Box::into_raw(app_handle).cast::<c_void>();
 
@@ -366,8 +491,6 @@ pub(crate) fn setup_traffic_light_positioner<R: Runtime>(window: &Window<R>) {
         mtm,
         DelegateConfig {
             window_label: window.label().to_string(),
-            traffic_light_x: WINDOW_CONTROL_PAD_X,
-            traffic_light_y: WINDOW_CONTROL_PAD_Y,
             super_delegate: current_delegate,
             ns_window_ptr,
             app_handle_ptr,
@@ -379,19 +502,39 @@ pub(crate) fn setup_traffic_light_positioner<R: Runtime>(window: &Window<R>) {
     let delegate_obj: &ProtocolObject<dyn NSWindowDelegate> = ProtocolObject::from_ref(&*delegate);
     ns_window.setDelegate(Some(delegate_obj));
 
-    // Keep the delegate alive by leaking it (it will live for the window's lifetime)
+    // INTENTIONAL MEMORY LEAK (Code Review Cycle 1, Issue #2):
+    //
+    // Keep the delegate alive by leaking it. This is the standard pattern for
+    // Objective-C delegates that must outlive the objects they serve.
+    //
+    // The delegate must live as long as the NSWindow exists. Since Orbit's main
+    // window lives for the entire app lifetime (see comment above about single
+    // window assumption), we leak the delegate rather than implement complex
+    // ref-counting. Total leak: ~100-200 bytes per window, happens once.
+    //
+    // The Retained<TrafficLightDelegate> holds strong references to the ivars,
+    // which include the leaked app_handle_ptr. Both are cleaned up by the OS
+    // when the process exits.
     std::mem::forget(delegate);
 }
 
-/// Update the stored traffic light positions for a window.
+/// Update the traffic light positions for a window.
+///
+/// This function:
+/// 1. Stores the new offsets in `TRAFFIC_LIGHT_OFFSETS` (global storage)
+/// 2. Repositions the traffic lights immediately
+///
+/// The delegate reads from the same global storage on resize/fullscreen events,
+/// so custom offsets now persist correctly. (Code Review Cycle 1, Codex Issue #1)
 pub(crate) fn update_traffic_light_positions(window: &tauri::WebviewWindow, x: f64, y: f64) {
+    // Store offsets globally so delegate can read them on resize/fullscreen
+    set_offsets(x, y);
+
     let Ok(ns_window_ptr) = window.ns_window() else {
         return;
     };
 
-    // Get the delegate and update its positions
-    // Note: Since we can't easily downcast to our delegate type, we just
-    // reposition the lights directly
+    // Reposition immediately
     if let Some(handle) = unsafe { WindowHandle::from_raw(ns_window_ptr) } {
         position_traffic_lights(&handle, x, y);
     }
