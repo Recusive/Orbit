@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-show-snap-overlay"
+description = "Enables the show-snap-overlay command without any pre-configured scope."
+commands.allow = ["show-snap-overlay"]
+
+[[permission]]
+identifier = "deny-show-snap-overlay"
+description = "Denies the show-snap-overlay command without any pre-configured scope."
+commands.deny = ["show-snap-overlay"]

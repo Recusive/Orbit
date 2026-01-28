@@ -283,19 +283,22 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        // NOTE: We do NOT call tauri_plugin_decorum::init() - it crashes on
-        // decoration-less windows (like our browser). We manually position
-        // traffic lights using the WebviewWindowExt trait instead.
+        // Use our local fork of decorum with fix for decoration-less windows.
+        // The original plugin crashes because standardWindowButton_ returns garbage
+        // pointers (not null) when decorations are disabled.
+        .plugin(orbit_plugin_decorum::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         // Setup event callbacks for agent and configure window
         .setup(move |app| {
             agent_cmd::setup_event_callbacks(app.handle(), &session_manager);
 
-            // Set traffic light position on macOS
+            // Set initial traffic light position on macOS.
+            // The orbit-plugin-decorum fork handles resize events via native delegate.
             #[cfg(target_os = "macos")]
             {
+                use orbit_plugin_decorum::WebviewWindowExt as _;
                 use tauri::Manager as _;
-                use tauri_plugin_decorum::WebviewWindowExt as _;
+
                 if let Some(window) = app.get_webview_window("main") {
                     // Center vertically in 35px header: (35 - 14) / 2 = 10.5
                     drop(window.set_traffic_lights_inset(11.0, 10.5));

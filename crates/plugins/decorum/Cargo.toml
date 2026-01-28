@@ -1,0 +1,45 @@
+[package]
+name = "orbit-plugin-decorum"
+version = "0.1.0"
+edition = "2021"
+description = "Fork of tauri-plugin-decorum with fix for decoration-less windows"
+license = "MIT"
+
+# Required for Tauri plugins
+links = "orbit-plugin-decorum"
+
+# Opt out of workspace lints - this is a fork using unsafe Cocoa FFI code
+# that doesn't follow our strict lint rules. Will be cleaned up when we
+# migrate to objc2-app-kit (see TODO below).
+[lints.rust]
+unsafe_code = "allow"
+missing_docs = "allow"
+missing_debug_implementations = "allow"
+missing_abi = "allow"
+deprecated = "allow"
+
+[lints.clippy]
+all = "allow"
+pedantic = "allow"
+nursery = "allow"
+cargo = "allow"
+
+[dependencies]
+tauri = { workspace = true }
+serde = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+rand = "0.8"
+cocoa = "0.26"
+objc = "0.2"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+# TODO: Migrate from deprecated cocoa/objc to objc2-app-kit
+# See MIGRATION.md for detailed plan (~7 days of work)
+# Benefits:
+# - Type-safe Objective-C bindings (no null pointer crashes)
+# - Compile-time selector verification
+# - Modern Rust patterns with Option<Retained<T>> instead of raw pointers
+# - No more deprecation warnings or lint suppressions needed
