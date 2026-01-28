@@ -19,7 +19,9 @@
 //! 2. Uses objc2's `Option<Retained<T>>` which properly returns `None`
 
 use tauri::plugin::{Builder, TauriPlugin};
-use tauri::{Error, Runtime, WebviewWindow};
+#[cfg(target_os = "macos")]
+use tauri::Error;
+use tauri::{Runtime, WebviewWindow};
 
 #[cfg(target_os = "macos")]
 mod traffic;
@@ -104,6 +106,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
                 }
                 traffic::setup_traffic_light_positioner(&win);
             }
+
+            // Suppress unused variable warning on non-macOS
+            #[cfg(not(target_os = "macos"))]
+            let _ = win;
         })
         .build()
 }
