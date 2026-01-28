@@ -32,12 +32,23 @@
 //!
 //! Errors are captured to Sentry for monitoring embedded browser issues.
 
-#![allow(
+// These lints are triggered by Tauri's #[tauri::command] macro, not our code.
+// Using `expect` instead of `allow` so we're notified if Tauri fixes these.
+#![expect(
     clippy::needless_pass_by_value,
-    clippy::unreachable,
-    clippy::let_underscore_must_use,
+    reason = "Tauri commands take params by value"
+)]
+#![expect(
     clippy::too_many_arguments,
-    reason = "Tauri's #[tauri::command] macro generates code that triggers false positives"
+    reason = "Tauri commands need all their params"
+)]
+#![expect(
+    clippy::unreachable,
+    reason = "Tauri macro generates unreachable patterns"
+)]
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "We intentionally ignore some Results"
 )]
 
 use std::result::Result as StdResult;
@@ -142,6 +153,8 @@ impl BrowserResultState {
         let maybe_tx = self.pending.lock().remove(id);
         if let Some(tx) = maybe_tx {
             let _ = tx.send(Ok(result));
+        } else {
+            log::warn!("Received result for unknown eval request: {id}");
         }
     }
 
@@ -150,6 +163,8 @@ impl BrowserResultState {
         let maybe_tx = self.pending.lock().remove(id);
         if let Some(tx) = maybe_tx {
             let _ = tx.send(Err(error));
+        } else {
+            log::warn!("Received error for unknown eval request: {id}");
         }
     }
 
@@ -183,12 +198,16 @@ pub async fn browser_create(
     let initial_url = url.unwrap_or_else(|| "https://example.com".to_owned());
 
     // Close existing browser window if any
-    if *state.exists.lock() {
-        if let Some(window) = app.get_webview_window(BROWSER_WINDOW_LABEL) {
-            log::info!("Closing existing browser window before creating new one");
-            let _ = window.close();
+    // Use a single lock scope to prevent race conditions between check and update
+    {
+        let mut exists = state.exists.lock();
+        if *exists {
+            if let Some(window) = app.get_webview_window(BROWSER_WINDOW_LABEL) {
+                log::info!("Closing existing browser window before creating new one");
+                let _ = window.close();
+            }
+            *exists = false;
         }
-        *state.exists.lock() = false;
     }
 
     // Get the main webview window to use as parent
@@ -279,7 +298,11 @@ pub async fn browser_create(
                         } else {
                             result_state_for_nav.complete_err(&req_id, error.unwrap_or_else(|| "Unknown error".to_owned()));
                         }
+                    } else {
+                        log::warn!("Malformed eval result URL: missing 'id' parameter in query: {query}");
                     }
+                } else {
+                    log::warn!("Malformed eval result URL: no query string in {url_str}");
                 }
                 // Block the navigation - this was just a result callback
                 return false;
@@ -654,9 +677,11 @@ pub async fn browser_show(app: AppHandle, state: State<'_, Arc<BrowserWindowStat
         .get_webview_window("main")
         .and_then(|w| w.outer_position().ok());
 
+    // Read bounds once for both restore and repaint operations (DRY)
+    let saved_bounds = *state.last_bounds.lock();
+
     // Restore bounds before showing (convert to screen coordinates)
-    let bounds_for_restore = *state.last_bounds.lock();
-    if let Some(bounds) = bounds_for_restore {
+    if let Some(bounds) = saved_bounds {
         if let Some(pos) = parent_pos {
             let screen_x = f64::from(pos.x) + bounds.x;
             let screen_y = f64::from(pos.y) + bounds.y;
@@ -669,9 +694,8 @@ pub async fn browser_show(app: AppHandle, state: State<'_, Arc<BrowserWindowStat
         .show()
         .map_err(|e| format!("Failed to show browser: {e}"))?;
 
-    // Force repaint by briefly resizing
-    let bounds_for_repaint = *state.last_bounds.lock();
-    if let Some(bounds) = bounds_for_repaint {
+    // Force repaint by briefly resizing (reuse saved_bounds)
+    if let Some(bounds) = saved_bounds {
         let _ = window.set_size(LogicalSize::new(
             bounds.width - 1.0_f64,
             bounds.height - 1.0_f64,

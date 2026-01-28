@@ -26,5 +26,19 @@
             e.stopImmediatePropagation();
             return false;
         }
+        // Block Cmd+Option+C (Elements inspector on macOS)
+        if ((e.metaKey && e.altKey && (e.key === 'c' || e.key === 'C')) ||
+            (e.ctrlKey && e.shiftKey && (e.key === 'c' || e.key === 'C'))) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return false;
+        }
+        // Block Cmd+Option+U (View Source on macOS)
+        if ((e.metaKey && e.altKey && (e.key === 'u' || e.key === 'U')) ||
+            (e.ctrlKey && e.shiftKey && (e.key === 'u' || e.key === 'U'))) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return false;
+        }
     }, true); // Use capture phase to intercept before Tauri's handler
 })();

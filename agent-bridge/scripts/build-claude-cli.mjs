@@ -134,6 +134,8 @@ async function main() {
   mkdirSync(binariesDir, { recursive: true });
 
   // Get latest stable version
+  // Note: Using /latest endpoint which points to the current stable release.
+  // The /stable endpoint was deprecated in favor of /latest for consistency.
   console.log('  Fetching latest version...');
   const version = (await fetchText(`${DIST_BASE}/latest`)).trim();
   console.log(`  Latest version: ${version}\n`);

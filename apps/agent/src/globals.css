@@ -840,8 +840,9 @@ html.dark [data-streamdown='code-block-body'] code span::before {
      The [data-streaming="true"] attribute is set on .message-item.
      --flow-duration is set dynamically by MessageItem based on content length:
        Short content (1-2 lines) → 0.8s  (slower, animation clearly visible)
-       Long content (800+ chars)  → 0.4s  (faster, doesn't slow reading) */
-  [data-streaming="true"] .flow-token {
+       Long content (800+ chars)  → 0.4s  (faster, doesn't slow reading)
+     Using specific .message-item selector for safety against accidental attribute matches. */
+  .message-item[data-streaming="true"] .flow-token {
     animation: flow-token-in var(--flow-duration, 0.6s) ease-in-out both;
   }
 }
@@ -882,7 +883,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
   }
 
   /* Flow token streaming animation */
-  [data-streaming="true"] .flow-token {
+  .message-item[data-streaming="true"] .flow-token {
     animation: none;
     opacity: 1;
   }

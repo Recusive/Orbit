@@ -32,7 +32,24 @@ interface HastRoot {
 }
 
 /** Covers the node types we encounter in practice. */
-type HastNode = HastText | HastElement | { type: string };
+type HastNode = HastText | HastElement | HastOther;
+
+/** Other node types (comments, doctypes, etc.) that we pass through unchanged. */
+interface HastOther {
+  type: string;
+}
+
+// ── Type Guards ─────────────────────────────────────────────────────────
+
+/** Type guard to check if a node is a text node. */
+function isTextNode(node: HastNode): node is HastText {
+  return node.type === 'text' && 'value' in node;
+}
+
+/** Type guard to check if a node is an element node. */
+function isElementNode(node: HastNode): node is HastElement {
+  return node.type === 'element' && 'tagName' in node && 'children' in node;
+}
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -54,28 +71,30 @@ function wrapTextNodes(node: HastRoot | HastElement): void {
   const result: HastNode[] = [];
 
   for (const child of source) {
-    if (child.type === 'text') {
-      const parts = (child as HastText).value.split(WORD_BOUNDARY);
+    if (isTextNode(child)) {
+      const parts = child.value.split(WORD_BOUNDARY);
 
       for (const part of parts) {
         if (part.length === 0) continue;
 
         if (/^\s+$/.test(part)) {
           // Preserve whitespace as a plain text node (no span wrapper)
-          result.push({ type: 'text', value: part } as HastText);
+          const textNode: HastText = { type: 'text', value: part };
+          result.push(textNode);
         } else {
           // Wrap each word in <span class="flow-token">
-          result.push({
+          const spanNode: HastElement = {
             type: 'element',
             tagName: 'span',
             properties: { className: ['flow-token'] },
-            children: [{ type: 'text', value: part } as HastText],
-          } as HastElement);
+            children: [{ type: 'text', value: part }],
+          };
+          result.push(spanNode);
         }
       }
-    } else if (child.type === 'element') {
+    } else if (isElementNode(child)) {
       // Recurse into child elements
-      wrapTextNodes(child as HastElement);
+      wrapTextNodes(child);
       result.push(child);
     } else {
       // Pass through comments, doctypes, etc.

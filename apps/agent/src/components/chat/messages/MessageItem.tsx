@@ -36,6 +36,27 @@ const REHYPE_PLUGINS_STREAMING = [rehypeFlowTokens];
 // Mermaid plugin for diagram rendering - defined outside component for reference stability
 const STREAMDOWN_PLUGINS = { mermaid };
 
+/**
+ * Calculate dynamic animation duration based on content length.
+ *
+ * Short responses get slower animations (0.8s) so each word is savored.
+ * Long responses get faster animations (0.4s) to stay out of the way.
+ * Linear interpolation between 0 and 800 characters.
+ *
+ * @param contentLength - Current length of the streaming content
+ * @returns Duration string like "0.6s", or undefined if not streaming
+ */
+function calculateFlowDuration(contentLength: number): string {
+  // Constants for the linear interpolation
+  const MAX_DURATION = 0.8; // seconds at 0 chars
+  const MIN_DURATION = 0.4; // seconds at 800+ chars
+  const THRESHOLD_CHARS = 800;
+
+  const ratio = Math.min(contentLength / THRESHOLD_CHARS, 1);
+  const duration = MAX_DURATION - ratio * (MAX_DURATION - MIN_DURATION);
+  return `${String(duration)}s`;
+}
+
 export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
   tools,
@@ -61,14 +82,9 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   // so completed messages carry zero extra DOM weight.
   const rehypePlugins = message.isStreaming ? REHYPE_PLUGINS_STREAMING : REHYPE_PLUGINS_STATIC;
 
-  // Dynamic animation speed: short responses get slower, more visible animations;
-  // long responses speed up so animation doesn't impede reading.
-  // Content naturally grows during streaming, so this accelerates organically.
-  //   0 chars   → 0.8s  (short reply, savor each word)
-  //   400 chars → 0.6s  (medium, balanced)
-  //   800+ chars → 0.4s (long output, stay out of the way)
+  // Dynamic animation speed based on content length (see calculateFlowDuration)
   const flowDuration = message.isStreaming
-    ? `${String(Math.max(0.4, Math.min(0.8, 0.8 - (animatedContent.length / 800) * 0.4)))}s`
+    ? calculateFlowDuration(animatedContent.length)
     : undefined;
 
   // Handle clicks on links in markdown content
