@@ -283,11 +283,9 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        // NOTE: We intentionally do NOT call tauri_plugin_decorum::init() here.
-        // The init() hook fires on ALL windows and crashes when a window has
-        // decorations(false) because it tries to position non-existent traffic lights.
-        // We only need the WebviewWindowExt trait for set_traffic_lights_inset(),
-        // which works independently without the plugin init.
+        // NOTE: We do NOT call tauri_plugin_decorum::init() - it crashes on
+        // decoration-less windows (like our browser). We manually position
+        // traffic lights using the WebviewWindowExt trait instead.
         .plugin(tauri_plugin_window_state::Builder::new().build())
         // Setup event callbacks for agent and configure window
         .setup(move |app| {
