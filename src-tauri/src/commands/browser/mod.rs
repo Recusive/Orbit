@@ -70,6 +70,38 @@ use crate::core::sentry_utils::SentryCapture as _;
 
 type Result<T> = StdResult<T, String>;
 
+/// Convert parent-relative logical coordinates to screen coordinates.
+///
+/// The DOM provides bounds in **logical** CSS pixels via `getBoundingClientRect()`.
+/// Tauri's `outer_position()` returns **physical** pixels. On HiDPI displays,
+/// these differ by the scale factor. This function:
+/// 1. Gets the window's scale factor
+/// 2. Converts the physical parent position to logical coordinates
+/// 3. Adds the logical DOM bounds
+///
+/// Returns `(screen_x, screen_y)` in logical coordinates for use with `LogicalPosition`.
+fn to_screen_coords(
+    main_window: &tauri::WebviewWindow,
+    relative_x: f64,
+    relative_y: f64,
+) -> Result<(f64, f64)> {
+    // Get scale factor for physical-to-logical conversion
+    let scale = main_window
+        .scale_factor()
+        .map_err(|e| format!("Failed to get scale factor: {e}"))?;
+
+    // Get parent position in physical pixels
+    let physical_pos = main_window
+        .outer_position()
+        .map_err(|e| format!("Failed to get parent position: {e}"))?;
+
+    // Convert physical position to logical coordinates, then add the relative offset
+    let logical_x = f64::from(physical_pos.x) / scale + relative_x;
+    let logical_y = f64::from(physical_pos.y) / scale + relative_y;
+
+    Ok((logical_x, logical_y))
+}
+
 /// Timeout for waiting on JavaScript evaluation results.
 const JS_EVAL_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -215,18 +247,13 @@ pub async fn browser_create(
         .get_webview_window("main")
         .ok_or("Main window not found")?;
 
-    // Convert parent-relative coordinates to screen coordinates
-    // Child windows use screen coordinates, not parent-relative coordinates
-    let parent_pos = main_window
-        .outer_position()
-        .map_err(|e| format!("Failed to get parent position: {e}"))?;
-    let screen_x = f64::from(parent_pos.x) + x;
-    let screen_y = f64::from(parent_pos.y) + y;
+    // Convert parent-relative logical coordinates to screen coordinates
+    // Handles HiDPI scaling: DOM bounds are logical, window position is physical
+    let (screen_x, screen_y) = to_screen_coords(&main_window, x, y)?;
 
     log::debug!(
-        "Browser position: parent=({}, {}), relative=({x}, {y}), screen=({screen_x}, {screen_y})",
-        parent_pos.x,
-        parent_pos.y
+        "Browser position: relative=({x}, {y}), screen=({screen_x}, {screen_y}), scale={}",
+        main_window.scale_factor().unwrap_or(1.0_f64)
     );
 
     // Parse the URL
@@ -397,15 +424,11 @@ pub async fn browser_set_bounds(
         .get_webview_window(BROWSER_WINDOW_LABEL)
         .ok_or("Browser window not found")?;
 
-    // Convert parent-relative coordinates to screen coordinates
+    // Convert parent-relative logical coordinates to screen coordinates (HiDPI-aware)
     let main_window = app
         .get_webview_window("main")
         .ok_or("Main window not found")?;
-    let parent_pos = main_window
-        .outer_position()
-        .map_err(|e| format!("Failed to get parent position: {e}"))?;
-    let screen_x = f64::from(parent_pos.x) + x;
-    let screen_y = f64::from(parent_pos.y) + y;
+    let (screen_x, screen_y) = to_screen_coords(&main_window, x, y)?;
 
     window
         .set_position(LogicalPosition::new(screen_x, screen_y))
@@ -672,20 +695,18 @@ pub async fn browser_show(app: AppHandle, state: State<'_, Arc<BrowserWindowStat
         .get_webview_window(BROWSER_WINDOW_LABEL)
         .ok_or("Browser window not found")?;
 
-    // Get parent position for coordinate conversion
-    let parent_pos = app
-        .get_webview_window("main")
-        .and_then(|w| w.outer_position().ok());
+    // Get main window for coordinate conversion (HiDPI-aware)
+    let main_window = app.get_webview_window("main");
 
     // Read bounds once for both restore and repaint operations (DRY)
     let saved_bounds = *state.last_bounds.lock();
 
     // Restore bounds before showing (convert to screen coordinates)
     if let Some(bounds) = saved_bounds {
-        if let Some(pos) = parent_pos {
-            let screen_x = f64::from(pos.x) + bounds.x;
-            let screen_y = f64::from(pos.y) + bounds.y;
-            let _ = window.set_position(LogicalPosition::new(screen_x, screen_y));
+        if let Some(main_win) = &main_window {
+            if let Ok((screen_x, screen_y)) = to_screen_coords(main_win, bounds.x, bounds.y) {
+                let _ = window.set_position(LogicalPosition::new(screen_x, screen_y));
+            }
         }
         let _ = window.set_size(LogicalSize::new(bounds.width, bounds.height));
     }
