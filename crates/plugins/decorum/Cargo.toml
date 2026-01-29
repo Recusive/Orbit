@@ -123,6 +123,7 @@ same_name_method = "deny"
 string_add = "deny"
 
 [dependencies]
+log = "0.4"
 tauri = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -148,6 +149,9 @@ objc2-foundation = { version = "0.3", features = [
 ] }
 # Required for CGPoint, CGRect, CGSize types
 objc2-core-foundation = "0.3"
+# Required for CAFrameRateRange struct (ProMotion 120Hz support)
+# CADisplayLink itself is obtained via raw msg_send from NSScreen (macOS API)
+objc2-quartz-core = { version = "0.3", features = ["CAFrameRateRange"] }
 
 [build-dependencies]
 tauri-plugin = { version = "2", features = ["build"] }

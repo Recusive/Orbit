@@ -24,6 +24,8 @@ use tauri::Error;
 use tauri::{Runtime, WebviewWindow};
 
 #[cfg(target_os = "macos")]
+mod promotion;
+#[cfg(target_os = "macos")]
 mod traffic;
 
 /// Extensions to [`tauri::WebviewWindow`] for window decoration control.
@@ -49,6 +51,25 @@ pub trait WebviewWindowExt {
     /// Decoration-less windows return `Ok` without making changes.
     #[cfg(target_os = "macos")]
     fn set_traffic_lights_inset(&self, x: f32, y: f32) -> Result<&WebviewWindow, Error>;
+
+    /// Enable `ProMotion` 120Hz rendering on macOS.
+    ///
+    /// Creates a background `CADisplayLink` that requests 120Hz from the
+    /// `ProMotion` display controller. This is a process-wide operation —
+    /// only the first call takes effect, subsequent calls are no-ops.
+    ///
+    /// # Compatibility
+    ///
+    /// - **macOS 14+**: Display link created (runs at system default rate)
+    /// - **macOS 15+**: Explicit 120Hz preference via `preferredFrameRateRange`
+    /// - **Pre-macOS 14**: Silent no-op
+    /// - **Non-ProMotion displays**: Silent no-op
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be dispatched to the main thread.
+    #[cfg(target_os = "macos")]
+    fn enable_promotion(&self) -> Result<(), Error>;
 }
 
 impl WebviewWindowExt for WebviewWindow {
@@ -75,6 +96,25 @@ impl WebviewWindowExt for WebviewWindow {
 
             Ok(win)
         })
+    }
+
+    #[cfg(target_os = "macos")]
+    fn enable_promotion(&self) -> Result<(), Error> {
+        if is_main_thread() {
+            promotion::enable_promotion();
+            if let Ok(ns_window) = self.ns_window() {
+                promotion::unlock_webview_framerate(ns_window);
+            }
+        } else {
+            let win = self.clone();
+            self.run_on_main_thread(move || {
+                promotion::enable_promotion();
+                if let Ok(ns_window) = win.ns_window() {
+                    promotion::unlock_webview_framerate(ns_window);
+                }
+            })?;
+        }
+        Ok(())
     }
 }
 

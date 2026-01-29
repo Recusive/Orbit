@@ -7,6 +7,14 @@ import '@xyflow/react/dist/style.css';
 import './globals.css';
 import App from './App';
 
+// Enable React Scan in development to visualize component re-renders.
+// Must run before createRoot so it can instrument React internals.
+if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  void import('react-scan').then(({ scan }) => {
+    scan({ enabled: true, log: false });
+  });
+}
+
 // Initialize Sentry before rendering using shared config for consistency
 // This ensures release naming, privacy settings, and sampling rates match
 // Canvas and Editor apps which also use getSentryConfig

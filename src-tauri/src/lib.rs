@@ -302,6 +302,10 @@ pub fn run() {
                 if let Some(window) = app.get_webview_window("main") {
                     // Center vertically in 35px header: (35 - 14) / 2 = 10.5
                     drop(window.set_traffic_lights_inset(11.0, 10.5));
+
+                    // Enable ProMotion 120Hz on supported displays.
+                    // Creates a dummy CADisplayLink that keeps the display at max refresh rate.
+                    drop(window.enable_promotion());
                 }
             }
 
