@@ -91,16 +91,33 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
 
   // Calculate popover position from trigger's viewport rect.
   // useLayoutEffect ensures position is set before paint to prevent flicker.
-  useLayoutEffect(() => {
-    if (!isOpen || !triggerRef.current) return;
+  // Also recalculates on window resize/scroll while open to keep alignment.
+  // (Code review: Opus cycle 1, issues #2 & #3)
+  const updatePosition = useCallback((): void => {
+    if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    // Use bottom (distance from viewport bottom) so transform is free for animations.
-    // The popover sits above the trigger: viewport height - trigger top + gap.
     setPosition({
       bottom: window.innerHeight - rect.top + POPOVER_GAP,
       left: rect.left,
     });
-  }, [isOpen]);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    updatePosition();
+  }, [isOpen, updatePosition]);
+
+  // Reposition popover on window resize/scroll while open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen, updatePosition]);
 
   // Handle closing with exit animation
   const handleClose = useCallback((): void => {
@@ -112,8 +129,11 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     }, POPOVER_ANIMATION.exitDurationMs);
   }, [isOpen, isAnimatingOut]);
 
-  // Close popover when clicking outside
+  // Close popover when clicking outside or pressing Escape
+  // Escape key is standard UX for dismissing popovers (code review: Opus cycle 1, issue #3)
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleClickOutside = (e: MouseEvent): void => {
       if (
         popoverRef.current &&
@@ -125,11 +145,20 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClose();
+        // Return focus to trigger button after closing
+        triggerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, handleClose]);
 
@@ -158,6 +187,8 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   const popoverContent = isOpen ? (
     <div
       ref={popoverRef}
+      role="listbox"
+      aria-label="Select model"
       className={cn(
         'fixed bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50',
         'origin-bottom-left',

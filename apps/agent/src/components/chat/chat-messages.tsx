@@ -4,13 +4,14 @@
  * NOTE: Chat container widths come from @/lib/utils/constants.
  * To change chat max-width, update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStickToBottom } from 'use-stick-to-bottom';
 
 import { MessageItem } from './messages';
 import { QueuedMessageBubble } from './queued-message';
 
 import type { ChatMessage } from './messages';
+import type { ToolExecution } from '@/stores/agent/tool-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { FC } from 'react';
 
@@ -217,6 +218,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       // Without this, a ResizeObserver callback racing the scroll event's
       // setTimeout(..., 1) can cause the resizeDifference guard to swallow
       // the scroll event — leaving isAtBottom=true at scrollTop=0.
+      // NOTE: This workaround depends on use-stick-to-bottom's internal timing.
+      // If the library updates its ResizeObserver scheduling, this may need
+      // revisiting. (Code review: Opus cycle 1, issue #12)
       stopScroll();
     }
 
@@ -267,6 +271,48 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // middleware stack — causing tool widgets to not appear until completion.
   const activeTools = useActiveTools();
   const completedTools = useCompletedTools();
+
+  // Memoize tools-per-message: build a Map<messageId, ToolExecution[]> once per
+  // activeTools/completedTools change, then O(1) lookup per message render.
+  // Without this, deduplicateAndSortTools() runs O(messages x tools) per cycle.
+  // (Code review: Opus cycle 1, issue #1)
+  const toolsByMessageId = useMemo(() => {
+    const activeByMsg = new Map<string, ToolExecution[]>();
+    const completedByMsg = new Map<string, ToolExecution[]>();
+
+    for (const tool of Object.values(activeTools)) {
+      const list = activeByMsg.get(tool.messageId);
+      if (list) {
+        list.push(tool);
+      } else {
+        activeByMsg.set(tool.messageId, [tool]);
+      }
+    }
+
+    for (const tool of completedTools) {
+      const list = completedByMsg.get(tool.messageId);
+      if (list) {
+        list.push(tool);
+      } else {
+        completedByMsg.set(tool.messageId, [tool]);
+      }
+    }
+
+    // Merge all message IDs and deduplicate+sort per message
+    const allMessageIds = new Set([...activeByMsg.keys(), ...completedByMsg.keys()]);
+    const result = new Map<string, ToolExecution[]>();
+    for (const messageId of allMessageIds) {
+      result.set(
+        messageId,
+        deduplicateAndSortTools(
+          activeByMsg.get(messageId) ?? [],
+          completedByMsg.get(messageId) ?? []
+        )
+      );
+    }
+
+    return result;
+  }, [activeTools, completedTools]);
 
   // Rotating loading message for a bit of personality (fallback)
   const rotatingMessage = useRotatingMessage(isLoading);
@@ -330,11 +376,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           // Check if this message should animate (newly sent user message)
           const shouldAnimate = animatingMessageIds.has(msg.id);
 
-          // Compute tools for this message from selector values directly.
-          // This bypasses the store's get() which lags behind in persist(immer(...)).
-          const activeForMsg = Object.values(activeTools).filter((t) => t.messageId === msg.id);
-          const completedForMsg = completedTools.filter((t) => t.messageId === msg.id);
-          const tools = deduplicateAndSortTools(activeForMsg, completedForMsg);
+          // O(1) lookup from memoized Map (code review: Opus cycle 1, issue #1)
+          const tools = toolsByMessageId.get(msg.id) ?? [];
 
           return (
             <MessageItem

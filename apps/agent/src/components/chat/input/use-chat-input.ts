@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { THINKING_MODE_DOTS, THINKING_MODE_INFO, THINKING_MODES } from './constants';
@@ -12,6 +13,8 @@ import { cn } from '@/lib/utils';
 import { compressImage } from '@/lib/utils/image-utils';
 import { useSlashCommands, useCommandsStore } from '@/stores/agent';
 import { useElementContexts, useBrowserStore } from '@/stores/browser/browser-store';
+
+const logger = createLogger('ChatInput');
 
 export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const {
@@ -194,7 +197,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
           setAttachedContext((prev) => [...prev, newContext]);
         })
         .catch((error: unknown) => {
-          console.error('[ImageCompression] Failed to compress image:', error);
+          logger.error('Failed to compress image', error);
         });
     });
 

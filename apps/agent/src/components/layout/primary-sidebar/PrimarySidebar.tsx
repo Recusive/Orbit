@@ -42,6 +42,14 @@ import {
   useCreateWorktreeDialogOpen,
 } from '@/stores/ui/ui-store';
 
+/** Evaluated once at module load -- the OS preference is static for the session lifetime. */
+const PREFERS_REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Width transition CSS for the sidebar, gated on reduced-motion preference. */
+const SIDEBAR_WIDTH_TRANSITION = PREFERS_REDUCED_MOTION
+  ? 'none'
+  : 'width 200ms cubic-bezier(0.165, 0.84, 0.44, 1)';
+
 // Lazy load heavy components
 const LazySettingsDialog = lazy(() =>
   import('@/components/modals/settings/SettingsDialog').then((m) => ({
@@ -118,7 +126,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       className="h-full flex flex-col bg-card overflow-hidden border-r border-divider shadow-lg dark:shadow-none"
       style={{
         width,
-        transition: 'width 200ms cubic-bezier(0.165, 0.84, 0.44, 1)',
+        transition: SIDEBAR_WIDTH_TRANSITION,
         contain: 'layout style',
       }}
     >

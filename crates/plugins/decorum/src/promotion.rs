@@ -86,7 +86,11 @@ fn ensure_quartz_core_loaded() {
 /// # Safety
 ///
 /// Called by the Objective-C runtime on every display refresh.
-const unsafe extern "C" fn promotion_step(_this: *mut AnyObject, _sel: Sel, _sender: *mut c_void) {
+// Allow clippy nursery suggestion: `const` is semantically misleading for a
+// runtime callback — it's never used in const-eval context.
+// (Code review: Opus cycle 1, issue #4)
+#[allow(clippy::missing_const_for_fn)]
+unsafe extern "C" fn promotion_step(_this: *mut AnyObject, _sel: Sel, _sender: *mut c_void) {
     // Intentionally empty — the display link's existence in the run loop
     // is sufficient to request 120Hz from the ProMotion controller.
 }
@@ -182,6 +186,12 @@ fn try_enable_promotion() -> bool {
     log::debug!("ProMotion: preferredFrameRateRange set to (80, 120, 120)");
 
     // Step 6: Add to main run loop in common modes
+    // NOTE: We pass the string literal "kCFRunLoopCommonModes" here, which
+    // coincidentally matches the actual value of the Core Foundation constant
+    // `kCFRunLoopCommonModes`. The objc2-foundation crate doesn't expose
+    // NSRunLoopMode::commonModes() for this context, so we rely on the
+    // constant's value being identical to its name (stable since macOS 10.0).
+    // (Code review: Opus cycle 1, issue #5)
     let main_run_loop = NSRunLoop::mainRunLoop();
     let common_modes = NSString::from_str("kCFRunLoopCommonModes");
     unsafe {

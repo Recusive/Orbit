@@ -4,9 +4,6 @@
 import { Plus } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 
-/** Indentation for conversation items nested under workspace (px) */
-const CONVERSATION_INDENT_PX = 19;
-
 import { ConversationItem } from './ConversationItem';
 import { WorkspaceItem } from './WorkspaceItem';
 
@@ -16,6 +13,9 @@ import type { FC } from 'react';
 
 import { WorktreeItem } from '@/components/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
+/** Indentation for conversation items nested under workspace (px) */
+const CONVERSATION_INDENT_PX = 19;
 
 interface ConversationListProps {
   readonly conversations: ConversationSummary[];
@@ -203,7 +203,11 @@ export const ConversationList: FC<ConversationListProps> = ({
                     onRemoveWorktree(wt.worktree);
                   }}
                 />
-                {/* Conversations for this worktree — kept mounted, toggled via CSS to avoid remount cost */}
+                {/* Conversations for this worktree — kept mounted, toggled via CSS to avoid remount cost.
+                    NOTE: With display:none, React hooks/subscriptions in ConversationItem remain active.
+                    For typical usage (<50 conversations), this is fine. For very large lists (200+),
+                    consider unmounting collapsed worktrees or virtualizing the list.
+                    (Code review: Opus cycle 1, issue #8) */}
                 <div style={{ display: wt.isExpanded ? 'block' : 'none' }}>
                   {renderConversations(getWorktreeConversations(wt.worktree.path))}
                 </div>

@@ -43,6 +43,14 @@ export const EditorLayout: FC = () => {
   // Frame 2: inner ResizablePanelGroup (vertical) computes content/terminal heights
   // Without this, EmptyState ("No file open") briefly appears at the top of the
   // editor area instead of centered, because the panel has no height yet.
+  //
+  // WHY 2 FRAMES: The nested ResizablePanelGroup layout is calculated in two
+  // passes — the outer group needs one frame to resolve its width before the
+  // inner group can calculate its height. A single RAF would only cover the
+  // first pass. A ResizeObserver on the container would be more deterministic,
+  // but the 2-frame approach is simpler and works reliably across Chromium-
+  // based renderers (Tauri uses WebKit, which follows the same RAF model).
+  // (Code review: Opus cycle 1, issue #6)
   const [mountReady, setMountReady] = useState(false);
   useEffect(() => {
     let cancelled = false;

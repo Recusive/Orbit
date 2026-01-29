@@ -322,11 +322,14 @@ export function deduplicateAndSortTools(
     return [];
   }
 
-  // Deduplicate by tool ID (keep latest version of each)
+  // Deduplicate by tool ID (keep latest version of each).
+  // Precedence: completed always wins over active for same ID (a completed
+  // tool is always "more recent" than an active one); otherwise prefer the
+  // entry with the newer startedAt timestamp.
+  // (Code review: Opus cycle 1, issue #10)
   const toolMap = new Map<string, ToolExecution>();
   for (const tool of [...active, ...completed]) {
     const existing = toolMap.get(tool.id);
-    // Keep the tool if it's newer or has more complete status
     if (
       !existing ||
       tool.startedAt > existing.startedAt ||

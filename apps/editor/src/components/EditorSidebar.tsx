@@ -13,6 +13,7 @@
  */
 import { FlaskConical, Settings } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { FC } from 'react';
@@ -91,13 +92,22 @@ interface EditorSidebarProps {
 }
 
 export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
+  // Use useShallow to prevent re-renders when unrelated store state changes
   const {
     toggleLeftSidebar,
     settingsDialogOpen,
     settingsDialogSection,
     setSettingsDialogOpen,
     openSettings,
-  } = useUIStore();
+  } = useUIStore(
+    useShallow((s) => ({
+      toggleLeftSidebar: s.toggleLeftSidebar,
+      settingsDialogOpen: s.settingsDialogOpen,
+      settingsDialogSection: s.settingsDialogSection,
+      setSettingsDialogOpen: s.setSettingsDialogOpen,
+      openSettings: s.openSettings,
+    }))
+  );
   // Detect isCollapsed state from width (same pattern as PrimarySidebar)
   const isCollapsed = useIsLeftSidebarCollapsed();
 
@@ -107,6 +117,9 @@ export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
   // when parent switches from display:none → display:block.
   // The browser treats the computed width going from "nothing" to the
   // target as a change, firing the CSS transition (sidebar slides open).
+  // A single RAF suffices here (unlike EditorLayout's 2-frame delay)
+  // because only the sidebar's width needs to resolve — no nested layout
+  // passes are involved. (Code review: Opus cycle 1, issue #7)
   const [mountReady, setMountReady] = useState(false);
   useEffect(() => {
     // Enable transitions after first paint

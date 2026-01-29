@@ -66,7 +66,7 @@ export const VaultPage: FC = () => {
                 className="w-full h-8 pl-9 pr-4 rounded-md bg-card border border-border/50 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-border/50 transition-colors"
               />
             </div>
-            <button className="h-8 px-3 rounded-md bg-card border border-border/50 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border hover:bg-card/80 active:scale-[0.97] transition-all duration-150">
+            <button className="h-8 px-3 rounded-md bg-card border border-border/50 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-border hover:bg-card/80 active:scale-[0.97] transition-[background-color,color,border-color,transform] duration-150">
               Search
             </button>
           </div>

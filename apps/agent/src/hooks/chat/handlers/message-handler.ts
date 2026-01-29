@@ -500,7 +500,13 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                 }
               : undefined;
 
-            // Get completed tools for this message to persist alongside the message
+            // Get completed tools for this message to persist alongside the message.
+            // NOTE: getState() returns the latest committed state (external call, not
+            // the closured get()). getToolsForMessage() uses the internal get(), which
+            // CAN be stale under persist(immer(...)). However, this runs during
+            // agent:complete handling — AFTER completeTool() has committed — so the
+            // immer middleware has already flushed and get() is current here.
+            // (Code review: Codex cycle 1, issue #3)
             const toolState = useToolStore.getState();
             const messageTools = toolState.getToolsForMessage(completedMsg.id);
             const toolUsesDto =

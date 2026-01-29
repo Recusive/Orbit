@@ -26,9 +26,7 @@ const commonPaths = [
 const currentPath = process.env.PATH ?? '';
 const pathSet = new Set(currentPath.split(':'));
 for (const p of commonPaths) {
-  if (!pathSet.has(p)) {
-    pathSet.add(p);
-  }
+  pathSet.add(p);
 }
 process.env.PATH = Array.from(pathSet).join(':');
 
@@ -323,8 +321,20 @@ function main(): void {
 
   function gracefulShutdown(reason: string): void {
     logger.info(`${reason}, shutting down...`);
-    sessionManager.dispose();
-    canvasSessionManager.dispose();
+    // Wrap dispose calls in try/catch — if dispose throws synchronously,
+    // the process could exit with code 1 before the grace timeout fires,
+    // potentially corrupting session state files.
+    // (Code review: Opus cycle 1, issue #11)
+    try {
+      sessionManager.dispose();
+    } catch (e) {
+      logger.error({ error: e }, 'sessionManager.dispose() failed');
+    }
+    try {
+      canvasSessionManager.dispose();
+    } catch (e) {
+      logger.error({ error: e }, 'canvasSessionManager.dispose() failed');
+    }
     // Allow async disposal (stopSession/interrupt) to complete before hard exit
     setTimeout(() => process.exit(0), SHUTDOWN_GRACE_MS);
   }

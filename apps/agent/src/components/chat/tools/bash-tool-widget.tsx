@@ -1,7 +1,14 @@
 import { ChevronDown, Loader2, Terminal } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { codeToHtml } from 'shiki';
+
+import {
+  TOOL_CARD_BASE,
+  TOOL_CHEVRON_BASE,
+  TOOL_EXPAND_TRANSITION,
+  TOOL_EXPAND_TRANSITION_NONE,
+} from './shared';
 
 import type { FC } from 'react';
 
@@ -58,6 +65,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
 }) => {
   const isDarkMode = useIsDarkMode();
   const isFailed = success === false;
+  const shouldReduceMotion = useReducedMotion();
   // Start expanded if running, collapsed if already completed (restored from persistence)
   const [isExpanded, setIsExpanded] = useState(isRunning);
   const [highlightedCommand, setHighlightedCommand] = useState<string>('');
@@ -110,7 +118,8 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
     <div>
       <div
         className={cn(
-          'bg-card overflow-hidden rounded-lg shadow-md',
+          TOOL_CARD_BASE,
+          'rounded-lg shadow-md',
           isFailed
             ? 'border-2 border-dotted border-destructive/40 opacity-60'
             : 'border border-border/50'
@@ -152,25 +161,17 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
               <span className="text-xs text-destructive/60">Failed</span>
             ) : null}
           </div>
-          <ChevronDown
-            className={cn(
-              'h-3 w-3 text-muted-foreground/60 transition-transform duration-200',
-              isExpanded && 'rotate-180'
-            )}
-          />
+          <ChevronDown className={cn(TOOL_CHEVRON_BASE, isExpanded && 'rotate-180')} />
         </button>
 
         {/* Collapsible content */}
         <AnimatePresence initial={false} mode="wait">
           {isExpanded ? (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
+              initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{
-                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
-                opacity: { duration: 0.15, ease: 'easeOut' },
-              }}
+              exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+              transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
               style={{ overflow: 'hidden' }}
             >
               {/* Command section */}

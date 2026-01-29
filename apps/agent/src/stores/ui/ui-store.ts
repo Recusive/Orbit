@@ -635,7 +635,11 @@ export const useUIStore = create<UIStore>()(
           worktreeState.isExpanded = !worktreeState.isExpanded;
         }
       });
-      // Defer persistence so React can commit the state update first
+      // Defer persistence to the next microtask. The immer middleware commits
+      // synchronously, so get() will return the updated state here. The deferral
+      // ensures persistence happens outside the set() call stack, avoiding any
+      // potential issues with React's batched rendering seeing intermediate state.
+      // (Code review: Opus cycle 1, issue #9)
       queueMicrotask(() => {
         saveWorktreesToStorage(get().worktrees);
       });

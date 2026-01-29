@@ -908,6 +908,13 @@ html.dark [data-streamdown='code-block-body'] code span::before {
     animation: none !important;
   }
 
+  /* Tool card chevron rotation and hover transitions.
+     The .tool-chevron class is applied via TOOL_CHEVRON_BASE in
+     components/chat/tools/shared/constants.ts */
+  .tool-chevron {
+    transition: none;
+  }
+
   /* Sidebar width transition - instant toggle for reduced motion */
   [data-sidebar="primary"],
   [data-sidebar="editor-primary"] {
