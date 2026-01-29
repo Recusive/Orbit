@@ -5,6 +5,7 @@
  * To change chat max-width, update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts.
  */
 import { useEffect, useRef, useState } from 'react';
+import { useStickToBottom } from 'use-stick-to-bottom';
 
 import { MessageItem } from './messages';
 import { QueuedMessageBubble } from './queued-message';
@@ -17,7 +18,7 @@ import type { FC } from 'react';
 import { HyperText } from '@/components/ui/hyper-text';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
-import { useRunningTool } from '@/stores/agent/tool-store';
+import { useRunningTool, useToolRevision } from '@/stores/agent/tool-store';
 
 // Rotating loading messages - fun tech-themed phrases (fallback when no tool is running)
 const LOADING_MESSAGES = [
@@ -172,13 +173,19 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   onCancelQueue,
   onFeedback,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const shouldAutoScroll = useRef(true);
+  // use-stick-to-bottom handles all scroll behavior:
+  // - Sticks to bottom during streaming (ResizeObserver-based)
+  // - Detects user scroll-up to cancel stickiness
+  // - Velocity-based spring animation for smooth content growth
+  // - Scroll anchoring when content above viewport resizes
+  const { scrollRef, contentRef, scrollToBottom } = useStickToBottom({
+    // Smooth spring animation when content resizes (tool expand/collapse)
+    resize: 'smooth',
+    // Smooth initial scroll on mount
+    initial: 'smooth',
+  });
+
   const prevSessionIdRef = useRef(sessionId);
-  const hasResetScrollRef = useRef(false);
-  // Track streaming state for ResizeObserver (code review issue #4)
-  const isStreamingRef = useRef(false);
 
   // Track message IDs that should animate (newly sent user messages)
   // Using STATE (not ref) ensures animation class is applied on same render (code review: Codex cycle 2 #2)
@@ -200,16 +207,15 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     setAnimatingMessageIds(new Set());
     knownMessageIds.current.clear();
 
-    // Reset scroll position
-    if (containerRef.current) {
-      shouldAutoScroll.current = true;
-      containerRef.current.scrollTop = 0;
+    // Reset scroll position to top for new conversation
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollTop = 0;
     }
-    hasResetScrollRef.current = true;
 
     // Update ref AFTER all mutations
     prevSessionIdRef.current = sessionId;
-  }, [sessionId]);
+  }, [sessionId, scrollRef]);
 
   // Detect newly added user messages and mark them for animation
   // CRITICAL: We track by message ID, not array length. This prevents:
@@ -234,8 +240,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (newUserMessages.length === 1 && newUserMessages[0] !== undefined) {
       const newId = newUserMessages[0];
       setAnimatingMessageIds((prev) => new Set(prev).add(newId));
+      // Scroll to bottom when user sends a new message
+      void scrollToBottom();
     }
-  }, [messages]);
+  }, [messages, scrollToBottom]);
 
   // Loading state - shown while agent is running
   // Note: Animation interval was removed for performance. Streaming effect is now
@@ -246,6 +254,11 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // (Uses dedicated selector for better encapsulation - code review cycle 2, issue #1)
   const runningTool = useRunningTool();
 
+  // Subscribe to tool revision counter to force re-render when tools change.
+  // getToolsForMessage is a stable function reference (never triggers re-renders on its own),
+  // so we need this counter to know when to re-call it with fresh store state.
+  useToolRevision();
+
   // Rotating loading message for a bit of personality (fallback)
   const rotatingMessage = useRotatingMessage(isLoading);
 
@@ -253,21 +266,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const loadingMessage = runningTool
     ? getToolStatusMessage(runningTool.toolName, runningTool.toolInput)
     : rotatingMessage;
-
-  // Track last message content length for scroll dependency
-  const lastMessage = messages[messages.length - 1];
-  const lastMessageContentLength = lastMessage?.displayedContent.length ?? 0;
-
-  // Update streaming ref for ResizeObserver (code review issue #4)
-  // Use ref so ResizeObserver callback can access current streaming state
-  isStreamingRef.current = lastMessage?.isStreaming === true;
-
-  // Instant scroll during streaming - this is the PRIMARY scroll mechanism
-  // ResizeObserver below handles layout changes (tool expand/collapse)
-  useEffect(() => {
-    if (!shouldAutoScroll.current || !containerRef.current) return;
-    containerRef.current.scrollTop = containerRef.current.scrollHeight;
-  }, [messages.length, lastMessageContentLength]);
 
   // Track active animation cleanup timeouts per message ID (code review: Opus #3)
   // Using individual timeouts prevents rapid messages from clearing each other's animations
@@ -304,89 +302,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     };
   }, []);
 
-  // Track manual scrolling - disable auto-scroll if user scrolls up
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const handleScroll = (): void => {
-      const { scrollHeight, clientHeight, scrollTop } = el;
-      const isNearBottom = scrollHeight - clientHeight - scrollTop < 100;
-      const wasNotAutoScrolling = !shouldAutoScroll.current;
-      shouldAutoScroll.current = isNearBottom;
-
-      // Catch up when user re-engages auto-scroll (code review issue #10)
-      // This prevents the "jump" when scrolling back down during streaming
-      if (wasNotAutoScrolling && isNearBottom) {
-        el.scrollTop = el.scrollHeight;
-      }
-    };
-
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      el.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
-
-  // ResizeObserver handles layout changes (tool expand/collapse, permission bar)
-  // NOT for streaming content - the useEffect above handles that with instant scroll
-  // CONSOLIDATED: Single observer watches both elements (code review: Opus #4)
-  useEffect(() => {
-    const content = contentRef.current;
-    const container = containerRef.current;
-    if (!content || !container) return;
-
-    let scrollTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    // Check prefers-reduced-motion (code review: Codex #2)
-    // Users who opt out of motion should get instant scroll, not smooth
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    // Debounced scroll for layout changes (not streaming)
-    // Uses smooth scroll unless user prefers reduced motion
-    const scheduleScroll = (): void => {
-      if (!shouldAutoScroll.current) return;
-
-      // Clear any pending scroll
-      if (scrollTimeoutId !== null) {
-        clearTimeout(scrollTimeoutId);
-      }
-
-      // Short debounce to let layout settle, then scroll
-      scrollTimeoutId = setTimeout(() => {
-        if (shouldAutoScroll.current) {
-          container.scrollTo({
-            top: container.scrollHeight,
-            // Respect prefers-reduced-motion: use instant scroll if reduced motion enabled
-            behavior: prefersReducedMotion ? 'auto' : 'smooth',
-          });
-        }
-        scrollTimeoutId = null;
-      }, 50);
-    };
-
-    // Single ResizeObserver watching both content and container
-    // The callback receives entries for all observed elements
-    const resizeObserver = new ResizeObserver(() => {
-      // Skip during streaming - the instant scroll useEffect handles that
-      if (isStreamingRef.current) return;
-      scheduleScroll();
-    });
-
-    resizeObserver.observe(content);
-    resizeObserver.observe(container);
-
-    return () => {
-      if (scrollTimeoutId !== null) {
-        clearTimeout(scrollTimeoutId);
-      }
-      resizeObserver.disconnect();
-    };
-  }, []);
-
   return (
     <div
-      ref={containerRef}
+      ref={scrollRef}
       className="flex-1 overflow-y-auto overflow-x-hidden p-4"
       style={{ scrollbarGutter: 'stable both-edges' }}
     >
