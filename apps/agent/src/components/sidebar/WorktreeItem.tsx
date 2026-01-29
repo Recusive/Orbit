@@ -22,11 +22,12 @@ import { cn, SIDEBAR, TRANSITIONS } from '@/lib/utils';
 // Hoisted RegExp for path splitting (avoids recreation on each render)
 const PATH_SEPARATOR_RE = /[/\\]/;
 
-// Transition string builder (matches primary-sidebar pattern)
+// Transition: only animate opacity (GPU-friendly), width change is instant.
+// The sidebar container's overflow:hidden clips the content during width animation.
 const getCollapseTransition = (collapsed: boolean): string =>
   collapsed
-    ? `opacity 0ms, width ${TRANSITIONS.sidebar}`
-    : `width ${TRANSITIONS.sidebar}, opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
+    ? 'opacity 0ms'
+    : `opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
 
 interface WorktreeItemProps {
   readonly worktreeState: WorktreeUIState;

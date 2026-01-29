@@ -3,12 +3,7 @@
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import * as React from 'react';
 
-import { cn } from '@/lib/utils';
-
-// Animation duration - keep under 200ms for responsiveness
-const ANIMATION_DURATION = '150ms';
-// Smooth ease-out curve: fast start, gentle end
-const ANIMATION_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)';
+import { cn, POPOVER_ANIMATION } from '@/lib/utils';
 
 const Popover = PopoverPrimitive.Root;
 
@@ -39,9 +34,8 @@ const PopoverContent = React.forwardRef<
         className
       )}
       style={{
-        // Custom timing for smoother, more responsive feel
-        animationDuration: ANIMATION_DURATION,
-        animationTimingFunction: ANIMATION_EASING,
+        animationDuration: POPOVER_ANIMATION.duration,
+        animationTimingFunction: POPOVER_ANIMATION.easing,
         ...style,
       }}
       {...props}

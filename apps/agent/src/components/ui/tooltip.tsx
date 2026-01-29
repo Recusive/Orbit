@@ -2,7 +2,7 @@ import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import * as React from 'react';
 import { createContext, useCallback, useRef } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn, POPOVER_ANIMATION } from '@/lib/utils';
 
 /**
  * Optimized TooltipProvider that reduces re-renders caused by Radix UI.
@@ -81,7 +81,7 @@ const TooltipTrigger = TooltipPrimitive.Trigger;
 const TooltipContent = React.forwardRef<
   React.ComponentRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
+>(({ className, sideOffset = 4, style, ...props }, ref) => (
   <TooltipPrimitive.Portal>
     <TooltipPrimitive.Content
       ref={ref}
@@ -90,8 +90,10 @@ const TooltipContent = React.forwardRef<
         'z-50 overflow-hidden rounded-md px-2 py-1 text-xs',
         'bg-foreground text-background',
         'dark:bg-[var(--tooltip-bg)] dark:text-[var(--tooltip-text)]',
-        'animate-in fade-in-0 zoom-in-95',
-        'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+        // Enter: zoom 97% → 100% + fade (matched to HoverCard & DropdownMenu)
+        'animate-in fade-in-0 zoom-in-[0.97]',
+        // Exit: reverse
+        'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97]',
         'data-[side=bottom]:slide-in-from-top-2',
         'data-[side=left]:slide-in-from-right-2',
         'data-[side=right]:slide-in-from-left-2',
@@ -99,6 +101,11 @@ const TooltipContent = React.forwardRef<
         'origin-[--radix-tooltip-content-transform-origin]',
         className
       )}
+      style={{
+        animationDuration: POPOVER_ANIMATION.duration,
+        animationTimingFunction: POPOVER_ANIMATION.easing,
+        ...style,
+      }}
       {...props}
     />
   </TooltipPrimitive.Portal>

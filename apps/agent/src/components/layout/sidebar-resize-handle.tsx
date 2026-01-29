@@ -85,7 +85,12 @@ export const SidebarResizeHandle: FC = () => {
     e.preventDefault();
 
     // Find the sidebar element first - if not found, bail out before setting any state
-    const sidebarElement = document.querySelector<HTMLElement>('[data-sidebar="primary"]');
+    // Find the sibling sidebar element. Both Agent ("primary") and Editor ("editor-primary")
+    // use this handle; query for either attribute on the previous sibling.
+    const sidebarElement =
+      (e.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(
+        '[data-sidebar="primary"], [data-sidebar="editor-primary"]'
+      ) ?? null;
     if (!sidebarElement) return;
 
     // Now safe to set dragging state since we have a valid element

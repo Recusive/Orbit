@@ -212,7 +212,10 @@ export const ChatArea: FC = () => {
   const showBottomTerminal = terminalPosition === 'both';
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-chat-area">
+    <div
+      className="flex-1 flex flex-col min-w-0 overflow-hidden bg-chat-area"
+      style={{ contain: 'layout style' }}
+    >
       {/* Full-width terminal layout */}
       <div
         className="flex-1 flex flex-col"

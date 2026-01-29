@@ -206,21 +206,35 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
   // ResizeObserver for panel - observe panelRef instead of terminal wrapper
   // This ensures resize events are captured when the Allotment panel changes size,
   // which propagates more reliably than observing the terminal wrapper with height: 100%
+  //
+  // PERF: Debounced with RAF to avoid calling expensive fitAddon.fit() on every
+  // frame during sidebar animation. The terminal only needs final dimensions.
   useEffect(() => {
     if (!activeSessionId || collapsed) return;
 
     const panel = panelRef.current;
     if (!panel) return;
 
+    let rafId: number | null = null;
+
     const observer = new ResizeObserver(() => {
-      const instance = terminalManager.getInstance(activeSessionId);
-      if (instance) {
-        instance.layout();
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
       }
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const instance = terminalManager.getInstance(activeSessionId);
+        if (instance) {
+          instance.layout();
+        }
+      });
     });
 
     observer.observe(panel);
     return () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
       observer.disconnect();
     };
   }, [activeSessionId, terminalManager, collapsed]);

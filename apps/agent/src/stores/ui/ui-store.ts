@@ -709,6 +709,10 @@ export const useUIStore = create<UIStore>()(
   }))
 );
 
+export const useLeftSidebarWidth = (): number => {
+  return useUIStore((state) => state.leftSidebarWidth);
+};
+
 export const useIsLeftSidebarCollapsed = (): boolean => {
   return useUIStore((state) => state.leftSidebarWidth <= SIDEBAR.collapsed);
 };

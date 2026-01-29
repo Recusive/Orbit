@@ -13,11 +13,12 @@ import { cn, TRANSITIONS } from '@/lib/utils';
 /** Gradient mask for text fade on hover (left-to-right fade at end) */
 const TITLE_HOVER_MASK = 'linear-gradient(to right, black 85%, transparent 98%)';
 
-// Transition string builder
+// Transition: only animate opacity (GPU-friendly), width change is instant.
+// The sidebar container's overflow:hidden clips the content during width animation.
 const getCollapseTransition = (collapsed: boolean): string =>
   collapsed
-    ? `opacity 0ms, width ${TRANSITIONS.sidebar}`
-    : `width ${TRANSITIONS.sidebar}, opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
+    ? 'opacity 0ms'
+    : `opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
 
 export const ConversationItem: FC<ConversationItemProps> = ({
   conversation,
@@ -126,7 +127,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
         {/* Text - truncate with ellipsis by default, gradient fade on hover */}
         <span
           className={cn(
-            'text-base overflow-hidden flex-1 text-left transition-[width,opacity] duration-150',
+            'text-base overflow-hidden flex-1 text-left',
             collapsed ? 'w-0 opacity-0 whitespace-nowrap' : '',
             // When not hovered: truncate with ellipsis
             // When hovered: allow full text with gradient mask

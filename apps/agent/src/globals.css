@@ -891,6 +891,34 @@ html.dark [data-streamdown='code-block-body'] code span::before {
     animation: none;
     opacity: 1;
   }
+
+  /* Tailwind built-in animations (pulse, spin, bounce, ping) */
+  .animate-pulse,
+  .animate-spin,
+  .animate-bounce,
+  .animate-ping {
+    animation: none !important;
+  }
+
+  /* tailwindcss-animate enter/exit animations (popover, dropdown, model-selector, etc.)
+     Belt-and-suspenders: override inline animationDuration/animationTimingFunction
+     that would otherwise survive the plugin's reduced-motion reset. */
+  .animate-in,
+  .animate-out {
+    animation: none !important;
+  }
+
+  /* Sidebar width transition - instant toggle for reduced motion */
+  [data-sidebar="primary"],
+  [data-sidebar="editor-primary"] {
+    transition: none;
+  }
+
+  /* Sidebar internal opacity transitions */
+  [data-sidebar="primary"] *,
+  [data-sidebar="editor-primary"] * {
+    transition: none;
+  }
 }
 
 /* Scrollbar styling for WKWebView */

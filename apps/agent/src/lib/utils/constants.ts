@@ -175,12 +175,67 @@ export const ANIMATION_DURATION = {
 } as const;
 
 /**
- * Transition configurations
+ * Transition configurations (inline style values)
  */
 export const TRANSITIONS = {
-  sidebar: `${String(ANIMATION_DURATION.normal)}ms ease-in-out`,
-  opacity: `${String(ANIMATION_DURATION.fast)}ms ease-in-out`,
+  /** Sidebar container width transition (paired with child opacity) */
+  sidebar: `${String(ANIMATION_DURATION.normal)}ms cubic-bezier(0.165, 0.84, 0.44, 1)`,
+  /** Child element opacity during sidebar collapse/expand */
+  opacity: `${String(ANIMATION_DURATION.fast)}ms ease-out`,
+  /** Delay before opacity starts (lets container begin moving first) */
   opacityDelay: 50,
+} as const;
+
+/**
+ * Popover / overlay animation configuration.
+ *
+ * Single source of truth for every enter/exit animation on tooltips,
+ * hover-cards, dropdown-menus, and custom popovers (ModelSelector).
+ *
+ * @see components/ui/tooltip.tsx
+ * @see components/ui/hover-card.tsx
+ * @see components/ui/dropdown-menu.tsx
+ * @see components/chat/input/model-selector.tsx
+ */
+export const POPOVER_ANIMATION = {
+  /** Duration in milliseconds (for JS timeouts — matches the longer of enter/exit) */
+  durationMs: 150,
+  /** Enter duration: rich 3-property animation needs a bit more time */
+  enterDuration: '150ms',
+  /** Exit duration: fade-only is perceived faster, so a shorter duration avoids lingering */
+  exitDuration: '100ms',
+  /** Exit duration in ms (for JS timeouts) */
+  exitDurationMs: 100,
+  /** Enter easing: ease-out (fast arrival, gentle settle) */
+  enterEasing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+  /** Exit easing: ease-in (gentle start, fast departure — opposite of enter) */
+  exitEasing: 'cubic-bezier(0.4, 0, 1, 1)',
+  /**
+   * Unified duration for Radix primitives (tooltip, hover-card, dropdown-menu, popover,
+   * context-menu) that apply a single animationDuration on a container whose enter/exit
+   * is toggled via data-[state=open/closed] CSS selectors.
+   *
+   * For custom popovers with JS-controlled enter/exit (like ModelSelector),
+   * prefer enterDuration / exitDuration + enterEasing / exitEasing instead.
+   */
+  duration: '150ms',
+  easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+} as const;
+
+/**
+ * Reusable Tailwind transition class patterns.
+ *
+ * These are the most common transition combinations used across input controls,
+ * dropdowns, and toolbar buttons. Centralised here to avoid divergence when
+ * updating timing or properties.
+ *
+ * @see InputControls, ModelSelector, ThinkingModeButton, MoreActionsMenu
+ */
+export const TRANSITION_CLASSES = {
+  /** Standard interactive button: bg-color + text color + transform at 150ms */
+  button: 'transition-[background-color,color,transform] duration-150',
+  /** Popover/dropdown list item: bg-color + transform at 150ms */
+  item: 'transition-[background-color,transform] duration-150',
 } as const;
 
 /**

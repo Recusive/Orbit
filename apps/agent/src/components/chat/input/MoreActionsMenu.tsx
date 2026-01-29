@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
+import { cn, TRANSITION_CLASSES } from '@/lib/utils';
 
 /**
  * Collapsed menu for secondary input actions (@, Thinking, Globe).
@@ -39,7 +39,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
           className={cn(
             'h-7 w-7 flex items-center justify-center rounded-lg',
             'bg-transparent text-muted-foreground/70',
-            'transition-[background-color,color,transform] duration-150',
+            TRANSITION_CLASSES.button,
             'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
             'active:scale-95',
             'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'

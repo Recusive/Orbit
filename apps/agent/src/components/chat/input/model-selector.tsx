@@ -1,22 +1,25 @@
 /**
  * ModelSelector - AI model dropdown selector
  *
+ * Uses a React portal to render the popover into document.body, escaping
+ * overflow:hidden / CSS containment on ancestor containers (ChatArea).
+ *
  * NOTE: Dropdown width comes from @/lib/utils/constants.
  * To change dropdown dimensions, update CHAT_WIDTH.dropdown in constants.ts.
  */
 import { Check, ChevronDown } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SiClaude, SiOpenai } from 'react-icons/si';
 
 import type { Model } from '@/types/protocol';
 import type { FC } from 'react';
 
-import { CHAT_WIDTH, cn } from '@/lib/utils';
+import { CHAT_WIDTH, cn, POPOVER_ANIMATION, TRANSITION_CLASSES } from '@/lib/utils';
 import { useModel, useToolStore } from '@/stores/agent/tool-store';
 
-// Animation duration - keep synced with CSS
-const ANIMATION_DURATION_MS = 150;
-const ANIMATION_DURATION = `${String(ANIMATION_DURATION_MS)}ms`;
+/** Gap between trigger and popover (matches the old mb-2 = 8px) */
+const POPOVER_GAP = 8;
 
 // Wrapper components to match the expected interface
 const ClaudeIcon: FC<{ className?: string }> = ({ className }) => (
@@ -68,6 +71,11 @@ const MODEL_GROUPS: ModelGroup[] = [
   },
 ];
 
+interface PopoverPosition {
+  bottom: number;
+  left: number;
+}
+
 interface ModelSelectorProps {
   onModelChange?: (model: Model) => void;
 }
@@ -75,10 +83,24 @@ interface ModelSelectorProps {
 export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+  const [position, setPosition] = useState<PopoverPosition>({ bottom: 0, left: 0 });
   const selectedModel = useModel();
   const setModel = useToolStore((s) => s.setModel);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Calculate popover position from trigger's viewport rect.
+  // useLayoutEffect ensures position is set before paint to prevent flicker.
+  useLayoutEffect(() => {
+    if (!isOpen || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    // Use bottom (distance from viewport bottom) so transform is free for animations.
+    // The popover sits above the trigger: viewport height - trigger top + gap.
+    setPosition({
+      bottom: window.innerHeight - rect.top + POPOVER_GAP,
+      left: rect.left,
+    });
+  }, [isOpen]);
 
   // Handle closing with exit animation
   const handleClose = useCallback((): void => {
@@ -87,7 +109,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     setTimeout(() => {
       setIsOpen(false);
       setIsAnimatingOut(false);
-    }, ANIMATION_DURATION_MS);
+    }, POPOVER_ANIMATION.exitDurationMs);
   }, [isOpen, isAnimatingOut]);
 
   // Close popover when clicking outside
@@ -132,6 +154,73 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     }
   };
 
+  // Popover content — rendered via portal into document.body
+  const popoverContent = isOpen ? (
+    <div
+      ref={popoverRef}
+      className={cn(
+        'fixed bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50',
+        'origin-bottom-left',
+        // Enter: rich 3-property animation (scale + fade + slide), ease-out
+        !isAnimatingOut && 'animate-in fade-in-0 zoom-in-[0.97] slide-in-from-bottom-1',
+        // Exit: fade-only for clean disappearance (no zoom/slide = no "deflating ghost")
+        isAnimatingOut && 'animate-out fade-out-0'
+      )}
+      style={{
+        width: CHAT_WIDTH.dropdown,
+        bottom: position.bottom,
+        left: position.left,
+        // Enter uses ease-out (fast arrival, gentle settle)
+        // Exit uses ease-in (gentle start, fast departure)
+        animationTimingFunction: isAnimatingOut
+          ? POPOVER_ANIMATION.exitEasing
+          : POPOVER_ANIMATION.enterEasing,
+        animationDuration: isAnimatingOut
+          ? POPOVER_ANIMATION.exitDuration
+          : POPOVER_ANIMATION.enterDuration,
+      }}
+    >
+      <div className="p-1.5">
+        {MODEL_GROUPS.map((group) => (
+          <div key={group.label} className="mb-1 last:mb-0">
+            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
+              {group.label}
+            </div>
+            {group.models.map((model) => (
+              <button
+                key={model.id}
+                onClick={() => {
+                  handleSelectModel(model.id);
+                }}
+                className={cn(
+                  `w-full flex items-center justify-between px-2 py-1.5 text-xs ${TRANSITION_CLASSES.item} mt-0.5 first:mt-0 group`,
+                  selectedModel === model.id
+                    ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
+                    : 'rounded-md hover:bg-muted/80 active:scale-[0.98]'
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <model.icon className={selectedModel === model.id ? 'opacity-100' : ''} />
+                  <span>{model.name}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {model.badge ? (
+                    <span className="text-[9px] font-medium text-muted-foreground/70 bg-muted/60 px-1.5 py-0.5 rounded-full">
+                      {model.badge}
+                    </span>
+                  ) : null}
+                  {selectedModel === model.id ? (
+                    <Check className="h-3.5 w-3.5 text-primary/80" />
+                  ) : null}
+                </div>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="relative">
       {/* Trigger Button */}
@@ -141,7 +230,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         className={cn(
           'h-7 px-2.5 flex items-center gap-1.5 rounded-lg',
           'bg-transparent text-muted-foreground',
-          'transition-[background-color,color,transform] duration-150',
+          TRANSITION_CLASSES.button,
           'hover:bg-muted/50 hover:text-foreground',
           'active:scale-[0.98]',
           'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
@@ -158,65 +247,8 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         />
       </button>
 
-      {/* Popover */}
-      {isOpen ? (
-        <div
-          ref={popoverRef}
-          className={cn(
-            'absolute bottom-full left-0 mb-2 bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50',
-            'origin-bottom-left',
-            // Enter animation: scale from 97% + fade in, ease-out for responsiveness
-            !isAnimatingOut && 'animate-in fade-in-0 zoom-in-[0.97] slide-in-from-bottom-1',
-            // Exit animation: scale to 97% + fade out, ease-out for smooth deceleration
-            isAnimatingOut && 'animate-out fade-out-0 zoom-out-[0.97] slide-out-to-bottom-1'
-          )}
-          style={{
-            width: CHAT_WIDTH.dropdown,
-            // Custom ease-out curve for more responsiveness (faster start, gentle end)
-            animationTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-            animationDuration: ANIMATION_DURATION,
-          }}
-        >
-          <div className="p-1.5">
-            {MODEL_GROUPS.map((group) => (
-              <div key={group.label} className="mb-1 last:mb-0">
-                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
-                  {group.label}
-                </div>
-                {group.models.map((model) => (
-                  <button
-                    key={model.id}
-                    onClick={() => {
-                      handleSelectModel(model.id);
-                    }}
-                    className={cn(
-                      'w-full flex items-center justify-between px-2 py-1.5 text-xs transition-[background-color,transform] duration-150 mt-0.5 first:mt-0 group',
-                      selectedModel === model.id
-                        ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
-                        : 'rounded-md hover:bg-muted/80 active:scale-[0.98]'
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <model.icon className={selectedModel === model.id ? 'opacity-100' : ''} />
-                      <span>{model.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {model.badge ? (
-                        <span className="text-[9px] font-medium text-muted-foreground/70 bg-muted/60 px-1.5 py-0.5 rounded-full">
-                          {model.badge}
-                        </span>
-                      ) : null}
-                      {selectedModel === model.id ? (
-                        <Check className="h-3.5 w-3.5 text-primary/80" />
-                      ) : null}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      {/* Popover — portaled to document.body to escape overflow:hidden ancestors */}
+      {popoverContent !== null ? createPortal(popoverContent, document.body) : null}
     </div>
   );
 };

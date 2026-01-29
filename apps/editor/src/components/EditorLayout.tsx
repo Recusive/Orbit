@@ -9,7 +9,7 @@
  * │ Explorer+Git│    [Terminal]         │                       │
  * └─────────────────────────────────────────────────────────────┘
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { EditorCenter } from './EditorCenter';
 import { EditorChatPanel } from './EditorChatPanel';
@@ -37,6 +37,27 @@ export const EditorLayout: FC = () => {
   const chatPanelOpen = useEditorChatPanelOpen();
   const toggleEditorChatPanel = useUIStore((state) => state.toggleEditorChatPanel);
 
+  // Suppress initial visibility for two frames so nested Allotment instances
+  // (position:absolute panes) can calculate panel sizes before painting.
+  // Frame 1: outer ResizablePanelGroup (horizontal) computes EditorCenter width
+  // Frame 2: inner ResizablePanelGroup (vertical) computes content/terminal heights
+  // Without this, EmptyState ("No file open") briefly appears at the top of the
+  // editor area instead of centered, because the panel has no height yet.
+  const [mountReady, setMountReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    requestAnimationFrame(() => {
+      if (cancelled) return;
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setMountReady(true);
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
@@ -54,7 +75,10 @@ export const EditorLayout: FC = () => {
   }, [toggleEditorChatPanel]);
 
   return (
-    <div className="h-full w-full flex overflow-hidden bg-background">
+    <div
+      className="h-full w-full flex overflow-hidden bg-background"
+      style={{ opacity: mountReady ? 1 : 0 }}
+    >
       {/* Left Sidebar - File Explorer + Git */}
       {/* Note: Uses data-sidebar="primary" so SidebarResizeHandle can find it */}
       <EditorSidebar width={leftSidebarWidth} />

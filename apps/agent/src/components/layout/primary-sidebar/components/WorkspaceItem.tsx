@@ -8,11 +8,12 @@ import type { FC } from 'react';
 
 import { cn, SIDEBAR, TRANSITIONS } from '@/lib/utils';
 
-// Transition string builder
+// Transition: only animate opacity (GPU-friendly), width change is instant.
+// The sidebar container's overflow:hidden clips the content during width animation.
 const getCollapseTransition = (collapsed: boolean): string =>
   collapsed
-    ? `opacity 0ms, width ${TRANSITIONS.sidebar}`
-    : `width ${TRANSITIONS.sidebar}, opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
+    ? 'opacity 0ms'
+    : `opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
 
 export const WorkspaceItem: FC<WorkspaceItemProps> = ({
   name,

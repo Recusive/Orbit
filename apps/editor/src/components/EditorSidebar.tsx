@@ -12,7 +12,7 @@
  * - Start conversation button
  */
 import { FlaskConical, Settings } from 'lucide-react';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 
 import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { FC } from 'react';
@@ -103,10 +103,25 @@ export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
 
   const [activeTab, setActiveTab] = useState<EditorSidebarTab>('explorer');
 
+  // Suppress width transition on initial mount to prevent ghost flash
+  // when parent switches from display:none → display:block.
+  // The browser treats the computed width going from "nothing" to the
+  // target as a change, firing the CSS transition (sidebar slides open).
+  const [mountReady, setMountReady] = useState(false);
+  useEffect(() => {
+    // Enable transitions after first paint
+    requestAnimationFrame(() => {
+      setMountReady(true);
+    });
+  }, []);
+
   return (
     <aside
-      data-sidebar="primary"
-      className="h-full flex flex-col bg-card transition-[width] duration-150 ease-in-out overflow-hidden shadow-lg dark:shadow-none border-r border-divider"
+      data-sidebar="editor-primary"
+      className={cn(
+        'h-full flex flex-col bg-card overflow-hidden shadow-lg dark:shadow-none border-r border-divider',
+        mountReady && 'transition-[width] duration-150 ease-in-out'
+      )}
       style={{ width }}
     >
       {/* Header */}

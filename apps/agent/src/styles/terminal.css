@@ -201,6 +201,14 @@
   }
 }
 
+/* Accessibility: disable terminal pulse for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .terminal-wrapper .terminal-command-decoration .default-color {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 /* Viewport adjustments are consolidated with viewport rules in Z-Index section above */
 
 /* ============================================================================

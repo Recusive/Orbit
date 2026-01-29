@@ -628,6 +628,169 @@ Before deploying any animation to production, verify ALL of the following:
 
 ---
 
+## Orbit-Specific: Popover & Overlay Animation System
+
+The codebase uses a centralized animation constant system for all overlays (popovers, tooltips, hover cards, dropdown menus, context menus). These rules were established through a full-tree animation audit of the chat input area.
+
+### POPOVER_ANIMATION — Single Source of Truth
+
+All overlay animations import timing from `@/lib/utils/constants.ts`:
+
+```typescript
+import { POPOVER_ANIMATION } from '@/lib/utils';
+
+// Constants available:
+POPOVER_ANIMATION.enterDuration; // '150ms' — enter animation
+POPOVER_ANIMATION.exitDuration; // '100ms' — exit animation (shorter = snappier)
+POPOVER_ANIMATION.exitDurationMs; // 100     — for setTimeout in manual exit animations
+POPOVER_ANIMATION.enterEasing; // 'cubic-bezier(0.16, 1, 0.3, 1)' — ease-out (fast in, gentle settle)
+POPOVER_ANIMATION.exitEasing; // 'cubic-bezier(0.4, 0, 1, 1)'    — ease-in (gentle start, fast out)
+
+// Legacy unified values (for Radix primitives that don't split enter/exit):
+POPOVER_ANIMATION.duration; // '150ms'
+POPOVER_ANIMATION.easing; // 'cubic-bezier(0.16, 1, 0.3, 1)'
+POPOVER_ANIMATION.durationMs; // 150
+```
+
+**Rule: Never define local animation constants in overlay components.** Import from `POPOVER_ANIMATION`.
+
+### Asymmetric Enter/Exit Pattern
+
+Enters and exits should feel fundamentally different, following macOS/iOS motion design:
+
+| Phase | Properties Animated         | Easing   | Duration | Effect                    |
+| ----- | --------------------------- | -------- | -------- | ------------------------- |
+| Enter | scale + opacity + translate | ease-out | 150ms    | Rich: zoom + fade + slide |
+| Exit  | opacity only                | ease-in  | 100ms    | Clean: fade only          |
+
+**Why asymmetric?** A rich enter animation (zoom + slide + fade) draws attention to new content. But on exit, multi-property animations create visual artifacts:
+
+- `zoom-out` with `backdrop-blur` creates a "smeared ghost" as the blur shows through decreasing opacity
+- `slide-out` combined with `zoom-out` causes content to appear to "deflate and sink"
+- These artifacts are especially visible on inner text/icon content
+
+```tsx
+// ✅ CORRECT: Asymmetric enter/exit
+className={cn(
+  // Enter: rich 3-property animation
+  !isAnimatingOut && 'animate-in fade-in-0 zoom-in-[0.97] slide-in-from-bottom-1',
+  // Exit: fade-only for clean disappearance
+  isAnimatingOut && 'animate-out fade-out-0'
+)}
+style={{
+  animationTimingFunction: isAnimatingOut
+    ? POPOVER_ANIMATION.exitEasing    // ease-in
+    : POPOVER_ANIMATION.enterEasing,  // ease-out
+  animationDuration: isAnimatingOut
+    ? POPOVER_ANIMATION.exitDuration  // 100ms
+    : POPOVER_ANIMATION.enterDuration // 150ms
+}}
+
+// ❌ BAD: Symmetric enter/exit (causes deflating ghost)
+className={cn(
+  !isAnimatingOut && 'animate-in fade-in-0 zoom-in-[0.97] slide-in-from-bottom-1',
+  isAnimatingOut && 'animate-out fade-out-0 zoom-out-[0.97] slide-out-to-bottom-1'
+)}
+```
+
+### Easing Direction Rule
+
+| Animation | Use      | cubic-bezier        | Why                                   |
+| --------- | -------- | ------------------- | ------------------------------------- |
+| Enter     | ease-out | `(0.16, 1, 0.3, 1)` | Fast arrival → gentle settle          |
+| Exit      | ease-in  | `(0.4, 0, 1, 1)`    | Gentle departure → fast disappearance |
+
+**Common mistake:** Using `ease-out` for both enter and exit. On exit, ease-out starts slow, making the element linger visually before accelerating away — the opposite of what users expect.
+
+### Zoom Scale Consistency
+
+All overlays must use the same zoom scale: **`0.97`** (3% scale).
+
+```css
+/* ✅ Consistent across all overlays */
+zoom-in-[0.97] / zoom-out-[0.97]
+
+/* ❌ Mismatched scales (tooltip used 0.95, others used 0.97) */
+zoom-in-95  /* = 0.95 — too aggressive, visually inconsistent */
+```
+
+### Scoped Transitions — No `transition-all`
+
+Never use `transition-all` — it transitions every CSS property including layout-triggering ones.
+
+```css
+/* ❌ BAD: Transitions width, height, padding, etc. */
+transition-all duration-200
+
+/* ✅ GOOD: Only transition what changes */
+transition-[border-color,box-shadow] duration-200
+transition-colors duration-150
+transition-opacity duration-150
+transition-transform duration-200
+```
+
+### Progress Bars — scaleX Instead of Width
+
+Animating `width` triggers layout reflow. Use `transform: scaleX()` with `origin-left`:
+
+```tsx
+// ✅ GPU-only: scaleX stays on composite layer
+<div className="h-full w-full origin-left rounded-full transition-transform duration-300 ease-out"
+  style={{ transform: `scaleX(${percentage / 100})` }}
+/>
+
+// ❌ Layout-triggering: width causes reflow every frame
+<div className="h-full rounded-full transition-[width] duration-300"
+  style={{ width: `${percentage}%` }}
+/>
+```
+
+### Reduced-Motion Guards for Tailwind Built-ins
+
+Tailwind's built-in animation utilities (`animate-pulse`, `animate-spin`, etc.) don't respect `prefers-reduced-motion` by default. Add global guards in `globals.css`:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .animate-spin,
+  .animate-bounce,
+  .animate-ping {
+    animation: none !important;
+  }
+}
+```
+
+### Full-Tree Audit Checklist
+
+When auditing a component's animations, trace **every child in the render tree**, not just the top-level component:
+
+1. **Map the DOM tree**: Identify every component rendered (including portals)
+2. **Grep for animation keywords**: Search `transition`, `animate`, `duration`, `ease`, `scale`, `transform` across the entire directory
+3. **Per-layer checks**:
+   - [ ] Only `transform` and `opacity` animated (no layout properties)
+   - [ ] Custom easing curves (no generic `ease`, `linear`)
+   - [ ] Paired overlays share the same timing constants
+   - [ ] `transition-all` replaced with scoped properties
+   - [ ] `prefers-reduced-motion` respected
+   - [ ] Zoom scale matches system standard (0.97)
+4. **React performance**: Memo'd components, granular store selectors, no subscriptions to unused state
+5. **Deduplication**: All animation constants imported from `POPOVER_ANIMATION`, no local copies
+
+### Files Using POPOVER_ANIMATION
+
+These files import from the centralized constant (keep this list updated):
+
+| File                                       | Usage                              |
+| ------------------------------------------ | ---------------------------------- |
+| `components/ui/tooltip.tsx`                | Enter/exit timing + easing         |
+| `components/ui/hover-card.tsx`             | Enter/exit timing + easing         |
+| `components/ui/dropdown-menu.tsx`          | Content + SubContent timing        |
+| `components/ui/context-menu.tsx`           | Content + SubContent timing        |
+| `components/ui/popover.tsx`                | Enter/exit timing + easing         |
+| `components/chat/input/model-selector.tsx` | Asymmetric enter/exit + setTimeout |
+
+---
+
 ## Credits
 
 Adapted from Emil Kowalski's animation guides:

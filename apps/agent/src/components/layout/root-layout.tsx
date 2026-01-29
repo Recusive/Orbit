@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import { ActionsBar } from './actions-bar';
 import { ChatArea } from './chat-area';
@@ -11,29 +12,44 @@ import type { FC } from 'react';
 import { GoToLineDialog, QuickOpen } from '@/components/modals';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { useDefaultKeyboardShortcuts } from '@/hooks/ui/use-keyboard-shortcuts';
-import { useUIStore } from '@/stores/ui/ui-store';
+import { useLeftSidebarWidth, useUIStore } from '@/stores/ui/ui-store';
 
 /**
  * RootLayout is the Agent mode content.
  * Renders the sidebar, chat area, and actions bar.
  * HeaderBar and StatusBar are rendered by App.tsx.
+ *
+ * PERF: Uses granular selectors to prevent full-tree re-renders.
+ * leftSidebarWidth is isolated so sidebar animation only re-renders
+ * PrimarySidebar — not ChatArea, Terminal, Browser, etc.
  */
 export const RootLayout: FC = () => {
+  // Granular data selectors — only re-render when THESE specific values change
+  const leftSidebarWidth = useLeftSidebarWidth();
+  const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
+  const goToLineDialogOpen = useUIStore((s) => s.goToLineDialogOpen);
+  const chatAreaDetached = useUIStore((s) => s.chatAreaDetached);
+
+  // Actions via useShallow — stable references, no spurious re-renders
   const {
-    leftSidebarWidth,
-    rightSidebarOpen,
-    goToLineDialogOpen,
     setGoToLineDialogOpen,
     toggleLeftSidebar,
     toggleReviewPanel,
     toggleBottomPanel,
-    reviewPanelOpen,
-    bottomPanelOpen,
     setTerminalPosition,
     openSettings,
     openSourceControl,
-    chatAreaDetached,
-  } = useUIStore();
+  } = useUIStore(
+    useShallow((s) => ({
+      setGoToLineDialogOpen: s.setGoToLineDialogOpen,
+      toggleLeftSidebar: s.toggleLeftSidebar,
+      toggleReviewPanel: s.toggleReviewPanel,
+      toggleBottomPanel: s.toggleBottomPanel,
+      setTerminalPosition: s.setTerminalPosition,
+      openSettings: s.openSettings,
+      openSourceControl: s.openSourceControl,
+    }))
+  );
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
 
@@ -64,13 +80,16 @@ export const RootLayout: FC = () => {
   }, []);
 
   // Smart terminal toggle: if activity panel is closed, open terminal in full-width mode
+  // PERF: Reads reviewPanelOpen/bottomPanelOpen from getState() instead of subscribing.
+  // These values are only needed at callback-invocation time, not for rendering.
   const handleToggleTerminal = useCallback((): void => {
+    const { reviewPanelOpen, bottomPanelOpen } = useUIStore.getState();
     if (!reviewPanelOpen && !bottomPanelOpen) {
       // Activity panel is closed and terminal is closed - open in full-width mode
       setTerminalPosition('both');
     }
     toggleBottomPanel();
-  }, [reviewPanelOpen, bottomPanelOpen, setTerminalPosition, toggleBottomPanel]);
+  }, [setTerminalPosition, toggleBottomPanel]);
 
   // Toggle editor panel in activity panel
   // If already open on 'file' tab, close it; otherwise open and switch to it

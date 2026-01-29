@@ -8,7 +8,7 @@
 import { IconCirclePlus } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconCirclePlus';
 import { IconSearchlinesSparkle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSearchlinesSparkle';
 import { FlaskConical, Inbox, Search, Settings } from 'lucide-react';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import { ConversationList } from './components/ConversationList';
@@ -88,6 +88,24 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
 
+  // PERF: Apply will-change only during width transitions, not permanently.
+  // Permanent will-change wastes GPU memory by keeping a compositor layer allocated.
+  const sidebarRef = useRef<HTMLElement>(null);
+  const prevWidthRef = useRef(width);
+
+  useEffect(() => {
+    if (prevWidthRef.current !== width && sidebarRef.current) {
+      sidebarRef.current.style.willChange = 'width';
+      prevWidthRef.current = width;
+    }
+  }, [width]);
+
+  const handleTransitionEnd = useCallback((): void => {
+    if (sidebarRef.current) {
+      sidebarRef.current.style.willChange = '';
+    }
+  }, []);
+
   const {
     deleteDialogOpen,
     setDeleteDialogOpen,
@@ -114,9 +132,14 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
 
   return (
     <aside
+      ref={sidebarRef}
       data-sidebar="primary"
-      className="h-full flex flex-col bg-card transition-[width] duration-150 ease-in-out overflow-hidden shadow-lg dark:shadow-none"
-      style={{ width }}
+      className="h-full flex flex-col bg-card overflow-hidden shadow-lg dark:shadow-none"
+      style={{
+        width,
+        transition: 'width 200ms cubic-bezier(0.165, 0.84, 0.44, 1)',
+      }}
+      onTransitionEnd={handleTransitionEnd}
     >
       {/* Header */}
       <div className="flex shrink-0" style={{ height: HEIGHTS.headerBar }}>
@@ -180,7 +203,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {/* Search Bar - hidden when collapsed */}
       <div
         className={cn(
-          'shrink-0 mx-1.5 overflow-hidden transition-[height,opacity] duration-150 ease-in-out',
+          'shrink-0 mx-1.5 overflow-hidden transition-opacity duration-150 ease-out',
           isCollapsed ? 'py-0' : 'py-1'
         )}
         style={{
@@ -214,7 +237,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {/* Tab Navigation - hidden when collapsed */}
       <div
         className={cn(
-          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-[height,opacity] duration-150 ease-in-out',
+          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-opacity duration-150 ease-out',
           isCollapsed ? '' : 'border-b border-divider'
         )}
         style={{
@@ -242,7 +265,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {activeTab === 'conversations' ? (
         <div
           className={cn(
-            'flex flex-col border-b border-divider shrink-0 transition-[gap,padding] duration-150 ease-in-out',
+            'flex flex-col border-b border-divider shrink-0',
             isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
           )}
         >

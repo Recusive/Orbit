@@ -4,12 +4,7 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronRight, Circle } from 'lucide-react';
 import * as React from 'react';
 
-import { cn } from '@/lib/utils';
-
-// Animation duration - keep under 200ms for responsiveness
-const ANIMATION_DURATION = '150ms';
-// Smooth ease-out curve: fast start, gentle end
-const ANIMATION_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)';
+import { cn, POPOVER_ANIMATION } from '@/lib/utils';
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
 
@@ -64,8 +59,8 @@ const DropdownMenuSubContent = React.forwardRef<
       className
     )}
     style={{
-      animationDuration: ANIMATION_DURATION,
-      animationTimingFunction: ANIMATION_EASING,
+      animationDuration: POPOVER_ANIMATION.duration,
+      animationTimingFunction: POPOVER_ANIMATION.easing,
       ...style,
     }}
     {...props}
@@ -95,8 +90,8 @@ const DropdownMenuContent = React.forwardRef<
         className
       )}
       style={{
-        animationDuration: ANIMATION_DURATION,
-        animationTimingFunction: ANIMATION_EASING,
+        animationDuration: POPOVER_ANIMATION.duration,
+        animationTimingFunction: POPOVER_ANIMATION.easing,
         ...style,
       }}
       {...props}
