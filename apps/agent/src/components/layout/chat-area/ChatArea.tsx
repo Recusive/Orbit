@@ -25,7 +25,6 @@ import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useChatMessages } from '@/hooks/chat/use-chat-messages';
 import { TERMINAL_PANEL, ACTIVITY_PANEL, CHAT_PANEL } from '@/lib/utils';
 import {
-  useGetToolsForMessage,
   usePendingPermissions,
   useInputMode,
   useThinkingMode,
@@ -69,8 +68,6 @@ export const ChatArea: FC = () => {
   const pendingPermissions = usePendingPermissions();
   const sessionUsage = useSessionUsage();
   const maxTokens = useMaxTokens();
-  const getToolsForMessage = useGetToolsForMessage();
-
   const {
     messages,
     isAgentRunning,
@@ -168,7 +165,6 @@ export const ChatArea: FC = () => {
       thinkingMode={thinkingMode}
       sessionUsage={sessionUsage}
       maxTokens={maxTokens}
-      getToolsForMessage={getToolsForMessage}
       onSend={handleSend}
       onStop={handleStop}
       onRewind={handleRewind}

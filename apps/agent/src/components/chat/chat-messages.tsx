@@ -11,14 +11,18 @@ import { MessageItem } from './messages';
 import { QueuedMessageBubble } from './queued-message';
 
 import type { ChatMessage } from './messages';
-import type { ToolExecution } from '@/stores/agent/tool-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { FC } from 'react';
 
 import { HyperText } from '@/components/ui/hyper-text';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
-import { useRunningTool, useToolRevision } from '@/stores/agent/tool-store';
+import {
+  deduplicateAndSortTools,
+  useActiveTools,
+  useCompletedTools,
+  useRunningTool,
+} from '@/stores/agent/tool-store';
 
 // Rotating loading messages - fun tech-themed phrases (fallback when no tool is running)
 const LOADING_MESSAGES = [
@@ -153,7 +157,6 @@ interface ChatMessagesProps {
   readonly isAgentRunning: boolean;
   readonly sessionId?: string;
   readonly queuedMessage: QueuedMessage | null;
-  readonly getToolsForMessage: (messageId: string) => ToolExecution[];
   readonly onRewind: (messageId: string) => void;
   readonly onOpenFile: (path: string) => void;
   readonly onOpenUrl: (url: string) => void;
@@ -166,7 +169,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   isAgentRunning,
   sessionId,
   queuedMessage,
-  getToolsForMessage,
   onRewind,
   onOpenFile,
   onOpenUrl,
@@ -254,10 +256,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // (Uses dedicated selector for better encapsulation - code review cycle 2, issue #1)
   const runningTool = useRunningTool();
 
-  // Subscribe to tool revision counter to force re-render when tools change.
-  // getToolsForMessage is a stable function reference (never triggers re-renders on its own),
-  // so we need this counter to know when to re-call it with fresh store state.
-  useToolRevision();
+  // Subscribe to activeTools and completedTools via selectors to compute
+  // tools-per-message directly in the render. This bypasses the store's
+  // internal get() which can return stale state in the persist(immer(...))
+  // middleware stack — causing tool widgets to not appear until completion.
+  const activeTools = useActiveTools();
+  const completedTools = useCompletedTools();
 
   // Rotating loading message for a bit of personality (fallback)
   const rotatingMessage = useRotatingMessage(isLoading);
@@ -321,11 +325,17 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           // Check if this message should animate (newly sent user message)
           const shouldAnimate = animatingMessageIds.has(msg.id);
 
+          // Compute tools for this message from selector values directly.
+          // This bypasses the store's get() which lags behind in persist(immer(...)).
+          const activeForMsg = Object.values(activeTools).filter((t) => t.messageId === msg.id);
+          const completedForMsg = completedTools.filter((t) => t.messageId === msg.id);
+          const tools = deduplicateAndSortTools(activeForMsg, completedForMsg);
+
           return (
             <MessageItem
               key={msg.id}
               message={msg}
-              tools={getToolsForMessage(msg.id)}
+              tools={tools}
               isLastAssistantMessage={isLastAssistantMessage}
               animate={shouldAnimate}
               onRewind={onRewind}

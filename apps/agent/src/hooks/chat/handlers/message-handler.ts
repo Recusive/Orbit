@@ -454,6 +454,10 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // Without this, the last chunk batch could appear AFTER isStreaming is set to false.
         batchedChunkHandler.cancel(FLUSH_PENDING);
 
+        // Flush any pending tool:end events so all tools are in completedTools
+        // before getToolsForMessage() is called for persistence below.
+        batchedToolHandler.cancel(FLUSH_PENDING);
+
         // Clean up pending chunk tracking for this message
         pendingChunkLengths.delete(message.message_id);
 
@@ -865,8 +869,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // should be at: displayedLength + pendingLength. This accounts for both rendered AND
         // received-but-not-yet-rendered content.
         //
-        // We also clamp to the backend's content_offset when available, taking the minimum
-        // to handle edge cases where frontend tracking might be ahead due to state race.
+        // NOTE: We do NOT flush batchedChunkHandler here because the flush calls setMessages()
+        // which queues a React state update. Since messagesRef.current isn't updated until the
+        // next React commit, the !currentMsg check below would create a DUPLICATE message.
         //
         // Fast path: check last message first (most common case during streaming)
         // This avoids O(n) scan through all messages when the target is almost always at the end.
@@ -888,15 +893,11 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             ? Math.min(message.content_offset, maxKnownLength)
             : maxKnownLength;
 
-        // Queue tool start to be processed in next RAF (reduces re-renders)
-        batchedToolHandler({
-          type: 'start',
-          toolId,
-          messageId: message.message_id,
-          toolName,
-          toolInput: message.tool_input,
-          contentOffset,
-        });
+        // Call startTool synchronously for immediate tool widget rendering.
+        // Tool events are infrequent (1-5 per turn vs 100+ text chunks), so
+        // RAF batching provides negligible performance benefit but delays the
+        // Zustand store update that triggers the tool widget to appear.
+        startTool(toolId, message.message_id, toolName, message.tool_input, contentOffset);
 
         // Only update messages if we need to create a new assistant message
         // This stays synchronous because we need the message for streaming
@@ -928,6 +929,12 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       }
 
       case 'permission:request':
+        // Flush pending text chunks so the assistant message is in React state
+        // BEFORE the permission modal appears. This ensures the tool widget
+        // (already added synchronously by the tool:start handler above) has
+        // a message row to render in.
+        batchedChunkHandler.cancel(FLUSH_PENDING);
+
         addPermissionRequest({
           requestId: message.request_id,
           sessionId: message.session_id,

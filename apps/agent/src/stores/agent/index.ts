@@ -28,12 +28,13 @@ export {
   useThinkingMode,
   useModel,
   useActiveTools,
+  useCompletedTools,
   usePendingPermissions,
   useSessionUsage,
   useContextPercentage,
   useMaxTokens,
   useUsedTokens,
-  useGetToolsForMessage,
+  deduplicateAndSortTools,
 } from './tool-store';
 export type {
   UsageData,

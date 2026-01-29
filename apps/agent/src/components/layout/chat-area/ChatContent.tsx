@@ -29,7 +29,6 @@ export const ChatContent: FC<ChatContentProps> = ({
   thinkingMode,
   sessionUsage,
   maxTokens,
-  getToolsForMessage,
   onSend,
   onStop,
   onRewind,
@@ -95,7 +94,6 @@ export const ChatContent: FC<ChatContentProps> = ({
             isAgentRunning={isAgentRunning}
             sessionId={sessionId}
             queuedMessage={queuedMessage}
-            getToolsForMessage={getToolsForMessage}
             onRewind={onRewind}
             onOpenFile={onOpenFile}
             onOpenUrl={onOpenUrl}

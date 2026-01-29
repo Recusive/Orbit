@@ -22,7 +22,6 @@ import { PermissionModal } from '@/components/modals';
 import { useChatMessages } from '@/hooks/chat/use-chat-messages';
 import { cn } from '@/lib/utils/utils';
 import {
-  useGetToolsForMessage,
   usePendingPermissions,
   useInputMode,
   useThinkingMode,
@@ -64,8 +63,6 @@ export const EditorChatPanel: FC = () => {
   const pendingPermissions = usePendingPermissions();
   const sessionUsage = useSessionUsage();
   const maxTokens = useMaxTokens();
-  const getToolsForMessage = useGetToolsForMessage();
-
   const {
     messages,
     isAgentRunning,
@@ -159,7 +156,6 @@ export const EditorChatPanel: FC = () => {
               isAgentRunning={isAgentRunning}
               sessionId={sessionId}
               queuedMessage={queuedMessage}
-              getToolsForMessage={getToolsForMessage}
               onRewind={handleRewind}
               onOpenFile={handleOpenFile}
               onOpenUrl={handleOpenUrl}
