@@ -29,8 +29,9 @@
 //! # `WKPreferences` Private API
 //!
 //! Safari exposes a "Prefer Page Rendering Updates near 60fps" feature flag.
-//! For embedded `WKWebView`, the only way to toggle this is via the private
-//! SPI `-[WKPreferences _setPreferPageRenderingUpdatesNear60FPSEnabled:]`.
+//! For embedded `WKWebView`, this is toggled via the private `_WKFeature`
+//! enumeration API: `[WKPreferences _features]` returns all feature flags,
+//! and `[prefs _setEnabled:NO forFeature:]` disables the 60fps cap.
 //! This is safe for non-App Store desktop apps (like Tauri).
 //!
 //! # Important
@@ -170,7 +171,7 @@ fn try_enable_promotion() -> bool {
         );
         return false;
     }
-    log::info!("ProMotion: CADisplayLink obtained from NSScreen.mainScreen");
+    log::debug!("ProMotion: CADisplayLink obtained from NSScreen.mainScreen");
 
     // Step 5: Set preferredFrameRateRange to request 120Hz
     // minimum=80, maximum=120, preferred=120 — tells ProMotion to run at max
@@ -178,7 +179,7 @@ fn try_enable_promotion() -> bool {
     unsafe {
         let _: () = msg_send![display_link, setPreferredFrameRateRange: range];
     }
-    log::info!("ProMotion: preferredFrameRateRange set to (80, 120, 120)");
+    log::debug!("ProMotion: preferredFrameRateRange set to (80, 120, 120)");
 
     // Step 6: Add to main run loop in common modes
     let main_run_loop = NSRunLoop::mainRunLoop();

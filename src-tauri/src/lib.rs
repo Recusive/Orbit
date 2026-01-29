@@ -304,7 +304,7 @@ pub fn run() {
                     drop(window.set_traffic_lights_inset(11.0, 10.5));
 
                     // Enable ProMotion 120Hz on supported displays.
-                    // Creates a dummy CADisplayLink that keeps the display at max refresh rate.
+                    // Creates a CADisplayLink at 120Hz and disables WebKit's 60fps cap.
                     drop(window.enable_promotion());
                 }
             }
