@@ -784,7 +784,9 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     }
 
     // Permission mode (UDE pattern)
-    // - Accept mode: 'acceptEdits' - SDK auto-approves all tools
+    // - Accept mode: 'acceptEdits' - SDK auto-approves file edits and filesystem ops
+    //   (Edit, Write, mkdir, rm, mv, cp). Other tools still go through canUseTool.
+    //   Our PermissionManager independently handles full auto-approval in accept mode.
     // - Plan mode: 'plan' - SDK restricts to read-only tools
     // - Default mode: 'default' - canUseTool callback handles all permissions
     const permissionMode: PermissionMode = this._acceptMode
@@ -798,6 +800,14 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     if (this._planMode) {
       logger.info('Plan mode ENABLED - SDK will restrict to read-only tools');
     }
+
+    // Safety limit: prevent runaway agent loops (200 turns is very generous)
+    options.maxTurns = 200;
+
+    // Route CLI subprocess stderr through structured logger for debugging
+    options.stderr = (data: string): void => {
+      logger.debug({ source: 'claude-cli' }, data.trimEnd());
+    };
 
     // Enable streaming partial messages for real-time text streaming
     options.includePartialMessages = true;

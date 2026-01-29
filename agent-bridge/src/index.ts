@@ -314,26 +314,32 @@ function main(): void {
     });
   });
 
-  rl.on('close', () => {
-    logger.info('stdin closed, shutting down...');
+  /**
+   * Graceful shutdown: dispose managers then allow a brief grace period
+   * for async cleanup (e.g., agent.stopSession() → query.interrupt())
+   * before hard-exiting the process.
+   */
+  const SHUTDOWN_GRACE_MS = 500;
+
+  function gracefulShutdown(reason: string): void {
+    logger.info(`${reason}, shutting down...`);
     sessionManager.dispose();
     canvasSessionManager.dispose();
-    process.exit(0);
+    // Allow async disposal (stopSession/interrupt) to complete before hard exit
+    setTimeout(() => process.exit(0), SHUTDOWN_GRACE_MS);
+  }
+
+  rl.on('close', () => {
+    gracefulShutdown('stdin closed');
   });
 
   // Handle process signals
   process.on('SIGTERM', () => {
-    logger.info('SIGTERM received, shutting down...');
-    sessionManager.dispose();
-    canvasSessionManager.dispose();
-    process.exit(0);
+    gracefulShutdown('SIGTERM received');
   });
 
   process.on('SIGINT', () => {
-    logger.info('SIGINT received, shutting down...');
-    sessionManager.dispose();
-    canvasSessionManager.dispose();
-    process.exit(0);
+    gracefulShutdown('SIGINT received');
   });
 
   // Clean up old sessions on startup (30 days default)
