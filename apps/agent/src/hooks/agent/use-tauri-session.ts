@@ -3,7 +3,7 @@ import { createLogger } from '@orbit/common/lib';
 import type { RewindContextMessage } from './types/tauri-types';
 import type { SessionConfig } from '@/lib/api';
 
-import { agentCreateSession, getWorkspacePath } from '@/lib/api';
+import { agentCreateSession, agentGetStoredSession, getWorkspacePath } from '@/lib/api';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -137,6 +137,26 @@ export async function ensureSession(sessionId: string): Promise<void> {
     });
     // Clean up the mapping
     forkedSessionResumeMap.delete(sessionId);
+  } else {
+    // Not a rewind fork — check if we have a persisted SDK session to resume.
+    // This handles the app restart case: sessionId survives in localStorage,
+    // messages are loaded from the backend store, but the SDK session was lost
+    // when the agent-bridge process restarted. The SDK session ID is persisted
+    // in orbit-sessions.json and can be used to resume with full context.
+    try {
+      const storedSdkSessionId = await agentGetStoredSession(sessionId);
+      if (storedSdkSessionId) {
+        config.resumeSessionId = storedSdkSessionId;
+        logger.info('Resuming SDK session after restart', {
+          sessionId,
+          sdkSessionId: storedSdkSessionId,
+        });
+      }
+    } catch {
+      // If lookup fails (e.g., bridge not ready), proceed without resume.
+      // The session will work but Claude won't have previous context.
+      logger.warn('Could not look up stored SDK session, creating fresh', { sessionId });
+    }
   }
 
   await agentCreateSession(sessionId, config);

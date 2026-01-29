@@ -61,10 +61,11 @@ pub struct AttachmentSource {
 
 /// Session configuration
 ///
-/// NOTE: We intentionally removed resume_session_id, fork_session, and resume_session_at.
-/// For rewind scenarios, we DON'T use SDK's resume because it loads ALL messages.
-/// Instead, we prepend the truncated conversation history to the first message.
-/// This matches how Claude Code handles rewind - they slice messages BEFORE passing to SDK.
+/// Resume support: `resume_session_id` enables session continuity after app restart.
+/// The SDK loads conversation history internally so Claude retains full context.
+///
+/// NOTE: This is NOT used for rewind scenarios. Rewind creates a fresh session
+/// and prepends truncated conversation context to the first message instead.
 /// See agent-bridge/src/protocol/schemas.ts for the TypeScript schema.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -85,6 +86,10 @@ pub struct SessionConfig {
     pub model: Option<Model>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_mode: Option<SessionMode>,
+    /// SDK session ID to resume from (for session continuity after app restart).
+    /// Not used for rewind — rewind uses context-prepend approach instead.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resume_session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
