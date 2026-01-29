@@ -17,17 +17,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn, SIDEBAR, TRANSITIONS } from '@/lib/utils';
+import { cn, getCollapseTransition, SIDEBAR } from '@/lib/utils';
 
 // Hoisted RegExp for path splitting (avoids recreation on each render)
 const PATH_SEPARATOR_RE = /[/\\]/;
-
-// Transition: only animate opacity (GPU-friendly), width change is instant.
-// The sidebar container's overflow:hidden clips the content during width animation.
-const getCollapseTransition = (collapsed: boolean): string =>
-  collapsed
-    ? 'opacity 0ms'
-    : `opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
 
 interface WorktreeItemProps {
   readonly worktreeState: WorktreeUIState;
@@ -91,36 +84,37 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         setIsHovered(false);
       }}
     >
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         className={cn(
-          'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-200 hover:bg-muted/40',
+          'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-100 hover:bg-muted/40 cursor-default',
           active ? 'text-foreground bg-muted/50' : 'text-muted-foreground hover:text-foreground',
           isExpanded && !active && 'bg-muted/40'
         )}
         onClick={handleRowClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleRowClick();
+          }
+        }}
       >
         {/* Chevron toggle - clickable separately to expand/collapse */}
-        <div
-          role="button"
-          tabIndex={0}
-          className="flex items-center justify-center shrink-0 hover:bg-muted/60 rounded-md cursor-pointer"
+        <button
+          type="button"
+          aria-label={isExpanded ? 'Collapse worktree' : 'Expand worktree'}
+          className="flex items-center justify-center shrink-0 hover:bg-muted/60 rounded-md"
           style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
           onClick={handleChevronClick}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              e.stopPropagation();
-              onToggle?.();
-            }
-          }}
         >
           <ChevronDown
             className={cn(
-              'h-4 w-4 shrink-0 transition-transform duration-200',
+              'h-4 w-4 shrink-0 transition-transform duration-150',
               !isExpanded && '-rotate-90'
             )}
           />
-        </div>
+        </button>
 
         {/* Workspace name */}
         <span
@@ -149,7 +143,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
             <span className="max-w-[60px] truncate">{branchName}</span>
           </div>
         )}
-      </button>
+      </div>
 
       {/* More options dropdown - appears on hover */}
       {!collapsed && !worktree.isMain && (
@@ -163,6 +157,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
               }}
+              aria-label="More options"
               title="More options"
             >
               <MoreHorizontal className="h-4 w-4" />

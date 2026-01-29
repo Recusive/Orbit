@@ -5,14 +5,7 @@ import type { SidebarItemProps } from '../types';
 import type { FC } from 'react';
 
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
-import { cn, SIDEBAR, TRANSITIONS } from '@/lib/utils';
-
-// Transition: only animate opacity (GPU-friendly), width change is instant.
-// The sidebar container's overflow:hidden clips the content during width animation.
-const getCollapseTransition = (collapsed: boolean): string =>
-  collapsed
-    ? 'opacity 0ms'
-    : `opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
+import { cn, getCollapseTransition, SIDEBAR } from '@/lib/utils';
 
 export const SidebarItem: FC<SidebarItemProps> = ({
   icon: Icon,
@@ -23,6 +16,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
   large,
   equalSpacing,
   shortcut,
+  badge,
   onClick,
 }) => {
   const iconSizeClass = small ? 'h-3 w-3' : large ? 'h-4.5 w-4.5' : 'h-4 w-4';
@@ -35,10 +29,11 @@ export const SidebarItem: FC<SidebarItemProps> = ({
       >
         <button
           className={cn(
-            'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150',
+            "relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 before:absolute before:content-[''] before:inset-[-8px]",
             active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
           )}
-          title={label}
+          aria-label={badge ? `${label} (${badge})` : label}
+          title={badge ? `${label} — ${badge}` : label}
           onClick={onClick}
         >
           <Icon className={cn('shrink-0', iconSizeClass)} />
@@ -73,6 +68,20 @@ export const SidebarItem: FC<SidebarItemProps> = ({
       >
         {label}
       </span>
+      {/* Badge */}
+      {badge && !collapsed ? (
+        <span
+          className="ml-auto mr-2 shrink-0 inline-flex items-center h-4 rounded border-dotted px-1 text-[10px] font-medium select-none"
+          style={{
+            color: 'var(--warning-foreground)',
+            borderWidth: '1.5px',
+            borderColor: 'var(--warning)',
+            backgroundColor: 'color-mix(in oklch, var(--warning) 10%, transparent)',
+          }}
+        >
+          {badge}
+        </span>
+      ) : null}
       {/* Keyboard shortcut */}
       {shortcut && !collapsed ? (
         <KbdGroup className="ml-auto mr-2">

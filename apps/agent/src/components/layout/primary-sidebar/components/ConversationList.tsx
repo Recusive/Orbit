@@ -165,13 +165,14 @@ export const ConversationList: FC<ConversationListProps> = ({
   return (
     <div className="py-1.5">
       <div className="flex items-center justify-between px-3 py-1">
-        <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-normal whitespace-nowrap">
+        <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
           Workspaces
         </span>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-90 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground shrink-0"
+              aria-label="Create worktree"
+              className="relative h-5 w-5 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-90 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground shrink-0 before:absolute before:content-[''] before:inset-[-10px]"
               onClick={onOpenCreateWorktree}
             >
               <Plus className="h-3 w-3" />
@@ -202,10 +203,10 @@ export const ConversationList: FC<ConversationListProps> = ({
                     onRemoveWorktree(wt.worktree);
                   }}
                 />
-                {/* Conversations for this worktree */}
-                {wt.isExpanded
-                  ? renderConversations(getWorktreeConversations(wt.worktree.path))
-                  : null}
+                {/* Conversations for this worktree — kept mounted, toggled via CSS to avoid remount cost */}
+                <div style={{ display: wt.isExpanded ? 'block' : 'none' }}>
+                  {renderConversations(getWorktreeConversations(wt.worktree.path))}
+                </div>
               </div>
             ))}
           </>

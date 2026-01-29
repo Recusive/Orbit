@@ -46,6 +46,7 @@ export {
   GIT_STATUS_STYLES,
   TRANSITION_CLASSES,
   POPOVER_ANIMATION,
+  getCollapseTransition,
 } from './constants';
 export type { KeyboardShortcutDef, GitStatusStyle } from './constants';
 

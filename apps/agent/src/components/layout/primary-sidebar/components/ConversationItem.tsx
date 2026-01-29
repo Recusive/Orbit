@@ -8,17 +8,10 @@ import type { ConversationItemProps } from '../types';
 import type { FC } from 'react';
 
 import { ConversationContextMenu, ConversationDropdownMenu } from '@/components/sidebar';
-import { cn, TRANSITIONS } from '@/lib/utils';
+import { cn, getCollapseTransition } from '@/lib/utils';
 
 /** Gradient mask for text fade on hover (left-to-right fade at end) */
 const TITLE_HOVER_MASK = 'linear-gradient(to right, black 85%, transparent 98%)';
-
-// Transition: only animate opacity (GPU-friendly), width change is instant.
-// The sidebar container's overflow:hidden clips the content during width animation.
-const getCollapseTransition = (collapsed: boolean): string =>
-  collapsed
-    ? 'opacity 0ms'
-    : `opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
 
 export const ConversationItem: FC<ConversationItemProps> = ({
   conversation,
@@ -86,7 +79,13 @@ export const ConversationItem: FC<ConversationItemProps> = ({
   // Render inline edit input
   if (isEditing && !collapsed) {
     return (
-      <div className="relative mx-1.5 ml-2">
+      <form
+        className="relative mx-1.5 ml-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSaveEdit();
+        }}
+      >
         <input
           ref={inputRef}
           type="text"
@@ -96,9 +95,11 @@ export const ConversationItem: FC<ConversationItemProps> = ({
           }}
           onBlur={handleSaveEdit}
           onKeyDown={handleKeyDown}
+          spellCheck={false}
+          autoComplete="off"
           className="h-7 w-full rounded-lg px-2 text-base bg-muted/50 border border-primary/50 outline-none focus:ring-1 focus:ring-primary/30"
         />
-      </div>
+      </form>
     );
   }
 

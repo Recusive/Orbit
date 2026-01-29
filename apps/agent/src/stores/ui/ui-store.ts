@@ -281,7 +281,7 @@ const saveActiveWorktreeToStorage = (path: string | null): void => {
 };
 
 export const useUIStore = create<UIStore>()(
-  immer((set) => ({
+  immer((set, get) => ({
     containerWidth: null,
     containerHeight: null,
     workspacePath: null,
@@ -633,8 +633,11 @@ export const useUIStore = create<UIStore>()(
         const worktreeState = state.worktrees.find((w) => w.worktree.path === path);
         if (worktreeState) {
           worktreeState.isExpanded = !worktreeState.isExpanded;
-          saveWorktreesToStorage(state.worktrees);
         }
+      });
+      // Defer persistence so React can commit the state update first
+      queueMicrotask(() => {
+        saveWorktreesToStorage(get().worktrees);
       });
     },
 

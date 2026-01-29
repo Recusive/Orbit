@@ -6,14 +6,7 @@ import { ChevronDown } from 'lucide-react';
 import type { WorkspaceItemProps } from '../types';
 import type { FC } from 'react';
 
-import { cn, SIDEBAR, TRANSITIONS } from '@/lib/utils';
-
-// Transition: only animate opacity (GPU-friendly), width change is instant.
-// The sidebar container's overflow:hidden clips the content during width animation.
-const getCollapseTransition = (collapsed: boolean): string =>
-  collapsed
-    ? 'opacity 0ms'
-    : `opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
+import { cn, getCollapseTransition, SIDEBAR } from '@/lib/utils';
 
 export const WorkspaceItem: FC<WorkspaceItemProps> = ({
   name,
@@ -33,7 +26,7 @@ export const WorkspaceItem: FC<WorkspaceItemProps> = ({
       >
         <ChevronDown
           className={cn(
-            'h-4 w-4 shrink-0 transition-transform duration-200',
+            'h-4 w-4 shrink-0 transition-transform duration-150',
             !expanded && '-rotate-90'
           )}
         />

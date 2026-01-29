@@ -180,7 +180,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // - Detects user scroll-up to cancel stickiness
   // - Velocity-based spring animation for smooth content growth
   // - Scroll anchoring when content above viewport resizes
-  const { scrollRef, contentRef, scrollToBottom } = useStickToBottom({
+  const { scrollRef, contentRef, scrollToBottom, stopScroll } = useStickToBottom({
     // Smooth spring animation when content resizes (tool expand/collapse)
     resize: 'smooth',
     // Smooth initial scroll on mount
@@ -213,11 +213,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     const el = scrollRef.current;
     if (el) {
       el.scrollTop = 0;
+      // Explicitly tell the library we're no longer at bottom.
+      // Without this, a ResizeObserver callback racing the scroll event's
+      // setTimeout(..., 1) can cause the resizeDifference guard to swallow
+      // the scroll event — leaving isAtBottom=true at scrollTop=0.
+      stopScroll();
     }
 
     // Update ref AFTER all mutations
     prevSessionIdRef.current = sessionId;
-  }, [sessionId, scrollRef]);
+  }, [sessionId, scrollRef, stopScroll]);
 
   // Detect newly added user messages and mark them for animation
   // CRITICAL: We track by message ID, not array length. This prevents:

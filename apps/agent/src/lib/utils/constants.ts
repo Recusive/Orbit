@@ -187,6 +187,19 @@ export const TRANSITIONS = {
 } as const;
 
 /**
+ * CSS transition string for child element opacity during sidebar collapse/expand.
+ *
+ * When collapsing: instant opacity (0ms) so content disappears immediately.
+ * When expanding: delayed fade-in so the container width starts animating first.
+ *
+ * Shared across SidebarItem, ConversationItem, WorkspaceItem, and WorktreeItem.
+ */
+export const getCollapseTransition = (collapsed: boolean): string =>
+  collapsed
+    ? 'opacity 0ms'
+    : `opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
+
+/**
  * Popover / overlay animation configuration.
  *
  * Single source of truth for every enter/exit animation on tooltips,

@@ -8,7 +8,7 @@
 import { IconCirclePlus } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconCirclePlus';
 import { IconSearchlinesSparkle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSearchlinesSparkle';
 import { FlaskConical, Inbox, Search, Settings } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import { ConversationList } from './components/ConversationList';
@@ -88,24 +88,6 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
 
-  // PERF: Apply will-change only during width transitions, not permanently.
-  // Permanent will-change wastes GPU memory by keeping a compositor layer allocated.
-  const sidebarRef = useRef<HTMLElement>(null);
-  const prevWidthRef = useRef(width);
-
-  useEffect(() => {
-    if (prevWidthRef.current !== width && sidebarRef.current) {
-      sidebarRef.current.style.willChange = 'width';
-      prevWidthRef.current = width;
-    }
-  }, [width]);
-
-  const handleTransitionEnd = useCallback((): void => {
-    if (sidebarRef.current) {
-      sidebarRef.current.style.willChange = '';
-    }
-  }, []);
-
   const {
     deleteDialogOpen,
     setDeleteDialogOpen,
@@ -132,14 +114,13 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
 
   return (
     <aside
-      ref={sidebarRef}
       data-sidebar="primary"
-      className="h-full flex flex-col bg-card overflow-hidden shadow-lg dark:shadow-none"
+      className="h-full flex flex-col bg-card overflow-hidden border-r border-divider shadow-lg dark:shadow-none"
       style={{
         width,
         transition: 'width 200ms cubic-bezier(0.165, 0.84, 0.44, 1)',
+        contain: 'layout style',
       }}
-      onTransitionEnd={handleTransitionEnd}
     >
       {/* Header */}
       <div className="flex shrink-0" style={{ height: HEIGHTS.headerBar }}>
@@ -153,7 +134,8 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleLeftSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground"
+                  aria-label="Expand sidebar"
+                  className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
                 >
                   <SidebarToggleIcon expanded={false} />
                 </button>
@@ -183,7 +165,8 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleLeftSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground"
+                  aria-label="Collapse sidebar"
+                  className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
                 >
                   <SidebarToggleIcon expanded={true} />
                 </button>
@@ -286,6 +269,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           <SidebarItem
             icon={IconSearchlinesSparkle}
             label="Vault"
+            badge="Soon"
             collapsed={isCollapsed}
             equalSpacing={isCollapsed}
             onClick={() => {
@@ -349,10 +333,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         )}
       </div>
 
-      <hr className={cn('border-divider shrink-0', isCollapsed ? 'my-0' : 'my-2')} />
+      <hr className="border-divider shrink-0 mt-2 mb-0" />
 
-      {/* Utilities */}
-      <div className={cn('flex flex-col shrink-0', isCollapsed ? 'gap-0 py-0' : 'gap-1 py-1.5')}>
+      {/* Utilities — pinned to bottom, spacing stays constant so buttons don't shift on collapse */}
+      <div className="flex flex-col shrink-0 gap-1 py-1.5">
         <SidebarItem
           icon={Settings}
           label="Settings"
