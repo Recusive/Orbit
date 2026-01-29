@@ -78,3 +78,8 @@ audits/
 
 # Personal prompts and notes (local only)
 Prompt and Info/
+
+# SDK docs and local RAG (indexed locally, not project code)
+SDK/
+models/
+lancedb/

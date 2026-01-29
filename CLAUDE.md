@@ -753,6 +753,20 @@ apps/Canvas-UI-Builder/src/
 <feature name="CSP Security" file="docs/architecture/CSP-SECURITY.md" description="Content Security Policy config, why unsafe-eval is required for streamdown"/>
 </feature_documentation>
 
+<sdk_documentation importance="high">
+Claude Agent SDK docs are in `SDK/` folder (18 markdown files) and indexed in local RAG vector database.
+
+**Lookup workflow — always two steps:**
+
+1. **Search index**: `query_documents({ query: "specific SDK terms here", limit: 10 })` → finds which file has the answer
+2. **Read source**: `Read` the file path from results → gets full content with code examples and tables intact
+
+RAG chunks are small fragments — good for discovery, not complete answers. Always Read the source file after searching.
+
+Use specific API names in queries (e.g., "canUseTool", "permissionMode", "PreToolUse") for best results.
+Search SDK docs whenever working on agent-bridge, SDK integration, permissions, hooks, MCP, sessions, or tools.
+</sdk_documentation>
+
 <changelog>
   <period date="January 2026">
     <entry>Canvas UI Builder - Visual component builder with shadcn/ui (Rust backend + React frontend)</entry>
