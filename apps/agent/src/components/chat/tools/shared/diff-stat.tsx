@@ -22,14 +22,22 @@ export const DiffStat: FC<DiffStatProps> = ({ additions, deletions }) => {
   let neutralSquares = 0;
 
   if (total > 0) {
+    // Allocate additions first, then derive deletions from the remainder
+    // to guarantee addSquares + delSquares <= MAX_SQUARES.
+    // (Code review: Codex cycle 1, issue #1 — Math.round on both sides
+    // could exceed MAX_SQUARES, e.g. additions=1, deletions=1 → 3+3=6)
     addSquares = Math.round((additions / total) * MAX_SQUARES);
-    delSquares = Math.round((deletions / total) * MAX_SQUARES);
-    // Ensure at least 1 square if there are changes
+    // Ensure at least 1 square when there are changes
     if (additions > 0 && addSquares === 0) addSquares = 1;
+    // Clamp so deletions still have room when non-zero
+    if (deletions > 0 && addSquares >= MAX_SQUARES) addSquares = MAX_SQUARES - 1;
+    // Deletions get the remainder (at least 1 if non-zero)
+    const maxDel = MAX_SQUARES - addSquares;
+    delSquares = Math.round((deletions / total) * MAX_SQUARES);
     if (deletions > 0 && delSquares === 0) delSquares = 1;
+    if (delSquares > maxDel) delSquares = maxDel;
     // Fill remaining with neutral
     neutralSquares = MAX_SQUARES - addSquares - delSquares;
-    if (neutralSquares < 0) neutralSquares = 0;
   } else {
     neutralSquares = MAX_SQUARES;
   }

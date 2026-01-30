@@ -30,6 +30,9 @@ const logger = createLogger('MessageBufferStore');
 /** Maximum messages per session to prevent memory bloat */
 const MAX_BUFFER_SIZE = 1000;
 
+/** Maximum delivered UUIDs to track per session to prevent unbounded Set growth */
+const MAX_DELIVERED_UUIDS = 2000;
+
 /** Maximum age for buffered messages (5 minutes) */
 const MAX_MESSAGE_AGE_MS = 5 * 60 * 1000;
 
@@ -276,6 +279,18 @@ export const useMessageBufferStore = create<MessageBufferState>()(
           // Mark these messages as delivered
           for (const msg of validMessages) {
             buf.deliveredUuids.add(msg.uuid);
+          }
+
+          // Cap deliveredUuids to prevent unbounded Set growth across turns.
+          // Sets maintain insertion order, so we evict oldest entries first.
+          if (buf.deliveredUuids.size > MAX_DELIVERED_UUIDS) {
+            const excess = buf.deliveredUuids.size - MAX_DELIVERED_UUIDS;
+            let removed = 0;
+            for (const uuid of buf.deliveredUuids) {
+              if (removed >= excess) break;
+              buf.deliveredUuids.delete(uuid);
+              removed++;
+            }
           }
         }
       });

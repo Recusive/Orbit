@@ -14,6 +14,25 @@ import type { FC } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
+ * Module-level singleton for Shiki import.
+ * Without this, 10+ bash tool widgets mounting simultaneously would each fire
+ * a separate dynamic import (module cache deduplicates the fetch, but each
+ * creates a separate Promise allocation and microtask). Hoisting to a singleton
+ * ensures only one import is in-flight and all consumers share the same Promise.
+ * (Code review: Opus cycle 1, issue #15)
+ */
+let shikiPromise: Promise<{
+  codeToHtml: (code: string, options: { lang: string; theme: string }) => Promise<string>;
+}> | null = null;
+
+function getShiki(): Promise<{
+  codeToHtml: (code: string, options: { lang: string; theme: string }) => Promise<string>;
+}> {
+  shikiPromise ??= import('shiki');
+  return shikiPromise;
+}
+
+/**
  * Subscribe to theme changes on the html element.
  * Uses MutationObserver to detect when 'dark' class is toggled.
  */
@@ -88,7 +107,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
         // Lazy-load Shiki only when first bash output needs highlighting.
         // Shiki's WASM bundle (~1.5MB) is excluded from the initial chunk,
         // reducing startup time for users who haven't seen bash output yet.
-        const { codeToHtml } = await import('shiki');
+        const { codeToHtml } = await getShiki();
         const html = await codeToHtml(command, {
           lang: 'bash',
           theme: shikiTheme,

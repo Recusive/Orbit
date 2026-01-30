@@ -724,6 +724,16 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         //   4. Sends DUPLICATE conversation:load 💥
         // The flag is cleared by use-chat-messages.ts when it sees the pending
         // load, and the 30s timeout in message-buffer-store provides safety cleanup.
+        //
+        // TIMING CONTRACT (happens-before chain):
+        //   setTimeout(0) → startTransition(setMessages+setSessionId) → React commit
+        //   → useEffect sees new sessionId → clearLoadPending(id)
+        //
+        // The buffer drains happen-after startTransition commits, so
+        // clearLoadPending in the useEffect fires before any new streaming
+        // messages are processed. New messages arriving between setTimeout(0)
+        // and useEffect firing are buffered safely because pendingLoads is
+        // still set. (Code review: Opus cycle 1, issue #4)
 
         // Switch file store to new session (saves old files to cache, restores from cache if exists)
         useFileStore.getState().switchSession(message.session_id);

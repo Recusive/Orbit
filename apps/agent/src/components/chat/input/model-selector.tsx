@@ -45,6 +45,8 @@ interface ModelOption {
   name: string;
   icon: FC<{ className?: string }>;
   badge?: string;
+  /** When true, the option is shown but not selectable (coming soon placeholder) */
+  disabled?: boolean;
 }
 
 interface ModelGroup {
@@ -64,9 +66,9 @@ const MODEL_GROUPS: ModelGroup[] = [
   {
     label: 'Codex',
     models: [
-      { id: 'gpt5-nano', name: 'GPT-5 Nano', icon: OpenAIIcon, badge: 'New chat' },
-      { id: 'gpt5-mini', name: 'GPT-5 Mini', icon: OpenAIIcon, badge: 'New chat' },
-      { id: 'gpt5', name: 'GPT-5', icon: OpenAIIcon, badge: 'New chat' },
+      { id: 'gpt5-nano', name: 'GPT-5 Nano', icon: OpenAIIcon, badge: 'Soon', disabled: true },
+      { id: 'gpt5-mini', name: 'GPT-5 Mini', icon: OpenAIIcon, badge: 'Soon', disabled: true },
+      { id: 'gpt5', name: 'GPT-5', icon: OpenAIIcon, badge: 'Soon', disabled: true },
     ],
   },
 ];
@@ -119,6 +121,17 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     };
   }, [isOpen, updatePosition]);
 
+  // Auto-focus popover container when opened for keyboard accessibility.
+  // This ensures screen readers announce the popover and Tab starts cycling
+  // within the focus trap. (Code review: Opus cycle 1, issue #3)
+  useEffect(() => {
+    if (!isOpen || isAnimatingOut) return;
+    // Defer to next frame so the portal DOM is mounted
+    requestAnimationFrame(() => {
+      popoverRef.current?.focus();
+    });
+  }, [isOpen, isAnimatingOut]);
+
   // Handle closing with exit animation
   const handleClose = useCallback((): void => {
     if (!isOpen || isAnimatingOut) return;
@@ -166,11 +179,13 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     (m) => m.id === selectedModel
   );
 
-  const handleSelectModel = (modelId: string): void => {
+  const handleSelectModel = (model: ModelOption): void => {
+    // Disabled models (coming soon) don't close the menu or change selection
+    if (model.disabled === true) return;
     // Only allow valid Model values
-    if (modelId === 'haiku' || modelId === 'sonnet' || modelId === 'opus') {
-      setModel(modelId);
-      onModelChange?.(modelId);
+    if (model.id === 'haiku' || model.id === 'sonnet' || model.id === 'opus') {
+      setModel(model.id);
+      onModelChange?.(model.id);
     }
     handleClose();
   };
@@ -183,12 +198,46 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     }
   };
 
+  // Focus trap: cycle Tab within the popover when open.
+  // Without this, Tab escapes the portal to document.body elements.
+  // (Code review: Opus cycle 1, issue #3)
+  const handlePopoverKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key !== 'Tab') return;
+
+    const popover = popoverRef.current;
+    if (!popover) return;
+
+    const focusable = popover.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (e.shiftKey) {
+      // Shift+Tab: wrap from first → last
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      }
+    } else {
+      // Tab: wrap from last → first
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    }
+  }, []);
+
   // Popover content — rendered via portal into document.body
   const popoverContent = isOpen ? (
     <div
       ref={popoverRef}
       role="listbox"
       aria-label="Select model"
+      tabIndex={-1}
+      onKeyDown={handlePopoverKeyDown}
       className={cn(
         'fixed bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50',
         'origin-bottom-left',
@@ -221,13 +270,17 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
               <button
                 key={model.id}
                 onClick={() => {
-                  handleSelectModel(model.id);
+                  handleSelectModel(model);
                 }}
+                disabled={model.disabled === true}
+                title={model.disabled === true ? 'Coming soon' : undefined}
                 className={cn(
                   `w-full flex items-center justify-between px-2 py-1.5 text-xs ${TRANSITION_CLASSES.item} mt-0.5 first:mt-0 group`,
-                  selectedModel === model.id
-                    ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
-                    : 'rounded-md hover:bg-muted/80 active:scale-[0.98]'
+                  model.disabled === true
+                    ? 'opacity-40 cursor-not-allowed'
+                    : selectedModel === model.id
+                      ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
+                      : 'rounded-md hover:bg-muted/80 active:scale-[0.98]'
                 )}
               >
                 <div className="flex items-center gap-2">

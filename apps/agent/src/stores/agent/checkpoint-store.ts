@@ -26,6 +26,9 @@ import { immer } from 'zustand/middleware/immer';
 
 const logger = createLogger('CheckpointStore');
 
+/** Maximum sessions to track checkpoints for — prevents unbounded memory growth */
+const MAX_CHECKPOINT_SESSIONS = 10;
+
 export interface RewindCheckpoints {
   /** Checkpoint for resumeSessionAt - Claude sees up to this message */
   resumeSessionAt: string;
@@ -199,6 +202,20 @@ export const useCheckpointStore = create<CheckpointState>()(
           state.currentTurnStartCheckpoint = { sessionId, checkpointId };
         }
         // Otherwise: intermediate checkpoint during tool execution, ignore for turn tracking
+
+        // Evict oldest sessions to prevent unbounded memory growth across all 4 records.
+        const sessionKeys = Object.keys(state.checkpointOrder);
+        if (sessionKeys.length > MAX_CHECKPOINT_SESSIONS) {
+          const evictCount = sessionKeys.length - MAX_CHECKPOINT_SESSIONS;
+          for (const key of sessionKeys.slice(0, evictCount)) {
+            // Skip the current session being written to
+            if (key === sessionId) continue;
+            Reflect.deleteProperty(state.turnStartCheckpoints, key);
+            Reflect.deleteProperty(state.turnEndCheckpoints, key);
+            Reflect.deleteProperty(state.checkpointOrder, key);
+            Reflect.deleteProperty(state.latestCheckpoints, key);
+          }
+        }
       });
     },
 

@@ -330,9 +330,9 @@ export const useSidebarActions = ({
     setDeleteDialogOpen(true);
   }, []);
 
-  // Duplicate handler (placeholder - will ask for SDK docs)
+  // Duplicate handler — placeholder until SDK conversation-fork API is available.
+  // Blocked on: Claude Agent SDK fork/duplicate support (not yet in SDK).
   const handleDuplicateConversation = useCallback((sessionId: string): void => {
-    // TODO: Implement using SDK fork - ask user for docs
     logger.info('Duplicate requested for conversation', { sessionId });
     toast.info('Duplicate feature coming soon');
   }, []);

@@ -42,8 +42,10 @@ import {
   useCreateWorktreeDialogOpen,
 } from '@/stores/ui/ui-store';
 
-/** Evaluated once at module load -- the OS preference is static for the session lifetime. */
-const PREFERS_REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** Evaluated once at module load — the OS preference is static for the session lifetime.
+ * Guarded for non-DOM contexts (tests / SSR). (Code review: Codex cycle 1, issue #3) */
+const PREFERS_REDUCED_MOTION =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Width transition CSS for the sidebar, gated on reduced-motion preference. */
 const SIDEBAR_WIDTH_TRANSITION = PREFERS_REDUCED_MOTION

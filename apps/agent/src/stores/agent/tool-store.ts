@@ -46,6 +46,9 @@ const STORE_VERSION = 1;
  */
 const MAX_PERSISTED_TOOLS = 500;
 
+/** Maximum cached sessions to prevent unbounded memory growth */
+const MAX_CACHED_SESSIONS = 10;
+
 /**
  * Maximum size for toolInput values to persist (in characters).
  * Larger values are truncated to prevent localStorage bloat and
@@ -422,6 +425,13 @@ export const useToolStore = create<ToolState>()(
 
             // Move to completed
             state.completedTools.push({ ...tool });
+
+            // Cap in-memory array to prevent unbounded growth in long sessions.
+            // Same limit as localStorage persistence (MAX_PERSISTED_TOOLS).
+            if (state.completedTools.length > MAX_PERSISTED_TOOLS) {
+              state.completedTools = state.completedTools.slice(-MAX_PERSISTED_TOOLS);
+            }
+
             // Remove from active tools (Reflect.deleteProperty avoids eslint no-dynamic-delete)
             Reflect.deleteProperty(state.activeTools, id);
             state.toolRevision += 1;
@@ -503,6 +513,15 @@ export const useToolStore = create<ToolState>()(
               activeTools: { ...state.activeTools },
               completedTools: [...state.completedTools],
             };
+
+            // Evict oldest sessions to prevent unbounded memory growth.
+            const cacheKeys = Object.keys(state.sessionCache);
+            if (cacheKeys.length > MAX_CACHED_SESSIONS) {
+              const evictCount = cacheKeys.length - MAX_CACHED_SESSIONS;
+              for (const key of cacheKeys.slice(0, evictCount)) {
+                Reflect.deleteProperty(state.sessionCache, key);
+              }
+            }
           }
 
           // Check if we have cached data for the new session
