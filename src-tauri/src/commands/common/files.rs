@@ -27,17 +27,20 @@ use crate::core::sentry_utils::SentryCapture as _;
 // Basic File Operations
 // ============================================
 
-/// Read file contents as a string
+/// Read file contents as a string.
+///
+/// Read-only: no workspace restriction. Matches VS Code behavior where any file
+/// on disk can be opened for reading, while writes remain sandboxed.
 #[tauri::command]
 pub async fn read_file(path: String) -> Result<String> {
-    ensure_workspace_paths(&[&path])?;
     orbit_fs::read_file(&path).await.capture("read_file")
 }
 
-/// Read file contents as bytes (base64 encoded for transport)
+/// Read file contents as bytes (base64 encoded for transport).
+///
+/// Read-only: no workspace restriction (see `read_file`).
 #[tauri::command]
 pub async fn read_file_bytes(path: String) -> Result<Vec<u8>> {
-    ensure_workspace_paths(&[&path])?;
     orbit_fs::read_file_bytes(&path)
         .await
         .capture("read_file_bytes")
@@ -114,28 +117,27 @@ pub async fn copy_file(from: String, to: String) -> Result<()> {
     orbit_fs::copy_file(&from, &to).await.capture("copy_file")
 }
 
-/// Check if a file exists
+/// Check if a file exists.
+///
+/// Read-only: no workspace restriction (see `read_file`).
 #[tauri::command]
 pub async fn file_exists(path: String) -> bool {
-    if ensure_workspace_paths(&[&path]).is_err() {
-        return false;
-    }
     orbit_fs::file_exists(&path).await
 }
 
-/// Check if a path is a directory
+/// Check if a path is a directory.
+///
+/// Read-only: no workspace restriction (see `read_file`).
 #[tauri::command]
 pub async fn is_directory(path: String) -> bool {
-    if ensure_workspace_paths(&[&path]).is_err() {
-        return false;
-    }
     orbit_fs::is_directory(&path).await
 }
 
-/// Get detailed file information
+/// Get detailed file information.
+///
+/// Read-only: no workspace restriction (see `read_file`).
 #[tauri::command]
 pub async fn get_file_info(path: String) -> Result<FileInfo> {
-    ensure_workspace_paths(&[&path])?;
     orbit_fs::get_file_info(&path)
         .await
         .capture("get_file_info")

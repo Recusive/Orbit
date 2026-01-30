@@ -259,6 +259,7 @@ describe('QuickOpen', () => {
             language: 'typescript',
             viewMode: 'file',
             isModified: false,
+            isExternal: false,
           },
           {
             path: '/workspace/src/recent-2.ts',
@@ -267,6 +268,7 @@ describe('QuickOpen', () => {
             language: 'typescript',
             viewMode: 'file',
             isModified: false,
+            isExternal: false,
           },
         ],
       });
@@ -287,6 +289,7 @@ describe('QuickOpen', () => {
         language: 'typescript',
         viewMode: 'file' as const,
         isModified: false,
+        isExternal: false,
       }));
 
       useFileViewerStore.setState({ openTabs: tabs });
@@ -311,6 +314,7 @@ describe('QuickOpen', () => {
             language: 'typescript',
             viewMode: 'file',
             isModified: false,
+            isExternal: false,
           },
         ],
       });
@@ -336,6 +340,7 @@ describe('QuickOpen', () => {
             language: 'typescript',
             viewMode: 'file',
             isModified: false,
+            isExternal: false,
           },
         ],
       });
@@ -410,6 +415,7 @@ describe('QuickOpen', () => {
             language: 'typescript',
             viewMode: 'file',
             isModified: false,
+            isExternal: false,
           },
         ],
       });

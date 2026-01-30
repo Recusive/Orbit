@@ -95,7 +95,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         'border-r border-border/50',
         isActive
           ? 'bg-card text-foreground'
-          : 'bg-sidebar text-muted-foreground hover:text-foreground'
+          : 'bg-chat-area text-muted-foreground hover:text-foreground'
       )}
       style={{ maxWidth: 180 }}
     >

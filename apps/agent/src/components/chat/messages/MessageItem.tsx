@@ -135,7 +135,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           )}
           style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
         >
-          <p className="text-base leading-relaxed whitespace-pre-wrap">
+          <p className="text-base leading-relaxed whitespace-pre-wrap select-text">
             {message.displayedContent}
           </p>
         </div>
@@ -167,7 +167,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                 return (
                   <div
                     key={segment.key}
-                    className="chat-markdown prose prose-sm dark:prose-invert max-w-none"
+                    className="chat-markdown prose prose-sm dark:prose-invert max-w-none select-text"
                     onClick={handleContentClick}
                   >
                     <Streamdown

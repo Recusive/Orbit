@@ -430,6 +430,15 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     // Higher values reduce visible blank areas during fast scrolling
     // but increase DOM node count. 5 is a good balance.
     overscan: 5,
+    // FIX: Disable flushSync to prevent "flushSync called inside lifecycle"
+    // errors with React 19. The library's default onChange wraps rerender()
+    // in flushSync for synchronous scrollToIndex measurement, but when the
+    // virtualizer's internal memoization chain fires during a parent render
+    // (e.g., streaming message updates), React 19 throws. Setting this to
+    // false uses the same internal useReducer rerender without the flushSync
+    // wrapper — zero extra renders, zero GC overhead. Safe here because
+    // use-stick-to-bottom handles all scroll-to-bottom behavior independently.
+    useFlushSync: false,
   });
 
   const virtualItems = virtualizer.getVirtualItems();
@@ -485,7 +494,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                 key={virtualItem.key}
                 data-index={virtualItem.index}
                 ref={virtualizer.measureElement}
-                className="absolute left-0 w-full pb-3"
+                className="absolute left-0 w-full pb-3 select-none"
                 style={{
                   top: `${String(virtualItem.start)}px`,
                   // NOTE: content-visibility:auto was REMOVED here. TanStack Virtual

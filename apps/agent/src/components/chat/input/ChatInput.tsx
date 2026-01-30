@@ -151,7 +151,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
         {/* Input Area */}
         <div
           ref={inputRef}
-          className="p-2 text-base outline-none overflow-y-auto"
+          className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden break-words"
           style={{
             minHeight: INPUT_SIZES.textareaMinHeight,
             maxHeight: INPUT_SIZES.textareaMaxHeight,
