@@ -243,8 +243,8 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1 bg-muted/50 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-success transition-[width] duration-300 rounded-full"
-                          style={{ width: `${String((completedCount / totalCount) * 100)}%` }}
+                          className="h-full bg-success transition-transform duration-300 origin-left rounded-full"
+                          style={{ transform: `scaleX(${String(completedCount / totalCount)})` }}
                         />
                       </div>
                       <span className="text-xs text-muted-foreground/60 font-medium">

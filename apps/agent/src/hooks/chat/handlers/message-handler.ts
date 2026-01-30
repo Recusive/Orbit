@@ -327,7 +327,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         const startTime = thinkingStartTimes.current.get(messageId) ?? Date.now();
         const currentDuration = Date.now() - startTime;
 
-        if (lastMsg?.role === 'assistant') {
+        if (lastMsg?.role === 'assistant' && lastMsg.id === messageId) {
+          // Verify message ID matches to prevent thinking content misattribution
+          // if multiple assistant messages exist. (Code review: Opus cycle 2, issue #8)
           const newThinking = (lastMsg.thinking ?? '') + accumulatedThinking;
           result[lastIdx] = {
             ...lastMsg,

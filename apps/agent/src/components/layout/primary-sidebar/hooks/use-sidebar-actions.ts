@@ -216,6 +216,7 @@ export const useSidebarActions = ({
       // Mark load as pending BEFORE posting the message.
       // This prevents use-chat-messages.ts from sending a duplicate conversation:load
       // when the sessionId changes in response to conversation:loaded.
+      // See message-buffer-store.ts:pendingLoads for the 30s safety timeout.
       useMessageBufferStore.getState().markLoadPending(sessionId);
       // PERF: Wrap the network request in startTransition so React can yield to
       // the browser between the synchronous loading-state paint above and the

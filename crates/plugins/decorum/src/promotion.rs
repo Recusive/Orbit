@@ -235,6 +235,23 @@ pub(crate) fn unlock_webview_framerate(ns_window: *mut c_void) {
 ///
 /// `view` must be a valid `NSView` pointer.
 unsafe fn find_wk_web_view(view: *mut AnyObject) -> Option<*mut AnyObject> {
+    // Max depth limit prevents stack overflow in deeply nested view hierarchies.
+    // WKWebView is typically 3-5 levels deep in a Tauri window; 20 is generous.
+    // Also provides implicit cycle protection. (Code review: Opus cycle 2, issue #5)
+    find_wk_web_view_recursive(view, 20)
+}
+
+/// Recursive helper with depth limit for `find_wk_web_view`.
+///
+/// # Safety
+///
+/// `view` must be a valid `NSView` pointer.
+unsafe fn find_wk_web_view_recursive(view: *mut AnyObject, depth: u32) -> Option<*mut AnyObject> {
+    if depth == 0 {
+        log::warn!("ProMotion: max view hierarchy depth reached without finding WKWebView");
+        return None;
+    }
+
     let wk_class = AnyClass::get(c"WKWebView")?;
 
     let is_wk: bool = msg_send![view, isKindOfClass: wk_class];
@@ -250,7 +267,7 @@ unsafe fn find_wk_web_view(view: *mut AnyObject) -> Option<*mut AnyObject> {
     for i in 0..count {
         let subview: *mut AnyObject = msg_send![subviews, objectAtIndex: i];
         if !subview.is_null() {
-            if let Some(found) = find_wk_web_view(subview) {
+            if let Some(found) = find_wk_web_view_recursive(subview, depth - 1) {
                 return Some(found);
             }
         }

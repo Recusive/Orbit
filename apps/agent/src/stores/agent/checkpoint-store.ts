@@ -204,6 +204,8 @@ export const useCheckpointStore = create<CheckpointState>()(
         // Otherwise: intermediate checkpoint during tool execution, ignore for turn tracking
 
         // Evict oldest sessions to prevent unbounded memory growth across all 4 records.
+        // Object.keys preserves insertion order for non-integer string keys
+        // (guaranteed by V8/JSC/SpiderMonkey; spec-guaranteed for all target engines).
         const sessionKeys = Object.keys(state.checkpointOrder);
         if (sessionKeys.length > MAX_CHECKPOINT_SESSIONS) {
           const evictCount = sessionKeys.length - MAX_CHECKPOINT_SESSIONS;

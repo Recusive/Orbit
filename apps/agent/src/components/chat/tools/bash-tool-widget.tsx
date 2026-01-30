@@ -28,7 +28,13 @@ let shikiPromise: Promise<{
 function getShiki(): Promise<{
   codeToHtml: (code: string, options: { lang: string; theme: string }) => Promise<string>;
 }> {
-  shikiPromise ??= import('shiki');
+  // Clear the cached promise on rejection so subsequent callers can retry.
+  // Without this, a transient import failure (e.g., network glitch during WASM fetch)
+  // would permanently reject for all future callers. (Code review: Opus cycle 2, edge case #2)
+  shikiPromise ??= import('shiki').catch((error: unknown) => {
+    shikiPromise = null;
+    throw error;
+  });
   return shikiPromise;
 }
 

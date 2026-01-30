@@ -14,6 +14,7 @@
  * NOTE: Chat container widths come from @/lib/utils/constants.
  * To change chat max-width, update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts.
  */
+import { createLogger } from '@orbit/common/lib';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // PINNED: use-stick-to-bottom@1.1.2 — the session-switch scroll reset workaround
@@ -39,6 +40,8 @@ import {
   useCompletedTools,
   useRunningTool,
 } from '@/stores/agent/tool-store';
+
+const logger = createLogger('ChatMessages');
 
 // Rotating loading messages - fun tech-themed phrases (fallback when no tool is running)
 const LOADING_MESSAGES = [
@@ -96,7 +99,8 @@ function truncateFileName(fileName: string): string {
 function getFileName(filePath: string): string {
   // Split on both forward and back slashes to handle Unix and Windows paths
   const parts = filePath.split(/[/\\]/);
-  const fileName = parts.pop() ?? 'file';
+  const raw = parts.pop();
+  const fileName = raw !== undefined && raw.length > 0 ? raw : 'file';
   return truncateFileName(fileName);
 }
 
@@ -403,7 +407,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // when messages are prepended or removed (e.g., conversation:loaded merge).
   const getItemKey = useCallback(
     (index: number): string => {
-      return messages[index]?.id ?? String(index);
+      const id = messages[index]?.id;
+      if (id === undefined) {
+        // Fallback should never trigger — virtualizer count matches messages.length.
+        // If it fires, something is out of sync during a rapid session switch.
+        logger.warn('getItemKey: messages[index] undefined, falling back to index', {
+          index,
+          count: messages.length,
+        });
+      }
+      return id ?? String(index);
     },
     [messages]
   );
