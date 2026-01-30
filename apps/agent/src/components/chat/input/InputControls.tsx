@@ -20,7 +20,7 @@ import type { FC } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useContainerWidth } from '@/hooks/ui';
-import { cn, INPUT_CONTROLS } from '@/lib/utils';
+import { cn, INPUT_CONTROLS, TRANSITION_CLASSES } from '@/lib/utils';
 
 export const InputControls: FC<InputControlsProps> = memo(function InputControls({
   inputMode,
@@ -70,7 +70,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               onClick={cycleInputMode}
               aria-label={`Input mode: ${INPUT_MODE_LABELS[inputMode]}. Click to change.`}
               className={cn(
-                'h-7 px-2.5 flex items-center gap-1.5 rounded-lg transition-[background-color,color,transform] duration-150',
+                `h-7 px-2.5 flex items-center gap-1.5 rounded-lg ${TRANSITION_CLASSES.button}`,
                 'hover:scale-[1.02] active:scale-[0.98]',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
                 inputMode === 'default' &&
@@ -113,7 +113,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                   className={cn(
                     'h-7 w-7 flex items-center justify-center rounded-lg',
                     'bg-transparent text-muted-foreground/70',
-                    'transition-[background-color,color,transform] duration-150',
+                    TRANSITION_CLASSES.button,
                     'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
                     'active:scale-95',
                     'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
@@ -137,7 +137,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                   className={cn(
                     'h-7 w-7 flex items-center justify-center rounded-lg',
                     'bg-transparent text-muted-foreground/70',
-                    'transition-[background-color,color,transform] duration-150',
+                    TRANSITION_CLASSES.button,
                     'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
                     'active:scale-95',
                     'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
@@ -169,7 +169,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                   className={cn(
                     'h-7 w-7 flex items-center justify-center rounded-lg',
                     'bg-transparent text-muted-foreground/70',
-                    'transition-[background-color,color,transform] duration-150',
+                    TRANSITION_CLASSES.button,
                     handleGlobeClick === undefined
                       ? 'opacity-50 cursor-not-allowed'
                       : 'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08] active:scale-95',
@@ -193,7 +193,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                   className={cn(
                     'h-7 w-7 flex items-center justify-center rounded-lg',
                     'bg-transparent text-muted-foreground/70',
-                    'transition-[background-color,color,transform] duration-150',
+                    TRANSITION_CLASSES.button,
                     'hover:bg-muted/50 hover:text-foreground hover:scale-[1.08]',
                     'active:scale-95',
                     'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'

@@ -5,7 +5,7 @@ import type { ThinkingModeButtonProps } from './types';
 import type { FC } from 'react';
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { cn } from '@/lib/utils';
+import { cn, TRANSITION_CLASSES } from '@/lib/utils';
 
 export const ThinkingModeButton: FC<ThinkingModeButtonProps> = ({
   thinkingMode,
@@ -34,7 +34,7 @@ export const ThinkingModeButton: FC<ThinkingModeButtonProps> = ({
             aria-label={`Extended thinking: ${thinkingInfo.level}. Click to change.`}
             className={cn(
               'h-7 flex items-center justify-center gap-1 px-1.5 rounded-lg',
-              'transition-[background-color,color,transform] duration-150',
+              TRANSITION_CLASSES.button,
               'hover:bg-muted/50 hover:scale-[1.02]',
               'active:scale-95',
               'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',

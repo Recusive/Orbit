@@ -208,11 +208,11 @@ export const ContextContentHeader: FC<ContextContentHeaderProps> = ({ children, 
         <span className="opacity-50">/</span>
         <span>{formatTokens(maxTokens)} tokens</span>
       </div>
-      {/* Progress bar */}
+      {/* Progress bar — uses scaleX instead of width to stay on GPU (no layout reflow) */}
       <div className="mt-2.5 h-2 bg-muted rounded-full overflow-hidden shadow-inner">
         <div
-          className="h-full rounded-full transition-[width] duration-300 ease-out"
-          style={{ width: `${String(percentage)}%`, ...getProgressStyle() }}
+          className="h-full w-full origin-left rounded-full transition-transform duration-300 ease-out"
+          style={{ transform: `scaleX(${String(percentage / 100)})`, ...getProgressStyle() }}
         />
       </div>
     </div>

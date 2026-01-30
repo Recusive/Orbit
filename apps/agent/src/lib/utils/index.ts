@@ -44,6 +44,9 @@ export {
   DEFAULT_UI_STATE,
   KEYBOARD_SHORTCUTS,
   GIT_STATUS_STYLES,
+  TRANSITION_CLASSES,
+  POPOVER_ANIMATION,
+  getCollapseTransition,
 } from './constants';
 export type { KeyboardShortcutDef, GitStatusStyle } from './constants';
 

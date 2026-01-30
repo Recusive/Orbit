@@ -1,4 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
+import { startTransition } from 'react';
 
 import type { ChatMessage } from '@/components/chat';
 import type { ExtensionMessage, Model } from '@/types/protocol';
@@ -9,7 +10,6 @@ import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { toConversationSummaries } from '@/lib/mappers';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { rafBatch } from '@/lib/utils/event-batcher';
-import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
@@ -35,6 +35,12 @@ const FLUSH_PENDING = true;
 interface TextChunkEvent {
   messageId: string;
   content: string;
+}
+
+/** Thinking chunk event for RAF batching - accumulates rapid thinking chunks */
+interface ThinkingChunkEvent {
+  messageId: string;
+  thinking: string;
 }
 
 interface ToolStartEvent {
@@ -205,10 +211,19 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       chunksByMessage.set(event.messageId, existing + event.content);
     }
 
-    // Apply all accumulated content in a single setMessages call
-    // After applying, clear pending lengths for these messages
+    // Apply all accumulated content in a single setMessages call.
+    // After applying, clear pending lengths for these messages.
+    //
+    // PERF: Uses shallow-copy + index mutation instead of spread + slice.
+    // The previous pattern created 3 intermediate arrays per message update:
+    //   [...result.slice(0, idx), { ...msg }, ...result.slice(idx + 1)]
+    // The new pattern creates 1 array copy (.slice()) + 1 object spread,
+    // cutting GC pressure on this hot path (~140+ calls per streaming turn).
     setMessages((prev) => {
-      let result = prev;
+      // Shallow copy once — all mutations target this single copy
+      const result = prev.slice();
+      let mutated = false;
+
       for (const [messageId, accumulatedContent] of chunksByMessage) {
         // Clear pending length for this message - content is now rendered
         pendingChunkLengths.set(messageId, 0);
@@ -216,17 +231,15 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
 
         // Sanity check: ensure valid array index before accessing
         if (lastIdx < 0) {
-          // Empty array - create new message below
-          result = [
-            ...result,
-            {
-              id: messageId,
-              role: 'assistant' as const,
-              content: accumulatedContent,
-              displayedContent: accumulatedContent,
-              isStreaming: true,
-            },
-          ];
+          // Empty array - create new message
+          result.push({
+            id: messageId,
+            role: 'assistant' as const,
+            content: accumulatedContent,
+            displayedContent: accumulatedContent,
+            isStreaming: true,
+          });
+          mutated = true;
           continue;
         }
 
@@ -246,11 +259,10 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // - Result: Data corruption where B's content merged into A
         if (lastMsg?.role === 'assistant' && lastMsg.id === messageId) {
           // Fast path: append to last assistant message with matching ID (common case)
+          // Mutate the shallow copy in-place (1 object allocation, 0 array allocations)
           const newContent = lastMsg.content + accumulatedContent;
-          result = [
-            ...result.slice(0, lastIdx),
-            { ...lastMsg, content: newContent, displayedContent: newContent },
-          ];
+          result[lastIdx] = { ...lastMsg, content: newContent, displayedContent: newContent };
+          mutated = true;
         } else {
           // Fallback: O(n) scan for out-of-order messages. This is acceptable because:
           // 1. It's rare - normal flow uses fast path above (last message matches)
@@ -264,27 +276,83 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             const existingMsg = result[existingIdx];
             if (!existingMsg) continue; // Defensive: should never happen given findIndex check
             const newContent = existingMsg.content + accumulatedContent;
-            result = [
-              ...result.slice(0, existingIdx),
-              { ...existingMsg, content: newContent, displayedContent: newContent },
-              ...result.slice(existingIdx + 1),
-            ];
+            result[existingIdx] = {
+              ...existingMsg,
+              content: newContent,
+              displayedContent: newContent,
+            };
+            mutated = true;
           } else {
             // Create new streaming message (first chunk of a new response)
-            result = [
-              ...result,
-              {
-                id: messageId,
-                role: 'assistant' as const,
-                content: accumulatedContent,
-                displayedContent: accumulatedContent,
-                isStreaming: true,
-              },
-            ];
+            result.push({
+              id: messageId,
+              role: 'assistant' as const,
+              content: accumulatedContent,
+              displayedContent: accumulatedContent,
+              isStreaming: true,
+            });
+            mutated = true;
           }
         }
       }
-      return result;
+      // Return same reference if nothing changed (React skips re-render)
+      return mutated ? result : prev;
+    });
+  });
+
+  // ============================================
+  // RAF-Batched Thinking Chunk Processor
+  // ============================================
+  // Batches rapid thinking chunks into single state updates, same strategy as text chunks.
+  // Extended thinking can emit many chunks per second during deep reasoning.
+  const batchedThinkingHandler = rafBatch<ThinkingChunkEvent>((events) => {
+    if (events.length === 0) return;
+
+    // Accumulate all thinking content by message ID
+    const thinkingByMessage = new Map<string, string>();
+    for (const event of events) {
+      const existing = thinkingByMessage.get(event.messageId) ?? '';
+      thinkingByMessage.set(event.messageId, existing + event.thinking);
+    }
+
+    setMessages((prev) => {
+      const result = prev.slice();
+      let mutated = false;
+
+      for (const [messageId, accumulatedThinking] of thinkingByMessage) {
+        const lastIdx = result.length - 1;
+        const lastMsg = lastIdx >= 0 ? result[lastIdx] : undefined;
+
+        // Calculate current thinking duration
+        const startTime = thinkingStartTimes.current.get(messageId) ?? Date.now();
+        const currentDuration = Date.now() - startTime;
+
+        if (lastMsg?.role === 'assistant' && lastMsg.id === messageId) {
+          // Verify message ID matches to prevent thinking content misattribution
+          // if multiple assistant messages exist. (Code review: Opus cycle 2, issue #8)
+          const newThinking = (lastMsg.thinking ?? '') + accumulatedThinking;
+          result[lastIdx] = {
+            ...lastMsg,
+            thinking: newThinking,
+            thinkingDurationMs: currentDuration,
+          };
+          mutated = true;
+        } else {
+          // No assistant message exists yet — create one with just thinking
+          result.push({
+            id: messageId,
+            role: 'assistant' as const,
+            content: '',
+            displayedContent: '',
+            isStreaming: true,
+            thinking: accumulatedThinking,
+            thinkingDurationMs: currentDuration,
+          });
+          mutated = true;
+        }
+      }
+
+      return mutated ? result : prev;
     });
   });
 
@@ -383,15 +451,16 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               `Preview: "${message.content.slice(0, 50)}...". Check agent-bridge batching.`
           );
           // Show user-visible error so they know something went wrong
+          // PERF: shallow-copy + index mutation instead of spread + slice
           setMessages((prev) => {
             const errorMsg = '[Some content may be missing due to a streaming error]';
-            const lastMsg = prev[prev.length - 1];
+            const lastIdx = prev.length - 1;
+            const lastMsg = lastIdx >= 0 ? prev[lastIdx] : undefined;
             // Only add error indicator once per streaming session
             if (lastMsg?.role === 'assistant' && !lastMsg.content.includes(errorMsg)) {
-              return [
-                ...prev.slice(0, -1),
-                { ...lastMsg, content: lastMsg.content + `\n\n${errorMsg}` },
-              ];
+              const copy = prev.slice();
+              copy[lastIdx] = { ...lastMsg, content: lastMsg.content + `\n\n${errorMsg}` };
+              return copy;
             }
             return prev;
           });
@@ -412,47 +481,19 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           thinkingStartTimes.current.set(message.message_id, Date.now());
         }
 
-        // Calculate current duration
-        const startTime = thinkingStartTimes.current.get(message.message_id) ?? Date.now();
-        const currentDuration = Date.now() - startTime;
-
-        // Update the current streaming message with thinking content (append, not replace)
-        setMessages((prev) => {
-          const lastMsg = prev[prev.length - 1];
-          if (lastMsg?.role === 'assistant') {
-            // Append thinking content like we do for regular content
-            const newThinking = (lastMsg.thinking ?? '') + message.thinking;
-            return [
-              ...prev.slice(0, -1),
-              {
-                ...lastMsg,
-                thinking: newThinking,
-                thinkingDurationMs: currentDuration,
-              },
-            ];
-          }
-          // If no assistant message exists yet, create one with just thinking
-          return [
-            ...prev,
-            {
-              id: message.message_id,
-              role: 'assistant',
-              content: '',
-              displayedContent: '',
-              isStreaming: true,
-              thinking: message.thinking,
-              thinkingDurationMs: currentDuration,
-            },
-          ];
-        });
+        // Queue thinking chunk to be processed in next RAF (same strategy as text chunks)
+        batchedThinkingHandler({ messageId: message.message_id, thinking: message.thinking });
         break;
       }
 
       case 'agent:complete': {
-        // Flush any pending text chunks BEFORE marking message as complete
-        // This ensures all streamed content is rendered before the message is finalized.
-        // Without this, the last chunk batch could appear AFTER isStreaming is set to false.
+        // Flush all pending batchers BEFORE marking message as complete.
+        // This ensures all streamed content (text, thinking, tools) is rendered
+        // before the message is finalized. Without this, the last batch could
+        // appear AFTER isStreaming is set to false.
         batchedChunkHandler.cancel(FLUSH_PENDING);
+        batchedThinkingHandler.cancel(FLUSH_PENDING);
+        batchedToolHandler.cancel(FLUSH_PENDING);
 
         // Clean up pending chunk tracking for this message
         pendingChunkLengths.delete(message.message_id);
@@ -496,7 +537,13 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                 }
               : undefined;
 
-            // Get completed tools for this message to persist alongside the message
+            // Get completed tools for this message to persist alongside the message.
+            // NOTE: getState() returns the latest committed state (external call, not
+            // the closured get()). getToolsForMessage() uses the internal get(), which
+            // CAN be stale under persist(immer(...)). However, this runs during
+            // agent:complete handling — AFTER completeTool() has committed — so the
+            // immer middleware has already flushed and get() is current here.
+            // (Code review: Codex cycle 1, issue #3)
             const toolState = useToolStore.getState();
             const messageTools = toolState.getToolsForMessage(completedMsg.id);
             const toolUsesDto =
@@ -537,7 +584,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               );
             }
 
-            return [...prev.slice(0, -1), completedMsg];
+            const copy = prev.slice();
+            copy[copy.length - 1] = completedMsg;
+            return copy;
           }
           // If message was already marked as interrupted, don't change it
           return prev;
@@ -561,31 +610,33 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       }
 
       case 'agent:error': {
-        // Flush any pending text chunks before handling error
+        // Flush all pending batchers before handling error
         // This ensures partial content is preserved before appending error message
         batchedChunkHandler.cancel(FLUSH_PENDING);
+        batchedThinkingHandler.cancel(FLUSH_PENDING);
 
         // Clean up pending chunk tracking for this message
         pendingChunkLengths.delete(message.message_id);
 
         setIsAgentRunning(false);
         const errorContent = `Error: ${message.error}`;
+        // PERF: shallow-copy + index mutation instead of spread + slice
         setMessages((prev) => {
-          const lastMsg = prev[prev.length - 1];
+          const lastIdx = prev.length - 1;
+          const lastMsg = lastIdx >= 0 ? prev[lastIdx] : undefined;
           // If there's an existing assistant message (possibly interrupted), append error to it
           if (lastMsg?.role === 'assistant') {
             const newContent = lastMsg.content
               ? `${lastMsg.content}\n\n${errorContent}`
               : errorContent;
-            return [
-              ...prev.slice(0, -1),
-              {
-                ...lastMsg,
-                content: newContent,
-                displayedContent: newContent,
-                isStreaming: false,
-              },
-            ];
+            const copy = prev.slice();
+            copy[lastIdx] = {
+              ...lastMsg,
+              content: newContent,
+              displayedContent: newContent,
+              isStreaming: false,
+            };
+            return copy;
           }
           // Otherwise create new error message
           return [
@@ -666,8 +717,25 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       }
 
       case 'conversation:loaded': {
-        // Clear pending load flag - the load has completed
-        useMessageBufferStore.getState().clearLoadPending(message.session_id);
+        // DO NOT clear pendingLoads here — the flag must survive until the
+        // use-chat-messages.ts useEffect fires (after React commits the new
+        // sessionId inside startTransition below). Clearing here causes a race:
+        //   1. clearLoadPending(id) ← runs immediately
+        //   2. startTransition → setSessionId(id) ← React defers
+        //   3. useEffect sees new sessionId, checks hasLoadPending → false
+        //   4. Sends DUPLICATE conversation:load 💥
+        // The flag is cleared by use-chat-messages.ts when it sees the pending
+        // load, and the 30s timeout in message-buffer-store provides safety cleanup.
+        //
+        // TIMING CONTRACT (happens-before chain):
+        //   setTimeout(0) → startTransition(setMessages+setSessionId) → React commit
+        //   → useEffect sees new sessionId → clearLoadPending(id)
+        //
+        // The buffer drains happen-after startTransition commits, so
+        // clearLoadPending in the useEffect fires before any new streaming
+        // messages are processed. New messages arriving between setTimeout(0)
+        // and useEffect firing are buffered safely because pendingLoads is
+        // still set. (Code review: Opus cycle 1, issue #4)
 
         // Switch file store to new session (saves old files to cache, restores from cache if exists)
         useFileStore.getState().switchSession(message.session_id);
@@ -685,112 +753,126 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           cachedMessages = messagesRef.current;
         }
 
-        // Prepare new messages (filter out system messages as they're not displayed)
-        const backendMessages = message.messages
-          .filter(
-            (m): m is typeof m & { role: 'user' | 'assistant' } =>
-              m.role === 'user' || m.role === 'assistant'
-          )
-          .map((m) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            displayedContent: m.content,
-          }));
+        // Break out of the postMessage event handler with setTimeout(0) before
+        // processing data. The IPC message event runs synchronously — without this
+        // yield, all data processing + React rendering blocks the main thread in a
+        // single 1,097ms task (V3 profiling). setTimeout(0) lets the browser:
+        //   1. Finish the message event (~0ms of work left)
+        //   2. Run any pending paint/layout
+        //   3. Process our data + transition in a separate task
+        setTimeout(() => {
+          startTransition(() => {
+            // Prepare new messages (filter out system messages as they're not displayed)
+            const backendMessages = message.messages
+              .filter(
+                (m): m is typeof m & { role: 'user' | 'assistant' } =>
+                  m.role === 'user' || m.role === 'assistant'
+              )
+              .map((m) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                displayedContent: m.content,
+              }));
 
-        // Merge backend and cache messages:
-        // - User messages ONLY come from backend (auto-start saves them immediately)
-        // - Assistant messages prefer cache (may have live streaming content)
-        // This handles the case where buffer hydration added streaming response
-        // but the user message wasn't in the buffer (it's in backend storage)
-        let newMessages: typeof backendMessages;
-        if (!cachedMessages || cachedMessages.length === 0) {
-          // No cache - use backend directly
-          newMessages = backendMessages;
-        } else if (backendMessages.length === 0) {
-          // No backend - use cache directly
-          newMessages = cachedMessages;
-        } else {
-          // Both exist - merge: user messages from backend, assistant from cache if exists
-          const cachedById = new Map(cachedMessages.map((m) => [m.id, m]));
-          const backendById = new Map(backendMessages.map((m) => [m.id, m]));
+            // Merge backend and cache messages:
+            // - User messages ONLY come from backend (auto-start saves them immediately)
+            // - Assistant messages prefer cache (may have live streaming content)
+            // This handles the case where buffer hydration added streaming response
+            // but the user message wasn't in the buffer (it's in backend storage)
+            let newMessages: typeof backendMessages;
+            if (!cachedMessages || cachedMessages.length === 0) {
+              // No cache - use backend directly
+              newMessages = backendMessages;
+            } else if (backendMessages.length === 0) {
+              // No backend - use cache directly
+              newMessages = cachedMessages;
+            } else {
+              // Both exist - merge: user messages from backend, assistant from cache if exists
+              const cachedById = new Map(cachedMessages.map((m) => [m.id, m]));
+              const backendById = new Map(backendMessages.map((m) => [m.id, m]));
 
-          // Start with all backend messages (this gives us user messages)
-          const merged = new Map(backendById);
+              // Start with all backend messages (this gives us user messages)
+              const merged = new Map(backendById);
 
-          // For each cached message, prefer cache version (has latest streaming content)
-          for (const [id, msg] of cachedById) {
-            merged.set(id, msg);
-          }
+              // For each cached message, prefer cache version (has latest streaming content)
+              for (const [id, msg] of cachedById) {
+                merged.set(id, msg);
+              }
 
-          // Also add any cached messages that aren't in backend (new streaming messages)
-          // These might have different IDs if streaming started after backend load
+              // Also add any cached messages that aren't in backend (new streaming messages)
+              // These might have different IDs if streaming started after backend load
 
-          // Convert to array, preserving order: backend messages first, then any new cached ones
-          const backendOrder = backendMessages.map((m) => m.id);
-          const cachedOrder = cachedMessages.map((m) => m.id);
+              // Convert to array, preserving order: backend messages first, then any new cached ones
+              const backendOrder = backendMessages.map((m) => m.id);
+              const cachedOrder = cachedMessages.map((m) => m.id);
 
-          // Build ordered result: backend order for backend messages, then append new cached messages
-          const orderedIds = [...new Set([...backendOrder, ...cachedOrder])];
-          newMessages = orderedIds
-            .map((id) => merged.get(id))
-            .filter((m): m is NonNullable<typeof m> => m !== undefined);
-        }
-
-        // Calculate cumulative usage from persisted messages (for token tracking persistence)
-        const processedMessageIds: string[] = [];
-        const cumulativeUsage = message.messages.reduce(
-          (acc, m) => {
-            if (m.usage) {
-              processedMessageIds.push(m.id);
-              return {
-                inputTokens: acc.inputTokens + m.usage.inputTokens,
-                outputTokens: acc.outputTokens + m.usage.outputTokens,
-                cacheReadInputTokens:
-                  acc.cacheReadInputTokens + (m.usage.cacheReadInputTokens ?? 0),
-                cacheCreationInputTokens:
-                  acc.cacheCreationInputTokens + (m.usage.cacheCreationInputTokens ?? 0),
-                totalCostUsd: acc.totalCostUsd + (m.usage.totalCostUsd ?? 0),
-              };
+              // Build ordered result: backend order for backend messages, then append new cached messages
+              const orderedIds = [...new Set([...backendOrder, ...cachedOrder])];
+              newMessages = orderedIds
+                .map((id) => merged.get(id))
+                .filter((m): m is NonNullable<typeof m> => m !== undefined);
             }
-            return acc;
-          },
-          {
-            inputTokens: 0,
-            outputTokens: 0,
-            cacheReadInputTokens: 0,
-            cacheCreationInputTokens: 0,
-            totalCostUsd: 0,
-          }
-        );
 
-        // Restore usage from persisted data BEFORE switching session
-        // This ensures the session cache is pre-populated with correct usage
-        if (processedMessageIds.length > 0) {
-          restoreSessionUsage(message.session_id, cumulativeUsage, processedMessageIds);
-        }
-
-        // Set all state atomically - React 18 batches these updates
-        setMessages(newMessages);
-        setSessionId(message.session_id);
-        setActiveConversation(message.session_id, message.title);
-        switchSession(message.session_id);
-
-        // Restore tool executions from persisted messages (for tool widget display)
-        for (const m of message.messages) {
-          if (m.toolUses.length > 0) {
-            restoreToolsForMessage(
-              m.id,
-              m.toolUses.map((t) => ({
-                id: t.id,
-                name: t.name,
-                input: t.input,
-                success: t.success,
-                ...(t.output !== undefined ? { output: t.output } : {}),
-              }))
+            // Calculate cumulative usage from persisted messages (for token tracking persistence)
+            const processedMessageIds: string[] = [];
+            const cumulativeUsage = message.messages.reduce(
+              (acc, m) => {
+                if (m.usage) {
+                  processedMessageIds.push(m.id);
+                  return {
+                    inputTokens: acc.inputTokens + m.usage.inputTokens,
+                    outputTokens: acc.outputTokens + m.usage.outputTokens,
+                    cacheReadInputTokens:
+                      acc.cacheReadInputTokens + (m.usage.cacheReadInputTokens ?? 0),
+                    cacheCreationInputTokens:
+                      acc.cacheCreationInputTokens + (m.usage.cacheCreationInputTokens ?? 0),
+                    totalCostUsd: acc.totalCostUsd + (m.usage.totalCostUsd ?? 0),
+                  };
+                }
+                return acc;
+              },
+              {
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheReadInputTokens: 0,
+                cacheCreationInputTokens: 0,
+                totalCostUsd: 0,
+              }
             );
-          }
-        }
+
+            // Restore usage from persisted data within the transition
+            // This ensures the session cache is pre-populated with correct usage
+            if (processedMessageIds.length > 0) {
+              restoreSessionUsage(message.session_id, cumulativeUsage, processedMessageIds);
+            }
+
+            setMessages(newMessages);
+            setSessionId(message.session_id);
+            setActiveConversation(message.session_id, message.title);
+            switchSession(message.session_id);
+
+            // Restore tool executions from persisted messages (for tool widget display).
+            // NOTE: This for-loop runs synchronously — React cannot interrupt between
+            // individual restoreToolsForMessage calls. startTransition only yields
+            // between React renders, not between synchronous Zustand set() calls.
+            // (Code review: Opus cycle 3, issue #1)
+            for (const m of message.messages) {
+              if (m.toolUses.length > 0) {
+                restoreToolsForMessage(
+                  m.id,
+                  m.toolUses.map((t) => ({
+                    id: t.id,
+                    name: t.name,
+                    input: t.input,
+                    success: t.success,
+                    ...(t.output !== undefined ? { output: t.output } : {}),
+                  }))
+                );
+              }
+            }
+          });
+        }, 0);
 
         // NOTE: Do NOT call setLoadingConversation(false) here!
         // The useLayoutEffect in chat-area.tsx will handle revealing content
@@ -865,8 +947,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // should be at: displayedLength + pendingLength. This accounts for both rendered AND
         // received-but-not-yet-rendered content.
         //
-        // We also clamp to the backend's content_offset when available, taking the minimum
-        // to handle edge cases where frontend tracking might be ahead due to state race.
+        // NOTE: We do NOT flush batchedChunkHandler here because the flush calls setMessages()
+        // which queues a React state update. Since messagesRef.current isn't updated until the
+        // next React commit, the !currentMsg check below would create a DUPLICATE message.
         //
         // Fast path: check last message first (most common case during streaming)
         // This avoids O(n) scan through all messages when the target is almost always at the end.
@@ -888,15 +971,11 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             ? Math.min(message.content_offset, maxKnownLength)
             : maxKnownLength;
 
-        // Queue tool start to be processed in next RAF (reduces re-renders)
-        batchedToolHandler({
-          type: 'start',
-          toolId,
-          messageId: message.message_id,
-          toolName,
-          toolInput: message.tool_input,
-          contentOffset,
-        });
+        // Call startTool synchronously for immediate tool widget rendering.
+        // Tool events are infrequent (1-5 per turn vs 100+ text chunks), so
+        // RAF batching provides negligible performance benefit but delays the
+        // Zustand store update that triggers the tool widget to appear.
+        startTool(toolId, message.message_id, toolName, message.tool_input, contentOffset);
 
         // Only update messages if we need to create a new assistant message
         // This stays synchronous because we need the message for streaming
@@ -928,6 +1007,12 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       }
 
       case 'permission:request':
+        // Flush pending text chunks so the assistant message is in React state
+        // BEFORE the permission modal appears. This ensures the tool widget
+        // (already added synchronously by the tool:start handler above) has
+        // a message row to render in.
+        batchedChunkHandler.cancel(FLUSH_PENDING);
+
         addPermissionRequest({
           requestId: message.request_id,
           sessionId: message.session_id,
@@ -1005,6 +1090,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
   // firing into dead state after component unmount
   const cleanup = (): void => {
     batchedChunkHandler.cancel();
+    batchedThinkingHandler.cancel();
     batchedToolHandler.cancel();
     // Clear pending chunk tracking to prevent memory leaks (code review issue #3)
     pendingChunkLengths.clear();
@@ -1015,6 +1101,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
   // before conversation:load effect runs. The batchers remain usable.
   const flush = (): void => {
     batchedChunkHandler.cancel(FLUSH_PENDING);
+    batchedThinkingHandler.cancel(FLUSH_PENDING);
     batchedToolHandler.cancel(FLUSH_PENDING);
   };
 

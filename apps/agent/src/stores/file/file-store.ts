@@ -8,6 +8,9 @@ import type { FileNode } from '@/types/protocol';
 
 const logger = createLogger('FileStore');
 
+/** Maximum cached sessions to prevent unbounded memory growth */
+const MAX_CACHED_SESSIONS = 10;
+
 // Enable Immer support for Map and Set
 enableMapSet();
 
@@ -415,6 +418,16 @@ export const useFileStore = create<FileState>()(
               pathToId: cloneDict(state.pathToId),
               selectedFile: state.selectedFile,
             };
+
+            // Evict oldest sessions to prevent unbounded memory growth.
+            // Object.keys preserves insertion order for non-integer string keys.
+            const cacheKeys = Object.keys(state.sessionCache);
+            if (cacheKeys.length > MAX_CACHED_SESSIONS) {
+              const evictCount = cacheKeys.length - MAX_CACHED_SESSIONS;
+              for (const key of cacheKeys.slice(0, evictCount)) {
+                Reflect.deleteProperty(state.sessionCache, key);
+              }
+            }
           } else {
             // No files - remove from cache if it exists (clean up empty sessions).
             // Empty sessions don't need cached state since they have nothing to restore.

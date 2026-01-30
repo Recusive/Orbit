@@ -1,6 +1,13 @@
 import { CheckCircle2, ChevronDown, Circle, ListTodo, Loader2 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+
+import {
+  TOOL_CARD_BASE,
+  TOOL_CHEVRON_BASE,
+  TOOL_EXPAND_TRANSITION,
+  TOOL_EXPAND_TRANSITION_NONE,
+} from './shared';
 
 import type { FC, ReactElement } from 'react';
 
@@ -104,6 +111,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
   const [isExpanded, setIsExpanded] = useState(isRunning);
   const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
+  const shouldReduceMotion = useReducedMotion();
 
   // Auto-collapse when tool finishes
   useEffect(() => {
@@ -122,7 +130,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
     <div>
       <div
         className={cn(
-          'bg-card overflow-hidden transition-[border-color,opacity,box-shadow] duration-200',
+          TOOL_CARD_BASE,
           isFailed
             ? 'border-2 border-dotted border-destructive/40 opacity-60'
             : 'border border-border/50',
@@ -182,26 +190,18 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                 </span>
               </div>
             ) : null}
-            <ChevronDown
-              className={cn(
-                'h-3 w-3 text-muted-foreground/60 transition-transform duration-200',
-                isExpanded && 'rotate-180'
-              )}
-            />
+            <ChevronDown className={cn(TOOL_CHEVRON_BASE, isExpanded && 'rotate-180')} />
           </div>
         </button>
 
         {/* Collapsible content */}
-        <AnimatePresence initial={false} mode="wait">
+        <AnimatePresence initial={false}>
           {isExpanded ? (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
+              initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{
-                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
-                opacity: { duration: 0.15, ease: 'easeOut' },
-              }}
+              exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+              transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
               style={{ overflow: 'hidden' }}
             >
               <div className="p-2.5">
@@ -243,8 +243,8 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1 bg-muted/50 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-success transition-[width] duration-300 rounded-full"
-                          style={{ width: `${String((completedCount / totalCount) * 100)}%` }}
+                          className="h-full bg-success transition-transform duration-300 origin-left rounded-full"
+                          style={{ transform: `scaleX(${String(completedCount / totalCount)})` }}
                         />
                       </div>
                       <span className="text-xs text-muted-foreground/60 font-medium">

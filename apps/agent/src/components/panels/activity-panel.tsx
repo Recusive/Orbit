@@ -94,7 +94,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         'group relative flex items-center h-full px-3 text-base cursor-pointer select-none shrink-0',
         'border-r border-border/50',
         isActive
-          ? 'bg-chat-area text-foreground'
+          ? 'bg-card text-foreground'
           : 'bg-sidebar text-muted-foreground hover:text-foreground'
       )}
       style={{ maxWidth: 180 }}
@@ -111,7 +111,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       <div
         className={cn(
           'absolute bottom-0 inset-x-0 h-px z-10',
-          isActive ? 'bg-chat-area' : 'bg-border/50'
+          isActive ? 'bg-card' : 'bg-border/50'
         )}
       />
 
@@ -277,7 +277,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
 
   return (
     <div
-      className="flex shrink-0 bg-sidebar relative"
+      className="flex shrink-0 bg-chat-area relative"
       style={{ height: ACTIVITY_PANEL.TABS_HEADER_HEIGHT }}
       onMouseEnter={() => {
         setIsHovered(true);
@@ -342,7 +342,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       </div>
 
       {/* Editor actions - VS Code style */}
-      <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-sidebar">
+      <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-chat-area">
         <button
           onClick={() => {
             if (activeTabPath) onToggleSearch(activeTabPath);
@@ -636,7 +636,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   const showActivityTerminal = terminalPosition === 'activity' && canRenderTerminal;
 
   return (
-    <div className="@container h-full w-full flex flex-col bg-chat-area">
+    <div className="@container h-full w-full flex flex-col bg-card">
       {/* Terminal in activity layout */}
       <div
         className="flex-1 flex flex-col"

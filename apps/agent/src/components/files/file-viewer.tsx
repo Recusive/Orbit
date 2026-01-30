@@ -35,7 +35,7 @@ export const FileViewer: FC = () => {
   }, [toggleSearch, activeFile?.path]);
 
   return (
-    <div className="flex flex-col h-full bg-chat-area relative">
+    <div className="flex flex-col h-full bg-card relative">
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
         {isLoading ? (
@@ -67,7 +67,7 @@ const LoadingState: FC<LoadingStateProps> = ({ path }) => {
 
 const EmptyState: FC = () => {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+    <div className="flex flex-col items-center justify-center h-full bg-card text-muted-foreground">
       <FileCode className="h-12 w-12 mb-4 opacity-50" />
       <p className="text-sm">No file open</p>
       <p className="text-xs mt-1 opacity-70">Click a file in the chat to view it here</p>

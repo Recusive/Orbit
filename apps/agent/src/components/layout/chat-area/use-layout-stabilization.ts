@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 
-import { STABILIZATION_FRAME_COUNT } from './constants';
+import { STABILIZATION_STABLE_THRESHOLD_MS } from './constants';
 
 import type { UseLayoutStabilizationProps, UseLayoutStabilizationReturn } from './types';
 
@@ -10,6 +10,10 @@ import type { UseLayoutStabilizationProps, UseLayoutStabilizationReturn } from '
  * Ensures the entire content area (welcome OR messages) is hidden until layout is stable.
  * Controls BOTH isLoadingConversation and isConversationTransitioning atomically
  * to prevent flash caused by state updates happening at different times.
+ *
+ * Uses ResizeObserver instead of rAF+scrollHeight polling to avoid forced synchronous
+ * layout reflows. The observer fires only when the container actually changes size,
+ * rather than polling every frame (which forces layout recalculation on each read).
  *
  * @param props - Stabilization configuration
  * @returns Content ref to attach to the container element
@@ -33,33 +37,41 @@ export function useLayoutStabilization({
       return undefined;
     }
 
-    let lastHeight = 0;
-    let stableCount = 0;
-    let frameId: number;
+    // Timer-based stability detection: when ResizeObserver stops firing
+    // for STABILIZATION_STABLE_THRESHOLD_MS, layout is considered stable.
+    let stabilityTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const checkStable = (): void => {
-      const currentHeight = container.scrollHeight;
-      if (currentHeight === lastHeight) {
-        stableCount++;
-        // Wait for consecutive frames with same height to ensure layout is complete
-        if (stableCount >= STABILIZATION_FRAME_COUNT) {
-          // Reveal content atomically - both states change together
-          // This prevents the flash where one state changes before the other
-          setLoadingConversation(false);
-          setConversationTransitioning(false);
-          return;
-        }
-      } else {
-        stableCount = 0;
-        lastHeight = currentHeight;
-      }
-      frameId = requestAnimationFrame(checkStable);
+    const reveal = (): void => {
+      // Reveal content atomically - both states change together
+      // This prevents the flash where one state changes before the other
+      setLoadingConversation(false);
+      setConversationTransitioning(false);
     };
 
-    frameId = requestAnimationFrame(checkStable);
+    const resetStabilityTimer = (): void => {
+      if (stabilityTimer !== null) {
+        clearTimeout(stabilityTimer);
+      }
+      stabilityTimer = setTimeout(reveal, STABILIZATION_STABLE_THRESHOLD_MS);
+    };
+
+    const observer = new ResizeObserver(() => {
+      // Each resize resets the stability timer — we wait for resizes to stop
+      resetStabilityTimer();
+    });
+
+    observer.observe(container);
+
+    // Start the initial stability timer immediately.
+    // If the container doesn't resize at all (empty conversation, already correct size),
+    // this ensures we still reveal after the threshold.
+    resetStabilityTimer();
 
     return () => {
-      cancelAnimationFrame(frameId);
+      observer.disconnect();
+      if (stabilityTimer !== null) {
+        clearTimeout(stabilityTimer);
+      }
     };
   }, [isTransitioning, messageCount, setConversationTransitioning, setLoadingConversation]);
 

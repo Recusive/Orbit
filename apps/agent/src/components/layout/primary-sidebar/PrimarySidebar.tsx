@@ -42,6 +42,16 @@ import {
   useCreateWorktreeDialogOpen,
 } from '@/stores/ui/ui-store';
 
+/** Evaluated once at module load — the OS preference is static for the session lifetime.
+ * Guarded for non-DOM contexts (tests / SSR). (Code review: Codex cycle 1, issue #3) */
+const PREFERS_REDUCED_MOTION =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Width transition CSS for the sidebar, gated on reduced-motion preference. */
+const SIDEBAR_WIDTH_TRANSITION = PREFERS_REDUCED_MOTION
+  ? 'none'
+  : 'width 200ms cubic-bezier(0.165, 0.84, 0.44, 1)';
+
 // Lazy load heavy components
 const LazySettingsDialog = lazy(() =>
   import('@/components/modals/settings/SettingsDialog').then((m) => ({
@@ -115,8 +125,12 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   return (
     <aside
       data-sidebar="primary"
-      className="h-full flex flex-col bg-card transition-[width] duration-150 ease-in-out overflow-hidden shadow-lg dark:shadow-none"
-      style={{ width }}
+      className="h-full flex flex-col bg-card overflow-hidden border-r border-divider"
+      style={{
+        width,
+        transition: SIDEBAR_WIDTH_TRANSITION,
+        contain: 'layout style',
+      }}
     >
       {/* Header */}
       <div className="flex shrink-0" style={{ height: HEIGHTS.headerBar }}>
@@ -130,7 +144,8 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleLeftSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground"
+                  aria-label="Expand sidebar"
+                  className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
                 >
                   <SidebarToggleIcon expanded={false} />
                 </button>
@@ -160,7 +175,8 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               <TooltipTrigger asChild>
                 <button
                   onClick={toggleLeftSidebar}
-                  className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground"
+                  aria-label="Collapse sidebar"
+                  className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
                 >
                   <SidebarToggleIcon expanded={true} />
                 </button>
@@ -180,7 +196,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {/* Search Bar - hidden when collapsed */}
       <div
         className={cn(
-          'shrink-0 mx-1.5 overflow-hidden transition-[height,opacity] duration-150 ease-in-out',
+          'shrink-0 mx-1.5 overflow-hidden transition-opacity duration-150 ease-out',
           isCollapsed ? 'py-0' : 'py-1'
         )}
         style={{
@@ -214,7 +230,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {/* Tab Navigation - hidden when collapsed */}
       <div
         className={cn(
-          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-[height,opacity] duration-150 ease-in-out',
+          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-opacity duration-150 ease-out',
           isCollapsed ? '' : 'border-b border-divider'
         )}
         style={{
@@ -242,7 +258,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {activeTab === 'conversations' ? (
         <div
           className={cn(
-            'flex flex-col border-b border-divider shrink-0 transition-[gap,padding] duration-150 ease-in-out',
+            'flex flex-col border-b border-divider shrink-0',
             isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
           )}
         >
@@ -263,6 +279,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           <SidebarItem
             icon={IconSearchlinesSparkle}
             label="Vault"
+            badge="Coming soon"
             collapsed={isCollapsed}
             equalSpacing={isCollapsed}
             onClick={() => {
@@ -326,10 +343,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         )}
       </div>
 
-      <hr className={cn('border-divider shrink-0', isCollapsed ? 'my-0' : 'my-2')} />
+      <hr className="border-divider shrink-0 mt-2 mb-0" />
 
-      {/* Utilities */}
-      <div className={cn('flex flex-col shrink-0', isCollapsed ? 'gap-0 py-0' : 'gap-1 py-1.5')}>
+      {/* Utilities — pinned to bottom, spacing stays constant so buttons don't shift on collapse */}
+      <div className="flex flex-col shrink-0 gap-1 py-1.5">
         <SidebarItem
           icon={Settings}
           label="Settings"

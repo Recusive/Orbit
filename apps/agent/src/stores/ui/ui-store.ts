@@ -281,7 +281,7 @@ const saveActiveWorktreeToStorage = (path: string | null): void => {
 };
 
 export const useUIStore = create<UIStore>()(
-  immer((set) => ({
+  immer((set, get) => ({
     containerWidth: null,
     containerHeight: null,
     workspacePath: null,
@@ -633,8 +633,15 @@ export const useUIStore = create<UIStore>()(
         const worktreeState = state.worktrees.find((w) => w.worktree.path === path);
         if (worktreeState) {
           worktreeState.isExpanded = !worktreeState.isExpanded;
-          saveWorktreesToStorage(state.worktrees);
         }
+      });
+      // Defer persistence to the next microtask. The immer middleware commits
+      // synchronously, so get() will return the updated state here. The deferral
+      // ensures persistence happens outside the set() call stack, avoiding any
+      // potential issues with React's batched rendering seeing intermediate state.
+      // (Code review: Opus cycle 1, issue #9)
+      queueMicrotask(() => {
+        saveWorktreesToStorage(get().worktrees);
       });
     },
 
@@ -708,6 +715,10 @@ export const useUIStore = create<UIStore>()(
     },
   }))
 );
+
+export const useLeftSidebarWidth = (): number => {
+  return useUIStore((state) => state.leftSidebarWidth);
+};
 
 export const useIsLeftSidebarCollapsed = (): boolean => {
   return useUIStore((state) => state.leftSidebarWidth <= SIDEBAR.collapsed);

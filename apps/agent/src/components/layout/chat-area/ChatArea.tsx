@@ -22,10 +22,10 @@ import type { FC, JSX } from 'react';
 import { ChatHeader, useQueuedMessageHandler } from '@/components/chat';
 import { ActivityPanel } from '@/components/panels';
 import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { useChatMessages } from '@/hooks/chat/use-chat-messages';
 import { TERMINAL_PANEL, ACTIVITY_PANEL, CHAT_PANEL } from '@/lib/utils';
 import {
-  useGetToolsForMessage,
   usePendingPermissions,
   useInputMode,
   useThinkingMode,
@@ -69,8 +69,6 @@ export const ChatArea: FC = () => {
   const pendingPermissions = usePendingPermissions();
   const sessionUsage = useSessionUsage();
   const maxTokens = useMaxTokens();
-  const getToolsForMessage = useGetToolsForMessage();
-
   const {
     messages,
     isAgentRunning,
@@ -168,7 +166,6 @@ export const ChatArea: FC = () => {
       thinkingMode={thinkingMode}
       sessionUsage={sessionUsage}
       maxTokens={maxTokens}
-      getToolsForMessage={getToolsForMessage}
       onSend={handleSend}
       onStop={handleStop}
       onRewind={handleRewind}
@@ -216,7 +213,17 @@ export const ChatArea: FC = () => {
   const showBottomTerminal = terminalPosition === 'both';
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-chat-area">
+    <div
+      className="relative flex-1 flex flex-col min-w-0 overflow-hidden bg-chat-area"
+      style={{ contain: 'layout style paint' }}
+    >
+      {/* Conversation transition loader - centered dots while content swaps */}
+      {isTransitioning ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+          <ThinkingDots size={28} duration={1.2} />
+        </div>
+      ) : null}
+
       {/* Full-width terminal layout */}
       <div
         className="flex-1 flex flex-col"

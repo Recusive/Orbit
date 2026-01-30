@@ -386,7 +386,7 @@ export const BrowserPanel: FC = () => {
 
         {/* Empty state (before browser is created) */}
         {!isActive && !isCreating && !error && lifecycleState === 'idle' ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-muted-foreground">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-card text-muted-foreground">
             <Globe className="h-12 w-12 opacity-50" />
             <span className="text-sm">Browser not active</span>
             <button

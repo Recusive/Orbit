@@ -67,10 +67,10 @@ export const SessionConfigSchema = z
     planEnabled: z.boolean().optional(),
     acceptEnabled: z.boolean().optional(),
     model: ModelSchema.optional(),
-    // NOTE: We intentionally removed resumeSessionId, forkSession, and resumeSessionAt.
-    // For rewind scenarios, we DON'T use SDK's resume because it loads ALL messages.
-    // Instead, we prepend the truncated conversation history to the first message.
-    // This matches how Claude Code handles rewind - they slice messages BEFORE passing to SDK.
+    // Resume an existing SDK session (for session continuity after app restart).
+    // NOTE: This is NOT used for rewind scenarios. Rewind creates a fresh session
+    // and prepends truncated context to the first message instead.
+    resumeSessionId: z.string().optional(),
   })
   .strict();
 export type SessionConfig = z.infer<typeof SessionConfigSchema>;

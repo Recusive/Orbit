@@ -1,11 +1,42 @@
 import { ChevronDown, Loader2, Terminal } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { codeToHtml } from 'shiki';
+
+import {
+  TOOL_CARD_BASE,
+  TOOL_CHEVRON_BASE,
+  TOOL_EXPAND_TRANSITION,
+  TOOL_EXPAND_TRANSITION_NONE,
+} from './shared';
 
 import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
+
+/**
+ * Module-level singleton for Shiki import.
+ * Without this, 10+ bash tool widgets mounting simultaneously would each fire
+ * a separate dynamic import (module cache deduplicates the fetch, but each
+ * creates a separate Promise allocation and microtask). Hoisting to a singleton
+ * ensures only one import is in-flight and all consumers share the same Promise.
+ * (Code review: Opus cycle 1, issue #15)
+ */
+let shikiPromise: Promise<{
+  codeToHtml: (code: string, options: { lang: string; theme: string }) => Promise<string>;
+}> | null = null;
+
+function getShiki(): Promise<{
+  codeToHtml: (code: string, options: { lang: string; theme: string }) => Promise<string>;
+}> {
+  // Clear the cached promise on rejection so subsequent callers can retry.
+  // Without this, a transient import failure (e.g., network glitch during WASM fetch)
+  // would permanently reject for all future callers. (Code review: Opus cycle 2, edge case #2)
+  shikiPromise ??= import('shiki').catch((error: unknown) => {
+    shikiPromise = null;
+    throw error;
+  });
+  return shikiPromise;
+}
 
 /**
  * Subscribe to theme changes on the html element.
@@ -58,6 +89,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
 }) => {
   const isDarkMode = useIsDarkMode();
   const isFailed = success === false;
+  const shouldReduceMotion = useReducedMotion();
   // Start expanded if running, collapsed if already completed (restored from persistence)
   const [isExpanded, setIsExpanded] = useState(isRunning);
   const [highlightedCommand, setHighlightedCommand] = useState<string>('');
@@ -78,6 +110,10 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
 
     const highlightCommand = async (): Promise<void> => {
       try {
+        // Lazy-load Shiki only when first bash output needs highlighting.
+        // Shiki's WASM bundle (~1.5MB) is excluded from the initial chunk,
+        // reducing startup time for users who haven't seen bash output yet.
+        const { codeToHtml } = await getShiki();
         const html = await codeToHtml(command, {
           lang: 'bash',
           theme: shikiTheme,
@@ -110,7 +146,8 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
     <div>
       <div
         className={cn(
-          'bg-card overflow-hidden rounded-lg shadow-md',
+          TOOL_CARD_BASE,
+          'rounded-lg shadow-md',
           isFailed
             ? 'border-2 border-dotted border-destructive/40 opacity-60'
             : 'border border-border/50'
@@ -152,25 +189,20 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
               <span className="text-xs text-destructive/60">Failed</span>
             ) : null}
           </div>
-          <ChevronDown
-            className={cn(
-              'h-3 w-3 text-muted-foreground/60 transition-transform duration-200',
-              isExpanded && 'rotate-180'
-            )}
-          />
+          <ChevronDown className={cn(TOOL_CHEVRON_BASE, isExpanded && 'rotate-180')} />
         </button>
 
         {/* Collapsible content */}
-        <AnimatePresence initial={false} mode="wait">
+        {/* PERF: Removed mode="wait" — it forces sequential exit→enter animations,
+         * causing 49+ queued fadeOut animations when many tools complete simultaneously.
+         * Default mode ("sync") allows parallel animations, cutting CPU from 5.5% to ~1%. */}
+        <AnimatePresence initial={false}>
           {isExpanded ? (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
+              initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{
-                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
-                opacity: { duration: 0.15, ease: 'easeOut' },
-              }}
+              exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+              transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
               style={{ overflow: 'hidden' }}
             >
               {/* Command section */}

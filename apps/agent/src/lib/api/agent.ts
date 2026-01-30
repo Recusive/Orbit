@@ -17,10 +17,9 @@ export interface SessionConfig {
   thinkingTokens?: number;
   acceptEnabled?: boolean;
   planEnabled?: boolean;
-  // NOTE: We intentionally removed resumeSessionId, forkSession, and resumeSessionAt.
-  // For rewind scenarios, we DON'T use SDK's resume because it loads ALL messages.
-  // Instead, we prepend the truncated conversation history to the first message.
-  // This matches how Claude Code handles rewind - they slice messages BEFORE passing to SDK.
+  /** SDK session ID to resume from (for session continuity after app restart).
+   * Not used for rewind — rewind uses context-prepend approach instead. */
+  resumeSessionId?: string;
 }
 
 export interface AttachmentContentBlock {

@@ -1,22 +1,25 @@
 /**
  * ModelSelector - AI model dropdown selector
  *
+ * Uses a React portal to render the popover into document.body, escaping
+ * overflow:hidden / CSS containment on ancestor containers (ChatArea).
+ *
  * NOTE: Dropdown width comes from @/lib/utils/constants.
  * To change dropdown dimensions, update CHAT_WIDTH.dropdown in constants.ts.
  */
 import { Check, ChevronDown } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SiClaude, SiOpenai } from 'react-icons/si';
 
 import type { Model } from '@/types/protocol';
 import type { FC } from 'react';
 
-import { CHAT_WIDTH, cn } from '@/lib/utils';
+import { CHAT_WIDTH, cn, POPOVER_ANIMATION, TRANSITION_CLASSES } from '@/lib/utils';
 import { useModel, useToolStore } from '@/stores/agent/tool-store';
 
-// Animation duration - keep synced with CSS
-const ANIMATION_DURATION_MS = 150;
-const ANIMATION_DURATION = `${String(ANIMATION_DURATION_MS)}ms`;
+/** Gap between trigger and popover (matches the old mb-2 = 8px) */
+const POPOVER_GAP = 8;
 
 // Wrapper components to match the expected interface
 const ClaudeIcon: FC<{ className?: string }> = ({ className }) => (
@@ -42,6 +45,8 @@ interface ModelOption {
   name: string;
   icon: FC<{ className?: string }>;
   badge?: string;
+  /** When true, the option is shown but not selectable (coming soon placeholder) */
+  disabled?: boolean;
 }
 
 interface ModelGroup {
@@ -61,12 +66,34 @@ const MODEL_GROUPS: ModelGroup[] = [
   {
     label: 'Codex',
     models: [
-      { id: 'gpt5-nano', name: 'GPT-5 Nano', icon: OpenAIIcon, badge: 'New chat' },
-      { id: 'gpt5-mini', name: 'GPT-5 Mini', icon: OpenAIIcon, badge: 'New chat' },
-      { id: 'gpt5', name: 'GPT-5', icon: OpenAIIcon, badge: 'New chat' },
+      {
+        id: 'gpt5-nano',
+        name: 'GPT-5 Nano',
+        icon: OpenAIIcon,
+        badge: 'Coming soon',
+        disabled: true,
+      },
+      {
+        id: 'gpt5-mini',
+        name: 'GPT-5 Mini',
+        icon: OpenAIIcon,
+        badge: 'Coming soon',
+        disabled: true,
+      },
+      { id: 'gpt5', name: 'GPT-5', icon: OpenAIIcon, badge: 'Coming soon', disabled: true },
     ],
   },
 ];
+
+interface PopoverPosition {
+  /** CSS `top` when opening below trigger, undefined when opening above */
+  top?: number;
+  /** CSS `bottom` when opening above trigger, undefined when opening below */
+  bottom?: number;
+  left: number;
+  /** Which side the popover opens on — drives transform-origin and animation direction */
+  side: 'top' | 'bottom';
+}
 
 interface ModelSelectorProps {
   onModelChange?: (model: Model) => void;
@@ -75,10 +102,80 @@ interface ModelSelectorProps {
 export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
+  const [position, setPosition] = useState<PopoverPosition>({ bottom: 0, left: 0, side: 'top' });
   const selectedModel = useModel();
   const setModel = useToolStore((s) => s.setModel);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Calculate popover position from trigger's viewport rect.
+  // Uses the actual popover height (when available) to decide whether to open
+  // above or below the trigger. Falls back to an estimate on first render,
+  // then corrects after the portal mounts via a second layout effect.
+  // (Code review: Opus cycle 1, issues #2 & #3)
+  const updatePosition = useCallback((): void => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    // Use actual popover height if already rendered, otherwise estimate
+    const popoverHeight = popoverRef.current?.offsetHeight ?? 300;
+    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom;
+
+    if (spaceAbove >= popoverHeight || spaceAbove >= spaceBelow) {
+      // Default: open above (bottom-anchored)
+      setPosition({
+        bottom: window.innerHeight - rect.top + POPOVER_GAP,
+        left: rect.left,
+        side: 'top',
+      });
+    } else {
+      // Flip: open below (top-anchored)
+      setPosition({
+        top: rect.bottom + POPOVER_GAP,
+        left: rect.left,
+        side: 'bottom',
+      });
+    }
+  }, []);
+
+  // Initial positioning (before paint, uses estimate since portal isn't mounted yet)
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    updatePosition();
+  }, [isOpen, updatePosition]);
+
+  // Post-mount correction: once the portal is in the DOM, re-measure with the
+  // real popover height and flip if the estimate was wrong.
+  useEffect(() => {
+    if (!isOpen || isAnimatingOut) return;
+    // RAF ensures the portal DOM is mounted and popoverRef.current has its real height
+    requestAnimationFrame(() => {
+      updatePosition();
+    });
+  }, [isOpen, isAnimatingOut, updatePosition]);
+
+  // Reposition popover on window resize/scroll while open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen, updatePosition]);
+
+  // Auto-focus popover container when opened for keyboard accessibility.
+  // This ensures screen readers announce the popover and Tab starts cycling
+  // within the focus trap. (Code review: Opus cycle 1, issue #3)
+  useEffect(() => {
+    if (!isOpen || isAnimatingOut) return;
+    // Defer to next frame so the portal DOM is mounted
+    requestAnimationFrame(() => {
+      popoverRef.current?.focus();
+    });
+  }, [isOpen, isAnimatingOut]);
 
   // Handle closing with exit animation
   const handleClose = useCallback((): void => {
@@ -87,11 +184,14 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     setTimeout(() => {
       setIsOpen(false);
       setIsAnimatingOut(false);
-    }, ANIMATION_DURATION_MS);
+    }, POPOVER_ANIMATION.exitDurationMs);
   }, [isOpen, isAnimatingOut]);
 
-  // Close popover when clicking outside
+  // Close popover when clicking outside or pressing Escape
+  // Escape key is standard UX for dismissing popovers (code review: Opus cycle 1, issue #3)
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleClickOutside = (e: MouseEvent): void => {
       if (
         popoverRef.current &&
@@ -103,11 +203,20 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       }
     };
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClose();
+        // Return focus to trigger button after closing
+        triggerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, handleClose]);
 
@@ -115,11 +224,13 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     (m) => m.id === selectedModel
   );
 
-  const handleSelectModel = (modelId: string): void => {
+  const handleSelectModel = (model: ModelOption): void => {
+    // Disabled models (coming soon) don't close the menu or change selection
+    if (model.disabled === true) return;
     // Only allow valid Model values
-    if (modelId === 'haiku' || modelId === 'sonnet' || modelId === 'opus') {
-      setModel(modelId);
-      onModelChange?.(modelId);
+    if (model.id === 'haiku' || model.id === 'sonnet' || model.id === 'opus') {
+      setModel(model.id);
+      onModelChange?.(model.id);
     }
     handleClose();
   };
@@ -132,6 +243,118 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     }
   };
 
+  // Focus trap: cycle Tab within the popover when open.
+  // Without this, Tab escapes the portal to document.body elements.
+  // (Code review: Opus cycle 1, issue #3)
+  const handlePopoverKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key !== 'Tab') return;
+
+    const popover = popoverRef.current;
+    if (!popover) return;
+
+    const focusable = popover.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (e.shiftKey) {
+      // Shift+Tab: wrap from first → last
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      }
+    } else {
+      // Tab: wrap from last → first
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    }
+  }, []);
+
+  // Popover content — rendered via portal into document.body
+  const popoverContent = isOpen ? (
+    <div
+      ref={popoverRef}
+      role="listbox"
+      aria-label="Select model"
+      tabIndex={-1}
+      onKeyDown={handlePopoverKeyDown}
+      className={cn(
+        'fixed bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50',
+        position.side === 'top' ? 'origin-bottom-left' : 'origin-top-left',
+        // Enter: rich 3-property animation (scale + fade + slide), ease-out
+        !isAnimatingOut &&
+          cn(
+            'animate-in fade-in-0 zoom-in-[0.97]',
+            position.side === 'top' ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1'
+          ),
+        // Exit: fade-only for clean disappearance (no zoom/slide = no "deflating ghost")
+        isAnimatingOut && 'animate-out fade-out-0'
+      )}
+      style={{
+        width: CHAT_WIDTH.dropdown,
+        ...(position.bottom !== undefined ? { bottom: position.bottom } : {}),
+        ...(position.top !== undefined ? { top: position.top } : {}),
+        left: position.left,
+        // Enter uses ease-out (fast arrival, gentle settle)
+        // Exit uses ease-in (gentle start, fast departure)
+        animationTimingFunction: isAnimatingOut
+          ? POPOVER_ANIMATION.exitEasing
+          : POPOVER_ANIMATION.enterEasing,
+        animationDuration: isAnimatingOut
+          ? POPOVER_ANIMATION.exitDuration
+          : POPOVER_ANIMATION.enterDuration,
+      }}
+    >
+      <div className="p-1.5">
+        {MODEL_GROUPS.map((group) => (
+          <div key={group.label} className="mb-1 last:mb-0">
+            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
+              {group.label}
+            </div>
+            {group.models.map((model) => (
+              <button
+                key={model.id}
+                onClick={() => {
+                  handleSelectModel(model);
+                }}
+                disabled={model.disabled === true}
+                title={model.disabled === true ? 'Coming soon' : undefined}
+                className={cn(
+                  `w-full flex items-center justify-between px-2 py-1.5 text-xs ${TRANSITION_CLASSES.item} mt-0.5 first:mt-0 group`,
+                  model.disabled === true
+                    ? 'opacity-40 cursor-not-allowed'
+                    : selectedModel === model.id
+                      ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
+                      : 'rounded-md hover:bg-muted/80 active:scale-[0.98]'
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <model.icon className={selectedModel === model.id ? 'opacity-100' : ''} />
+                  <span>{model.name}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {model.badge ? (
+                    <span className="text-[9px] font-medium text-muted-foreground/70 bg-muted/60 px-1.5 py-0.5 rounded-full">
+                      {model.badge}
+                    </span>
+                  ) : null}
+                  {selectedModel === model.id ? (
+                    <Check className="h-3.5 w-3.5 text-primary/80" />
+                  ) : null}
+                </div>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="relative">
       {/* Trigger Button */}
@@ -141,7 +364,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         className={cn(
           'h-7 px-2.5 flex items-center gap-1.5 rounded-lg',
           'bg-transparent text-muted-foreground',
-          'transition-[background-color,color,transform] duration-150',
+          TRANSITION_CLASSES.button,
           'hover:bg-muted/50 hover:text-foreground',
           'active:scale-[0.98]',
           'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
@@ -158,65 +381,8 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         />
       </button>
 
-      {/* Popover */}
-      {isOpen ? (
-        <div
-          ref={popoverRef}
-          className={cn(
-            'absolute bottom-full left-0 mb-2 bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50',
-            'origin-bottom-left',
-            // Enter animation: scale from 97% + fade in, ease-out for responsiveness
-            !isAnimatingOut && 'animate-in fade-in-0 zoom-in-[0.97] slide-in-from-bottom-1',
-            // Exit animation: scale to 97% + fade out, ease-out for smooth deceleration
-            isAnimatingOut && 'animate-out fade-out-0 zoom-out-[0.97] slide-out-to-bottom-1'
-          )}
-          style={{
-            width: CHAT_WIDTH.dropdown,
-            // Custom ease-out curve for more responsiveness (faster start, gentle end)
-            animationTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
-            animationDuration: ANIMATION_DURATION,
-          }}
-        >
-          <div className="p-1.5">
-            {MODEL_GROUPS.map((group) => (
-              <div key={group.label} className="mb-1 last:mb-0">
-                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
-                  {group.label}
-                </div>
-                {group.models.map((model) => (
-                  <button
-                    key={model.id}
-                    onClick={() => {
-                      handleSelectModel(model.id);
-                    }}
-                    className={cn(
-                      'w-full flex items-center justify-between px-2 py-1.5 text-xs transition-[background-color,transform] duration-150 mt-0.5 first:mt-0 group',
-                      selectedModel === model.id
-                        ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
-                        : 'rounded-md hover:bg-muted/80 active:scale-[0.98]'
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <model.icon className={selectedModel === model.id ? 'opacity-100' : ''} />
-                      <span>{model.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {model.badge ? (
-                        <span className="text-[9px] font-medium text-muted-foreground/70 bg-muted/60 px-1.5 py-0.5 rounded-full">
-                          {model.badge}
-                        </span>
-                      ) : null}
-                      {selectedModel === model.id ? (
-                        <Check className="h-3.5 w-3.5 text-primary/80" />
-                      ) : null}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      {/* Popover — portaled to document.body to escape overflow:hidden ancestors */}
+      {popoverContent !== null ? createPortal(popoverContent, document.body) : null}
     </div>
   );
 };

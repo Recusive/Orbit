@@ -26,9 +26,7 @@ const commonPaths = [
 const currentPath = process.env.PATH ?? '';
 const pathSet = new Set(currentPath.split(':'));
 for (const p of commonPaths) {
-  if (!pathSet.has(p)) {
-    pathSet.add(p);
-  }
+  pathSet.add(p);
 }
 process.env.PATH = Array.from(pathSet).join(':');
 
@@ -314,26 +312,47 @@ function main(): void {
     });
   });
 
+  /**
+   * Graceful shutdown: dispose managers then allow a brief grace period
+   * for async cleanup (e.g., agent.stopSession() → query.interrupt())
+   * before hard-exiting the process.
+   */
+  const SHUTDOWN_GRACE_MS = 500;
+
+  let shuttingDown = false;
+  function gracefulShutdown(reason: string): void {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info(`${reason}, shutting down...`);
+    // Wrap dispose calls in try/catch — if dispose throws synchronously,
+    // the process could exit with code 1 before the grace timeout fires,
+    // potentially corrupting session state files.
+    // (Code review: Opus cycle 1, issue #11)
+    try {
+      sessionManager.dispose();
+    } catch (e) {
+      logger.error({ error: e }, 'sessionManager.dispose() failed');
+    }
+    try {
+      canvasSessionManager.dispose();
+    } catch (e) {
+      logger.error({ error: e }, 'canvasSessionManager.dispose() failed');
+    }
+    // Allow async disposal (stopSession/interrupt) to complete before hard exit
+    setTimeout(() => process.exit(0), SHUTDOWN_GRACE_MS);
+  }
+
   rl.on('close', () => {
-    logger.info('stdin closed, shutting down...');
-    sessionManager.dispose();
-    canvasSessionManager.dispose();
-    process.exit(0);
+    gracefulShutdown('stdin closed');
   });
 
   // Handle process signals
   process.on('SIGTERM', () => {
-    logger.info('SIGTERM received, shutting down...');
-    sessionManager.dispose();
-    canvasSessionManager.dispose();
-    process.exit(0);
+    gracefulShutdown('SIGTERM received');
   });
 
   process.on('SIGINT', () => {
-    logger.info('SIGINT received, shutting down...');
-    sessionManager.dispose();
-    canvasSessionManager.dispose();
-    process.exit(0);
+    gracefulShutdown('SIGINT received');
   });
 
   // Clean up old sessions on startup (30 days default)

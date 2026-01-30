@@ -8,16 +8,10 @@ import type { ConversationItemProps } from '../types';
 import type { FC } from 'react';
 
 import { ConversationContextMenu, ConversationDropdownMenu } from '@/components/sidebar';
-import { cn, TRANSITIONS } from '@/lib/utils';
+import { cn, getCollapseTransition } from '@/lib/utils';
 
 /** Gradient mask for text fade on hover (left-to-right fade at end) */
 const TITLE_HOVER_MASK = 'linear-gradient(to right, black 85%, transparent 98%)';
-
-// Transition string builder
-const getCollapseTransition = (collapsed: boolean): string =>
-  collapsed
-    ? `opacity 0ms, width ${TRANSITIONS.sidebar}`
-    : `width ${TRANSITIONS.sidebar}, opacity ${TRANSITIONS.opacity} ${String(TRANSITIONS.opacityDelay)}ms`;
 
 export const ConversationItem: FC<ConversationItemProps> = ({
   conversation,
@@ -85,7 +79,13 @@ export const ConversationItem: FC<ConversationItemProps> = ({
   // Render inline edit input
   if (isEditing && !collapsed) {
     return (
-      <div className="relative mx-1.5 ml-2">
+      <form
+        className="relative mx-1.5 ml-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSaveEdit();
+        }}
+      >
         <input
           ref={inputRef}
           type="text"
@@ -95,9 +95,11 @@ export const ConversationItem: FC<ConversationItemProps> = ({
           }}
           onBlur={handleSaveEdit}
           onKeyDown={handleKeyDown}
+          spellCheck={false}
+          autoComplete="off"
           className="h-7 w-full rounded-lg px-2 text-base bg-muted/50 border border-primary/50 outline-none focus:ring-1 focus:ring-primary/30"
         />
-      </div>
+      </form>
     );
   }
 
@@ -126,7 +128,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
         {/* Text - truncate with ellipsis by default, gradient fade on hover */}
         <span
           className={cn(
-            'text-base overflow-hidden flex-1 text-left transition-[width,opacity] duration-150',
+            'text-base overflow-hidden flex-1 text-left',
             collapsed ? 'w-0 opacity-0 whitespace-nowrap' : '',
             // When not hovered: truncate with ellipsis
             // When hovered: allow full text with gradient mask

@@ -6,10 +6,17 @@
  * content as formatted markdown for better readability.
  */
 import { ChevronDown, ClipboardList, Loader2 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
+
+import {
+  TOOL_CARD_BASE,
+  TOOL_CHEVRON_BASE,
+  TOOL_EXPAND_TRANSITION,
+  TOOL_EXPAND_TRANSITION_NONE,
+} from './shared';
 
 import type { FC } from 'react';
 
@@ -37,6 +44,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(true); // Plans start expanded
   const isFailed = success === false;
+  const shouldReduceMotion = useReducedMotion();
 
   const fileName = filePath.split('/').pop() ?? filePath;
 
@@ -50,7 +58,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
     <div>
       <div
         className={cn(
-          'bg-card overflow-hidden transition-[border-color,opacity,box-shadow] duration-200',
+          TOOL_CARD_BASE,
           isFailed
             ? 'border-2 border-dotted border-destructive/40 opacity-60'
             : 'border-2 border-dotted border-mode-plan/40', // Match input box in plan mode
@@ -115,26 +123,18 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
             ) : (
               <span className="text-xs text-mode-plan/60">Ready for review</span>
             )}
-            <ChevronDown
-              className={cn(
-                'h-3 w-3 text-muted-foreground/60 transition-transform duration-200',
-                isExpanded && 'rotate-180'
-              )}
-            />
+            <ChevronDown className={cn(TOOL_CHEVRON_BASE, isExpanded && 'rotate-180')} />
           </div>
         </button>
 
         {/* Markdown preview */}
-        <AnimatePresence initial={false} mode="wait">
+        <AnimatePresence initial={false}>
           {isExpanded ? (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
+              initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{
-                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
-                opacity: { duration: 0.15, ease: 'easeOut' },
-              }}
+              exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+              transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
               style={{ overflow: 'hidden' }}
             >
               <div className="overflow-auto max-h-[400px] bg-mode-plan/5 border-t border-mode-plan/20">

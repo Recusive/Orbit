@@ -366,12 +366,15 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     }
 
     // Check if another component (e.g., useAgentConversation) already has a pending load
-    // This prevents duplicate conversation:load requests that cause message duplicates
+    // This prevents duplicate conversation:load requests that cause message duplicates.
+    // NOTE: conversation:loaded handler deliberately does NOT clear the pending flag —
+    // it must survive until this useEffect fires (after React commits the new sessionId
+    // from startTransition). We clear it here after observing it.
     const bufferStore = useMessageBufferStore.getState();
     if (bufferStore.hasLoadPending(sessionId)) {
-      // Another component is handling the load - just mark as loaded locally
-      // to prevent retrying on next render
+      // Another component is handling the load - mark as loaded locally and clear flag
       loadedSessionsRef.current.add(sessionId);
+      bufferStore.clearLoadPending(sessionId);
       return;
     }
 

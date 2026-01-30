@@ -1,6 +1,15 @@
 import { ChevronDown, FilePen, Loader2 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
+
+import {
+  DiffStat,
+  TOOL_CARD_BASE,
+  TOOL_CHEVRON_BASE,
+  TOOL_EXPAND_TRANSITION,
+  TOOL_EXPAND_TRANSITION_NONE,
+  TOOL_HEADER_BASE,
+} from './shared';
 
 import type { FC } from 'react';
 
@@ -15,57 +24,6 @@ interface EditToolWidgetProps {
   readonly onOpenFile?: (path: string) => void;
 }
 
-// Diff stat squares component (GitHub style)
-interface DiffStatProps {
-  readonly additions: number;
-  readonly deletions: number;
-}
-
-const DiffStat: FC<DiffStatProps> = ({ additions, deletions }) => {
-  const total = additions + deletions;
-  const maxSquares = 5;
-
-  let addSquares = 0;
-  let delSquares = 0;
-  let neutralSquares = 0;
-
-  if (total > 0) {
-    addSquares = Math.round((additions / total) * maxSquares);
-    delSquares = Math.round((deletions / total) * maxSquares);
-    if (additions > 0 && addSquares === 0) addSquares = 1;
-    if (deletions > 0 && delSquares === 0) delSquares = 1;
-    neutralSquares = maxSquares - addSquares - delSquares;
-    if (neutralSquares < 0) neutralSquares = 0;
-  } else {
-    neutralSquares = maxSquares;
-  }
-
-  return (
-    <div className="flex items-center gap-1">
-      {additions > 0 ? (
-        <span className="text-xs font-semibold text-success">+{additions}</span>
-      ) : null}
-      {deletions > 0 ? (
-        <span className="text-xs font-semibold text-destructive">-{deletions}</span>
-      ) : null}
-      <div className="flex gap-px">
-        {Array.from({ length: addSquares }).map((_, i) => (
-          <div key={`add-${String(i)}`} className="w-1.5 h-1.5 rounded-sm bg-success" />
-        ))}
-        {Array.from({ length: delSquares }).map((_, i) => (
-          <div key={`del-${String(i)}`} className="w-1.5 h-1.5 rounded-sm bg-destructive" />
-        ))}
-        {Array.from({ length: neutralSquares }).map((_, i) => (
-          <div
-            key={`neutral-${String(i)}`}
-            className="w-1.5 h-1.5 rounded-sm bg-muted-foreground/30"
-          />
-        ))}
-      </div>
-    </div>
-  );
-};
-
 export const EditToolWidget: FC<EditToolWidgetProps> = ({
   filePath,
   oldString,
@@ -78,6 +36,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   const [showAllLines, setShowAllLines] = useState(false);
   const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
+  const shouldReduceMotion = useReducedMotion();
 
   // Auto-collapse when tool finishes
   useEffect(() => {
@@ -110,7 +69,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
     <div>
       <div
         className={cn(
-          'bg-card overflow-hidden transition-[border-color,opacity,box-shadow] duration-200',
+          TOOL_CARD_BASE,
           isFailed
             ? 'border-2 border-dotted border-destructive/40 opacity-60'
             : 'border border-border/50',
@@ -122,7 +81,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
           onClick={() => {
             setIsExpanded(!isExpanded);
           }}
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-muted/40 transition-colors duration-150"
+          className={TOOL_HEADER_BASE}
         >
           {/* Icon container */}
           <div
@@ -174,26 +133,18 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
             ) : (
               <DiffStat additions={additions} deletions={deletions} />
             )}
-            <ChevronDown
-              className={cn(
-                'h-3 w-3 text-muted-foreground/60 transition-transform duration-200',
-                isExpanded && 'rotate-180'
-              )}
-            />
+            <ChevronDown className={cn(TOOL_CHEVRON_BASE, isExpanded && 'rotate-180')} />
           </div>
         </button>
 
         {/* Diff preview */}
-        <AnimatePresence initial={false} mode="wait">
+        <AnimatePresence initial={false}>
           {isExpanded ? (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
+              initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{
-                height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] },
-                opacity: { duration: 0.15, ease: 'easeOut' },
-              }}
+              exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+              transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
               style={{ overflow: 'hidden' }}
             >
               <div className={cn('overflow-auto', !showAllLines && 'max-h-[300px]')}>
@@ -254,7 +205,10 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                   className="w-full py-1 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-0.5"
                 >
                   <ChevronDown
-                    className={cn('h-2.5 w-2.5 transition-transform', showAllLines && 'rotate-180')}
+                    className={cn(
+                      'h-2.5 w-2.5 transition-transform duration-200 ease-out',
+                      showAllLines && 'rotate-180'
+                    )}
                   />
                   <span>
                     {showAllLines

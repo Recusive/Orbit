@@ -653,6 +653,17 @@ export class TerminalInstance {
         this.unacknowledgedBytes = 0;
       }
     }, 100);
+
+    // Track in disposables so the interval is cleared even if dispose() isn't called
+    // (e.g., orphaned instances where only disposables are cleaned up)
+    this.disposables.push({
+      dispose: () => {
+        if (this.ackInterval !== null) {
+          clearInterval(this.ackInterval);
+          this.ackInterval = null;
+        }
+      },
+    });
   }
 
   private setupCopyOnSelection(): void {

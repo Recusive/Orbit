@@ -1,6 +1,6 @@
 import type { ImageAttachment } from '@/components/chat/input/types';
 import type { ChatMessage } from '@/components/chat/messages';
-import type { PermissionRequest, ToolExecution, UsageData } from '@/stores/agent/tool-store';
+import type { PermissionRequest, UsageData } from '@/stores/agent/tool-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { InputMode, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 
@@ -30,8 +30,6 @@ export interface ChatContentProps {
   readonly sessionUsage: UsageData;
   /** Max tokens limit */
   readonly maxTokens: number;
-  /** Get tools for a specific message */
-  readonly getToolsForMessage: (messageId: string) => ToolExecution[];
   /** Handlers */
   readonly onSend: (
     text: string,

@@ -1,10 +1,27 @@
 /**
- * ChatMessages - Message list with auto-scroll behavior
+ * ChatMessages - Virtualized message list with auto-scroll behavior
+ *
+ * Uses @tanstack/react-virtual for DOM virtualization. Only messages near
+ * the viewport are rendered, capping DOM nodes to ~30 (viewport + overscan)
+ * regardless of conversation length. This is the primary fix for the 2.27GB
+ * DOM memory spike observed in profiling.
+ *
+ * Integration with use-stick-to-bottom:
+ * - scrollRef: shared scroll container for both virtualizer and stick-to-bottom
+ * - contentRef: on the wrapper div whose height is driven by virtualizer.getTotalSize()
+ *   The stick-to-bottom ResizeObserver sees this height change and triggers auto-scroll.
  *
  * NOTE: Chat container widths come from @/lib/utils/constants.
  * To change chat max-width, update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts.
  */
-import { useEffect, useRef, useState } from 'react';
+import { createLogger } from '@orbit/common/lib';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// PINNED: use-stick-to-bottom@1.1.2 — the session-switch scroll reset workaround
+// (stopScroll() call below) depends on this library's internal ResizeObserver
+// timing. Upgrading may break the workaround silently. Test thoroughly before
+// bumping. (Code review: Opus cycle 1, issue #8)
+import { useStickToBottom } from 'use-stick-to-bottom';
 
 import { MessageItem } from './messages';
 import { QueuedMessageBubble } from './queued-message';
@@ -17,7 +34,14 @@ import type { FC } from 'react';
 import { HyperText } from '@/components/ui/hyper-text';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
-import { useRunningTool } from '@/stores/agent/tool-store';
+import {
+  deduplicateAndSortTools,
+  useActiveTools,
+  useCompletedTools,
+  useRunningTool,
+} from '@/stores/agent/tool-store';
+
+const logger = createLogger('ChatMessages');
 
 // Rotating loading messages - fun tech-themed phrases (fallback when no tool is running)
 const LOADING_MESSAGES = [
@@ -75,7 +99,8 @@ function truncateFileName(fileName: string): string {
 function getFileName(filePath: string): string {
   // Split on both forward and back slashes to handle Unix and Windows paths
   const parts = filePath.split(/[/\\]/);
-  const fileName = parts.pop() ?? 'file';
+  const raw = parts.pop();
+  const fileName = raw !== undefined && raw.length > 0 ? raw : 'file';
   return truncateFileName(fileName);
 }
 
@@ -147,12 +172,14 @@ function useRotatingMessage(isActive: boolean, intervalMs = 2500): string {
   return LOADING_MESSAGES[index] ?? 'Thinking';
 }
 
+/** Estimated average message height for virtualizer initial sizing */
+const ESTIMATED_MESSAGE_HEIGHT = 120;
+
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
   readonly isAgentRunning: boolean;
   readonly sessionId?: string;
   readonly queuedMessage: QueuedMessage | null;
-  readonly getToolsForMessage: (messageId: string) => ToolExecution[];
   readonly onRewind: (messageId: string) => void;
   readonly onOpenFile: (path: string) => void;
   readonly onOpenUrl: (url: string) => void;
@@ -165,20 +192,25 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   isAgentRunning,
   sessionId,
   queuedMessage,
-  getToolsForMessage,
   onRewind,
   onOpenFile,
   onOpenUrl,
   onCancelQueue,
   onFeedback,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const shouldAutoScroll = useRef(true);
+  // use-stick-to-bottom handles all scroll behavior:
+  // - Sticks to bottom during streaming (ResizeObserver-based)
+  // - Detects user scroll-up to cancel stickiness
+  // - Velocity-based spring animation for smooth content growth
+  // - Scroll anchoring when content above viewport resizes
+  const { scrollRef, contentRef, scrollToBottom, stopScroll } = useStickToBottom({
+    // Smooth spring animation when content resizes (tool expand/collapse)
+    resize: 'smooth',
+    // Smooth initial scroll on mount
+    initial: 'smooth',
+  });
+
   const prevSessionIdRef = useRef(sessionId);
-  const hasResetScrollRef = useRef(false);
-  // Track streaming state for ResizeObserver (code review issue #4)
-  const isStreamingRef = useRef(false);
 
   // Track message IDs that should animate (newly sent user messages)
   // Using STATE (not ref) ensures animation class is applied on same render (code review: Codex cycle 2 #2)
@@ -200,16 +232,23 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     setAnimatingMessageIds(new Set());
     knownMessageIds.current.clear();
 
-    // Reset scroll position
-    if (containerRef.current) {
-      shouldAutoScroll.current = true;
-      containerRef.current.scrollTop = 0;
+    // Reset scroll position to top for new conversation
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollTop = 0;
+      // Explicitly tell the library we're no longer at bottom.
+      // Without this, a ResizeObserver callback racing the scroll event's
+      // setTimeout(..., 1) can cause the resizeDifference guard to swallow
+      // the scroll event — leaving isAtBottom=true at scrollTop=0.
+      // NOTE: This workaround depends on use-stick-to-bottom's internal timing.
+      // If the library updates its ResizeObserver scheduling, this may need
+      // revisiting. (Code review: Opus cycle 1, issue #12)
+      stopScroll();
     }
-    hasResetScrollRef.current = true;
 
     // Update ref AFTER all mutations
     prevSessionIdRef.current = sessionId;
-  }, [sessionId]);
+  }, [sessionId, scrollRef, stopScroll]);
 
   // Detect newly added user messages and mark them for animation
   // CRITICAL: We track by message ID, not array length. This prevents:
@@ -234,8 +273,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (newUserMessages.length === 1 && newUserMessages[0] !== undefined) {
       const newId = newUserMessages[0];
       setAnimatingMessageIds((prev) => new Set(prev).add(newId));
+      // Scroll to bottom when user sends a new message
+      void scrollToBottom();
     }
-  }, [messages]);
+  }, [messages, scrollToBottom]);
 
   // Loading state - shown while agent is running
   // Note: Animation interval was removed for performance. Streaming effect is now
@@ -246,6 +287,66 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // (Uses dedicated selector for better encapsulation - code review cycle 2, issue #1)
   const runningTool = useRunningTool();
 
+  // Subscribe to activeTools and completedTools via selectors to compute
+  // tools-per-message directly in the render. This bypasses the store's
+  // internal get() which can return stale state in the persist(immer(...))
+  // middleware stack — causing tool widgets to not appear until completion.
+  const activeTools = useActiveTools();
+  const completedTools = useCompletedTools();
+
+  // Memoize tools-per-message: build a Map<messageId, ToolExecution[]> once per
+  // activeTools/completedTools change, then O(1) lookup per message render.
+  // Without this, deduplicateAndSortTools() runs O(messages x tools) per cycle.
+  // (Code review: Opus cycle 1, issue #1)
+  const toolsByMessageId = useMemo(() => {
+    const activeByMsg = new Map<string, ToolExecution[]>();
+    const completedByMsg = new Map<string, ToolExecution[]>();
+
+    for (const tool of Object.values(activeTools)) {
+      const list = activeByMsg.get(tool.messageId);
+      if (list) {
+        list.push(tool);
+      } else {
+        activeByMsg.set(tool.messageId, [tool]);
+      }
+    }
+
+    for (const tool of completedTools) {
+      const list = completedByMsg.get(tool.messageId);
+      if (list) {
+        list.push(tool);
+      } else {
+        completedByMsg.set(tool.messageId, [tool]);
+      }
+    }
+
+    // Merge all message IDs and deduplicate+sort per message
+    const allMessageIds = new Set([...activeByMsg.keys(), ...completedByMsg.keys()]);
+    const result = new Map<string, ToolExecution[]>();
+    for (const messageId of allMessageIds) {
+      result.set(
+        messageId,
+        deduplicateAndSortTools(
+          activeByMsg.get(messageId) ?? [],
+          completedByMsg.get(messageId) ?? []
+        )
+      );
+    }
+
+    return result;
+  }, [activeTools, completedTools]);
+
+  // Precompute isLastAssistantMessage for each message in O(n) instead of O(n²).
+  // Walk backwards: the last assistant message is the one with no assistant messages after it.
+  const lastAssistantMessageId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === 'assistant') {
+        return messages[i]?.id ?? null;
+      }
+    }
+    return null;
+  }, [messages]);
+
   // Rotating loading message for a bit of personality (fallback)
   const rotatingMessage = useRotatingMessage(isLoading);
 
@@ -253,21 +354,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const loadingMessage = runningTool
     ? getToolStatusMessage(runningTool.toolName, runningTool.toolInput)
     : rotatingMessage;
-
-  // Track last message content length for scroll dependency
-  const lastMessage = messages[messages.length - 1];
-  const lastMessageContentLength = lastMessage?.displayedContent.length ?? 0;
-
-  // Update streaming ref for ResizeObserver (code review issue #4)
-  // Use ref so ResizeObserver callback can access current streaming state
-  isStreamingRef.current = lastMessage?.isStreaming === true;
-
-  // Instant scroll during streaming - this is the PRIMARY scroll mechanism
-  // ResizeObserver below handles layout changes (tool expand/collapse)
-  useEffect(() => {
-    if (!shouldAutoScroll.current || !containerRef.current) return;
-    containerRef.current.scrollTop = containerRef.current.scrollHeight;
-  }, [messages.length, lastMessageContentLength]);
 
   // Track active animation cleanup timeouts per message ID (code review: Opus #3)
   // Using individual timeouts prevents rapid messages from clearing each other's animations
@@ -304,119 +390,127 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     };
   }, []);
 
-  // Track manual scrolling - disable auto-scroll if user scrolls up
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+  // ─────────────────────────────────────────────────────────────
+  // Virtualizer Setup
+  // ─────────────────────────────────────────────────────────────
+  // Always virtualize — even short conversations benefit from containment.
+  // The overscan of 5 above + 5 below means ~10-15 items in DOM at any time.
 
-    const handleScroll = (): void => {
-      const { scrollHeight, clientHeight, scrollTop } = el;
-      const isNearBottom = scrollHeight - clientHeight - scrollTop < 100;
-      const wasNotAutoScrolling = !shouldAutoScroll.current;
-      shouldAutoScroll.current = isNearBottom;
+  // Stable getScrollElement callback for the virtualizer.
+  // use-stick-to-bottom types scrollRef as RefObject<HTMLElement>, not HTMLDivElement.
+  const getScrollElement = useCallback((): HTMLElement | null => {
+    return scrollRef.current;
+  }, [scrollRef]);
 
-      // Catch up when user re-engages auto-scroll (code review issue #10)
-      // This prevents the "jump" when scrolling back down during streaming
-      if (wasNotAutoScrolling && isNearBottom) {
-        el.scrollTop = el.scrollHeight;
+  // Stable key extractor — uses message ID for consistent reconciliation.
+  // Without this, the virtualizer uses array index which causes full re-renders
+  // when messages are prepended or removed (e.g., conversation:loaded merge).
+  const getItemKey = useCallback(
+    (index: number): string => {
+      const id = messages[index]?.id;
+      if (id === undefined) {
+        // Fallback should never trigger — virtualizer count matches messages.length.
+        // If it fires, something is out of sync during a rapid session switch.
+        logger.warn('getItemKey: messages[index] undefined, falling back to index', {
+          index,
+          count: messages.length,
+        });
       }
-    };
+      return id ?? String(index);
+    },
+    [messages]
+  );
 
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      el.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
+  const virtualizer = useVirtualizer<HTMLElement, HTMLDivElement>({
+    count: messages.length,
+    getScrollElement,
+    estimateSize: () => ESTIMATED_MESSAGE_HEIGHT,
+    getItemKey,
+    // Overscan: render 5 extra items above and below the viewport.
+    // Higher values reduce visible blank areas during fast scrolling
+    // but increase DOM node count. 5 is a good balance.
+    overscan: 5,
+  });
 
-  // ResizeObserver handles layout changes (tool expand/collapse, permission bar)
-  // NOT for streaming content - the useEffect above handles that with instant scroll
-  // CONSOLIDATED: Single observer watches both elements (code review: Opus #4)
-  useEffect(() => {
-    const content = contentRef.current;
-    const container = containerRef.current;
-    if (!content || !container) return;
-
-    let scrollTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    // Check prefers-reduced-motion (code review: Codex #2)
-    // Users who opt out of motion should get instant scroll, not smooth
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    // Debounced scroll for layout changes (not streaming)
-    // Uses smooth scroll unless user prefers reduced motion
-    const scheduleScroll = (): void => {
-      if (!shouldAutoScroll.current) return;
-
-      // Clear any pending scroll
-      if (scrollTimeoutId !== null) {
-        clearTimeout(scrollTimeoutId);
-      }
-
-      // Short debounce to let layout settle, then scroll
-      scrollTimeoutId = setTimeout(() => {
-        if (shouldAutoScroll.current) {
-          container.scrollTo({
-            top: container.scrollHeight,
-            // Respect prefers-reduced-motion: use instant scroll if reduced motion enabled
-            behavior: prefersReducedMotion ? 'auto' : 'smooth',
-          });
-        }
-        scrollTimeoutId = null;
-      }, 50);
-    };
-
-    // Single ResizeObserver watching both content and container
-    // The callback receives entries for all observed elements
-    const resizeObserver = new ResizeObserver(() => {
-      // Skip during streaming - the instant scroll useEffect handles that
-      if (isStreamingRef.current) return;
-      scheduleScroll();
-    });
-
-    resizeObserver.observe(content);
-    resizeObserver.observe(container);
-
-    return () => {
-      if (scrollTimeoutId !== null) {
-        clearTimeout(scrollTimeoutId);
-      }
-      resizeObserver.disconnect();
-    };
-  }, []);
+  const virtualItems = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
 
   return (
     <div
-      ref={containerRef}
+      ref={scrollRef}
       className="flex-1 overflow-y-auto overflow-x-hidden p-4"
-      style={{ scrollbarGutter: 'stable both-edges' }}
+      style={{
+        scrollbarGutter: 'stable both-edges',
+        // PERF: contain layout + style to this scroll container.
+        // Prevents layout/style recalculations from propagating to parent.
+        // Cannot use `contain: paint` here because overflow-y: auto already
+        // establishes a paint containment context.
+        contain: 'layout style',
+      }}
     >
+      {/*
+       * contentRef from use-stick-to-bottom watches this element's height via ResizeObserver.
+       * The height is driven by the spacer div inside (getTotalSize()). When the virtualizer
+       * count increases (new messages), getTotalSize() grows, this wrapper's height changes,
+       * and stick-to-bottom detects it and auto-scrolls.
+       */}
       <div
         ref={contentRef}
-        className="mx-auto flex flex-col gap-3"
+        className="mx-auto"
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
-        {/* All messages rendered directly - no virtualization needed for chat */}
-        {messages.map((msg, index) => {
-          const isLastAssistantMessage =
-            msg.role === 'assistant' && messages.slice(index + 1).every((m) => m.role === 'user');
+        {/* Spacer div — establishes the correct scrollable height.
+         * Items are absolutely positioned inside, so this div's height
+         * sets the scroll container's scrollHeight correctly.
+         * PERF: contain: layout style paint isolates this subtree from the
+         * rest of the page. Combined with content-visibility on children,
+         * this limits layout/paint recalculations to only visible messages. */}
+        <div
+          className="relative w-full"
+          style={{
+            height: `${String(totalSize)}px`,
+            contain: 'layout style paint',
+          }}
+        >
+          {virtualItems.map((virtualItem) => {
+            const msg = messages[virtualItem.index];
+            if (!msg) return null;
 
-          // Check if this message should animate (newly sent user message)
-          const shouldAnimate = animatingMessageIds.has(msg.id);
+            const isLastAssistant = msg.id === lastAssistantMessageId;
+            const shouldAnimate = animatingMessageIds.has(msg.id);
+            const tools = toolsByMessageId.get(msg.id) ?? [];
 
-          return (
-            <MessageItem
-              key={msg.id}
-              message={msg}
-              tools={getToolsForMessage(msg.id)}
-              isLastAssistantMessage={isLastAssistantMessage}
-              animate={shouldAnimate}
-              onRewind={onRewind}
-              onOpenFile={onOpenFile}
-              onOpenUrl={onOpenUrl}
-              onFeedback={onFeedback}
-            />
-          );
-        })}
+            return (
+              <div
+                key={virtualItem.key}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
+                className="absolute left-0 w-full pb-3"
+                style={{
+                  top: `${String(virtualItem.start)}px`,
+                  // NOTE: content-visibility:auto was REMOVED here. TanStack Virtual
+                  // already ensures only ~15 items are in the DOM (viewport + overscan).
+                  // Adding browser-level content-visibility created redundant compositing
+                  // layers and internal IntersectionObserver callbacks that consumed 5.2s
+                  // of compositing time and caused a 220ms IO callback in profiling.
+                }}
+              >
+                <MessageItem
+                  message={msg}
+                  tools={tools}
+                  isLastAssistantMessage={isLastAssistant}
+                  animate={shouldAnimate}
+                  onRewind={onRewind}
+                  onOpenFile={onOpenFile}
+                  onOpenUrl={onOpenUrl}
+                  onFeedback={onFeedback}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer lives outside the virtual list — always visible at the bottom */}
 
         {/* Queued message bubble - shows when user typed while agent was running */}
         {queuedMessage !== null ? (

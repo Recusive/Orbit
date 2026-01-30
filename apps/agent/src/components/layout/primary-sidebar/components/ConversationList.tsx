@@ -4,9 +4,6 @@
 import { Plus } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 
-/** Indentation for conversation items nested under workspace (px) */
-const CONVERSATION_INDENT_PX = 19;
-
 import { ConversationItem } from './ConversationItem';
 import { WorkspaceItem } from './WorkspaceItem';
 
@@ -16,6 +13,9 @@ import type { FC } from 'react';
 
 import { WorktreeItem } from '@/components/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
+/** Indentation for conversation items nested under workspace (px) */
+const CONVERSATION_INDENT_PX = 19;
 
 interface ConversationListProps {
   readonly conversations: ConversationSummary[];
@@ -165,13 +165,14 @@ export const ConversationList: FC<ConversationListProps> = ({
   return (
     <div className="py-1.5">
       <div className="flex items-center justify-between px-3 py-1">
-        <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-normal whitespace-nowrap">
+        <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
           Workspaces
         </span>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-90 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground shrink-0"
+              aria-label="Create worktree"
+              className="relative h-5 w-5 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-90 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground shrink-0 before:absolute before:content-[''] before:inset-[-10px]"
               onClick={onOpenCreateWorktree}
             >
               <Plus className="h-3 w-3" />
@@ -202,10 +203,14 @@ export const ConversationList: FC<ConversationListProps> = ({
                     onRemoveWorktree(wt.worktree);
                   }}
                 />
-                {/* Conversations for this worktree */}
-                {wt.isExpanded
-                  ? renderConversations(getWorktreeConversations(wt.worktree.path))
-                  : null}
+                {/* Conversations for this worktree — kept mounted, toggled via CSS to avoid remount cost.
+                    NOTE: With display:none, React hooks/subscriptions in ConversationItem remain active.
+                    For typical usage (<50 conversations), this is fine. For very large lists (200+),
+                    consider unmounting collapsed worktrees or virtualizing the list.
+                    (Code review: Opus cycle 1, issue #8) */}
+                <div style={{ display: wt.isExpanded ? 'block' : 'none' }}>
+                  {renderConversations(getWorktreeConversations(wt.worktree.path))}
+                </div>
               </div>
             ))}
           </>

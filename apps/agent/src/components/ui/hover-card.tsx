@@ -3,7 +3,7 @@
 import * as HoverCardPrimitive from '@radix-ui/react-hover-card';
 import * as React from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn, POPOVER_ANIMATION } from '@/lib/utils';
 
 // Wrapper with instant open/close (no delay)
 const HoverCard: React.FC<React.ComponentPropsWithoutRef<typeof HoverCardPrimitive.Root>> = ({
@@ -13,11 +13,6 @@ const HoverCard: React.FC<React.ComponentPropsWithoutRef<typeof HoverCardPrimiti
 }) => <HoverCardPrimitive.Root openDelay={openDelay} closeDelay={closeDelay} {...props} />;
 
 const HoverCardTrigger = HoverCardPrimitive.Trigger;
-
-// Animation duration - keep under 200ms for responsiveness
-const ANIMATION_DURATION = '150ms';
-// Smooth ease-out curve: fast start, gentle end
-const ANIMATION_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)';
 
 const HoverCardContent = React.forwardRef<
   React.ComponentRef<typeof HoverCardPrimitive.Content>,
@@ -42,8 +37,8 @@ const HoverCardContent = React.forwardRef<
     )}
     style={{
       // Custom timing for smoother, more responsive feel
-      animationDuration: ANIMATION_DURATION,
-      animationTimingFunction: ANIMATION_EASING,
+      animationDuration: POPOVER_ANIMATION.duration,
+      animationTimingFunction: POPOVER_ANIMATION.easing,
       ...style,
     }}
     {...props}

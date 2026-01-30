@@ -1,3 +1,27 @@
+/**
+ * Tool Store — Tool executions, permissions, usage tracking, model/mode selection.
+ *
+ * ⚠️  STALE get() WARNING — persist(immer(...)) middleware gotcha
+ * ──────────────────────────────────────────────────────────────
+ * The `get()` function captured inside `immer((set, get) => ...)` can return
+ * STALE state after a synchronous `set()` call. This is specific to the
+ * `persist(immer(...))` middleware stack — it does NOT happen with plain
+ * `create((set, get) => ...)`.
+ *
+ * What happens:
+ *   1. `startTool()` calls `set()` with immer → Zustand commits new state
+ *   2. Zustand selector hooks (useActiveTools, etc.) immediately see the update
+ *   3. BUT `get()` inside the store closure may still return pre-mutation state
+ *
+ * Consequence: Any store function that uses `get()` and feeds rendering may
+ * return stale data. `getToolsForMessage()` was the original victim — it
+ * returned empty arrays during active tool execution because `get().activeTools`
+ * was behind, causing tool widgets to not appear until completion.
+ *
+ * Rule: For rendering hot paths, use Zustand selector hooks in components
+ * and compute derived state there (see ChatMessages + deduplicateAndSortTools).
+ * Reserve `get()` for non-rendering logic (usage calculations, etc.).
+ */
 import { createLogger } from '@orbit/common/lib';
 import { z } from 'zod';
 import { create } from 'zustand';
@@ -21,6 +45,9 @@ const STORE_VERSION = 1;
  * This leaves plenty of headroom while supporting power users with long sessions.
  */
 const MAX_PERSISTED_TOOLS = 500;
+
+/** Maximum cached sessions to prevent unbounded memory growth */
+const MAX_CACHED_SESSIONS = 10;
 
 /**
  * Maximum size for toolInput values to persist (in characters).
@@ -198,6 +225,11 @@ export interface ToolState {
   // Active tool executions (keyed by tool ID)
   activeTools: Record<string, ToolExecution>;
 
+  // Monotonically increasing counter, bumped on every startTool/completeTool.
+  // Legacy: was used to force re-renders when tools changed. ChatMessages now
+  // subscribes directly to activeTools/completedTools selectors instead.
+  toolRevision: number;
+
   // Completed tool executions (for history/display)
   completedTools: ToolExecution[];
 
@@ -278,6 +310,41 @@ export interface ToolState {
   reset: () => void;
 }
 
+/**
+ * Pure function: deduplicate and sort tools from active + completed lists.
+ *
+ * Exported so that components can compute tools-for-message from selector
+ * values directly, bypassing the store's internal get() which can lag
+ * behind selector state in the persist(immer(...)) middleware stack.
+ */
+export function deduplicateAndSortTools(
+  active: ToolExecution[],
+  completed: ToolExecution[]
+): ToolExecution[] {
+  if (active.length === 0 && completed.length === 0) {
+    return [];
+  }
+
+  // Deduplicate by tool ID (keep latest version of each).
+  // Precedence: completed always wins over active for same ID (a completed
+  // tool is always "more recent" than an active one); otherwise prefer the
+  // entry with the newer startedAt timestamp.
+  // (Code review: Opus cycle 1, issue #10)
+  const toolMap = new Map<string, ToolExecution>();
+  for (const tool of [...active, ...completed]) {
+    const existing = toolMap.get(tool.id);
+    if (
+      !existing ||
+      tool.startedAt > existing.startedAt ||
+      (tool.completedAt !== undefined && existing.completedAt === undefined)
+    ) {
+      toolMap.set(tool.id, tool);
+    }
+  }
+
+  return Array.from(toolMap.values()).sort((a, b) => a.startedAt - b.startedAt);
+}
+
 const initialUsage: UsageData = {
   inputTokens: 0,
   outputTokens: 0,
@@ -293,6 +360,7 @@ export const useToolStore = create<ToolState>()(
       thinkingMode: 'off',
       model: 'sonnet',
       activeTools: {},
+      toolRevision: 0,
       completedTools: [],
       pendingPermissions: [],
       currentSessionId: null,
@@ -337,6 +405,7 @@ export const useToolStore = create<ToolState>()(
             contentOffset,
           };
           state.activeTools[id] = tool;
+          state.toolRevision += 1;
         });
       },
 
@@ -356,8 +425,16 @@ export const useToolStore = create<ToolState>()(
 
             // Move to completed
             state.completedTools.push({ ...tool });
+
+            // Cap in-memory array to prevent unbounded growth in long sessions.
+            // Same limit as localStorage persistence (MAX_PERSISTED_TOOLS).
+            if (state.completedTools.length > MAX_PERSISTED_TOOLS) {
+              state.completedTools = state.completedTools.slice(-MAX_PERSISTED_TOOLS);
+            }
+
             // Remove from active tools (Reflect.deleteProperty avoids eslint no-dynamic-delete)
             Reflect.deleteProperty(state.activeTools, id);
+            state.toolRevision += 1;
           }
         });
       },
@@ -436,6 +513,15 @@ export const useToolStore = create<ToolState>()(
               activeTools: { ...state.activeTools },
               completedTools: [...state.completedTools],
             };
+
+            // Evict oldest sessions to prevent unbounded memory growth.
+            const cacheKeys = Object.keys(state.sessionCache);
+            if (cacheKeys.length > MAX_CACHED_SESSIONS) {
+              const evictCount = cacheKeys.length - MAX_CACHED_SESSIONS;
+              for (const key of cacheKeys.slice(0, evictCount)) {
+                Reflect.deleteProperty(state.sessionCache, key);
+              }
+            }
           }
 
           // Check if we have cached data for the new session
@@ -503,26 +589,16 @@ export const useToolStore = create<ToolState>()(
         return state.sessionUsage.inputTokens + state.sessionUsage.outputTokens;
       },
 
+      // ⚠️  DO NOT use this for rendering — get() returns stale state.
+      // See file-level comment. For rendering, use useActiveTools() +
+      // useCompletedTools() selectors with deduplicateAndSortTools() directly.
+      // Kept for non-rendering callers (e.g., restoreToolsForMessage).
       getToolsForMessage: (messageId: string) => {
         const state = get();
         const active = Object.values(state.activeTools).filter((t) => t.messageId === messageId);
         const completed = state.completedTools.filter((t) => t.messageId === messageId);
 
-        // Deduplicate by tool ID (keep latest version of each)
-        const toolMap = new Map<string, ToolExecution>();
-        for (const tool of [...active, ...completed]) {
-          const existing = toolMap.get(tool.id);
-          // Keep the tool if it's newer or has more complete status
-          if (
-            !existing ||
-            tool.startedAt > existing.startedAt ||
-            (tool.completedAt !== undefined && existing.completedAt === undefined)
-          ) {
-            toolMap.set(tool.id, tool);
-          }
-        }
-
-        return Array.from(toolMap.values()).sort((a, b) => a.startedAt - b.startedAt);
+        return deduplicateAndSortTools(active, completed);
       },
 
       restoreToolsForMessage: (
@@ -692,6 +768,11 @@ export const useActiveTools = (): Record<string, ToolExecution> =>
 export const usePendingPermissions = (): PermissionRequest[] =>
   useToolStore((state) => state.pendingPermissions);
 
+// Completed tools selector - used by ChatMessages to compute tools-for-message
+// from selector values rather than the store's internal get() which lags behind
+export const useCompletedTools = (): ToolExecution[] =>
+  useToolStore((state) => state.completedTools);
+
 // Usage selectors
 export const useSessionUsage = (): UsageData => useToolStore((state) => state.sessionUsage);
 export const useContextPercentage = (): number =>
@@ -699,9 +780,20 @@ export const useContextPercentage = (): number =>
 export const useMaxTokens = (): number => useToolStore((state) => state.getMaxTokens());
 export const useUsedTokens = (): number => useToolStore((state) => state.getUsedTokens());
 
-// Tool lookup selector - stable reference to avoid re-renders
+/**
+ * @deprecated Do not use for rendering — get() returns stale state in persist(immer(...)).
+ * Use useActiveTools() + useCompletedTools() + deduplicateAndSortTools() instead.
+ * Kept for backward compatibility with non-rendering callers.
+ */
 export const useGetToolsForMessage = (): ((messageId: string) => ToolExecution[]) =>
   useToolStore((state) => state.getToolsForMessage);
+
+/**
+ * @deprecated No longer needed. ChatMessages now subscribes to useActiveTools()
+ * and useCompletedTools() directly, which trigger re-renders automatically.
+ * Was previously required to force re-renders when using useGetToolsForMessage().
+ */
+export const useToolRevision = (): number => useToolStore((state) => state.toolRevision);
 
 /**
  * Selector for currently running tool (if any).
