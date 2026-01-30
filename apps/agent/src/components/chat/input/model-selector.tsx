@@ -109,18 +109,19 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Calculate popover position from trigger's viewport rect.
-  // Flips to below the trigger when there isn't enough space above (small windows,
-  // input near top). Mirrors the avoidCollisions behavior of the @-mention and
-  // slash-command Radix popovers. (Code review: Opus cycle 1, issues #2 & #3)
+  // Uses the actual popover height (when available) to decide whether to open
+  // above or below the trigger. Falls back to an estimate on first render,
+  // then corrects after the portal mounts via a second layout effect.
+  // (Code review: Opus cycle 1, issues #2 & #3)
   const updatePosition = useCallback((): void => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    // Estimate popover height: 2 groups × ~3 items × 28px + padding ≈ 220px
-    const estimatedHeight = 220;
+    // Use actual popover height if already rendered, otherwise estimate
+    const popoverHeight = popoverRef.current?.offsetHeight ?? 300;
     const spaceAbove = rect.top;
     const spaceBelow = window.innerHeight - rect.bottom;
 
-    if (spaceAbove >= estimatedHeight || spaceAbove >= spaceBelow) {
+    if (spaceAbove >= popoverHeight || spaceAbove >= spaceBelow) {
       // Default: open above (bottom-anchored)
       setPosition({
         bottom: window.innerHeight - rect.top + POPOVER_GAP,
@@ -137,10 +138,21 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     }
   }, []);
 
+  // Initial positioning (before paint, uses estimate since portal isn't mounted yet)
   useLayoutEffect(() => {
     if (!isOpen) return;
     updatePosition();
   }, [isOpen, updatePosition]);
+
+  // Post-mount correction: once the portal is in the DOM, re-measure with the
+  // real popover height and flip if the estimate was wrong.
+  useEffect(() => {
+    if (!isOpen || isAnimatingOut) return;
+    // RAF ensures the portal DOM is mounted and popoverRef.current has its real height
+    requestAnimationFrame(() => {
+      updatePosition();
+    });
+  }, [isOpen, isAnimatingOut, updatePosition]);
 
   // Reposition popover on window resize/scroll while open
   useEffect(() => {
