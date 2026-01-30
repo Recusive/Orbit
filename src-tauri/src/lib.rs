@@ -528,6 +528,7 @@ pub fn run() {
             browser::browser_eval_async,
             browser::browser_screenshot,
             browser::browser_open_devtools,
+            browser::app_open_devtools,
             // Browser navigation commands
             browser::browser_back,
             browser::browser_forward,

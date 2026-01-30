@@ -626,6 +626,8 @@ pub async fn browser_screenshot(
 ///
 /// Because the browser is a separate window (not a child webview), it has
 /// its own independent Web Inspector that can be docked!
+///
+/// Available in both debug and release builds (requires `devtools` Cargo feature).
 #[tauri::command]
 pub async fn browser_open_devtools(
     app: AppHandle,
@@ -639,18 +641,25 @@ pub async fn browser_open_devtools(
         .get_webview_window(BROWSER_WINDOW_LABEL)
         .ok_or("Browser window not found")?;
 
-    #[cfg(debug_assertions)]
-    {
-        window.open_devtools();
-        log::info!("Opened DevTools for browser window (independent inspector!)");
-        Ok(())
-    }
+    window.open_devtools();
+    log::info!("Opened DevTools for browser window (independent inspector!)");
+    Ok(())
+}
 
-    #[cfg(not(debug_assertions))]
-    {
-        let _ = window;
-        Err("DevTools is only available in debug builds".to_owned())
-    }
+/// Open DevTools for the main application window.
+///
+/// Available in both debug and release builds (requires `devtools` Cargo feature).
+#[tauri::command]
+pub async fn app_open_devtools(app: AppHandle) -> Result<()> {
+    use tauri::Manager as _;
+
+    let window = app
+        .get_webview_window("main")
+        .ok_or("Main window not found")?;
+
+    window.open_devtools();
+    log::info!("Opened DevTools for main application window");
+    Ok(())
 }
 
 // ═══════════════════════════════════════════════════════════════
