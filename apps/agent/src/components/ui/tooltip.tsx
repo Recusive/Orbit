@@ -81,16 +81,11 @@ const TooltipTrigger = TooltipPrimitive.Trigger;
 const TooltipContent = React.forwardRef<
   React.ComponentRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
->(({ className, sideOffset = 4, avoidCollisions = false, style, ...props }, ref) => (
+>(({ className, sideOffset = 4, style, ...props }, ref) => (
   <TooltipPrimitive.Portal>
     <TooltipPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
-      // PERF: Disable collision detection to prevent Floating UI from running
-      // getCssDimensions in a tight loop during streaming. Profiling showed
-      // getCssDimensions ← getElementRects ← Popover$1 consuming 18.7% CPU
-      // (212/1134 samples). Tooltips are small enough to not need collision flipping.
-      avoidCollisions={avoidCollisions}
       className={cn(
         'z-50 overflow-hidden rounded-md px-2 py-1 text-xs',
         'bg-foreground text-background',

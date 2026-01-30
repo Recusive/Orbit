@@ -172,7 +172,6 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
         side="top"
         align="start"
         sideOffset={8}
-        avoidCollisions
         onOpenAutoFocus={(e) => {
           e.preventDefault();
         }}
