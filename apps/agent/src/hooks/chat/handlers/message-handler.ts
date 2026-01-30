@@ -852,7 +852,11 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             setActiveConversation(message.session_id, message.title);
             switchSession(message.session_id);
 
-            // Restore tool executions from persisted messages (for tool widget display)
+            // Restore tool executions from persisted messages (for tool widget display).
+            // NOTE: This for-loop runs synchronously — React cannot interrupt between
+            // individual restoreToolsForMessage calls. startTransition only yields
+            // between React renders, not between synchronous Zustand set() calls.
+            // (Code review: Opus cycle 3, issue #1)
             for (const m of message.messages) {
               if (m.toolUses.length > 0) {
                 restoreToolsForMessage(

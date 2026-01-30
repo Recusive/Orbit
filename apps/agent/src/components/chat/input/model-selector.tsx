@@ -74,8 +74,13 @@ const MODEL_GROUPS: ModelGroup[] = [
 ];
 
 interface PopoverPosition {
-  bottom: number;
+  /** CSS `top` when opening below trigger, undefined when opening above */
+  top?: number;
+  /** CSS `bottom` when opening above trigger, undefined when opening below */
+  bottom?: number;
   left: number;
+  /** Which side the popover opens on — drives transform-origin and animation direction */
+  side: 'top' | 'bottom';
 }
 
 interface ModelSelectorProps {
@@ -85,23 +90,39 @@ interface ModelSelectorProps {
 export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
-  const [position, setPosition] = useState<PopoverPosition>({ bottom: 0, left: 0 });
+  const [position, setPosition] = useState<PopoverPosition>({ bottom: 0, left: 0, side: 'top' });
   const selectedModel = useModel();
   const setModel = useToolStore((s) => s.setModel);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Calculate popover position from trigger's viewport rect.
-  // useLayoutEffect ensures position is set before paint to prevent flicker.
-  // Also recalculates on window resize/scroll while open to keep alignment.
-  // (Code review: Opus cycle 1, issues #2 & #3)
+  // Flips to below the trigger when there isn't enough space above (small windows,
+  // input near top). Mirrors the avoidCollisions behavior of the @-mention and
+  // slash-command Radix popovers. (Code review: Opus cycle 1, issues #2 & #3)
   const updatePosition = useCallback((): void => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    setPosition({
-      bottom: window.innerHeight - rect.top + POPOVER_GAP,
-      left: rect.left,
-    });
+    // Estimate popover height: 2 groups × ~3 items × 28px + padding ≈ 220px
+    const estimatedHeight = 220;
+    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom;
+
+    if (spaceAbove >= estimatedHeight || spaceAbove >= spaceBelow) {
+      // Default: open above (bottom-anchored)
+      setPosition({
+        bottom: window.innerHeight - rect.top + POPOVER_GAP,
+        left: rect.left,
+        side: 'top',
+      });
+    } else {
+      // Flip: open below (top-anchored)
+      setPosition({
+        top: rect.bottom + POPOVER_GAP,
+        left: rect.left,
+        side: 'bottom',
+      });
+    }
   }, []);
 
   useLayoutEffect(() => {
@@ -240,15 +261,20 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       onKeyDown={handlePopoverKeyDown}
       className={cn(
         'fixed bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50',
-        'origin-bottom-left',
+        position.side === 'top' ? 'origin-bottom-left' : 'origin-top-left',
         // Enter: rich 3-property animation (scale + fade + slide), ease-out
-        !isAnimatingOut && 'animate-in fade-in-0 zoom-in-[0.97] slide-in-from-bottom-1',
+        !isAnimatingOut &&
+          cn(
+            'animate-in fade-in-0 zoom-in-[0.97]',
+            position.side === 'top' ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1'
+          ),
         // Exit: fade-only for clean disappearance (no zoom/slide = no "deflating ghost")
         isAnimatingOut && 'animate-out fade-out-0'
       )}
       style={{
         width: CHAT_WIDTH.dropdown,
-        bottom: position.bottom,
+        ...(position.bottom !== undefined ? { bottom: position.bottom } : {}),
+        ...(position.top !== undefined ? { top: position.top } : {}),
         left: position.left,
         // Enter uses ease-out (fast arrival, gentle settle)
         // Exit uses ease-in (gentle start, fast departure)

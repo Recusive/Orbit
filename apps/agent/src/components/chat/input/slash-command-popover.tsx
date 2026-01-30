@@ -73,6 +73,7 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
         side="top"
         align="start"
         sideOffset={8}
+        avoidCollisions
         onOpenAutoFocus={(e) => {
           e.preventDefault();
         }}

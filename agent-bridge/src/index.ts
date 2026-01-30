@@ -319,7 +319,10 @@ function main(): void {
    */
   const SHUTDOWN_GRACE_MS = 500;
 
+  let shuttingDown = false;
   function gracefulShutdown(reason: string): void {
+    if (shuttingDown) return;
+    shuttingDown = true;
     logger.info(`${reason}, shutting down...`);
     // Wrap dispose calls in try/catch — if dispose throws synchronously,
     // the process could exit with code 1 before the grace timeout fires,

@@ -107,6 +107,14 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           className="flex items-center justify-center shrink-0 hover:bg-muted/60 rounded-md"
           style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
           onClick={handleChevronClick}
+          onKeyDown={(e) => {
+            // Stop Enter/Space from bubbling to parent role="button" div,
+            // which would fire handleRowClick (select) in addition to
+            // the chevron's onClick (toggle). (Code review: Opus cycle 3, issue #8)
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation();
+            }
+          }}
         >
           <ChevronDown
             className={cn(

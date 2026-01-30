@@ -117,13 +117,13 @@ const languages: Record<string, LanguageFactory> = {
 };
 
 // ============================================
-// Custom dark theme (matches chat-area background)
+// Custom dark theme (matches --card background)
 // ============================================
 
 const darkTheme = EditorView.theme(
   {
     '&': {
-      backgroundColor: 'oklch(0.18 0.012 60)', // Same as --chat-area in dark mode
+      backgroundColor: 'oklch(0.2 0.015 58)', // Same as --card in dark mode
       color: '#e1e1e1',
     },
     '.cm-scroller': {
@@ -142,7 +142,7 @@ const darkTheme = EditorView.theme(
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
     '.cm-gutters': {
-      backgroundColor: 'oklch(0.18 0.012 60)', // Same as editor bg for horizontal scroll
+      backgroundColor: 'oklch(0.2 0.015 58)', // Same as editor bg for horizontal scroll
       color: 'oklch(0.55 0.03 60)', // Warm brown matching --muted-foreground
       border: 'none',
     },
@@ -229,7 +229,7 @@ const darkTheme = EditorView.theme(
       transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
     },
     '.cm-search.cm-panel input.cm-textfield:focus': {
-      backgroundColor: 'oklch(0.18 0.012 60 / 0.8)',
+      backgroundColor: 'oklch(0.2 0.015 58 / 0.8)',
       borderColor: 'oklch(0.40 0.012 60 / 0.6)',
       boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.15), 0 0 0 1px oklch(0.40 0.012 60 / 0.3)',
     },
@@ -383,7 +383,7 @@ const darkHighlightStyle = HighlightStyle.define([
 
 const lightTheme = EditorView.theme({
   '&': {
-    backgroundColor: 'oklch(0.93 0.015 75)', // Same as --chat-area in light mode
+    backgroundColor: 'oklch(0.9 0.02 75)', // Same as --card in light mode
     color: '#24292f',
   },
   '.cm-scroller': {
@@ -402,7 +402,7 @@ const lightTheme = EditorView.theme({
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   '.cm-gutters': {
-    backgroundColor: 'oklch(0.93 0.015 75)', // Same as editor bg for horizontal scroll
+    backgroundColor: 'oklch(0.9 0.02 75)', // Same as editor bg for horizontal scroll
     color: 'oklch(0.50 0.03 60)', // Warm brown matching --muted-foreground
     border: 'none',
   },
