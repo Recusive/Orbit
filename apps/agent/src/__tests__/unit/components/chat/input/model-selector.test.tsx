@@ -125,7 +125,7 @@ describe('ModelSelector Component', () => {
       expect(screen.getAllByText('Opus 4.5')).toHaveLength(1);
     });
 
-    it('should show Codex models with "New chat" badge', async () => {
+    it('should show Codex models with "Coming soon" badge', async () => {
       const user = userEvent.setup();
       render(<ModelSelector />, { wrapper: TestWrapper });
 
@@ -135,7 +135,7 @@ describe('ModelSelector Component', () => {
       expect(screen.getByText('GPT-5 Nano')).toBeInTheDocument();
       expect(screen.getByText('GPT-5 Mini')).toBeInTheDocument();
       expect(screen.getByText('GPT-5')).toBeInTheDocument();
-      expect(screen.getAllByText('New chat')).toHaveLength(3);
+      expect(screen.getAllByText('Coming soon')).toHaveLength(3);
     });
 
     it('should close dropdown when clicking the button again', async () => {
