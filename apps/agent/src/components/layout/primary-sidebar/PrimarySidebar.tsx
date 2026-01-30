@@ -125,7 +125,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   return (
     <aside
       data-sidebar="primary"
-      className="h-full flex flex-col bg-card overflow-hidden border-r border-divider shadow-lg dark:shadow-none"
+      className="h-full flex flex-col bg-card overflow-hidden border-r border-divider"
       style={{
         width,
         transition: SIDEBAR_WIDTH_TRANSITION,
@@ -279,7 +279,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           <SidebarItem
             icon={IconSearchlinesSparkle}
             label="Vault"
-            badge="Soon"
+            badge="Coming soon"
             collapsed={isCollapsed}
             equalSpacing={isCollapsed}
             onClick={() => {

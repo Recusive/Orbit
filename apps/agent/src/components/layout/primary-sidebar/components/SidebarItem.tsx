@@ -71,12 +71,10 @@ export const SidebarItem: FC<SidebarItemProps> = ({
       {/* Badge */}
       {badge && !collapsed ? (
         <span
-          className="ml-auto mr-2 shrink-0 inline-flex items-center h-4 rounded border-dotted px-1 text-[10px] font-medium select-none"
+          className="ml-auto mr-2 shrink-0 inline-flex items-center h-4 rounded px-1.5 text-[10px] font-medium select-none"
           style={{
-            color: 'var(--warning-foreground)',
-            borderWidth: '1.5px',
-            borderColor: 'var(--warning)',
-            backgroundColor: 'color-mix(in oklch, var(--warning) 10%, transparent)',
+            color: 'var(--primary)',
+            backgroundColor: 'color-mix(in oklch, var(--primary) 15%, transparent)',
           }}
         >
           {badge}

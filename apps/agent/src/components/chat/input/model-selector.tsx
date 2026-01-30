@@ -66,9 +66,21 @@ const MODEL_GROUPS: ModelGroup[] = [
   {
     label: 'Codex',
     models: [
-      { id: 'gpt5-nano', name: 'GPT-5 Nano', icon: OpenAIIcon, badge: 'Soon', disabled: true },
-      { id: 'gpt5-mini', name: 'GPT-5 Mini', icon: OpenAIIcon, badge: 'Soon', disabled: true },
-      { id: 'gpt5', name: 'GPT-5', icon: OpenAIIcon, badge: 'Soon', disabled: true },
+      {
+        id: 'gpt5-nano',
+        name: 'GPT-5 Nano',
+        icon: OpenAIIcon,
+        badge: 'Coming soon',
+        disabled: true,
+      },
+      {
+        id: 'gpt5-mini',
+        name: 'GPT-5 Mini',
+        icon: OpenAIIcon,
+        badge: 'Coming soon',
+        disabled: true,
+      },
+      { id: 'gpt5', name: 'GPT-5', icon: OpenAIIcon, badge: 'Coming soon', disabled: true },
     ],
   },
 ];
