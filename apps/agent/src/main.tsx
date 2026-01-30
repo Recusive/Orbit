@@ -18,20 +18,34 @@ if (typeof __DEV__ !== 'undefined' && __DEV__) {
 // Initialize Sentry before rendering using shared config for consistency
 // This ensures release naming, privacy settings, and sampling rates match
 // Canvas and Editor apps which also use getSentryConfig
-Sentry.init({
-  ...getSentryConfig({ appTag: 'agent', enableReplay: true }),
+//
+// PERF: In development, skip replay and browser tracing integrations.
+// Replay captures DOM mutations (heavy with frequent streaming updates) and
+// browser tracing instruments all network calls — both add measurable overhead
+// that distorts performance profiling.
+const isDevelopment = typeof __DEV__ !== 'undefined' && __DEV__;
 
-  // Agent-specific integrations
-  integrations: [
-    // Performance monitoring - page loads, navigation, API calls
-    Sentry.browserTracingIntegration(),
-    // Session Replay with shared privacy settings
-    Sentry.replayIntegration(REPLAY_OPTIONS),
-    // Capture console warnings/errors as breadcrumbs
-    Sentry.consoleLoggingIntegration({
-      levels: ['warn', 'error'],
-    }),
-  ],
+Sentry.init({
+  ...getSentryConfig({ appTag: 'agent', enableReplay: !isDevelopment }),
+
+  // Agent-specific integrations — lighter in development
+  integrations: isDevelopment
+    ? [
+        // Only console logging in dev (minimal overhead)
+        Sentry.consoleLoggingIntegration({
+          levels: ['warn', 'error'],
+        }),
+      ]
+    : [
+        // Performance monitoring - page loads, navigation, API calls
+        Sentry.browserTracingIntegration(),
+        // Session Replay with shared privacy settings
+        Sentry.replayIntegration(REPLAY_OPTIONS),
+        // Capture console warnings/errors as breadcrumbs
+        Sentry.consoleLoggingIntegration({
+          levels: ['warn', 'error'],
+        }),
+      ],
 });
 
 // Send verification log on app startup (only in development for debugging)

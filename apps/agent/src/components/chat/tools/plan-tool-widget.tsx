@@ -128,7 +128,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
         </button>
 
         {/* Markdown preview */}
-        <AnimatePresence initial={false} mode="wait">
+        <AnimatePresence initial={false}>
           {isExpanded ? (
             <motion.div
               initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}

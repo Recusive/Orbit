@@ -14,34 +14,43 @@ const PopoverAnchor = PopoverPrimitive.Anchor;
 const PopoverContent = React.forwardRef<
   React.ComponentRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = 'center', sideOffset = 4, style, ...props }, ref) => (
-  <PopoverPrimitive.Portal>
-    <PopoverPrimitive.Content
-      ref={ref}
-      align={align}
-      sideOffset={sideOffset}
-      className={cn(
-        'z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none',
-        // Transform origin from Radix - scales from where it connects to trigger
-        'origin-[--radix-popover-content-transform-origin]',
-        // Enter animation: subtle scale + fade + directional slide
-        'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97]',
-        // Exit animation: reverse of enter
-        'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97]',
-        // Directional slides based on which side the popover appears
-        'data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1',
-        'data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1',
-        className
-      )}
-      style={{
-        animationDuration: POPOVER_ANIMATION.duration,
-        animationTimingFunction: POPOVER_ANIMATION.easing,
-        ...style,
-      }}
-      {...props}
-    />
-  </PopoverPrimitive.Portal>
-));
+>(
+  (
+    { className, align = 'center', sideOffset = 4, avoidCollisions = false, style, ...props },
+    ref
+  ) => (
+    <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Content
+        ref={ref}
+        align={align}
+        sideOffset={sideOffset}
+        // PERF: Disable collision detection by default to prevent Floating UI from
+        // running getCssDimensions in a tight loop when layout changes during streaming.
+        // Callers can override with avoidCollisions={true} where collision detection is needed.
+        avoidCollisions={avoidCollisions}
+        className={cn(
+          'z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none',
+          // Transform origin from Radix - scales from where it connects to trigger
+          'origin-[--radix-popover-content-transform-origin]',
+          // Enter animation: subtle scale + fade + directional slide
+          'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97]',
+          // Exit animation: reverse of enter
+          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97]',
+          // Directional slides based on which side the popover appears
+          'data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1',
+          'data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1',
+          className
+        )}
+        style={{
+          animationDuration: POPOVER_ANIMATION.duration,
+          animationTimingFunction: POPOVER_ANIMATION.easing,
+          ...style,
+        }}
+        {...props}
+      />
+    </PopoverPrimitive.Portal>
+  )
+);
 PopoverContent.displayName = PopoverPrimitive.Content.displayName;
 
 export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor };

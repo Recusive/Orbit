@@ -117,7 +117,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
         </button>
 
         {/* Collapsible content */}
-        <AnimatePresence initial={false} mode="wait">
+        <AnimatePresence initial={false}>
           {isExpanded ? (
             <motion.div
               initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}

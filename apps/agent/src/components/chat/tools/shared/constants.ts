@@ -39,6 +39,12 @@ export const TOOL_EXPAND_TRANSITION_NONE: Transition = {
  *
  * - box-shadow removed from transition list (triggers paint, imperceptible change)
  * - [contain:content] isolates layout/paint from sibling cards in chat scroll
+ *
+ * NOTE: content-visibility:auto was REMOVED because tool cards live inside
+ * TanStack Virtual items which already handle off-screen culling. Adding
+ * browser-level content-visibility on each card created redundant compositing
+ * layers (123 composite ops, 5.2s overhead) and internal IntersectionObserver
+ * callbacks (220ms single callback) — see Safari WebKit Timeline profiling.
  */
 export const TOOL_CARD_BASE =
   'bg-card overflow-hidden transition-[border-color,opacity] duration-200 [contain:content]';

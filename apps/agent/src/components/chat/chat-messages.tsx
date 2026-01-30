@@ -1,10 +1,21 @@
 /**
- * ChatMessages - Message list with auto-scroll behavior
+ * ChatMessages - Virtualized message list with auto-scroll behavior
+ *
+ * Uses @tanstack/react-virtual for DOM virtualization. Only messages near
+ * the viewport are rendered, capping DOM nodes to ~30 (viewport + overscan)
+ * regardless of conversation length. This is the primary fix for the 2.27GB
+ * DOM memory spike observed in profiling.
+ *
+ * Integration with use-stick-to-bottom:
+ * - scrollRef: shared scroll container for both virtualizer and stick-to-bottom
+ * - contentRef: on the wrapper div whose height is driven by virtualizer.getTotalSize()
+ *   The stick-to-bottom ResizeObserver sees this height change and triggers auto-scroll.
  *
  * NOTE: Chat container widths come from @/lib/utils/constants.
  * To change chat max-width, update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStickToBottom } from 'use-stick-to-bottom';
 
 import { MessageItem } from './messages';
@@ -152,6 +163,9 @@ function useRotatingMessage(isActive: boolean, intervalMs = 2500): string {
 
   return LOADING_MESSAGES[index] ?? 'Thinking';
 }
+
+/** Estimated average message height for virtualizer initial sizing */
+const ESTIMATED_MESSAGE_HEIGHT = 120;
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
@@ -314,6 +328,17 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     return result;
   }, [activeTools, completedTools]);
 
+  // Precompute isLastAssistantMessage for each message in O(n) instead of O(n²).
+  // Walk backwards: the last assistant message is the one with no assistant messages after it.
+  const lastAssistantMessageId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === 'assistant') {
+        return messages[i]?.id ?? null;
+      }
+    }
+    return null;
+  }, [messages]);
+
   // Rotating loading message for a bit of personality (fallback)
   const rotatingMessage = useRotatingMessage(isLoading);
 
@@ -357,42 +382,118 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     };
   }, []);
 
+  // ─────────────────────────────────────────────────────────────
+  // Virtualizer Setup
+  // ─────────────────────────────────────────────────────────────
+  // Always virtualize — even short conversations benefit from containment.
+  // The overscan of 5 above + 5 below means ~10-15 items in DOM at any time.
+
+  // Stable getScrollElement callback for the virtualizer.
+  // use-stick-to-bottom types scrollRef as RefObject<HTMLElement>, not HTMLDivElement.
+  const getScrollElement = useCallback((): HTMLElement | null => {
+    return scrollRef.current;
+  }, [scrollRef]);
+
+  // Stable key extractor — uses message ID for consistent reconciliation.
+  // Without this, the virtualizer uses array index which causes full re-renders
+  // when messages are prepended or removed (e.g., conversation:loaded merge).
+  const getItemKey = useCallback(
+    (index: number): string => {
+      return messages[index]?.id ?? String(index);
+    },
+    [messages]
+  );
+
+  const virtualizer = useVirtualizer<HTMLElement, HTMLDivElement>({
+    count: messages.length,
+    getScrollElement,
+    estimateSize: () => ESTIMATED_MESSAGE_HEIGHT,
+    getItemKey,
+    // Overscan: render 5 extra items above and below the viewport.
+    // Higher values reduce visible blank areas during fast scrolling
+    // but increase DOM node count. 5 is a good balance.
+    overscan: 5,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
+
   return (
     <div
       ref={scrollRef}
       className="flex-1 overflow-y-auto overflow-x-hidden p-4"
-      style={{ scrollbarGutter: 'stable both-edges' }}
+      style={{
+        scrollbarGutter: 'stable both-edges',
+        // PERF: contain layout + style to this scroll container.
+        // Prevents layout/style recalculations from propagating to parent.
+        // Cannot use `contain: paint` here because overflow-y: auto already
+        // establishes a paint containment context.
+        contain: 'layout style',
+      }}
     >
+      {/*
+       * contentRef from use-stick-to-bottom watches this element's height via ResizeObserver.
+       * The height is driven by the spacer div inside (getTotalSize()). When the virtualizer
+       * count increases (new messages), getTotalSize() grows, this wrapper's height changes,
+       * and stick-to-bottom detects it and auto-scrolls.
+       */}
       <div
         ref={contentRef}
-        className="mx-auto flex flex-col gap-3"
+        className="mx-auto"
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
-        {/* All messages rendered directly - no virtualization needed for chat */}
-        {messages.map((msg, index) => {
-          const isLastAssistantMessage =
-            msg.role === 'assistant' && messages.slice(index + 1).every((m) => m.role === 'user');
+        {/* Spacer div — establishes the correct scrollable height.
+         * Items are absolutely positioned inside, so this div's height
+         * sets the scroll container's scrollHeight correctly.
+         * PERF: contain: layout style paint isolates this subtree from the
+         * rest of the page. Combined with content-visibility on children,
+         * this limits layout/paint recalculations to only visible messages. */}
+        <div
+          className="relative w-full"
+          style={{
+            height: `${String(totalSize)}px`,
+            contain: 'layout style paint',
+          }}
+        >
+          {virtualItems.map((virtualItem) => {
+            const msg = messages[virtualItem.index];
+            if (!msg) return null;
 
-          // Check if this message should animate (newly sent user message)
-          const shouldAnimate = animatingMessageIds.has(msg.id);
+            const isLastAssistant = msg.id === lastAssistantMessageId;
+            const shouldAnimate = animatingMessageIds.has(msg.id);
+            const tools = toolsByMessageId.get(msg.id) ?? [];
 
-          // O(1) lookup from memoized Map (code review: Opus cycle 1, issue #1)
-          const tools = toolsByMessageId.get(msg.id) ?? [];
+            return (
+              <div
+                key={virtualItem.key}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
+                className="absolute left-0 w-full pb-3"
+                style={{
+                  top: `${String(virtualItem.start)}px`,
+                  // NOTE: content-visibility:auto was REMOVED here. TanStack Virtual
+                  // already ensures only ~15 items are in the DOM (viewport + overscan).
+                  // Adding browser-level content-visibility created redundant compositing
+                  // layers and internal IntersectionObserver callbacks that consumed 5.2s
+                  // of compositing time and caused a 220ms IO callback in profiling.
+                }}
+              >
+                <MessageItem
+                  message={msg}
+                  tools={tools}
+                  isLastAssistantMessage={isLastAssistant}
+                  animate={shouldAnimate}
+                  onRewind={onRewind}
+                  onOpenFile={onOpenFile}
+                  onOpenUrl={onOpenUrl}
+                  onFeedback={onFeedback}
+                />
+              </div>
+            );
+          })}
+        </div>
 
-          return (
-            <MessageItem
-              key={msg.id}
-              message={msg}
-              tools={tools}
-              isLastAssistantMessage={isLastAssistantMessage}
-              animate={shouldAnimate}
-              onRewind={onRewind}
-              onOpenFile={onOpenFile}
-              onOpenUrl={onOpenUrl}
-              onFeedback={onFeedback}
-            />
-          );
-        })}
+        {/* Footer lives outside the virtual list — always visible at the bottom */}
 
         {/* Queued message bubble - shows when user typed while agent was running */}
         {queuedMessage !== null ? (

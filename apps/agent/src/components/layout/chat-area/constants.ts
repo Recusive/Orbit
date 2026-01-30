@@ -5,8 +5,13 @@
  * are imported from @/lib/utils/constants
  */
 
-/** Number of consecutive stable frames before revealing content */
-export const STABILIZATION_FRAME_COUNT = 3;
+/**
+ * Time in ms that the container must remain a stable size before revealing content.
+ * ResizeObserver fires on each dimension change — once no resize occurs for this
+ * duration, we consider layout settled. ~50ms ≈ 3 frames at 60fps, matching the
+ * previous 3-frame rAF stability check but without forced synchronous layout.
+ */
+export const STABILIZATION_STABLE_THRESHOLD_MS = 50;
 
 /** Empty state vertical positioning - pushes input above center */
 export const EMPTY_STATE_PADDING_BOTTOM = '40%';

@@ -71,11 +71,13 @@ DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayNam
 const DropdownMenuContent = React.forwardRef<
   React.ComponentRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, style, ...props }, ref) => (
+>(({ className, sideOffset = 4, avoidCollisions = false, style, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
     <DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
+      // PERF: Disable collision detection to prevent Floating UI positioning loop
+      avoidCollisions={avoidCollisions}
       className={cn(
         'z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border-border/50 border bg-popover p-1 text-popover-foreground shadow-md',
         // Transform origin from Radix - scales from where it connects to trigger
