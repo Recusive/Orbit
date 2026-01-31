@@ -152,7 +152,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
           {/* Search button - VS Code style command palette */}
           <button
             data-tauri-drag-region={false}
-            className="flex items-center gap-2 h-6 px-2 rounded-md text-foreground hover:text-foreground overflow-hidden bg-muted hover:bg-muted/80 transition-colors duration-200"
+            className="flex items-center gap-2 h-6 px-2 rounded-md text-foreground hover:text-foreground overflow-hidden border border-border/50 bg-muted hover:bg-muted/80 transition-colors duration-200"
             title="Search files (⌘P)"
             onClick={handleOpenSearch}
           >

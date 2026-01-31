@@ -1,9 +1,45 @@
 import { ChevronDown } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { FC } from 'react';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from '../tools/shared';
+
+import type { FC, ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
+
+/** Word-boundary split that preserves whitespace as its own token (matches rehypeFlowTokens). */
+const WORD_BOUNDARY = /(\s+)/;
+
+/**
+ * Tokenize text into flow-token spans for per-word streaming animation.
+ * Mirrors the rehypeFlowTokens rehype plugin, but operates on plain text
+ * rather than a HAST tree. Each word gets a <span class="flow-token">;
+ * whitespace is preserved as plain text between spans.
+ */
+function tokenizeThinking(text: string): ReactNode[] {
+  const parts = text.split(WORD_BOUNDARY);
+  const nodes: ReactNode[] = [];
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part === undefined || part.length === 0) continue;
+
+    if (/^\s+$/.test(part)) {
+      // Whitespace — render as plain text (no animation wrapper)
+      nodes.push(part);
+    } else {
+      // Word — wrap in flow-token span for CSS fade-in
+      nodes.push(
+        <span key={i} className="flow-token">
+          {part}
+        </span>
+      );
+    }
+  }
+
+  return nodes;
+}
 
 interface ThinkingBoxProps {
   readonly thinking: string;
@@ -32,57 +68,61 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
   defaultExpanded = false,
   isStreaming = false,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded || isStreaming);
   const wasStreamingRef = useRef(false);
+  const shouldReduceMotion = useReducedMotion();
 
   // Auto-expand when streaming starts, auto-collapse when streaming ends
   useEffect(() => {
     if (isStreaming && !wasStreamingRef.current) {
-      // Streaming just started - expand
       setIsExpanded(true);
     } else if (!isStreaming && wasStreamingRef.current) {
-      // Streaming just ended - collapse
       setIsExpanded(false);
     }
     wasStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
-  const toggleExpanded = (): void => {
-    setIsExpanded(!isExpanded);
-  };
-
   const durationText = formatDuration(thinkingDurationMs);
 
+  // Tokenize thinking text for per-word fade-in during streaming.
+  // Memoized to avoid re-splitting on every render — only recomputes when text changes.
+  // Once streaming ends, we render plain text (zero extra DOM from spans).
+  const tokenizedThinking = useMemo(
+    () => (isStreaming ? tokenizeThinking(thinking) : null),
+    [thinking, isStreaming]
+  );
+
   return (
-    <div
-      className={cn(
-        'rounded-lg border border-border/40 overflow-hidden mb-3',
-        'bg-gradient-to-b from-muted/20 to-muted/30',
-        'shadow-sm transition-shadow duration-200'
-      )}
-    >
-      {/* Header */}
+    <div className="min-w-0">
+      {/* Header — flat inline row */}
       <button
-        onClick={toggleExpanded}
+        onClick={() => {
+          setIsExpanded(!isExpanded);
+        }}
         className={cn(
-          'w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-sm',
-          'text-muted-foreground/70 hover:text-foreground',
-          'hover:bg-muted/20 transition-[background-color,color] duration-150',
-          'focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/30'
+          'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
+          'transition-colors duration-150 cursor-pointer w-full text-left',
+          'rounded-lg hover:bg-muted/20'
         )}
         aria-expanded={isExpanded}
         aria-label={`Thought for ${durationText}, ${isExpanded ? 'expanded' : 'collapsed'}`}
       >
-        <span className="flex items-center gap-1.5">
+        <div
+          className={cn(
+            'w-5 h-5 rounded flex items-center justify-center shrink-0',
+            'transition-colors duration-150',
+            'bg-violet-500/8 group-hover/status:bg-violet-500/12'
+          )}
+        >
           <svg
             aria-hidden="true"
-            width="14"
-            height="14"
+            width="12"
+            height="12"
             viewBox="0 0 24 24"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             className={cn(
-              'text-violet-500/60 transition-colors duration-150',
+              'text-violet-500/60 group-hover/status:text-violet-500/80 transition-colors duration-150',
               isStreaming && 'animate-pulse'
             )}
           >
@@ -98,37 +138,62 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
               fill="currentColor"
             />
           </svg>
-          <span className="text-sm font-medium text-muted-foreground/60">
-            Thought for {durationText}
+        </div>
+
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className="text-xs font-medium truncate text-muted-foreground/70 group-hover/status:text-foreground/90">
+            {isStreaming ? 'Thinking' : 'Thought'}
           </span>
-        </span>
+          <span className="text-xs text-muted-foreground/50">
+            {isStreaming ? '' : `for ${durationText}`}
+          </span>
+        </div>
+
         <ChevronDown
           className={cn(
-            'h-4 w-4 shrink-0 opacity-50 transition-transform duration-200',
+            'h-3 w-3 text-muted-foreground/40 transition-transform duration-200 ease-out shrink-0',
             isExpanded && 'rotate-180'
           )}
         />
       </button>
 
-      {/* Collapsible Content */}
-      <div
-        className={cn(
-          'grid transition-[grid-template-rows,opacity] duration-[250ms] ease-[cubic-bezier(0.16,1,0.3,1)]',
-          isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        )}
-      >
-        <div className="overflow-hidden">
-          {/* Divider */}
-          <div className="border-t border-border/30 mx-3.5" />
+      {/* Tree-style expanded content */}
+      <AnimatePresence initial={false}>
+        {isExpanded ? (
+          <motion.div
+            initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="flex flex-col">
+              <div className="flex flex-row px-2.5">
+                {/* Gutter: vertical connector line */}
+                <div className="w-5 flex justify-center shrink-0">
+                  <div className="w-px h-full bg-border/40" />
+                </div>
 
-          {/* Content */}
-          <div className="px-3.5 pb-3.5 pt-2.5 max-h-[500px] overflow-y-auto">
-            <div className="text-base text-muted-foreground/60 leading-[1.7] whitespace-pre-wrap font-mono tracking-tighter">
-              {thinking}
+                {/* Content box */}
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card/50 overflow-hidden">
+                  <div className="px-3 py-2 max-h-[500px] overflow-y-auto">
+                    <div className="text-sm text-muted-foreground/60 leading-[1.7] whitespace-pre-wrap font-mono tracking-tighter">
+                      {tokenizedThinking ?? thinking}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom connector stub */}
+              <div className="flex flex-row h-1 px-2.5">
+                <div className="w-5 flex justify-center">
+                  <div className="w-px h-full bg-border/20" />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };

@@ -141,7 +141,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                 }}
               >
                 <motion.div
-                  className="w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-card border border-border/40 rounded-lg overflow-hidden flex flex-col"
+                  className="w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-card border-[3px] border-border/40 rounded-xl overflow-hidden flex flex-col"
                   onClick={(e) => {
                     e.stopPropagation();
                   }}
