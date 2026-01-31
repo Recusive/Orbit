@@ -7,7 +7,7 @@
  */
 import { IconCirclePlus } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconCirclePlus';
 import { IconSearchlinesSparkle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSearchlinesSparkle';
-import { FlaskConical, Inbox, Search, Settings } from 'lucide-react';
+import { FlaskConical, Inbox, Search, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
@@ -348,7 +348,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {/* Utilities — pinned to bottom, spacing stays constant so buttons don't shift on collapse */}
       <div className="flex flex-col shrink-0 gap-1 py-1.5">
         <SidebarItem
-          icon={Settings}
+          icon={Settings2}
           label="Settings"
           collapsed={isCollapsed}
           equalSpacing={isCollapsed}

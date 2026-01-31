@@ -1,5 +1,5 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Settings2, X } from 'lucide-react';
+import { ChevronRight, Settings2, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Suspense, useEffect, useState } from 'react';
 
@@ -10,7 +10,7 @@ import type { SettingsDialogProps, SettingsSection } from './types';
 import type { FC, ReactNode } from 'react';
 
 import { Dialog, DialogPortal } from '@/components/ui/dialog';
-import { Spinner } from '@/components/ui/spinner';
+import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { cn } from '@/lib/utils';
 
 // Animation configuration for the settings dialog
@@ -50,7 +50,7 @@ const contentVariants = {
 // Loading fallback for lazy-loaded pages
 const PageLoader: FC = () => (
   <div className="flex items-center justify-center h-full">
-    <Spinner size="lg" className="text-muted-foreground/60" />
+    <ThinkingDots size={24} />
   </div>
 );
 
@@ -159,13 +159,17 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                 >
                   {/* Accessibility: Hidden title for screen readers */}
                   <DialogPrimitive.Title className="sr-only">
-                    Settings - {getSectionTitle()}
+                    Settings &gt; {getSectionTitle()}
                   </DialogPrimitive.Title>
                   {/* Title bar */}
                   <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-muted/30">
                     <div className="flex items-center gap-2">
                       <Settings2 className="h-4 w-4 text-muted-foreground/70" />
-                      <span className="font-medium text-base">Settings - {getSectionTitle()}</span>
+                      <span className="font-medium text-base">
+                        <span className="text-muted-foreground/70">Settings</span>
+                        <ChevronRight className="inline h-3.5 w-3.5 text-muted-foreground/40 mx-1" />
+                        <span>{getSectionTitle()}</span>
+                      </span>
                     </div>
                     <DialogPrimitive.Close className="rounded-md p-1 opacity-60 hover:opacity-100 hover:bg-muted/50 active:scale-95 transition-[opacity,background-color,transform] duration-150">
                       <X className="h-4 w-4" />
