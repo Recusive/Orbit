@@ -114,7 +114,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   }, [permissions, onPermissionApprove, onPermissionDeny]);
 
   return (
-    <div className="p-4 pt-0 shrink-0 relative">
+    <div className="flex justify-center p-4 pt-0 shrink-0 relative">
       <div
         className={getInputBoxClasses()}
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
@@ -151,7 +151,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
         {/* Input Area */}
         <div
           ref={inputRef}
-          className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden break-words"
+          className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden wrap-break-word"
           style={{
             minHeight: INPUT_SIZES.textareaMinHeight,
             maxHeight: INPUT_SIZES.textareaMaxHeight,

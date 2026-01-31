@@ -89,7 +89,7 @@ const TooltipContent = React.forwardRef<
       className={cn(
         'z-50 overflow-hidden rounded-md px-2 py-1 text-xs',
         'bg-foreground text-background',
-        'dark:bg-[var(--tooltip-bg)] dark:text-[var(--tooltip-text)]',
+        'dark:bg-(--tooltip-bg) dark:text-(--tooltip-text)',
         // Enter: zoom 97% → 100% + fade (matched to HoverCard & DropdownMenu)
         'animate-in fade-in-0 zoom-in-[0.97]',
         // Exit: reverse
@@ -118,7 +118,7 @@ const TooltipArrow = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TooltipPrimitive.Arrow
     ref={ref}
-    className={cn('fill-foreground dark:fill-[var(--tooltip-bg)]', className)}
+    className={cn('fill-foreground dark:fill-(--tooltip-bg)', className)}
     {...props}
   />
 ));

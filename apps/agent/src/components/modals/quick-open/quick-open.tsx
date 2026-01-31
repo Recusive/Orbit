@@ -38,7 +38,7 @@ function highlightMatches(name: string, indices: number[]): ReactNode {
   return chars.map((char, idx) => {
     if (matchSet.has(idx)) {
       return (
-        <mark key={idx} className="bg-primary/25 text-foreground rounded-[2px] px-[1px] -mx-[1px]">
+        <mark key={idx} className="bg-primary/25 text-foreground rounded-[2px] px-px -mx-px">
           {char}
         </mark>
       );

@@ -388,7 +388,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
 
   const getInputBoxClasses = useCallback((): string => {
     const base = cn(
-      'mx-auto p-1 bg-card border transition-[border-color,box-shadow] duration-200',
+      'w-full p-1 bg-card border transition-[border-color,box-shadow] duration-200',
       'rounded-xl',
       'shadow-lg',
       'focus-within:shadow-focus',
