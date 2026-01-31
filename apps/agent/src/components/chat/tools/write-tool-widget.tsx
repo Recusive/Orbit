@@ -1,14 +1,13 @@
-import { ChevronDown, FilePlus, Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2, SquarePlus } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
 import {
   DiffStat,
-  TOOL_CARD_BASE,
-  TOOL_CHEVRON_BASE,
   TOOL_EXPAND_TRANSITION,
   TOOL_EXPAND_TRANSITION_NONE,
-  TOOL_HEADER_BASE,
+  useHighlightedTokens,
+  useIsDarkMode,
 } from './shared';
 
 import type { FC } from 'react';
@@ -35,6 +34,8 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
+  const isDarkMode = useIsDarkMode();
+  const highlightedTokens = useHighlightedTokens(content, filePath, isDarkMode);
 
   // Auto-collapse when tool finishes
   useEffect(() => {
@@ -65,133 +66,175 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   };
 
   return (
-    <div>
-      <div
+    <div className={cn('min-w-0', isFailed && 'opacity-60')}>
+      {/* Header — flat inline row */}
+      <button
+        onClick={() => {
+          setIsExpanded(!isExpanded);
+        }}
         className={cn(
-          TOOL_CARD_BASE,
-          isFailed
-            ? 'border-2 border-dotted border-destructive/40 opacity-60'
-            : 'border border-border/50',
-          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
+          'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
+          'transition-colors duration-150 cursor-pointer w-full text-left',
+          'rounded-lg hover:bg-muted/20',
+          isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        {/* Header */}
-        <button
-          onClick={() => {
-            setIsExpanded(!isExpanded);
-          }}
-          className={TOOL_HEADER_BASE}
+        <div
+          className={cn(
+            'w-5 h-5 rounded flex items-center justify-center shrink-0',
+            'transition-colors duration-150',
+            isFailed
+              ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
+              : 'bg-success/8 group-hover/status:bg-success/12'
+          )}
         >
-          {/* Icon container */}
-          <div
+          <SquarePlus
             className={cn(
-              'w-5 h-5 rounded flex items-center justify-center',
-              isFailed ? 'bg-destructive/10' : 'bg-success/10'
+              'h-3 w-3 transition-colors duration-150',
+              isFailed
+                ? 'text-destructive/60 group-hover/status:text-destructive/80'
+                : 'text-success/60 group-hover/status:text-success/80',
+              isRunning && 'animate-pulse'
+            )}
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span
+            className={cn(
+              'text-xs font-medium truncate cursor-pointer hover:underline',
+              isFailed ? 'text-muted-foreground line-through' : 'text-foreground/90'
+            )}
+            onClick={handleFileClick}
+            title={filePath}
+          >
+            {fileName}
+          </span>
+          <span
+            className={cn(
+              'text-xs shrink-0',
+              isFailed ? 'text-destructive/60' : 'text-muted-foreground/50'
             )}
           >
-            <FilePlus
-              className={cn(
-                'h-3 w-3',
-                isFailed ? 'text-destructive/70' : 'text-success/70',
-                isRunning && 'animate-pulse'
-              )}
-            />
-          </div>
+            {isFailed ? '(failed)' : '(new)'}
+          </span>
+          {isRunning ? (
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
+          ) : null}
+        </div>
 
-          {/* File info */}
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span
-              className={cn(
-                'text-xs font-medium hover:underline truncate cursor-pointer',
-                isFailed ? 'text-muted-foreground line-through' : 'text-foreground'
-              )}
-              onClick={handleFileClick}
-              title={filePath}
-            >
-              {fileName}
-            </span>
-            <span
-              className={cn(
-                'text-xs shrink-0',
-                isFailed ? 'text-destructive/60' : 'text-muted-foreground/60'
-              )}
-            >
-              {isFailed ? '(failed)' : '(new)'}
-            </span>
-          </div>
-
-          {/* Status - Diff stat or loading or failed */}
-          <div className="flex items-center gap-2 shrink-0">
-            {isRunning ? (
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                <span className="text-sm">Writing...</span>
-              </div>
-            ) : isFailed ? (
-              <span className="text-xs text-destructive/60">Failed</span>
-            ) : (
-              <DiffStat additions={lineCount} deletions={0} />
+        <div className="flex items-center gap-2 shrink-0">
+          {!isRunning && !isFailed ? <DiffStat additions={lineCount} deletions={0} /> : null}
+          <ChevronDown
+            className={cn(
+              'h-3 w-3 text-muted-foreground/40 transition-transform duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-180'
             )}
-            <ChevronDown className={cn(TOOL_CHEVRON_BASE, isExpanded && 'rotate-180')} />
-          </div>
-        </button>
+          />
+        </div>
+      </button>
 
-        {/* Code preview */}
-        <AnimatePresence initial={false}>
-          {isExpanded ? (
-            <motion.div
-              initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-              transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
-              style={{ overflow: 'hidden' }}
-            >
-              <div className={cn('overflow-auto bg-success/5', !showAllLines && 'max-h-[300px]')}>
-                <div className="w-fit min-w-full">
-                  {displayLines.map((line, index) => (
-                    <div key={index} className="flex font-mono text-sm leading-4">
-                      {/* Sticky gutter + line number */}
-                      <div className="sticky left-0 flex shrink-0 bg-success/5">
-                        <div className="w-0.5 bg-success" />
-                        <div className="w-8 px-1.5 text-right text-muted-foreground/50 select-none bg-success/10">
-                          {index + 1}
-                        </div>
-                      </div>
-                      {/* Content */}
-                      <div className="flex-1 px-2 text-foreground whitespace-pre">
-                        {line || ' '}
-                      </div>
+      {/* Tree-style expanded content */}
+      <AnimatePresence initial={false}>
+        {isExpanded ? (
+          <motion.div
+            initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="flex flex-col">
+              <div className="flex flex-row px-2.5">
+                {/* Gutter: vertical connector line */}
+                <div className="w-5 flex justify-center shrink-0">
+                  <div className="w-px h-full bg-border/40" />
+                </div>
+
+                {/* Content box */}
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-success/40 bg-card/50 overflow-hidden">
+                  <div
+                    className={cn('overflow-auto bg-success/5', !showAllLines && 'max-h-[300px]')}
+                  >
+                    <div className="w-fit min-w-full">
+                      {displayLines.map((line, index) => {
+                        // When showAllLines is off, index maps directly to display slice
+                        // When showAllLines is on, index maps 1:1 to the full lines array
+                        const lineIndex = showAllLines ? index : index;
+                        const tokens = highlightedTokens?.[lineIndex];
+
+                        return (
+                          <div key={index} className="flex font-mono text-sm leading-4">
+                            {/* Sticky gutter + line number */}
+                            <div className="sticky left-0 flex shrink-0 bg-success/5">
+                              <div className="w-0.5 bg-success" />
+                              <div className="w-8 px-1.5 text-right text-muted-foreground/50 select-none bg-success/10">
+                                {index + 1}
+                              </div>
+                            </div>
+                            {/* Content — syntax highlighted when available */}
+                            <div className="flex-1 px-2 whitespace-pre">
+                              {tokens ? (
+                                tokens.map((token, ti) => (
+                                  <span
+                                    key={ti}
+                                    style={token.color ? { color: token.color } : undefined}
+                                  >
+                                    {token.content}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-foreground">{line || ' '}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
+                  </div>
                 </div>
               </div>
 
-              {/* Show all / Show less toggle button */}
+              {/* Show all / Show less toggle — detached below the box */}
               {(hasMore || showAllLines) && lines.length > maxPreviewLines ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowAllLines(!showAllLines);
-                  }}
-                  className="w-full py-1 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-0.5"
-                >
-                  <ChevronDown
-                    className={cn(
-                      'h-2.5 w-2.5 transition-transform duration-200 ease-out',
-                      showAllLines && 'rotate-180'
-                    )}
-                  />
-                  <span>
-                    {showAllLines
-                      ? 'Show less'
-                      : `${String(lines.length - maxPreviewLines)} more lines`}
-                  </span>
-                </button>
+                <div className="flex flex-row px-2.5">
+                  <div className="w-5 flex justify-center shrink-0">
+                    <div className="w-px h-full bg-border/40" />
+                  </div>
+                  <div className="flex-1 ml-2.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAllLines(!showAllLines);
+                      }}
+                      className="py-1 text-xs text-muted-foreground/60 hover:text-foreground transition-colors flex items-center gap-0.5"
+                    >
+                      <ChevronDown
+                        className={cn(
+                          'h-2.5 w-2.5 transition-transform duration-200 ease-out',
+                          showAllLines && 'rotate-180'
+                        )}
+                      />
+                      <span>
+                        {showAllLines
+                          ? 'Show less'
+                          : `${String(lines.length - maxPreviewLines)} more lines`}
+                      </span>
+                    </button>
+                  </div>
+                </div>
               ) : null}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </div>
+
+              {/* Bottom connector stub */}
+              <div className="flex flex-row h-1 px-2.5">
+                <div className="w-5 flex justify-center">
+                  <div className="w-px h-full bg-border/20" />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };

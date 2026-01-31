@@ -11,12 +11,7 @@ import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
-import {
-  TOOL_CARD_BASE,
-  TOOL_CHEVRON_BASE,
-  TOOL_EXPAND_TRANSITION,
-  TOOL_EXPAND_TRANSITION_NONE,
-} from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
@@ -55,111 +50,132 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
   };
 
   return (
-    <div>
-      <div
+    <div className={cn('min-w-0', isFailed && 'opacity-60')}>
+      {/* Header — flat inline row with plan-mode accent */}
+      <button
+        onClick={() => {
+          setIsExpanded(!isExpanded);
+        }}
+        aria-expanded={isExpanded}
         className={cn(
-          TOOL_CARD_BASE,
+          'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
+          'transition-colors duration-150 cursor-pointer w-full text-left',
+          'rounded-lg hover:bg-muted/20',
           isFailed
-            ? 'border-2 border-dotted border-destructive/40 opacity-60'
-            : 'border-2 border-dotted border-mode-plan/40', // Match input box in plan mode
-          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
+            ? 'border-2 border-dotted border-destructive/40'
+            : 'border-2 border-dotted border-mode-plan/40'
         )}
       >
-        {/* Header */}
-        <button
-          onClick={() => {
-            setIsExpanded(!isExpanded);
-          }}
-          aria-expanded={isExpanded}
-          className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-muted/40 transition-colors duration-150"
+        <div
+          className={cn(
+            'w-5 h-5 rounded flex items-center justify-center shrink-0',
+            'transition-colors duration-150',
+            isFailed
+              ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
+              : 'bg-mode-plan/8 group-hover/status:bg-mode-plan/12'
+          )}
         >
-          {/* Icon container - amber/plan mode color */}
-          <div
+          <ClipboardList
             className={cn(
-              'w-5 h-5 rounded flex items-center justify-center',
-              isFailed ? 'bg-destructive/10' : 'bg-mode-plan/10'
+              'h-3 w-3 transition-colors duration-150',
+              isFailed
+                ? 'text-destructive/60 group-hover/status:text-destructive/80'
+                : 'text-mode-plan/60 group-hover/status:text-mode-plan/80',
+              isRunning && 'animate-pulse'
+            )}
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span
+            className={cn(
+              'text-xs font-medium',
+              isFailed ? 'text-muted-foreground line-through' : 'text-mode-plan'
             )}
           >
-            <ClipboardList
-              className={cn(
-                'h-3 w-3',
-                isFailed ? 'text-destructive/70' : 'text-mode-plan/70',
-                isRunning && 'animate-pulse'
-              )}
-            />
-          </div>
-
-          {/* Plan info */}
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span
-              className={cn(
-                'text-xs font-medium',
-                isFailed ? 'text-muted-foreground line-through' : 'text-mode-plan'
-              )}
-            >
-              Plan
-            </span>
-            <span
-              className={cn(
-                'text-xs font-medium hover:underline truncate cursor-pointer',
-                isFailed ? 'text-muted-foreground line-through' : 'text-foreground/80'
-              )}
-              onClick={handleFileClick}
-              title={filePath}
-            >
-              {fileName}
-            </span>
-          </div>
-
-          {/* Status */}
-          <div className="flex items-center gap-2 shrink-0">
-            {isRunning ? (
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                <span className="text-sm">Creating plan...</span>
-              </div>
-            ) : isFailed ? (
-              <span className="text-xs text-destructive/60">Failed</span>
-            ) : (
-              <span className="text-xs text-mode-plan/60">Ready for review</span>
+            Plan
+          </span>
+          <span
+            className={cn(
+              'text-xs font-medium truncate cursor-pointer hover:underline',
+              isFailed ? 'text-muted-foreground line-through' : 'text-foreground/80'
             )}
-            <ChevronDown className={cn(TOOL_CHEVRON_BASE, isExpanded && 'rotate-180')} />
-          </div>
-        </button>
+            onClick={handleFileClick}
+            title={filePath}
+          >
+            {fileName}
+          </span>
+        </div>
 
-        {/* Markdown preview */}
-        <AnimatePresence initial={false}>
-          {isExpanded ? (
-            <motion.div
-              initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-              transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
-              style={{ overflow: 'hidden' }}
-            >
-              <div className="overflow-auto max-h-[400px] bg-mode-plan/5 border-t border-mode-plan/20">
-                <div className="p-3">
-                  {content.trim() ? (
-                    <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none">
-                      <Streamdown
-                        remarkPlugins={REMARK_PLUGINS}
-                        rehypePlugins={REHYPE_PLUGINS}
-                        mode="static"
-                      >
-                        {content}
-                      </Streamdown>
+        <div className="flex items-center gap-2 shrink-0">
+          {isRunning ? (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              <span className="text-xs">Creating plan...</span>
+            </div>
+          ) : !isFailed ? (
+            <span className="text-xs text-mode-plan/60">Ready for review</span>
+          ) : null}
+          <ChevronDown
+            className={cn(
+              'h-3 w-3 text-muted-foreground/40 transition-transform duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-180'
+            )}
+          />
+        </div>
+      </button>
+
+      {/* Tree-style expanded content */}
+      <AnimatePresence initial={false}>
+        {isExpanded ? (
+          <motion.div
+            initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="flex flex-col">
+              <div className="flex flex-row px-2.5">
+                {/* Gutter: vertical connector line */}
+                <div className="w-5 flex justify-center shrink-0">
+                  <div className="w-px h-full bg-mode-plan/30" />
+                </div>
+
+                {/* Content box */}
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-mode-plan/20 bg-mode-plan/5 overflow-hidden">
+                  <div className="overflow-auto max-h-[400px]">
+                    <div className="p-3">
+                      {content.trim() ? (
+                        <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none">
+                          <Streamdown
+                            remarkPlugins={REMARK_PLUGINS}
+                            rehypePlugins={REHYPE_PLUGINS}
+                            mode="static"
+                          >
+                            {content}
+                          </Streamdown>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground/40 italic">
+                          Plan content is empty
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground/60 italic">
-                      Plan content is empty
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </div>
+
+              {/* Bottom connector stub */}
+              <div className="flex flex-row h-1 px-2.5">
+                <div className="w-5 flex justify-center">
+                  <div className="w-px h-full bg-mode-plan/15" />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };

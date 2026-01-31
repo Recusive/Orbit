@@ -33,32 +33,3 @@ export const TOOL_EXPAND_TRANSITION: Transition = {
 export const TOOL_EXPAND_TRANSITION_NONE: Transition = {
   duration: 0,
 };
-
-/**
- * Outer card container classes.
- *
- * - box-shadow removed from transition list (triggers paint, imperceptible change)
- * - [contain:content] isolates layout/paint from sibling cards in chat scroll
- *
- * NOTE: content-visibility:auto was REMOVED because tool cards live inside
- * TanStack Virtual items which already handle off-screen culling. Adding
- * browser-level content-visibility on each card created redundant compositing
- * layers (123 composite ops, 5.2s overhead) and internal IntersectionObserver
- * callbacks (220ms single callback) — see Safari WebKit Timeline profiling.
- */
-export const TOOL_CARD_BASE =
-  'bg-card overflow-hidden transition-[border-color,opacity] duration-200 [contain:content]';
-
-/**
- * Header button classes.
- * Hover uses CSS `ease` (correct per animation guidelines for hover states).
- */
-export const TOOL_HEADER_BASE =
-  'w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-muted/40 transition-colors duration-150';
-
-/**
- * Chevron icon classes.
- * ease-out for user-initiated rotation (click-to-expand).
- */
-export const TOOL_CHEVRON_BASE =
-  'tool-chevron h-3 w-3 text-muted-foreground/60 transition-transform duration-200 ease-out';
