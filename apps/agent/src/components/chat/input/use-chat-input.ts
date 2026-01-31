@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { compressImage } from '@/lib/utils/image-utils';
 import { useSlashCommands, useCommandsStore } from '@/stores/agent';
 import { useElementContexts, useBrowserStore } from '@/stores/browser/browser-store';
+import { useFileStore } from '@/stores/file/file-store';
 
 const logger = createLogger('ChatInput');
 
@@ -207,11 +208,16 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   // Mention selection handler
   const handleMentionSelect = useCallback(
     (file: FileEntry): void => {
+      // Fuzzy search returns relative paths — resolve to absolute for file reading
+      const rootPath = useFileStore.getState().rootPath;
+      const absolutePath =
+        rootPath && !file.path.startsWith('/') ? `${rootPath}/${file.path}` : file.path;
+
       const newContext: ContextItem = {
         id: crypto.randomUUID(),
         type: file.isDirectory ? 'folder' : 'file',
         name: file.name,
-        path: file.path,
+        path: absolutePath,
       };
       setAttachedContext((prev) => [...prev, newContext]);
 
@@ -383,7 +389,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const getInputBoxClasses = useCallback((): string => {
     const base = cn(
       'mx-auto p-1 bg-card border transition-[border-color,box-shadow] duration-200',
-      'rounded-lg',
+      'rounded-xl',
       'shadow-lg',
       'focus-within:shadow-focus',
       'dark:shadow-none dark:focus-within:shadow-none'

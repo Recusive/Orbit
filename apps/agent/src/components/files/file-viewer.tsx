@@ -1,10 +1,11 @@
-import { FileCode, Loader2 } from 'lucide-react';
+import { FileCode } from 'lucide-react';
 import { useEffect } from 'react';
 
 import { FileViewerContent } from './file-viewer-content';
 
 import type { FC } from 'react';
 
+import { ThinkingDots } from '@/components/ui/thinking-dots';
 import {
   useActiveFile,
   useFileViewerLoading,
@@ -59,7 +60,7 @@ const LoadingState: FC<LoadingStateProps> = ({ path }) => {
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-      <Loader2 className="h-8 w-8 animate-spin mb-2" />
+      <ThinkingDots size={32} className="mb-2" />
       <p className="text-sm">Loading {fileName}...</p>
     </div>
   );

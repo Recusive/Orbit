@@ -180,7 +180,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
         }}
       >
         <Command shouldFilter={false} className="rounded-lg bg-transparent">
-          <CommandList className="scroll-py-2 max-h-[300px]">
+          <CommandList className="scroll-py-2 max-h-[300px] pb-1.5">
             {/* Loading state */}
             {isLoading && results.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
@@ -278,9 +278,9 @@ const FileItem: FC<FileItemProps> = ({ result, isSelected, isFirst, isLast, onSe
         onSelect(result);
       }}
       className={cn(
-        'relative flex cursor-pointer gap-2.5 select-none items-center px-2.5 py-2 outline-none transition-[background-color,border-color,transform] duration-150',
+        'relative flex cursor-pointer gap-2.5 select-none items-center border-l-2 border-transparent pl-2 pr-2.5 py-2 outline-none',
         isSelected
-          ? 'rounded-r-md bg-primary/10 text-foreground border-l-2 border-primary/60 pl-2'
+          ? 'rounded-r-md bg-primary/10 text-foreground border-primary/60'
           : 'rounded-md hover:bg-muted/50 active:scale-[0.99]'
       )}
     >

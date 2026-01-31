@@ -72,7 +72,7 @@ const CommandList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn('max-h-[320px] overflow-y-auto overflow-x-hidden', className)}
+    className={cn('max-h-[320px] overflow-y-auto overflow-x-hidden pb-1.5', className)}
     {...props}
   />
 ));
@@ -127,7 +127,7 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      'group relative flex cursor-default gap-3 select-none items-center px-3 py-2 text-sm outline-none transition-colors duration-150 data-[disabled=true]:pointer-events-none data-[selected=false]:rounded-lg data-[selected=false]:hover:bg-muted/30 data-[selected=true]:rounded-r-lg data-[selected=true]:bg-primary/10 data-[selected=true]:text-foreground data-[selected=true]:border-l-2 data-[selected=true]:border-primary/60 data-[selected=true]:pl-[10px] data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+      'group relative flex cursor-default gap-3 select-none items-center border-l-2 border-transparent pl-[10px] pr-3 py-2 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected=false]:rounded-lg data-[selected=false]:hover:bg-muted/30 data-[selected=true]:rounded-r-lg data-[selected=true]:bg-primary/10 data-[selected=true]:text-foreground data-[selected=true]:border-primary/60 data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
       className
     )}
     {...props}

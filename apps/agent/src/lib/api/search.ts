@@ -50,6 +50,8 @@ export interface FuzzySearchResult {
   score: number;
   /** Character indices in `name` where the pattern matched. Used for highlighting. */
   matchIndices: number[];
+  /** Character indices in `path` where the pattern matched. Used for path highlighting. */
+  pathMatchIndices: number[];
 }
 
 // ============================================

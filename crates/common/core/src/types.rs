@@ -520,4 +520,7 @@ pub struct FuzzySearchResult {
     /// Character indices in `name` where the pattern matched.
     /// Used for highlighting matched characters in the UI.
     pub match_indices: Vec<u32>,
+    /// Character indices in `path` where the pattern matched.
+    /// Used for highlighting matched characters in the path subtitle.
+    pub path_match_indices: Vec<u32>,
 }

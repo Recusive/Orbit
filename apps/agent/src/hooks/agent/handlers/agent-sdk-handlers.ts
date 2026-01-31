@@ -47,10 +47,19 @@ export async function handleMessageSend(
       }
     }
 
+    // Prepend attached file paths so the agent knows which files the user is referencing.
+    // The agent can then use its Read tool to inspect file contents on demand,
+    // avoiding blowing the context window with large files.
+    let contentToSend = message.content;
+    if (message.context?.files && message.context.files.length > 0) {
+      const fileList = message.context.files.map((f) => `- ${f}`).join('\n');
+      const fileContext = `The user has attached the following files for context. Use your Read tool to read them if needed:\n${fileList}\n\n`;
+      contentToSend = fileContext + contentToSend;
+    }
+
     // Check if this session has rewind context (from a rewind fork)
     // If so, prepend the conversation history to the first message
     // This is the key fix: we pass truncated history as context, NOT via SDK resume
-    let contentToSend = message.content;
     const rewindContext = consumeRewindContext(message.session_id);
     if (rewindContext && rewindContext.length > 0) {
       const contextPrefix = formatConversationContext(rewindContext);

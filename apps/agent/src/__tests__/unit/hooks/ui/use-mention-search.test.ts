@@ -51,6 +51,7 @@ function createMockResults(count: number, prefix = 'file'): FuzzySearchResult[] 
     name: `${prefix}-${String(i)}.tsx`,
     score: 100 - i, // Higher score = better match, decreasing for each result
     matchIndices: [0, 1, 2], // First 3 characters match
+    pathMatchIndices: [],
   }));
 }
 
