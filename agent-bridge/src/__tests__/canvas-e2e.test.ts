@@ -403,14 +403,17 @@ class E2ETestHarness {
   /**
    * Simulate: Tauri invoke('canvas_create_session', { sessionId, config })
    */
-  createSession(sessionId: string, config?: CanvasSessionConfig): BridgeCommandResponse {
+  async createSession(
+    sessionId: string,
+    config?: CanvasSessionConfig
+  ): Promise<BridgeCommandResponse> {
     const request = createBridgeRequest<CanvasCreateSessionRequest>({
       type: 'canvas:create_session',
       sessionId,
       config,
     });
 
-    this.manager.createSession(request.sessionId, request.config);
+    await this.manager.createSession(request.sessionId, request.config);
     return createSuccessResponse(request.type);
   }
 
@@ -551,7 +554,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Full Tauri → Bridge → SD
       const sessionId = 'e2e-lifecycle-test';
 
       // Step 1: Create session (simulates Tauri invoke → bridge → SDK)
-      const createResponse = harness.createSession(sessionId, {
+      const createResponse = await harness.createSession(sessionId, {
         thinkingEnabled: false,
         model: 'claude-sonnet-4-20250514',
       });
@@ -570,7 +573,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Full Tauri → Bridge → SD
       const sessions = ['e2e-multi-1', 'e2e-multi-2', 'e2e-multi-3'];
 
       // Create all sessions
-      const createResponses = sessions.map((id) => harness.createSession(id));
+      const createResponses = await Promise.all(sessions.map((id) => harness.createSession(id)));
 
       // Validate all responses
       for (const response of createResponses) {
@@ -588,7 +591,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Full Tauri → Bridge → SD
   describe('Canvas State E2E', () => {
     it('should validate canvas state through full flow', async () => {
       const sessionId = 'e2e-state-test';
-      harness.createSession(sessionId);
+      await harness.createSession(sessionId);
 
       // Create complex canvas state
       const state: CanvasState = {
@@ -656,7 +659,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Full Tauri → Bridge → SD
   describe('Tool Request/Response E2E', () => {
     it('should complete full tool round-trip with validated data', async () => {
       const sessionId = 'e2e-tool-test';
-      harness.createSession(sessionId);
+      await harness.createSession(sessionId);
 
       const capturedRequests: McpToolRequest[] = [];
 
@@ -712,7 +715,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Full Tauri → Bridge → SD
   describe('Event Validation E2E', () => {
     it('should validate all event schemas during message flow', async () => {
       const sessionId = 'e2e-event-test';
-      harness.createSession(sessionId);
+      await harness.createSession(sessionId);
       harness.clearEvents();
 
       // The events are captured and validated by the harness automatically
@@ -864,7 +867,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Real Claude SDK Integration'
     const sessionId = 'e2e-real-sdk-test';
 
     // This creates a REAL CanvasAgent with REAL Claude SDK connection
-    const response = harness.createSession(sessionId, {
+    const response = await harness.createSession(sessionId, {
       thinkingEnabled: false,
       model: 'claude-sonnet-4-20250514',
     });
@@ -1140,7 +1143,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Orchestrator Integration', (
   describe('Session Manager Intent Routing', () => {
     it('should have IntentAnalyzer initialized in session manager', async () => {
       const sessionId = 'e2e-orchestrator-init-test';
-      harness.createSession(sessionId);
+      await harness.createSession(sessionId);
 
       // Access private intentAnalyzer via manager
       const managerPrivate = getManagerPrivate(harness.manager);
@@ -1154,7 +1157,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Orchestrator Integration', (
 
     it('should have orchestrators map initialized in session manager', async () => {
       const sessionId = 'e2e-orchestrator-map-test';
-      harness.createSession(sessionId);
+      await harness.createSession(sessionId);
 
       const managerPrivate = getManagerPrivate(harness.manager);
       const orchestrators = managerPrivate.orchestrators;
@@ -1168,7 +1171,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Orchestrator Integration', (
 
     it('should analyze intent before sending message', async () => {
       const sessionId = 'e2e-intent-analysis-test';
-      harness.createSession(sessionId);
+      await harness.createSession(sessionId);
 
       const managerPrivate = getManagerPrivate(harness.manager);
       const intentAnalyzer = managerPrivate.intentAnalyzer;
@@ -1208,7 +1211,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Orchestrator Integration', (
   describe('Canvas State to Snapshot Conversion', () => {
     it('should convert CanvasState to CanvasSnapshot correctly', async () => {
       const sessionId = 'e2e-snapshot-conversion-test';
-      harness.createSession(sessionId);
+      await harness.createSession(sessionId);
 
       const managerPrivate = getManagerPrivate(harness.manager);
 
@@ -1265,7 +1268,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Orchestrator Integration', (
 
     it('should handle null selectedNodeId', async () => {
       const sessionId = 'e2e-null-selected-test';
-      harness.createSession(sessionId);
+      await harness.createSession(sessionId);
 
       const managerPrivate = getManagerPrivate(harness.manager);
 
@@ -1286,7 +1289,7 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Orchestrator Integration', (
   describe('Orchestrator Lifecycle', () => {
     it('should clean up orchestrator when session is deleted', async () => {
       const sessionId = 'e2e-orchestrator-cleanup-test';
-      harness.createSession(sessionId);
+      await harness.createSession(sessionId);
 
       const managerPrivate = getManagerPrivate(harness.manager);
 
@@ -1311,8 +1314,8 @@ describe.skipIf(skipIntegrationTests)('Canvas E2E - Orchestrator Integration', (
       const managerPrivate = getManagerPrivate(manager);
 
       // Create sessions
-      manager.createSession('session-1');
-      manager.createSession('session-2');
+      await manager.createSession('session-1');
+      await manager.createSession('session-2');
 
       // Add orchestrators
       const { createOrchestrator } = await import('../canvas/orchestrator/index.js');

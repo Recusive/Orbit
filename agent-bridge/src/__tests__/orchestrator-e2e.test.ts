@@ -35,8 +35,8 @@ const logger = createLogger('orchestrator-e2e');
 
 import type { CanvasSnapshot, OrchestratorState, TaskOutput } from '../canvas/index.js';
 
-// Check for credentials (OAuth from Keychain or API key fallback)
-const credentials = ClaudeCredentials.getCredentials();
+// Check for credentials (OAuth from Keychain or API key fallback, async)
+const credentials = await ClaudeCredentials.getCredentials();
 const hasCredentials = credentials.hasCredentials;
 const describeWithApi = hasCredentials ? describe : describe.skip;
 

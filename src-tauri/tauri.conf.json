@@ -35,8 +35,8 @@
     "security": {
       "csp": {
         "default-src": "'self'",
-        "script-src": "'self' 'unsafe-eval' https://streamdown.ai",
-        "style-src": "'self' 'unsafe-inline' https://streamdown.ai",
+        "script-src": "'self' 'unsafe-eval' https://streamdown.ai http://localhost:*",
+        "style-src": "'self' 'unsafe-inline' https://streamdown.ai http://localhost:*",
         "connect-src": "'self' https://api.anthropic.com ipc://localhost https://streamdown.ai http://localhost:* ws://localhost:*",
         "img-src": "'self' data: blob:",
         "font-src": "'self' data: https://streamdown.ai",

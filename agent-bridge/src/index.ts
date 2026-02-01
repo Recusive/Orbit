@@ -569,7 +569,7 @@ async function handleRequest(
 
     // Canvas Operations
     case 'canvas:create_session': {
-      canvasSessionManager.createSession(request.sessionId, request.config);
+      await canvasSessionManager.createSession(request.sessionId, request.config);
       sendResponse({ type: 'success', requestType: request.type });
       break;
     }

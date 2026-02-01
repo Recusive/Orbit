@@ -9,6 +9,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 
 import { BrowserToolBridge, createBrowserMcpServer } from '../../browser/index.js';
 import { ClaudeCredentials } from '../../common/auth/credentials.js';
+import { getShellEnvironment } from '../../common/env/shell-env.js';
 import { createLogger } from '../../common/logging/logger.js';
 import { withRetry, RetryPresets } from '../../common/retry/retry.js';
 import { listCommands } from '../definitions/index.js';
@@ -113,6 +114,20 @@ function getMessageContentArray(message: SDKMessage): unknown[] | null {
   return content as unknown[];
 }
 
+/** Categorized stderr error types for structured error handling */
+export type StderrErrorCategory =
+  | 'AUTH_FAILED'
+  | 'RATE_LIMIT'
+  | 'SESSION_EXPIRED'
+  | 'OVERLOADED'
+  | 'UNKNOWN';
+
+export interface StderrError {
+  category: StderrErrorCategory;
+  message: string;
+  raw: string;
+}
+
 export interface OrbitAgentConfig {
   permissionRequestCallback?: PermissionRequestCallback;
   snapshotCallback?: SnapshotCallback;
@@ -146,6 +161,11 @@ export interface OrbitAgentConfig {
    * Keys are agent names, values are agent definitions with description, prompt, and optional tools/model.
    */
   agents?: Record<string, AgentDefinition>;
+  /**
+   * Callback for categorized stderr errors from the CLI subprocess.
+   * Enables the session manager to surface auth failures, rate limits, etc. to the frontend.
+   */
+  onStderrError?: (error: StderrError) => void;
 }
 
 /**
@@ -233,6 +253,58 @@ class MessageQueue {
   }
 }
 
+/** Stderr error patterns for categorization */
+const STDERR_ERROR_PATTERNS: readonly {
+  category: StderrErrorCategory;
+  patterns: readonly RegExp[];
+  message: string;
+}[] = [
+  {
+    category: 'AUTH_FAILED',
+    patterns: [
+      /invalid.*(?:api[_ ]?key|token|credential)/i,
+      /auth(?:entication|orization)?\s+(?:failed|error|invalid)/i,
+      /unauthorized/i,
+      /401/,
+    ],
+    message: 'Authentication failed — check your credentials',
+  },
+  {
+    category: 'RATE_LIMIT',
+    patterns: [/rate[_ ]?limit/i, /too many requests/i, /429/, /retry[_ ]?after/i],
+    message: 'Rate limited — please wait before retrying',
+  },
+  {
+    category: 'SESSION_EXPIRED',
+    patterns: [/session.*(?:expired|invalid|not found)/i, /token.*expired/i],
+    message: 'Session expired — please start a new session',
+  },
+  {
+    category: 'OVERLOADED',
+    patterns: [/overloaded/i, /503/, /529/, /capacity/i, /temporarily unavailable/i],
+    message: 'Service overloaded — please try again shortly',
+  },
+];
+
+/**
+ * Categorize a stderr line into a structured error type.
+ * Returns null if the line doesn't match any known error patterns.
+ */
+function categorizeStderrError(line: string): StderrError | null {
+  const trimmed = line.trim();
+  if (trimmed === '') return null;
+
+  for (const { category, patterns, message } of STDERR_ERROR_PATTERNS) {
+    for (const pattern of patterns) {
+      if (pattern.test(trimmed)) {
+        return { category, message, raw: trimmed };
+      }
+    }
+  }
+
+  return null;
+}
+
 export class OrbitAgent {
   private currentQuery: Query | null = null;
   private permissionManager: PermissionManager;
@@ -268,6 +340,9 @@ export class OrbitAgent {
   // Custom subagents for Task tool
   private _agents?: Record<string, AgentDefinition>;
 
+  // Stderr error callback for surfacing categorized errors to frontend
+  private _onStderrError?: (error: StderrError) => void;
+
   constructor(config: OrbitAgentConfig = {}) {
     this.permissionManager = new PermissionManager(
       config.permissionRequestCallback,
@@ -294,6 +369,7 @@ export class OrbitAgent {
     this._mcpServers = config.mcpServers ?? {};
     this._outputFormat = config.outputFormat;
     this._agents = config.agents;
+    this._onStderrError = config.onStderrError;
     logger.info(
       {
         sessionMode: this._sessionMode,
@@ -804,9 +880,22 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Safety limit: prevent runaway agent loops (200 turns is very generous)
     options.maxTurns = 200;
 
-    // Route CLI subprocess stderr through structured logger for debugging
+    // Route CLI subprocess stderr through structured logger + error categorization
     options.stderr = (data: string): void => {
-      logger.debug({ source: 'claude-cli' }, data.trimEnd());
+      const trimmed = data.trimEnd();
+      logger.debug({ source: 'claude-cli' }, trimmed);
+
+      // Categorize known error patterns and surface to session manager
+      if (this._onStderrError) {
+        const categorized = categorizeStderrError(trimmed);
+        if (categorized !== null) {
+          logger.warn(
+            { category: categorized.category, message: categorized.message },
+            'Categorized CLI stderr error'
+          );
+          this._onStderrError(categorized);
+        }
+      }
     };
 
     // Enable streaming partial messages for real-time text streaming
@@ -868,9 +957,12 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     }
 
     // CRITICAL: Pass the env variable through options.env (not just process.env)
-    // The SDK requires this to enable file checkpointing storage
-    // Also verify process.env already has it (set at index.ts entry point)
+    // The SDK requires this to enable file checkpointing storage.
+    // Merge the shell environment so the CLI subprocess inherits the user's
+    // full PATH (nvm, fnm, homebrew, bun, etc.) and other shell-specific vars.
+    const shellEnv = getShellEnvironment();
     options.env = {
+      ...shellEnv,
       ...process.env,
       CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1',
     };
@@ -901,28 +993,17 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       return;
     }
 
-    // Fix PATH for production Tauri apps launched from Finder/Dock
-    // These don't inherit the user's shell PATH, so bun/npm won't be found
-    const currentPath = process.env.PATH ?? '';
-    const homeDir = process.env.HOME ?? '';
-    const additionalPaths = [
-      `${homeDir}/.local/bin`, // Claude Code CLI install location
-      '/opt/homebrew/bin', // Homebrew on Apple Silicon
-      '/usr/local/bin', // Homebrew on Intel Macs
-      '/usr/bin', // System binaries
-      `${homeDir}/.bun/bin`, // Bun installation
-      `${homeDir}/.nvm/versions/node/v22.11.0/bin`, // Common nvm path (for external tools)
-      `${homeDir}/.nvm/versions/node/v20.18.0/bin`, // Another common nvm path
-      `${homeDir}/.fnm/node-versions/v22.11.0/installation/bin`, // fnm path
-    ].filter((p) => !currentPath.includes(p));
-
-    if (additionalPaths.length > 0) {
-      process.env.PATH = [...additionalPaths, currentPath].join(':');
-      logger.debug({ addedPaths: additionalPaths }, 'Fixed PATH for Tauri app');
+    // Capture the user's interactive login shell environment.
+    // Tauri apps launched from Finder/Dock don't inherit the user's shell PATH,
+    // so tools like bun/npm/node won't be found without this.
+    const shellEnv = getShellEnvironment();
+    if (shellEnv.PATH) {
+      process.env.PATH = shellEnv.PATH;
+      logger.debug({ pathLength: shellEnv.PATH.length }, 'Applied shell environment PATH');
     }
 
-    // Get credentials with OAuth-first priority
-    const credentials = ClaudeCredentials.getCredentials();
+    // Get credentials with OAuth-first priority (async: may attempt token refresh)
+    const credentials = await ClaudeCredentials.getCredentials();
 
     if (!credentials.hasCredentials) {
       throw new Error(
@@ -932,19 +1013,21 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       );
     }
 
-    // Handle OAuth token case
+    // Handle OAuth token case — pass token explicitly via CLAUDE_CODE_OAUTH_TOKEN
+    // This is the official SDK mechanism: the CLI checks this env var first before
+    // trying Keychain, giving us deterministic and reliable auth behavior.
     if (credentials.type === 'oauth') {
-      // Clear environment variables to force SDK to spawn Claude CLI
-      // The CLI subprocess will read OAuth token from Keychain internally
+      if (credentials.token) {
+        process.env.CLAUDE_CODE_OAUTH_TOKEN = credentials.token;
+      }
       delete process.env.ANTHROPIC_API_KEY;
       delete process.env.ANTHROPIC_AUTH_TOKEN;
 
-      logger.info('Using Claude Code OAuth (CLI will read from Keychain)');
+      logger.info('Using Claude Code OAuth via CLAUDE_CODE_OAUTH_TOKEN');
       logger.info('Note: Using your Claude subscription quota, not API credits');
     } else {
       // API key fallback case
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) {
+      if (!credentials.token) {
         throw new Error('API key was detected but is no longer available');
       }
       logger.info('Using API key from .env (will consume API credits)');

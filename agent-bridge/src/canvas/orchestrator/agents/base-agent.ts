@@ -173,16 +173,19 @@ export abstract class BaseAgent {
     this.collectedChanges = [];
     this.collectedNodeIds = [];
 
-    // Check credentials
-    const credentials = ClaudeCredentials.getCredentials();
+    // Check credentials (async: may attempt token refresh)
+    const credentials = await ClaudeCredentials.getCredentials();
     if (!credentials.hasCredentials) {
       throw new Error(
         'No credentials found. Please log in to Claude Code CLI or set ANTHROPIC_API_KEY.'
       );
     }
 
-    // Handle OAuth vs API key
+    // Handle OAuth vs API key — pass token explicitly via CLAUDE_CODE_OAUTH_TOKEN
     if (credentials.type === 'oauth') {
+      if (credentials.token) {
+        process.env.CLAUDE_CODE_OAUTH_TOKEN = credentials.token;
+      }
       delete process.env.ANTHROPIC_API_KEY;
       delete process.env.ANTHROPIC_AUTH_TOKEN;
     }

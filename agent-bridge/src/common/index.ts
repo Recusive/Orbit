@@ -5,6 +5,10 @@
 
 // Authentication
 export { ClaudeCredentials } from './auth/index.js';
+export type { CredentialResult } from './auth/credentials.js';
+
+// Shell environment capture
+export { getShellEnvironment, clearShellEnvironmentCache } from './env/index.js';
 
 // Event emitter and disposable pattern
 export { Disposable, Emitter } from './events/index.js';

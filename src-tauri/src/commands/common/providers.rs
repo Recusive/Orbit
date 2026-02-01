@@ -228,7 +228,7 @@ async fn check_macos_keychain_validated() -> KeychainStatus {
                         };
                     }
 
-                    // Check expiry (with 60s buffer for clock skew)
+                    // Check expiry (with 300s / 5-min buffer aligned with agent-bridge TS side)
                     if let Some(exp) = expires_at {
                         let now = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
@@ -237,7 +237,7 @@ async fn check_macos_keychain_validated() -> KeychainStatus {
 
                         // expiresAt is in milliseconds
                         let exp_secs = exp / 1000;
-                        if exp_secs <= now + 60 {
+                        if exp_secs <= now + 300 {
                             return KeychainStatus {
                                 has_credentials: false,
                                 credential_type: Some("oauth".to_owned()),
