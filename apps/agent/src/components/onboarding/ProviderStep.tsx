@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import { ArrowRight, Check, Key, Loader2, Terminal } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { ArrowRight, Check, Key, Loader2, RefreshCw, Terminal } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AuthMethod, ProviderStatus } from '@/stores/onboarding/provider-store';
 import type { FC } from 'react';
@@ -16,6 +16,13 @@ interface KeychainStatus {
   hasCredentials: boolean;
   credentialType: string | null;
   expiresAt: number | null;
+  entryExists: boolean;
+  error: string | null;
+}
+
+/** Result of triggering Claude CLI auth from Rust backend. */
+interface AuthTriggerResult {
+  success: boolean;
   error: string | null;
 }
 
@@ -36,24 +43,28 @@ export interface ProviderStepProps {
   readonly className?: string;
 }
 
+type DetectionPhase = 'checking' | 'valid' | 'authenticating' | 'no-credentials';
+
 interface DetectionState {
-  isChecking: boolean;
-  hasKeychain: boolean;
+  phase: DetectionPhase;
   error: string | null;
 }
 
 /**
  * Provider setup step in onboarding.
- * Checks for existing keychain credentials or allows manual API key entry.
- * Note: CLI detection removed - bundled app includes its own claude binary.
+ *
+ * Flow:
+ * 1. Check keychain for valid OAuth token
+ * 2. If valid → show "Claude Code Detected" (green checkmark)
+ * 3. If entry exists but token invalid/expired → auto-trigger CLI auth, then re-check
+ * 4. If no entry at all → show API key input form
  */
 export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) => {
   const addProvider = useProviderStore((s) => s.addProvider);
 
   // Detection state
   const [detection, setDetection] = useState<DetectionState>({
-    isChecking: true,
-    hasKeychain: false,
+    phase: 'checking',
     error: null,
   });
 
@@ -62,28 +73,84 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Check for keychain credentials on mount
-  useEffect(() => {
-    const checkCredentials = async (): Promise<void> => {
-      try {
-        const keychainResult = await invoke<KeychainStatus>('check_claude_keychain');
+  // Prevent double-triggering auth in React strict mode
+  const authTriggered = useRef(false);
 
-        setDetection({
-          isChecking: false,
-          hasKeychain: keychainResult.hasCredentials,
-          error: keychainResult.error,
-        });
-      } catch (err) {
-        setDetection({
-          isChecking: false,
-          hasKeychain: false,
-          error: err instanceof Error ? err.message : 'Failed to check credentials',
-        });
+  // Check keychain and optionally trigger auth
+  const checkAndAuth = useCallback(async (): Promise<void> => {
+    setDetection({ phase: 'checking', error: null });
+
+    try {
+      const status = await invoke<KeychainStatus>('check_claude_keychain');
+
+      if (status.hasCredentials) {
+        // Valid token found
+        setDetection({ phase: 'valid', error: null });
+        return;
       }
-    };
 
-    checkCredentials().catch(console.error);
+      if (status.entryExists) {
+        // Entry exists but token is invalid/expired — trigger CLI auth
+        if (authTriggered.current) {
+          // Already tried once — don't loop, show error
+          setDetection({
+            phase: 'no-credentials',
+            error: status.error ?? 'Token expired. Please authenticate manually.',
+          });
+          return;
+        }
+
+        authTriggered.current = true;
+        setDetection({ phase: 'authenticating', error: null });
+
+        const authResult = await invoke<AuthTriggerResult>('trigger_claude_auth');
+
+        if (!authResult.success) {
+          setDetection({
+            phase: 'no-credentials',
+            error: authResult.error ?? 'Authentication failed',
+          });
+          return;
+        }
+
+        // Re-check after auth
+        const recheckStatus = await invoke<KeychainStatus>('check_claude_keychain');
+
+        if (recheckStatus.hasCredentials) {
+          setDetection({ phase: 'valid', error: null });
+        } else {
+          setDetection({
+            phase: 'no-credentials',
+            error: recheckStatus.error ?? 'Authentication did not complete. Please try again.',
+          });
+        }
+        return;
+      }
+
+      // No entry at all
+      setDetection({ phase: 'no-credentials', error: status.error });
+    } catch (err) {
+      setDetection({
+        phase: 'no-credentials',
+        error: err instanceof Error ? err.message : 'Failed to check credentials',
+      });
+    }
   }, []);
+
+  // Check on mount
+  useEffect(() => {
+    checkAndAuth().catch(() => {
+      /* handled inside */
+    });
+  }, [checkAndAuth]);
+
+  // Retry auth manually
+  const handleRetryAuth = useCallback((): void => {
+    authTriggered.current = false;
+    checkAndAuth().catch(() => {
+      /* handled inside */
+    });
+  }, [checkAndAuth]);
 
   // Use detected keychain credentials
   const handleUseKeychain = useCallback((): void => {
@@ -162,8 +229,8 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
         </div>
       </div>
 
-      {/* Detection Status */}
-      {detection.isChecking ? (
+      {/* Checking / Authenticating spinner */}
+      {detection.phase === 'checking' || detection.phase === 'authenticating' ? (
         <div
           className={cn(
             'flex flex-col items-center justify-center gap-3 p-6 w-full max-w-[380px]',
@@ -171,10 +238,19 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
           )}
         >
           <Loader2 className="h-6 w-6 animate-spin text-primary/60" />
-          <span className="text-sm text-muted-foreground">Detecting Claude Code...</span>
+          <span className="text-sm text-muted-foreground">
+            {detection.phase === 'authenticating'
+              ? 'Authenticating with Claude...'
+              : 'Detecting Claude Code...'}
+          </span>
+          {detection.phase === 'authenticating' ? (
+            <span className="text-xs text-muted-foreground/70 text-center">
+              If a browser window opens, please complete the login
+            </span>
+          ) : null}
         </div>
-      ) : detection.hasKeychain ? (
-        /* Keychain credentials found (CLI detection is optional - bundled app has its own) */
+      ) : detection.phase === 'valid' ? (
+        /* Valid keychain credentials found */
         <div
           className={cn(
             'flex flex-col gap-4 p-5 w-full max-w-[380px]',
@@ -201,7 +277,7 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
           </Button>
         </div>
       ) : (
-        /* No CLI or show manual entry */
+        /* No credentials or auth failed — show manual entry */
         <div className="flex flex-col gap-4 w-full max-w-[380px]">
           {/* Status message */}
           <div
@@ -212,10 +288,20 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
           >
             <Terminal className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-sm text-muted-foreground">
-              No Claude Code credentials found. Run &quot;claude&quot; in terminal to authenticate,
-              or enter your Anthropic API key below.
+              {detection.error ??
+                'No Claude Code credentials found. Enter your Anthropic API key below or retry authentication.'}
             </span>
           </div>
+
+          {/* Retry auth button */}
+          <Button
+            variant="outline"
+            onClick={handleRetryAuth}
+            className="w-full h-10 text-sm font-medium"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry Authentication
+          </Button>
 
           {/* Manual API Key Entry */}
           <div className="flex flex-col gap-4 p-5 rounded-lg border border-border">

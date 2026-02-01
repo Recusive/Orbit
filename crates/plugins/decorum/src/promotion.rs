@@ -5,9 +5,23 @@
 //! 1. **`CADisplayLink`** — Obtains a display link from `NSScreen.mainScreen`
 //!    requesting 120Hz, signaling the `ProMotion` hardware to stay at max rate.
 //!
-//! 2. **`WKPreferences` private API** — Disables `WebKit`'s internal 60fps cap
-//!    (`preferPageRenderingUpdatesNear60FPSEnabled`) so `requestAnimationFrame`
-//!    fires at the display's native refresh rate instead of being throttled.
+//! 2. **`WKPreferences` `_WKFeature` API** — Disables `WebKit`'s internal 60fps
+//!    cap (`PreferPageRenderingUpdatesNear60FPSEnabled`) so
+//!    `requestAnimationFrame` fires at the display's native refresh rate.
+//!
+//! # 60Hz Display Guard
+//!
+//! On 60Hz displays (e.g. `MacBook` Air), both mechanisms are skipped entirely.
+//! There is no benefit to requesting 120Hz from hardware that cannot deliver it,
+//! and the `_WKFeature` API has a known side-effect that breaks the fullscreen
+//! slide-down header on some machines.
+//!
+//! # Deferred Initialization
+//!
+//! The `WKWebView` may not exist in the view hierarchy when `enable_promotion`
+//! is called during Tauri's `setup` callback. The framerate unlock is therefore
+//! deferred using `performSelector:withObject:afterDelay:` with a retry
+//! mechanism (up to 3 attempts at 1-second intervals).
 //!
 //! # Why Both Are Needed
 //!
@@ -26,14 +40,6 @@
 //! link to the correct physical display (important for multi-monitor setups
 //! with different refresh rates).
 //!
-//! # `WKPreferences` Private API
-//!
-//! Safari exposes a "Prefer Page Rendering Updates near 60fps" feature flag.
-//! For embedded `WKWebView`, this is toggled via the private `_WKFeature`
-//! enumeration API: `[WKPreferences _features]` returns all feature flags,
-//! and `[prefs _setEnabled:NO forFeature:]` disables the 60fps cap.
-//! This is safe for non-App Store desktop apps (like Tauri).
-//!
 //! # Important
 //!
 //! The `QuartzCore` framework must be dynamically loaded at runtime — it is not
@@ -46,15 +52,19 @@
 //! |---------------|----------|
 //! | < 14 (Sonoma) | Silent no-op — `CADisplayLink` unavailable on macOS |
 //! | 14+ (Sonoma)  | Display link created via `NSScreen`, 120Hz requested |
-//! | Non-`ProMotion`| Silent no-op — display ignores the request |
+//! | 60Hz displays | Silent no-op — both mechanisms skipped |
 
 use std::ffi::{c_void, CStr};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use objc2::runtime::{AnyClass, AnyObject, ClassBuilder, Sel};
 use objc2::{msg_send, sel};
 use objc2_foundation::{NSRunLoop, NSString};
 use objc2_quartz_core::CAFrameRateRange;
+
+// =============================================================================
+// CADisplayLink — 120Hz hardware refresh
+// =============================================================================
 
 /// Guard against duplicate initialization (process-wide singleton).
 static PROMOTION_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -86,9 +96,6 @@ fn ensure_quartz_core_loaded() {
 /// # Safety
 ///
 /// Called by the Objective-C runtime on every display refresh.
-// Allow clippy nursery suggestion: `const` is semantically misleading for a
-// runtime callback — it's never used in const-eval context.
-// (Code review: Opus cycle 1, issue #4)
 #[allow(clippy::missing_const_for_fn)]
 unsafe extern "C" fn promotion_step(_this: *mut AnyObject, _sel: Sel, _sender: *mut c_void) {
     // Intentionally empty — the display link's existence in the run loop
@@ -114,17 +121,58 @@ fn register_target_class() -> Option<&'static AnyClass> {
     Some(builder.register())
 }
 
+// CoreGraphics FFI for display refresh rate detection.
+extern "C" {
+    fn CGMainDisplayID() -> u32;
+    fn CGDisplayCopyDisplayMode(display: u32) -> *mut c_void;
+    fn CGDisplayModeGetRefreshRate(mode: *mut c_void) -> f64;
+    fn CGDisplayModeRelease(mode: *mut c_void);
+}
+
+/// Query the refresh rate of the main display via `CoreGraphics`.
+///
+/// Returns the current mode's refresh rate in Hz. `ProMotion` displays
+/// report 120.0, standard displays report 60.0. Some displays may report
+/// 0.0 (meaning "default/unknown"), which we treat as 60Hz.
+fn screen_refresh_rate() -> f64 {
+    unsafe {
+        let display_id = CGMainDisplayID();
+        let mode = CGDisplayCopyDisplayMode(display_id);
+        if mode.is_null() {
+            return 0.0;
+        }
+        let rate = CGDisplayModeGetRefreshRate(mode);
+        CGDisplayModeRelease(mode);
+        log::debug!("ProMotion: CGDisplayModeGetRefreshRate = {rate:.0}Hz");
+        rate
+    }
+}
+
 /// Enable `ProMotion` 120Hz rendering for the application.
 ///
 /// Loads the `QuartzCore` framework, obtains a `CADisplayLink` from
 /// `NSScreen.mainScreen` and attaches it to the main run loop requesting
 /// 120Hz via `preferredFrameRateRange`.
 ///
+/// On displays that report ≤ 60Hz via `CGDisplayModeGetRefreshRate`, this is a
+/// no-op — there's no benefit to creating a display link that requests a
+/// frame rate the hardware can't deliver.
+///
 /// This is a **process-wide singleton** — only the first call takes effect.
 ///
 /// Must be called from the main thread.
 pub(crate) fn enable_promotion() {
     if PROMOTION_ENABLED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    let rate = screen_refresh_rate();
+    // 0.0 means "default/unknown" — also skip in that case.
+    if rate <= 60.0 {
+        log::info!(
+            "ProMotion: display refresh rate is {rate:.0}Hz — \
+             skipping (no high-refresh-rate hardware)"
+        );
         return;
     }
 
@@ -138,20 +186,17 @@ pub(crate) fn enable_promotion() {
 
 /// Internal implementation that returns false on failure.
 fn try_enable_promotion() -> bool {
-    // Step 1: Register ObjC target class with a step: callback
     let Some(target_class) = register_target_class() else {
         log::warn!("ProMotion: failed to register target class");
         return false;
     };
 
-    // Step 2: Create target instance
     let target: *mut AnyObject = unsafe { msg_send![target_class, new] };
     if target.is_null() {
         log::warn!("ProMotion: target alloc returned null");
         return false;
     }
 
-    // Step 3: Get NSScreen.mainScreen
     let Some(screen_class) = AnyClass::get(c"NSScreen") else {
         log::warn!("ProMotion: NSScreen class not found");
         return false;
@@ -162,11 +207,9 @@ fn try_enable_promotion() -> bool {
         return false;
     }
 
-    // Step 4: Create CADisplayLink via -[NSScreen displayLinkWithTarget:selector:]
-    //
-    // IMPORTANT: On macOS 14+, CADisplayLink must be obtained from
-    // NSScreen/NSWindow/NSView — the iOS class factory method
-    // +[CADisplayLink displayLinkWithTarget:selector:] does NOT exist on macOS.
+    // On macOS 14+, CADisplayLink must be obtained from NSScreen — the iOS
+    // class factory +[CADisplayLink displayLinkWithTarget:selector:] does NOT
+    // exist on macOS.
     let display_link: *mut AnyObject =
         unsafe { msg_send![main_screen, displayLinkWithTarget: target, selector: sel!(step:)] };
     if display_link.is_null() {
@@ -175,23 +218,15 @@ fn try_enable_promotion() -> bool {
         );
         return false;
     }
-    log::debug!("ProMotion: CADisplayLink obtained from NSScreen.mainScreen");
 
-    // Step 5: Set preferredFrameRateRange to request 120Hz
     // minimum=80, maximum=120, preferred=120 — tells ProMotion to run at max
     let range = CAFrameRateRange::new(80.0, 120.0, 120.0);
     unsafe {
         let _: () = msg_send![display_link, setPreferredFrameRateRange: range];
     }
-    log::debug!("ProMotion: preferredFrameRateRange set to (80, 120, 120)");
 
-    // Step 6: Add to main run loop in common modes
-    // NOTE: We pass the string literal "kCFRunLoopCommonModes" here, which
-    // coincidentally matches the actual value of the Core Foundation constant
-    // `kCFRunLoopCommonModes`. The objc2-foundation crate doesn't expose
-    // NSRunLoopMode::commonModes() for this context, so we rely on the
-    // constant's value being identical to its name (stable since macOS 10.0).
-    // (Code review: Opus cycle 1, issue #5)
+    // Add to main run loop. The string "kCFRunLoopCommonModes" matches the
+    // actual value of the Core Foundation constant (stable since macOS 10.0).
     let main_run_loop = NSRunLoop::mainRunLoop();
     let common_modes = NSString::from_str("kCFRunLoopCommonModes");
     unsafe {
@@ -201,73 +236,169 @@ fn try_enable_promotion() -> bool {
             forMode: &*common_modes
         ];
     }
-    log::info!("ProMotion: display link added to main run loop — 120Hz enabled");
-
-    // The display link and target must live for the process lifetime.
-    // They are now retained by the run loop; we intentionally do not free them.
+    log::info!("ProMotion: CADisplayLink added to main run loop — 120Hz enabled");
 
     true
 }
 
-// ---------------------------------------------------------------------------
-// WKWebView 60fps cap removal
-// ---------------------------------------------------------------------------
+// =============================================================================
+// WebKit 60fps cap removal — deferred init
+// =============================================================================
 
-/// Disable `WebKit`'s internal 60fps rendering cap on the `WKWebView` inside
-/// the given `NSWindow`.
+/// Guard against duplicate framerate unlock.
+static FRAMERATE_UNLOCKED: AtomicBool = AtomicBool::new(false);
+
+/// Max retry attempts for deferred `WKWebView` discovery.
+const MAX_UNLOCK_ATTEMPTS: u8 = 3;
+/// Current retry count.
+static UNLOCK_ATTEMPTS: AtomicU8 = AtomicU8::new(0);
+
+/// Schedule the `WebKit` 60fps cap removal.
 ///
-/// `WebKit` defaults to capping `requestAnimationFrame` at ~60fps even on
-/// `ProMotion` displays. This uses the private `_WKFeature` API to find
-/// the `PreferPageRenderingUpdatesNear60FPSEnabled` feature and disable it,
-/// matching Safari's "Prefer Page Rendering Updates near 60fps" feature flag.
+/// Since the `WKWebView` may not exist during Tauri's setup callback,
+/// this schedules the unlock via `performSelector:withObject:afterDelay:`
+/// with automatic retries (up to 3 attempts at 1-second intervals).
 ///
-/// # Safety
+/// On 60Hz displays this is a no-op — the `_WKFeature` unlock has no
+/// benefit and is known to break fullscreen on some machines.
 ///
-/// `ns_window` must be a valid `NSWindow` pointer obtained from Tauri.
 /// Must be called from the main thread.
-pub(crate) fn unlock_webview_framerate(ns_window: *mut c_void) {
-    unsafe { try_unlock_webview_framerate(ns_window) }
-}
-
-/// Walk the `NSWindow` view hierarchy to find a `WKWebView`.
-///
-/// # Safety
-///
-/// `view` must be a valid `NSView` pointer.
-unsafe fn find_wk_web_view(view: *mut AnyObject) -> Option<*mut AnyObject> {
-    // Max depth limit prevents stack overflow in deeply nested view hierarchies.
-    // WKWebView is typically 3-5 levels deep in a Tauri window; 20 is generous.
-    // Also provides implicit cycle protection. (Code review: Opus cycle 2, issue #5)
-    find_wk_web_view_recursive(view, 20)
-}
-
-/// Recursive helper with depth limit for `find_wk_web_view`.
-///
-/// # Safety
-///
-/// `view` must be a valid `NSView` pointer.
-unsafe fn find_wk_web_view_recursive(view: *mut AnyObject, depth: u32) -> Option<*mut AnyObject> {
-    if depth == 0 {
-        log::warn!("ProMotion: max view hierarchy depth reached without finding WKWebView");
-        return None;
+pub(crate) fn unlock_webview_framerate() {
+    if FRAMERATE_UNLOCKED.load(Ordering::SeqCst) {
+        return;
     }
 
+    let rate = screen_refresh_rate();
+    if rate <= 60.0 {
+        log::info!(
+            "ProMotion: display refresh rate is {rate:.0}Hz — \
+             skipping WebKit 60fps cap removal"
+        );
+        FRAMERATE_UNLOCKED.store(true, Ordering::SeqCst);
+        return;
+    }
+
+    UNLOCK_ATTEMPTS.store(0, Ordering::SeqCst);
+    schedule_unlock_attempt();
+}
+
+/// Schedule a single unlock attempt after a 1-second delay.
+fn schedule_unlock_attempt() {
+    let Some(unlocker_class) = register_unlocker_class() else {
+        log::warn!("ProMotion: failed to register unlocker class");
+        return;
+    };
+
+    let instance: *mut AnyObject = unsafe { msg_send![unlocker_class, new] };
+    if instance.is_null() {
+        log::warn!("ProMotion: unlocker alloc returned null");
+        return;
+    }
+
+    unsafe {
+        let _: () = msg_send![
+            instance,
+            performSelector: sel!(attemptUnlock:),
+            withObject: std::ptr::null::<AnyObject>(),
+            afterDelay: 1.0_f64
+        ];
+    }
+}
+
+/// Register the `OrbitFramerateUnlocker` Objective-C class.
+fn register_unlocker_class() -> Option<&'static AnyClass> {
+    const CLASS_NAME: &CStr = c"OrbitFramerateUnlocker";
+
+    if let Some(cls) = AnyClass::get(CLASS_NAME) {
+        return Some(cls);
+    }
+
+    let superclass = AnyClass::get(c"NSObject")?;
+    let mut builder = ClassBuilder::new(CLASS_NAME, superclass)?;
+
+    let attempt_fn: unsafe extern "C" fn(*mut AnyObject, Sel, *mut AnyObject) = on_attempt_unlock;
+    unsafe {
+        builder.add_method(sel!(attemptUnlock:), attempt_fn);
+    }
+
+    Some(builder.register())
+}
+
+/// Callback for deferred unlock attempts.
+///
+/// # Safety
+///
+/// Called by the Objective-C runtime via `performSelector:withObject:afterDelay:`.
+#[allow(clippy::missing_const_for_fn)]
+unsafe extern "C" fn on_attempt_unlock(_this: *mut AnyObject, _sel: Sel, _sender: *mut AnyObject) {
+    let attempt = UNLOCK_ATTEMPTS.fetch_add(1, Ordering::SeqCst) + 1;
+
+    if FRAMERATE_UNLOCKED.load(Ordering::SeqCst) {
+        return;
+    }
+
+    if try_unlock_webview_framerate() {
+        FRAMERATE_UNLOCKED.store(true, Ordering::SeqCst);
+        log::info!("ProMotion: WebKit 60fps cap disabled (attempt {attempt})");
+    } else if attempt < MAX_UNLOCK_ATTEMPTS {
+        log::debug!("ProMotion: WKWebView unlock attempt {attempt} failed, retrying...");
+        schedule_unlock_attempt();
+    } else {
+        log::warn!("ProMotion: all {MAX_UNLOCK_ATTEMPTS} unlock attempts failed — stuck at 60fps");
+    }
+}
+
+/// Internal implementation that returns false on failure.
+fn try_unlock_webview_framerate() -> bool {
+    // Find the WKWebView in the view hierarchy
+    let Some(wk_web_view) = find_wk_web_view() else {
+        return false;
+    };
+
+    // Get WKWebView.configuration.preferences
+    let config: *mut AnyObject = unsafe { msg_send![wk_web_view, configuration] };
+    if config.is_null() {
+        return false;
+    }
+    let prefs: *mut AnyObject = unsafe { msg_send![config, preferences] };
+    if prefs.is_null() {
+        return false;
+    }
+
+    // Find the _WKFeature for 60fps preference
+    let Some(feature) = find_60fps_feature() else {
+        return false;
+    };
+
+    // Disable the 60fps cap
+    unsafe {
+        let _: () = msg_send![prefs, _setEnabled: false, forFeature: feature];
+    }
+
+    true
+}
+
+/// Find the `WKWebView` by walking `NSApplication`'s window hierarchy.
+fn find_wk_web_view() -> Option<*mut AnyObject> {
+    let ns_app_class = AnyClass::get(c"NSApplication")?;
     let wk_class = AnyClass::get(c"WKWebView")?;
 
-    let is_wk: bool = msg_send![view, isKindOfClass: wk_class];
-    if is_wk {
-        return Some(view);
-    }
-
-    let subviews: *mut AnyObject = msg_send![view, subviews];
-    if subviews.is_null() {
+    let app: *mut AnyObject = unsafe { msg_send![ns_app_class, sharedApplication] };
+    if app.is_null() {
         return None;
     }
-    let count: usize = msg_send![subviews, count];
+
+    let windows: *mut AnyObject = unsafe { msg_send![app, windows] };
+    if windows.is_null() {
+        return None;
+    }
+
+    let count: usize = unsafe { msg_send![windows, count] };
     for i in 0..count {
-        let subview: *mut AnyObject = msg_send![subviews, objectAtIndex: i];
-        if !subview.is_null() {
-            if let Some(found) = find_wk_web_view_recursive(subview, depth - 1) {
+        let window: *mut AnyObject = unsafe { msg_send![windows, objectAtIndex: i] };
+        let content_view: *mut AnyObject = unsafe { msg_send![window, contentView] };
+        if !content_view.is_null() {
+            if let Some(found) = find_wk_web_view_recursive(content_view, wk_class) {
                 return Some(found);
             }
         }
@@ -276,94 +407,58 @@ unsafe fn find_wk_web_view_recursive(view: *mut AnyObject, depth: u32) -> Option
     None
 }
 
-/// Internal: find the `WKWebView` and disable its 60fps rendering cap.
-///
-/// # Safety
-///
-/// `ns_window` must be a valid `NSWindow` pointer.
-unsafe fn try_unlock_webview_framerate(ns_window: *mut c_void) {
-    let window: *mut AnyObject = ns_window.cast::<AnyObject>();
-
-    let content_view: *mut AnyObject = msg_send![window, contentView];
-    if content_view.is_null() {
-        log::warn!("ProMotion: NSWindow contentView is null");
-        return;
+/// Recursively search a view hierarchy for a `WKWebView` instance.
+fn find_wk_web_view_recursive(view: *mut AnyObject, wk_class: &AnyClass) -> Option<*mut AnyObject> {
+    let is_kind: bool = unsafe { msg_send![view, isKindOfClass: wk_class] };
+    if is_kind {
+        return Some(view);
     }
 
-    let Some(wk_web_view) = find_wk_web_view(content_view) else {
-        log::warn!("ProMotion: WKWebView not found in window hierarchy");
-        return;
-    };
-    log::debug!("ProMotion: found WKWebView in window hierarchy");
-
-    let config: *mut AnyObject = msg_send![wk_web_view, configuration];
-    if config.is_null() {
-        log::warn!("ProMotion: WKWebView.configuration is null");
-        return;
+    let subviews: *mut AnyObject = unsafe { msg_send![view, subviews] };
+    if subviews.is_null() {
+        return None;
     }
 
-    let prefs: *mut AnyObject = msg_send![config, preferences];
-    if prefs.is_null() {
-        log::warn!("ProMotion: WKPreferences is null");
-        return;
+    let count: usize = unsafe { msg_send![subviews, count] };
+    for i in 0..count {
+        let subview: *mut AnyObject = unsafe { msg_send![subviews, objectAtIndex: i] };
+        if let Some(found) = find_wk_web_view_recursive(subview, wk_class) {
+            return Some(found);
+        }
     }
 
-    disable_60fps_preference(prefs);
+    None
 }
 
-/// Enumerate `_WKFeature` flags on `WKPreferences` and disable the 60fps cap.
+/// Find the `_WKFeature` for `PreferPageRenderingUpdatesNear60FPSEnabled`.
 ///
-/// Uses `[WKPreferences _features]` to list all feature flags, finds
-/// `PreferPageRenderingUpdatesNear60FPSEnabled`, and calls
-/// `[prefs _setEnabled:NO forFeature:]`.
-///
-/// # Safety
-///
-/// `prefs` must be a valid `WKPreferences` pointer.
-unsafe fn disable_60fps_preference(prefs: *mut AnyObject) {
-    let Some(prefs_class) = AnyClass::get(c"WKPreferences") else {
-        log::warn!("ProMotion: WKPreferences class not found");
-        return;
-    };
-
-    // _features is a class method returning NSArray<_WKFeature *>
-    let has_features: bool = msg_send![prefs_class, respondsToSelector: sel!(_features)];
-    if !has_features {
-        log::warn!("ProMotion: WKPreferences does not respond to _features");
-        return;
-    }
-
-    let features: *mut AnyObject = msg_send![prefs_class, _features];
+/// Enumerates `[WKPreferences _features]` (class method) and returns the
+/// feature whose `key` matches the 60fps preference name.
+fn find_60fps_feature() -> Option<*mut AnyObject> {
+    let prefs_class = AnyClass::get(c"WKPreferences")?;
+    let features: *mut AnyObject = unsafe { msg_send![prefs_class, _features] };
     if features.is_null() {
-        log::warn!("ProMotion: [WKPreferences _features] returned null");
-        return;
+        return None;
     }
 
-    let count: usize = msg_send![features, count];
-    let target_key = NSString::from_str("PreferPageRenderingUpdatesNear60FPSEnabled");
-    log::debug!("ProMotion: scanning {count} WebKit features for 60fps preference");
+    let count: usize = unsafe { msg_send![features, count] };
+    let target_key = b"PreferPageRenderingUpdatesNear60FPSEnabled";
 
     for i in 0..count {
-        let feature: *mut AnyObject = msg_send![features, objectAtIndex: i];
-        if feature.is_null() {
-            continue;
-        }
+        let feature: *mut AnyObject = unsafe { msg_send![features, objectAtIndex: i] };
 
-        let key: *mut AnyObject = msg_send![feature, key];
-        if key.is_null() {
-            continue;
-        }
-
-        let is_match: bool = msg_send![key, isEqualToString: &*target_key];
-        if is_match {
-            let _: () = msg_send![prefs, _setEnabled: false, forFeature: feature];
-            log::info!("ProMotion: disabled WebKit 60fps cap via _WKFeature API");
-            return;
+        // Try -[_WKFeature key] (standard accessor)
+        let key: *mut AnyObject = unsafe { msg_send![feature, key] };
+        if !key.is_null() {
+            let key_ptr: *const u8 = unsafe { msg_send![key, UTF8String] };
+            if !key_ptr.is_null() {
+                let key_cstr = unsafe { CStr::from_ptr(key_ptr.cast()) };
+                if key_cstr.to_bytes() == target_key.as_slice() {
+                    return Some(feature);
+                }
+            }
         }
     }
 
-    log::warn!(
-        "ProMotion: PreferPageRenderingUpdatesNear60FPSEnabled not found \
-         in {count} WebKit features"
-    );
+    None
 }

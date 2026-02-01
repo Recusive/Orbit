@@ -11,6 +11,7 @@
   },
   "app": {
     "withGlobalTauri": true,
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Orbit",
@@ -27,7 +28,7 @@
         "hiddenTitle": true,
         "trafficLightPosition": {
           "x": 11,
-          "y": 10
+          "y": 18
         }
       }
     ],
@@ -36,10 +37,11 @@
         "default-src": "'self'",
         "script-src": "'self' 'unsafe-eval' https://streamdown.ai",
         "style-src": "'self' 'unsafe-inline' https://streamdown.ai",
-        "connect-src": "'self' https://api.anthropic.com ipc://localhost https://streamdown.ai",
+        "connect-src": "'self' https://api.anthropic.com ipc://localhost https://streamdown.ai http://localhost:* ws://localhost:*",
         "img-src": "'self' data: blob:",
         "font-src": "'self' data: https://streamdown.ai",
-        "frame-src": "'none'",
+        "worker-src": "'self' blob:",
+        "frame-src": "'self' http://localhost:*",
         "object-src": "'none'"
       },
       "freezePrototype": false,

@@ -366,6 +366,7 @@ export class CanvasAgent {
     const currentPath = process.env.PATH ?? '';
     const homeDir = process.env.HOME ?? '';
     const additionalPaths = [
+      `${homeDir}/.local/bin`, // Claude Code CLI install location
       '/opt/homebrew/bin', // Homebrew on Apple Silicon
       '/usr/local/bin', // Homebrew on Intel Macs
       '/usr/bin', // System binaries

@@ -57,7 +57,7 @@ hostname = "0.4"  # For non-macOS device ID generation
 regex = "1"  # Component name validation
 
 # Tauri
-tauri = { workspace = true, features = ["tray-icon"] }
+tauri = { workspace = true, features = ["tray-icon", "macos-private-api"] }
 tauri-plugin-log = { workspace = true }
 tauri-plugin-fs = { workspace = true }
 tauri-plugin-shell = { workspace = true }
