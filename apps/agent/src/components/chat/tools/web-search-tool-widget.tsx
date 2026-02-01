@@ -230,7 +230,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                         <span>Searching for results...</span>
                       </div>
                     ) : results.length > 0 ? (
-                      <div className="relative max-h-[200px] overflow-y-auto">
+                      <div className="relative max-h-[200px] overflow-y-auto bg-muted/30 rounded-md p-2">
                         {results.map((result, index) => (
                           <button
                             key={`${result.url}-${String(index)}`}

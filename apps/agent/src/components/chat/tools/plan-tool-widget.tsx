@@ -17,6 +17,9 @@ import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
 
+// Disable Streamdown's built-in link safety modal (desktop app opens URLs via Tauri)
+const LINK_SAFETY_DISABLED = { enabled: false } as const;
+
 // Stable plugin arrays - defined outside component to prevent recreation on each render
 // This is critical for Streamdown performance as it compares plugin arrays by reference
 const REMARK_PLUGINS = [remarkGfm];
@@ -151,6 +154,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
                           <Streamdown
                             remarkPlugins={REMARK_PLUGINS}
                             rehypePlugins={REHYPE_PLUGINS}
+                            linkSafety={LINK_SAFETY_DISABLED}
                             mode="static"
                           >
                             {content}

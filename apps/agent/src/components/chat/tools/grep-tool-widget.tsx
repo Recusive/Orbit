@@ -265,7 +265,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                         <span>Searching for matches...</span>
                       </div>
                     ) : matches.length > 0 ? (
-                      <div className="relative max-h-[200px] overflow-y-auto overflow-x-hidden">
+                      <div className="relative max-h-[200px] overflow-y-auto overflow-x-hidden bg-muted/30 rounded-md p-2">
                         {isContentMode
                           ? Object.entries(groupedMatches).map(
                               ([filePath, fileMatches], index, arr) => (

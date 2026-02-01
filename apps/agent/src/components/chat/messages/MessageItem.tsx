@@ -24,6 +24,10 @@ import { ErrorBoundary } from '@/components/shared';
 import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
 import { cn, CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
+// Disable Streamdown's built-in link safety modal. Links render as plain <a> tags instead
+// of <button> elements, letting our handleContentClick route them through onOpenUrl → Tauri.
+const LINK_SAFETY_DISABLED = { enabled: false } as const;
+
 // Stable plugin arrays - defined outside component to prevent recreation on each render.
 // This is critical for Streamdown performance as it compares plugin arrays by reference.
 const REMARK_PLUGINS = [remarkGfm];
@@ -174,6 +178,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                       remarkPlugins={REMARK_PLUGINS}
                       rehypePlugins={rehypePlugins}
                       plugins={STREAMDOWN_PLUGINS}
+                      linkSafety={LINK_SAFETY_DISABLED}
                       mode="static"
                     >
                       {segment.text}

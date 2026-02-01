@@ -181,7 +181,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                         <span>Searching for files...</span>
                       </div>
                     ) : files.length > 0 ? (
-                      <div className="space-y-0.5 max-h-[200px] overflow-y-auto overflow-x-hidden">
+                      <div className="space-y-0.5 max-h-[200px] overflow-y-auto overflow-x-hidden bg-muted/30 rounded-md p-2">
                         {files.map((file, index) => (
                           <button
                             key={`${file}-${String(index)}`}

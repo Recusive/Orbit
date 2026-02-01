@@ -11,6 +11,9 @@ import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
 
+// Disable Streamdown's built-in link safety modal (desktop app opens URLs via Tauri)
+const LINK_SAFETY_DISABLED = { enabled: false } as const;
+
 // Zod schema for task output content blocks
 const ContentBlockSchema = z
   .object({
@@ -210,7 +213,11 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                       </div>
                     ) : output ? (
                       <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none text-sm">
-                        <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>
+                        <Streamdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[]}
+                          linkSafety={LINK_SAFETY_DISABLED}
+                        >
                           {parseTaskOutput(output)}
                         </Streamdown>
                       </div>
