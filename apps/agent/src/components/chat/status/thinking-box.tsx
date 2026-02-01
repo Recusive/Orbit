@@ -141,7 +141,7 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span className="text-xs font-medium truncate text-muted-foreground/70 group-hover/status:text-foreground/90">
+          <span className="text-xs font-medium truncate text-muted-foreground/90 group-hover/status:text-foreground">
             {isStreaming ? 'Thinking' : 'Thought'}
           </span>
           <span className="text-xs text-muted-foreground/50">
@@ -171,11 +171,11 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-px h-full bg-border/40" />
+                  <div className="w-px h-full bg-violet-500/40" />
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card/50 overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card overflow-hidden">
                   <div className="px-3 py-2 max-h-[500px] overflow-y-auto">
                     <div className="text-sm text-muted-foreground/60 leading-[1.7] whitespace-pre-wrap font-mono tracking-tighter">
                       {tokenizedThinking ?? thinking}

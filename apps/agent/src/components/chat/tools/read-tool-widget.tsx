@@ -74,7 +74,7 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
 
       {/* Content */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-        <span className="text-xs text-muted-foreground/50 font-medium">Read</span>
+        <span className="text-xs text-muted-foreground/70 font-medium">Read</span>
         <button
           className={cn(
             'text-xs font-medium',

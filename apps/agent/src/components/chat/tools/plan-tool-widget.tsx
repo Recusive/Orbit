@@ -118,7 +118,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           ) : null}
           <ChevronDown
             className={cn(
-              'h-3 w-3 text-muted-foreground/40 transition-transform duration-200 ease-out shrink-0',
+              'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
               isExpanded && 'rotate-180'
             )}
           />

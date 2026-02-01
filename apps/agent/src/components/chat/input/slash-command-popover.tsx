@@ -69,7 +69,7 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[280px] p-0 rounded-lg border-[3px] border-border/50 bg-popover/98 backdrop-blur-sm shadow-lg"
+        className="w-[280px] p-0 rounded-lg border-[3px] border-border bg-card shadow-lg"
         side="top"
         align="start"
         sideOffset={8}

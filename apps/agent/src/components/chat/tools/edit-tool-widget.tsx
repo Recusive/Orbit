@@ -115,7 +115,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-muted-foreground/50'
+              isFailed ? 'text-destructive/60' : 'text-muted-foreground/70'
             )}
           >
             {isFailed ? '(failed)' : '(modified)'}
@@ -131,7 +131,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
           ) : null}
           <ChevronDown
             className={cn(
-              'h-3 w-3 text-muted-foreground/40 transition-transform duration-200 ease-out shrink-0',
+              'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
               isExpanded && 'rotate-180'
             )}
           />
@@ -152,7 +152,9 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-px h-full bg-border/40" />
+                  <div
+                    className={cn('w-px h-full', isFailed ? 'bg-destructive/40' : 'bg-warning/40')}
+                  />
                 </div>
 
                 {/* Content box — connected red/green sections with colored borders */}
@@ -161,7 +163,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                   {displayOldLines.length > 0 ? (
                     <div
                       className={cn(
-                        'border-3 border-destructive/40 bg-card/50 overflow-hidden',
+                        'border-3 border-destructive/40 bg-card overflow-hidden',
                         displayNewLines.length > 0 ? 'rounded-t-lg border-b-0' : 'rounded-lg'
                       )}
                     >
@@ -175,7 +177,6 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                                 className="flex font-mono text-sm leading-4 bg-destructive/10"
                               >
                                 <div className="sticky left-0 flex shrink-0 bg-destructive/10">
-                                  <div className="w-0.5 bg-destructive" />
                                   <div className="w-5 px-1 text-center text-destructive/70 select-none">
                                     -
                                   </div>
@@ -206,7 +207,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                   {displayNewLines.length > 0 ? (
                     <div
                       className={cn(
-                        'border-3 border-success/40 bg-card/50 overflow-hidden',
+                        'border-3 border-success/40 bg-card overflow-hidden',
                         displayOldLines.length > 0 ? 'rounded-b-lg border-t-0' : 'rounded-lg'
                       )}
                     >
@@ -220,7 +221,6 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                                 className="flex font-mono text-sm leading-4 bg-success/10"
                               >
                                 <div className="sticky left-0 flex shrink-0 bg-success/10">
-                                  <div className="w-0.5 bg-success" />
                                   <div className="w-5 px-1 text-center text-success/70 select-none">
                                     +
                                   </div>
@@ -254,7 +254,12 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
               (oldLines.length > maxPreviewLines || newLines.length > maxPreviewLines) ? (
                 <div className="flex flex-row px-2.5">
                   <div className="w-5 flex justify-center shrink-0">
-                    <div className="w-px h-full bg-border/40" />
+                    <div
+                      className={cn(
+                        'w-px h-full',
+                        isFailed ? 'bg-destructive/40' : 'bg-warning/40'
+                      )}
+                    />
                   </div>
                   <div className="flex-1 ml-2.5">
                     <button

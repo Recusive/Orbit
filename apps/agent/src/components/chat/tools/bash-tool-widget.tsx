@@ -141,7 +141,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
             'transition-colors duration-150',
             isFailed
               ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
-              : 'bg-primary/8 group-hover/status:bg-primary/12'
+              : 'bg-primary/15 group-hover/status:bg-primary/25'
           )}
         >
           <Terminal
@@ -149,7 +149,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
               'h-3 w-3 transition-colors duration-150',
               isFailed
                 ? 'text-destructive/60 group-hover/status:text-destructive/80'
-                : 'text-primary/60 group-hover/status:text-primary/80',
+                : 'text-primary/80 group-hover/status:text-primary',
               isRunning && 'animate-pulse'
             )}
           />
@@ -161,7 +161,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
               'text-xs font-medium truncate',
               isFailed
                 ? 'text-muted-foreground line-through'
-                : 'text-muted-foreground/70 group-hover/status:text-foreground/90'
+                : 'text-muted-foreground/90 group-hover/status:text-foreground'
             )}
           >
             {statusLabel}
@@ -173,7 +173,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
 
         <ChevronDown
           className={cn(
-            'h-3 w-3 text-muted-foreground/40 transition-transform duration-200 ease-out shrink-0',
+            'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
             isExpanded && 'rotate-180'
           )}
         />
@@ -197,14 +197,16 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line aligned under header icon */}
                 <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-px h-full bg-border/40" />
+                  <div
+                    className={cn('w-px h-full', isFailed ? 'bg-destructive/40' : 'bg-primary/40')}
+                  />
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card/50 overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card overflow-hidden">
                   {/* Command section */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/50 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1.5">
                       command
                     </div>
                     {highlightedCommand ? (
@@ -224,7 +226,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                     <>
                       <div className="h-px bg-border/20 mx-3" />
                       <div className="px-3 py-2">
-                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground/50 uppercase mb-1">
+                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1">
                           description
                         </div>
                         <div className="text-sm text-muted-foreground/80">{description}</div>
@@ -235,7 +237,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                   {/* Output section */}
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/50 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1.5">
                       output
                     </div>
                     {isRunning && !output ? (
@@ -254,7 +256,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                           <pre className="whitespace-pre-wrap break-words m-0">{displayOutput}</pre>
                         )}
                         {hasMoreLines ? (
-                          <div className="mt-1.5 text-muted-foreground/50 text-xs">
+                          <div className="mt-1.5 text-muted-foreground/70 text-xs">
                             {String(outputLines.length)} lines total
                           </div>
                         ) : null}
@@ -269,7 +271,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
               {/* Bottom connector stub */}
               <div className="flex flex-row h-1 px-2.5">
                 <div className="w-5 flex justify-center">
-                  <div className="w-px h-full bg-border/20" />
+                  <div className="w-px h-full ${isFailed ? 'bg-destructive/40' : 'bg-primary/40'}/20" />
                 </div>
               </div>
             </div>

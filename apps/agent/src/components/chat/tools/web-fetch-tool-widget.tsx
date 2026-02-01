@@ -89,7 +89,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
               'text-xs font-medium truncate',
               isFailed
                 ? 'text-muted-foreground line-through'
-                : 'text-muted-foreground/70 group-hover/status:text-foreground/90'
+                : 'text-muted-foreground/90 group-hover/status:text-foreground'
             )}
           >
             {statusLabel}
@@ -101,7 +101,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
 
         <ChevronDown
           className={cn(
-            'h-3 w-3 text-muted-foreground/40 transition-transform duration-200 ease-out shrink-0',
+            'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
             isExpanded && 'rotate-180'
           )}
         />
@@ -121,14 +121,16 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-px h-full bg-border/40" />
+                  <div
+                    className={cn('w-px h-full', isFailed ? 'bg-destructive/40' : 'bg-info/40')}
+                  />
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card/50 overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card overflow-hidden">
                   {/* URL */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/50 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1.5">
                       url
                     </div>
                     <button
@@ -148,7 +150,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
                   {/* Prompt */}
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/50 uppercase mb-1">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1">
                       prompt
                     </div>
                     <div className="text-sm text-foreground/80 line-clamp-2">{prompt}</div>

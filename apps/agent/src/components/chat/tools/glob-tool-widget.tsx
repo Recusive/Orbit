@@ -78,7 +78,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
             'transition-colors duration-150',
             isFailed
               ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
-              : 'bg-primary/8 group-hover/status:bg-primary/12'
+              : 'bg-primary/15 group-hover/status:bg-primary/25'
           )}
         >
           <Search
@@ -86,7 +86,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
               'h-3 w-3 transition-colors duration-150',
               isFailed
                 ? 'text-destructive/60 group-hover/status:text-destructive/80'
-                : 'text-primary/60 group-hover/status:text-primary/80',
+                : 'text-primary/80 group-hover/status:text-primary',
               isRunning && 'animate-pulse'
             )}
           />
@@ -98,13 +98,13 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
               'text-xs font-medium truncate',
               isFailed
                 ? 'text-muted-foreground line-through'
-                : 'text-muted-foreground/70 group-hover/status:text-foreground/90'
+                : 'text-muted-foreground/90 group-hover/status:text-foreground'
             )}
           >
             {statusLabel}
           </span>
           {!isRunning && !isFailed && fileCount > 0 ? (
-            <span className="text-xs text-muted-foreground/50">
+            <span className="text-xs text-muted-foreground/70">
               ({fileCount} {fileCount === 1 ? 'file' : 'files'})
             </span>
           ) : null}
@@ -115,7 +115,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
 
         <ChevronDown
           className={cn(
-            'h-3 w-3 text-muted-foreground/40 transition-transform duration-200 ease-out shrink-0',
+            'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
             isExpanded && 'rotate-180'
           )}
         />
@@ -135,14 +135,16 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-px h-full bg-border/40" />
+                  <div
+                    className={cn('w-px h-full', isFailed ? 'bg-destructive/40' : 'bg-primary/40')}
+                  />
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card/50 overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card overflow-hidden">
                   {/* Pattern & Path */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/50 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1.5">
                       pattern
                     </div>
                     <code className="block bg-muted/40 rounded-md px-2 py-1 font-mono text-sm text-foreground">
@@ -150,7 +152,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                     </code>
                     {path ? (
                       <>
-                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground/50 uppercase mb-1 mt-2">
+                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1 mt-2">
                           in
                         </div>
                         <span className="text-sm text-muted-foreground/80 font-mono">{path}</span>

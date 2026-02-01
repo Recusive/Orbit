@@ -113,7 +113,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-muted-foreground/50'
+              isFailed ? 'text-destructive/60' : 'text-muted-foreground/70'
             )}
           >
             {isFailed ? '(failed)' : '(new)'}
@@ -127,7 +127,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
           {!isRunning && !isFailed ? <DiffStat additions={lineCount} deletions={0} /> : null}
           <ChevronDown
             className={cn(
-              'h-3 w-3 text-muted-foreground/40 transition-transform duration-200 ease-out shrink-0',
+              'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
               isExpanded && 'rotate-180'
             )}
           />
@@ -148,11 +148,13 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-px h-full bg-border/40" />
+                  <div
+                    className={cn('w-px h-full', isFailed ? 'bg-destructive/40' : 'bg-success/40')}
+                  />
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-success/40 bg-card/50 overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-success/40 bg-card overflow-hidden">
                   <div
                     className={cn('overflow-auto bg-success/5', !showAllLines && 'max-h-[300px]')}
                   >
@@ -167,8 +169,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                           <div key={index} className="flex font-mono text-sm leading-4">
                             {/* Sticky gutter + line number */}
                             <div className="sticky left-0 flex shrink-0 bg-success/5">
-                              <div className="w-0.5 bg-success" />
-                              <div className="w-8 px-1.5 text-right text-muted-foreground/50 select-none bg-success/10">
+                              <div className="w-8 px-1.5 text-right text-muted-foreground/70 select-none bg-success/10">
                                 {index + 1}
                               </div>
                             </div>
@@ -199,7 +200,12 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
               {(hasMore || showAllLines) && lines.length > maxPreviewLines ? (
                 <div className="flex flex-row px-2.5">
                   <div className="w-5 flex justify-center shrink-0">
-                    <div className="w-px h-full bg-border/40" />
+                    <div
+                      className={cn(
+                        'w-px h-full',
+                        isFailed ? 'bg-destructive/40' : 'bg-success/40'
+                      )}
+                    />
                   </div>
                   <div className="flex-1 ml-2.5">
                     <button

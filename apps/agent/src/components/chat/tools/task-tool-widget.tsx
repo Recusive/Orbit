@@ -107,7 +107,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
             'transition-colors duration-150',
             isFailed
               ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
-              : 'bg-primary/8 group-hover/status:bg-primary/12'
+              : 'bg-primary/15 group-hover/status:bg-primary/25'
           )}
         >
           <Bot
@@ -115,7 +115,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
               'h-3 w-3 transition-colors duration-150',
               isFailed
                 ? 'text-destructive/60 group-hover/status:text-destructive/80'
-                : 'text-primary/60 group-hover/status:text-primary/80',
+                : 'text-primary/80 group-hover/status:text-primary',
               isRunning && 'animate-pulse'
             )}
           />
@@ -127,12 +127,12 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
               'text-xs font-medium truncate',
               isFailed
                 ? 'text-muted-foreground line-through'
-                : 'text-muted-foreground/70 group-hover/status:text-foreground/90'
+                : 'text-muted-foreground/90 group-hover/status:text-foreground'
             )}
           >
             {statusLabel}
           </span>
-          <span className="text-xs text-muted-foreground/50 truncate">{description}</span>
+          <span className="text-xs text-muted-foreground/70 truncate">{description}</span>
           {isRunning ? (
             <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
           ) : null}
@@ -140,7 +140,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
 
         <ChevronDown
           className={cn(
-            'h-3 w-3 text-muted-foreground/40 transition-transform duration-200 ease-out shrink-0',
+            'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
             isExpanded && 'rotate-180'
           )}
         />
@@ -160,25 +160,27 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-px h-full bg-border/40" />
+                  <div
+                    className={cn('w-px h-full', isFailed ? 'bg-destructive/40' : 'bg-primary/40')}
+                  />
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card/50 overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card overflow-hidden">
                   {/* Task details */}
                   <div className="px-3 py-2">
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <div className="text-[9px] font-medium tracking-wide text-muted-foreground/50 uppercase">
+                      <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase">
                         agent
                       </div>
                       <span className="px-1 py-0.5 rounded bg-muted/50 text-sm font-medium text-foreground">
                         {formattedType}
                       </span>
                       {model ? (
-                        <span className="text-sm text-muted-foreground/50">({model})</span>
+                        <span className="text-sm text-muted-foreground/70">({model})</span>
                       ) : null}
                     </div>
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/50 uppercase mb-1">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1">
                       prompt
                     </div>
                     <div className="text-sm text-foreground/80 line-clamp-3" title={prompt}>
