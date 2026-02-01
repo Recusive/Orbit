@@ -244,7 +244,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                               {/* Vertical connecting line */}
                               {index < results.length - 1 ? (
                                 <div
-                                  className="absolute left-[8px] top-[18px] w-px bg-border/50"
+                                  className="absolute left-[8px] top-[18px] w-[2px] rounded-full bg-border/50"
                                   style={{ height: 'calc(100% + 4px)' }}
                                 />
                               ) : null}
