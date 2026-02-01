@@ -65,7 +65,10 @@ export const TerminalContextMenu: FC<TerminalContextMenuProps> = ({
           <Pencil />
           Rename
         </ContextMenuItem>
-        <ContextMenuItem onSelect={onKill} className="text-destructive focus:text-destructive">
+        <ContextMenuItem
+          onSelect={onKill}
+          className="text-destructive focus:text-destructive focus:bg-destructive/10"
+        >
           <Trash2 />
           Kill Terminal
         </ContextMenuItem>

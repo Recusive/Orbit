@@ -44,7 +44,7 @@ const SectionHeader: FC<SectionHeaderProps> = ({ title, children }) => (
   <div className="mb-5">
     <h3 className="text-base font-semibold mb-1.5">{title}</h3>
     {children !== undefined && (
-      <p className="text-sm text-muted-foreground/70 leading-relaxed">{children}</p>
+      <p className="text-sm text-muted-foreground/90 leading-relaxed">{children}</p>
     )}
   </div>
 );
@@ -65,7 +65,7 @@ const AgentCard: FC<AgentCardProps> = ({ agent, onEdit, onDelete }) => (
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-medium text-base truncate">{agent.name}</div>
-          <div className="text-sm text-muted-foreground/70 line-clamp-2 mt-1 wrap-break-word">
+          <div className="text-sm text-muted-foreground/90 line-clamp-2 mt-1 wrap-break-word">
             {agent.description || 'No description'}
           </div>
           {agent.tools !== undefined && agent.tools.length > 0 && (
@@ -73,13 +73,13 @@ const AgentCard: FC<AgentCardProps> = ({ agent, onEdit, onDelete }) => (
               {agent.tools.slice(0, 4).map((tool) => (
                 <span
                   key={tool}
-                  className="text-xs px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/70"
+                  className="text-xs px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/90"
                 >
                   {tool}
                 </span>
               ))}
               {agent.tools.length > 4 && (
-                <span className="text-xs px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/70">
+                <span className="text-xs px-1.5 py-0.5 rounded-md bg-muted/50 text-muted-foreground/90">
                   +{agent.tools.length - 4} more
                 </span>
               )}
@@ -250,7 +250,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
               <div className="space-y-5 px-px">
                 {/* Name */}
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
+                  <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
                     Name <span className="text-red-500/70">*</span>
                   </label>
                   <Input
@@ -261,14 +261,14 @@ const AgentEditor: FC<AgentEditorProps> = ({
                     placeholder="code-reviewer"
                     className="mt-1 h-8 text-sm"
                   />
-                  <p className="text-xs text-muted-foreground/50 mt-1.5 leading-relaxed">
+                  <p className="text-xs text-muted-foreground/90 mt-1.5 leading-relaxed">
                     Used as the filename and identifier. Use lowercase with dashes.
                   </p>
                 </div>
 
                 {/* Description */}
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
+                  <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
                     Description
                   </label>
                   <Input
@@ -279,7 +279,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
                     placeholder="Expert code review specialist for quality and security"
                     className="mt-1 h-8 text-sm"
                   />
-                  <p className="text-xs text-muted-foreground/50 mt-1.5 leading-relaxed">
+                  <p className="text-xs text-muted-foreground/90 mt-1.5 leading-relaxed">
                     Describes when this agent should be used. Claude uses this to decide when to
                     invoke it.
                   </p>
@@ -287,7 +287,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
 
                 {/* Prompt */}
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
+                  <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
                     System Prompt <span className="text-red-500/70">*</span>
                   </label>
                   <Textarea
@@ -298,14 +298,14 @@ const AgentEditor: FC<AgentEditorProps> = ({
                     placeholder="You are a code review specialist with expertise in security, performance, and best practices..."
                     className="mt-1 text-sm min-h-[120px]"
                   />
-                  <p className="text-xs text-muted-foreground/50 mt-1.5 leading-relaxed">
+                  <p className="text-xs text-muted-foreground/90 mt-1.5 leading-relaxed">
                     Instructions that define the agent&apos;s behavior and expertise.
                   </p>
                 </div>
 
                 {/* Model */}
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
+                  <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
                     Model
                   </label>
                   <Select
@@ -328,10 +328,10 @@ const AgentEditor: FC<AgentEditorProps> = ({
 
                 {/* Tools */}
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
+                  <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
                     Allowed Tools
                   </label>
-                  <p className="text-xs text-muted-foreground/50 mb-2 mt-1">
+                  <p className="text-xs text-muted-foreground/90 mb-2 mt-1">
                     Select which tools this agent can use. Leave empty to inherit all tools.
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -605,7 +605,7 @@ export const SubagentsSettings: FC = () => {
 
         {/* Agent list */}
         {agents.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground/70 text-base">
+          <div className="text-center py-8 text-muted-foreground/90 text-base">
             <Bot className="h-8 w-8 mx-auto mb-2 opacity-40" />
             <p>No subagents defined yet.</p>
             <p className="text-sm mt-1">Create a subagent to extend Claude&apos;s capabilities.</p>
@@ -629,7 +629,7 @@ export const SubagentsSettings: FC = () => {
       </div>
 
       {/* Info section */}
-      <div className="mt-6 p-3.5 rounded-lg bg-muted/30 border border-border/30 text-sm text-muted-foreground/70">
+      <div className="mt-6 p-3.5 rounded-lg bg-muted/30 border border-border/30 text-sm text-muted-foreground/90">
         <p className="font-medium mb-1.5 text-foreground/80">How Subagents Work</p>
         <ul className="list-disc list-inside space-y-0.5">
           <li>

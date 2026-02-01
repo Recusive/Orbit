@@ -3,6 +3,7 @@
 import { Allotment } from 'allotment';
 import { forwardRef } from 'react';
 import 'allotment/dist/style.css';
+import '@/styles/allotment-overrides.css';
 
 import type { AllotmentHandle, AllotmentProps } from 'allotment';
 import type { ReactNode } from 'react';

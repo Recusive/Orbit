@@ -116,7 +116,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
             {/* Animated overlay/backdrop - clicks close the dialog */}
             <DialogPrimitive.Overlay asChild forceMount>
               <motion.div
-                className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+                className="fixed inset-0 z-50 bg-black/40"
                 initial={overlayVariants.hidden}
                 animate={overlayVariants.visible}
                 exit={shouldReduceMotion ? { opacity: 0 } : overlayVariants.exit}
@@ -141,12 +141,12 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                 }}
               >
                 <motion.div
-                  className="w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-card border-[3px] border-border/40 rounded-xl overflow-hidden flex flex-col"
+                  className="w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-card border-[3px] border-border rounded-xl overflow-hidden flex flex-col"
                   onClick={(e) => {
                     e.stopPropagation();
                   }}
                   style={{
-                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                    boxShadow: 'none',
                   }}
                   initial={shouldReduceMotion ? { opacity: 0 } : contentVariants.hidden}
                   animate={shouldReduceMotion ? { opacity: 1 } : contentVariants.visible}

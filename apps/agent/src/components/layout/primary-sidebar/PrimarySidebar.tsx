@@ -125,7 +125,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   return (
     <aside
       data-sidebar="primary"
-      className="h-full flex flex-col bg-card overflow-hidden border-r border-divider"
+      className="h-full flex flex-col bg-card overflow-hidden border-r-[3px] border-border/50"
       style={{
         width,
         transition: SIDEBAR_WIDTH_TRANSITION,
@@ -230,8 +230,8 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {/* Tab Navigation - hidden when collapsed */}
       <div
         className={cn(
-          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-opacity duration-150 ease-out',
-          isCollapsed ? '' : 'border-b border-divider'
+          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-visible transition-opacity duration-150 ease-out',
+          isCollapsed ? '' : 'border-b-[3px] border-border/50'
         )}
         style={{
           height: isCollapsed ? 0 : SIDEBAR.tabNavHeight,
@@ -258,7 +258,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {activeTab === 'conversations' ? (
         <div
           className={cn(
-            'flex flex-col border-b border-divider shrink-0',
+            'flex flex-col border-b-[3px] border-border/50 shrink-0',
             isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
           )}
         >
@@ -343,7 +343,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         )}
       </div>
 
-      <hr className="border-divider shrink-0 mt-2 mb-0" />
+      <hr className="border-border/50 border-t-[3px] shrink-0 mt-2 mb-0" />
 
       {/* Utilities — pinned to bottom, spacing stays constant so buttons don't shift on collapse */}
       <div className="flex flex-col shrink-0 gap-1 py-1.5">

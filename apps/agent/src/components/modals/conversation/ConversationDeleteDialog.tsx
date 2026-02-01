@@ -52,13 +52,14 @@ export const ConversationDeleteDialog: FC<ConversationDeleteDialogProps> = ({
         <DialogFooter className="gap-2 sm:gap-0">
           <Button
             variant="outline"
+            className="text-base"
             onClick={() => {
               onOpenChange(false);
             }}
           >
             Cancel
           </Button>
-          <Button variant="destructive" onClick={handleConfirm}>
+          <Button variant="destructive" className="text-base" onClick={handleConfirm}>
             Delete
           </Button>
         </DialogFooter>

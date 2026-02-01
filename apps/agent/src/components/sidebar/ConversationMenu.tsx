@@ -76,7 +76,10 @@ const ContextMenuItems: FC<MenuItemsProps> = ({ onRename, onDelete, onDuplicate,
         Duplicate
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
+      <ContextMenuItem
+        onClick={handleDelete}
+        className="text-destructive focus:text-destructive focus:bg-destructive/10"
+      >
         <Trash2 className="h-4 w-4" />
         Delete
         <ContextMenuShortcut>⌘⌫</ContextMenuShortcut>
@@ -116,7 +119,10 @@ const DropdownMenuItems: FC<MenuItemsProps> = ({ onRename, onDelete, onDuplicate
         Duplicate
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
+      <DropdownMenuItem
+        onClick={handleDelete}
+        className="text-destructive focus:text-destructive focus:bg-destructive/10"
+      >
         <Trash2 className="h-4 w-4" />
         Delete
         <DropdownMenuShortcut>⌘⌫</DropdownMenuShortcut>

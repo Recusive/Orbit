@@ -16,7 +16,7 @@ export const ChatHeader: FC = () => {
 
   return (
     <header
-      className="flex items-center justify-between px-4 border-b border-border shrink-0"
+      className="flex items-center justify-between px-4 border-b-[3px] border-border/50 shrink-0"
       style={{ height: HEIGHTS.headerBar }}
     >
       {/* Breadcrumb */}

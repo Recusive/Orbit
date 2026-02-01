@@ -173,7 +173,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
             <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
+              className="text-destructive focus:text-destructive focus:bg-destructive/10"
               onSelect={handleRemove}
             >
               <Trash2 className="h-4 w-4 mr-2" />

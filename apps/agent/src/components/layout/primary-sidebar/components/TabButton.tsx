@@ -24,7 +24,10 @@ export const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
         )}
       />
       {/* Active indicator */}
-      {active ? <div className="absolute bottom-0 inset-x-0 h-0.5 bg-primary/90" /> : null}
+      {/* Active indicator - offset to sit on parent's bottom border */}
+      {active ? (
+        <div className="absolute inset-x-0 h-[3px] bg-primary/90" style={{ bottom: -3 }} />
+      ) : null}
       <span className="relative text-base font-medium truncate">{label}</span>
     </button>
   );

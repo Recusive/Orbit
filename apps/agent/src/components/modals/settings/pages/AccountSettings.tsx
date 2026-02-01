@@ -19,7 +19,7 @@ export const AccountSettings: FC = () => {
           </div>
           <div>
             <div className="font-medium text-base">Guest User</div>
-            <div className="text-sm text-muted-foreground/60">Not signed in</div>
+            <div className="text-sm text-muted-foreground/80">Not signed in</div>
           </div>
         </div>
         <Button variant="outline" className="w-full mt-4" size="sm">
@@ -33,11 +33,11 @@ export const AccountSettings: FC = () => {
 
       <div className="space-y-3">
         <div>
-          <label className="text-sm font-medium text-muted-foreground/70">Anthropic API Key</label>
+          <label className="text-sm font-medium text-muted-foreground/90">Anthropic API Key</label>
           <Input type="password" placeholder="sk-ant-..." className="mt-1.5 h-8 text-sm" />
         </div>
         <div>
-          <label className="text-sm font-medium text-muted-foreground/70">OpenAI API Key</label>
+          <label className="text-sm font-medium text-muted-foreground/90">OpenAI API Key</label>
           <Input type="password" placeholder="sk-..." className="mt-1.5 h-8 text-sm" />
         </div>
       </div>

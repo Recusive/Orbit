@@ -461,14 +461,17 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
       ref={panelRef}
       className={cn(
         panelBackground,
-        'relative z-10 flex flex-col min-h-[35px]',
-        isFullWidth ? 'border-l border-border' : 'border-l border-border/50',
+        'relative flex flex-col min-h-[35px]',
         collapsed ? 'shrink-0' : 'h-full'
       )}
       style={collapsed ? { height: TERMINAL_HEADER_HEIGHT } : undefined}
     >
       <header
-        className="relative z-10 flex items-center justify-between px-2 shrink-0 border-t border-b border-divider bg-sidebar"
+        className={cn(
+          'relative z-10 flex items-center justify-between px-2 shrink-0 border-t-[3px] border-b-[3px] border-border/50 bg-card',
+          collapsed && 'border-b-0',
+          !isFullWidth && 'border-l-[3px]'
+        )}
         style={{ height: TERMINAL_HEADER_HEIGHT }}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0 h-full">

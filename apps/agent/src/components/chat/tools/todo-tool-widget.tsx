@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, Circle, ListTodo, Loader2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Circle, ListTodo, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -121,7 +121,9 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
   const inProgressCount = todos.filter((t) => t.status === 'in_progress').length;
   const totalCount = todos.length;
 
-  const statusLabel = isRunning ? 'Updating tasks' : isFailed ? 'Task update failed' : 'Task list';
+  const allCompleted = totalCount > 0 && completedCount === totalCount;
+
+  const statusLabel = isRunning ? 'Updating tasks' : 'Todo';
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -214,7 +216,21 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                 {/* Gutter: vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
                   <div
-                    className={cn('w-px h-full', isFailed ? 'bg-destructive/40' : 'bg-primary/40')}
+                    className={cn(
+                      'w-[2px] rounded-full h-full',
+                      success === undefined && 'bg-primary/40'
+                    )}
+                    style={
+                      success !== undefined
+                        ? {
+                            background: isFailed
+                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)'
+                              : allCompleted
+                                ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
+                                : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #eab308 50%, transparent) 100%)',
+                          }
+                        : undefined
+                    }
                   />
                 </div>
 
@@ -275,12 +291,29 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                 </div>
               </div>
 
-              {/* Bottom connector stub */}
-              <div className="flex flex-row h-1 px-2.5">
-                <div className="w-5 flex justify-center">
-                  <div className="w-px h-full bg-border/20" />
+              {/* Bottom status indicator */}
+              {isFailed ? (
+                <div className="flex flex-row items-center px-2.5 py-1">
+                  <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-red-500/15">
+                    <XCircle className="h-3 w-3 text-red-500/80" />
+                  </div>
+                  <span className="ml-2.5 text-xs text-muted-foreground/90">Failed</span>
                 </div>
-              </div>
+              ) : allCompleted && !isRunning ? (
+                <div className="flex flex-row items-center px-2.5 py-1">
+                  <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-green-500/15">
+                    <CheckCircle2 className="h-3 w-3 text-green-500/80" />
+                  </div>
+                  <span className="ml-2.5 text-xs text-muted-foreground/90">Completed</span>
+                </div>
+              ) : (
+                <div className="flex flex-row items-center px-2.5 py-1">
+                  <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-yellow-500/15">
+                    <Circle className="h-3 w-3 text-yellow-500/80" />
+                  </div>
+                  <span className="ml-2.5 text-xs text-muted-foreground/90">Running</span>
+                </div>
+              )}
             </div>
           </motion.div>
         ) : null}

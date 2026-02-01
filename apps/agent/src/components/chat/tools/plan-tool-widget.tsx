@@ -139,7 +139,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-px h-full bg-mode-plan/30" />
+                  <div className="w-[2px] rounded-full h-full bg-mode-plan/30" />
                 </div>
 
                 {/* Content box */}
@@ -169,7 +169,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
               {/* Bottom connector stub */}
               <div className="flex flex-row h-1 px-2.5">
                 <div className="w-5 flex justify-center">
-                  <div className="w-px h-full bg-mode-plan/15" />
+                  <div className="w-[2px] rounded-full h-full bg-mode-plan/15" />
                 </div>
               </div>
             </div>

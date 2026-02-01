@@ -1,4 +1,4 @@
-import { Bot, ChevronDown, Loader2 } from 'lucide-react';
+import { Bot, CheckCircle2, ChevronDown, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import remarkGfm from 'remark-gfm';
@@ -85,7 +85,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
   }, [isRunning]);
 
   const formattedType = formatSubagentType(subagentType);
-  const statusLabel = isRunning ? 'Running Task' : isFailed ? 'Task Failed' : 'Completed Task';
+  const statusLabel = isRunning ? 'Running Task' : 'Task';
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -161,7 +161,19 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                 {/* Gutter: vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
                   <div
-                    className={cn('w-px h-full', isFailed ? 'bg-destructive/40' : 'bg-primary/40')}
+                    className={cn(
+                      'w-[2px] rounded-full h-full',
+                      success === undefined && 'bg-primary/40'
+                    )}
+                    style={
+                      success !== undefined
+                        ? {
+                            background: success
+                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
+                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
+                          }
+                        : undefined
+                    }
                   />
                 </div>
 
@@ -209,12 +221,32 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                 </div>
               </div>
 
-              {/* Bottom connector stub */}
-              <div className="flex flex-row h-1 px-2.5">
-                <div className="w-5 flex justify-center">
-                  <div className="w-px h-full bg-border/20" />
+              {/* Bottom status indicator */}
+              {!isRunning && success !== undefined ? (
+                <div className="flex flex-row items-center px-2.5 py-1">
+                  <div
+                    className={cn(
+                      'w-5 h-5 rounded flex items-center justify-center shrink-0',
+                      isFailed ? 'bg-red-500/15' : 'bg-green-500/15'
+                    )}
+                  >
+                    {isFailed ? (
+                      <XCircle className="h-3 w-3 text-red-500/80" />
+                    ) : (
+                      <CheckCircle2 className="h-3 w-3 text-green-500/80" />
+                    )}
+                  </div>
+                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                    {isFailed ? 'Failed' : 'Completed'}
+                  </span>
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-row h-1 px-2.5">
+                  <div className="w-5 flex justify-center">
+                    <div className="w-[2px] rounded-full h-full bg-border/20" />
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         ) : null}
