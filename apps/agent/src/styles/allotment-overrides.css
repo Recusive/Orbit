@@ -12,11 +12,12 @@
    --separator-border: uses --border-panel token (stays in sync with theme).
    --focus-border: uses --primary (coral) instead of allotment's default blue (#007fd4). */
 :root {
-  --separator-border: var(--border-panel) !important;
+  --separator-border: color-mix(in oklch, var(--border) 50%, transparent) !important;
   --focus-border: oklch(0.62 0.18 35) !important; /* Coral - midpoint for light mode visibility */
 }
 
 html.dark {
+  --separator-border: color-mix(in oklch, var(--border) 50%, transparent) !important;
   --focus-border: var(--primary) !important;
 }
 

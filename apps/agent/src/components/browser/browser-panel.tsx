@@ -21,8 +21,8 @@ import {
 import { useActivityTab } from '@/stores/ui/ui-store';
 import { generateUUID } from '@/types/protocol';
 
-// Inset to prevent webview from overlapping panel borders
-const WEBVIEW_BORDER_INSET = 1;
+// Inset to prevent webview from overlapping panel drag handles (3px separator)
+const WEBVIEW_BORDER_INSET = 3;
 
 export const BrowserPanel: FC = () => {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -93,7 +93,7 @@ export const BrowserPanel: FC = () => {
       x: Math.round(rect.x) + WEBVIEW_BORDER_INSET,
       y: Math.round(rect.y),
       width: Math.round(rect.width) - WEBVIEW_BORDER_INSET,
-      height: Math.round(rect.height),
+      height: Math.round(rect.height) - WEBVIEW_BORDER_INSET,
       url: initialUrl,
     };
 
@@ -216,7 +216,7 @@ export const BrowserPanel: FC = () => {
           x: Math.round(rect.x) + WEBVIEW_BORDER_INSET,
           y: Math.round(rect.y),
           width: Math.round(rect.width) - WEBVIEW_BORDER_INSET,
-          height: Math.round(rect.height),
+          height: Math.round(rect.height) - WEBVIEW_BORDER_INSET,
         };
 
         // Only send if bounds actually changed
@@ -319,7 +319,7 @@ export const BrowserPanel: FC = () => {
   }, [postMessage]);
 
   return (
-    <div className="h-full w-full flex flex-col bg-background">
+    <div className="h-full w-full flex flex-col bg-card">
       {/* Toolbar */}
       <BrowserToolbar
         onBack={handleBack}

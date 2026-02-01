@@ -108,7 +108,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
 
   return (
     <div
-      className="flex items-center gap-1 px-2 border-b border-border bg-background shrink-0"
+      className="flex items-center gap-1 px-2 border-b-3 border-border/50 bg-chat-area shrink-0"
       style={{ height: 35 }}
     >
       {/* Navigation buttons - enabled when canGoBack/canGoForward is null (unknown) or true */}

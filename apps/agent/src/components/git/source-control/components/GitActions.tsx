@@ -37,9 +37,9 @@ export const GitActions: React.FC<GitActionsProps> = ({
         aria-label={isCommitting ? 'Committing changes...' : 'Commit staged changes'}
         className="
           flex-1 flex items-center justify-center gap-2
-          px-3 py-1.5 rounded-lg text-sm font-medium
-          bg-primary/90 text-primary-foreground shadow-sm
-          hover:bg-primary hover:shadow
+          px-3 py-1.5 rounded-md text-sm font-medium
+          bg-primary/15 text-primary shadow-sm
+          hover:bg-primary/25 hover:shadow
           active:scale-[0.98] transition-[background-color,box-shadow,transform] duration-200
           disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none
         "
@@ -59,7 +59,7 @@ export const GitActions: React.FC<GitActionsProps> = ({
         aria-label={isPulling ? 'Pulling changes...' : 'Pull from remote'}
         className="
           px-3 py-1.5 rounded-lg
-          border border-border/50 hover:bg-muted/50 hover:border-border/70
+          border-3 border-border/50 hover:bg-muted/50 hover:border-border/70
           text-sm
           active:scale-[0.98] transition-[background-color,border-color,transform] duration-150
           disabled:opacity-40 disabled:cursor-not-allowed
@@ -80,7 +80,7 @@ export const GitActions: React.FC<GitActionsProps> = ({
         aria-label={isPushing ? 'Pushing changes...' : 'Push to remote'}
         className="
           px-3 py-1.5 rounded-lg
-          border border-border/50 hover:bg-muted/50 hover:border-border/70
+          border-3 border-border/50 hover:bg-muted/50 hover:border-border/70
           text-sm
           active:scale-[0.98] transition-[background-color,border-color,transform] duration-150
           disabled:opacity-40 disabled:cursor-not-allowed

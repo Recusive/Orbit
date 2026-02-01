@@ -171,7 +171,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                         <span>{getSectionTitle()}</span>
                       </span>
                     </div>
-                    <DialogPrimitive.Close className="rounded-md p-1 opacity-60 hover:opacity-100 hover:bg-muted/50 active:scale-95 transition-[opacity,background-color,transform] duration-150">
+                    <DialogPrimitive.Close className="rounded-md p-1 opacity-60 hover:opacity-100 hover:bg-muted active:scale-95 transition-[opacity,background-color,transform] duration-150">
                       <X className="h-4 w-4" />
                       <span className="sr-only">Close</span>
                     </DialogPrimitive.Close>
