@@ -139,10 +139,13 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
           break;
 
         case 'Enter':
-          if (itemCount > 0 && results[selectedIndex]) {
-            e.preventDefault();
-            e.stopPropagation();
-            handleSelect(results[selectedIndex]);
+          {
+            const selected = results[selectedIndex];
+            if (itemCount > 0 && selected !== undefined) {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSelect(selected);
+            }
           }
           break;
 
