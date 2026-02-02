@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import { Clock, Key, Loader2, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Clock, Info, Key, Loader2, RefreshCw, ShieldCheck, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SiClaude } from 'react-icons/si';
 
 import { SectionDivider, SectionHeader } from '../components';
@@ -114,6 +114,8 @@ export const AccountSettings: FC = () => {
   const [isChecking, setIsChecking] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastChecked, setLastChecked] = useState<number | null>(null);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // API key management
   const [storedApiKey, setStoredApiKey] = useState<string | null>(null);
@@ -162,7 +164,17 @@ export const AccountSettings: FC = () => {
   // ── Refresh token handler ────────────────────────────────────────────
   const handleRefreshToken = useCallback(async (): Promise<void> => {
     setIsRefreshing(true);
+    setRefreshMessage(null);
+
+    // Clear any pending dismiss timer
+    if (refreshTimerRef.current !== null) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+
     try {
+      const oldExpiresAt = keychainStatus?.expiresAt ?? null;
+
       const authResult = await invoke<AuthTriggerResult>('trigger_claude_auth');
 
       if (!authResult.success) {
@@ -175,6 +187,23 @@ export const AccountSettings: FC = () => {
       const status = await invoke<KeychainStatus>('check_claude_keychain');
       setKeychainStatus(status);
       setLastChecked(Date.now());
+
+      // Compare old and new expiry to give user feedback
+      if (status.hasCredentials && status.expiresAt !== null) {
+        if (oldExpiresAt === status.expiresAt) {
+          setRefreshMessage(
+            `Token still valid · ${formatTimeUntilExpiry(status.expiresAt)} remaining`
+          );
+        } else {
+          setRefreshMessage('Token refreshed');
+        }
+      }
+
+      // Auto-dismiss after 4 seconds
+      refreshTimerRef.current = setTimeout(() => {
+        setRefreshMessage(null);
+        refreshTimerRef.current = null;
+      }, 4000);
     } catch {
       setKeychainStatus((prev) =>
         prev !== null ? { ...prev, error: 'Failed to refresh token' } : prev
@@ -182,7 +211,7 @@ export const AccountSettings: FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [keychainStatus?.expiresAt]);
 
   // ── Save API key handler ─────────────────────────────────────────────
   const handleSaveKey = useCallback(async (): Promise<void> => {
@@ -238,6 +267,16 @@ export const AccountSettings: FC = () => {
     } finally {
       setIsRemovingKey(false);
     }
+  }, []);
+
+  // ── Cleanup refresh timer on unmount ─────────────────────────────────
+  useEffect(() => {
+    const timerRef = refreshTimerRef;
+    return (): void => {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+      }
+    };
   }, []);
 
   // ── Derived display values ───────────────────────────────────────────
@@ -447,6 +486,32 @@ export const AccountSettings: FC = () => {
           </p>
         </form>
       )}
+
+      {/* Refresh feedback bar */}
+      {refreshMessage !== null ? (
+        <div className="mt-6 flex w-full items-center justify-between rounded-lg border border-border/40 bg-muted/20">
+          <div className="flex flex-1 items-center gap-3 py-2.5 pl-3.5">
+            <Info className="h-4 w-4 shrink-0 text-primary" />
+            <span className="text-sm font-medium">{refreshMessage}</span>
+          </div>
+          <div className="flex items-center border-l border-border/40">
+            <button
+              type="button"
+              className="flex items-center justify-center rounded-md p-2.5 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Dismiss"
+              onClick={() => {
+                setRefreshMessage(null);
+                if (refreshTimerRef.current !== null) {
+                  clearTimeout(refreshTimerRef.current);
+                  refreshTimerRef.current = null;
+                }
+              }}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
