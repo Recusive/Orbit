@@ -7,7 +7,7 @@
  */
 import { IconCirclePlus } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconCirclePlus';
 import { IconSearchlinesSparkle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSearchlinesSparkle';
-import { FlaskConical, Inbox, Search, Settings2 } from 'lucide-react';
+import { FlaskConical, FolderOpen, Search, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
@@ -271,8 +271,8 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
             onClick={handleStartConversation}
           />
           <SidebarItem
-            icon={Inbox}
-            label="Inbox"
+            icon={FolderOpen}
+            label="Projects"
             collapsed={isCollapsed}
             equalSpacing={isCollapsed}
           />

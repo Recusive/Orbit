@@ -89,10 +89,10 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
   // Check if we're on an async section (subagents or commands)
   const isAsyncSection = activeSection === 'subagents' || activeSection === 'commands';
 
-  const getSectionTitle = (): string => {
-    if (activeSection === 'feedback') return FEEDBACK_ITEM.label;
+  const getActiveItem = (): { label: string; icon: ReactNode } => {
+    if (activeSection === 'feedback') return FEEDBACK_ITEM;
     const item = NAV_ITEMS.find((n) => n.id === activeSection);
-    return item?.label ?? 'Settings';
+    return item ?? { label: 'Settings', icon: null };
   };
 
   // Render static content via lazy-loaded components
@@ -159,17 +159,16 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                 >
                   {/* Accessibility: Hidden title for screen readers */}
                   <DialogPrimitive.Title className="sr-only">
-                    Settings &gt; {getSectionTitle()}
+                    Settings &gt; {getActiveItem().label}
                   </DialogPrimitive.Title>
                   {/* Title bar */}
                   <div className="flex items-center justify-between px-4 py-2.5 border-b-3 border-border/40 bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <Settings2 className="h-4 w-4 text-muted-foreground/70" />
-                      <span className="font-medium text-base">
-                        <span className="text-muted-foreground/70">Settings</span>
-                        <ChevronRight className="inline h-3.5 w-3.5 text-muted-foreground/40 mx-1" />
-                        <span>{getSectionTitle()}</span>
-                      </span>
+                    <div className="flex items-center gap-2 font-medium text-base">
+                      <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+                      <span className="text-muted-foreground/70">Settings</span>
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
+                      <span>{getActiveItem().icon}</span>
+                      <span>{getActiveItem().label}</span>
                     </div>
                     <DialogPrimitive.Close className="rounded-md p-1 opacity-60 hover:opacity-100 hover:bg-muted active:scale-95 transition-[opacity,background-color,transform] duration-150">
                       <X className="h-4 w-4" />
