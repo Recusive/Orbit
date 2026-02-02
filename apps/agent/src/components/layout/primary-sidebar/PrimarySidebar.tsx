@@ -27,6 +27,7 @@ import {
   CreateWorktreeDialog,
   DeleteWorktreeDialog,
 } from '@/components/modals';
+import { ScrambleAsciiPre } from '@/components/shared';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
@@ -163,13 +164,15 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           /* Expanded: text on left, button on right */
           <div className="flex items-center justify-between w-full px-3">
             <div className="flex items-center gap-1.5">
-              <span className="text-lg font-semibold whitespace-nowrap">Orbit Agent</span>
-              <span
-                className="bg-primary/8 text-primary/70 rounded-full px-1.5 py-0.5 font-medium tracking-wide whitespace-nowrap"
-                style={{ fontSize: SIDEBAR.previewBadgeFontSize }}
-              >
-                Preview
-              </span>
+              <ScrambleAsciiPre
+                ariaLabel="Orbit Agent"
+                text={` ██████╗ ██████╗ ██████╗ ██╗████████╗     █████╗  ██████╗ ███████╗███╗  ██╗████████╗
+██╔═══██╗██╔══██╗██╔══██╗██║╚══██╔══╝    ██╔══██╗██╔════╝ ██╔════╝████╗ ██║╚══██╔══╝
+██║   ██║██████╔╝██████╔╝██║   ██║       ███████║██║  ███╗█████╗  ██╔██╗██║   ██║
+██║   ██║██╔══██╗██╔══██╗██║   ██║       ██╔══██║██║   ██║██╔══╝  ██║╚████║   ██║
+╚██████╔╝██║  ██║██████╔╝██║   ██║       ██║  ██║╚██████╔╝███████╗██║ ╚███║   ██║
+ ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝       ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚══╝   ╚═╝`}
+              />
             </div>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -197,7 +200,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       <div
         className={cn(
           'shrink-0 mx-1.5 overflow-hidden transition-opacity duration-150 ease-out',
-          isCollapsed ? 'py-0' : 'py-1'
+          isCollapsed ? 'py-0' : ''
         )}
         style={{
           height: isCollapsed ? 0 : SIDEBAR.searchBarHeight,

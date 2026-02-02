@@ -69,7 +69,7 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[280px] p-0 rounded-lg border-[3px] border-border bg-card shadow-lg"
+        className="w-[280px] p-0 rounded-xl border-[3px] border-border bg-card shadow-lg"
         side="top"
         align="start"
         sideOffset={8}
@@ -80,7 +80,7 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
           e.preventDefault();
         }}
       >
-        <Command shouldFilter={false} className="rounded-lg bg-transparent">
+        <Command shouldFilter={false} className="rounded-xl bg-transparent">
           <CommandList className="scroll-py-2 pb-1.5">
             {filteredCommands.length === 0 ? <CommandEmpty>No commands found.</CommandEmpty> : null}
 

@@ -271,7 +271,7 @@ const App: FC = () => {
             ) : null}
 
             {/* Toast notifications */}
-            <Toaster position="bottom-right" />
+            <Toaster position="bottom-right" offset={40} />
           </div>
         </TooltipProvider>
       </TauriProvider>

@@ -1,9 +1,19 @@
 import { spawnSync } from 'child_process';
 
 import { formatZodError } from '@orbit/shared-schemas';
+import { z } from 'zod';
 
-import { KeychainCredentialsSchema, OAuthRefreshResponseSchema } from '../../protocol/schemas.js';
+import { KeychainCredentialsSchema } from '../../protocol/schemas.js';
 import { createLogger } from '../logging/logger.js';
+
+/** OAuth token refresh response from Anthropic's token endpoint */
+const OAuthRefreshResponseSchema = z.object({
+  access_token: z.string().min(1),
+  token_type: z.string().optional(),
+  expires_in: z.number(),
+  refresh_token: z.string().optional(),
+  scope: z.string().optional(),
+});
 
 const logger = createLogger('ClaudeCredentials');
 

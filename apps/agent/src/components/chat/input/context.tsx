@@ -152,7 +152,7 @@ export const ContextContent: FC<ContextContentProps> = ({ children, className })
     <HoverCardContent
       side="top"
       align="end"
-      className={cn('w-56 p-0 rounded-lg border-[3px] border-border bg-card shadow-lg', className)}
+      className={cn('w-56 p-0 rounded-xl border-[3px] border-border bg-card shadow-lg', className)}
     >
       {children}
     </HoverCardContent>

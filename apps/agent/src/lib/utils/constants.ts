@@ -47,7 +47,7 @@ export const SIDEBAR = {
   iconColumnWidth: 35,
   itemPadding: 12, // 6px mx-1.5 each side
   itemHeight: 32,
-  searchBarHeight: 40,
+  searchBarHeight: 32,
   tabNavHeight: 40,
   previewBadgeFontSize: 9,
 } as const;

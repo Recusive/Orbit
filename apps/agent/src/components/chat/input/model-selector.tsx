@@ -290,7 +290,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       tabIndex={-1}
       onKeyDown={handlePopoverKeyDown}
       className={cn(
-        'fixed bg-card border-[3px] border-border rounded-lg shadow-lg overflow-hidden z-50',
+        'fixed bg-card border-[3px] border-border rounded-xl shadow-lg overflow-hidden z-50 outline-none',
         position.side === 'top' ? 'origin-bottom-left' : 'origin-top-left',
         // Enter: rich 3-property animation (scale + fade + slide), ease-out
         !isAnimatingOut &&

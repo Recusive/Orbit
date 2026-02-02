@@ -582,34 +582,23 @@ export type SessionStorageData = z.infer<typeof SessionStorageDataSchema>;
 
 // OAuth token schema - allows additional fields from Claude CLI (refreshToken, scopes, etc.)
 // expiresAt can be number (timestamp) or string (ISO date or stringified timestamp)
-export const OAuthTokenSchema = z
-  .object({
-    accessToken: z.string().optional(),
-    expiresAt: z.union([z.number(), z.string()]).optional(),
-    // Additional fields that may be present (not strictly required)
-    refreshToken: z.string().optional(),
-    scopes: z.array(z.string()).optional(),
-    subscriptionType: z.string().optional(),
-    rateLimitTier: z.string().optional(),
-  })
-  .loose(); // Allow any additional fields we don't know about
+// External API schemas: default strip mode accepts unknown keys without error,
+// strips them from output. No .loose()/.catchall() needed since we only read known fields.
+
+export const OAuthTokenSchema = z.object({
+  accessToken: z.string().optional(),
+  expiresAt: z.union([z.number(), z.string()]).optional(),
+  refreshToken: z.string().optional(),
+  scopes: z.array(z.string()).optional(),
+  subscriptionType: z.string().optional(),
+  rateLimitTier: z.string().optional(),
+});
 export type OAuthToken = z.infer<typeof OAuthTokenSchema>;
 
-export const KeychainCredentialsSchema = z
-  .object({
-    claudeAiOauth: OAuthTokenSchema.optional(),
-  })
-  .loose(); // Allow any additional fields
+export const KeychainCredentialsSchema = z.object({
+  claudeAiOauth: OAuthTokenSchema.optional(),
+});
 export type KeychainCredentials = z.infer<typeof KeychainCredentialsSchema>;
 
-// OAuth token refresh response from Anthropic's token endpoint
-export const OAuthRefreshResponseSchema = z
-  .object({
-    access_token: z.string().min(1),
-    token_type: z.string().optional(),
-    expires_in: z.number(),
-    refresh_token: z.string().optional(),
-    scope: z.string().optional(),
-  })
-  .loose(); // Allow additional fields from the OAuth endpoint
-export type OAuthRefreshResponse = z.infer<typeof OAuthRefreshResponseSchema>;
+// OAuthRefreshResponseSchema is defined locally in credentials.ts (its sole consumer)
+// to avoid cross-file type resolution issues with ESLint's projectService.

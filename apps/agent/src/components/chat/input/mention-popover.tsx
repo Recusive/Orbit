@@ -168,7 +168,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[320px] p-0 rounded-lg border-[3px] border-border bg-card shadow-lg"
+        className="w-[320px] p-0 rounded-xl border-[3px] border-border bg-card shadow-lg"
         side="top"
         align="start"
         sideOffset={8}

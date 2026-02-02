@@ -21,6 +21,7 @@ import type { FC } from 'react';
 import { FileExplorer } from '@/components/files';
 import { SourceControlTab } from '@/components/git';
 import { SidebarToggleIcon, TabButton } from '@/components/layout/primary-sidebar';
+import { ScrambleAsciiPre } from '@/components/shared';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { HEIGHTS, SIDEBAR } from '@/lib/utils/constants';
@@ -167,10 +168,15 @@ export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
           /* Expanded: text on left, button on right */
           <div className="flex items-center justify-between w-full px-3">
             <div className="flex items-center gap-1.5">
-              <span className="text-lg font-semibold whitespace-nowrap">Orbit Editor</span>
-              <span className="bg-primary/8 text-primary/70 rounded-full px-1.5 py-0.5 text-[9px] font-medium tracking-wide whitespace-nowrap">
-                Preview
-              </span>
+              <ScrambleAsciiPre
+                ariaLabel="Orbit Editor"
+                text={` ██████╗ ██████╗ ██████╗ ██╗████████╗    ███████╗██████╗ ██╗████████╗ ██████╗ ██████╗
+██╔═══██╗██╔══██╗██╔══██╗██║╚══██╔══╝    ██╔════╝██╔══██╗██║╚══██╔══╝██╔═══██╗██╔══██╗
+██║   ██║██████╔╝██████╔╝██║   ██║       █████╗  ██║  ██║██║   ██║   ██║   ██║██████╔╝
+██║   ██║██╔══██╗██╔══██╗██║   ██║       ██╔══╝  ██║  ██║██║   ██║   ██║   ██║██╔══██╗
+╚██████╔╝██║  ██║██████╔╝██║   ██║       ███████╗██████╔╝██║   ██║   ╚██████╔╝██║  ██║
+ ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝       ╚══════╝╚═════╝ ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝`}
+              />
             </div>
             <Tooltip>
               <TooltipTrigger asChild>
