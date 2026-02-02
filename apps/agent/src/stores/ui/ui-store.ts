@@ -15,6 +15,7 @@ import type { SettingsSection } from '@/components/modals/settings';
 import type { StoredConversationSummary } from '@/types/protocol';
 
 import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/utils';
+import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { StoredConversationSummaryArraySchema } from '@/types/protocol';
 
 const logger = createLogger('UIStore');
@@ -395,8 +396,12 @@ export const useUIStore = create<UIStore>()(
           state.activeConversationId = null;
           state.activeConversationTitle = null;
         }
+        // Clean up session-specific data (Code review: Opus cycle 3, #4)
+        state.sessionWorktreeMap.delete(sessionId);
         saveConversationsToStorage(state.conversations);
       });
+      // Clean up checkpoint data for deleted conversation (Opus cycle 3, #5)
+      useCheckpointStore.getState().clearSessionCheckpoints(sessionId);
     },
 
     updateConversationTitle: (sessionId: string, title: string): void => {

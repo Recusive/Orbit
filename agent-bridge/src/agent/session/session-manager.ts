@@ -1148,7 +1148,11 @@ export class SessionManager extends Disposable {
   /**
    * Send a message to a session
    */
-  sendMessage(message: string, sessionId: string, attachments?: AttachmentContentBlock[]): void {
+  async sendMessage(
+    message: string,
+    sessionId: string,
+    attachments?: AttachmentContentBlock[]
+  ): Promise<void> {
     const agent = this.activeSessions.get(sessionId);
     if (agent === undefined) {
       throw new Error(`Session ${sessionId} not found. Call createSession() first.`);
@@ -1158,19 +1162,19 @@ export class SessionManager extends Disposable {
       throw new Error(`Session ${sessionId} is not ready.`);
     }
 
-    // Layer 2: Pre-send credential re-validation.
-    // Attempt a refresh before sending — if it fails, emit an auth error
-    // event instead of letting the message fail with a cryptic error.
-    void agent.refreshCredentials().then((hasCredentials) => {
-      if (!hasCredentials) {
-        this._onAuthError.fire({
-          sessionId,
-          category: 'NO_CREDENTIALS',
-          message: 'No valid credentials available. Please re-authenticate with "claude login".',
-          recoverable: true,
-        });
-      }
-    });
+    // Layer 2: Pre-send credential re-validation — MUST block message send.
+    // If credentials are expired, surface a clear auth error instead of
+    // letting the message fail with a cryptic SDK error. (Code review: Opus cycle 3, #1)
+    const hasCredentials = await agent.refreshCredentials();
+    if (!hasCredentials) {
+      this._onAuthError.fire({
+        sessionId,
+        category: 'NO_CREDENTIALS',
+        message: 'No valid credentials available. Please re-authenticate with "claude login".',
+        recoverable: true,
+      });
+      return;
+    }
 
     // Track turn start time
     this.turnStartTimes.set(sessionId, Date.now());

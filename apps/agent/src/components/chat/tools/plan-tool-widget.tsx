@@ -59,6 +59,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
         onClick={() => {
           setIsExpanded(!isExpanded);
         }}
+        aria-label={isExpanded ? 'Collapse Plan output' : 'Expand Plan output'}
         aria-expanded={isExpanded}
         className={cn(
           'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',

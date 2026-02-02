@@ -180,6 +180,8 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
         onClick={() => {
           setIsExpanded(!isExpanded);
         }}
+        aria-label={isExpanded ? 'Collapse Browser output' : 'Expand Browser output'}
+        aria-expanded={isExpanded}
         className={cn(
           'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
           'transition-colors duration-150 cursor-pointer w-full text-left',

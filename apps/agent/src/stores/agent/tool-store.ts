@@ -232,11 +232,6 @@ export interface ToolState {
   // Active tool executions (keyed by tool ID)
   activeTools: Record<string, ToolExecution>;
 
-  // Monotonically increasing counter, bumped on every startTool/completeTool.
-  // Legacy: was used to force re-renders when tools changed. ChatMessages now
-  // subscribes directly to activeTools/completedTools selectors instead.
-  toolRevision: number;
-
   // Completed tool executions (for history/display)
   completedTools: ToolExecution[];
 
@@ -367,7 +362,6 @@ export const useToolStore = create<ToolState>()(
       thinkingMode: 'off',
       model: 'sonnet',
       activeTools: {},
-      toolRevision: 0,
       completedTools: [],
       pendingPermissions: [],
       currentSessionId: null,
@@ -412,7 +406,6 @@ export const useToolStore = create<ToolState>()(
             contentOffset,
           };
           state.activeTools[id] = tool;
-          state.toolRevision += 1;
         });
       },
 
@@ -442,7 +435,6 @@ export const useToolStore = create<ToolState>()(
 
             // Remove from active tools (Reflect.deleteProperty avoids eslint no-dynamic-delete)
             Reflect.deleteProperty(state.activeTools, id);
-            state.toolRevision += 1;
           }
         });
       },
@@ -795,13 +787,6 @@ export const useUsedTokens = (): number => useToolStore((state) => state.getUsed
  */
 export const useGetToolsForMessage = (): ((messageId: string) => ToolExecution[]) =>
   useToolStore((state) => state.getToolsForMessage);
-
-/**
- * @deprecated No longer needed. ChatMessages now subscribes to useActiveTools()
- * and useCompletedTools() directly, which trigger re-renders automatically.
- * Was previously required to force re-renders when using useGetToolsForMessage().
- */
-export const useToolRevision = (): number => useToolStore((state) => state.toolRevision);
 
 /**
  * Selector for currently running tool (if any).

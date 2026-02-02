@@ -122,6 +122,8 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
         onClick={() => {
           setIsExpanded(!isExpanded);
         }}
+        aria-label={isExpanded ? 'Collapse Web Search output' : 'Expand Web Search output'}
+        aria-expanded={isExpanded}
         className={cn(
           'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
           'transition-colors duration-150 cursor-pointer w-full text-left',

@@ -401,7 +401,7 @@ async function handleRequest(
     }
 
     case 'send_message': {
-      sessionManager.sendMessage(request.message, request.sessionId, request.attachments);
+      await sessionManager.sendMessage(request.message, request.sessionId, request.attachments);
       // Update last active timestamp in persistent storage
       touchSession(request.sessionId);
       sendResponse({ type: 'success', requestType: request.type });
