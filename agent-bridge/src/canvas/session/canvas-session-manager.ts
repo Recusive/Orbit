@@ -172,7 +172,7 @@ export class CanvasSessionManager {
    * Create a new canvas session
    * @throws Error if session already exists or manager is disposed
    */
-  createSession(sessionId: string, config?: CanvasSessionConfig): void {
+  async createSession(sessionId: string, config?: CanvasSessionConfig): Promise<void> {
     if (this.disposed) {
       throw new Error('CanvasSessionManager has been disposed');
     }
@@ -206,8 +206,8 @@ export class CanvasSessionManager {
     this.sessionCleanups.set(sessionId, cleanups);
 
     try {
-      // Start the agent session
-      agent.startSession();
+      // Start the agent session (async: credential check may refresh token)
+      await agent.startSession();
 
       // Store agent
       this.sessions.set(sessionId, agent);

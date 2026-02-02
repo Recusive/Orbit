@@ -6,6 +6,7 @@
  */
 import {
   BashToolWidget,
+  BrowserToolWidget,
   EditToolWidget,
   GlobToolWidget,
   GrepToolWidget,
@@ -20,6 +21,8 @@ import {
 
 import type { ToolExecution } from '@/stores/agent/tool-store';
 import type { FC } from 'react';
+
+import { isBrowserTool } from '@/lib/utils/mcp-tools';
 
 export interface ToolWidgetRendererProps {
   readonly tool: ToolExecution;
@@ -198,6 +201,18 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
       return null;
 
     default:
+      // Browser MCP tools (mcp__orbit-browser__browser_open, etc.)
+      if (isBrowserTool(tool.toolName)) {
+        return (
+          <BrowserToolWidget
+            toolName={tool.toolName}
+            toolInput={tool.toolInput}
+            isRunning={statusProps.isRunning}
+            success={statusProps.success}
+            onOpenUrl={onOpenUrl}
+          />
+        );
+      }
       return null;
   }
 };

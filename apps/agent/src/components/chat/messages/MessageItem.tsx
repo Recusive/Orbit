@@ -24,6 +24,10 @@ import { ErrorBoundary } from '@/components/shared';
 import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
 import { cn, CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
+// Disable Streamdown's built-in link safety modal. Links render as plain <a> tags instead
+// of <button> elements, letting our handleContentClick route them through onOpenUrl → Tauri.
+const LINK_SAFETY_DISABLED = { enabled: false } as const;
+
 // Stable plugin arrays - defined outside component to prevent recreation on each render.
 // This is critical for Streamdown performance as it compares plugin arrays by reference.
 const REMARK_PLUGINS = [remarkGfm];
@@ -130,12 +134,12 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
         /* User message bubble */
         <div
           className={cn(
-            'p-2 rounded-lg bg-card border border-border/40 shadow-sm',
+            'p-2 rounded-lg bg-card border-[3px] border-border/40 shadow-sm',
             animate && 'animate-message-in'
           )}
           style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
         >
-          <p className="text-base leading-relaxed whitespace-pre-wrap">
+          <p className="text-base leading-relaxed whitespace-pre-wrap select-text">
             {message.displayedContent}
           </p>
         </div>
@@ -148,17 +152,17 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
             paddingRight: CHAT_SPACING.assistantPadding,
           }}
         >
-          {/* Thinking Box - show when thinking content exists */}
-          {message.thinking ? (
-            <ThinkingBox
-              thinking={message.thinking}
-              thinkingDurationMs={message.thinkingDurationMs}
-              isStreaming={message.isStreaming}
-            />
-          ) : null}
-
           {/* Content and tool segments */}
           <div className="space-y-2">
+            {/* Thinking Box - inside space-y-2 for consistent spacing with tools and text */}
+            {message.thinking ? (
+              <ThinkingBox
+                thinking={message.thinking}
+                thinkingDurationMs={message.thinkingDurationMs}
+                isStreaming={message.isStreaming}
+              />
+            ) : null}
+
             {segments.map((segment) => {
               if (segment.type === 'content') {
                 // Use mode="static" to prevent scrollbar jumping during streaming.
@@ -167,13 +171,14 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                 return (
                   <div
                     key={segment.key}
-                    className="chat-markdown prose prose-sm dark:prose-invert max-w-none"
+                    className="chat-markdown prose prose-sm dark:prose-invert max-w-none select-text"
                     onClick={handleContentClick}
                   >
                     <Streamdown
                       remarkPlugins={REMARK_PLUGINS}
                       rehypePlugins={rehypePlugins}
                       plugins={STREAMDOWN_PLUGINS}
+                      linkSafety={LINK_SAFETY_DISABLED}
                       mode="static"
                     >
                       {segment.text}

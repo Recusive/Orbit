@@ -210,7 +210,7 @@ export const SidebarResizeHandle: FC = () => {
       style={{ width: RESIZE_HANDLE.width, padding: '0 4px', margin: '0 -4px' }}
     >
       {/* Persistent separator line (always visible, matches site border) */}
-      <div className="h-full bg-border" style={{ width: RESIZE_HANDLE.width }} />
+      <div className="h-full border-r border-border/50" />
       {/* Hover/Active indicator line - only show when expanded (can resize) */}
       {!isCollapsed && (
         <div

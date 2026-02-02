@@ -149,9 +149,12 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   useEffect(() => {
     if (!isOpen || isAnimatingOut) return;
     // RAF ensures the portal DOM is mounted and popoverRef.current has its real height
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       updatePosition();
     });
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
   }, [isOpen, isAnimatingOut, updatePosition]);
 
   // Reposition popover on window resize/scroll while open
@@ -172,9 +175,12 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   useEffect(() => {
     if (!isOpen || isAnimatingOut) return;
     // Defer to next frame so the portal DOM is mounted
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       popoverRef.current?.focus();
     });
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
   }, [isOpen, isAnimatingOut]);
 
   // Handle closing with exit animation
@@ -284,7 +290,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       tabIndex={-1}
       onKeyDown={handlePopoverKeyDown}
       className={cn(
-        'fixed bg-popover/98 backdrop-blur-sm border border-border/50 rounded-lg shadow-lg overflow-hidden z-50',
+        'fixed bg-card border-[3px] border-border rounded-lg shadow-lg overflow-hidden z-50',
         position.side === 'top' ? 'origin-bottom-left' : 'origin-top-left',
         // Enter: rich 3-property animation (scale + fade + slide), ease-out
         !isAnimatingOut &&

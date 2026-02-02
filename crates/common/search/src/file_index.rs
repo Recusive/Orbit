@@ -310,6 +310,7 @@ impl FileIndex {
                     name: entry.name.clone(),
                     score: 0,
                     match_indices: vec![],
+                    path_match_indices: vec![],
                 }
             })
             .collect()
@@ -336,18 +337,47 @@ impl FileIndex {
         // Parse pattern with smart case matching
         let pattern = Pattern::parse(query, CaseMatching::Smart, Normalization::Smart);
 
-        // Score each entry
-        let mut scored: Vec<(u32, &IndexEntry, Vec<u32>)> = Vec::new();
+        // Score each entry.
+        // Strategy: prefer filename matches over path-only matches.
+        // If the query matches the filename, use that score directly.
+        // If it only matches via the directory path, halve the score so
+        // filename matches always rank above path-only matches.
+        //
+        // Tuple: (score, entry, name_indices, path_indices)
+        let mut scored: Vec<(u32, &IndexEntry, Vec<u32>, Vec<u32>)> = Vec::new();
 
         for entry in &self.entries {
-            // Get relative path for matching (allows searching by directory + filename)
+            // Try matching against filename first (preferred)
+            let mut name_indices = Vec::new();
+            let mut name_buf = Vec::new();
+            let name_haystack = Utf32Str::new(&entry.name, &mut name_buf);
+
+            if let Some(name_score) =
+                pattern.indices(name_haystack, &mut matcher, &mut name_indices)
+            {
+                // Also get path indices for highlighting the subtitle
+                let relative_path = entry
+                    .path
+                    .strip_prefix(&self.root_path)
+                    .unwrap_or(&entry.path)
+                    .to_string_lossy();
+
+                let mut path_indices = Vec::new();
+                let mut path_buf = Vec::new();
+                let path_haystack = Utf32Str::new(&relative_path, &mut path_buf);
+                let _ = pattern.indices(path_haystack, &mut matcher, &mut path_indices);
+
+                scored.push((name_score, entry, name_indices, path_indices));
+                continue;
+            }
+
+            // Filename didn't match — fall back to full path matching
             let relative_path = entry
                 .path
                 .strip_prefix(&self.root_path)
                 .unwrap_or(&entry.path)
                 .to_string_lossy();
 
-            // Try matching against full path first
             let mut path_indices = Vec::new();
             let mut path_buf = Vec::new();
             let path_haystack = Utf32Str::new(&relative_path, &mut path_buf);
@@ -355,15 +385,9 @@ impl FileIndex {
             if let Some(path_score) =
                 pattern.indices(path_haystack, &mut matcher, &mut path_indices)
             {
-                // Now get highlight indices for just the filename (for display)
-                let mut name_indices = Vec::new();
-                let mut name_buf = Vec::new();
-                let name_haystack = Utf32Str::new(&entry.name, &mut name_buf);
-
-                // Try to get indices for filename - if no match, use empty indices
-                let _ = pattern.indices(name_haystack, &mut matcher, &mut name_indices);
-
-                scored.push((path_score, entry, name_indices));
+                // Path matched but filename didn't — halve the score so these
+                // always rank below filename matches. No name highlight indices.
+                scored.push((path_score / 2, entry, Vec::new(), path_indices));
             }
         }
 
@@ -374,7 +398,7 @@ impl FileIndex {
         let results: Vec<FuzzySearchResult> = scored
             .into_iter()
             .take(max_results)
-            .map(|(score, entry, match_indices)| {
+            .map(|(score, entry, match_indices, path_match_indices)| {
                 // Make path relative to root
                 let relative_path = entry
                     .path
@@ -388,6 +412,7 @@ impl FileIndex {
                     name: entry.name.clone(),
                     score,
                     match_indices,
+                    path_match_indices,
                 }
             })
             .collect();

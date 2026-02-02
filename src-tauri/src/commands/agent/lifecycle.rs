@@ -566,6 +566,25 @@ fn emit_canvas_error(app: &AppHandle, session_id: &str, error: &str) {
     ));
 }
 
+/// Emit auth error event
+fn emit_auth_error(
+    app: &AppHandle,
+    session_id: &str,
+    category: &str,
+    message: &str,
+    recoverable: bool,
+) {
+    drop(app.emit(
+        "agent:auth_error",
+        serde_json::json!({
+            "sessionId": session_id,
+            "category": category,
+            "message": message,
+            "recoverable": recoverable,
+        }),
+    ));
+}
+
 /// Wire up event callbacks to emit Tauri events
 pub fn setup_event_callbacks(app: &AppHandle, session_manager: &Arc<SessionManager>) {
     let app_handle = app.clone();
@@ -612,5 +631,11 @@ pub fn setup_event_callbacks(app: &AppHandle, session_manager: &Arc<SessionManag
             session_id,
             request,
         } => emit_browser_tool_request(&app_handle, &session_id, &request),
+        BridgeEvent::AuthError {
+            session_id,
+            category,
+            message,
+            recoverable,
+        } => emit_auth_error(&app_handle, &session_id, &category, &message, recoverable),
     }));
 }

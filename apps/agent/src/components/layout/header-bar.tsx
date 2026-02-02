@@ -1,6 +1,5 @@
 import { IconSquareGridCircle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSquareGridCircle';
-import { Moon, Search, Sun } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Search } from 'lucide-react';
 import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
@@ -9,13 +8,6 @@ import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, getCommandKey } from '@/lib/utils';
 import { useUIStore, useWorkspaceName, useActiveTab, useHasWorkspace } from '@/stores/ui/ui-store';
-
-type Theme = 'light' | 'dark';
-
-const getInitialTheme = (): Theme => {
-  if (typeof document === 'undefined') return 'dark';
-  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-};
 
 // Re-export for backwards compatibility
 export type { HeaderTab } from '@/stores/ui/ui-store';
@@ -66,7 +58,6 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
  */
 export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
   const activeTab = useActiveTab();
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const workspaceName = useWorkspaceName();
   const hasWorkspace = useHasWorkspace();
 
@@ -82,21 +73,6 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
       }))
     );
 
-  // Theme toggle effect
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const toggleTheme = useCallback((): void => {
-    setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
-  }, []);
-
   const handleOpenSearch = (): void => {
     window.dispatchEvent(new CustomEvent('openCommandPalette'));
   };
@@ -107,7 +83,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
     <header
       data-tauri-drag-region
       className={cn(
-        'h-[35px] flex items-center justify-between pr-4 border-y border-divider shrink-0',
+        'h-[35px] flex items-center justify-between pr-2 border-b-[3px] border-border/50 shrink-0',
         'bg-card shadow-lg',
         // Left padding for macOS traffic light buttons (matches Cursor: x:11 + ~69px for 3 buttons)
         'pl-[80px]',
@@ -152,7 +128,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
           {/* Search button - VS Code style command palette */}
           <button
             data-tauri-drag-region={false}
-            className="flex items-center gap-2 h-6 px-2 rounded-md text-foreground hover:text-foreground overflow-hidden bg-muted hover:bg-muted/80 transition-colors duration-200"
+            className="flex items-center gap-2 h-6 px-2 rounded-md text-foreground hover:text-foreground overflow-hidden border border-border/50 bg-muted hover:bg-muted/80 transition-colors duration-200"
             title="Search files (⌘P)"
             onClick={handleOpenSearch}
           >
@@ -167,20 +143,6 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
           </button>
 
           <div className="flex items-center gap-1">
-            {/* Theme Toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  data-tauri-drag-region={false}
-                  onClick={toggleTheme}
-                  className="h-7 w-7 flex items-center justify-center rounded-md opacity-60 hover:opacity-100 hover:bg-muted/60 active:scale-95 transition-[background-color,opacity,transform] duration-150"
-                >
-                  {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</TooltipContent>
-            </Tooltip>
-
             {/* Activity Panel Toggle */}
             <Tooltip>
               <TooltipTrigger asChild>

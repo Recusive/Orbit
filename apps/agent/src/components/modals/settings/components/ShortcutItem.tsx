@@ -5,7 +5,7 @@ import { Kbd, KbdGroup } from '@/components/ui/kbd';
 
 export const ShortcutItem: FC<ShortcutItemProps> = ({ label, keys }) => (
   <div className="flex items-center justify-between py-2.5">
-    <span className="text-base text-muted-foreground/70">{label}</span>
+    <span className="text-base text-muted-foreground/90">{label}</span>
     <KbdGroup>
       {keys.map((key, index) => (
         <Kbd key={index}>{key}</Kbd>

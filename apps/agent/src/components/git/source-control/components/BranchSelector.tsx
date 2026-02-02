@@ -64,15 +64,14 @@ export const BranchSelector: React.FC<BranchSelectorProps> = ({
             }}
             className="flex items-center gap-2"
           >
-            {branch.isCurrent ? (
-              <Check className="h-3.5 w-3.5 text-green-500" />
-            ) : (
-              <span className="w-3.5" />
-            )}
+            <GitBranch className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
             <span className="truncate">{branch.name}</span>
-            {branch.upstream ? (
-              <span className="text-xs text-muted-foreground ml-auto">→ {branch.upstream}</span>
-            ) : null}
+            <span className="flex items-center gap-1.5 ml-auto shrink-0">
+              {branch.upstream ? (
+                <span className="text-xs text-muted-foreground">→ {branch.upstream}</span>
+              ) : null}
+              {branch.isCurrent ? <Check className="h-3.5 w-3.5 text-green-500" /> : null}
+            </span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

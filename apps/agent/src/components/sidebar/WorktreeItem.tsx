@@ -143,7 +143,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         {!collapsed && (
           <div
             className={cn(
-              'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium mr-7 shrink-0 transition-colors duration-200',
+              'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium mr-1 shrink-0 transition-colors duration-200',
               worktree.isMain ? 'bg-primary/12 text-primary' : 'bg-muted text-muted-foreground'
             )}
           >
@@ -173,7 +173,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
             <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
+              className="text-destructive focus:text-destructive focus:bg-destructive/10"
               onSelect={handleRemove}
             >
               <Trash2 className="h-4 w-4 mr-2" />

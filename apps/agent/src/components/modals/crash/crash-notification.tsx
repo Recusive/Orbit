@@ -5,6 +5,7 @@
  * allowing users to view details or dismiss the notification.
  */
 
+import { createLogger } from '@orbit/common/lib';
 import { AlertTriangle, Copy, ExternalLink, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
@@ -22,6 +23,8 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getCrashLogPath } from '@/lib/api';
 import { cn } from '@/lib/utils';
+
+const logger = createLogger('CrashNotification');
 
 interface CrashNotificationProps {
   /** Whether the dialog is open */
@@ -97,7 +100,7 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
         setCopied(false);
       }, 2000);
     } catch (err: unknown) {
-      console.error('Failed to copy crash log:', err);
+      logger.error('Failed to copy crash log', err);
     }
   }, [crashLog]);
 
@@ -106,7 +109,7 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
       const path = await getCrashLogPath();
       setLogPath(path);
     } catch (err: unknown) {
-      console.error('Failed to get crash log path:', err);
+      logger.error('Failed to get crash log path', err);
     }
   }, []);
 

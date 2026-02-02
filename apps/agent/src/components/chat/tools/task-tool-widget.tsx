@@ -1,20 +1,18 @@
-import { Bot, ChevronDown, Loader2 } from 'lucide-react';
+import { Bot, CheckCircle2, ChevronDown, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 import { z } from 'zod';
 
-import {
-  TOOL_CARD_BASE,
-  TOOL_CHEVRON_BASE,
-  TOOL_EXPAND_TRANSITION,
-  TOOL_EXPAND_TRANSITION_NONE,
-} from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
+
+// Disable Streamdown's built-in link safety modal (desktop app opens URLs via Tauri)
+const LINK_SAFETY_DISABLED = { enabled: false } as const;
 
 // Zod schema for task output content blocks
 const ContentBlockSchema = z
@@ -90,111 +88,178 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
   }, [isRunning]);
 
   const formattedType = formatSubagentType(subagentType);
+  const statusLabel = isRunning ? 'Running Task' : 'Task';
 
   return (
-    <div>
-      <div
+    <div className={cn('min-w-0', isFailed && 'opacity-60')}>
+      {/* Header — flat inline row */}
+      <button
+        onClick={() => {
+          setIsExpanded(!isExpanded);
+        }}
+        aria-label={isExpanded ? 'Collapse Task output' : 'Expand Task output'}
+        aria-expanded={isExpanded}
         className={cn(
-          TOOL_CARD_BASE,
-          isFailed
-            ? 'border-2 border-dotted border-destructive/40 opacity-60'
-            : 'border border-border/50',
-          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
+          'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
+          'transition-colors duration-150 cursor-pointer w-full text-left',
+          'rounded-lg hover:bg-muted/20',
+          isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        {/* Header */}
-        <button
-          onClick={() => {
-            setIsExpanded(!isExpanded);
-          }}
-          className="w-full flex items-center justify-between px-2.5 py-1.5 bg-transparent hover:bg-muted/40 active:bg-muted/50 transition-colors duration-150"
+        <div
+          className={cn(
+            'w-5 h-5 rounded flex items-center justify-center shrink-0',
+            'transition-colors duration-150',
+            isFailed
+              ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
+              : 'bg-primary/15 group-hover/status:bg-primary/25'
+          )}
         >
-          <div className="flex items-center gap-2">
-            <div
-              className={cn(
-                'w-5 h-5 rounded flex items-center justify-center',
-                isFailed ? 'bg-destructive/10' : 'bg-primary/10'
-              )}
-            >
-              <Bot
-                className={cn(
-                  'h-3 w-3',
-                  isFailed ? 'text-destructive/70' : 'text-primary/70',
-                  isRunning && 'animate-pulse'
-                )}
-              />
-            </div>
-            <span
-              className={cn(
-                'text-xs font-medium',
-                isFailed ? 'text-muted-foreground line-through' : 'text-foreground'
-              )}
-            >
-              {isRunning ? 'Running Task' : isFailed ? 'Task Failed' : 'Completed Task'}
-            </span>
-            <span className="text-sm text-muted-foreground/60">{description}</span>
-            {isRunning ? (
-              <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
-            ) : isFailed ? (
-              <span className="text-xs text-destructive/60">Failed</span>
-            ) : null}
-          </div>
-          <ChevronDown className={cn(TOOL_CHEVRON_BASE, isExpanded && 'rotate-180')} />
-        </button>
+          <Bot
+            className={cn(
+              'h-3 w-3 transition-colors duration-150',
+              isFailed
+                ? 'text-destructive/60 group-hover/status:text-destructive/80'
+                : 'text-primary/80 group-hover/status:text-primary',
+              isRunning && 'animate-pulse'
+            )}
+          />
+        </div>
 
-        {/* Collapsible content */}
-        <AnimatePresence initial={false}>
-          {isExpanded ? (
-            <motion.div
-              initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-              transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
-              style={{ overflow: 'hidden' }}
-            >
-              {/* Task details */}
-              <div className="px-2.5 py-2 bg-muted/30">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase">
-                    agent
-                  </div>
-                  <span className="px-1 py-0.5 rounded bg-muted/50 text-sm font-medium text-foreground">
-                    {formattedType}
-                  </span>
-                  {model ? (
-                    <span className="text-sm text-muted-foreground/60">({model})</span>
-                  ) : null}
-                </div>
-                <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
-                  prompt
-                </div>
-                <div className="text-sm text-foreground line-clamp-3" title={prompt}>
-                  {truncatePrompt(prompt, 300)}
-                </div>
-              </div>
-
-              {/* Output */}
-              <div className="h-px bg-border/30 mx-2.5" />
-              <div className="p-2.5">
-                {isRunning ? (
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                    <span>Agent is working on the task...</span>
-                  </div>
-                ) : output ? (
-                  <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none text-sm">
-                    <Streamdown remarkPlugins={[remarkGfm]} rehypePlugins={[]}>
-                      {parseTaskOutput(output)}
-                    </Streamdown>
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground/60 italic">Task completed</div>
-                )}
-              </div>
-            </motion.div>
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span
+            className={cn(
+              'text-xs font-medium truncate',
+              isFailed
+                ? 'text-muted-foreground line-through'
+                : 'text-muted-foreground/90 group-hover/status:text-foreground'
+            )}
+          >
+            {statusLabel}
+          </span>
+          <span className="text-xs text-muted-foreground/70 truncate">{description}</span>
+          {isRunning ? (
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
           ) : null}
-        </AnimatePresence>
-      </div>
+        </div>
+
+        <ChevronDown
+          className={cn(
+            'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
+            isExpanded && 'rotate-180'
+          )}
+        />
+      </button>
+
+      {/* Tree-style expanded content */}
+      <AnimatePresence initial={false}>
+        {isExpanded ? (
+          <motion.div
+            initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="flex flex-col">
+              <div className="flex flex-row px-2.5">
+                {/* Gutter: vertical connector line */}
+                <div className="w-5 flex justify-center shrink-0">
+                  <div
+                    className={cn(
+                      'w-[2px] rounded-full h-full',
+                      success === undefined && 'bg-primary/40'
+                    )}
+                    style={
+                      success !== undefined
+                        ? {
+                            background: success
+                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
+                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
+
+                {/* Content box */}
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card overflow-hidden">
+                  {/* Task details */}
+                  <div className="px-3 py-2">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+                        agent
+                      </div>
+                      <span className="px-1 py-0.5 rounded bg-muted/50 text-sm font-medium text-foreground">
+                        {formattedType}
+                      </span>
+                      {model ? (
+                        <span className="text-sm text-muted-foreground/70">({model})</span>
+                      ) : null}
+                    </div>
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1">
+                      prompt
+                    </div>
+                    <div className="text-sm text-foreground/80 line-clamp-3" title={prompt}>
+                      {truncatePrompt(prompt, 300)}
+                    </div>
+                  </div>
+
+                  {/* Output */}
+                  <div className="h-px bg-border/20 mx-3" />
+                  <div className="px-3 py-2">
+                    {isRunning ? (
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        <span>Agent is working on the task...</span>
+                      </div>
+                    ) : output ? (
+                      <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none text-sm">
+                        <Streamdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[]}
+                          linkSafety={LINK_SAFETY_DISABLED}
+                        >
+                          {parseTaskOutput(output)}
+                        </Streamdown>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground/40 italic">Task completed</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom status indicator */}
+              {!isRunning && success !== undefined ? (
+                <div className="flex flex-row items-center px-2.5 py-1">
+                  <div
+                    className={cn(
+                      'w-5 h-5 rounded flex items-center justify-center shrink-0',
+                      isFailed ? 'bg-red-500/15' : 'bg-green-500/15'
+                    )}
+                  >
+                    {isFailed ? (
+                      <XCircle className="h-3 w-3 text-red-500/80" />
+                    ) : (
+                      <CheckCircle2 className="h-3 w-3 text-green-500/80" />
+                    )}
+                  </div>
+                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                    {isFailed ? 'Failed' : 'Completed'}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-row h-1 px-2.5">
+                  <div className="w-5 flex justify-center">
+                    <div className="w-[2px] rounded-full h-full bg-border/20" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };

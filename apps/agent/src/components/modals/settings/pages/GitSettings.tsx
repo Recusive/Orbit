@@ -83,13 +83,13 @@ export const GitSettings: FC = () => {
               disabled={!gitSettings.autoFetchEnabled}
               className="w-24 h-8 text-sm"
             />
-            <span className="text-sm text-muted-foreground">seconds</span>
+            <span className="text-sm text-muted-foreground/90">seconds</span>
           </div>
         </SettingItem>
       </div>
 
       <div className="mt-4 p-3 bg-muted/30 rounded-md">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground/90">
           Auto-fetch keeps your local repository in sync with the remote by periodically running{' '}
           <code className="bg-muted px-1 rounded">git fetch</code>. This updates the ahead/behind
           counts shown in source control without modifying your working directory.

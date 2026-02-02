@@ -640,6 +640,18 @@ export interface CanvasErrorEvent {
 }
 
 /**
+ * Auth error event - structured authentication failure notification
+ */
+export interface AuthErrorEvent {
+  type: 'auth_error';
+  sessionId: string;
+  category: 'TOKEN_EXPIRED' | 'REFRESH_FAILED' | 'NO_CREDENTIALS' | 'INVALID_TOKEN';
+  message: string;
+  /** Whether the user can retry (e.g., re-login) vs unrecoverable */
+  recoverable: boolean;
+}
+
+/**
  * All possible events from Node.js
  */
 export type BridgeEvent =
@@ -654,7 +666,8 @@ export type BridgeEvent =
   | CanvasMessageEvent
   | CanvasToolRequestEvent
   | CanvasErrorEvent
-  | BrowserToolRequestEvent;
+  | BrowserToolRequestEvent
+  | AuthErrorEvent;
 
 /**
  * All possible messages from Node.js to Rust

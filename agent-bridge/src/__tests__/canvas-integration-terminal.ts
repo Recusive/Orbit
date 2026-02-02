@@ -70,13 +70,13 @@ logger.info('1. Session Lifecycle:');
 
 const manager1 = new CanvasSessionManager();
 
-manager1.createSession('lifecycle-test', { thinkingEnabled: false });
+await manager1.createSession('lifecycle-test', { thinkingEnabled: false });
 test(
   'Create session succeeds',
   manager1.hasSession('lifecycle-test') && manager1.sessionCount === 1
 );
 
-manager1.createSession('lifecycle-test-2');
+await manager1.createSession('lifecycle-test-2');
 test('Create second session', manager1.sessionCount === 2);
 
 await manager1.deleteSession('lifecycle-test');
@@ -85,7 +85,7 @@ test(
   !manager1.hasSession('lifecycle-test') && manager1.sessionCount === 1
 );
 
-manager1.createSession('lifecycle-test-2');
+await manager1.createSession('lifecycle-test-2');
 test('Duplicate session is idempotent', manager1.sessionCount === 1);
 
 manager1.dispose();
@@ -96,7 +96,7 @@ manager1.dispose();
 logger.info('\n2. Canvas State Management:');
 
 const manager2 = new CanvasSessionManager();
-manager2.createSession('state-test');
+await manager2.createSession('state-test');
 
 const mockState = createMockState();
 manager2.updateCanvasState('state-test', mockState);
@@ -108,7 +108,7 @@ test(
 );
 
 // Test state isolation
-manager2.createSession('state-test-2');
+await manager2.createSession('state-test-2');
 const isolatedState: CanvasState = {
   nodes: [
     {
@@ -246,12 +246,12 @@ await testAsync('sendMessage to nonexistent session throws', async () => {
 
 manager5.dispose();
 
-void testAsync('createSession after dispose throws', () => {
+void testAsync('createSession after dispose throws', async () => {
   try {
-    manager5.createSession('post-dispose');
-    return Promise.resolve(false);
+    await manager5.createSession('post-dispose');
+    return false;
   } catch (e) {
-    return Promise.resolve(e instanceof Error && e.message.includes('disposed'));
+    return e instanceof Error && e.message.includes('disposed');
   }
 });
 
@@ -261,7 +261,7 @@ void testAsync('createSession after dispose throws', () => {
 logger.info('\n6. Configuration Updates:');
 
 const manager6 = new CanvasSessionManager();
-manager6.createSession('config-test', {
+await manager6.createSession('config-test', {
   thinkingEnabled: false,
   model: 'claude-sonnet-4-20250514',
 });
@@ -303,7 +303,7 @@ e2eManager.onError(() => {
 
 void testAsync('E2E: Full session lifecycle', async () => {
   // Create
-  e2eManager.createSession('e2e-session', { thinkingEnabled: false });
+  await e2eManager.createSession('e2e-session', { thinkingEnabled: false });
   if (!e2eManager.hasSession('e2e-session')) return false;
 
   // Update state

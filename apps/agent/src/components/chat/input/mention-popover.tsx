@@ -62,7 +62,7 @@ function highlightMatches(name: string, indices: number[]): ReactNode {
   return chars.map((char, idx) => {
     if (matchSet.has(idx)) {
       return (
-        <mark key={idx} className="bg-primary/25 text-foreground rounded-[2px] px-[1px] -mx-[1px]">
+        <mark key={idx} className="bg-primary/25 text-foreground rounded-[2px] px-px -mx-px">
           {char}
         </mark>
       );
@@ -168,11 +168,10 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[320px] p-0 rounded-lg border-border/50 bg-popover/98 backdrop-blur-sm shadow-lg"
+        className="w-[320px] p-0 rounded-lg border-[3px] border-border bg-card shadow-lg"
         side="top"
         align="start"
         sideOffset={8}
-        avoidCollisions
         onOpenAutoFocus={(e) => {
           e.preventDefault();
         }}
@@ -181,7 +180,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
         }}
       >
         <Command shouldFilter={false} className="rounded-lg bg-transparent">
-          <CommandList className="scroll-py-2 max-h-[300px]">
+          <CommandList className="scroll-py-2 max-h-[300px] pb-1.5">
             {/* Loading state */}
             {isLoading && results.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
@@ -279,9 +278,9 @@ const FileItem: FC<FileItemProps> = ({ result, isSelected, isFirst, isLast, onSe
         onSelect(result);
       }}
       className={cn(
-        'relative flex cursor-pointer gap-2.5 select-none items-center px-2.5 py-2 outline-none transition-[background-color,border-color,transform] duration-150',
+        'relative flex cursor-pointer gap-2.5 select-none items-center border-l-2 border-transparent pl-2 pr-2.5 py-2 outline-none',
         isSelected
-          ? 'rounded-r-md bg-primary/10 text-foreground border-l-2 border-primary/60 pl-2'
+          ? 'rounded-r-md bg-primary/10 text-foreground border-primary/60'
           : 'rounded-md hover:bg-muted/50 active:scale-[0.99]'
       )}
     >

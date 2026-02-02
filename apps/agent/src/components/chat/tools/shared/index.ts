@@ -1,8 +1,4 @@
 export { DiffStat } from './diff-stat';
-export {
-  TOOL_CARD_BASE,
-  TOOL_CHEVRON_BASE,
-  TOOL_EXPAND_TRANSITION,
-  TOOL_EXPAND_TRANSITION_NONE,
-  TOOL_HEADER_BASE,
-} from './constants';
+export { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './constants';
+export { getShiki, useIsDarkMode, useHighlightedTokens } from './use-syntax-highlight';
+export type { HighlightToken } from './use-syntax-highlight';

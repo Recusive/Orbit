@@ -10,7 +10,7 @@ import {
   Globe,
   Icon,
   Keyboard,
-  Terminal,
+  Slash,
   User,
 } from 'lucide-react';
 
@@ -48,7 +48,7 @@ const NAV_ITEMS: NavItemConfig[] = [
   {
     id: 'commands',
     label: 'Commands',
-    icon: <Terminal className="h-4 w-4" />,
+    icon: <Slash className="h-3.5 w-3.5 -rotate-[25deg]" />,
   },
   {
     id: 'shortcuts',
@@ -95,7 +95,7 @@ const FEEDBACK_ITEM: NavItemConfig = {
 
 export const SettingsSidebar: FC<SettingsSidebarProps> = ({ activeSection, onSectionChange }) => {
   return (
-    <div className="w-48 border-r border-border/40 p-2.5 bg-muted/20 flex flex-col">
+    <div className="w-48 border-r-3 border-border/40 p-2.5 bg-muted/20 flex flex-col">
       <nav className="space-y-1 flex-1">
         {NAV_ITEMS.map((item) => (
           <NavItem
@@ -110,7 +110,7 @@ export const SettingsSidebar: FC<SettingsSidebarProps> = ({ activeSection, onSec
         ))}
       </nav>
       {/* Feedback at bottom */}
-      <div className="border-t border-border/30 pt-2 mt-2">
+      <div className="border-t-3 border-border/30 pt-2 mt-2 -mx-2.5 px-2.5">
         <NavItem
           icon={FEEDBACK_ITEM.icon}
           label={FEEDBACK_ITEM.label}

@@ -60,6 +60,7 @@
 use std::fmt;
 use std::io::{BufRead as _, BufReader};
 use std::net::TcpListener;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::thread;
 
@@ -154,6 +155,39 @@ pub struct PreviewServerInfo {
 /// Find an available port in the range.
 fn find_available_port() -> Option<u16> {
     (PORT_RANGE_START..=PORT_RANGE_END).find(|&port| TcpListener::bind(("127.0.0.1", port)).is_ok())
+}
+
+/// Build an augmented PATH that includes common bun install locations.
+///
+/// When the app is launched from Finder (not terminal), macOS provides a minimal
+/// PATH (typically just `/usr/bin:/bin:/usr/sbin:/sbin`). This function appends
+/// common locations where `bun` is installed so that `Command::new("bun")` works
+/// in production builds.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "std::env::var(PATH) is needed to read the system PATH for augmentation - not a config value"
+)]
+fn augmented_path() -> String {
+    let current_path = std::env::var("PATH").unwrap_or_default();
+
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
+    let extra_paths = [
+        home.join(".bun/bin"),
+        home.join(".local/bin"),
+        home.join(".nvm/current/bin"),
+        PathBuf::from("/usr/local/bin"),
+        PathBuf::from("/opt/homebrew/bin"),
+    ];
+
+    let mut parts: Vec<String> = vec![current_path];
+    for p in &extra_paths {
+        let s = p.to_string_lossy().to_string();
+        if !parts.contains(&s) {
+            parts.push(s);
+        }
+    }
+
+    parts.join(":")
 }
 
 /// Attempt graceful shutdown with SIGTERM, fallback to SIGKILL after timeout.
@@ -1103,6 +1137,7 @@ pub async fn canvas_install_preview_deps() -> Result<(), String> {
 
     let output = Command::new("bun")
         .arg("install")
+        .env("PATH", augmented_path())
         .current_dir(&preview_path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -1190,6 +1225,7 @@ pub async fn canvas_start_preview_server(
     // Spawn process (outside lock scope)
     let mut child = Command::new("bun")
         .args(["run", "dev"])
+        .env("PATH", augmented_path())
         .env("VITE_PORT", port.to_string())
         .current_dir(&preview_path)
         .stdout(Stdio::piped())

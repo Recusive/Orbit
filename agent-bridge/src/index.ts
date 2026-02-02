@@ -214,6 +214,17 @@ function main(): void {
     });
   });
 
+  // Auth error events (from auto-refresh or pre-send credential checks)
+  sessionManager.onAuthError((data) => {
+    sendEvent({
+      type: 'auth_error',
+      sessionId: data.sessionId,
+      category: data.category,
+      message: data.message,
+      recoverable: data.recoverable,
+    });
+  });
+
   // Wire up canvas session event handlers
   canvasSessionManager.onMessage((data) => {
     sendEvent({
@@ -390,7 +401,7 @@ async function handleRequest(
     }
 
     case 'send_message': {
-      sessionManager.sendMessage(request.message, request.sessionId, request.attachments);
+      await sessionManager.sendMessage(request.message, request.sessionId, request.attachments);
       // Update last active timestamp in persistent storage
       touchSession(request.sessionId);
       sendResponse({ type: 'success', requestType: request.type });
@@ -569,7 +580,7 @@ async function handleRequest(
 
     // Canvas Operations
     case 'canvas:create_session': {
-      canvasSessionManager.createSession(request.sessionId, request.config);
+      await canvasSessionManager.createSession(request.sessionId, request.config);
       sendResponse({ type: 'success', requestType: request.type });
       break;
     }

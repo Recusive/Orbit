@@ -170,7 +170,7 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
     <div
       className={cn(
         'h-[22px] flex items-center justify-between px-3',
-        'bg-card border-t border-divider',
+        'bg-card border-t-[3px] border-border/50',
         'text-muted-foreground',
         className
       )}

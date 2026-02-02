@@ -1,76 +1,17 @@
-import { ChevronDown, Loader2, Terminal } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Loader2, Terminal, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
-  TOOL_CARD_BASE,
-  TOOL_CHEVRON_BASE,
+  getShiki,
   TOOL_EXPAND_TRANSITION,
   TOOL_EXPAND_TRANSITION_NONE,
+  useIsDarkMode,
 } from './shared';
 
 import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
-
-/**
- * Module-level singleton for Shiki import.
- * Without this, 10+ bash tool widgets mounting simultaneously would each fire
- * a separate dynamic import (module cache deduplicates the fetch, but each
- * creates a separate Promise allocation and microtask). Hoisting to a singleton
- * ensures only one import is in-flight and all consumers share the same Promise.
- * (Code review: Opus cycle 1, issue #15)
- */
-let shikiPromise: Promise<{
-  codeToHtml: (code: string, options: { lang: string; theme: string }) => Promise<string>;
-}> | null = null;
-
-function getShiki(): Promise<{
-  codeToHtml: (code: string, options: { lang: string; theme: string }) => Promise<string>;
-}> {
-  // Clear the cached promise on rejection so subsequent callers can retry.
-  // Without this, a transient import failure (e.g., network glitch during WASM fetch)
-  // would permanently reject for all future callers. (Code review: Opus cycle 2, edge case #2)
-  shikiPromise ??= import('shiki').catch((error: unknown) => {
-    shikiPromise = null;
-    throw error;
-  });
-  return shikiPromise;
-}
-
-/**
- * Subscribe to theme changes on the html element.
- * Uses MutationObserver to detect when 'dark' class is toggled.
- */
-function subscribeToTheme(callback: () => void): () => void {
-  const observer = new MutationObserver(callback);
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['class'],
-  });
-  return (): void => {
-    observer.disconnect();
-  };
-}
-
-/** Get current dark mode state from DOM */
-function getThemeSnapshot(): boolean {
-  return document.documentElement.classList.contains('dark');
-}
-
-/** Server-side fallback (defaults to dark) */
-function getServerSnapshot(): boolean {
-  return true;
-}
-
-/**
- * Hook to detect dark mode using React 19's useSyncExternalStore.
- * This is the correct, concurrency-safe way to subscribe to external DOM state.
- * Works correctly even inside memoized components.
- */
-function useIsDarkMode(): boolean {
-  return useSyncExternalStore(subscribeToTheme, getThemeSnapshot, getServerSnapshot);
-}
 
 interface BashToolWidgetProps {
   readonly command: string;
@@ -93,6 +34,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   // Start expanded if running, collapsed if already completed (restored from persistence)
   const [isExpanded, setIsExpanded] = useState(isRunning);
   const [highlightedCommand, setHighlightedCommand] = useState<string>('');
+  const [highlightedOutput, setHighlightedOutput] = useState<string>('');
   const wasRunningRef = useRef(isRunning);
 
   // Auto-collapse when tool finishes
@@ -136,130 +78,240 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
     };
   }, [command, isDarkMode]);
 
+  // Syntax highlight the output
+  useEffect(() => {
+    let mounted = true;
+
+    if (!output) {
+      setHighlightedOutput('');
+      return;
+    }
+
+    const shikiTheme = isDarkMode ? 'github-dark' : 'github-light';
+
+    const highlightOutput = async (): Promise<void> => {
+      try {
+        const { codeToHtml } = await getShiki();
+        const html = await codeToHtml(output, {
+          lang: 'log',
+          theme: shikiTheme,
+        });
+        if (mounted) {
+          setHighlightedOutput(html);
+        }
+      } catch {
+        if (mounted) {
+          setHighlightedOutput('');
+        }
+      }
+    };
+
+    void highlightOutput();
+
+    return () => {
+      mounted = false;
+    };
+  }, [output, isDarkMode]);
+
   // Truncate long output for collapsed view
   const maxCollapsedLines = 10;
   const outputLines = output?.split('\n') ?? [];
   const hasMoreLines = outputLines.length > maxCollapsedLines;
   const displayOutput = isExpanded ? output : outputLines.slice(0, maxCollapsedLines).join('\n');
 
+  const statusLabel = isRunning ? 'Running Bash' : 'Bash';
+
   return (
-    <div>
-      <div
+    <div className={cn('min-w-0', isFailed && 'opacity-60')}>
+      {/* Header — flat inline row like Read widget */}
+      <button
+        onClick={() => {
+          setIsExpanded(!isExpanded);
+        }}
+        aria-label={isExpanded ? 'Collapse Bash output' : 'Expand Bash output'}
+        aria-expanded={isExpanded}
         className={cn(
-          TOOL_CARD_BASE,
-          'rounded-lg shadow-md',
-          isFailed
-            ? 'border-2 border-dotted border-destructive/40 opacity-60'
-            : 'border border-border/50'
+          'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
+          'transition-colors duration-150 cursor-pointer w-full text-left',
+          'rounded-lg hover:bg-muted/20',
+          isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        {/* Header */}
-        <button
-          onClick={() => {
-            setIsExpanded(!isExpanded);
-          }}
-          className="w-full flex items-center justify-between px-2.5 py-1.5 bg-transparent hover:bg-muted/40 active:bg-muted/50 transition-colors duration-150"
+        <div
+          className={cn(
+            'w-5 h-5 rounded flex items-center justify-center shrink-0',
+            'transition-colors duration-150',
+            isFailed
+              ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
+              : 'bg-primary/15 group-hover/status:bg-primary/25'
+          )}
         >
-          <div className="flex items-center gap-2">
-            <div
-              className={cn(
-                'w-5 h-5 rounded flex items-center justify-center',
-                isFailed ? 'bg-destructive/10' : 'bg-primary/10'
-              )}
-            >
-              <Terminal
-                className={cn(
-                  'h-3 w-3',
-                  isFailed ? 'text-destructive/70' : 'text-primary/70',
-                  isRunning && 'animate-pulse'
-                )}
-              />
-            </div>
-            <span
-              className={cn(
-                'text-xs font-medium',
-                isFailed ? 'text-muted-foreground line-through' : 'text-foreground'
-              )}
-            >
-              {isRunning ? 'Running Bash' : isFailed ? 'Bash Failed' : 'Ran Bash'}
-            </span>
-            {isRunning ? (
-              <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
-            ) : isFailed ? (
-              <span className="text-xs text-destructive/60">Failed</span>
-            ) : null}
-          </div>
-          <ChevronDown className={cn(TOOL_CHEVRON_BASE, isExpanded && 'rotate-180')} />
-        </button>
+          <Terminal
+            className={cn(
+              'h-3 w-3 transition-colors duration-150',
+              isFailed
+                ? 'text-destructive/60 group-hover/status:text-destructive/80'
+                : 'text-primary/80 group-hover/status:text-primary',
+              isRunning && 'animate-pulse'
+            )}
+          />
+        </div>
 
-        {/* Collapsible content */}
-        {/* PERF: Removed mode="wait" — it forces sequential exit→enter animations,
-         * causing 49+ queued fadeOut animations when many tools complete simultaneously.
-         * Default mode ("sync") allows parallel animations, cutting CPU from 5.5% to ~1%. */}
-        <AnimatePresence initial={false}>
-          {isExpanded ? (
-            <motion.div
-              initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-              transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
-              style={{ overflow: 'hidden' }}
-            >
-              {/* Command section */}
-              <div className="px-2.5 py-2 bg-muted/30">
-                <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
-                  command
-                </div>
-                {highlightedCommand ? (
-                  <div
-                    className="bg-muted/50 rounded-md px-2 py-1 font-mono text-sm overflow-x-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent [&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_code]:!bg-transparent"
-                    dangerouslySetInnerHTML={{ __html: highlightedCommand }}
-                  />
-                ) : (
-                  <code className="block bg-muted/50 rounded-md px-2 py-1 font-mono text-sm text-foreground break-all">
-                    {command}
-                  </code>
-                )}
-              </div>
-
-              {/* Description section */}
-              {description ? (
-                <>
-                  <div className="h-px bg-border/30 mx-2.5" />
-                  <div className="px-2.5 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/60 lowercase mb-1">
-                      description
-                    </div>
-                    <div className="text-sm text-muted-foreground">{description}</div>
-                  </div>
-                </>
-              ) : null}
-
-              {/* Output section */}
-              <div className="h-px bg-border/30 mx-2.5" />
-              <div className="p-2.5">
-                {isRunning && !output ? (
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                    <span>Running command...</span>
-                  </div>
-                ) : output ? (
-                  <div className="bg-muted/40 rounded-lg p-2 border border-border/30 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
-                    <pre className="whitespace-pre-wrap break-words m-0">{displayOutput}</pre>
-                    {hasMoreLines ? (
-                      <div className="mt-1.5 text-muted-foreground/60">
-                        {String(outputLines.length)} lines total
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground/60 italic">No output</div>
-                )}
-              </div>
-            </motion.div>
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span
+            className={cn(
+              'text-xs font-medium truncate',
+              isFailed
+                ? 'text-muted-foreground line-through'
+                : 'text-muted-foreground/90 group-hover/status:text-foreground'
+            )}
+          >
+            {statusLabel}
+          </span>
+          {isRunning ? (
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
           ) : null}
-        </AnimatePresence>
-      </div>
+        </div>
+
+        <ChevronDown
+          className={cn(
+            'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
+            isExpanded && 'rotate-180'
+          )}
+        />
+      </button>
+
+      {/* Tree-style expanded content */}
+      {/* PERF: Removed mode="wait" — it forces sequential exit→enter animations,
+       * causing 49+ queued fadeOut animations when many tools complete simultaneously.
+       * Default mode ("sync") allows parallel animations, cutting CPU from 5.5% to ~1%. */}
+      <AnimatePresence initial={false}>
+        {isExpanded ? (
+          <motion.div
+            initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="flex flex-col">
+              {/* Content node with vertical line from header icon */}
+              <div className="flex flex-row px-2.5">
+                {/* Gutter: vertical connector line aligned under header icon */}
+                <div className="w-5 flex justify-center shrink-0">
+                  <div
+                    className={cn(
+                      'w-[2px] rounded-full h-full',
+                      success === undefined && 'bg-primary/40'
+                    )}
+                    style={
+                      success !== undefined
+                        ? {
+                            background: success
+                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
+                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
+
+                {/* Content box */}
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card overflow-hidden">
+                  {/* Command section */}
+                  <div className="px-3 py-2">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1.5">
+                      command
+                    </div>
+                    {highlightedCommand ? (
+                      <div
+                        className="bg-muted/40 rounded-md px-2 py-1 font-mono text-sm [&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_code]:!bg-transparent"
+                        dangerouslySetInnerHTML={{ __html: highlightedCommand }}
+                      />
+                    ) : (
+                      <code className="block bg-muted/40 rounded-md px-2 py-1 font-mono text-sm text-foreground break-all">
+                        {command}
+                      </code>
+                    )}
+                  </div>
+
+                  {/* Description section */}
+                  {description ? (
+                    <>
+                      <div className="h-px bg-border/20 mx-3" />
+                      <div className="px-3 py-2">
+                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1">
+                          description
+                        </div>
+                        <div className="text-sm text-muted-foreground/80">{description}</div>
+                      </div>
+                    </>
+                  ) : null}
+
+                  {/* Output section */}
+                  <div className="h-px bg-border/20 mx-3" />
+                  <div className="px-3 py-2">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1.5">
+                      output
+                    </div>
+                    {isRunning && !output ? (
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        <span>Running command...</span>
+                      </div>
+                    ) : output ? (
+                      <div className="bg-muted/30 rounded-md p-2 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
+                        {highlightedOutput ? (
+                          <div
+                            className="[&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_code]:!bg-transparent [&_pre]:whitespace-pre-wrap [&_pre]:break-words"
+                            dangerouslySetInnerHTML={{ __html: highlightedOutput }}
+                          />
+                        ) : (
+                          <pre className="whitespace-pre-wrap break-words m-0">{displayOutput}</pre>
+                        )}
+                        {hasMoreLines ? (
+                          <div className="mt-1.5 text-muted-foreground/70 text-xs">
+                            {String(outputLines.length)} lines total
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground/40 italic">No output</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom status indicator */}
+              {!isRunning ? (
+                <div className="flex flex-row items-center px-2.5 py-1">
+                  <div
+                    className={cn(
+                      'w-5 h-5 rounded flex items-center justify-center shrink-0',
+                      isFailed ? 'bg-red-500/15' : 'bg-green-500/15'
+                    )}
+                  >
+                    {isFailed ? (
+                      <XCircle className="h-3 w-3 text-red-500/80" />
+                    ) : (
+                      <CheckCircle2 className="h-3 w-3 text-green-500/80" />
+                    )}
+                  </div>
+                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                    {isFailed ? 'Failed' : 'Completed'}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-row h-1 px-2.5">
+                  <div className="w-5 flex justify-center">
+                    <div className="w-[2px] rounded-full h-full bg-border/20" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };

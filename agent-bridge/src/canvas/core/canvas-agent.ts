@@ -18,6 +18,7 @@ import { existsSync } from 'node:fs';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
 import { ClaudeCredentials } from '../../common/auth/credentials.js';
+import { getShellEnvironment } from '../../common/env/shell-env.js';
 import { createLogger } from '../../common/logging/logger.js';
 import { createCanvasMcpServer } from '../mcp/canvas-mcp-server.js';
 import { CanvasToolBridge } from '../mcp/canvas-tool-bridge.js';
@@ -349,7 +350,7 @@ export class CanvasAgent {
   /**
    * Start streaming session with Claude SDK
    */
-  startSession(): void {
+  async startSession(): Promise<void> {
     if (this.sessionActive) {
       logger.warn('Session already active');
       return;
@@ -361,35 +362,30 @@ export class CanvasAgent {
 
     logger.info({ sessionId: this.sessionId }, 'Starting canvas session');
 
-    // Fix PATH for production Tauri apps launched from Finder/Dock
-    // These don't inherit the user's shell PATH, so claude binary won't be found
-    const currentPath = process.env.PATH ?? '';
-    const homeDir = process.env.HOME ?? '';
-    const additionalPaths = [
-      '/opt/homebrew/bin', // Homebrew on Apple Silicon
-      '/usr/local/bin', // Homebrew on Intel Macs
-      '/usr/bin', // System binaries
-      `${homeDir}/.bun/bin`, // Bun installation
-    ].filter((p) => !currentPath.includes(p));
-
-    if (additionalPaths.length > 0) {
-      process.env.PATH = [...additionalPaths, currentPath].join(':');
-      logger.info({ addedPaths: additionalPaths }, 'Extended PATH for claude binary');
+    // Capture the user's interactive login shell environment.
+    // Tauri apps launched from Finder/Dock don't inherit the user's shell PATH.
+    const shellEnv = getShellEnvironment();
+    if (shellEnv.PATH) {
+      process.env.PATH = shellEnv.PATH;
+      logger.debug({ pathLength: shellEnv.PATH.length }, 'Applied shell environment PATH');
     }
 
-    // Check credentials
-    const credentials = ClaudeCredentials.getCredentials();
+    // Check credentials (async: may attempt token refresh)
+    const credentials = await ClaudeCredentials.getCredentials();
     if (!credentials.hasCredentials) {
       throw new Error(
         'No credentials found. Please log in to Claude Code CLI or set ANTHROPIC_API_KEY.'
       );
     }
 
-    // Handle OAuth vs API key
+    // Handle OAuth vs API key — pass token explicitly via CLAUDE_CODE_OAUTH_TOKEN
     if (credentials.type === 'oauth') {
+      if (credentials.token) {
+        process.env.CLAUDE_CODE_OAUTH_TOKEN = credentials.token;
+      }
       delete process.env.ANTHROPIC_API_KEY;
       delete process.env.ANTHROPIC_AUTH_TOKEN;
-      logger.info('Using Claude Code OAuth');
+      logger.info('Using Claude Code OAuth via CLAUDE_CODE_OAUTH_TOKEN');
     } else {
       logger.info('Using API key from environment');
     }

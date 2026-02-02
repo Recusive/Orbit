@@ -15,6 +15,7 @@ import {
   readFile,
 } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
+import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 export async function handleFileTreeRequest(
@@ -158,6 +159,10 @@ export async function handleFileRead(
       '*'
     );
   } catch (err: unknown) {
+    // Close the empty tab that was pre-opened before the read attempt.
+    // Without this, clicking a file that fails to read leaves a blank tab.
+    useFileViewerStore.getState().closeTab(message.path);
+
     const errorMessage = err instanceof Error ? err.message : 'Failed to read file';
     window.postMessage(
       {

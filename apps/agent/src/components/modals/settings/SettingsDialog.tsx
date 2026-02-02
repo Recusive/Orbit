@@ -1,5 +1,5 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Settings2, X } from 'lucide-react';
+import { ChevronRight, Settings2, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Suspense, useEffect, useState } from 'react';
 
@@ -10,7 +10,7 @@ import type { SettingsDialogProps, SettingsSection } from './types';
 import type { FC, ReactNode } from 'react';
 
 import { Dialog, DialogPortal } from '@/components/ui/dialog';
-import { Spinner } from '@/components/ui/spinner';
+import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { cn } from '@/lib/utils';
 
 // Animation configuration for the settings dialog
@@ -50,7 +50,7 @@ const contentVariants = {
 // Loading fallback for lazy-loaded pages
 const PageLoader: FC = () => (
   <div className="flex items-center justify-center h-full">
-    <Spinner size="lg" className="text-muted-foreground/60" />
+    <ThinkingDots size={24} />
   </div>
 );
 
@@ -89,10 +89,10 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
   // Check if we're on an async section (subagents or commands)
   const isAsyncSection = activeSection === 'subagents' || activeSection === 'commands';
 
-  const getSectionTitle = (): string => {
-    if (activeSection === 'feedback') return FEEDBACK_ITEM.label;
+  const getActiveItem = (): { label: string; icon: ReactNode } => {
+    if (activeSection === 'feedback') return FEEDBACK_ITEM;
     const item = NAV_ITEMS.find((n) => n.id === activeSection);
-    return item?.label ?? 'Settings';
+    return item ?? { label: 'Settings', icon: null };
   };
 
   // Render static content via lazy-loaded components
@@ -116,7 +116,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
             {/* Animated overlay/backdrop - clicks close the dialog */}
             <DialogPrimitive.Overlay asChild forceMount>
               <motion.div
-                className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+                className="fixed inset-0 z-50 bg-black/40"
                 initial={overlayVariants.hidden}
                 animate={overlayVariants.visible}
                 exit={shouldReduceMotion ? { opacity: 0 } : overlayVariants.exit}
@@ -141,12 +141,12 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                 }}
               >
                 <motion.div
-                  className="w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-card border border-border/40 rounded-lg overflow-hidden flex flex-col"
+                  className="w-[720px] max-w-[90vw] h-[600px] max-h-[85vh] bg-card border-[3px] border-border rounded-xl overflow-hidden flex flex-col"
                   onClick={(e) => {
                     e.stopPropagation();
                   }}
                   style={{
-                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+                    boxShadow: 'none',
                   }}
                   initial={shouldReduceMotion ? { opacity: 0 } : contentVariants.hidden}
                   animate={shouldReduceMotion ? { opacity: 1 } : contentVariants.visible}
@@ -159,15 +159,18 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                 >
                   {/* Accessibility: Hidden title for screen readers */}
                   <DialogPrimitive.Title className="sr-only">
-                    Settings - {getSectionTitle()}
+                    Settings &gt; {getActiveItem().label}
                   </DialogPrimitive.Title>
                   {/* Title bar */}
-                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <Settings2 className="h-4 w-4 text-muted-foreground/70" />
-                      <span className="font-medium text-base">Settings - {getSectionTitle()}</span>
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b-3 border-border/40 bg-muted/30">
+                    <div className="flex items-center gap-2 font-medium text-base">
+                      <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+                      <span className="text-muted-foreground/70">Settings</span>
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
+                      <span>{getActiveItem().icon}</span>
+                      <span>{getActiveItem().label}</span>
                     </div>
-                    <DialogPrimitive.Close className="rounded-md p-1 opacity-60 hover:opacity-100 hover:bg-muted/50 active:scale-95 transition-[opacity,background-color,transform] duration-150">
+                    <DialogPrimitive.Close className="rounded-md p-1 opacity-60 hover:opacity-100 hover:bg-muted active:scale-95 transition-[opacity,background-color,transform] duration-150">
                       <X className="h-4 w-4" />
                       <span className="sr-only">Close</span>
                     </DialogPrimitive.Close>

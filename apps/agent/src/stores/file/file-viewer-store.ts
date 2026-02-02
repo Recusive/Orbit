@@ -4,6 +4,8 @@ import { immer } from 'zustand/middleware/immer';
 
 import type { FileDiff } from '@/stores/file/file-store';
 
+import { useUIStore } from '@/stores/ui/ui-store';
+
 const logger = createLogger('FileViewerStore');
 
 // Diff data for files opened from Changes tab
@@ -27,6 +29,7 @@ export interface ViewedFile {
   diffData?: ViewedFileDiff;
   viewMode: FileViewMode;
   isModified: boolean; // Track if content has been modified
+  isExternal: boolean; // File is outside workspace (read-only, no save)
 }
 
 // Position to navigate to after opening a file
@@ -200,6 +203,13 @@ export function getLanguageFromPath(path: string): string {
   return languageMap[ext] ?? 'plaintext';
 }
 
+/** Check whether a file path is outside the current workspace. */
+function isPathExternal(filePath: string): boolean {
+  const workspacePath = useUIStore.getState().workspacePath;
+  if (!workspacePath) return false;
+  return !filePath.startsWith(workspacePath);
+}
+
 export const useFileViewerStore = create<FileViewerStore>()(
   immer((set, get) => ({
     // Initial state
@@ -242,6 +252,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
             language: getLanguageFromPath(path),
             viewMode: 'file',
             isModified: false,
+            isExternal: isPathExternal(path),
           };
           state.openTabs.push(newTab);
           state.activeTabPath = path;
@@ -277,6 +288,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
             diffData,
             viewMode: 'diff',
             isModified: false,
+            isExternal: isPathExternal(path),
           };
           state.openTabs.push(newTab);
           state.activeTabPath = path;
@@ -360,6 +372,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
             language: language ?? getLanguageFromPath(path),
             viewMode: 'file',
             isModified: false,
+            isExternal: isPathExternal(path),
           });
           state.activeTabPath = path;
         }

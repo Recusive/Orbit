@@ -619,7 +619,17 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         pendingChunkLengths.delete(message.message_id);
 
         setIsAgentRunning(false);
-        const errorContent = `Error: ${message.error}`;
+
+        // Detect auth-related errors and provide a user-friendly message
+        // instead of dumping the raw SDK error into the chat
+        const rawError = message.error;
+        const isAuthError =
+          /no credentials found|oauth.*token|auth(?:entication|orization)?\s+(?:failed|error)|unauthorized/i.test(
+            rawError
+          );
+        const errorContent = isAuthError
+          ? 'Error: Authentication failed. Please run `claude login` in your terminal to re-authenticate.'
+          : `Error: ${rawError}`;
         // PERF: shallow-copy + index mutation instead of spread + slice
         setMessages((prev) => {
           const lastIdx = prev.length - 1;

@@ -18,11 +18,13 @@ import {
   useRef,
   useState,
 } from 'react';
+import { toast } from 'sonner';
 
 import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
 import type { FC, ReactNode } from 'react';
 
 import {
+  onAgentAuthError,
   onAgentCheckpoint,
   onAgentError,
   onAgentMessage,
@@ -545,6 +547,39 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             uuid: crypto.randomUUID(),
             session_id: event.sessionId,
             checkpoint_id: event.checkpointId,
+          });
+        })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
+          })
+      );
+
+      // Auth error events (OAuth token expiry, refresh failure)
+      listenerPromises.push(
+        onAgentAuthError((event) => {
+          logger.warn('Auth error received', {
+            category: event.category,
+            recoverable: event.recoverable,
+          });
+          toast.error('Authentication Error', {
+            description: event.recoverable
+              ? 'Your session token has expired. Run "claude login" in your terminal to re-authenticate.'
+              : event.message,
+            duration: 10_000,
+            action: event.recoverable
+              ? {
+                  label: 'Copy command',
+                  onClick: (): void => {
+                    void navigator.clipboard.writeText('claude login');
+                  },
+                }
+              : undefined,
           });
         })
           .then((unlisten) => {

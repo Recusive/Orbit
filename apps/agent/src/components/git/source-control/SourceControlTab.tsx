@@ -118,7 +118,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header with Branch Dropdown */}
       <div
-        className="flex items-center justify-between px-4 border-b border-border shrink-0"
+        className="flex items-center justify-between px-4 border-b-3 border-border/50 shrink-0"
         style={{ height: HEADER_HEIGHT }} // Extracted constant
       >
         <BranchSelector

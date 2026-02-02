@@ -601,3 +601,15 @@ export const KeychainCredentialsSchema = z
   })
   .loose(); // Allow any additional fields
 export type KeychainCredentials = z.infer<typeof KeychainCredentialsSchema>;
+
+// OAuth token refresh response from Anthropic's token endpoint
+export const OAuthRefreshResponseSchema = z
+  .object({
+    access_token: z.string().min(1),
+    token_type: z.string().optional(),
+    expires_in: z.number(),
+    refresh_token: z.string().optional(),
+    scope: z.string().optional(),
+  })
+  .loose(); // Allow additional fields from the OAuth endpoint
+export type OAuthRefreshResponse = z.infer<typeof OAuthRefreshResponseSchema>;

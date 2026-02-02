@@ -269,7 +269,9 @@ class MissionAgentImpl implements MissionAgent {
  * });
  * ```
  */
-export function createMissionAgentSession(options: MissionAgentOptions): MissionAgent {
+export async function createMissionAgentSession(
+  options: MissionAgentOptions
+): Promise<MissionAgent> {
   const { sessionId, typeConfig, sessionConfig } = options;
 
   logger.info(
@@ -302,11 +304,14 @@ export function createMissionAgentSession(options: MissionAgentOptions): Mission
 /**
  * Create a full (general-purpose) agent
  */
-function createFullAgent(sessionId: string, sessionConfig?: CanvasSessionConfig): MissionAgent {
+async function createFullAgent(
+  sessionId: string,
+  sessionConfig?: CanvasSessionConfig
+): Promise<MissionAgent> {
   logger.info({ sessionId }, 'Creating full agent');
 
   const agent = createCanvasAgent(sessionId, sessionConfig);
-  agent.startSession();
+  await agent.startSession();
 
   return new MissionAgentImpl(sessionId, 'full', agent);
 }
@@ -314,11 +319,11 @@ function createFullAgent(sessionId: string, sessionConfig?: CanvasSessionConfig)
 /**
  * Create a review agent with diff context
  */
-function createReviewAgent(
+async function createReviewAgent(
   sessionId: string,
   typeConfig: ReviewAgentTypeConfig,
   sessionConfig?: CanvasSessionConfig
-): MissionAgent {
+): Promise<MissionAgent> {
   logger.info({ sessionId, reviewScope: typeConfig.reviewScope }, 'Creating review agent');
 
   // Fetch diff based on scope (placeholder - frontend provides actual diff)
@@ -337,7 +342,7 @@ function createReviewAgent(
 
   // Create and start agent
   const agent = createCanvasAgent(sessionId, sessionConfig);
-  agent.startSession();
+  await agent.startSession();
 
   logger.info(
     {
@@ -356,11 +361,11 @@ function createReviewAgent(
  * Create a plan agent with plan mode enabled
  * Plan mode sets SDK's permissionMode to 'plan', restricting to read-only tools.
  */
-function createPlanAgent(
+async function createPlanAgent(
   sessionId: string,
   _typeConfig: PlanAgentTypeConfig,
   sessionConfig?: CanvasSessionConfig
-): MissionAgent {
+): Promise<MissionAgent> {
   logger.info({ sessionId }, 'Creating plan agent with plan mode enabled');
 
   // Enable plan mode via session config
@@ -371,7 +376,7 @@ function createPlanAgent(
   };
 
   const agent = createCanvasAgent(sessionId, planConfig);
-  agent.startSession();
+  await agent.startSession();
 
   logger.info({ sessionId }, 'Plan agent created - SDK will restrict to read-only tools');
 

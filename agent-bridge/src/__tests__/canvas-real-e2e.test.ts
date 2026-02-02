@@ -260,8 +260,8 @@ function createToolResponseHandler(
 // REAL E2E TESTS
 // =============================================================================
 
-// Check credentials upfront (module-level)
-const CREDENTIALS = ClaudeCredentials.getCredentials();
+// Check credentials upfront (module-level, async)
+const CREDENTIALS = await ClaudeCredentials.getCredentials();
 const HAS_CREDENTIALS = CREDENTIALS.hasCredentials;
 
 if (!HAS_CREDENTIALS) {
@@ -325,7 +325,7 @@ describe.skipIf(skipIntegrationTests)('Canvas REAL E2E - Claude API Integration'
     const sessionId = `real-e2e-greeting-${String(++sessionCounter)}`;
 
     // Create session with Claude SDK
-    manager.createSession(sessionId, {
+    await manager.createSession(sessionId, {
       thinkingEnabled: false,
       model: 'claude-sonnet-4-20250514',
     });
@@ -374,7 +374,7 @@ describe.skipIf(skipIntegrationTests)('Canvas REAL E2E - Claude API Integration'
     async () => {
       const sessionId = `real-e2e-tool-${String(++sessionCounter)}`;
 
-      manager.createSession(sessionId, {
+      await manager.createSession(sessionId, {
         thinkingEnabled: false,
         model: 'claude-sonnet-4-20250514',
       });
@@ -430,7 +430,7 @@ describe.skipIf(skipIntegrationTests)('Canvas REAL E2E - Claude API Integration'
   conditionalTest('should validate canvas state in real request/response flow', async () => {
     const sessionId = `real-e2e-state-${String(++sessionCounter)}`;
 
-    manager.createSession(sessionId, {
+    await manager.createSession(sessionId, {
       thinkingEnabled: false,
       model: 'claude-sonnet-4-20250514',
     });
@@ -499,7 +499,7 @@ describe.skipIf(skipIntegrationTests)('Canvas REAL E2E - Claude API Integration'
   conditionalTest('should handle session interruption gracefully', async () => {
     const sessionId = `real-e2e-interrupt-${String(++sessionCounter)}`;
 
-    manager.createSession(sessionId, {
+    await manager.createSession(sessionId, {
       thinkingEnabled: false,
       model: 'claude-sonnet-4-20250514',
     });
@@ -529,7 +529,7 @@ describe.skipIf(skipIntegrationTests)('Canvas REAL E2E - Claude API Integration'
   conditionalTest('should validate tool_use message metadata when Claude uses tools', async () => {
     const sessionId = `real-e2e-toolmeta-${String(++sessionCounter)}`;
 
-    manager.createSession(sessionId, {
+    await manager.createSession(sessionId, {
       thinkingEnabled: false,
       model: 'claude-sonnet-4-20250514',
     });

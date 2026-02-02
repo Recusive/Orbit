@@ -2,11 +2,11 @@
 name = "orbit-plugin-decorum"
 version = "0.1.0"
 edition = "2021"
-description = "Fork of tauri-plugin-decorum with fix for decoration-less windows"
+description = "macOS ProMotion 120Hz support for Tauri apps"
 license = "MIT"
 repository = "https://github.com/Recusive/Orbit"
 readme = "README.md"
-keywords = ["tauri", "plugin", "macos", "traffic-lights"]
+keywords = ["tauri", "plugin", "macos", "promotion"]
 categories = ["gui"]
 
 # Required for Tauri plugins
@@ -63,7 +63,6 @@ cargo = { level = "warn", priority = -1 }
 # Allowed - outside our control or intentional
 multiple_crate_versions = "allow"  # Transitive dependency conflicts
 redundant_pub_crate = "allow"  # pub(crate) in private mod is intentional
-suboptimal_flops = "allow"  # mul_add is premature optimization for 3 buttons
 
 # Panics and unwraps
 unwrap_used = "deny"
@@ -118,7 +117,6 @@ expl_impl_clone_on_copy = "deny"
 float_cmp = "deny"
 float_cmp_const = "deny"
 lossy_float_literal = "deny"
-mem_forget = "allow"  # Required for leaking delegate to prevent deallocation
 same_name_method = "deny"
 string_add = "deny"
 
@@ -127,28 +125,12 @@ log = "0.4"
 tauri = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# parking_lot::RwLock for thread-safe global offset storage (required by project clippy rules)
-parking_lot = "0.12"
-
 # Modern objc2 ecosystem (type-safe, actively maintained)
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = [
-    "NSResponder",
-    "NSView",
-    "NSWindow",
-    "NSButton",
-    "NSControl",
-    "NSCell",
-    "NSWindowTabGroup"
-] }
 objc2-foundation = { version = "0.3", features = [
-    "NSObject",
-    "NSNotification",
-    "NSString",
-    "NSGeometry"
+    "NSRunLoop",
+    "NSString"
 ] }
-# Required for CGPoint, CGRect, CGSize types
-objc2-core-foundation = "0.3"
 # Required for CAFrameRateRange struct (ProMotion 120Hz support)
 # CADisplayLink itself is obtained via raw msg_send from NSScreen (macOS API)
 objc2-quartz-core = { version = "0.3", features = ["CAFrameRateRange"] }

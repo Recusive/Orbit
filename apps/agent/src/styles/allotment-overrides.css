@@ -1,0 +1,38 @@
+/**
+ * Allotment separator border overrides.
+ * Imported AFTER allotment/dist/style.css in resizable.tsx to guarantee cascade order.
+ *
+ * Allotment uses ::before pseudo-elements on splitViewView for visible borders.
+ * The hashed class names (e.g. allotment-module_splitView__L-yRc) come from the
+ * published npm package and are stable within a given version.
+ */
+
+/* ── Separator color & sash hover ── */
+/* Override allotment's --separator-border and --focus-border variables.
+   --separator-border: uses --border-panel token (stays in sync with theme).
+   --focus-border: uses --primary (coral) instead of allotment's default blue (#007fd4). */
+:root {
+  --separator-border: color-mix(in oklch, var(--border) 50%, transparent) !important;
+  --focus-border: oklch(0.62 0.18 35) !important; /* Coral - midpoint for light mode visibility */
+}
+
+html.dark {
+  --separator-border: color-mix(in oklch, var(--border) 50%, transparent) !important;
+  --focus-border: var(--primary) !important;
+}
+
+/* ── Separator width: 3px (matches app's 3px border system) ── */
+
+/* Vertical layout → horizontal separator (top border of second pane) */
+.allotment-module_vertical__WSwwa.allotment-module_separatorBorder__x-rDS
+  > .allotment-module_splitViewContainer__rQnVa
+  > .allotment-module_splitViewView__MGZ6O:not(:first-child)::before {
+  height: 3px !important;
+}
+
+/* Horizontal layout → vertical separator (left border of second pane) */
+.allotment-module_horizontal__7doS8.allotment-module_separatorBorder__x-rDS
+  > .allotment-module_splitViewContainer__rQnVa
+  > .allotment-module_splitViewView__MGZ6O:not(:first-child)::before {
+  width: 3px !important;
+}

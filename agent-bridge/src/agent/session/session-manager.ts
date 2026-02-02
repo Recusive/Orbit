@@ -405,6 +405,17 @@ export class SessionManager extends Disposable {
   );
   readonly onBrowserToolRequest = this._onBrowserToolRequest.event;
 
+  // Auth error event - structured auth failure notification for frontend
+  private readonly _onAuthError = this._register(
+    new Emitter<{
+      sessionId: string;
+      category: 'TOKEN_EXPIRED' | 'REFRESH_FAILED' | 'NO_CREDENTIALS' | 'INVALID_TOKEN';
+      message: string;
+      recoverable: boolean;
+    }>()
+  );
+  readonly onAuthError = this._onAuthError.event;
+
   // Session tracking
   private activeSessions = new Map<string, OrbitAgent>();
   private sessionConsumers = new Map<
@@ -570,6 +581,14 @@ export class SessionManager extends Disposable {
       // NOT for rewind scenarios. Rewind uses context-prepend approach instead.
       resumeSessionId: config?.resumeSessionId,
       forkSession: config?.forkSession,
+      onAuthFailure: (message: string) => {
+        this._onAuthError.fire({
+          sessionId,
+          category: 'REFRESH_FAILED',
+          message,
+          recoverable: true,
+        });
+      },
     };
 
     logger.info(
@@ -606,6 +625,17 @@ export class SessionManager extends Disposable {
       logger.error({ sessionId, error: errorMessage }, 'Failed to start session');
       // Remove from active sessions on failure
       this.activeSessions.delete(sessionId);
+
+      // Detect credential errors and emit structured auth event
+      if (/no credentials found|api[_ ]?key|oauth.*token/i.test(errorMessage)) {
+        this._onAuthError.fire({
+          sessionId,
+          category: 'NO_CREDENTIALS',
+          message: errorMessage,
+          recoverable: true,
+        });
+      }
+
       throw error;
     }
 
@@ -1118,7 +1148,11 @@ export class SessionManager extends Disposable {
   /**
    * Send a message to a session
    */
-  sendMessage(message: string, sessionId: string, attachments?: AttachmentContentBlock[]): void {
+  async sendMessage(
+    message: string,
+    sessionId: string,
+    attachments?: AttachmentContentBlock[]
+  ): Promise<void> {
     const agent = this.activeSessions.get(sessionId);
     if (agent === undefined) {
       throw new Error(`Session ${sessionId} not found. Call createSession() first.`);
@@ -1126,6 +1160,20 @@ export class SessionManager extends Disposable {
 
     if (!agent.isSessionReady()) {
       throw new Error(`Session ${sessionId} is not ready.`);
+    }
+
+    // Layer 2: Pre-send credential re-validation — MUST block message send.
+    // If credentials are expired, surface a clear auth error instead of
+    // letting the message fail with a cryptic SDK error. (Code review: Opus cycle 3, #1)
+    const hasCredentials = await agent.refreshCredentials();
+    if (!hasCredentials) {
+      this._onAuthError.fire({
+        sessionId,
+        category: 'NO_CREDENTIALS',
+        message: 'No valid credentials available. Please re-authenticate with "claude login".',
+        recoverable: true,
+      });
+      return;
     }
 
     // Track turn start time

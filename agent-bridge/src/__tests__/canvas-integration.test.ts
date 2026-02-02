@@ -54,18 +54,18 @@ describe.skipIf(skipIntegrationTests)('Canvas Session Manager - Real Integration
   });
 
   describe('Session Lifecycle', () => {
-    it('should create a real session with CanvasAgent', () => {
-      manager.createSession('test-session-1', { thinkingEnabled: false });
+    it('should create a real session with CanvasAgent', async () => {
+      await manager.createSession('test-session-1', { thinkingEnabled: false });
 
       expect(manager.hasSession('test-session-1')).toBe(true);
       expect(manager.sessionCount).toBe(1);
       expect(manager.getActiveSessions()).toContain('test-session-1');
     });
 
-    it('should create multiple independent sessions', () => {
-      manager.createSession('session-a');
-      manager.createSession('session-b');
-      manager.createSession('session-c');
+    it('should create multiple independent sessions', async () => {
+      await manager.createSession('session-a');
+      await manager.createSession('session-b');
+      await manager.createSession('session-c');
 
       expect(manager.sessionCount).toBe(3);
       expect(manager.hasSession('session-a')).toBe(true);
@@ -73,15 +73,15 @@ describe.skipIf(skipIntegrationTests)('Canvas Session Manager - Real Integration
       expect(manager.hasSession('session-c')).toBe(true);
     });
 
-    it('should not create duplicate sessions', () => {
-      manager.createSession('duplicate-test');
-      manager.createSession('duplicate-test'); // Should warn but not throw
+    it('should not create duplicate sessions', async () => {
+      await manager.createSession('duplicate-test');
+      await manager.createSession('duplicate-test'); // Should warn but not throw
 
       expect(manager.sessionCount).toBe(1);
     });
 
     it('should delete session and clean up resources', async () => {
-      manager.createSession('to-delete');
+      await manager.createSession('to-delete');
       expect(manager.hasSession('to-delete')).toBe(true);
 
       await manager.deleteSession('to-delete');
@@ -89,13 +89,13 @@ describe.skipIf(skipIntegrationTests)('Canvas Session Manager - Real Integration
       expect(manager.sessionCount).toBe(0);
     });
 
-    it('should store and retrieve session config', () => {
+    it('should store and retrieve session config', async () => {
       const config = {
         thinkingEnabled: true,
         model: 'claude-sonnet-4-20250514',
       };
 
-      manager.createSession('config-test', config);
+      await manager.createSession('config-test', config);
 
       const retrieved = manager.getSessionConfig('config-test');
       expect(retrieved).toBeDefined();
@@ -105,8 +105,8 @@ describe.skipIf(skipIntegrationTests)('Canvas Session Manager - Real Integration
   });
 
   describe('Canvas State Management', () => {
-    it('should update and retrieve canvas state', () => {
-      manager.createSession('state-test');
+    it('should update and retrieve canvas state', async () => {
+      await manager.createSession('state-test');
 
       const mockState = createMockCanvasState();
       manager.updateCanvasState('state-test', mockState);
@@ -120,9 +120,9 @@ describe.skipIf(skipIntegrationTests)('Canvas Session Manager - Real Integration
       expect(firstNode.id).toBe('node-1');
     });
 
-    it('should isolate state between sessions', () => {
-      manager.createSession('state-a');
-      manager.createSession('state-b');
+    it('should isolate state between sessions', async () => {
+      await manager.createSession('state-a');
+      await manager.createSession('state-b');
 
       const stateA: CanvasState = {
         nodes: [
@@ -175,11 +175,11 @@ describe.skipIf(skipIntegrationTests)('Canvas Session Manager - Real Integration
       }
     });
 
-    it('should reject session creation after disposal', () => {
+    it('should reject session creation after disposal', async () => {
       manager.dispose();
 
       try {
-        manager.createSession('post-dispose');
+        await manager.createSession('post-dispose');
         expect(true).toBe(false); // Should not reach here
       } catch (err: unknown) {
         expect(err instanceof Error && err.message).toContain('disposed');
@@ -188,8 +188,8 @@ describe.skipIf(skipIntegrationTests)('Canvas Session Manager - Real Integration
   });
 
   describe('Configuration Updates', () => {
-    it('should update thinking mode on existing session', () => {
-      manager.createSession('thinking-test', { thinkingEnabled: false });
+    it('should update thinking mode on existing session', async () => {
+      await manager.createSession('thinking-test', { thinkingEnabled: false });
 
       manager.setThinkingMode('thinking-test', true);
 
@@ -197,8 +197,8 @@ describe.skipIf(skipIntegrationTests)('Canvas Session Manager - Real Integration
       expect(config?.thinkingEnabled).toBe(true);
     });
 
-    it('should update model on existing session', () => {
-      manager.createSession('model-test');
+    it('should update model on existing session', async () => {
+      await manager.createSession('model-test');
 
       manager.setModel('model-test', 'claude-opus-4-20250514');
 
@@ -394,7 +394,7 @@ describe.skipIf(skipIntegrationTests)('End-to-End Integration Flow', () => {
     });
 
     // Create session
-    manager.createSession('e2e-test', { thinkingEnabled: false });
+    await manager.createSession('e2e-test', { thinkingEnabled: false });
     expect(manager.hasSession('e2e-test')).toBe(true);
 
     // Update state

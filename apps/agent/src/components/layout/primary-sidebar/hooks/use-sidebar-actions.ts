@@ -125,6 +125,26 @@ export const useSidebarActions = ({
     try {
       const worktreeList = await gitWorktreeList(workspacePath);
 
+      // GUARD: If git discovery found a PARENT repo (not the workspace itself),
+      // ignore the worktree list entirely. This happens when the workspace is a
+      // plain folder inside a directory that has a .git (e.g., ~/Desktop/test1
+      // where ~ has .git). The user's chosen workspace must never be overridden
+      // by a parent repo root — that would hijack the file explorer.
+      const worktreePaths = new Set(worktreeList.map((wt) => wt.path));
+      const workspaceIsWorktree = worktreePaths.has(workspacePath);
+      const workspaceInsideWorktree = worktreeList.some((wt) =>
+        workspacePath.startsWith(wt.path + '/')
+      );
+
+      if (!workspaceIsWorktree && workspaceInsideWorktree) {
+        logger.info('Workspace is inside a parent repo, ignoring discovered worktrees', {
+          workspace: workspacePath,
+          discoveredRoot: worktreeList[0]?.path,
+        });
+        setWorktrees([]);
+        return;
+      }
+
       // Preserve existing isExpanded state when refreshing worktree list
       const existingWorktrees = useUIStore.getState().worktrees;
       const existingExpandedMap = new Map(
@@ -141,7 +161,6 @@ export const useSidebarActions = ({
       // CRITICAL: Validate activeWorktreePath against the new worktree list.
       // A stale path from a prior workspace could drive file/git/terminal ops to wrong directory.
       const currentActiveWorktree = useUIStore.getState().activeWorktreePath;
-      const worktreePaths = new Set(worktreeList.map((wt) => wt.path));
       const isActiveWorktreeValid =
         currentActiveWorktree !== null && worktreePaths.has(currentActiveWorktree);
 
@@ -162,9 +181,15 @@ export const useSidebarActions = ({
       }
     } catch {
       logger.warn('Failed to load worktrees (may not be a git repo)');
-      // Not a git repo or error - clear worktrees and reset active worktree
+      // Not a git repo or error - clear the worktree list.
       setWorktrees([]);
-      setActiveWorktree(null);
+      // Only clear activeWorktreePath if it's stale (pointing to a different directory
+      // from a previous workspace). If it matches the current workspace or is already
+      // null, leave it alone to avoid triggering unnecessary file tree re-syncs.
+      const current = useUIStore.getState().activeWorktreePath;
+      if (current !== null && current !== workspacePath) {
+        setActiveWorktree(null);
+      }
     }
   }, [workspacePath, setWorktrees, setActiveWorktree]);
 

@@ -129,7 +129,10 @@ export const ConversationList: FC<ConversationListProps> = ({
     return (
       <div className="relative mt-1" style={{ marginLeft: CONVERSATION_INDENT_PX }}>
         {/* Vertical timeline line */}
-        <div className="absolute left-0 top-0 bottom-2 w-px bg-border/60" />
+        <div
+          className="absolute top-0 bottom-2 w-[2px] rounded-full bg-border/60"
+          style={{ left: -2 }}
+        />
         {/* Conversations */}
         <div className="flex flex-col gap-0.5">
           {convList.map((conv) => (

@@ -104,6 +104,13 @@ export interface CheckpointEvent {
   checkpointId: string;
 }
 
+export interface AuthErrorEvent {
+  sessionId: string;
+  category: 'TOKEN_EXPIRED' | 'REFRESH_FAILED' | 'NO_CREDENTIALS' | 'INVALID_TOKEN';
+  message: string;
+  recoverable: boolean;
+}
+
 export type AgentModel = 'sonnet' | 'opus' | 'haiku' | 'inherit';
 
 export interface SubagentDefinition {
@@ -265,6 +272,12 @@ export async function onAgentReady(callback: () => void): Promise<() => void> {
   return listen<undefined>('agent:ready', () => {
     callback();
   });
+}
+
+export async function onAgentAuthError(
+  callback: (event: AuthErrorEvent) => void
+): Promise<() => void> {
+  return listen<AuthErrorEvent>('agent:auth_error', callback);
 }
 
 // ============================================

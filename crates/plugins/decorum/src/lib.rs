@@ -1,22 +1,10 @@
-//! Orbit's fork of tauri-plugin-decorum with fix for decoration-less windows.
+//! Orbit's window enhancement plugin for macOS.
 //!
-//! This plugin provides macOS traffic light (close/minimize/zoom) positioning using
-//! the modern objc2-app-kit ecosystem for type-safe Objective-C bindings.
-//!
-//! ## Key Features
-//!
-//! - **Type-safe**: Uses `Option<Retained<T>>` instead of raw pointers
-//! - **Crash-resistant**: Properly handles decoration-less windows
-//! - **Modern**: Built on objc2 with compile-time selector verification
-//!
-//! ## The Original Bug
-//!
-//! The original plugin crashes when used with decoration-less windows because
-//! `standardWindowButton_` returns a garbage pointer (not null) on macOS when
-//! decorations are disabled. This fork:
-//!
-//! 1. Checks `window.is_decorated()` before accessing traffic lights
-//! 2. Uses objc2's `Option<Retained<T>>` which properly returns `None`
+//! Provides `ProMotion` 120Hz rendering support via `CADisplayLink` and
+//! `WebKit` 60fps cap removal via the `_WKFeature` private API (with
+//! fullscreen-aware toggling for notch `MacBook` compatibility).
+//! Traffic light positioning is handled natively by Tauri's
+//! `trafficLightPosition` config — no custom delegate needed.
 
 use tauri::plugin::{Builder, TauriPlugin};
 #[cfg(target_os = "macos")]
@@ -25,33 +13,9 @@ use tauri::{Runtime, WebviewWindow};
 
 #[cfg(target_os = "macos")]
 mod promotion;
-#[cfg(target_os = "macos")]
-mod traffic;
 
-/// Extensions to [`tauri::WebviewWindow`] for window decoration control.
+/// Extensions to [`tauri::WebviewWindow`] for macOS window enhancements.
 pub trait WebviewWindowExt {
-    /// Set the inset of the macOS traffic lights (close/minimize/zoom buttons).
-    ///
-    /// This will move the traffic lights to the specified position relative to
-    /// the window's top-left corner.
-    ///
-    /// # Arguments
-    ///
-    /// * `x` - Horizontal offset from the left edge (pixels)
-    /// * `y` - Vertical offset from the top edge (pixels)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the window handle cannot be obtained or if the
-    /// operation cannot be performed on the main thread.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(&self)` for method chaining, or `Err` if the operation fails.
-    /// Decoration-less windows return `Ok` without making changes.
-    #[cfg(target_os = "macos")]
-    fn set_traffic_lights_inset(&self, x: f32, y: f32) -> Result<&WebviewWindow, Error>;
-
     /// Enable `ProMotion` 120Hz rendering on macOS.
     ///
     /// Creates a background `CADisplayLink` that requests 120Hz from the
@@ -74,44 +38,14 @@ pub trait WebviewWindowExt {
 
 impl WebviewWindowExt for WebviewWindow {
     #[cfg(target_os = "macos")]
-    fn set_traffic_lights_inset(&self, x: f32, y: f32) -> Result<&WebviewWindow, Error> {
-        // Skip decoration-less windows - they don't have traffic lights
-        if !self.is_decorated().unwrap_or(true) {
-            return Ok(self);
-        }
-
-        ensure_main_thread(self, move |win| {
-            let ns_window = win.ns_window()?;
-
-            // SAFETY: Tauri gives us a valid NSWindow pointer
-            let Some(handle) = (unsafe { traffic::WindowHandle::from_raw(ns_window) }) else {
-                return Ok(win);
-            };
-
-            // Update stored position in delegate
-            traffic::update_traffic_light_positions(win, f64::from(x), f64::from(y));
-
-            // Apply the position immediately
-            traffic::position_traffic_lights(&handle, f64::from(x), f64::from(y));
-
-            Ok(win)
-        })
-    }
-
-    #[cfg(target_os = "macos")]
     fn enable_promotion(&self) -> Result<(), Error> {
         if is_main_thread() {
             promotion::enable_promotion();
-            if let Ok(ns_window) = self.ns_window() {
-                promotion::unlock_webview_framerate(ns_window);
-            }
+            promotion::unlock_webview_framerate();
         } else {
-            let win = self.clone();
             self.run_on_main_thread(move || {
                 promotion::enable_promotion();
-                if let Ok(ns_window) = win.ns_window() {
-                    promotion::unlock_webview_framerate(ns_window);
-                }
+                promotion::unlock_webview_framerate();
             })?;
         }
         Ok(())
@@ -119,9 +53,6 @@ impl WebviewWindowExt for WebviewWindow {
 }
 
 /// Initialize the decorum plugin.
-///
-/// This sets up traffic light positioning for all decorated windows.
-/// Decoration-less windows are automatically skipped.
 ///
 /// # Example
 ///
@@ -135,56 +66,11 @@ impl WebviewWindowExt for WebviewWindow {
 /// ```
 #[must_use]
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
-    Builder::new("decorum")
-        .on_window_ready(|win| {
-            #[cfg(target_os = "macos")]
-            {
-                // Skip decoration-less windows - they don't have traffic lights
-                // and the old cocoa crate would crash on them
-                if !win.is_decorated().unwrap_or(true) {
-                    return;
-                }
-                traffic::setup_traffic_light_positioner(&win);
-            }
-
-            // Suppress unused variable warning on non-macOS
-            #[cfg(not(target_os = "macos"))]
-            let _ = win;
-        })
-        .build()
+    Builder::new("decorum").build()
 }
 
-/// Check if we're on the main thread.
-///
-/// # Implementation (Code Review Cycle 1, Issue #7)
-///
-/// Previously used `thread.name() == Some("main")` which is fragile because:
-/// - Tauri/Rust may not always name the main thread "main"
-/// - Thread names are optional and platform-dependent
-///
-/// Now uses `MainThreadMarker::new()` from `objc2_foundation`, which is the
-/// canonical way to check for main thread in Apple frameworks. This uses
-/// `NSThread.isMainThread` internally, which is authoritative.
+/// Check if we're on the main thread using `NSThread.isMainThread`.
 #[cfg(target_os = "macos")]
 fn is_main_thread() -> bool {
     objc2_foundation::MainThreadMarker::new().is_some()
-}
-
-#[cfg(target_os = "macos")]
-fn ensure_main_thread<F>(win: &WebviewWindow, main_action: F) -> Result<&WebviewWindow, Error>
-where
-    F: FnOnce(&WebviewWindow) -> Result<&WebviewWindow, Error> + Send + 'static,
-{
-    if is_main_thread() {
-        let _ = main_action(win)?;
-        Ok(win)
-    } else {
-        let win2 = win.clone();
-        match win.run_on_main_thread(move || {
-            drop(main_action(&win2));
-        }) {
-            Ok(()) => Ok(win),
-            Err(e) => Err(e),
-        }
-    }
 }

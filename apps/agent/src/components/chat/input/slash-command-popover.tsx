@@ -69,11 +69,10 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[280px] p-0 rounded-lg border-border/50 bg-popover/98 backdrop-blur-sm shadow-lg"
+        className="w-[280px] p-0 rounded-lg border-[3px] border-border bg-card shadow-lg"
         side="top"
         align="start"
         sideOffset={8}
-        avoidCollisions
         onOpenAutoFocus={(e) => {
           e.preventDefault();
         }}
@@ -82,7 +81,7 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
         }}
       >
         <Command shouldFilter={false} className="rounded-lg bg-transparent">
-          <CommandList className="scroll-py-2">
+          <CommandList className="scroll-py-2 pb-1.5">
             {filteredCommands.length === 0 ? <CommandEmpty>No commands found.</CommandEmpty> : null}
 
             <CommandGroup
@@ -174,9 +173,9 @@ const CommandItem: FC<CommandItemProps> = ({ command, isSelected, isFirst, isLas
         onSelect(command);
       }}
       className={cn(
-        'relative flex cursor-pointer gap-2.5 select-none items-center px-2.5 py-2 outline-none transition-[background-color,border-color,transform] duration-150',
+        'relative flex cursor-pointer gap-2.5 select-none items-center border-l-2 border-transparent pl-2 pr-2.5 py-2 outline-none',
         isSelected
-          ? 'rounded-r-md bg-primary/10 text-foreground border-l-2 border-primary/60 pl-2'
+          ? 'rounded-r-md bg-primary/10 text-foreground border-primary/60'
           : 'rounded-md hover:bg-muted/50 active:scale-[0.99]'
       )}
     >

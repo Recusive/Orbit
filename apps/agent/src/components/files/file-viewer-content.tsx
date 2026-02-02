@@ -115,7 +115,12 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
 
   // Handle save (Cmd-S)
   // Note: LSP notifications (didSave) are handled by CodeMirrorEditor's Mod-s keymap
+  // External files (outside workspace) are read-only — save is a no-op.
   const handleSave = useCallback(async (): Promise<void> => {
+    if (file.isExternal) {
+      logger.warn('Cannot save external file (read-only)', { path: file.path });
+      return;
+    }
     try {
       await writeFile(file.path, file.content);
       markSaved(file.path);
@@ -124,7 +129,7 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
         error: error instanceof Error ? error.message : String(error),
       });
     }
-  }, [file.path, file.content, markSaved]);
+  }, [file.path, file.content, file.isExternal, markSaved]);
 
   // Render diff view when in diff mode with diff data
   if (file.viewMode === 'diff' && file.diffData) {

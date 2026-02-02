@@ -1,14 +1,13 @@
-import { ChevronDown, FilePen, Loader2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Loader2, Pencil, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
 import {
   DiffStat,
-  TOOL_CARD_BASE,
-  TOOL_CHEVRON_BASE,
   TOOL_EXPAND_TRANSITION,
   TOOL_EXPAND_TRANSITION_NONE,
-  TOOL_HEADER_BASE,
+  useHighlightedTokens,
+  useIsDarkMode,
 } from './shared';
 
 import type { FC } from 'react';
@@ -37,6 +36,9 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
+  const isDarkMode = useIsDarkMode();
+  const oldTokens = useHighlightedTokens(oldString, filePath, isDarkMode);
+  const newTokens = useHighlightedTokens(newString, filePath, isDarkMode);
 
   // Auto-collapse when tool finishes
   useEffect(() => {
@@ -66,161 +68,269 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   };
 
   return (
-    <div>
-      <div
+    <div className={cn('min-w-0', isFailed && 'opacity-60')}>
+      {/* Header — flat inline row */}
+      <button
+        onClick={() => {
+          setIsExpanded(!isExpanded);
+        }}
+        aria-label={
+          isExpanded ? `Collapse Edit output for ${fileName}` : `Expand Edit output for ${fileName}`
+        }
+        aria-expanded={isExpanded}
         className={cn(
-          TOOL_CARD_BASE,
-          isFailed
-            ? 'border-2 border-dotted border-destructive/40 opacity-60'
-            : 'border border-border/50',
-          isExpanded ? 'rounded-lg shadow-xl' : 'rounded-lg shadow-md'
+          'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
+          'transition-colors duration-150 cursor-pointer w-full text-left',
+          'rounded-lg hover:bg-muted/20',
+          isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        {/* Header */}
-        <button
-          onClick={() => {
-            setIsExpanded(!isExpanded);
-          }}
-          className={TOOL_HEADER_BASE}
+        <div
+          className={cn(
+            'w-5 h-5 rounded flex items-center justify-center shrink-0',
+            'transition-colors duration-150',
+            isFailed
+              ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
+              : 'bg-warning/8 group-hover/status:bg-warning/12'
+          )}
         >
-          {/* Icon container */}
-          <div
+          <Pencil
             className={cn(
-              'w-5 h-5 rounded flex items-center justify-center',
-              isFailed ? 'bg-destructive/10' : 'bg-warning/10'
+              'h-3 w-3 transition-colors duration-150',
+              isFailed
+                ? 'text-destructive/60 group-hover/status:text-destructive/80'
+                : 'text-warning/60 group-hover/status:text-warning/80',
+              isRunning && 'animate-pulse'
+            )}
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span
+            className={cn(
+              'text-xs font-medium truncate cursor-pointer hover:underline',
+              isFailed ? 'text-muted-foreground line-through' : 'text-foreground/90'
+            )}
+            onClick={handleFileClick}
+            title={filePath}
+          >
+            {fileName}
+          </span>
+          <span
+            className={cn(
+              'text-xs shrink-0',
+              isFailed ? 'text-destructive/60' : 'text-muted-foreground/70'
             )}
           >
-            <FilePen
-              className={cn(
-                'h-3 w-3',
-                isFailed ? 'text-destructive/70' : 'text-warning/70',
-                isRunning && 'animate-pulse'
-              )}
-            />
-          </div>
+            {isFailed ? '(failed)' : '(modified)'}
+          </span>
+          {isRunning ? (
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
+          ) : null}
+        </div>
 
-          {/* File info */}
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span
-              className={cn(
-                'text-xs font-medium hover:underline truncate cursor-pointer',
-                isFailed ? 'text-muted-foreground line-through' : 'text-foreground'
-              )}
-              onClick={handleFileClick}
-              title={filePath}
-            >
-              {fileName}
-            </span>
-            <span
-              className={cn(
-                'text-xs shrink-0',
-                isFailed ? 'text-destructive/60' : 'text-muted-foreground/60'
-              )}
-            >
-              {isFailed ? '(failed)' : '(modified)'}
-            </span>
-          </div>
-
-          {/* Status - Diff stat or loading or failed */}
-          <div className="flex items-center gap-2 shrink-0">
-            {isRunning ? (
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                <span className="text-sm">Editing...</span>
-              </div>
-            ) : isFailed ? (
-              <span className="text-xs text-destructive/60">Failed</span>
-            ) : (
-              <DiffStat additions={additions} deletions={deletions} />
+        <div className="flex items-center gap-2 shrink-0">
+          {!isRunning && !isFailed ? (
+            <DiffStat additions={additions} deletions={deletions} />
+          ) : null}
+          <ChevronDown
+            className={cn(
+              'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-180'
             )}
-            <ChevronDown className={cn(TOOL_CHEVRON_BASE, isExpanded && 'rotate-180')} />
-          </div>
-        </button>
+          />
+        </div>
+      </button>
 
-        {/* Diff preview */}
-        <AnimatePresence initial={false}>
-          {isExpanded ? (
-            <motion.div
-              initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-              transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
-              style={{ overflow: 'hidden' }}
-            >
-              <div className={cn('overflow-auto', !showAllLines && 'max-h-[300px]')}>
-                <div className="w-fit min-w-full">
-                  {/* Deleted lines (old) */}
-                  {displayOldLines.map((line, index) => (
+      {/* Tree-style expanded content */}
+      <AnimatePresence initial={false}>
+        {isExpanded ? (
+          <motion.div
+            initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="flex flex-col">
+              <div className="flex flex-row px-2.5">
+                {/* Gutter: vertical connector line */}
+                <div className="w-5 flex justify-center shrink-0">
+                  <div
+                    className={cn(
+                      'w-[2px] rounded-full h-full',
+                      success === undefined && 'bg-warning/40'
+                    )}
+                    style={
+                      success !== undefined
+                        ? {
+                            background: success
+                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-warning) 40%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
+                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-warning) 40%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
+
+                {/* Content box — connected red/green sections with colored borders */}
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 flex flex-col">
+                  {/* Deleted lines (old) — red border */}
+                  {displayOldLines.length > 0 ? (
                     <div
-                      key={`old-${String(index)}`}
-                      className="flex font-mono text-sm leading-4 bg-destructive/10"
+                      className={cn(
+                        'border-3 border-destructive/40 bg-card overflow-hidden',
+                        displayNewLines.length > 0 ? 'rounded-t-lg border-b-0' : 'rounded-lg'
+                      )}
                     >
-                      {/* Sticky gutter + indicator */}
-                      <div className="sticky left-0 flex shrink-0 bg-destructive/10">
-                        <div className="w-0.5 bg-destructive" />
-                        <div className="w-5 px-1 text-center text-destructive/70 select-none">
-                          -
+                      <div className={cn('overflow-auto', !showAllLines && 'max-h-[150px]')}>
+                        <div className="w-fit min-w-full">
+                          {displayOldLines.map((line, index) => {
+                            const tokens = oldTokens?.[index];
+                            return (
+                              <div
+                                key={`old-${String(index)}`}
+                                className="flex font-mono text-sm leading-4 bg-destructive/10"
+                              >
+                                <div className="sticky left-0 flex shrink-0 bg-destructive/10">
+                                  <div className="w-5 px-1 text-center text-destructive/70 select-none">
+                                    -
+                                  </div>
+                                </div>
+                                <div className="flex-1 px-2 whitespace-pre opacity-70">
+                                  {tokens ? (
+                                    tokens.map((token, ti) => (
+                                      <span
+                                        key={ti}
+                                        style={token.color ? { color: token.color } : undefined}
+                                      >
+                                        {token.content}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-foreground">{line || ' '}</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                      {/* Content */}
-                      <div className="flex-1 px-2 text-foreground/70 whitespace-pre">
-                        {line || ' '}
-                      </div>
                     </div>
-                  ))}
-
-                  {/* Separator */}
-                  {displayOldLines.length > 0 && displayNewLines.length > 0 ? (
-                    <div className="h-px bg-border/50" />
                   ) : null}
 
-                  {/* Added lines (new) */}
-                  {displayNewLines.map((line, index) => (
+                  {/* Added lines (new) — green border */}
+                  {displayNewLines.length > 0 ? (
                     <div
-                      key={`new-${String(index)}`}
-                      className="flex font-mono text-sm leading-4 bg-success/10"
+                      className={cn(
+                        'border-3 border-success/40 bg-card overflow-hidden',
+                        displayOldLines.length > 0 ? 'rounded-b-lg border-t-0' : 'rounded-lg'
+                      )}
                     >
-                      {/* Sticky gutter + indicator */}
-                      <div className="sticky left-0 flex shrink-0 bg-success/10">
-                        <div className="w-0.5 bg-success" />
-                        <div className="w-5 px-1 text-center text-success/70 select-none">+</div>
-                      </div>
-                      {/* Content */}
-                      <div className="flex-1 px-2 text-foreground whitespace-pre">
-                        {line || ' '}
+                      <div className={cn('overflow-auto', !showAllLines && 'max-h-[150px]')}>
+                        <div className="w-fit min-w-full">
+                          {displayNewLines.map((line, index) => {
+                            const tokens = newTokens?.[index];
+                            return (
+                              <div
+                                key={`new-${String(index)}`}
+                                className="flex font-mono text-sm leading-4 bg-success/10"
+                              >
+                                <div className="sticky left-0 flex shrink-0 bg-success/10">
+                                  <div className="w-5 px-1 text-center text-success/70 select-none">
+                                    +
+                                  </div>
+                                </div>
+                                <div className="flex-1 px-2 whitespace-pre">
+                                  {tokens ? (
+                                    tokens.map((token, ti) => (
+                                      <span
+                                        key={ti}
+                                        style={token.color ? { color: token.color } : undefined}
+                                      >
+                                        {token.content}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-foreground">{line || ' '}</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                  ))}
+                  ) : null}
                 </div>
               </div>
 
-              {/* Show all / Show less toggle button */}
+              {/* Show all / Show less toggle — detached below the box */}
               {(hasMore || showAllLines) &&
               (oldLines.length > maxPreviewLines || newLines.length > maxPreviewLines) ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowAllLines(!showAllLines);
-                  }}
-                  className="w-full py-1 text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors flex items-center justify-center gap-0.5"
-                >
-                  <ChevronDown
-                    className={cn(
-                      'h-2.5 w-2.5 transition-transform duration-200 ease-out',
-                      showAllLines && 'rotate-180'
-                    )}
-                  />
-                  <span>
-                    {showAllLines
-                      ? 'Show less'
-                      : `Show all changes (${String(oldLines.length + newLines.length)} lines)`}
-                  </span>
-                </button>
+                <div className="flex flex-row px-2.5">
+                  <div className="w-5 flex justify-center shrink-0">
+                    <div
+                      className={cn(
+                        'w-[2px] rounded-full h-full',
+                        isFailed ? 'bg-destructive/40' : 'bg-warning/40'
+                      )}
+                    />
+                  </div>
+                  <div className="flex-1 ml-2.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAllLines(!showAllLines);
+                      }}
+                      className="py-1 text-xs text-muted-foreground/60 hover:text-foreground transition-colors flex items-center gap-0.5"
+                    >
+                      <ChevronDown
+                        className={cn(
+                          'h-2.5 w-2.5 transition-transform duration-200 ease-out',
+                          showAllLines && 'rotate-180'
+                        )}
+                      />
+                      <span>
+                        {showAllLines
+                          ? 'Show less'
+                          : `Show all changes (${String(oldLines.length + newLines.length)} lines)`}
+                      </span>
+                    </button>
+                  </div>
+                </div>
               ) : null}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </div>
+
+              {/* Bottom status indicator */}
+              {!isRunning && success !== undefined ? (
+                <div className="flex flex-row items-center px-2.5 py-1">
+                  <div
+                    className={cn(
+                      'w-5 h-5 rounded flex items-center justify-center shrink-0',
+                      isFailed ? 'bg-red-500/15' : 'bg-green-500/15'
+                    )}
+                  >
+                    {isFailed ? (
+                      <XCircle className="h-3 w-3 text-red-500/80" />
+                    ) : (
+                      <CheckCircle2 className="h-3 w-3 text-green-500/80" />
+                    )}
+                  </div>
+                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                    {isFailed ? 'Failed' : 'Completed'}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-row h-1 px-2.5">
+                  <div className="w-5 flex justify-center">
+                    <div className="w-[2px] rounded-full h-full bg-border/20" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };

@@ -65,6 +65,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
+  --color-border-panel: var(--border-panel);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-chat-area: var(--chat-area);
@@ -168,7 +169,7 @@
   /* 70% Oat/Sand (backgrounds), 20% Clay (secondary), 10% Coral (accents) */
   --background: oklch(0.95 0.01 75); /* Warm off-white, main chat area */
   --foreground: oklch(0.24 0.02 55); /* Headline #3D3630 */
-  --card: oklch(0.9 0.02 75); /* Oat #E8E0D5 - sidebar/header/input */
+  --card: oklch(0.87 0.02 75); /* Oat - sidebar/header/input */
   --card-foreground: oklch(0.24 0.02 55);
   --popover: oklch(0.92 0.015 75); /* Between bg and card */
   --popover-foreground: oklch(0.24 0.02 55);
@@ -181,11 +182,12 @@
   --accent: oklch(0.82 0.03 70); /* Sand - same as muted for subtle fills */
   --accent-foreground: oklch(0.24 0.02 55);
   --destructive: oklch(0.55 0.22 25);
-  --border: oklch(0.84 0.025 70); /* Visible border, sand-toned */
+  --border: oklch(0.76 0.03 70); /* Visible border, sand-toned */
+  --border-panel: oklch(0.76 0.03 70 / 50%); /* Panel/separator borders - border at 50% alpha */
   --divider: oklch(0.84 0.025 70); /* Structural panel dividers - same as border for consistency */
   --input: oklch(0.87 0.02 70); /* Input fields */
   --ring: oklch(0.56 0.18 35); /* Coral - darker */
-  --chat-area: oklch(0.93 0.015 75); /* 3% lighter than card (0.90) */
+  --chat-area: oklch(0.90 0.015 75); /* 3% lighter than card (0.87) */
 
   /* Charts - coral gradient */
   --chart-1: oklch(0.837 0.128 66.29);
@@ -312,6 +314,7 @@ html.dark {
   --accent-foreground: oklch(0.93 0.01 75);
   --destructive: oklch(0.65 0.2 25);
   --border: oklch(1 0 0 / 10%);
+  --border-panel: oklch(1 0 0 / 5%); /* Panel/separator borders - border at 50% alpha */
   --divider: oklch(1 0 0 / 10%); /* Structural panel dividers - same as border for consistency */
   --input: oklch(1 0 0 / 12%);
   --ring: oklch(0.55 0.15 38);
@@ -1039,13 +1042,3 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   overflow-anchor: none;
 }
 
-/* Allotment (resizable panels) - style the separator border */
-:root {
-  --separator-border: var(--border);
-  --focus-border: var(--primary);
-}
-
-html.dark {
-  --separator-border: rgba(255, 255, 255, 0.1);
-  --focus-border: var(--primary);
-}

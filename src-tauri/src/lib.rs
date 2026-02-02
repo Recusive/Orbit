@@ -283,28 +283,19 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        // Use our local fork of decorum with fix for decoration-less windows.
-        // The original plugin crashes because standardWindowButton_ returns garbage
-        // pointers (not null) when decorations are disabled.
         .plugin(orbit_plugin_decorum::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         // Setup event callbacks for agent and configure window
         .setup(move |app| {
             agent_cmd::setup_event_callbacks(app.handle(), &session_manager);
 
-            // Set initial traffic light position on macOS.
-            // The orbit-plugin-decorum fork handles resize events via native delegate.
             #[cfg(target_os = "macos")]
             {
                 use orbit_plugin_decorum::WebviewWindowExt as _;
                 use tauri::Manager as _;
 
                 if let Some(window) = app.get_webview_window("main") {
-                    // Center vertically in 35px header: (35 - 14) / 2 = 10.5
-                    drop(window.set_traffic_lights_inset(11.0, 10.5));
-
                     // Enable ProMotion 120Hz on supported displays.
-                    // Creates a CADisplayLink at 120Hz and disables WebKit's 60fps cap.
                     drop(window.enable_promotion());
                 }
             }
@@ -511,6 +502,7 @@ pub fn run() {
             dev_monitor::dev_monitor_clear,
             // Provider detection commands
             providers::check_claude_keychain,
+            providers::trigger_claude_auth,
             // Credentials commands
             credentials::store_api_key,
             credentials::retrieve_api_key,

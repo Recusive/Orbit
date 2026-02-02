@@ -140,6 +140,23 @@ export default defineConfig(
     },
   },
   /*
+   * Agent-bridge test files - Additional relaxed rules for Bun test runner
+   *
+   * agent-bridge uses bun:test (not Vitest). ESLint's projectService cannot
+   * resolve types across the agent-bridge tsconfig boundary, causing false
+   * positives for await-thenable and strict-boolean-expressions on methods
+   * that ARE async but ESLint sees as unresolvable.
+   */
+  {
+    files: ['agent-bridge/src/__tests__/**/*.ts'],
+    rules: {
+      '@typescript-eslint/await-thenable': 'off',
+      '@typescript-eslint/strict-boolean-expressions': 'off',
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+      '@typescript-eslint/no-unnecessary-type-conversion': 'off',
+    },
+  },
+  /*
    * CLI Scripts - Relaxed rules for command-line utilities
    *
    * Scripts in scripts/ are CLI tools that:

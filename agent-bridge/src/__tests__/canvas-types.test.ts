@@ -238,9 +238,9 @@ describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Real Session M
     manager.dispose();
   });
 
-  it('should validate real canvas state stored in session manager', () => {
+  it('should validate real canvas state stored in session manager', async () => {
     // Create a real session
-    manager.createSession('schema-test-1', { thinkingEnabled: false });
+    await manager.createSession('schema-test-1', { thinkingEnabled: false });
 
     // Create state that will flow through the system
     const realState: CanvasState = {
@@ -273,14 +273,14 @@ describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Real Session M
     }
   });
 
-  it('should validate real session config from session manager', () => {
+  it('should validate real session config from session manager', async () => {
     const config: CanvasSessionConfig = {
       thinkingEnabled: true,
       model: 'claude-sonnet-4-20250514',
     };
 
     // Create session with real config
-    manager.createSession('config-schema-test', config);
+    await manager.createSession('config-schema-test', config);
 
     // Retrieve config from real manager
     const retrievedConfig = manager.getSessionConfig('config-schema-test');
@@ -294,8 +294,8 @@ describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Real Session M
     }
   });
 
-  it('should validate complex canvas state with page nodes and edges', () => {
-    manager.createSession('complex-state-test');
+  it('should validate complex canvas state with page nodes and edges', async () => {
+    await manager.createSession('complex-state-test');
 
     // Complex state with multiple node types
     const complexState: CanvasState = {
@@ -516,7 +516,7 @@ describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Real Event Flo
     });
 
     // Create session and update state
-    manager.createSession('event-test', { thinkingEnabled: false });
+    await manager.createSession('event-test', { thinkingEnabled: false });
 
     const state: CanvasState = {
       nodes: [
@@ -541,11 +541,11 @@ describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Real Event Flo
     manager.dispose();
   });
 
-  it('should validate state isolation between sessions', () => {
+  it('should validate state isolation between sessions', async () => {
     const manager = new CanvasSessionManager();
 
-    manager.createSession('session-a');
-    manager.createSession('session-b');
+    await manager.createSession('session-a');
+    await manager.createSession('session-b');
 
     const stateA: CanvasState = {
       nodes: [
@@ -603,8 +603,8 @@ describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Schema Strictn
     manager.dispose();
   });
 
-  it('should reject state with extra fields when validated', () => {
-    manager.createSession('strict-test');
+  it('should reject state with extra fields when validated', async () => {
+    await manager.createSession('strict-test');
 
     // This state is valid TypeScript but has extra fields
     const stateWithExtra = {
@@ -631,7 +631,7 @@ describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Schema Strictn
     expect(result.success).toBe(false);
   });
 
-  it('should validate that real session manager produces valid data', () => {
+  it('should validate that real session manager produces valid data', async () => {
     // Create multiple sessions with various configs
     const configs: CanvasSessionConfig[] = [
       { thinkingEnabled: true },
@@ -642,7 +642,7 @@ describe.skipIf(skipIntegrationTests)('Canvas Types Integration - Schema Strictn
 
     for (let i = 0; i < configs.length; i++) {
       const sessionId = `validation-test-${String(i)}`;
-      manager.createSession(sessionId, configs[i]);
+      await manager.createSession(sessionId, configs[i]);
 
       const retrievedConfig = manager.getSessionConfig(sessionId);
       const result = CanvasSessionConfigSchema.safeParse(retrievedConfig);
