@@ -912,14 +912,20 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             categorized.category === 'AUTH_FAILED' ||
             categorized.category === 'SESSION_EXPIRED'
           ) {
-            void ClaudeCredentials.refreshIfNeeded().then((result) => {
-              if (result.refreshed) {
-                logger.info('Auto-refreshed credentials after CLI auth error');
-              } else {
-                // Refresh failed — notify via auth failure callback
+            void ClaudeCredentials.refreshIfNeeded()
+              .then((result) => {
+                if (result.refreshed) {
+                  logger.info('Auto-refreshed credentials after CLI auth error');
+                } else {
+                  // Refresh failed — notify via auth failure callback
+                  this._onAuthFailure?.(categorized.message);
+                }
+              })
+              .catch((err: unknown) => {
+                const msg = err instanceof Error ? err.message : String(err);
+                logger.error({ error: msg }, 'Credential refresh threw during stderr recovery');
                 this._onAuthFailure?.(categorized.message);
-              }
-            });
+              });
           }
 
           this._onStderrError(categorized);

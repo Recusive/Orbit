@@ -315,7 +315,36 @@ async function refreshIfNeeded(): Promise<TokenRefreshResult> {
  */
 function scheduleAutoRefresh(onFailure: AutoRefreshFailureCallback): () => void {
   let timerId: ReturnType<typeof setTimeout> | null = null;
+  let periodicId: ReturnType<typeof setInterval> | null = null;
   let stopped = false;
+
+  /** Periodic fallback interval (5 minutes) to catch cases where setTimeout
+   *  fires during system sleep with no network, or the scheduled time is missed
+   *  entirely due to timer coalescing after wake. (Code review: Opus cycle 2, issue #6) */
+  const PERIODIC_CHECK_MS = 5 * 60_000;
+
+  function doRefresh(): void {
+    if (stopped) return;
+
+    void refreshIfNeeded()
+      .then((result) => {
+        if (stopped) return;
+
+        if (result.refreshed) {
+          logger.info('Auto-refresh succeeded, rescheduling');
+          schedule(); // Reschedule for the new token's expiry
+        } else {
+          logger.warn('Auto-refresh failed, notifying caller');
+          onFailure('OAuth token refresh failed. Please re-authenticate with "claude login".');
+        }
+      })
+      .catch((err: unknown) => {
+        if (stopped) return;
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error({ error: msg }, 'Auto-refresh threw unexpectedly');
+        onFailure('OAuth auto-refresh error. Please re-authenticate.');
+      });
+  }
 
   function schedule(): void {
     if (stopped) return;
@@ -335,30 +364,33 @@ function scheduleAutoRefresh(onFailure: AutoRefreshFailureCallback): () => void 
       'Scheduling auto-refresh'
     );
 
-    timerId = setTimeout(() => {
-      if (stopped) return;
-
-      void refreshIfNeeded().then((result) => {
-        if (stopped) return;
-
-        if (result.refreshed) {
-          logger.info('Auto-refresh succeeded, rescheduling');
-          schedule(); // Reschedule for the new token's expiry
-        } else {
-          logger.warn('Auto-refresh failed, notifying caller');
-          onFailure('OAuth token refresh failed. Please re-authenticate with "claude login".');
-        }
-      });
-    }, delayMs);
+    timerId = setTimeout(doRefresh, delayMs);
   }
 
   schedule();
+
+  // Periodic fallback: after system sleep, setTimeout may have already fired
+  // with no network. This interval re-checks token expiry every 5 minutes as
+  // a safety net. (Code review: Opus cycle 2, issue #6)
+  periodicId = setInterval(() => {
+    if (stopped) return;
+
+    const expiryMs = getTokenExpiry();
+    if (expiryMs !== null && Date.now() + EXPIRY_BUFFER_MS >= expiryMs) {
+      logger.info('Periodic check detected expired/expiring token, triggering refresh');
+      doRefresh();
+    }
+  }, PERIODIC_CHECK_MS);
 
   return () => {
     stopped = true;
     if (timerId !== null) {
       clearTimeout(timerId);
       timerId = null;
+    }
+    if (periodicId !== null) {
+      clearInterval(periodicId);
+      periodicId = null;
     }
   };
 }

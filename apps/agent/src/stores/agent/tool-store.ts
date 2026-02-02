@@ -46,6 +46,13 @@ const STORE_VERSION = 1;
  */
 const MAX_PERSISTED_TOOLS = 500;
 
+/**
+ * Buffer above MAX_PERSISTED_TOOLS before trimming. Without this, every
+ * completeTool call past 500 triggers an O(n) array slice. With a buffer
+ * of 50, we only trim once per 50 completions. (Code review: Opus cycle 2, issue #7)
+ */
+const TRIM_BUFFER = 50;
+
 /** Maximum cached sessions to prevent unbounded memory growth */
 const MAX_CACHED_SESSIONS = 10;
 
@@ -427,8 +434,9 @@ export const useToolStore = create<ToolState>()(
             state.completedTools.push({ ...tool });
 
             // Cap in-memory array to prevent unbounded growth in long sessions.
-            // Same limit as localStorage persistence (MAX_PERSISTED_TOOLS).
-            if (state.completedTools.length > MAX_PERSISTED_TOOLS) {
+            // Uses a buffer to avoid O(n) slice on every completion past the limit.
+            // Trims at MAX + BUFFER, keeping MAX items. (Code review: Opus cycle 2, issue #7)
+            if (state.completedTools.length > MAX_PERSISTED_TOOLS + TRIM_BUFFER) {
               state.completedTools = state.completedTools.slice(-MAX_PERSISTED_TOOLS);
             }
 

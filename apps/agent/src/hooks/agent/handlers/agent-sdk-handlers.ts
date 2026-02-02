@@ -63,7 +63,9 @@ export async function handleMessageSend(
     const rewindContext = consumeRewindContext(message.session_id);
     if (rewindContext && rewindContext.length > 0) {
       const contextPrefix = formatConversationContext(rewindContext);
-      contentToSend = contextPrefix + message.content;
+      // Prepend rewind context to contentToSend (NOT message.content) to preserve
+      // any previously prepended file attachments. (Code review: Codex cycle 1, issue #1)
+      contentToSend = contextPrefix + contentToSend;
       logger.debug('Prepended rewind context to message', {
         sessionId: message.session_id,
         contextMessageCount: rewindContext.length,

@@ -183,6 +183,17 @@ async fn trigger_claude_auth_inner(_app: &tauri::AppHandle) -> AuthTriggerResult
     }
 }
 
+/// Parse `expiresAt` from a JSON number or numeric string.
+#[cfg(target_os = "macos")]
+fn parse_expires_at(json: &serde_json::Value) -> Option<i64> {
+    json.get("claudeAiOauth")
+        .and_then(|oauth| oauth.get("expiresAt"))
+        .and_then(|v| {
+            v.as_i64()
+                .or_else(|| v.as_str().and_then(|s| s.trim().parse::<i64>().ok()))
+        })
+}
+
 /// Check macOS keychain and validate the OAuth token contents.
 #[cfg(target_os = "macos")]
 async fn check_macos_keychain_validated() -> KeychainStatus {
@@ -203,20 +214,15 @@ async fn check_macos_keychain_validated() -> KeychainStatus {
             let raw = String::from_utf8_lossy(&output.stdout);
             let json_str = raw.trim();
 
-            // Parse the JSON to validate token contents
             match serde_json::from_str::<serde_json::Value>(json_str) {
                 Ok(json) => {
-                    // Look for claudeAiOauth.accessToken
                     let access_token = json
                         .get("claudeAiOauth")
                         .and_then(|oauth| oauth.get("accessToken"))
                         .and_then(serde_json::Value::as_str)
                         .unwrap_or("");
 
-                    let expires_at = json
-                        .get("claudeAiOauth")
-                        .and_then(|oauth| oauth.get("expiresAt"))
-                        .and_then(serde_json::Value::as_i64);
+                    let expires_at = parse_expires_at(&json);
 
                     if access_token.is_empty() {
                         return KeychainStatus {
