@@ -1,5 +1,5 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Edit2, Loader2, Lock, Plus, Sparkles, Terminal, Trash2, X } from 'lucide-react';
+import { Edit2, Loader2, Lock, Plus, Slash, Sparkles, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type {
@@ -81,11 +81,11 @@ const CommandCard: FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
   const scopeConfig = SCOPE_CONFIG[command.scope];
 
   return (
-    <div className="rounded-lg border border-border/40 p-4 hover:bg-muted/40 transition-[background-color] duration-150">
+    <div className="rounded-lg border-3 border-border/40 p-4 hover:bg-muted/40 transition-[background-color] duration-150">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Terminal className="h-4 w-4 text-primary/80" />
+            <Slash className="h-3.5 w-3.5 -rotate-[25deg] text-primary/80" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -833,7 +833,7 @@ export const SlashCommandsSettings: FC = () => {
           {/* Empty state */}
           {commands.length === 0 && (
             <div className="text-center py-8 text-muted-foreground/90 text-sm">
-              <Terminal className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <Slash className="h-8 w-8 mx-auto mb-2 opacity-50 -rotate-[25deg]" />
               <p>No commands available.</p>
               <p className="text-xs mt-1">Create a command to quickly run common prompts.</p>
             </div>
@@ -842,7 +842,7 @@ export const SlashCommandsSettings: FC = () => {
       </div>
 
       {/* Info section */}
-      <div className="mt-6 p-3.5 rounded-lg bg-muted/30 border border-border/30 text-sm text-muted-foreground/90">
+      <div className="mt-6 p-3.5 rounded-lg bg-muted/30 border-3 border-border/30 text-sm text-muted-foreground/90">
         <p className="font-medium mb-1.5 text-foreground/80">How Slash Commands Work</p>
         <ul className="list-disc list-inside space-y-0.5">
           <li>

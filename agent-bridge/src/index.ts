@@ -214,6 +214,17 @@ function main(): void {
     });
   });
 
+  // Auth error events (from auto-refresh or pre-send credential checks)
+  sessionManager.onAuthError((data) => {
+    sendEvent({
+      type: 'auth_error',
+      sessionId: data.sessionId,
+      category: data.category,
+      message: data.message,
+      recoverable: data.recoverable,
+    });
+  });
+
   // Wire up canvas session event handlers
   canvasSessionManager.onMessage((data) => {
     sendEvent({

@@ -23,6 +23,14 @@ export interface CredentialResult {
   token?: string;
 }
 
+export interface TokenRefreshResult {
+  refreshed: boolean;
+  token?: string;
+}
+
+/** Callback invoked when a scheduled auto-refresh fails */
+export type AutoRefreshFailureCallback = (error: string) => void;
+
 function parseExpiryMs(expiresAt: number | string): number | null {
   if (typeof expiresAt === 'number') {
     return Number.isFinite(expiresAt) ? expiresAt : null;
@@ -217,6 +225,145 @@ function getApiKeyFromEnv(): string | null {
 }
 
 /**
+ * Read the OAuth token expiry from macOS Keychain without performing a full
+ * credential validation. Returns the expiry timestamp in milliseconds, or
+ * null if the token is not OAuth or the expiry cannot be determined.
+ *
+ * This is a lightweight check suitable for scheduling background refresh timers.
+ */
+function getTokenExpiry(): number | null {
+  try {
+    const spawnResult = spawnSync(
+      'security',
+      ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+
+    if (spawnResult.error || spawnResult.status !== 0) {
+      return null;
+    }
+
+    const json: unknown = JSON.parse(spawnResult.stdout.trim());
+    const parseResult = KeychainCredentialsSchema.safeParse(json);
+    if (!parseResult.success) return null;
+
+    const claudeAuth = parseResult.data.claudeAiOauth;
+    if (claudeAuth === undefined) return null;
+
+    const expiresAt = claudeAuth.expiresAt;
+    if (expiresAt === undefined || expiresAt === '') return null;
+
+    return parseExpiryMs(expiresAt);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if the current OAuth token is expired or expiring soon and attempt
+ * a refresh if needed. Updates `process.env.CLAUDE_CODE_OAUTH_TOKEN` on
+ * success so the CLI subprocess picks up the new token.
+ *
+ * @returns Whether a refresh was performed and the new token if so
+ */
+async function refreshIfNeeded(): Promise<TokenRefreshResult> {
+  // API key users don't need refresh
+  const apiKey = getApiKeyFromEnv();
+  if (apiKey !== null) {
+    return { refreshed: false };
+  }
+
+  const expiryMs = getTokenExpiry();
+  // No expiry info means we can't tell — try a full credential load instead
+  if (expiryMs === null) {
+    const creds = await getOAuthTokenFromKeychain();
+    if (creds !== null) {
+      process.env.CLAUDE_CODE_OAUTH_TOKEN = creds;
+      return { refreshed: true, token: creds };
+    }
+    return { refreshed: false };
+  }
+
+  // Token still valid with buffer — no refresh needed
+  if (Date.now() + EXPIRY_BUFFER_MS < expiryMs) {
+    return { refreshed: false };
+  }
+
+  // Token expired or expiring soon — attempt refresh via full Keychain read
+  // (getOAuthTokenFromKeychain already handles refresh internally)
+  logger.info('Token expired or expiring soon, attempting refresh');
+  const refreshedToken = await getOAuthTokenFromKeychain();
+  if (refreshedToken !== null) {
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = refreshedToken;
+    logger.info('OAuth token refreshed and env var updated');
+    return { refreshed: true, token: refreshedToken };
+  }
+
+  logger.warn('OAuth token refresh failed');
+  return { refreshed: false };
+}
+
+/**
+ * Start a background timer that refreshes the OAuth token before it expires.
+ *
+ * The timer fires 5 minutes before the token's `expiresAt` timestamp.
+ * On success it reschedules for the new token's expiry. On failure it
+ * invokes `onFailure` so the caller can surface an auth error to the user.
+ *
+ * @param onFailure - Called when auto-refresh fails (token cannot be renewed)
+ * @returns A cleanup function to cancel the timer
+ */
+function scheduleAutoRefresh(onFailure: AutoRefreshFailureCallback): () => void {
+  let timerId: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+
+  function schedule(): void {
+    if (stopped) return;
+
+    const expiryMs = getTokenExpiry();
+    if (expiryMs === null) {
+      // No expiry info available — check again in 5 minutes
+      logger.debug('No token expiry available, checking again in 5 minutes');
+      timerId = setTimeout(schedule, EXPIRY_BUFFER_MS);
+      return;
+    }
+
+    // Fire 5 minutes before expiry (EXPIRY_BUFFER_MS)
+    const delayMs = Math.max(expiryMs - Date.now() - EXPIRY_BUFFER_MS, 0);
+    logger.debug(
+      { expiryDate: new Date(expiryMs).toISOString(), delayMs },
+      'Scheduling auto-refresh'
+    );
+
+    timerId = setTimeout(() => {
+      if (stopped) return;
+
+      void refreshIfNeeded().then((result) => {
+        if (stopped) return;
+
+        if (result.refreshed) {
+          logger.info('Auto-refresh succeeded, rescheduling');
+          schedule(); // Reschedule for the new token's expiry
+        } else {
+          logger.warn('Auto-refresh failed, notifying caller');
+          onFailure('OAuth token refresh failed. Please re-authenticate with "claude login".');
+        }
+      });
+    }, delayMs);
+  }
+
+  schedule();
+
+  return () => {
+    stopped = true;
+    if (timerId !== null) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+  };
+}
+
+/**
  * Gets credentials with OAuth-first priority.
  *
  * Returns the actual token value so the caller can pass it explicitly via
@@ -259,4 +406,7 @@ export const ClaudeCredentials = {
   getApiKeyFromEnv,
   getCredentials,
   refreshOAuthToken,
+  getTokenExpiry,
+  refreshIfNeeded,
+  scheduleAutoRefresh,
 } as const;

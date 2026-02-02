@@ -629,7 +629,7 @@ export const SubagentsSettings: FC = () => {
       </div>
 
       {/* Info section */}
-      <div className="mt-6 p-3.5 rounded-lg bg-muted/30 border border-border/30 text-sm text-muted-foreground/90">
+      <div className="mt-6 p-3.5 rounded-lg bg-muted/30 border-3 border-border/30 text-sm text-muted-foreground/90">
         <p className="font-medium mb-1.5 text-foreground/80">How Subagents Work</p>
         <ul className="list-disc list-inside space-y-0.5">
           <li>

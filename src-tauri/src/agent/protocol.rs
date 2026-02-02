@@ -590,6 +590,13 @@ pub enum BridgeEvent {
         session_id: String,
         request: McpToolRequest,
     },
+    AuthError {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        category: String,
+        message: String,
+        recoverable: bool,
+    },
 }
 
 /// All possible messages from Node.js

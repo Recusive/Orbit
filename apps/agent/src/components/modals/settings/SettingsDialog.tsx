@@ -162,7 +162,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                     Settings &gt; {getSectionTitle()}
                   </DialogPrimitive.Title>
                   {/* Title bar */}
-                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-muted/30">
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b-3 border-border/40 bg-muted/30">
                     <div className="flex items-center gap-2">
                       <Settings2 className="h-4 w-4 text-muted-foreground/70" />
                       <span className="font-medium text-base">

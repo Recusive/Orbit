@@ -166,6 +166,11 @@ export interface OrbitAgentConfig {
    * Enables the session manager to surface auth failures, rate limits, etc. to the frontend.
    */
   onStderrError?: (error: StderrError) => void;
+  /**
+   * Callback for auth failures detected during auto-refresh or pre-send credential checks.
+   * Enables the session manager to emit structured auth error events to the frontend.
+   */
+  onAuthFailure?: (message: string) => void;
 }
 
 /**
@@ -343,6 +348,12 @@ export class OrbitAgent {
   // Stderr error callback for surfacing categorized errors to frontend
   private _onStderrError?: (error: StderrError) => void;
 
+  // Auto-refresh timer cleanup function
+  private _autoRefreshCleanup?: () => void;
+
+  /** Callback for auth failures detected during auto-refresh or credential re-validation */
+  private _onAuthFailure?: (message: string) => void;
+
   constructor(config: OrbitAgentConfig = {}) {
     this.permissionManager = new PermissionManager(
       config.permissionRequestCallback,
@@ -370,6 +381,7 @@ export class OrbitAgent {
     this._outputFormat = config.outputFormat;
     this._agents = config.agents;
     this._onStderrError = config.onStderrError;
+    this._onAuthFailure = config.onAuthFailure;
     logger.info(
       {
         sessionMode: this._sessionMode,
@@ -893,6 +905,23 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             { category: categorized.category, message: categorized.message },
             'Categorized CLI stderr error'
           );
+
+          // On auth/session errors, attempt an automatic credential refresh
+          // before surfacing the error — the refreshed token may fix the issue
+          if (
+            categorized.category === 'AUTH_FAILED' ||
+            categorized.category === 'SESSION_EXPIRED'
+          ) {
+            void ClaudeCredentials.refreshIfNeeded().then((result) => {
+              if (result.refreshed) {
+                logger.info('Auto-refreshed credentials after CLI auth error');
+              } else {
+                // Refresh failed — notify via auth failure callback
+                this._onAuthFailure?.(categorized.message);
+              }
+            });
+          }
+
           this._onStderrError(categorized);
         }
       }
@@ -1069,7 +1098,35 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       }
     );
 
+    // Schedule proactive token refresh (Layer 1) for OAuth sessions.
+    // The timer fires 5 minutes before expiry and reschedules on success.
+    if (credentials.type === 'oauth') {
+      this._autoRefreshCleanup = ClaudeCredentials.scheduleAutoRefresh((msg) => {
+        this._onAuthFailure?.(msg);
+      });
+      logger.info('Scheduled proactive OAuth token auto-refresh');
+    }
+
     logger.info('Session started successfully');
+  }
+
+  /**
+   * Attempt to refresh OAuth credentials if they are expired or expiring soon.
+   * Updates `process.env.CLAUDE_CODE_OAUTH_TOKEN` on success so the CLI subprocess
+   * picks up the new token on the next API call.
+   *
+   * @returns true if credentials are valid (either still fresh or successfully refreshed)
+   */
+  async refreshCredentials(): Promise<boolean> {
+    const result = await ClaudeCredentials.refreshIfNeeded();
+    if (result.refreshed) {
+      logger.info('Credentials refreshed via pre-send check');
+      return true;
+    }
+    // refreshIfNeeded returns { refreshed: false } for both "no refresh needed" (API key
+    // or token still valid) and "refresh failed". Check if we actually have working creds.
+    const creds = await ClaudeCredentials.getCredentials();
+    return creds.hasCredentials;
   }
 
   /**
@@ -1311,6 +1368,12 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     }
 
     logger.debug('Stopping session');
+
+    // Cancel the auto-refresh timer if running
+    if (this._autoRefreshCleanup) {
+      this._autoRefreshCleanup();
+      this._autoRefreshCleanup = undefined;
+    }
 
     // Stop the message queue
     if (this.messageQueue) {

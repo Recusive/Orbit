@@ -37,13 +37,23 @@ Orbit-specific metadata (custom titles, worktree paths, fork relationships) is s
 
 The existing sidebar groups conversations by `worktree_path`. JSONL files don't contain this concept — it's Orbit-specific. The enrichment cache stores `worktreePath` per session, written when Orbit creates a session and preserved across restarts.
 
-### Fork & Rewind via SDK
+### Fork & Rewind Strategy
 
-Orbit's custom `Conversation::fork()` (which manually copies messages up to a point) is replaced by the SDK's native capabilities:
+The SDK provides **two separate mechanisms** that Orbit uses together:
 
-- **Fork**: `forkSession: true` option when resuming — SDK creates a new session branching from the resume point, preserving the original
-- **Rewind files**: `rewindFiles(checkpointId)` — restores file disk state to a checkpoint UUID (from user message `.uuid` field)
-- **Rewind conversation**: Resume with `resumeSessionAt: messageUuid` + `forkSession: true` — creates a new branch starting from that message
+- **File rewind**: `rewindFiles(checkpointId)` — SDK restores files on disk to a checkpoint UUID ✅ (fully documented, integration tested)
+- **Session forking**: `forkSession: true` — SDK creates a new JSONL when the next message is sent, preserving the original ✅ (fully documented)
+
+**Conversation positioning** (which messages Claude sees) is handled by **Orbit's context-prepend system**, NOT by the SDK. The SDK's `resumeSessionAt` option exists in the Options table but is **undocumented** (one line, zero examples, zero docs pages). The current codebase intentionally avoids it — see notes at `agent.ts:138-140` and `session-manager.ts:188-191`.
+
+**The existing rewind flow is preserved with one change** — the data source switches from Orbit's JSON store to SDK JSONL files:
+
+1. `rewindFiles(checkpointId)` → SDK restores files on disk
+2. `conversationFork(old, new, messageId)` → **reads JSONL** (was: reads JSON), returns messages up to point (read-only, no write)
+3. `setRewindContext(messages)` → stores truncated history in-memory
+4. `markSessionAsForked(newId, sdkId)` → tracks fork for checkpointing
+5. On next message send → `consumeRewindContext()` → `formatConversationContext()` → prepend to user message
+6. Message goes to fresh SDK session → SDK creates new JSONL
 
 ### SDK Compatibility Notes (verified against SDK docs)
 
@@ -51,25 +61,18 @@ These behaviors are confirmed in the SDK documentation and existing `agent.ts` c
 
 1. **Session ID assignment**: SDK generates session IDs — returned in `system:init` message (`message.type === 'system' && message.subtype === 'init'` → `message.session_id`). Callers cannot pre-assign IDs. (SDK ref: `Options.resume`, Session Management doc)
 
-2. **`resumeSessionAt` option**: Exists in SDK Options (`resumeSessionAt: string`) and is the correct mechanism for conversation rewind. The current codebase has comments (`agent.ts:138-140`, `session-manager.ts:188-191`) claiming it was "removed" in favor of a "context-prepend" workaround. **This plan restores `resumeSessionAt`** because:
-   - The SDK docs confirm it's a supported, stable option (SDK ref: Options.resumeSessionAt)
-   - `resumeSessionAt` resumes **at** a specific message UUID — it does NOT replay all messages from the beginning
-   - The context-prepend workaround loses SDK conversation context (tool history, reasoning chain, file edits) because Claude sees truncated text as new input, not its own prior conversation
-   - Implementation: add `_resumeSessionAt?: string` field to `OrbitAgent`, set from `config.resumeSessionAt`, pass as `options.resumeSessionAt` in `_createOptions()`
-   - **Remove the NOTE comments** at `agent.ts:138-140` and `session-manager.ts:188-191` that say `resumeSessionAt` was removed
+2. **`resumeSessionAt` — NOT USED**: The SDK Options table lists `resumeSessionAt: string` but it has **zero documentation** beyond one line — no examples, no tutorial, not mentioned in Session Management or File Checkpointing docs. The current codebase's NOTE comments correctly warn against using it. **This plan does NOT use `resumeSessionAt`** — conversation positioning uses the proven context-prepend mechanism.
 
-3. **`replay-user-messages` guard**: The existing `agent.ts:942-957` disables `replay-user-messages` for resumed/forked sessions. This guard must be **updated** to handle `resumeSessionAt` correctly:
-   - **New sessions** (no resume): Enable `replay-user-messages` — needed for checkpoint UUID tracking ✅
-   - **`resumeSessionAt` + `forkSession`** (rewind flow): Enable `replay-user-messages` — the SDK truncates at the specified UUID so there's no replay bug, and new messages in the fork need checkpoint UUIDs for future rewinds ✅
-   - **Plain `resume`** without `resumeSessionAt` (continue existing session): Disable `replay-user-messages` — prevents the replay bug where Claude sees both replayed and new messages ✅
+3. **`replay-user-messages` guard**: The existing `agent.ts:942-957` disables `replay-user-messages` for resumed/forked sessions. **No changes needed** — the current guard is correct for the context-prepend flow:
+   - **New sessions** (no `_resumeSessionId`): Enable `replay-user-messages` — needed for checkpoint UUID tracking ✅
+   - **Forked/rewind sessions**: Create FRESH SDK sessions (not resumed), so `_resumeSessionId` is unset → `replay-user-messages` ON → checkpoint UUIDs available for future rewinds ✅
+   - **Plain resume** (continue existing session): `_resumeSessionId` set → `replay-user-messages` OFF → prevents replay bug ✅
 
-   Updated logic:
+   Current logic (unchanged):
 
    ```typescript
-   // Enable replay-user-messages when we need checkpoint UUIDs
-   // Safe when: new session OR resumeSessionAt (SDK truncates at UUID, no replay bug)
-   // Unsafe when: plain resume without resumeSessionAt (causes replay bug)
-   if (!this._resumeSessionId || this._resumeSessionAt) {
+   // Only enable replay-user-messages for NEW sessions (not forked/resumed)
+   if (!this._resumeSessionId) {
      options.extraArgs = { ...options.extraArgs, 'replay-user-messages': null };
    }
    ```
@@ -80,29 +83,24 @@ These behaviors are confirmed in the SDK documentation and existing `agent.ts` c
 
 5. **`enableFileCheckpointing` + env var**: Both `options.enableFileCheckpointing = true` AND `CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=1` env var are required. Already set in `agent.ts:940` and `agent.ts:967`.
 
-6. **File rewind ≠ conversation rewind**: The SDK's `rewindFiles()` restores **files on disk only** — it does not rewind the conversation. Conversation positioning is handled separately via `resumeSessionAt` + `forkSession`. These are two distinct operations that must be used together for a full rewind.
+6. **File rewind ≠ conversation rewind**: The SDK's `rewindFiles()` restores **files on disk only** — it does not rewind the conversation. Conversation positioning is handled by Orbit's context-prepend system (`setRewindContext` → `consumeRewindContext` → `formatConversationContext`). These are two distinct operations used together for a full rewind.
 
-### Context-Prepend Removal
+### Context-Prepend — PRESERVED
 
-The current codebase implements a "context-prepend" workaround for rewind (`conversation-handlers.ts:handleConversationRewind()`):
+The context-prepend rewind system is **kept as-is**. It is integration tested (`combined-rewind.test.ts`, `conversation-rewind.test.ts`) and works correctly. The only change is the data source for `conversationFork()`:
 
-1. Gets checkpoint → calls `rewindFiles()` for disk state
-2. Forks via Orbit's own `conversationFork()` (copies messages up to a point)
-3. Stores truncated messages as `rewindContext` via `setRewindContext()`
-4. On next message, prepends the truncated history as new user context
+**Before:** `conversationFork()` reads `{session_id}.json` from Orbit's store → copies messages → writes new JSON file
+**After:** `conversationFork()` reads `{session_id}.jsonl` from `~/.claude/projects/` → returns messages (read-only, no write)
 
-**This plan eliminates context-prepend entirely.** The SDK-native approach:
+Items **preserved** (no changes):
 
-1. `rewindFiles(checkpointId)` for disk state
-2. `resumeSessionAt: messageUuid` + `forkSession: true` for conversation positioning
-3. No rewindContext storage, no message truncation, no context prepending
-
-Items to remove:
-
-- `setRewindContext()` / `getRewindContext()` from checkpoint store
-- `rewindContext` prepend logic in message send handler
-- Orbit's `conversationFork()` Tauri command (replaced by SDK `forkSession`)
-- `markSessionAsForked()` (replaced by enrichment cache `forkedFrom` field)
+- `setRewindContext()` / `consumeRewindContext()` in `use-tauri-session.ts`
+- `rewindContextMap` in `use-tauri-session.ts`
+- Context prepend logic in `agent-sdk-handlers.ts:62-72`
+- `formatConversationContext()` in `use-tauri-context.ts`
+- `markSessionAsForked()` / `forkedSessionResumeMap` in `use-tauri-session.ts`
+- NOTE comments in `agent.ts:138-140` and `session-manager.ts:188-191`
+- `replay-user-messages` guard in `agent.ts:942-957` (unchanged)
 
 ### Platform Considerations
 
@@ -140,6 +138,38 @@ This is an existing issue in both Orbit's `ConversationManager` and the Claude C
 ## Phase 1: JSONL Reader Module (Rust)
 
 **New file: `crates/common/conversations/src/jsonl.rs`**
+
+### Performance Requirement (MANDATORY)
+
+The enrichment cache is **not optional** — it is a mandatory Phase 1 deliverable. Real workspaces have 1,300+ JSONL files. Without the cache, `list_sdk_sessions()` must parse the first ~30 lines of every file on each sidebar refresh, which is unacceptable.
+
+**Implementation priority:**
+
+1. Build enrichment cache read/write first
+2. Build JSONL metadata extractor second
+3. Wire `list_sdk_sessions()` to check cache before parsing
+
+**Cache invalidation**: For each session, store `(fileMtime, fileSize)`. On `list_sdk_sessions()`:
+
+- If JSONL file's mtime+size match cache → return cached metadata (O(1) stat call)
+- If mismatch → re-parse first ~30 lines → update cache entry
+- If JSONL file deleted → remove cache entry
+- If new JSONL file (no cache entry) → parse and add to cache
+
+**Concurrent access**: Use atomic write (write to temp file, `rename()`) for cache updates. Single Tauri command thread prevents concurrent writes.
+
+### JSONL Line Filtering Rules
+
+Not all JSONL lines are displayable messages. The parser must filter:
+
+| Line Type               | `type` field                         | Action                                                                                  |
+| ----------------------- | ------------------------------------ | --------------------------------------------------------------------------------------- |
+| `file-history-snapshot` | `"file-history-snapshot"`            | **Skip** — file checkpoint data, not a message                                          |
+| `isSidechain`           | any (has `isSidechain: true`)        | **Skip** — internal SDK branching data                                                  |
+| `isMeta`                | any (has `isMeta: true`)             | **Skip** — metadata entries                                                             |
+| `user`                  | `"user"`                             | **Parse** — content is a `string`                                                       |
+| `assistant`             | `"assistant"`                        | **Parse** — content is `Array<ContentBlock>`                                            |
+| Duplicate assistant IDs | `"assistant"` with same `message.id` | **Deduplicate** — keep last occurrence (streaming appends multiple entries per message) |
 
 ### Types
 
@@ -231,8 +261,11 @@ Cache invalidation: compare JSONL file mtime + size. If either changed, re-parse
 
 - `save()` / `save_to_workspace()` — SDK appends to JSONL
 - `add_message()` — SDK appends to JSONL
-- `fork()` — SDK handles forking natively via `forkSession: true`
 - Atomic write logic (temp files, rename)
+
+### Modify `fork()` to read-only JSONL
+
+- `fork()` — **Changed from write to read-only**: reads `{session_id}.jsonl` from `~/.claude/projects/`, extracts messages up to `up_to_message_id`, returns `Vec<Message>` **without writing a new file**. The SDK creates the new JSONL when the user sends the first message to a fresh session. This function is needed by the rewind flow to provide messages for `setRewindContext()`.
 
 ### Modify to read from `~/.claude/projects/`
 
@@ -275,17 +308,17 @@ pub struct ConversationSummary {
 
 **File: `src-tauri/src/commands/agent/conversations.rs`**
 
-| Command                         | Change                                                                  |
-| ------------------------------- | ----------------------------------------------------------------------- |
-| `conversation_list`             | Returns JSONL-sourced summaries merged with enrichment cache            |
-| `conversation_load`             | Parses JSONL file, returns messages in existing DTO format              |
-| `conversation_delete`           | Deletes JSONL from `~/.claude/projects/` + enrichment cache entry       |
-| `conversation_update_title`     | Writes `customTitle` to enrichment cache                                |
-| `conversation_create`           | **Simplified** — writes placeholder to enrichment cache only (no JSONL) |
-| `conversation_add_message`      | **Remove** — SDK handles persistence                                    |
-| `conversation_fork`             | **Remove** — SDK handles forking via `forkSession: true`                |
-| `conversation_data_path`        | Return `~/.claude/projects/{workspace}/`                                |
-| `conversation_cleanup_orphaned` | **Remove** — no longer meaningful                                       |
+| Command                         | Change                                                                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `conversation_list`             | Returns JSONL-sourced summaries merged with enrichment cache                                                                         |
+| `conversation_load`             | Parses JSONL file, returns messages in existing DTO format                                                                           |
+| `conversation_delete`           | Deletes JSONL from `~/.claude/projects/` + enrichment cache entry                                                                    |
+| `conversation_update_title`     | Writes `customTitle` to enrichment cache                                                                                             |
+| `conversation_create`           | **Simplified** — writes placeholder to enrichment cache only (no JSONL)                                                              |
+| `conversation_add_message`      | **Remove** — SDK handles persistence (remove 6 frontend call sites only AFTER JSONL parser verified)                                 |
+| `conversation_fork`             | **Modified** — read-only: parses JSONL up to message ID, returns messages (no write). Needed by rewind flow for `setRewindContext()` |
+| `conversation_data_path`        | Return `~/.claude/projects/{workspace}/`                                                                                             |
+| `conversation_cleanup_orphaned` | **Remove** — replaced by enrichment cache cleanup (remove entries without matching JSONL files)                                      |
 
 **DTO changes: `ConversationSummaryDto`**
 
@@ -341,43 +374,34 @@ In `createSession()` for RESUMED sessions:
 3. SDK resumes from existing JSONL — session ID stays the same
 4. `session_init` fires with the same ID (no swap needed)
 
-### Fork Session Flow (Rewind)
+### Fork/Rewind Session Flow (Context-Prepend — Preserved)
 
-In `forkSession()`:
+The rewind flow uses Orbit's context-prepend system, NOT `resumeSessionAt`. The only change is that `conversationFork()` now reads from JSONL instead of JSON:
 
-1. Frontend sends `fork_session` with the current session ID + `messageUuid` to rewind to
-2. agent-bridge calls `createSession` with `resumeSessionId`, `resumeSessionAt: messageUuid`, `forkSession: true`
-3. SDK creates a new JSONL file with a new session ID, branching from `messageUuid`
-4. `session_init` fires with the NEW fork session ID
-5. Frontend receives the new ID, writes enrichment cache entry with `forkedFrom: originalSessionId`
-6. If file rewind is also needed: call `rewindFiles(checkpointId)` on the new session
+1. Frontend calls `handleConversationRewind()` with `message_id` + `user_message_id`
+2. `getRewindCheckpoints()` → get turnEnd checkpoint UUID from `CheckpointStore`
+3. `agentRewindFiles(checkpointId)` → SDK restores files on disk
+4. `conversationFork(old, new, messageId)` → **reads JSONL** (was: reads JSON), returns messages up to point
+5. `setRewindContext(messages)` → stores truncated history in `rewindContextMap`
+6. `markSessionAsForked(newId, sdkId)` → tracks fork for checkpointing
+7. Frontend creates a fresh session (no SDK resume) → `session_init` fires
+8. On first message send → `consumeRewindContext()` → `formatConversationContext()` → prepend to user message
+9. Claude receives full prior context as XML prefix, responds with awareness of history
 
-**Implementation — restore `resumeSessionAt`**: The SDK supports `resumeSessionAt` in `Options` (SDK ref), and this plan restores it. Changes required in `agent-bridge/src/agent/core/agent.ts`:
+**No changes to `agent.ts` or `session-manager.ts`:**
 
-- Add `_resumeSessionAt?: string` field to `OrbitAgent`
-- Set from `config.resumeSessionAt` in constructor
-- Pass as `options.resumeSessionAt` in `_createOptions()`
-- **Remove** the NOTE comments at lines 138-140 that say "resumeSessionAt was removed"
-- **Remove** the equivalent NOTE at `session-manager.ts:188-191`
+- Do NOT add `_resumeSessionAt` field
+- Do NOT modify the `replay-user-messages` guard (current logic is correct)
+- Do NOT remove NOTE comments at `agent.ts:138-140` or `session-manager.ts:188-191`
+- The `OrbitAgentConfig` type is unchanged
 
-**Implementation — `replay-user-messages` for forks**: Update the guard at `agent.ts:942-957`:
+**Context-prepend system — fully preserved:**
 
-```typescript
-// Enable checkpoint tracking when: new session OR resumeSessionAt (no replay bug)
-// Disable when: plain resume without resumeSessionAt (prevents replay bug)
-if (!this._resumeSessionId || this._resumeSessionAt) {
-  options.extraArgs = { ...options.extraArgs, 'replay-user-messages': null };
-}
-```
-
-This ensures forked sessions created via `resumeSessionAt` + `forkSession: true` receive checkpoint UUIDs for new messages, enabling future rewinds from the fork.
-
-**Implementation — remove context-prepend**: The following items are removed as part of the `resumeSessionAt` restoration:
-
-- `setRewindContext()` / `getRewindContext()` in checkpoint store
-- `rewindContext` prepend logic in message send handler
-- Orbit's `conversationFork()` Tauri command (replaced by SDK `forkSession`)
-- `markSessionAsForked()` (replaced by enrichment cache `forkedFrom` field)
+- `setRewindContext()` / `consumeRewindContext()` in `use-tauri-session.ts`
+- `rewindContextMap` in `use-tauri-session.ts`
+- Context prepend in `agent-sdk-handlers.ts:62-72`
+- `formatConversationContext()` in `use-tauri-context.ts`
+- `markSessionAsForked()` / `forkedSessionResumeMap` in `use-tauri-session.ts`
 
 ---
 
@@ -385,50 +409,46 @@ This ensures forked sessions created via `resumeSessionAt` + `forkSession: true`
 
 ### `apps/agent/src/hooks/agent/handlers/conversation-handlers.ts`
 
-| Handler                         | Change                                                                                                        |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `handleConversationCreate`      | **Simplified** — writes enrichment cache entry only (worktreePath, no JSONL)                                  |
-| `handleConversationList`        | Unchanged (API contract same, data now from JSONL + cache)                                                    |
-| `handleConversationLoad`        | Unchanged (API contract same, data now from JSONL)                                                            |
-| `handleConversationDelete`      | Unchanged                                                                                                     |
-| `handleConversationUpdateTitle` | Unchanged                                                                                                     |
-| `handleConversationRewind`      | **Rewritten** — uses SDK `resumeSessionAt` + `forkSession: true` + `rewindFiles` (eliminates context-prepend) |
+| Handler                         | Change                                                                                                           |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `handleConversationCreate`      | **Simplified** — writes enrichment cache entry only (worktreePath, no JSONL)                                     |
+| `handleConversationList`        | Unchanged (API contract same, data now from JSONL + cache)                                                       |
+| `handleConversationLoad`        | Unchanged (API contract same, data now from JSONL)                                                               |
+| `handleConversationDelete`      | Unchanged                                                                                                        |
+| `handleConversationUpdateTitle` | Unchanged                                                                                                        |
+| `handleConversationRewind`      | **Adapted** — data source change only (reads JSONL instead of JSON). Context-prepend rewind flow preserved as-is |
 
-**Rewind flow (replacing context-prepend):**
+**Rewind flow (preserved — data source change only):**
 
-The current `handleConversationRewind()` uses a context-prepend workaround that loses SDK context. Replace with SDK-native operations:
+The existing `handleConversationRewind()` is kept with one change — `conversationFork()` reads from JSONL instead of Orbit's JSON store:
 
 ```
-Old flow (context-prepend):
+Flow (unchanged logic, new data source):
   1. getRewindCheckpoints() → get checkpoint UUID
-  2. agentRewindFiles() → disk state
-  3. conversationFork() → Orbit copies messages up to point
-  4. setRewindContext() → store truncated history
-  5. On next send → prepend context as new user text (loses SDK context)
-
-New flow (SDK-native):
-  1. getRewindCheckpoints() → get checkpoint UUID
-  2. agentRewindFiles(checkpointId) → disk state
-  3. agentCreateSession({ resumeSessionId, resumeSessionAt: messageUuid, forkSession: true })
-  4. SDK creates new JSONL branch, positions conversation at messageUuid
-  5. session_init fires → swap ID, write enrichment cache with forkedFrom
-  6. On next send → SDK has full prior context up to messageUuid natively
+  2. agentRewindFiles(checkpointId) → SDK restores files on disk
+  3. conversationFork(oldId, newId, messageId) → reads JSONL (was: JSON), returns messages up to point (read-only)
+  4. setRewindContext(messages) → stores truncated history in-memory
+  5. markSessionAsForked(newId, sdkId) → tracks fork for checkpointing
+  6. On next send → consumeRewindContext() → formatConversationContext() → prepend to user message
+  7. Message goes to fresh SDK session → SDK creates new JSONL
 ```
 
 **Keep `handleConversationCreate` and `conversation:create → conversation:created` event cycle.** The frontend's `use-sidebar-actions.ts` → `handleStartConversation()` → `conversation:create` flow is deeply wired into the UI lifecycle (clears messages, switches active session, updates sidebar). Removing it would break the UI. Instead, make the backend handler lightweight (cache-only, returns immediately).
 
 ### `apps/agent/src/lib/api/conversations.ts`
 
-- Remove `conversationAddMessage()` — SDK handles persistence
-- Remove `conversationFork()` — SDK handles forking via `forkSession: true`
+- **Phase out** `conversationAddMessage()` — SDK handles persistence. Remove only after JSONL parser returns same DTO shape and all 6 call sites are verified. Called in `conversation-handlers.ts`, `agent-sdk-handlers.ts`, `message-handler.ts`, `use-tauri-session.ts`.
+- **Modify** `conversationFork()` — read-only from JSONL (reads messages up to point, returns `Vec<Message>`, no write). Needed by rewind flow for `setRewindContext()`.
 - Remove `conversationCleanupOrphaned()` — no longer meaningful
 - Keep: `conversationCreate()`, `conversationList()`, `conversationLoad()`, `conversationDelete()`, `conversationUpdateTitle()`
 
 ### `apps/agent/src/stores/checkpoint-store.ts` (or equivalent)
 
-- Remove `setRewindContext()` / `getRewindContext()` — no longer needed (SDK positions conversation natively via `resumeSessionAt`)
-- Remove `markSessionAsForked()` — replaced by enrichment cache `forkedFrom` field written on `session_init`
-- Keep checkpoint tracking (checkpoint UUIDs from user messages)
+- **Keep** `setRewindContext()` / `getRewindContext()` — used by context-prepend rewind flow (unchanged)
+- **Keep** `markSessionAsForked()` — used by rewind flow in `conversation-handlers.ts` (unchanged)
+- **Keep** checkpoint tracking (checkpoint UUIDs from user messages)
+- **Keep** `turnStartCheckpoints` / `turnEndCheckpoints` / `getRewindCheckpoints()` — all unchanged
+- No changes to this store — it works correctly with the data source change
 
 ### `apps/agent/src/hooks/agent/use-tauri.ts` (or tauri-handlers)
 
@@ -570,22 +590,22 @@ fn migrate_old_store() -> Result<MigrationReport>
 
 ## Files Modified
 
-| File                                                                            | Change Type  | Description                                                                   |
-| ------------------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------- |
-| `crates/common/conversations/src/jsonl.rs`                                      | **NEW**      | JSONL parser, metadata extractor                                              |
-| `crates/common/conversations/src/lib.rs`                                        | **Major**    | Read from `~/.claude/projects/`, enrichment cache, remove fork                |
-| `src-tauri/src/commands/agent/conversations.rs`                                 | **Major**    | Remove addMessage/fork/cleanup, adapt list/load to JSONL                      |
-| `src-tauri/capabilities/filesystem.json`                                        | **Minor**    | Add explicit allow for `$HOME/.claude/**` and `$HOME/.config/claude/**`       |
-| `agent-bridge/src/agent/session/session-storage.ts`                             | **Major**    | Remove mapping layer (SDK assigns session IDs)                                |
-| `agent-bridge/src/agent/session/session-manager.ts`                             | **Moderate** | Remove saveSession, add fork-via-SDK, add `resumeSessionAt` config field      |
-| `agent-bridge/src/agent/core/agent.ts`                                          | **Moderate** | Restore `resumeSessionAt`, update `replay-user-messages` guard, remove NOTEs  |
-| `apps/agent/src/hooks/agent/handlers/conversation-handlers.ts`                  | **Moderate** | Simplify create (cache-only), rewrite rewind (SDK-native, no context-prepend) |
-| `apps/agent/src/hooks/agent/use-tauri.ts`                                       | **Moderate** | Add session ID swap on `session_init`, rewrite resume flow                    |
-| `apps/agent/src/lib/api/conversations.ts`                                       | **Minor**    | Remove addMessage, fork, cleanupOrphaned                                      |
-| `apps/agent/src/stores/checkpoint-store.ts`                                     | **Minor**    | Remove rewindContext/markSessionAsForked, keep checkpoint tracking            |
-| `apps/agent/src/components/layout/primary-sidebar/hooks/use-sidebar-actions.ts` | **Minor**    | Keep existing flow (create still calls backend)                               |
-| `apps/agent/src/stores/ui/ui-store.ts`                                          | **Minor**    | Keep localStorage fallback for dev mode                                       |
-| `apps/agent/src/hooks/chat/handlers/message-handler.ts`                         | **Minor**    | Keep conversation:created handling                                            |
+| File                                                                            | Change Type   | Description                                                                     |
+| ------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------- |
+| `crates/common/conversations/src/jsonl.rs`                                      | **NEW**       | JSONL parser, metadata extractor                                                |
+| `crates/common/conversations/src/lib.rs`                                        | **Major**     | Read from `~/.claude/projects/`, enrichment cache, fork → read-only JSONL       |
+| `src-tauri/src/commands/agent/conversations.rs`                                 | **Major**     | Remove addMessage/cleanup, fork → read-only, adapt list/load to JSONL           |
+| `src-tauri/capabilities/filesystem.json`                                        | **Minor**     | Add explicit allow for `$HOME/.claude/**` and `$HOME/.config/claude/**`         |
+| `agent-bridge/src/agent/session/session-storage.ts`                             | **Major**     | Remove mapping layer (SDK assigns session IDs)                                  |
+| `agent-bridge/src/agent/session/session-manager.ts`                             | **Minor**     | Remove saveSession calls only. No `resumeSessionAt` changes. Keep NOTE comments |
+| `agent-bridge/src/agent/core/agent.ts`                                          | **No change** | Keep as-is. NOTE comments preserved. `replay-user-messages` guard unchanged     |
+| `apps/agent/src/hooks/agent/handlers/conversation-handlers.ts`                  | **Minor**     | Simplify create (cache-only). Rewind adapted (JSONL data source, same logic)    |
+| `apps/agent/src/hooks/agent/use-tauri.ts`                                       | **Moderate**  | Add session ID swap on `session_init`, adapt resume flow                        |
+| `apps/agent/src/lib/api/conversations.ts`                                       | **Minor**     | Modify fork (read-only JSONL), phase out addMessage, remove cleanupOrphaned     |
+| `apps/agent/src/stores/checkpoint-store.ts`                                     | **No change** | Keep all: rewindContext, markSessionAsForked, checkpoint tracking               |
+| `apps/agent/src/components/layout/primary-sidebar/hooks/use-sidebar-actions.ts` | **Minor**     | Keep existing flow (create still calls backend)                                 |
+| `apps/agent/src/stores/ui/ui-store.ts`                                          | **Minor**     | Keep localStorage fallback for dev mode                                         |
+| `apps/agent/src/hooks/chat/handlers/message-handler.ts`                         | **Minor**     | Keep conversation:created handling                                              |
 
 ---
 
@@ -624,16 +644,17 @@ fn migrate_old_store() -> Result<MigrationReport>
 17. Verify JSONL file removed from `~/.claude/projects/`
 18. Verify enrichment cache entry removed
 
-### Manual Tests — Rewind (SDK-native, no context-prepend)
+### Manual Tests — Rewind (context-prepend preserved, JSONL data source)
 
 19. Use rewind on a message mid-conversation
-20. Verify SDK `resumeSessionAt` + `forkSession: true` creates a new JSONL file
-21. Verify original session JSONL is preserved unchanged
-22. Verify `rewindFiles()` restores disk state to the checkpoint
-23. Verify `forkedFrom` relationship written to enrichment cache
-24. Send a new message in the forked session → verify Claude has full prior context up to the rewind point (not just truncated text)
-25. Verify `replay-user-messages` is enabled for the fork (checkpoint UUIDs available for future rewinds)
-26. Use rewind again from the forked session → verify nested rewind works
+20. Verify `rewindFiles()` restores disk state to the checkpoint
+21. Verify `conversationFork()` reads messages from JSONL (not old JSON store)
+22. Verify `setRewindContext()` stores truncated message history
+23. Send a new message → verify `consumeRewindContext()` prepends formatted context to user message
+24. Verify new SDK session creates a new JSONL file (original preserved)
+25. Verify `forkedFrom` relationship tracked in enrichment cache
+26. Verify `replay-user-messages` is enabled for the fresh session (checkpoint UUIDs available for future rewinds)
+27. Use rewind again from the forked session → verify nested rewind works
 
 ### Manual Tests — Live Refresh
 
@@ -668,7 +689,7 @@ fn migrate_old_store() -> Result<MigrationReport>
 | Session ID swap race condition                    | `session_init` fires before any assistant response. Queue messages behind the swap.                                                                          |
 | SDK changes JSONL format                          | Pin SDK version. JSONL parsing uses defensive `serde_json::Value` with graceful skip on unknown fields.                                                      |
 | Enrichment cache concurrent writes                | Use atomic write (write to temp file, rename) for cache updates. Single-writer in Tauri command thread.                                                      |
-| Breaking rewind                                   | SDK native `resumeSessionAt` + `forkSession` + `rewindFiles`. No context-prepend workaround.                                                                 |
+| Breaking rewind                                   | Context-prepend rewind preserved as-is. Only data source changes (JSONL instead of JSON). Integration tested in `combined-rewind.test.ts`.                   |
 | Title quality                                     | First user message truncated to 80 chars. Users can rename via enrichment cache `customTitle`.                                                               |
 | Migration data loss                               | Old files left as-is. Migration is additive (copies to cache). `.migrated` flag prevents re-runs.                                                            |
 | 500+ JSONL files in workspace                     | Enrichment cache stores pre-parsed metadata. Only re-parse files whose mtime+size changed.                                                                   |
@@ -678,5 +699,5 @@ fn migrate_old_store() -> Result<MigrationReport>
 | Linux `~/.config/claude/` path                    | Add explicit Tauri FS ACL allow for `$HOME/.config/claude/**`. Detect path at runtime via `dirs` crate.                                                      |
 | Tauri FS ACL blocks `~/.claude/`                  | Add explicit allow for `$HOME/.claude/**` in `capabilities/filesystem.json` (don't rely on `$HOME/**` minus deny rules).                                     |
 | Workspace path encoding collisions                | `/Users/foo/my-project` and `/Users/foo/my/project` both encode to `-Users-foo-my-project`. Inherited from SDK — no fix needed, but document the limitation. |
-| `resumeSessionAt` not wired in current codebase   | Must add `_resumeSessionAt` field to `OrbitAgent`, pass through in `_createOptions()`. Remove old NOTE comments.                                             |
-| Checkpoint UUIDs missing in forked sessions       | Updated `replay-user-messages` guard enables checkpoint tracking for `resumeSessionAt` forks. Plain `resume` still disables it.                              |
+| `resumeSessionAt` undocumented in SDK             | NOT USED. Context-prepend rewind is preserved. NOTE comments in `agent.ts` and `session-manager.ts` kept as warnings.                                        |
+| Checkpoint UUIDs in forked sessions               | Forked sessions are fresh SDK sessions (not resumed), so `replay-user-messages` is ON → checkpoint UUIDs available. No change to existing guard.             |
