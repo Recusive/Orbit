@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { FolderOpen, GitBranch, Terminal } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
@@ -12,6 +13,8 @@ import { toConversationSummaries } from '@/lib/mappers';
 import { cn } from '@/lib/utils';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
+
+const logger = createLogger('WelcomePage');
 
 export interface WelcomePageProps {
   className?: string;
@@ -43,7 +46,7 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
         const conversations = await conversationList(path);
         useUIStore.getState().setConversations(toConversationSummaries(conversations));
       } catch (err) {
-        console.error('[WelcomePage] Failed to open project:', err);
+        logger.error('Failed to open project', err);
       }
     },
     [setRootPath]
@@ -61,14 +64,16 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
         await openProject(selected);
       }
     } catch (err) {
-      console.error('[WelcomePage] Failed to open project:', err);
+      logger.error('Failed to open project', err);
     }
   }, [openProject]);
 
   const handleRecentProjectClick = useCallback(
     (path: string) => {
       return (): void => {
-        openProject(path).catch(console.error);
+        openProject(path).catch((err: unknown) => {
+          logger.error('Failed to open recent project', err);
+        });
       };
     },
     [openProject]

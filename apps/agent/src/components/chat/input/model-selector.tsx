@@ -149,9 +149,12 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   useEffect(() => {
     if (!isOpen || isAnimatingOut) return;
     // RAF ensures the portal DOM is mounted and popoverRef.current has its real height
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       updatePosition();
     });
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
   }, [isOpen, isAnimatingOut, updatePosition]);
 
   // Reposition popover on window resize/scroll while open
@@ -172,9 +175,12 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   useEffect(() => {
     if (!isOpen || isAnimatingOut) return;
     // Defer to next frame so the portal DOM is mounted
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       popoverRef.current?.focus();
     });
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
   }, [isOpen, isAnimatingOut]);
 
   // Handle closing with exit animation

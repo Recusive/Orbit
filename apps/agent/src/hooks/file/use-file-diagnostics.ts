@@ -1,8 +1,11 @@
+import { createLogger } from '@orbit/common/lib';
 import { useEffect, useRef, useState } from 'react';
 
 import type { Diagnostic } from '@/lib/api';
 
 import { onFileDiagnostics } from '@/lib/api';
+
+const logger = createLogger('useFileDiagnostics');
 
 interface UseFileDiagnosticsResult {
   /** Diagnostics for this file */
@@ -60,7 +63,7 @@ export function useFileDiagnostics(filePath: string | null): UseFileDiagnosticsR
         unlistenRef.current = unlisten;
       })
       .catch((err: unknown) => {
-        console.error('[useFileDiagnostics] Failed to subscribe:', err);
+        logger.error('Failed to subscribe', err);
       });
 
     return (): void => {

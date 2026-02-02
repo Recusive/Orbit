@@ -230,10 +230,11 @@ async fn check_macos_keychain_validated() -> KeychainStatus {
 
                     // Check expiry (with 300s / 5-min buffer aligned with agent-bridge TS side)
                     if let Some(exp) = expires_at {
+                        // Fail-closed: if system time is unavailable, treat token as expired
                         let now = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
                             .map(|d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
-                            .unwrap_or(0);
+                            .unwrap_or(i64::MAX);
 
                         // expiresAt is in milliseconds
                         let exp_secs = exp / 1000;

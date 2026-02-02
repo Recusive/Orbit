@@ -4,7 +4,7 @@
  * Functions for dialogs, clipboard, and app info.
  */
 
-import { invoke, IS_TAURI } from './core';
+import { invoke, IS_TAURI, logger } from './core';
 
 // ============================================
 // Types
@@ -32,7 +32,7 @@ export async function openFileDialog(
   options?: FileDialogOptions
 ): Promise<string | string[] | null> {
   if (!IS_TAURI) {
-    console.warn('[Mock] openFileDialog');
+    logger.warn('Mock: openFileDialog');
     return null;
   }
   const { open } = await import('@tauri-apps/plugin-dialog');
@@ -41,7 +41,7 @@ export async function openFileDialog(
 
 export async function saveFileDialog(options?: SaveDialogOptions): Promise<string | null> {
   if (!IS_TAURI) {
-    console.warn('[Mock] saveFileDialog');
+    logger.warn('Mock: saveFileDialog');
     return null;
   }
   const { save } = await import('@tauri-apps/plugin-dialog');
@@ -107,6 +107,6 @@ export async function initializeWorkspace(path: string): Promise<void> {
   // Note: Tauri 2.0 auto-converts Rust snake_case to camelCase for frontend
   invoke('build_file_index', { rootPath: path }).catch((err: unknown) => {
     // Log but don't fail workspace initialization
-    console.warn('[initializeWorkspace] Failed to build file index:', err);
+    logger.warn('Failed to build file index', { error: String(err) });
   });
 }
