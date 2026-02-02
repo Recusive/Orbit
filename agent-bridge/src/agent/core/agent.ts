@@ -1129,10 +1129,14 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       logger.info('Credentials refreshed via pre-send check');
       return true;
     }
-    // refreshIfNeeded returns { refreshed: false } for both "no refresh needed" (API key
-    // or token still valid) and "refresh failed". Check if we actually have working creds.
-    const creds = await ClaudeCredentials.getCredentials();
-    return creds.hasCredentials;
+    // error field distinguishes "refresh failed" from "no refresh needed"
+    // (Code review: Opus cycle 4, #6)
+    if (result.error !== undefined) {
+      logger.warn({ error: result.error }, 'Credential refresh failed in pre-send check');
+      return false;
+    }
+    // No refresh was needed — credentials still valid (API key or unexpired token)
+    return true;
   }
 
   /**

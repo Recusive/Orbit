@@ -26,6 +26,8 @@ export interface CredentialResult {
 export interface TokenRefreshResult {
   refreshed: boolean;
   token?: string;
+  /** Present when a refresh was attempted but failed (Code review: Opus cycle 4, #6) */
+  error?: string;
 }
 
 /** Callback invoked when a scheduled auto-refresh fails */
@@ -281,7 +283,7 @@ async function refreshIfNeeded(): Promise<TokenRefreshResult> {
       process.env.CLAUDE_CODE_OAUTH_TOKEN = creds;
       return { refreshed: true, token: creds };
     }
-    return { refreshed: false };
+    return { refreshed: false, error: 'No valid credentials found in keychain' };
   }
 
   // Token still valid with buffer — no refresh needed
@@ -300,7 +302,7 @@ async function refreshIfNeeded(): Promise<TokenRefreshResult> {
   }
 
   logger.warn('OAuth token refresh failed');
-  return { refreshed: false };
+  return { refreshed: false, error: 'OAuth token refresh failed' };
 }
 
 /**
@@ -333,9 +335,12 @@ function scheduleAutoRefresh(onFailure: AutoRefreshFailureCallback): () => void 
         if (result.refreshed) {
           logger.info('Auto-refresh succeeded, rescheduling');
           schedule(); // Reschedule for the new token's expiry
+        } else if (result.error !== undefined) {
+          logger.warn({ error: result.error }, 'Auto-refresh failed, notifying caller');
+          onFailure(result.error);
         } else {
-          logger.warn('Auto-refresh failed, notifying caller');
-          onFailure('OAuth token refresh failed. Please re-authenticate with "claude login".');
+          // Token still valid — periodic check found nothing to refresh
+          logger.debug('Periodic check: token still valid, no refresh needed');
         }
       })
       .catch((err: unknown) => {

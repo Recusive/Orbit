@@ -12,8 +12,14 @@
 
 /// <reference types="vitest/globals" />
 import '@testing-library/jest-dom/vitest';
-
+import { enableMapSet } from 'immer';
 import React from 'react';
+
+// Enable Immer Map/Set plugin globally for all tests.
+// At runtime, file-store.ts calls this at module level, but tests may import
+// stores in isolation (e.g., ui-store without file-store), so we ensure it
+// here. (Code review: Opus cycle 4, CI fix)
+enableMapSet();
 
 // =============================================================================
 // Browser API Mocks
