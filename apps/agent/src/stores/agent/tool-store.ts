@@ -609,6 +609,7 @@ export const useToolStore = create<ToolState>()(
           input: Record<string, unknown>;
           output?: string | undefined;
           success: boolean;
+          contentOffset?: number | undefined;
         }[]
       ) => {
         set((state) => {
@@ -630,6 +631,7 @@ export const useToolStore = create<ToolState>()(
               startedAt: 0, // Not available from persisted data
               completedAt: 0, // Not available from persisted data
               success: tool.success,
+              contentOffset: tool.contentOffset,
             };
             state.completedTools.push(toolExecution);
           }

@@ -28,7 +28,6 @@ const getUIActions = (): Pick<
   | 'setActiveConversation'
   | 'setConversationTransitioning'
   | 'setConversations'
-  | 'addConversation'
   | 'updateConversationTitle'
 > => {
   const state = useUIStore.getState();
@@ -37,7 +36,6 @@ const getUIActions = (): Pick<
     setActiveConversation: state.setActiveConversation,
     setConversationTransitioning: state.setConversationTransitioning,
     setConversations: state.setConversations,
-    addConversation: state.addConversation,
     updateConversationTitle: state.updateConversationTitle,
   };
 };
@@ -232,7 +230,6 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setActiveConversation: uiActions.setActiveConversation,
       setConversationTransitioning: uiActions.setConversationTransitioning,
       setConversations: uiActions.setConversations,
-      addConversation: uiActions.addConversation,
       setInputMode: toolActions.setInputMode,
       setModel: toolActions.setModel,
       startTool: toolActions.startTool,

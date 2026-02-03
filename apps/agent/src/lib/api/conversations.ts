@@ -26,6 +26,7 @@ export interface ToolUseDto {
   input: Record<string, unknown>;
   output?: string;
   success: boolean;
+  contentOffset?: number;
 }
 
 export interface TokenUsageDto {

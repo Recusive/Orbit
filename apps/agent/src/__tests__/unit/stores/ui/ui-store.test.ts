@@ -304,7 +304,7 @@ describe('ui-store', () => {
 
   describe('conversation list', () => {
     describe('setConversations', () => {
-      it('should set conversations and persist to localStorage', () => {
+      it('should replace conversations list from disk', () => {
         const { setConversations } = useUIStore.getState();
         const conversations = [
           createMockConversation('conv-1', 'First'),
@@ -314,7 +314,7 @@ describe('ui-store', () => {
         setConversations(conversations);
 
         expect(useUIStore.getState().conversations).toEqual(conversations);
-        expect(mockSetItem).toHaveBeenCalledWith('orbit-conversations', expect.any(String));
+        // No localStorage persistence — conversations are loaded from disk (JSONL files)
       });
     });
 
@@ -394,14 +394,15 @@ describe('ui-store', () => {
         expect(useUIStore.getState().activeConversationTitle).toBe('Updated');
       });
 
-      it('should persist to localStorage', () => {
+      it('should not persist to localStorage (conversations are disk-only)', () => {
         const { setConversations, updateConversationTitle } = useUIStore.getState();
 
         setConversations([createMockConversation('conv-1', 'Original')]);
         vi.clearAllMocks();
         updateConversationTitle('conv-1', 'Updated');
 
-        expect(mockSetItem).toHaveBeenCalledWith('orbit-conversations', expect.any(String));
+        // No localStorage call — conversations are read from JSONL files on disk
+        expect(mockSetItem).not.toHaveBeenCalledWith('orbit-conversations', expect.any(String));
       });
     });
   });

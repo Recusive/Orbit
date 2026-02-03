@@ -94,8 +94,6 @@ interface UIState {
   isConversationTransitioning: boolean;
   // Conversation list
   conversations: ConversationSummary[];
-  // Session IDs created during this app session (not persisted — protects new sessions from disk overwrites)
-  recentlyCreatedSessionIds: Set<string>;
   // Conversation editing state (for inline rename)
   editingConversationId: string | null;
   // Left Sidebar
@@ -268,7 +266,6 @@ export const useUIStore = create<UIStore>()(
     isLoadingConversation: false,
     isConversationTransitioning: false,
     conversations: [],
-    recentlyCreatedSessionIds: new Set<string>(),
     editingConversationId: null,
     leftSidebarOpen: DEFAULT_UI_STATE.leftSidebarOpen,
     leftSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
@@ -348,23 +345,14 @@ export const useUIStore = create<UIStore>()(
 
     setConversations: (conversations: ConversationSummary[]): void => {
       set((state) => {
-        // Protect sessions created THIS app session that aren't on disk yet.
-        // The SDK writes .jsonl files asynchronously, so new sessions won't appear
-        // on disk until the first message completes. Only preserve those — not
-        // stale localStorage entries from previous sessions.
-        const diskIds = new Set(conversations.map((c) => c.sessionId));
-        const newThisSession = state.conversations.filter(
-          (c) => state.recentlyCreatedSessionIds.has(c.sessionId) && !diskIds.has(c.sessionId)
-        );
-        const merged = [...newThisSession, ...conversations];
-        state.conversations = merged;
+        // Pure reader: replace the sidebar list entirely from disk-scanned JSONL files.
+        // The SDK writes JSONL files — Orbit just reads them.
+        state.conversations = conversations;
       });
     },
 
     addConversation: (conversation: ConversationSummary): void => {
       set((state) => {
-        // Track that this session was created during this app session
-        state.recentlyCreatedSessionIds.add(conversation.sessionId);
         // Check if conversation already exists (prevent duplicates)
         const exists = state.conversations.some((c) => c.sessionId === conversation.sessionId);
         if (!exists) {

@@ -1356,6 +1356,7 @@ const PersistedToolUseSchema = z
     input: z.record(z.string(), z.unknown()),
     output: z.string().optional(),
     success: z.boolean().default(true),
+    contentOffset: z.number().optional(),
   })
   .strict();
 
@@ -1379,6 +1380,7 @@ const PersistedMessageSchema = z
     role: z.enum(['user', 'assistant', 'system']),
     content: z.string(),
     thinking: z.string().optional(),
+    isInterrupted: z.boolean().optional(),
     // Support both old 'timestamp' and new 'createdAt' field names
     createdAt: z.number().optional(),
     timestamp: z.number().optional(),
@@ -1391,6 +1393,7 @@ const PersistedMessageSchema = z
     role: msg.role,
     content: msg.content,
     thinking: msg.thinking,
+    isInterrupted: msg.isInterrupted,
     // Prefer createdAt, fall back to timestamp, default to 0
     createdAt: msg.createdAt ?? msg.timestamp ?? 0,
     toolUses: msg.toolUses ?? [],
@@ -1433,6 +1436,7 @@ export const ConversationRewoundSchema = z
                 input: z.record(z.string(), z.unknown()),
                 output: z.string().optional(),
                 success: z.boolean(),
+                contentOffset: z.number().optional(),
               })
             )
             .optional(),

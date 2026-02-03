@@ -56,6 +56,9 @@ pub struct ToolUseDto {
     /// Success status
     #[serde(default = "default_true")]
     pub success: bool,
+    /// Byte offset into the message content where this tool was invoked
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_offset: Option<u32>,
 }
 
 /// Serializable token usage for frontend
@@ -140,6 +143,7 @@ impl From<ToolUse> for ToolUseDto {
             input: tu.input,
             output: tu.output,
             success: tu.success,
+            content_offset: tu.content_offset,
         }
     }
 }
@@ -171,6 +175,7 @@ impl From<ToolUseDto> for ToolUse {
             input: dto.input,
             output: dto.output,
             success: dto.success,
+            content_offset: dto.content_offset,
         }
     }
 }

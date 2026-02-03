@@ -77,7 +77,6 @@ interface MessageHandlerDeps {
   setActiveConversation: (sessionId: string | null, title: string | null) => void;
   setConversationTransitioning: (transitioning: boolean) => void;
   setConversations: (conversations: Conversation[]) => void;
-  addConversation: (conversation: Conversation) => void;
   setInputMode: (mode: 'default' | 'plan' | 'accept') => void;
   setModel: (model: Model) => void;
   startTool: (
@@ -160,7 +159,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
     setActiveConversation,
     setConversationTransitioning,
     setConversations,
-    addConversation,
     setInputMode,
     setModel,
     startTool,
@@ -606,6 +604,16 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           addUsage(message.message_id, usageForStore, message.total_cost_usd);
         }
         setIsAgentRunning(false);
+
+        // Refresh conversation list from disk after agent completes.
+        // The SDK writes JSONL files during the turn — by the time agent:complete fires,
+        // the file exists on disk. This is how new sessions appear in the sidebar
+        // (Orbit is a pure reader — it never pre-adds sessions to the list).
+        if (workspacePath) {
+          void conversationList(workspacePath).then((conversations) => {
+            setConversations(toConversationSummaries(conversations));
+          });
+        }
         break;
       }
 
@@ -682,16 +690,12 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         useFileStore.getState().switchSession(message.session_id);
 
         // Now update session state (triggers ChatArea remount via key prop)
+        // NOTE: We do NOT call addConversation() here. Orbit is a pure reader —
+        // the sidebar populates only from SDK-written JSONL files on disk.
+        // The new session will appear in the sidebar after agent:complete
+        // triggers a disk refresh via conversationList().
         setSessionId(message.session_id);
         setActiveConversation(message.session_id, message.title);
-        addConversation({
-          sessionId: message.session_id,
-          title: message.title,
-          updatedAt: Date.now(),
-          messageCount: 0,
-          ...(message.workspace_path ? { workspacePath: message.workspace_path } : {}),
-          ...(message.worktree_path ? { worktreePath: message.worktree_path } : {}),
-        });
         switchSession(message.session_id); // Switch to new session (resets usage for new conversation)
         onSessionCreated?.(message.session_id, message.title);
         break;
@@ -778,12 +782,18 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                 (m): m is typeof m & { role: 'user' | 'assistant' } =>
                   m.role === 'user' || m.role === 'assistant'
               )
-              .map((m) => ({
-                id: m.id,
-                role: m.role,
-                content: m.content,
-                displayedContent: m.content,
-              }));
+              .map((m) => {
+                const base = {
+                  id: m.id,
+                  role: m.role,
+                  content: m.content,
+                  displayedContent: m.content,
+                };
+                if (m.isInterrupted === true) {
+                  return { ...base, isInterrupted: true as const };
+                }
+                return base;
+              });
 
             // Merge backend and cache messages:
             // - User messages ONLY come from backend (auto-start saves them immediately)
@@ -877,6 +887,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                     input: t.input,
                     success: t.success,
                     ...(t.output !== undefined ? { output: t.output } : {}),
+                    ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
                   }))
                 );
               }

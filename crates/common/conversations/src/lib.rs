@@ -85,6 +85,10 @@ pub struct ToolUse {
     /// Whether the tool execution was successful
     #[serde(default = "default_true")]
     pub success: bool,
+    /// Byte offset into the merged text content where this tool was invoked.
+    /// Used by the frontend to interleave tool widgets between text segments.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_offset: Option<u32>,
 }
 
 /// Token usage statistics for a message
@@ -1099,7 +1103,12 @@ fn merge_consecutive_assistants(raw: Vec<Message>) -> Vec<Message> {
         if msg.role == MessageRole::Assistant {
             if let Some(last) = merged.last_mut() {
                 if last.role == MessageRole::Assistant {
-                    if !msg.content.is_empty() {
+                    // Record the current text length BEFORE appending so we can
+                    // shift the incoming tool offsets by this amount.
+                    let base_len = u32::try_from(last.content.len()).unwrap_or(u32::MAX);
+                    let incoming_has_text = !msg.content.is_empty();
+
+                    if incoming_has_text {
                         if last.content.is_empty() {
                             last.content = msg.content;
                         } else {
@@ -1110,7 +1119,20 @@ fn merge_consecutive_assistants(raw: Vec<Message>) -> Vec<Message> {
                     if last.thinking.is_none() {
                         last.thinking = msg.thinking;
                     }
-                    last.tool_uses.extend(msg.tool_uses);
+
+                    // Shift tool content_offsets by the existing text length
+                    // (+ 1 for the "\n" separator if we appended text).
+                    let shift = if base_len > 0 && incoming_has_text {
+                        base_len + 1
+                    } else {
+                        base_len
+                    };
+                    for mut tool in msg.tool_uses {
+                        tool.content_offset =
+                            Some(tool.content_offset.unwrap_or(0).saturating_add(shift));
+                        last.tool_uses.push(tool);
+                    }
+
                     if msg.usage.is_some() {
                         last.usage = msg.usage;
                     }
@@ -1131,10 +1153,17 @@ fn merge_consecutive_assistants(raw: Vec<Message>) -> Vec<Message> {
 }
 
 /// Extract text content, thinking, and tool uses from an assistant message.
+///
+/// Tracks the running byte length of concatenated text so each `ToolUse`
+/// records the `content_offset` where it appeared in the text stream.
+/// The frontend uses this offset to interleave tool widgets between text
+/// segments (via `buildSegments`).
 fn extract_assistant_content(value: &serde_json::Value) -> (String, Option<String>, Vec<ToolUse>) {
     let mut text_parts: Vec<String> = Vec::new();
     let mut thinking: Option<String> = None;
     let mut tool_uses: Vec<ToolUse> = Vec::new();
+    // Running byte length of all text parts joined so far (including "\n" separators).
+    let mut text_byte_len: u32 = 0;
 
     let content = value.get("content");
 
@@ -1143,6 +1172,11 @@ fn extract_assistant_content(value: &serde_json::Value) -> (String, Option<Strin
             match block.get("type").and_then(serde_json::Value::as_str) {
                 Some("text") => {
                     if let Some(text) = block.get("text").and_then(serde_json::Value::as_str) {
+                        if !text_parts.is_empty() {
+                            // Account for the "\n" join separator
+                            text_byte_len += 1;
+                        }
+                        text_byte_len += u32::try_from(text.len()).unwrap_or(u32::MAX);
                         text_parts.push(text.to_owned());
                     }
                 },
@@ -1173,6 +1207,7 @@ fn extract_assistant_content(value: &serde_json::Value) -> (String, Option<Strin
                         input,
                         output: None,
                         success: true,
+                        content_offset: Some(text_byte_len),
                     });
                 },
                 _ => {},
@@ -1540,6 +1575,51 @@ mod tests {
         assert!(conv.messages[1].content.contains("Here are your files"));
         assert_eq!(conv.messages[1].tool_uses.len(), 1);
         assert_eq!(conv.messages[1].tool_uses[0].name, "Bash");
+
+        // The tool was on a separate JSONL line (a2) with no text.
+        // After merge: base text "I'll run that for you." (22 bytes), tool_use line
+        // had empty content so no \n separator added. Tool offset = 0 + 22 = 22.
+        assert_eq!(
+            conv.messages[1].tool_uses[0].content_offset,
+            Some(22),
+            "Tool offset should account for preceding text from earlier lines"
+        );
+    }
+
+    #[test]
+    fn test_content_offset_interleaved_text_and_tools() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Single assistant message with interleaved text → tool → text → tool → text
+        let path = ws_dir.join("interleaved-session.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"do stuff"},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"First."},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}},{"type":"text","text":"Second."},{"type":"tool_use","id":"t2","name":"Read","input":{"path":"a.txt"}},{"type":"text","text":"Third."}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("interleaved-session", None)
+            .expect("load")
+            .expect("not found");
+
+        // Should have 1 user + 1 assistant message
+        assert_eq!(conv.messages.len(), 2);
+        let assistant = &conv.messages[1];
+
+        // Content should be all text parts joined: "First.\nSecond.\nThird."
+        assert_eq!(assistant.content, "First.\nSecond.\nThird.");
+        assert_eq!(assistant.tool_uses.len(), 2);
+
+        // t1 appears after "First." (6 bytes)
+        assert_eq!(assistant.tool_uses[0].id, "t1");
+        assert_eq!(assistant.tool_uses[0].content_offset, Some(6));
+
+        // t2 appears after "First.\nSecond." (6 + 1 + 7 = 14 bytes)
+        assert_eq!(assistant.tool_uses[1].id, "t2");
+        assert_eq!(assistant.tool_uses[1].content_offset, Some(14));
     }
 
     #[test]
