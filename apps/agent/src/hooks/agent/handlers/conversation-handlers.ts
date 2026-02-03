@@ -119,13 +119,18 @@ export async function handleConversationLoad(
         '*'
       );
     } else {
-      // Conversation not found in backend - return empty
+      // Conversation not found on disk — likely a cache-only session
+      // (created via "New Session" but SDK hasn't written the JSONL file yet).
+      // Return empty messages but preserve whatever title the sidebar already has.
+      logger.debug('Conversation not found on disk (cache-only?)', {
+        sessionId: message.session_id,
+      });
       window.postMessage(
         {
           type: 'conversation:loaded',
           uuid: crypto.randomUUID(),
           session_id: message.session_id,
-          title: 'Conversation',
+          title: 'Untitled',
           messages: [],
         },
         '*'
@@ -138,7 +143,7 @@ export async function handleConversationLoad(
         type: 'conversation:loaded',
         uuid: crypto.randomUUID(),
         session_id: message.session_id,
-        title: 'Conversation',
+        title: 'Untitled',
         messages: [],
       },
       '*'

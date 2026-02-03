@@ -282,9 +282,10 @@ pub fn conversation_list(
 #[tauri::command]
 pub fn conversation_load(
     session_id: String,
+    workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<Option<ConversationDto>> {
-    let conv = manager.load(&session_id)?;
+    let conv = manager.load(&session_id, workspace_path.as_deref())?;
     Ok(conv.map(ConversationDto::from))
 }
 
@@ -292,9 +293,10 @@ pub fn conversation_load(
 #[tauri::command]
 pub fn conversation_delete(
     session_id: String,
+    workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<()> {
-    manager.delete(&session_id)
+    manager.delete(&session_id, workspace_path.as_deref())
 }
 
 /// Update conversation title
@@ -330,20 +332,14 @@ pub fn conversation_fork(
     session_id: String,
     new_session_id: String,
     up_to_message_id: Option<String>,
+    workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<Option<ConversationDto>> {
-    let forked = manager.fork(&session_id, new_session_id, up_to_message_id.as_deref())?;
+    let forked = manager.fork(
+        &session_id,
+        &new_session_id,
+        up_to_message_id.as_deref(),
+        workspace_path.as_deref(),
+    )?;
     Ok(forked.map(ConversationDto::from))
-}
-
-/// Get the conversations data directory path
-#[tauri::command]
-pub fn conversation_data_path(manager: State<'_, ConversationManager>) -> String {
-    manager.data_dir().to_string_lossy().to_string()
-}
-
-/// Delete all conversations without a workspace path (orphaned)
-#[tauri::command]
-pub fn conversation_cleanup_orphaned(manager: State<'_, ConversationManager>) -> Result<usize> {
-    manager.cleanup_orphaned_conversations()
 }

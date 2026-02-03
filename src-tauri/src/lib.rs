@@ -244,11 +244,8 @@ pub fn run() {
         log::warn!("Failed to load settings: {e}");
     }
 
-    // Initialize conversation manager and load summaries
+    // Initialize conversation manager (pure disk reader — no cache to warm)
     let conversation_manager = ConversationManager::new();
-    if let Err(e) = conversation_manager.load_summaries() {
-        log::warn!("Failed to load conversation summaries: {e}");
-    }
 
     // Initialize agent session manager
     // The sidecar path is resolved based on environment:
@@ -493,8 +490,6 @@ pub fn run() {
             conversations::conversation_update_title,
             conversations::conversation_add_message,
             conversations::conversation_fork,
-            conversations::conversation_data_path,
-            conversations::conversation_cleanup_orphaned,
             // Dev-monitor commands (dev-only)
             dev_monitor::dev_monitor_ensure_dir,
             dev_monitor::dev_monitor_write_batch,

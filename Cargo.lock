@@ -3439,8 +3439,10 @@ dependencies = [
 name = "orbit-conversations"
 version = "0.0.1"
 dependencies = [
+ "chrono",
  "directories",
  "dirs",
+ "hashbrown 0.15.5",
  "orbit-core",
  "parking_lot",
  "serde",
