@@ -613,13 +613,13 @@ export const useToolStore = create<ToolState>()(
         }[]
       ) => {
         set((state) => {
-          // Convert persisted tool data to ToolExecution format
+          // Convert persisted tool data to ToolExecution format.
+          // If a tool already exists (e.g., from localStorage rehydration), UPDATE it
+          // rather than skipping — the rehydrated copy may have a stale messageId
+          // (from the live streaming session) that doesn't match the merged JSONL
+          // message ID used after reload.
           for (const tool of tools) {
-            // Skip if we already have this tool (avoid duplicates on multiple loads)
-            const exists = state.completedTools.some((t) => t.id === tool.id);
-            if (exists) {
-              continue;
-            }
+            const existingIdx = state.completedTools.findIndex((t) => t.id === tool.id);
 
             const toolExecution: ToolExecution = {
               id: tool.id,
@@ -633,7 +633,13 @@ export const useToolStore = create<ToolState>()(
               success: tool.success,
               contentOffset: tool.contentOffset,
             };
-            state.completedTools.push(toolExecution);
+
+            if (existingIdx >= 0) {
+              // Replace stale entry with correct messageId and contentOffset
+              state.completedTools[existingIdx] = toolExecution;
+            } else {
+              state.completedTools.push(toolExecution);
+            }
           }
 
           // Also update sessionCache so tools survive session switches

@@ -328,6 +328,13 @@ export class OrbitAgent {
   private _forkSession: boolean;
   private _currentSessionId?: string;
 
+  /**
+   * The canonical session ID used for Map keys and event emissions.
+   * Set to the temp ID at creation, then updated to the SDK ID on system:init.
+   * Closures use this instead of capturing a stale temp ID.
+   */
+  effectiveSessionId = '';
+
   // Streaming input mode fields
   private messageQueue: MessageQueue | null = null;
   private sessionActive = false;

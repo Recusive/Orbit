@@ -88,6 +88,16 @@ export function consumeRewindContext(sessionId: string): RewindContextMessage[] 
   return context;
 }
 
+/** Remap a created session from oldId to newId (e.g., Orbit UUID → SDK session ID).
+ *  This keeps ensureSession() from re-creating the session under the new ID. */
+export function remapCreatedSession(oldId: string, newId: string): void {
+  if (createdSessions.has(oldId)) {
+    createdSessions.delete(oldId);
+    createdSessions.add(newId);
+    logger.debug('Remapped created session', { oldId, newId });
+  }
+}
+
 /** Ensure a session exists before sending messages */
 export async function ensureSession(sessionId: string): Promise<void> {
   if (createdSessions.has(sessionId)) {

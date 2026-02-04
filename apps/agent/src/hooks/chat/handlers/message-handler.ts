@@ -5,6 +5,7 @@ import type { ChatMessage } from '@/components/chat';
 import type { ExtensionMessage, Model } from '@/types/protocol';
 
 import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-handlers';
+import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
 import { conversationAddMessage, conversationList } from '@/lib/api';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { toConversationSummaries } from '@/lib/mappers';
@@ -13,6 +14,7 @@ import { rafBatch } from '@/lib/utils/event-batcher';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('MessageHandler');
 
@@ -152,6 +154,10 @@ export interface MessageHandlerResult {
 }
 
 export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerResult {
+  // Track Orbit session IDs that were remapped to SDK session IDs.
+  // Used to ignore stale conversation:loaded responses for the old Orbit ID.
+  const remappedOrbitIds = new Set<string>();
+
   const {
     setWorkspace,
     workspacePath,
@@ -419,12 +425,34 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
 
   const handleMessage = (message: ExtensionMessage): void => {
     switch (message.type) {
-      case 'system:init':
-        // Only set sessionId if we don't already have an active session with messages
-        // This prevents browser panel opening from resetting the session
-        if (!sessionIdRef.current || messagesRef.current.length === 0) {
+      case 'system:init': {
+        // Remap to SDK session ID so our session matches the JSONL filename on disk.
+        // The SDK writes `{sdk_session_id}.jsonl` — if we keep using Orbit's UUID,
+        // the sidebar (populated from disk) won't match our active session.
+        const sdkSessionId = message.sdk_session_id;
+        const currentSessionId = sessionIdRef.current;
+        if (sdkSessionId && currentSessionId && sdkSessionId !== currentSessionId) {
+          // Mark the old temp ID so stale conversation:loaded responses are ignored
+          remappedOrbitIds.add(currentSessionId);
+          // Migrate messages cache from temp key to SDK ID
+          const cached = messagesCache.current.get(currentSessionId);
+          if (cached) {
+            messagesCache.current.set(sdkSessionId, cached);
+            messagesCache.current.delete(currentSessionId);
+          }
+          // Update createdSessions so ensureSession() recognises the new ID
+          remapCreatedSession(currentSessionId, sdkSessionId);
+          // Switch to the SDK session ID
+          setSessionId(sdkSessionId);
+          setActiveConversation(sdkSessionId, null);
+          switchSession(sdkSessionId);
+          // Remove stale temp entry from sidebar (if it appeared before remap)
+          useUIStore.getState().removeConversation(currentSessionId);
+        } else if (!sessionIdRef.current || messagesRef.current.length === 0) {
+          // No active session yet — adopt whatever session_id we received
           setSessionId(message.session_id);
         }
+
         // Only set workspace if we don't already have one
         // This prevents file tree operations from overwriting the root workspace
         if (message.cwd && !workspacePath) {
@@ -435,6 +463,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           });
         }
         break;
+      }
 
       case 'agent:chunk': {
         // Queue chunk to be processed in next RAF (reduces 58ms jank from rapid chunks)
@@ -731,6 +760,14 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       }
 
       case 'conversation:loaded': {
+        // Skip stale responses for Orbit session IDs that were remapped to SDK IDs.
+        // Without this guard, a late-arriving conversation:load response for the
+        // old Orbit ID (which has no JSONL file) would clear messages and revert
+        // the sessionId back to the Orbit ID — undoing the system:init remap.
+        if (remappedOrbitIds.has(message.session_id)) {
+          break;
+        }
+
         // DO NOT clear pendingLoads here — the flag must survive until the
         // use-chat-messages.ts useEffect fires (after React commits the new
         // sessionId inside startTransition below). Clearing here causes a race:

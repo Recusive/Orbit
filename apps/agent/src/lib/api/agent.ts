@@ -163,7 +163,11 @@ export async function agentSendMessage(
   message: string,
   attachments?: AttachmentContentBlock[]
 ): Promise<void> {
-  return invoke('agent_send_message', { sessionId, message, attachments });
+  return invoke('agent_send_message', {
+    sessionId,
+    message,
+    attachments,
+  });
 }
 
 export async function agentInterrupt(sessionId: string): Promise<void> {
@@ -171,11 +175,15 @@ export async function agentInterrupt(sessionId: string): Promise<void> {
 }
 
 export async function agentIsSessionReady(sessionId: string): Promise<boolean> {
-  return invoke<boolean>('agent_is_session_ready', { sessionId });
+  return invoke<boolean>('agent_is_session_ready', {
+    sessionId,
+  });
 }
 
 export async function agentGetSdkSessionId(sessionId: string): Promise<string | null> {
-  return invoke<string | null>('agent_get_sdk_session_id', { sessionId });
+  return invoke<string | null>('agent_get_sdk_session_id', {
+    sessionId,
+  });
 }
 
 export async function agentRespondPermission(
@@ -192,11 +200,17 @@ export async function agentSetThinkingMode(
   enabled: boolean,
   maxTokens?: number
 ): Promise<void> {
-  return invoke('agent_set_thinking_mode', { sessionId, enabled, maxTokens });
+  return invoke('agent_set_thinking_mode', {
+    sessionId,
+    enabled,
+    maxTokens,
+  });
 }
 
 export async function agentGetThinkingMode(sessionId: string): Promise<boolean> {
-  return invoke<boolean>('agent_get_thinking_mode', { sessionId });
+  return invoke<boolean>('agent_get_thinking_mode', {
+    sessionId,
+  });
 }
 
 export async function agentSetModel(
@@ -285,7 +299,9 @@ export async function onAgentAuthError(
 // ============================================
 
 export async function agentGetStoredSession(sessionId: string): Promise<string | null> {
-  return invoke<string | null>('agent_get_stored_session', { sessionId });
+  return invoke<string | null>('agent_get_stored_session', {
+    sessionId,
+  });
 }
 
 export async function agentCleanupSessions(maxAgeDays?: number): Promise<number> {

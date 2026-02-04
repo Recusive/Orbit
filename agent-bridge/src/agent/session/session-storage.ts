@@ -173,11 +173,21 @@ function getSession(sessionId: string): StoredSession | undefined {
 }
 
 /**
- * Get the SDK session ID for a given session ID
+ * Get the SDK session ID for a given session ID.
+ *
+ * Supports dual-key lookup: first tries sessionId as the stored session key,
+ * then falls back to checking if the caller is already passing an SDK ID
+ * (common after app restart when in-memory alias maps are empty).
  */
 export function getSDKSessionIdForSession(sessionId: string): string | undefined {
   const session = getSession(sessionId);
-  return session?.sdkSessionId;
+  if (session) return session.sdkSessionId;
+
+  // Fallback: caller may be passing the SDK ID directly (after app restart,
+  // in-memory sessionIdAliases are empty, so the frontend uses the SDK ID it persisted)
+  const sessions = getSessions();
+  const bySDK = sessions.find((s) => s.sdkSessionId === sessionId);
+  return bySDK?.sdkSessionId;
 }
 
 /**
@@ -190,11 +200,19 @@ export function deleteSession(sessionId: string): void {
 }
 
 /**
- * Update the last active timestamp for a session
+ * Update the last active timestamp for a session.
+ *
+ * Supports dual-key lookup: tries sessionId first, then falls back to
+ * matching by sdkSessionId (for post-restart scenarios where the frontend
+ * uses the SDK ID directly).
  */
 export function touchSession(sessionId: string): void {
   const sessions = getSessions();
-  const session = sessions.find((s) => s.sessionId === sessionId);
+  let session = sessions.find((s) => s.sessionId === sessionId);
+
+  // Fallback: caller may be passing the SDK ID (after app restart)
+  session ??= sessions.find((s) => s.sdkSessionId === sessionId);
+
   if (session) {
     session.lastActiveAt = Date.now();
     persistSessions(sessions);

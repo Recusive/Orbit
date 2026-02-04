@@ -10,7 +10,6 @@ const logger = createLogger('ConversationHandlers');
 import {
   agentRewindFiles,
   agentGetSdkSessionId,
-  conversationCreate,
   conversationList,
   conversationLoad,
   conversationDelete,
@@ -19,42 +18,25 @@ import {
 } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 
-export async function handleConversationCreate(
+export function handleConversationCreate(
   message: Extract<WebviewMessage, { type: 'conversation:create' }>
-): Promise<void> {
-  try {
-    const sessionId = crypto.randomUUID();
-    const title = message.title ?? 'New Conversation';
-    const workspacePath = message.workspace_path;
-    const worktreePath = message.worktree_path;
-    await conversationCreate(sessionId, title, workspacePath, worktreePath);
-    window.postMessage(
-      {
-        type: 'conversation:created',
-        uuid: crypto.randomUUID(),
-        session_id: sessionId,
-        title,
-        workspace_path: workspacePath,
-        worktree_path: worktreePath,
-      },
-      '*'
-    );
-  } catch (err: unknown) {
-    logger.error('Conversation create error', err);
-    // Still emit created event so UI can proceed (will use localStorage fallback)
-    const sessionId = crypto.randomUUID();
-    window.postMessage(
-      {
-        type: 'conversation:created',
-        uuid: crypto.randomUUID(),
-        session_id: sessionId,
-        title: message.title ?? 'New Conversation',
-        workspace_path: message.workspace_path,
-        worktree_path: message.worktree_path,
-      },
-      '*'
-    );
-  }
+): void {
+  // Generate a temp session ID for the frontend. The SDK will write the JSONL file
+  // when the first message is sent, using its own session ID. The system:init handler
+  // in message-handler.ts remaps the frontend to the SDK ID at that point.
+  const sessionId = crypto.randomUUID();
+  const title = message.title ?? 'New Conversation';
+  window.postMessage(
+    {
+      type: 'conversation:created',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+      title,
+      workspace_path: message.workspace_path,
+      worktree_path: message.worktree_path,
+    },
+    '*'
+  );
 }
 
 export async function handleConversationList(

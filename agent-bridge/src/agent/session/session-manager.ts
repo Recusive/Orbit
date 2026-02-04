@@ -472,6 +472,41 @@ export class SessionManager extends Disposable {
   }
 
   /**
+   * Re-key all internal Maps from oldId to newId.
+   *
+   * Called when system:init fires and we learn the SDK session ID.
+   * After this, both the agent-bridge and the frontend use the SDK ID
+   * as the single source of truth — no aliases or translation needed.
+   */
+  private rekeySession(oldId: string, newId: string): void {
+    const rekey = <V>(map: Map<string, V>): void => {
+      const value = map.get(oldId);
+      if (value !== undefined) {
+        map.delete(oldId);
+        map.set(newId, value);
+      }
+    };
+
+    rekey(this.activeSessions);
+    rekey(this.sessionConsumers);
+    rekey(this.modePreferences);
+    rekey(this.pendingTools);
+    rekey(this.approvedToolNames);
+    rekey(this.sessionResumeState);
+    rekey(this.turnStartTimes);
+    rekey(this.pendingDisplayNames);
+    rekey(this.browserToolUnsubscribers);
+    rekey(this.currentTurnId);
+
+    if (this.sessionInitFired.has(oldId)) {
+      this.sessionInitFired.delete(oldId);
+      this.sessionInitFired.add(newId);
+    }
+
+    logger.info({ oldId, newId }, 'Re-keyed session to SDK ID');
+  }
+
+  /**
    * Create a new agent session
    */
   async createSession(sessionId: string, config?: SessionConfig): Promise<void> {
@@ -495,9 +530,9 @@ export class SessionManager extends Disposable {
     }> => {
       const requestId = randomUUID();
 
-      // Fire event to frontend
+      // Fire event to frontend (use agent's effective ID — SDK ID after init)
       this._onPermissionRequest.fire({
-        sessionId,
+        sessionId: agent.effectiveSessionId,
         toolName,
         toolInput,
         requestId,
@@ -541,12 +576,12 @@ export class SessionManager extends Disposable {
       if (result.decision === 'approve') {
         if (toolName === 'ExitPlanMode') {
           agent.setPlanMode(false);
-          const prefs = this.modePreferences.get(sessionId) ?? {};
+          const prefs = this.modePreferences.get(agent.effectiveSessionId) ?? {};
           prefs.planEnabled = false;
-          this.modePreferences.set(sessionId, prefs);
+          this.modePreferences.set(agent.effectiveSessionId, prefs);
         }
 
-        const approvedTools = this.approvedToolNames.get(sessionId);
+        const approvedTools = this.approvedToolNames.get(agent.effectiveSessionId);
         if (approvedTools !== undefined) {
           approvedTools.add(toolName);
         }
@@ -583,7 +618,7 @@ export class SessionManager extends Disposable {
       forkSession: config?.forkSession,
       onAuthFailure: (message: string) => {
         this._onAuthError.fire({
-          sessionId,
+          sessionId: agent.effectiveSessionId,
           category: 'REFRESH_FAILED',
           message,
           recoverable: true,
@@ -601,11 +636,12 @@ export class SessionManager extends Disposable {
       'Creating session with config'
     );
     const agent = new OrbitAgent(finalConfig);
+    agent.effectiveSessionId = sessionId; // Will be updated to SDK ID on system:init
 
     // Initialize browser MCP server and forward tool requests
     agent.initializeBrowserMcp();
     const unsubscribeBrowserTools = agent.onBrowserToolRequest((request) => {
-      this._onBrowserToolRequest.fire({ sessionId, request });
+      this._onBrowserToolRequest.fire({ sessionId: agent.effectiveSessionId, request });
     });
     this.browserToolUnsubscribers.set(sessionId, unsubscribeBrowserTools);
 
@@ -646,7 +682,8 @@ export class SessionManager extends Disposable {
   /**
    * Start a background consumer for streaming messages
    */
-  private _startBackgroundConsumer(sessionId: string, agent: OrbitAgent): void {
+  private _startBackgroundConsumer(initialSessionId: string, agent: OrbitAgent): void {
+    let sessionId = initialSessionId;
     const state: { cancelled: boolean; pendingRewindCheckpointId?: string } = { cancelled: false };
 
     const cancel = (): void => {
@@ -697,13 +734,23 @@ export class SessionManager extends Disposable {
               }
               this.sessionInitFired.add(sessionId);
 
+              const sdkSessionId = sdkMessage.session_id;
+
+              // Re-key all Maps from temp ID to SDK ID.
+              // After this, both the agent-bridge and frontend use one ID.
+              if (sdkSessionId !== sessionId) {
+                this.rekeySession(sessionId, sdkSessionId);
+                agent.effectiveSessionId = sdkSessionId;
+                sessionId = sdkSessionId; // All subsequent emissions use SDK ID
+              }
+
               const resumeState = this.sessionResumeState.get(sessionId) ?? {
                 isResumed: false,
                 isForked: false,
               };
               this._onSessionInit.fire({
                 sessionId,
-                sdkSessionId: sdkMessage.session_id,
+                sdkSessionId,
                 isResumed: resumeState.isResumed,
                 isForked: resumeState.isForked,
               });
