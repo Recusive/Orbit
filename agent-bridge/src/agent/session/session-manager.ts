@@ -4,6 +4,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 import { formatZodError } from '@orbit/shared-schemas';
 import { z } from 'zod';
@@ -346,6 +349,57 @@ interface ContentLossMetrics {
   firstLossAt: number | null;
   /** Timestamp of most recent content loss event (null if no loss) */
   lastLossAt: number | null;
+}
+
+// ============================================================================
+// Usage Persistence
+// ============================================================================
+
+/**
+ * Encode a workspace path to the Claude Code convention (replace `/` with `-`).
+ * Example: `/Users/pranit/Desktop/orbit` → `-Users-pranit-Desktop-orbit`
+ */
+function encodeWorkspacePath(cwd: string): string {
+  return cwd.replace(/\//g, '-');
+}
+
+/**
+ * Persist the authoritative cumulative usage from the SDK's `result` message
+ * to a `.usage.json` file alongside the JSONL.
+ *
+ * The SDK's JSONL files contain per-message usage with inaccurate output_tokens
+ * (written at stream-start). The `result` event carries the correct cumulative
+ * totals for the entire session. We persist this so the Rust conversation loader
+ * can return accurate usage on reload.
+ */
+function persistSessionUsage(
+  sdkSessionId: string,
+  cwd: string,
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadInputTokens?: number;
+    cacheCreationInputTokens?: number;
+  },
+  totalCostUsd?: number
+): void {
+  try {
+    const projectDir = path.join(os.homedir(), '.claude', 'projects', encodeWorkspacePath(cwd));
+    const usagePath = path.join(projectDir, `${sdkSessionId}.usage.json`);
+
+    const data = {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      cacheReadInputTokens: usage.cacheReadInputTokens ?? 0,
+      cacheCreationInputTokens: usage.cacheCreationInputTokens ?? 0,
+      totalCostUsd: totalCostUsd ?? 0,
+    };
+
+    fs.writeFileSync(usagePath, JSON.stringify(data), 'utf-8');
+  } catch {
+    // Non-critical — live usage still works, just won't survive restart
+    logger.debug({ sdkSessionId }, 'Failed to persist session usage');
+  }
 }
 
 /**
@@ -1086,6 +1140,23 @@ export class SessionManager extends Disposable {
                 resultSubtype: resultMsg.subtype,
               },
             });
+
+            // Persist authoritative cumulative usage to disk so it survives restart.
+            // The SDK's JSONL has inaccurate per-message output_tokens (stream-start values).
+            if (resultMsg.usage !== undefined) {
+              persistSessionUsage(
+                agent.effectiveSessionId,
+                agent.workingDirectory,
+                {
+                  inputTokens: resultMsg.usage.input_tokens ?? 0,
+                  outputTokens: resultMsg.usage.output_tokens ?? 0,
+                  cacheReadInputTokens: resultMsg.usage.cache_read_input_tokens,
+                  cacheCreationInputTokens: resultMsg.usage.cache_creation_input_tokens,
+                },
+                resultMsg.total_cost_usd
+              );
+            }
+
             // Reset for next turn - the next turn will get a new message ID from the SDK
             textWasStreamed = false;
             this.currentTurnId.delete(sessionId);

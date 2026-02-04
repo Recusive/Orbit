@@ -97,6 +97,8 @@ export async function handleConversationLoad(
             ...(m.toolUses && m.toolUses.length > 0 ? { toolUses: m.toolUses } : {}),
             ...(m.usage ? { usage: m.usage } : {}),
           })),
+          // Authoritative session usage from SDK result event (via .usage.json sidecar)
+          ...(conv.sessionUsage ? { session_usage: conv.sessionUsage } : {}),
         },
         '*'
       );

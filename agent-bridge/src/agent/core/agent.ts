@@ -335,6 +335,11 @@ export class OrbitAgent {
    */
   effectiveSessionId = '';
 
+  /** The working directory for this agent session. */
+  get workingDirectory(): string {
+    return this.cwd;
+  }
+
   // Streaming input mode fields
   private messageQueue: MessageQueue | null = null;
   private sessionActive = false;

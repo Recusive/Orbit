@@ -116,7 +116,7 @@ interface MessageHandlerDeps {
       cacheCreationInputTokens: number;
       totalCostUsd: number;
     },
-    processedMessageIds: string[]
+    processedMessageIds?: string[]
   ) => void;
   restoreToolsForMessage: (
     messageId: string,
@@ -442,6 +442,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           }
           // Update createdSessions so ensureSession() recognises the new ID
           remapCreatedSession(currentSessionId, sdkSessionId);
+          // Migrate tool store session cache (usage, tools) from old → new ID
+          // so token counts survive when the user navigates back to this conversation.
+          useToolStore.getState().remapSession(currentSessionId, sdkSessionId);
           // Switch to the SDK session ID
           setSessionId(sdkSessionId);
           setActiveConversation(sdkSessionId, null);
@@ -871,37 +874,53 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                 .filter((m): m is NonNullable<typeof m> => m !== undefined);
             }
 
-            // Calculate cumulative usage from persisted messages (for token tracking persistence)
-            const processedMessageIds: string[] = [];
-            const cumulativeUsage = message.messages.reduce(
-              (acc, m) => {
-                if (m.usage) {
-                  processedMessageIds.push(m.id);
-                  return {
-                    inputTokens: acc.inputTokens + m.usage.inputTokens,
-                    outputTokens: acc.outputTokens + m.usage.outputTokens,
-                    cacheReadInputTokens:
-                      acc.cacheReadInputTokens + (m.usage.cacheReadInputTokens ?? 0),
-                    cacheCreationInputTokens:
-                      acc.cacheCreationInputTokens + (m.usage.cacheCreationInputTokens ?? 0),
-                    totalCostUsd: acc.totalCostUsd + (m.usage.totalCostUsd ?? 0),
-                  };
+            // Restore authoritative session usage from the backend.
+            // Prefer session_usage (from .usage.json sidecar, written by agent-bridge
+            // on SDK result event) over per-message JSONL usage which has inaccurate
+            // output_tokens (written at stream-start, never updated by the SDK).
+            if (message.session_usage) {
+              restoreSessionUsage(message.session_id, {
+                inputTokens: message.session_usage.inputTokens,
+                outputTokens: message.session_usage.outputTokens,
+                cacheReadInputTokens: message.session_usage.cacheReadInputTokens ?? 0,
+                cacheCreationInputTokens: message.session_usage.cacheCreationInputTokens ?? 0,
+                totalCostUsd: message.session_usage.totalCostUsd ?? 0,
+              });
+            } else if (message.messages.length > 0) {
+              // Fallback: sum per-message usage from JSONL (inaccurate but better than nothing).
+              // Deduplicate by message ID: the SDK reports identical usage for all messages
+              // in the same turn (text + tool_use share one ID).
+              const seenIds = new Set<string>();
+              const processedMessageIds: string[] = [];
+              const cumulativeUsage = message.messages.reduce(
+                (acc, m) => {
+                  if (m.usage && !seenIds.has(m.id)) {
+                    seenIds.add(m.id);
+                    processedMessageIds.push(m.id);
+                    return {
+                      inputTokens: acc.inputTokens + m.usage.inputTokens,
+                      outputTokens: acc.outputTokens + m.usage.outputTokens,
+                      cacheReadInputTokens:
+                        acc.cacheReadInputTokens + (m.usage.cacheReadInputTokens ?? 0),
+                      cacheCreationInputTokens:
+                        acc.cacheCreationInputTokens + (m.usage.cacheCreationInputTokens ?? 0),
+                      totalCostUsd: acc.totalCostUsd + (m.usage.totalCostUsd ?? 0),
+                    };
+                  }
+                  return acc;
+                },
+                {
+                  inputTokens: 0,
+                  outputTokens: 0,
+                  cacheReadInputTokens: 0,
+                  cacheCreationInputTokens: 0,
+                  totalCostUsd: 0,
                 }
-                return acc;
-              },
-              {
-                inputTokens: 0,
-                outputTokens: 0,
-                cacheReadInputTokens: 0,
-                cacheCreationInputTokens: 0,
-                totalCostUsd: 0,
-              }
-            );
+              );
 
-            // Restore usage from persisted data within the transition
-            // This ensures the session cache is pre-populated with correct usage
-            if (processedMessageIds.length > 0) {
-              restoreSessionUsage(message.session_id, cumulativeUsage, processedMessageIds);
+              if (processedMessageIds.length > 0) {
+                restoreSessionUsage(message.session_id, cumulativeUsage, processedMessageIds);
+              }
             }
 
             setMessages(newMessages);

@@ -234,6 +234,11 @@ pub struct Conversation {
     /// Optional forked from session ID
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forked_from: Option<String>,
+    /// Authoritative cumulative session usage from the SDK `result` event.
+    /// Read from `{sessionId}.usage.json` sidecar file (written by agent-bridge).
+    /// More accurate than summing per-message usage from JSONL (which has stale output_tokens).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_usage: Option<TokenUsage>,
 }
 
 impl Conversation {
@@ -255,6 +260,7 @@ impl Conversation {
             workspace_path,
             worktree_path,
             forked_from: None,
+            session_usage: None,
         }
     }
 
@@ -303,6 +309,7 @@ impl Conversation {
             workspace_path: self.workspace_path.clone(),
             worktree_path: self.worktree_path.clone(),
             forked_from: Some(self.session_id.clone()),
+            session_usage: None,
         }
     }
 }
@@ -568,6 +575,10 @@ impl ConversationManager {
         let created_at = parsed.first_timestamp.unwrap_or(now);
         let updated_at = parsed.last_timestamp.unwrap_or(now);
 
+        // Read authoritative session usage from sidecar file (written by agent-bridge
+        // on each SDK `result` event). More accurate than JSONL per-message usage.
+        let session_usage = read_session_usage(&path);
+
         Ok(Some(Conversation {
             session_id: session_id.to_owned(),
             title: parsed.title,
@@ -577,6 +588,7 @@ impl ConversationManager {
             workspace_path: workspace_path.map(str::to_owned),
             worktree_path: None,
             forked_from: None,
+            session_usage,
         }))
     }
 
@@ -1231,6 +1243,41 @@ fn extract_usage(value: &serde_json::Value) -> Option<TokenUsage> {
         cache_read_input_tokens: raw.cache_read_input_tokens,
         cache_creation_input_tokens: raw.cache_creation_input_tokens,
         total_cost_usd: None,
+    })
+}
+
+/// Read authoritative session usage from a `.usage.json` sidecar file.
+///
+/// The agent-bridge writes this file when it receives the SDK's `result` event,
+/// which contains correct cumulative usage. The JSONL per-message usage has
+/// inaccurate `output_tokens` (written at stream-start, never updated).
+///
+/// `jsonl_path` is the path to the `.jsonl` file; we swap the extension.
+fn read_session_usage(jsonl_path: &Path) -> Option<TokenUsage> {
+    let usage_path = jsonl_path.with_extension("usage.json");
+    let data = fs::read_to_string(&usage_path).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&data).ok()?;
+
+    let to_u32 = |v: u64| -> u32 { u32::try_from(v).unwrap_or(u32::MAX) };
+
+    Some(TokenUsage {
+        input_tokens: json
+            .get("inputTokens")
+            .and_then(serde_json::Value::as_u64)
+            .map_or(0, to_u32),
+        output_tokens: json
+            .get("outputTokens")
+            .and_then(serde_json::Value::as_u64)
+            .map_or(0, to_u32),
+        cache_read_input_tokens: json
+            .get("cacheReadInputTokens")
+            .and_then(serde_json::Value::as_u64)
+            .map(to_u32),
+        cache_creation_input_tokens: json
+            .get("cacheCreationInputTokens")
+            .and_then(serde_json::Value::as_u64)
+            .map(to_u32),
+        total_cost_usd: json.get("totalCostUsd").and_then(serde_json::Value::as_f64),
     })
 }
 

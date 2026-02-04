@@ -203,6 +203,10 @@ pub struct ConversationDto {
     /// Forked from session ID
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forked_from: Option<String>,
+    /// Authoritative cumulative session usage from SDK `result` event.
+    /// More accurate than summing per-message usage from JSONL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_usage: Option<TokenUsageDto>,
 }
 
 impl From<Conversation> for ConversationDto {
@@ -216,6 +220,7 @@ impl From<Conversation> for ConversationDto {
             workspace_path: conv.workspace_path,
             worktree_path: conv.worktree_path,
             forked_from: conv.forked_from,
+            session_usage: conv.session_usage.map(TokenUsageDto::from),
         }
     }
 }

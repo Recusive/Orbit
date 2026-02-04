@@ -46,6 +46,8 @@ export interface ConversationDto {
   workspacePath?: string;
   worktreePath?: string;
   forkedFrom?: string;
+  /** Authoritative cumulative session usage from SDK `result` event. */
+  sessionUsage?: TokenUsageDto;
 }
 
 export interface ConversationSummaryDto {

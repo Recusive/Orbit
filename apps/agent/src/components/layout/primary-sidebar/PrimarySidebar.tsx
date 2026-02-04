@@ -12,6 +12,7 @@ import { lazy, Suspense, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import { ConversationList } from './components/ConversationList';
+import { PowersSection } from './components/PowersSection';
 import { SidebarItem } from './components/SidebarItem';
 import { SidebarToggleIcon } from './components/SidebarToggleIcon';
 import { TabButton } from './components/TabButton';
@@ -289,6 +290,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               useUIStore.getState().toggleVault();
             }}
           />
+          <PowersSection collapsed={isCollapsed} />
         </div>
       ) : null}
 

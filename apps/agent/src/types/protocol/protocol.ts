@@ -1407,8 +1407,12 @@ export const ConversationLoadedSchema = z
     session_id: SessionIdSchema,
     title: z.string(),
     messages: z.array(PersistedMessageSchema),
+    // Authoritative cumulative session usage from the SDK `result` event,
+    // persisted by agent-bridge to a .usage.json sidecar file.
+    // When present, more accurate than summing per-message JSONL usage.
+    session_usage: PersistedTokenUsageSchema.optional(),
   })
-  .strict();
+  .strip();
 
 export const ConversationRewoundSchema = z
   .object({
