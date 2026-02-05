@@ -134,7 +134,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
         /* User message bubble */
         <div
           className={cn(
-            'p-2 rounded-lg bg-card border-[3px] border-border/40 shadow-sm',
+            'p-2 rounded-lg bg-muted/30 border-[3px] border-border/40 shadow-sm',
             animate && 'animate-message-in'
           )}
           style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
