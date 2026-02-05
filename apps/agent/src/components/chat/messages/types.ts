@@ -36,6 +36,13 @@ export interface ChatMessage {
   attachedFiles?: string[] | undefined;
   /** Attached images for user messages */
   attachedImages?: ImageAttachment[] | undefined;
+  /**
+   * UUID of the previous message in the conversation chain.
+   * Used for Claude Code-style rewind/branching.
+   * - null for first message in conversation
+   * - undefined for legacy messages without this field
+   */
+  parentUuid?: string | null | undefined;
 }
 
 export interface MessageItemProps {

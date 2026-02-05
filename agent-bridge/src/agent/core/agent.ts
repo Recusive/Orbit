@@ -133,11 +133,12 @@ export interface OrbitAgentConfig {
   snapshotCallback?: SnapshotCallback;
   /** SDK session ID to resume from (for programmatic forking only) */
   resumeSessionId?: string;
+  /** Specific message UUID to resume at (for forking at a point in the conversation).
+   *  When used with forkSession=true, this creates a new branch starting from that message.
+   *  Claude only sees context UP TO this message, not messages that came after. */
+  resumeSessionAt?: string;
   /** Whether to fork the session (for programmatic forking only) */
   forkSession?: boolean;
-  // NOTE: resumeSessionAt was removed. For rewind scenarios, we DON'T use SDK's resume
-  // because it loads ALL messages. Instead, the frontend prepends truncated conversation
-  // history to the first message. This matches how Claude Code handles rewind.
   model?: string;
   /** Fallback model to use if primary model fails */
   fallbackModel?: string;
@@ -323,8 +324,9 @@ export class OrbitAgent {
   private _fallbackModel?: string;
   private _sessionMode: OrbitSessionMode;
 
-  // Session resume/fork fields (for programmatic forking only, NOT rewind)
+  // Session resume/fork fields (for programmatic forking and rewind)
   private _resumeSessionId?: string;
+  private _resumeSessionAt?: string;
   private _forkSession: boolean;
   private _currentSessionId?: string;
 
@@ -379,10 +381,17 @@ export class OrbitAgent {
     this._acceptMode = config.acceptEnabled ?? false;
     this._critiqueMode = config.critiqueEnabled ?? false;
     this._sessionMode = config.sessionMode ?? 'agent';
-    // NOTE: resumeSessionId and forkSession are for programmatic forking only.
-    // For rewind scenarios, we don't use SDK resume - the frontend prepends context instead.
+    // Session resume/fork for programmatic forking and rewind
+    // resumeSessionAt + forkSession=true creates a new branch from a specific message
     this._resumeSessionId = config.resumeSessionId;
+    this._resumeSessionAt = config.resumeSessionAt;
     this._forkSession = config.forkSession ?? false;
+    // For resumed sessions, pre-populate _currentSessionId since the SDK won't emit
+    // a new system:init message - it just replays existing messages from the JSONL file.
+    // This ensures getCurrentSessionId() returns the correct value immediately.
+    if (config.resumeSessionId) {
+      this._currentSessionId = config.resumeSessionId;
+    }
     if (config.model !== undefined) {
       this.model = config.model;
     }
@@ -948,18 +957,24 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Enable streaming partial messages for real-time text streaming
     options.includePartialMessages = true;
 
-    // Session resume/fork options (for programmatic forking only)
-    // NOTE: For rewind scenarios, we DON'T use SDK resume because it loads ALL messages.
-    // Instead, the frontend prepends truncated conversation history to the first message.
-    // This matches how Claude Code handles rewind - they slice messages BEFORE passing to SDK.
+    // Session resume/fork options
+    // With resumeSessionAt + forkSession=true, SDK resumes at that specific message
+    // and creates a new branch - Claude only sees context UP TO that message
     if (this._resumeSessionId) {
       options.resume = this._resumeSessionId;
+      if (this._resumeSessionAt) {
+        options.resumeSessionAt = this._resumeSessionAt;
+      }
       if (this._forkSession) {
         options.forkSession = true;
       }
       logger.info(
-        { resumeFrom: this._resumeSessionId, fork: this._forkSession },
-        'Session resume/fork configured (programmatic fork)'
+        {
+          resumeFrom: this._resumeSessionId,
+          resumeAt: this._resumeSessionAt,
+          fork: this._forkSession,
+        },
+        'Session resume/fork configured'
       );
     }
 
@@ -986,21 +1001,36 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // and allows rewinding to any previous checkpoint
     options.enableFileCheckpointing = true;
 
-    // Only enable replay-user-messages for NEW sessions (not forked/resumed)
-    // This flag causes the SDK to replay user messages from the resumed session.
-    // For forked sessions, this would cause Claude to see BOTH the replayed message
-    // AND the new message, creating a "replay bug" where Claude responds to both.
+    // Enable replay-user-messages for:
+    // 1. NEW sessions: need checkpoint UUIDs for the rewind feature
+    // 2. FORKED sessions with resumeSessionAt: need conversation context replayed UP TO the fork point
+    //    (The SDK will only replay messages up to resumeSessionAt, so no double-message bug)
     //
-    // For new sessions: We need checkpoint UUIDs for the rewind feature
-    // For forked sessions: We already have checkpoints from the original session
-    if (!this._resumeSessionId) {
+    // Disable for:
+    // - Plain resumed sessions (continue where left off): would replay ALL messages causing double-response
+    //
+    // Key insight: resumeSessionAt tells the SDK WHERE to stop replaying, making it safe to enable.
+    // Without resumeSessionAt, replay goes to the END of the session, then adds the new message.
+    const shouldEnableReplay =
+      this._resumeSessionId === undefined ||
+      (this._forkSession && this._resumeSessionAt !== undefined);
+
+    if (shouldEnableReplay) {
       options.extraArgs = {
         ...options.extraArgs,
         'replay-user-messages': null,
       };
-      logger.info('replay-user-messages enabled for new session (checkpoint tracking)');
+      logger.info(
+        {
+          isNewSession: !this._resumeSessionId,
+          isForkWithResumeAt: this._forkSession && !!this._resumeSessionAt,
+        },
+        'replay-user-messages ENABLED (new session or fork with resumeSessionAt)'
+      );
     } else {
-      logger.info('replay-user-messages DISABLED for forked session (prevents replay bug)');
+      logger.info(
+        'replay-user-messages DISABLED for plain resumed session (prevents double-message)'
+      );
     }
 
     // CRITICAL: Pass the env variable through options.env (not just process.env)
@@ -1311,7 +1341,25 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         if (message.type === 'system' && (message as { subtype?: string }).subtype === 'init') {
           const initMessage = message as { session_id?: string };
           if (initMessage.session_id) {
+            const isForkedSession = this._forkSession && this._resumeSessionAt !== undefined;
             this._currentSessionId = initMessage.session_id;
+
+            // CRITICAL: After a fork completes, clear the fork options so subsequent
+            // messages continue the forked session instead of re-forking.
+            // Update _resumeSessionId to the new forked session ID.
+            if (isForkedSession) {
+              logger.info(
+                {
+                  oldResumeId: this._resumeSessionId,
+                  newSessionId: initMessage.session_id,
+                  clearedForkPoint: this._resumeSessionAt,
+                },
+                'Fork completed - clearing fork options for subsequent messages'
+              );
+              this._resumeSessionId = initMessage.session_id;
+              this._resumeSessionAt = undefined;
+              this._forkSession = false;
+            }
           }
         }
 

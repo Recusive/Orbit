@@ -1,22 +1,19 @@
 import { createLogger } from '@orbit/common/lib';
 
-import { markSessionAsForked, setRewindContext } from '../use-tauri-session';
-
-import type { RewindContextMessage } from '../types/tauri-types';
+import type { ConversationMessageDto } from '@/lib/api/conversations';
 import type { WebviewMessage } from '@/types/protocol';
-
-const logger = createLogger('ConversationHandlers');
 
 import {
   agentRewindFiles,
-  agentGetSdkSessionId,
+  agentForkSessionAt,
   conversationList,
   conversationLoad,
   conversationDelete,
   conversationUpdateTitle,
-  conversationFork,
 } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
+
+const logger = createLogger('ConversationHandlers');
 
 export function handleConversationCreate(
   message: Extract<WebviewMessage, { type: 'conversation:create' }>
@@ -166,116 +163,207 @@ export async function handleConversationUpdateTitle(
 // TESTED: This rewind flow is covered by integration tests.
 //     If you modify this, run: cd agent-bridge && bun test
 //     Test file: src/__tests__/combined-rewind.test.ts
+//
+// =============================================================================
+// SDK FORK-BASED REWIND (resumeSessionAt + forkSession)
+// =============================================================================
+//
+// How this works:
+// 1. User clicks "rewind to message X"
+// 2. We rewind files to the checkpoint state (restores file changes)
+// 3. We fork the session at message X using SDK's resumeSessionAt + forkSession
+// 4. The SDK creates a NEW session with context ONLY up to message X
+// 5. Claude genuinely doesn't see messages that came after the fork point
+//
+// This uses the SDK's built-in forking mechanism which is much cleaner than
+// trying to manipulate parentUuid chains manually. The user message UUIDs
+// captured via replay-user-messages are the exact checkpoints needed.
+//
 export async function handleConversationRewind(
   message: Extract<WebviewMessage, { type: 'conversation:rewind' }>
 ): Promise<void> {
   try {
-    // We receive TWO message IDs:
-    // - message_id: The clicked message (for UI fork - include up to this message)
-    // - user_message_id: The user message (for checkpoint lookup - checkpoints stored by user msg)
-    const { message_id, user_message_id } = message;
+    // We receive THREE pieces of information:
+    // - message_id: The clicked message ID (for UI display - show up to this message)
+    // - user_message_id: The user message ID (for checkpoint lookup - checkpoints stored by user msg)
+    // - message_index: Position of clicked message in the UI (fallback when IDs don't match disk)
+    //
+    // The index fallback is needed because:
+    // - Messages loaded from disk have SDK-generated UUIDs
+    // - New messages sent this session have frontend-generated UUIDs
+    // - On rewind, we load from disk (SDK IDs) but the clicked message might have a frontend ID
+    const { message_id, user_message_id, session_id, message_index } = message;
 
     // Step 1: Get the checkpoint using the USER message ID
     // (checkpoints are stored under user message IDs, not assistant IDs)
     const checkpointStore = useCheckpointStore.getState();
-    const rewindCheckpoints = checkpointStore.getRewindCheckpoints(
-      message.session_id,
-      user_message_id
-    );
+    const rewindCheckpoints = checkpointStore.getRewindCheckpoints(session_id, user_message_id);
 
     // Debug: Log checkpoint state
-    const sessionCheckpoints = checkpointStore.getSessionCheckpoints(message.session_id);
-    logger.debug('Rewind requested', {
-      session_id: message.session_id,
+    const sessionCheckpoints = checkpointStore.getSessionCheckpoints(session_id);
+    logger.debug('Rewind requested (Claude Code-style, same session)', {
+      session_id,
       message_id,
       user_message_id,
       rewindCheckpoints,
       sessionCheckpoints,
     });
 
-    // Step 2: Get SDK session ID BEFORE forking so we can resume from it
-    let sdkSessionId: string | null = null;
-    try {
-      sdkSessionId = await agentGetSdkSessionId(message.session_id);
-      logger.debug('Got SDK session ID for resume', { sdkSessionId });
-    } catch (sdkErr) {
-      logger.error('Could not get SDK session ID', sdkErr);
-    }
-
-    // Step 3: Rewind files to the turn END checkpoint (file state after this message completed)
+    // Step 2: Rewind files to the turn END checkpoint (file state after this message completed)
     // This restores all Write/Edit/NotebookEdit changes made after this point
     if (rewindCheckpoints?.rewindFiles) {
       try {
         logger.debug('Calling agentRewindFiles with turnEnd checkpoint');
-        await agentRewindFiles(message.session_id, rewindCheckpoints.rewindFiles);
+        await agentRewindFiles(session_id, rewindCheckpoints.rewindFiles);
         logger.debug('Files rewound to checkpoint', { checkpoint: rewindCheckpoints.rewindFiles });
       } catch (rewindErr) {
-        // Log but continue with conversation fork even if file rewind fails
+        // Log but continue with UI update even if file rewind fails
         logger.error('File rewind failed', rewindErr);
       }
     } else {
       logger.debug('No checkpoints found for session, skipping file rewind');
     }
 
-    // Step 4: Fork the conversation to this point
-    const newSessionId = crypto.randomUUID();
+    // Step 3: CRITICAL - Fork the session at the target message
+    // Using SDK's resumeSessionAt + forkSession creates a new session with context
+    // ONLY up to the specified message. Claude won't see messages that came after.
+    // IMPORTANT: We must use the SDK checkpoint UUID (from replay-user-messages),
+    // NOT the frontend message ID. The SDK only knows about its own checkpoint UUIDs.
+    //
+    // NOTE: The SDK fork is LAZY - it doesn't create the new session until you send a message.
+    // agentForkSessionAt returns the OLD session ID because the new one isn't known yet.
+    // The actual new session ID comes back in system:init when the first message is sent.
+    // Step 4: Load conversation from disk FIRST to get the SDK message ID
+    // We need the actual SDK-generated message ID for the fork (frontend IDs don't match JSONL)
+    const conv = await conversationLoad(session_id);
 
-    // Step 5: Fork the conversation using the CLICKED message ID
-    // This ensures we include up to and including the clicked message (user OR assistant)
-    const forked = await conversationFork(message.session_id, newSessionId, message_id);
+    // Find the target message - need this before setting up the fork
+    let targetMessage: ConversationMessageDto | undefined;
+    let sdkMessageId: string | undefined;
 
-    // Step 6: Store rewind context and mark session as forked
-    // NOTE: We DON'T use SDK's resume for message history anymore.
-    // The SDK's resume loads ALL messages which breaks rewind.
-    // Instead, we store the truncated messages and prepend them to the first message.
-    if (forked && forked.messages.length > 0) {
-      // Store the truncated messages as context for the first message
-      const contextMessages: RewindContextMessage[] = forked.messages.map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      }));
-      setRewindContext(forked.sessionId, contextMessages);
-      logger.debug('Stored rewind context for forked session', {
-        sessionId: forked.sessionId,
-        messageCount: contextMessages.length,
+    if (conv) {
+      const messageMap = new Map(conv.messages.map((m) => [m.id, m]));
+
+      // Try to find the clicked message by ID first
+      targetMessage = messageMap.get(message_id);
+
+      // Fallback: If ID matching fails (frontend ID vs SDK ID mismatch), use position
+      // This happens when:
+      // - User sends a message this session → frontend-generated UUID
+      // - Clicks rewind → disk has SDK-generated UUID for same message
+      // - ID lookup fails → use message_index to find by position
+      if (!targetMessage && message_index >= 0 && message_index < conv.messages.length) {
+        targetMessage = conv.messages[message_index];
+        logger.debug('ID match failed, using position-based fallback', {
+          message_id,
+          message_index,
+          fallbackMessageId: targetMessage?.id,
+        });
+      }
+
+      // Use SDK message ID (from disk) for the fork, NOT the frontend ID
+      sdkMessageId = targetMessage?.id;
+    }
+
+    // Step 5: Set up the SDK fork with the correct SDK message ID
+    // IMPORTANT: We use sdkMessageId (the assistant response UUID), NOT the checkpoint UUID.
+    // The checkpoint UUID is a USER message UUID from replay-user-messages, which would
+    // truncate BEFORE the response. We need to truncate AFTER the response.
+    // The agent-bridge will truncate the JSONL file at this message ID.
+    if (sdkMessageId) {
+      try {
+        logger.debug('Forking session - truncating JSONL at message', {
+          user_message_id,
+          sdkMessageId,
+          checkpointUuid: rewindCheckpoints?.resumeSessionAt,
+        });
+        await agentForkSessionAt(session_id, sdkMessageId);
+        logger.debug('Session fork prepared - JSONL truncated at assistant response');
+
+        // Track the pending conversation fork for later (when we know the actual new session ID)
+        checkpointStore.setPendingConversationFork(session_id, sdkMessageId);
+      } catch (forkErr) {
+        // Log but continue - worst case, we show the UI update without SDK context change
+        logger.error('Session fork failed', forkErr);
+      }
+    } else {
+      logger.warn('No SDK message ID found for rewind target, cannot fork session', {
+        user_message_id,
+        message_id,
+        message_index,
+        session_id,
       });
     }
 
-    // Mark session as forked (for file checkpoint tracking, NOT for SDK resume)
-    if (sdkSessionId) {
-      markSessionAsForked(newSessionId, sdkSessionId);
-      logger.debug('Marked forked session (context-based, no SDK resume)', {
-        newSessionId,
-        sdkSessionId,
-      });
-    }
+    // Step 6: Build the message list to display
+    if (conv && targetMessage) {
+      // Find all messages up to and including the clicked message
+      // Build the message list by finding the rewind target and its ancestors
+      const messagesUpToRewind: typeof conv.messages = [];
+      const messageMap = new Map(conv.messages.map((m) => [m.id, m]));
 
-    if (forked) {
+      // Walk backwards from target to build the chain (for parentUuid chains)
+      const chain: typeof conv.messages = [];
+      let current: (typeof conv.messages)[number] | undefined = targetMessage;
+      while (current) {
+        chain.unshift(current);
+        current = current.parentUuid ? messageMap.get(current.parentUuid) : undefined;
+      }
+      // If parentUuid chain only has the target itself (or is empty), fall back to position-based slice.
+      // This happens when:
+      // - JSONL files don't contain parentUuid (SDK doesn't write it)
+      // - parentUuid references a message ID that's not in the map
+      // In these cases, use position-based slicing which is reliable.
+      if (chain.length <= 1) {
+        // Position-based: take messages from start up to and including target
+        const targetIndex = conv.messages.indexOf(targetMessage);
+        messagesUpToRewind.push(...conv.messages.slice(0, targetIndex + 1));
+        logger.debug('Using position-based slice (parentUuid chain incomplete)', {
+          chainLength: chain.length,
+          targetIndex,
+          sliceLength: targetIndex + 1,
+        });
+      } else {
+        messagesUpToRewind.push(...chain);
+      }
+
+      logger.debug('Filtered messages for rewind', {
+        total: conv.messages.length,
+        filtered: messagesUpToRewind.length,
+        rewindTargetId: message_id,
+        usedPositionFallback: !messageMap.has(message_id),
+      });
+
+      // Step 5: Send rewound response - same session ID (fork happens lazily)
+      // The SDK fork is lazy - the actual new session ID comes when the first message is sent.
+      // At that point, the session remap handler will call conversationFork with the real ID.
       window.postMessage(
         {
           type: 'conversation:rewound',
           uuid: crypto.randomUUID(),
-          session_id: message.session_id,
-          new_session_id: forked.sessionId,
+          session_id,
+          new_session_id: session_id, // Same ID for now - SDK fork is lazy
           rewind_to_message_id: message_id,
-          messages: forked.messages.map((m) => ({
+          messages: messagesUpToRewind.map((m) => ({
             id: m.id,
             role: m.role as 'user' | 'assistant',
             content: m.content,
             timestamp: m.createdAt,
             toolUses: m.toolUses,
+            parentUuid: m.parentUuid,
           })),
         },
         '*'
       );
     } else {
-      // Original not found - just create empty fork
+      // Conversation not found - return empty (shouldn't happen normally)
+      logger.warn('Conversation not found for rewind', { session_id });
       window.postMessage(
         {
           type: 'conversation:rewound',
           uuid: crypto.randomUUID(),
-          session_id: message.session_id,
-          new_session_id: newSessionId,
+          session_id,
+          new_session_id: session_id, // Same ID for now - SDK fork is lazy
           rewind_to_message_id: message_id,
           messages: [],
         },
@@ -284,13 +372,13 @@ export async function handleConversationRewind(
     }
   } catch (err: unknown) {
     logger.error('Conversation rewind error', err);
-    const newSessionId = crypto.randomUUID();
+    // On error, still respond with same session to avoid breaking the UI
     window.postMessage(
       {
         type: 'conversation:rewound',
         uuid: crypto.randomUUID(),
         session_id: message.session_id,
-        new_session_id: newSessionId,
+        new_session_id: message.session_id,
         rewind_to_message_id: message.message_id,
         messages: [],
       },

@@ -419,6 +419,12 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         title: text,
       });
 
+      // Get the last message's ID to establish parentUuid chain (Claude Code-style rewind)
+      // For new conversations (after conversation:created), this will be null
+      // For existing conversations with pending messages, this links to the previous message
+      const lastMessage = messagesRef.current[messagesRef.current.length - 1];
+      const parentUuid = lastMessage?.id ?? null;
+
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'user',
@@ -426,6 +432,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         displayedContent: text,
         attachedFiles: contextFiles,
         attachedImages: images,
+        parentUuid,
       };
       setMessages((prev: ChatMessage[]) => [...prev, userMessage]);
       setIsAgentRunning(true);
@@ -439,6 +446,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           role: 'user',
           content: text,
           createdAt: Date.now(),
+          parentUuid,
         },
         workspacePath ?? undefined,
         activeWorktreePath ?? undefined
@@ -464,11 +472,13 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           : undefined;
 
       // IMPORTANT: Use userMessage.id so checkpoints are associated correctly with the rewind target
+      // Include parent_uuid for Claude Code-style rewind (linked list of messages)
       postMessage({
         type: 'message:send',
         uuid: userMessage.id,
         session_id: sessionId,
         content: text,
+        parent_uuid: parentUuid,
         context,
       });
     }
@@ -481,6 +491,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     setIsAgentRunning,
     workspacePath,
     activeWorktreePath,
+    messagesRef,
   ]);
 
   // Create chat actions - memoized to prevent unnecessary recreations

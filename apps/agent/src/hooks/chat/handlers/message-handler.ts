@@ -4,13 +4,15 @@ import { startTransition } from 'react';
 import type { ChatMessage } from '@/components/chat';
 import type { ExtensionMessage, Model } from '@/types/protocol';
 
+import { getActiveChain } from '@/components/chat/messages/message-utils';
 import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-handlers';
 import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
-import { conversationAddMessage, conversationList } from '@/lib/api';
+import { conversationAddMessage, conversationFork, conversationList } from '@/lib/api';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { toConversationSummaries } from '@/lib/mappers';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { rafBatch } from '@/lib/utils/event-batcher';
+import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
@@ -235,13 +237,14 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
 
         // Sanity check: ensure valid array index before accessing
         if (lastIdx < 0) {
-          // Empty array - create new message
+          // Empty array - create new message with null parentUuid (first message)
           result.push({
             id: messageId,
             role: 'assistant' as const,
             content: accumulatedContent,
             displayedContent: accumulatedContent,
             isStreaming: true,
+            parentUuid: null,
           });
           mutated = true;
           continue;
@@ -288,12 +291,15 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             mutated = true;
           } else {
             // Create new streaming message (first chunk of a new response)
+            // Set parentUuid to the last message's ID to maintain the chain
+            const parentUuid = result[result.length - 1]?.id ?? null;
             result.push({
               id: messageId,
               role: 'assistant' as const,
               content: accumulatedContent,
               displayedContent: accumulatedContent,
               isStreaming: true,
+              parentUuid,
             });
             mutated = true;
           }
@@ -343,6 +349,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           mutated = true;
         } else {
           // No assistant message exists yet — create one with just thinking
+          // Set parentUuid to the last message's ID to maintain the chain
+          const parentUuid = result[result.length - 1]?.id ?? null;
           result.push({
             id: messageId,
             role: 'assistant' as const,
@@ -351,6 +359,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             isStreaming: true,
             thinking: accumulatedThinking,
             thinkingDurationMs: currentDuration,
+            parentUuid,
           });
           mutated = true;
         }
@@ -445,6 +454,30 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           // Migrate tool store session cache (usage, tools) from old → new ID
           // so token counts survive when the user navigates back to this conversation.
           useToolStore.getState().remapSession(currentSessionId, sdkSessionId);
+          // Migrate checkpoint store session data (turnStart/turnEnd checkpoints, pending messages)
+          // so rewind correctly associates checkpoints with the new SDK session ID.
+          useCheckpointStore.getState().remapSession(currentSessionId, sdkSessionId);
+
+          // Check if this is a forked session from a rewind operation.
+          // The SDK fork is lazy - we only know the actual new session ID now.
+          // Copy messages from the original session to the new forked session.
+          const rewindMessageId = useCheckpointStore
+            .getState()
+            .consumePendingConversationFork(currentSessionId);
+          if (rewindMessageId) {
+            logger.debug('Executing deferred conversationFork for rewind', {
+              originalSessionId: currentSessionId,
+              newSessionId: sdkSessionId,
+              rewindMessageId,
+            });
+            void conversationFork(
+              currentSessionId,
+              sdkSessionId,
+              rewindMessageId,
+              workspacePath ?? undefined
+            );
+          }
+
           // Switch to the SDK session ID
           setSessionId(sdkSessionId);
           setActiveConversation(sdkSessionId, null);
@@ -608,6 +641,10 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                   createdAt: Date.now(),
                   ...(usageDto ? { usage: usageDto } : {}),
                   ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
+                  // Include parentUuid for Claude Code-style rewind chain
+                  ...(completedMsg.parentUuid !== undefined
+                    ? { parentUuid: completedMsg.parentUuid }
+                    : {}),
                 },
                 workspacePath ?? undefined,
                 activeWorktreePath ?? undefined
@@ -689,6 +726,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             return copy;
           }
           // Otherwise create new error message
+          // Set parentUuid to the last message's ID to maintain the chain
+          const parentUuid = prev[prev.length - 1]?.id ?? null;
           return [
             ...prev,
             {
@@ -696,6 +735,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               role: 'assistant' as const,
               content: errorContent,
               displayedContent: errorContent,
+              parentUuid,
             },
           ];
         });
@@ -817,7 +857,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         setTimeout(() => {
           startTransition(() => {
             // Prepare new messages (filter out system messages as they're not displayed)
-            const backendMessages = message.messages
+            // Then extract the active chain using parentUuid links (Claude Code-style rewind)
+            const allBackendMessages = message.messages
               .filter(
                 (m): m is typeof m & { role: 'user' | 'assistant' } =>
                   m.role === 'user' || m.role === 'assistant'
@@ -828,6 +869,10 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                   role: m.role,
                   content: m.content,
                   displayedContent: m.content,
+                  // Preserve parentUuid from persisted messages (Claude Code-style rewind)
+                  ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
+                  // Include createdAt for chain extraction (needed to find the head)
+                  createdAt: m.createdAt,
                 };
                 if (m.isInterrupted === true) {
                   return { ...base, isInterrupted: true as const };
@@ -835,12 +880,17 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                 return base;
               });
 
+            // Extract only the active branch using parentUuid chain (Claude Code-style).
+            // When there are forks (rewinds), multiple messages can share a parent.
+            // We walk from the latest message backwards to get the active branch.
+            const backendMessages = getActiveChain(allBackendMessages);
+
             // Merge backend and cache messages:
             // - User messages ONLY come from backend (auto-start saves them immediately)
             // - Assistant messages prefer cache (may have live streaming content)
             // This handles the case where buffer hydration added streaming response
             // but the user message wasn't in the buffer (it's in backend storage)
-            let newMessages: typeof backendMessages;
+            let newMessages: ChatMessage[];
             if (!cachedMessages || cachedMessages.length === 0) {
               // No cache - use backend directly
               newMessages = backendMessages;
@@ -849,11 +899,13 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               newMessages = cachedMessages;
             } else {
               // Both exist - merge: user messages from backend, assistant from cache if exists
-              const cachedById = new Map(cachedMessages.map((m) => [m.id, m]));
-              const backendById = new Map(backendMessages.map((m) => [m.id, m]));
+              const cachedById = new Map<string, ChatMessage>(cachedMessages.map((m) => [m.id, m]));
+              const backendById = new Map<string, ChatMessage>(
+                backendMessages.map((m) => [m.id, m])
+              );
 
               // Start with all backend messages (this gives us user messages)
-              const merged = new Map(backendById);
+              const merged = new Map<string, ChatMessage>(backendById);
 
               // For each cached message, prefer cache version (has latest streaming content)
               for (const [id, msg] of cachedById) {
@@ -874,6 +926,11 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                 .filter((m): m is NonNullable<typeof m> => m !== undefined);
             }
 
+            // Build set of message IDs in the active chain for filtering usage/tools.
+            // Only messages in the active branch should contribute to usage counts
+            // and have their tools restored (orphaned branches are ignored).
+            const activeChainIds = new Set(backendMessages.map((m) => m.id));
+
             // Restore authoritative session usage from the backend.
             // Prefer session_usage (from .usage.json sidecar, written by agent-bridge
             // on SDK result event) over per-message JSONL usage which has inaccurate
@@ -890,33 +947,36 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               // Fallback: sum per-message usage from JSONL (inaccurate but better than nothing).
               // Deduplicate by message ID: the SDK reports identical usage for all messages
               // in the same turn (text + tool_use share one ID).
+              // Only count messages in the active chain (not orphaned branches).
               const seenIds = new Set<string>();
               const processedMessageIds: string[] = [];
-              const cumulativeUsage = message.messages.reduce(
-                (acc, m) => {
-                  if (m.usage && !seenIds.has(m.id)) {
-                    seenIds.add(m.id);
-                    processedMessageIds.push(m.id);
-                    return {
-                      inputTokens: acc.inputTokens + m.usage.inputTokens,
-                      outputTokens: acc.outputTokens + m.usage.outputTokens,
-                      cacheReadInputTokens:
-                        acc.cacheReadInputTokens + (m.usage.cacheReadInputTokens ?? 0),
-                      cacheCreationInputTokens:
-                        acc.cacheCreationInputTokens + (m.usage.cacheCreationInputTokens ?? 0),
-                      totalCostUsd: acc.totalCostUsd + (m.usage.totalCostUsd ?? 0),
-                    };
+              const cumulativeUsage = message.messages
+                .filter((m) => activeChainIds.has(m.id))
+                .reduce(
+                  (acc, m) => {
+                    if (m.usage && !seenIds.has(m.id)) {
+                      seenIds.add(m.id);
+                      processedMessageIds.push(m.id);
+                      return {
+                        inputTokens: acc.inputTokens + m.usage.inputTokens,
+                        outputTokens: acc.outputTokens + m.usage.outputTokens,
+                        cacheReadInputTokens:
+                          acc.cacheReadInputTokens + (m.usage.cacheReadInputTokens ?? 0),
+                        cacheCreationInputTokens:
+                          acc.cacheCreationInputTokens + (m.usage.cacheCreationInputTokens ?? 0),
+                        totalCostUsd: acc.totalCostUsd + (m.usage.totalCostUsd ?? 0),
+                      };
+                    }
+                    return acc;
+                  },
+                  {
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    cacheReadInputTokens: 0,
+                    cacheCreationInputTokens: 0,
+                    totalCostUsd: 0,
                   }
-                  return acc;
-                },
-                {
-                  inputTokens: 0,
-                  outputTokens: 0,
-                  cacheReadInputTokens: 0,
-                  cacheCreationInputTokens: 0,
-                  totalCostUsd: 0,
-                }
-              );
+                );
 
               if (processedMessageIds.length > 0) {
                 restoreSessionUsage(message.session_id, cumulativeUsage, processedMessageIds);
@@ -929,12 +989,13 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             switchSession(message.session_id);
 
             // Restore tool executions from persisted messages (for tool widget display).
+            // Only restore tools for messages in the active chain (orphaned branches excluded).
             // NOTE: This for-loop runs synchronously — React cannot interrupt between
             // individual restoreToolsForMessage calls. startTransition only yields
             // between React renders, not between synchronous Zustand set() calls.
             // (Code review: Opus cycle 3, issue #1)
             for (const m of message.messages) {
-              if (m.toolUses.length > 0) {
+              if (activeChainIds.has(m.id) && m.toolUses.length > 0) {
                 restoreToolsForMessage(
                   m.id,
                   m.toolUses.map((t) => ({
@@ -960,37 +1021,78 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
 
       case 'conversation:rewound': {
         // Prepare new messages - no filter needed as schema already ensures role is 'user' | 'assistant'
-        const rewoundMessages = message.messages.map((m) => ({
+        // Preserve parentUuid from persisted messages (Claude Code-style rewind)
+        const rewoundMessages: ChatMessage[] = message.messages.map((m) => ({
           id: m.id,
           role: m.role,
           content: m.content,
           displayedContent: m.content,
+          ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
         }));
 
-        // Switch to new session FIRST (clears old tool state)
-        switchSession(message.new_session_id);
+        // CLAUDE CODE-STYLE REWIND:
+        // If new_session_id === session_id, we're staying on the same session (no fork).
+        // This is the correct behavior for parentUuid-based rewind.
+        // The parentUuid chain determines which messages are in context, not session switching.
+        const isSameSession = message.new_session_id === message.session_id;
 
-        // Switch file store to new session (rewind creates a new fork, so start fresh)
-        useFileStore.getState().switchSession(message.new_session_id);
+        if (isSameSession) {
+          // Same session rewind - just update displayed messages and set fork point
+          // Do NOT switch sessions or clear tool state
+          logger.debug('Same-session rewind (Claude Code-style)', {
+            sessionId: message.session_id,
+            rewindToMessageId: message.rewind_to_message_id,
+            messageCount: rewoundMessages.length,
+          });
+        } else {
+          // Session fork: SDK created a new session with context up to the rewind point.
+          // Messages have been copied to the new session via conversationFork().
+          // Switch the frontend to use the new session ID going forward.
+          switchSession(message.new_session_id);
+          useFileStore.getState().switchSession(message.new_session_id);
+          setSessionId(message.new_session_id);
+          setActiveConversation(message.new_session_id, `Rewind`);
+        }
 
-        // Set all state atomically - React 18 batches these updates
+        // Update displayed messages (same for both paths)
         setMessages(rewoundMessages);
-        setSessionId(message.new_session_id);
-        setActiveConversation(message.new_session_id, `Rewind`);
+
+        // Set rewind fork point for Claude Code-style branching.
+        // The last message in the rewound messages becomes the fork point.
+        // The next user message will use this as its parentUuid, creating a fork.
+        if (rewoundMessages.length > 0) {
+          const lastRewoundMessage = rewoundMessages[rewoundMessages.length - 1];
+          if (lastRewoundMessage) {
+            // For same-session rewind, set fork point on the CURRENT session
+            // For legacy rewind, set on new session (backwards compat)
+            const targetSessionId = isSameSession ? message.session_id : message.new_session_id;
+            useCheckpointStore
+              .getState()
+              .setRewindForkPoint(targetSessionId, lastRewoundMessage.id);
+            logger.debug('Set rewind fork point', {
+              sessionId: targetSessionId,
+              forkPointId: lastRewoundMessage.id,
+              isSameSession,
+            });
+          }
+        }
 
         // Restore tool executions from persisted messages (for tool widget display)
-        for (const m of message.messages) {
-          if (m.toolUses && m.toolUses.length > 0) {
-            restoreToolsForMessage(
-              m.id,
-              m.toolUses.map((t) => ({
-                id: t.id,
-                name: t.name,
-                input: t.input,
-                success: t.success,
-                ...(t.output !== undefined ? { output: t.output } : {}),
-              }))
-            );
+        // Only do this if switching sessions (legacy) - same session keeps existing tools
+        if (!isSameSession) {
+          for (const m of message.messages) {
+            if (m.toolUses && m.toolUses.length > 0) {
+              restoreToolsForMessage(
+                m.id,
+                m.toolUses.map((t) => ({
+                  id: t.id,
+                  name: t.name,
+                  input: t.input,
+                  success: t.success,
+                  ...(t.output !== undefined ? { output: t.output } : {}),
+                }))
+              );
+            }
           }
         }
         break;
@@ -1057,16 +1159,21 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // Only update messages if we need to create a new assistant message
         // This stays synchronous because we need the message for streaming
         if (!currentMsg) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: message.message_id,
-              role: 'assistant' as const,
-              content: '',
-              displayedContent: '',
-              isStreaming: true,
-            },
-          ]);
+          setMessages((prev) => {
+            // Set parentUuid to the last message's ID to maintain the chain
+            const parentUuid = prev[prev.length - 1]?.id ?? null;
+            return [
+              ...prev,
+              {
+                id: message.message_id,
+                role: 'assistant' as const,
+                content: '',
+                displayedContent: '',
+                isStreaming: true,
+                parentUuid,
+              },
+            ];
+          });
         }
         break;
       }

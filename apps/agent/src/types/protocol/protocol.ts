@@ -156,6 +156,13 @@ export const StoredChatMessageSchema = z
     thinkingDurationMs: z.number().optional(),
     attachedFiles: z.array(z.string()).optional(),
     attachedImages: z.array(StoredImageAttachmentSchema).optional(),
+    /**
+     * UUID of the previous message in the conversation chain.
+     * Used for Claude Code-style rewind/branching.
+     * - null for first message in conversation
+     * - undefined for legacy messages without this field
+     */
+    parentUuid: z.string().nullish(),
   })
   .strict();
 
@@ -196,6 +203,14 @@ export const SendMessageSchema = z
     uuid: UUIDSchema,
     session_id: SessionIdSchema,
     content: z.string().min(1),
+    /**
+     * UUID of the previous message in the conversation chain.
+     * Used for Claude Code-style rewind: after rewinding, the next message
+     * should have parentUuid set to the message we rewound to.
+     * - null for the first message in a conversation
+     * - undefined if not specified (default linear behavior)
+     */
+    parent_uuid: z.string().nullish(),
     context: z
       .object({
         files: z.array(z.string()).optional(),
@@ -279,6 +294,12 @@ export const RewindConversationSchema = z
     message_id: z.string(),
     /** The user message ID for checkpoint lookup (checkpoints are stored by user message) */
     user_message_id: z.string(),
+    /**
+     * The index (0-based position) of the clicked message in the UI's message list.
+     * Used as fallback when ID-based matching fails (e.g., new messages have frontend-generated
+     * IDs while disk has SDK-generated IDs).
+     */
+    message_index: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -1386,6 +1407,13 @@ const PersistedMessageSchema = z
     timestamp: z.number().optional(),
     toolUses: z.array(PersistedToolUseSchema).optional(),
     usage: PersistedTokenUsageSchema.optional(),
+    /**
+     * UUID of the previous message in the conversation chain.
+     * Used for Claude Code-style rewind/branching.
+     * - null for first message in conversation
+     * - undefined for legacy messages without this field
+     */
+    parentUuid: z.string().nullish(),
   })
   .strip() // Remove extra fields from old data instead of rejecting
   .transform((msg) => ({
@@ -1398,6 +1426,7 @@ const PersistedMessageSchema = z
     createdAt: msg.createdAt ?? msg.timestamp ?? 0,
     toolUses: msg.toolUses ?? [],
     usage: msg.usage,
+    parentUuid: msg.parentUuid,
   }));
 
 export const ConversationLoadedSchema = z
@@ -1444,6 +1473,11 @@ export const ConversationRewoundSchema = z
               })
             )
             .optional(),
+          /**
+           * UUID of the previous message in the conversation chain.
+           * Used for Claude Code-style rewind/branching.
+           */
+          parentUuid: z.string().nullish(),
         })
         .strict()
     ),

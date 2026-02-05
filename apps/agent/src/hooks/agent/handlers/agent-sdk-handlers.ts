@@ -1,7 +1,6 @@
 import { createLogger } from '@orbit/common/lib';
 
-import { formatConversationContext } from '../use-tauri-context';
-import { ensureSession, consumeRewindContext } from '../use-tauri-session';
+import { ensureSession } from '../use-tauri-session';
 
 import type { AttachmentContentBlock } from '@/lib/api';
 import type { WebviewMessage } from '@/types/protocol';
@@ -57,22 +56,9 @@ export async function handleMessageSend(
       contentToSend = fileContext + contentToSend;
     }
 
-    // Check if this session has rewind context (from a rewind fork)
-    // If so, prepend the conversation history to the first message
-    // This is the key fix: we pass truncated history as context, NOT via SDK resume
-    const rewindContext = consumeRewindContext(message.session_id);
-    if (rewindContext && rewindContext.length > 0) {
-      const contextPrefix = formatConversationContext(rewindContext);
-      // Prepend rewind context to contentToSend (NOT message.content) to preserve
-      // any previously prepended file attachments. (Code review: Codex cycle 1, issue #1)
-      contentToSend = contextPrefix + contentToSend;
-      logger.debug('Prepended rewind context to message', {
-        sessionId: message.session_id,
-        contextMessageCount: rewindContext.length,
-        originalLength: message.content.length,
-        newLength: contentToSend.length,
-      });
-    }
+    // NOTE: The old rewind system prepended XML conversation context here.
+    // The new rewind system uses parentUuid chains (like Claude Code) instead.
+    // Context prepending has been removed - see Task #6 for parentUuid implementation.
 
     // Send message to agent
     await agentSendMessage(

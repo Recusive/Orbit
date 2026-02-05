@@ -603,8 +603,8 @@ When creating integration tests for a function or feature, always add a warning 
   ]]></comment_format>
       <tested_features>
         <feature name="File Rewind" source="agent-bridge/src/agent.ts:rewindFiles()" test="agent-bridge/src/__tests__/file-rewind.test.ts"/>
-        <feature name="Conversation Context Format" source="apps/agent/src/hooks/use-tauri.ts:formatConversationContext()" test="agent-bridge/src/__tests__/conversation-rewind.test.ts"/>
-        <feature name="Combined Rewind Flow" source="apps/agent/src/hooks/use-tauri.ts:conversation:rewind handler" test="agent-bridge/src/__tests__/combined-rewind.test.ts"/>
+        <!-- DEPRECATED: Conversation context prepend tests removed - see Task #5 -->
+        <!-- Old system used XML context prepending; new system uses parentUuid chains -->
       </tested_features>
     </integration_test_coverage>
 

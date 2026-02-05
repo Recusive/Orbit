@@ -29,6 +29,14 @@ export interface MessagePayload {
   sessionId: string;
   message: string;
   attachments?: AttachmentContentBlock[];
+  /**
+   * UUID of the previous message in the conversation chain.
+   * Used for Claude Code-style rewind: after rewinding, the next message
+   * should have parentUuid set to the message we rewound to.
+   * - null for the first message in a conversation
+   * - undefined if not specified (default behavior)
+   */
+  parentUuid?: string | null;
 }
 
 /**

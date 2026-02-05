@@ -17,9 +17,14 @@ export interface SessionConfig {
   thinkingTokens?: number;
   acceptEnabled?: boolean;
   planEnabled?: boolean;
-  /** SDK session ID to resume from (for session continuity after app restart).
-   * Not used for rewind — rewind uses context-prepend approach instead. */
+  /** SDK session ID to resume from (for session continuity after app restart). */
   resumeSessionId?: string;
+  /** Specific message UUID to resume at (for forking at a point in conversation).
+   * When used with forkSession=true, creates a new branch starting from that message.
+   * Claude only sees context UP TO this message. */
+  resumeSessionAt?: string;
+  /** Whether to fork the session (create new branch) vs continue original. */
+  forkSession?: boolean;
 }
 
 export interface AttachmentContentBlock {
@@ -318,6 +323,27 @@ export async function agentCleanupSessions(maxAgeDays?: number): Promise<number>
  */
 export async function agentRewindFiles(sessionId: string, checkpointId: string): Promise<void> {
   await invoke('agent_rewind_files', { sessionId, checkpointId });
+}
+
+/**
+ * Fork a session at a specific message point.
+ * This creates a new SDK session that has context only UP TO the specified message.
+ * Used for rewind operations - Claude only sees the conversation history up to that point.
+ *
+ * How it works:
+ * 1. Gets the current SDK session ID
+ * 2. Creates a new session with resumeSessionAt + forkSession=true
+ * 3. The new session starts fresh with context truncated at the target message
+ *
+ * @param sessionId - The Orbit session ID
+ * @param atMessageUuid - The message UUID to fork at (Claude sees up to this point)
+ * @returns The new SDK session ID
+ */
+export async function agentForkSessionAt(
+  sessionId: string,
+  atMessageUuid: string
+): Promise<string> {
+  return invoke<string>('agent_fork_session_at', { sessionId, atMessageUuid });
 }
 
 // ============================================

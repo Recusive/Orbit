@@ -162,6 +162,14 @@ export const SendMessageRequestSchema = z
     sessionId: z.string(),
     message: z.string(),
     attachments: z.array(AttachmentContentBlockSchema).optional(),
+    /**
+     * UUID of the previous message in the conversation chain.
+     * Used for Claude Code-style rewind: after rewinding, the next message
+     * should have parentUuid set to the message we rewound to.
+     * - null for the first message in a conversation
+     * - undefined if not specified (default behavior)
+     */
+    parentUuid: z.string().nullish(),
   })
   .strict();
 export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
@@ -394,6 +402,15 @@ export const RewindFilesRequestSchema = z
   .strict();
 export type RewindFilesRequest = z.infer<typeof RewindFilesRequestSchema>;
 
+export const ForkSessionAtRequestSchema = z
+  .object({
+    type: z.literal('fork_session_at'),
+    sessionId: z.string(),
+    atMessageUuid: z.string(),
+  })
+  .strict();
+export type ForkSessionAtRequest = z.infer<typeof ForkSessionAtRequestSchema>;
+
 export const GenerateAgentDefinitionRequestSchema = z
   .object({
     type: z.literal('generate_agent_definition'),
@@ -540,6 +557,7 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   DeleteCommandRequestSchema,
   ForkSessionRequestSchema,
   RewindFilesRequestSchema,
+  ForkSessionAtRequestSchema,
   GenerateAgentDefinitionRequestSchema,
   GenerateCommandDefinitionRequestSchema,
   ShutdownRequestSchema,

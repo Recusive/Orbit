@@ -8,12 +8,7 @@ import { initWindowMessageListener, messageHandlers } from './use-tauri-message-
 import { handleMockMessage } from './use-tauri-mock';
 
 // Import types for use in this file
-import type {
-  UseTauriOptions,
-  UseTauriReturn,
-  RewindContextMessage,
-  MessageHandler,
-} from './types/tauri-types';
+import type { UseTauriOptions, UseTauriReturn, MessageHandler } from './types/tauri-types';
 import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
 
 import { WebviewMessageSchema } from '@/types/protocol';
@@ -21,11 +16,10 @@ import { WebviewMessageSchema } from '@/types/protocol';
 const logger = createLogger('Tauri');
 
 // Re-export types for consumers
-export type { UseTauriOptions, UseTauriReturn, RewindContextMessage, MessageHandler };
+export type { UseTauriOptions, UseTauriReturn, MessageHandler };
 
 // Re-export utility functions
-export { formatConversationContext } from './use-tauri-context';
-export { markSessionAsForked, setRewindContext } from './use-tauri-session';
+export { markSessionAsForked } from './use-tauri-session';
 
 // ═══════════════════════════════════════════════════════════════
 // Tauri API Detection

@@ -566,6 +566,17 @@ async function handleRequest(
       break;
     }
 
+    case 'fork_session_at': {
+      // Fork session at a specific message point for rewind
+      // Creates new SDK session with context only up to the specified message
+      const newSdkSessionId = await sessionManager.forkSessionAt(
+        request.sessionId,
+        request.atMessageUuid
+      );
+      sendResponse({ type: 'string', requestType: request.type, value: newSdkSessionId });
+      break;
+    }
+
     case 'generate_agent_definition': {
       const agent = await sessionManager.generateAgentDefinition(request.description);
       sendResponse({ type: 'agent', requestType: request.type, agent });

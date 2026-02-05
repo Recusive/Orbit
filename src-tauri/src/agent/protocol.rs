@@ -61,12 +61,13 @@ pub struct AttachmentSource {
 
 /// Session configuration
 ///
-/// Resume support: `resume_session_id` enables session continuity after app restart.
-/// The SDK loads conversation history internally so Claude retains full context.
+/// Resume support:
+/// - `resume_session_id` enables session continuity after app restart
+/// - `resume_session_at` resumes at a specific message UUID (for rewind/fork)
+/// - `fork_session=true` creates a new branch instead of modifying original
 ///
-/// NOTE: This is NOT used for rewind scenarios. Rewind creates a fresh session
-/// and prepends truncated conversation context to the first message instead.
-/// See agent-bridge/src/protocol/schemas.ts for the TypeScript schema.
+/// For rewind: use all three options together. SDK will resume at the target
+/// message and create a new branch - Claude only sees context UP TO that point.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionConfig {
@@ -87,9 +88,15 @@ pub struct SessionConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_mode: Option<SessionMode>,
     /// SDK session ID to resume from (for session continuity after app restart).
-    /// Not used for rewind — rewind uses context-prepend approach instead.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resume_session_id: Option<String>,
+    /// Specific message UUID to resume at (for forking at a point in conversation).
+    /// When used with fork_session=true, creates a new branch starting from that message.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resume_session_at: Option<String>,
+    /// Whether to fork the session (create new branch) vs continue original.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fork_session: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -421,6 +428,12 @@ pub enum BridgeRequest {
         session_id: String,
         #[serde(rename = "checkpointId")]
         checkpoint_id: String,
+    },
+    ForkSessionAt {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        #[serde(rename = "atMessageUuid")]
+        at_message_uuid: String,
     },
     GenerateAgentDefinition {
         description: String,

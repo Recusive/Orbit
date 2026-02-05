@@ -2,22 +2,23 @@
  * Checkpoint Store
  *
  * Tracks file checkpoints for the Rewind feature.
- * Each message (user turn) has TWO checkpoints:
+ * Checkpoints arrive from the SDK's `replay-user-messages` option.
  *
- * 1. Turn Start Checkpoint: The user message UUID from the SDK stream
- *    - Created when user sends a message
- *    - Used for `resumeSessionAt` - SDK forks at this user message
- *
- * 2. Turn End Checkpoint: The checkpoint from the NEXT user message
- *    - Created AFTER Claude responded and tools completed
- *    - Used for `rewindFiles()` to restore files to post-turn state
+ * KEY INSIGHT: Checkpoint IDs are USER MESSAGE UUIDs from replay-user-messages.
+ * The SDK's resumeSessionAt: uuid includes messages UP TO AND INCLUDING that uuid,
+ * but NOT subsequent messages (including the response to that message!).
  *
  * IMPORTANT: Checkpoints are stored against the USER message ID (the message the user
  * clicks to rewind), NOT the assistant message ID. This is tracked via onUserMessageSent().
  *
  * When rewinding to message N:
- * - resumeSessionAt: turnStartCheckpoint[N] → User message UUID for SDK to fork at
- * - rewindFiles: turnEndCheckpoint[N] → Files are restored to state after N's tools completed
+ * - resumeSessionAt: Use the NEXT checkpoint (N+1's UUID) to include N's response
+ *   - If we used N's checkpoint, the fork would only include N, not its response
+ *   - Using N+1's checkpoint includes: N, N's response, and N+1 (extra but unavoidable)
+ * - rewindFiles: Use N's checkpoint (file state is correctly restored with N's UUID)
+ *
+ * SDK limitation: resumeSessionAt works at message boundaries, not "end of turn" boundaries.
+ * There's no way to fork exactly between a response and the next user message.
  */
 
 import { createLogger } from '@orbit/common/lib';
@@ -64,16 +65,35 @@ export interface CheckpointState {
   // Pending message waiting for its turn END checkpoint
   // When message completes, it waits for the next turn's checkpoint to mark its end
   // This stores the USER message ID (not assistant)
+  // LEGACY: kept for backwards compatibility, prefer pendingMessagesQueue
   pendingMessageForTurnEnd: {
     sessionId: string;
     messageId: string;
   } | null;
+
+  // Queue of messages waiting for their turn END checkpoint (FIFO)
+  // Multiple messages can complete before a checkpoint arrives, so we need a queue
+  // Map: sessionId -> [userMessageId1, userMessageId2, ...] (oldest first)
+  pendingMessagesQueue: Record<string, string[]>;
 
   // Ordered list of all checkpoint IDs per session (for debugging/fallback)
   checkpointOrder: Record<string, string[]>;
 
   // Latest checkpoint for each session (fallback for last message's turn end)
   latestCheckpoints: Record<string, string>;
+
+  // Rewind fork point (Claude Code-style branching)
+  // When set, the next message should use this as parentUuid instead of the normal last message.
+  // This creates a FORK in the conversation tree - two messages with the same parent.
+  // Map: sessionId -> messageUuid (the message UUID to fork from)
+  // Cleared after use (one-time fork).
+  rewindForkPoints: Record<string, string>;
+
+  // Pending conversation fork (deferred until new session ID is known)
+  // SDK forks are LAZY - the new session ID isn't known until the first message is sent.
+  // We track the fork request here and call conversationFork when system:init provides the real ID.
+  // Map: originalSessionId -> rewindMessageId
+  pendingConversationForks: Record<string, string>;
 
   // Actions
 
@@ -151,6 +171,69 @@ export interface CheckpointState {
    * Clear all checkpoints.
    */
   clearAll: () => void;
+
+  // ============================================
+  // Rewind Fork Point Actions (Claude Code-style)
+  // ============================================
+
+  /**
+   * Set the rewind fork point for a session.
+   * Called when conversation:rewound arrives - the last message in the rewound
+   * messages becomes the fork point. The next user message will use this as
+   * its parentUuid, creating a fork in the conversation tree.
+   */
+  setRewindForkPoint: (sessionId: string, messageUuid: string) => void;
+
+  /**
+   * Get and clear the rewind fork point for a session.
+   * Returns the fork point UUID if set, then clears it (one-time use).
+   * Called when sending a message to check if we should fork.
+   */
+  consumeRewindForkPoint: (sessionId: string) => string | null;
+
+  /**
+   * Check if a session has a pending rewind fork point without consuming it.
+   */
+  hasRewindForkPoint: (sessionId: string) => boolean;
+
+  /**
+   * Clear the rewind fork point for a session without consuming it.
+   * Called when switching sessions or other scenarios where the fork should be abandoned.
+   */
+  clearRewindForkPoint: (sessionId: string) => void;
+
+  // ============================================
+  // Pending Conversation Fork Actions (Deferred Fork)
+  // ============================================
+
+  /**
+   * Set a pending conversation fork for a session.
+   * Called when rewind is requested but the new session ID isn't known yet (SDK fork is lazy).
+   * The fork will be executed when system:init provides the actual new session ID.
+   */
+  setPendingConversationFork: (originalSessionId: string, rewindMessageId: string) => void;
+
+  /**
+   * Consume and clear a pending conversation fork for a session.
+   * Returns the rewind message ID if there was a pending fork, null otherwise.
+   * Called from the session remap handler when the new session ID is known.
+   */
+  consumePendingConversationFork: (originalSessionId: string) => string | null;
+
+  /**
+   * Check if a session has a pending conversation fork.
+   */
+  hasPendingConversationFork: (originalSessionId: string) => boolean;
+
+  /**
+   * Remap checkpoints from old session ID to new session ID.
+   * Called during session ID remapping when the frontend temp ID is replaced with SDK ID.
+   *
+   * This updates:
+   * - In-flight state (currentUserMessageId, pendingMessageForTurnEnd, currentTurnStartCheckpoint)
+   * - Session-keyed records (turnStartCheckpoints, turnEndCheckpoints, etc.)
+   */
+  remapSession: (oldSessionId: string, newSessionId: string) => void;
 }
 
 export const useCheckpointStore = create<CheckpointState>()(
@@ -160,8 +243,11 @@ export const useCheckpointStore = create<CheckpointState>()(
     currentTurnStartCheckpoint: null,
     currentUserMessageId: null,
     pendingMessageForTurnEnd: null,
+    pendingMessagesQueue: {},
     checkpointOrder: {},
     latestCheckpoints: {},
+    rewindForkPoints: {},
+    pendingConversationForks: {},
 
     onUserMessageSent: (sessionId, userMessageId): void => {
       logger.debug(`User message sent`, { sessionId, userMessageId });
@@ -173,33 +259,73 @@ export const useCheckpointStore = create<CheckpointState>()(
     },
 
     onCheckpointReceived: (sessionId, checkpointId): void => {
-      logger.debug(`Checkpoint received`, { sessionId, checkpointId });
-      set((state) => {
+      const state = get();
+      logger.debug(`Checkpoint received`, {
+        sessionId,
+        checkpointId,
+        pendingMessageForTurnEnd: state.pendingMessageForTurnEnd,
+        currentTurnStartCheckpoint: state.currentTurnStartCheckpoint,
+        currentUserMessageId: state.currentUserMessageId,
+      });
+      set((draft) => {
         // Always track checkpoint in order and as latest
-        state.checkpointOrder[sessionId] ??= [];
-        if (!state.checkpointOrder[sessionId].includes(checkpointId)) {
-          state.checkpointOrder[sessionId].push(checkpointId);
+        draft.checkpointOrder[sessionId] ??= [];
+        if (!draft.checkpointOrder[sessionId].includes(checkpointId)) {
+          draft.checkpointOrder[sessionId].push(checkpointId);
         }
-        state.latestCheckpoints[sessionId] = checkpointId;
+        draft.latestCheckpoints[sessionId] = checkpointId;
 
-        const pending = state.pendingMessageForTurnEnd;
+        // Check pending queue first (FIFO - drain all pending messages waiting for turnEnd)
+        const pendingQueue = draft.pendingMessagesQueue[sessionId];
+        if (pendingQueue && pendingQueue.length > 0) {
+          // Pop the OLDEST message (first one added)
+          const oldestPending = pendingQueue.shift();
+          if (oldestPending) {
+            draft.turnEndCheckpoints[sessionId] ??= {};
+            draft.turnEndCheckpoints[sessionId][oldestPending] = checkpointId;
+            logger.debug('Set turnEnd from queue', {
+              sessionId,
+              messageId: oldestPending,
+              checkpointId,
+              remainingInQueue: pendingQueue.length,
+            });
+          }
+          // Update legacy field: set to next pending message or null if queue empty
+          const nextPending = pendingQueue[0];
+          if (nextPending !== undefined) {
+            draft.pendingMessageForTurnEnd = { sessionId, messageId: nextPending };
+          } else {
+            draft.pendingMessageForTurnEnd = null;
+          }
+          // This checkpoint is ALSO the START of the next turn
+          draft.currentTurnStartCheckpoint = { sessionId, checkpointId };
+        } else {
+          // Legacy single-pending support (fallback)
+          const pending = draft.pendingMessageForTurnEnd;
 
-        if (pending?.sessionId === sessionId) {
-          // There's a message waiting for its turn END checkpoint
-          // This checkpoint marks the END of that message's turn
-          state.turnEndCheckpoints[sessionId] ??= {};
-          state.turnEndCheckpoints[sessionId][pending.messageId] = checkpointId;
+          if (pending?.sessionId === sessionId) {
+            // There's a message waiting for its turn END checkpoint
+            // This checkpoint marks the END of that message's turn
+            draft.turnEndCheckpoints[sessionId] ??= {};
+            draft.turnEndCheckpoints[sessionId][pending.messageId] = checkpointId;
+            logger.debug('Set turnEnd from legacy pending', {
+              sessionId,
+              messageId: pending.messageId,
+              checkpointId,
+            });
 
-          // Clear the pending message
-          state.pendingMessageForTurnEnd = null;
+            // Clear the pending message
+            draft.pendingMessageForTurnEnd = null;
 
-          // This checkpoint is ALSO the START of the current turn
-          // Store it for when the current message completes
-          state.currentTurnStartCheckpoint = { sessionId, checkpointId };
-        } else if (state.currentTurnStartCheckpoint?.sessionId !== sessionId) {
-          // No pending message and no current turn start for this session
-          // This is the first checkpoint of the session (turn 1 start)
-          state.currentTurnStartCheckpoint = { sessionId, checkpointId };
+            // This checkpoint is ALSO the START of the current turn
+            // Store it for when the current message completes
+            draft.currentTurnStartCheckpoint = { sessionId, checkpointId };
+          } else if (draft.currentTurnStartCheckpoint?.sessionId !== sessionId) {
+            // No pending message and no current turn start for this session
+            // This is the first checkpoint of the session (turn 1 start)
+            draft.currentTurnStartCheckpoint = { sessionId, checkpointId };
+            logger.debug('Set as first turn start', { sessionId, checkpointId });
+          }
         }
         // Otherwise: intermediate checkpoint during tool execution, ignore for turn tracking
 
@@ -222,11 +348,19 @@ export const useCheckpointStore = create<CheckpointState>()(
     },
 
     onMessageComplete: (sessionId): void => {
+      const currentState = get();
+      logger.debug('Message complete', {
+        sessionId,
+        currentUserMessageId: currentState.currentUserMessageId,
+        currentTurnStartCheckpoint: currentState.currentTurnStartCheckpoint,
+        pendingMessagesQueue: currentState.pendingMessagesQueue[sessionId],
+      });
       set((state) => {
         // Get the USER message ID for this turn (set when user sent the message)
         const userMsg = state.currentUserMessageId;
         if (userMsg?.sessionId !== sessionId) {
           // No user message tracked - this shouldn't happen but handle gracefully
+          logger.warn('No user message tracked for session', { sessionId });
           return;
         }
 
@@ -237,11 +371,25 @@ export const useCheckpointStore = create<CheckpointState>()(
         if (turnStart?.sessionId === sessionId) {
           state.turnStartCheckpoints[sessionId] ??= {};
           state.turnStartCheckpoints[sessionId][userMessageId] = turnStart.checkpointId;
+          logger.debug('Associated turnStart with user message', {
+            sessionId,
+            userMessageId,
+            checkpointId: turnStart.checkpointId,
+          });
           state.currentTurnStartCheckpoint = null;
         }
 
-        // Mark this USER message as waiting for its turn END checkpoint
-        // The next turn's checkpoint will mark the end of this turn
+        // Add this USER message to the pending queue (FIFO)
+        // Multiple messages can complete before the next checkpoint arrives
+        state.pendingMessagesQueue[sessionId] ??= [];
+        state.pendingMessagesQueue[sessionId].push(userMessageId);
+        logger.debug('Added to pending queue', {
+          sessionId,
+          userMessageId,
+          queueLength: state.pendingMessagesQueue[sessionId].length,
+        });
+
+        // Also update legacy field for backwards compatibility
         state.pendingMessageForTurnEnd = { sessionId, messageId: userMessageId };
 
         // Clear the current user message ID
@@ -251,13 +399,9 @@ export const useCheckpointStore = create<CheckpointState>()(
 
     getRewindCheckpoints: (sessionId, messageId): RewindCheckpoints | undefined => {
       const state = get();
-      const turnStart = state.turnStartCheckpoints[sessionId]?.[messageId];
 
-      if (!turnStart) {
-        return undefined;
-      }
-
-      // For turn end, use the stored value or fall back to latest
+      // Get the turnEnd checkpoint for this message
+      // This is the checkpoint ID (user message UUID) for the message itself
       let turnEnd = state.turnEndCheckpoints[sessionId]?.[messageId];
 
       // If this is the pending message (last message), use latest checkpoint
@@ -266,16 +410,50 @@ export const useCheckpointStore = create<CheckpointState>()(
         turnEnd = state.latestCheckpoints[sessionId];
       }
 
-      // If still no turn end, fall back to turn start (might not restore files correctly but won't crash)
-      turnEnd ??= turnStart;
+      if (!turnEnd) {
+        return undefined;
+      }
 
-      // resumeSessionAt: Use turnStart (the user message UUID)
-      // The SDK forks at that user message, including its complete response
+      // CRITICAL: The checkpoint ID is the USER MESSAGE UUID from replay-user-messages.
+      // When we use resumeSessionAt: userMessageUuid, the SDK includes messages
+      // UP TO AND INCLUDING that user message, but NOT its response!
       //
-      // rewindFiles: Use turnEnd (checkpoint from NEXT user message)
-      // This restores files to the state AFTER this turn's tools completed
+      // To include the response, we need to use the NEXT checkpoint in the order.
+      // The next checkpoint is the next user message's UUID, which comes AFTER
+      // the current message's response.
+      //
+      // Example: Conversation has [user1, assistant1, user2, assistant2]
+      // - turnEnd for user1 = cp1 (user1's UUID)
+      // - If we use resumeSessionAt: cp1, fork includes: user1 (NO response!)
+      // - If we use resumeSessionAt: cp2, fork includes: user1, assistant1, user2
+      //
+      // We want user1 + assistant1, so we use cp2. The extra user2 is unavoidable
+      // with the SDK's message-level granularity, but Claude will see proper context.
+      const order = state.checkpointOrder[sessionId] ?? [];
+      const currentIndex = order.indexOf(turnEnd);
+      const hasNextCheckpoint = currentIndex >= 0 && currentIndex < order.length - 1;
+      const nextCheckpoint = hasNextCheckpoint ? order[currentIndex + 1] : undefined;
+
+      // For resumeSessionAt: Use NEXT checkpoint to include the response
+      // If there's no next checkpoint (last message), use turnEnd as fallback
+      // (the response won't be included, but there's no better option)
+      const resumeAt = nextCheckpoint ?? turnEnd;
+
+      logger.debug('getRewindCheckpoints resolved', {
+        sessionId,
+        messageId,
+        turnEnd,
+        checkpointOrder: order,
+        currentIndex,
+        nextCheckpoint,
+        resumeAt,
+        usedNextCheckpoint: hasNextCheckpoint,
+      });
+
+      // For rewindFiles: Use turnEnd (file state after this turn's tools completed)
+      // Files are correctly restored to post-response state with the user message UUID
       return {
-        resumeSessionAt: turnStart,
+        resumeSessionAt: resumeAt,
         rewindFiles: turnEnd,
       };
     },
@@ -356,6 +534,12 @@ export const useCheckpointStore = create<CheckpointState>()(
         state.latestCheckpoints = Object.fromEntries(
           Object.entries(state.latestCheckpoints).filter(([key]) => key !== sessionId)
         );
+        state.rewindForkPoints = Object.fromEntries(
+          Object.entries(state.rewindForkPoints).filter(([key]) => key !== sessionId)
+        );
+        state.pendingConversationForks = Object.fromEntries(
+          Object.entries(state.pendingConversationForks).filter(([key]) => key !== sessionId)
+        );
         if (state.pendingMessageForTurnEnd?.sessionId === sessionId) {
           state.pendingMessageForTurnEnd = null;
         }
@@ -374,9 +558,122 @@ export const useCheckpointStore = create<CheckpointState>()(
         state.turnEndCheckpoints = {};
         state.checkpointOrder = {};
         state.latestCheckpoints = {};
+        state.rewindForkPoints = {};
+        state.pendingConversationForks = {};
         state.pendingMessageForTurnEnd = null;
         state.currentTurnStartCheckpoint = null;
         state.currentUserMessageId = null;
+      });
+    },
+
+    // ============================================
+    // Rewind Fork Point Implementations
+    // ============================================
+
+    setRewindForkPoint: (sessionId, messageUuid): void => {
+      logger.debug('Setting rewind fork point', { sessionId, messageUuid });
+      set((state) => {
+        state.rewindForkPoints[sessionId] = messageUuid;
+      });
+    },
+
+    consumeRewindForkPoint: (sessionId): string | null => {
+      const state = get();
+      const forkPoint = state.rewindForkPoints[sessionId];
+      if (forkPoint) {
+        logger.debug('Consuming rewind fork point', { sessionId, forkPoint });
+        // Clear the fork point after consuming (one-time use)
+        set((draft) => {
+          Reflect.deleteProperty(draft.rewindForkPoints, sessionId);
+        });
+        return forkPoint;
+      }
+      return null;
+    },
+
+    hasRewindForkPoint: (sessionId): boolean => {
+      return sessionId in get().rewindForkPoints;
+    },
+
+    clearRewindForkPoint: (sessionId): void => {
+      logger.debug('Clearing rewind fork point', { sessionId });
+      set((state) => {
+        Reflect.deleteProperty(state.rewindForkPoints, sessionId);
+      });
+    },
+
+    // ============================================
+    // Pending Conversation Fork Implementations
+    // ============================================
+
+    setPendingConversationFork: (originalSessionId, rewindMessageId): void => {
+      logger.debug('Setting pending conversation fork', { originalSessionId, rewindMessageId });
+      set((state) => {
+        state.pendingConversationForks[originalSessionId] = rewindMessageId;
+      });
+    },
+
+    consumePendingConversationFork: (originalSessionId): string | null => {
+      const state = get();
+      const rewindMessageId = state.pendingConversationForks[originalSessionId];
+      if (rewindMessageId) {
+        logger.debug('Consuming pending conversation fork', { originalSessionId, rewindMessageId });
+        set((draft) => {
+          Reflect.deleteProperty(draft.pendingConversationForks, originalSessionId);
+        });
+        return rewindMessageId;
+      }
+      return null;
+    },
+
+    hasPendingConversationFork: (originalSessionId): boolean => {
+      return originalSessionId in get().pendingConversationForks;
+    },
+
+    remapSession: (oldSessionId, newSessionId): void => {
+      logger.debug('Remapping session checkpoints', { oldSessionId, newSessionId });
+      set((state) => {
+        // Update in-flight state objects
+        if (state.currentUserMessageId?.sessionId === oldSessionId) {
+          state.currentUserMessageId.sessionId = newSessionId;
+        }
+        if (state.pendingMessageForTurnEnd?.sessionId === oldSessionId) {
+          state.pendingMessageForTurnEnd.sessionId = newSessionId;
+        }
+        if (state.currentTurnStartCheckpoint?.sessionId === oldSessionId) {
+          state.currentTurnStartCheckpoint.sessionId = newSessionId;
+        }
+
+        // Migrate session-keyed records (move data from old key to new key)
+        if (state.turnStartCheckpoints[oldSessionId] !== undefined) {
+          state.turnStartCheckpoints[newSessionId] = state.turnStartCheckpoints[oldSessionId];
+          Reflect.deleteProperty(state.turnStartCheckpoints, oldSessionId);
+        }
+        if (state.turnEndCheckpoints[oldSessionId] !== undefined) {
+          state.turnEndCheckpoints[newSessionId] = state.turnEndCheckpoints[oldSessionId];
+          Reflect.deleteProperty(state.turnEndCheckpoints, oldSessionId);
+        }
+        if (state.checkpointOrder[oldSessionId] !== undefined) {
+          state.checkpointOrder[newSessionId] = state.checkpointOrder[oldSessionId];
+          Reflect.deleteProperty(state.checkpointOrder, oldSessionId);
+        }
+        if (state.latestCheckpoints[oldSessionId] !== undefined) {
+          state.latestCheckpoints[newSessionId] = state.latestCheckpoints[oldSessionId];
+          Reflect.deleteProperty(state.latestCheckpoints, oldSessionId);
+        }
+        if (state.pendingMessagesQueue[oldSessionId] !== undefined) {
+          state.pendingMessagesQueue[newSessionId] = state.pendingMessagesQueue[oldSessionId];
+          Reflect.deleteProperty(state.pendingMessagesQueue, oldSessionId);
+        }
+        if (state.rewindForkPoints[oldSessionId] !== undefined) {
+          state.rewindForkPoints[newSessionId] = state.rewindForkPoints[oldSessionId];
+          Reflect.deleteProperty(state.rewindForkPoints, oldSessionId);
+        }
+        if (state.pendingConversationForks[oldSessionId] !== undefined) {
+          state.pendingConversationForks[newSessionId] =
+            state.pendingConversationForks[oldSessionId];
+          Reflect.deleteProperty(state.pendingConversationForks, oldSessionId);
+        }
       });
     },
   }))

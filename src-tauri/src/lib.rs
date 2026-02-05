@@ -335,6 +335,7 @@ pub fn run() {
             // Fork and generate commands
             agent_cmd::agent_fork_session,
             agent_cmd::agent_rewind_files,
+            agent_cmd::agent_fork_session_at,
             agent_cmd::agent_generate_agent_definition,
             agent_cmd::agent_generate_command_definition,
             // Canvas session commands

@@ -184,13 +184,12 @@ export interface SessionConfig {
   critiqueEnabled?: boolean;
   model?: 'haiku' | 'sonnet' | 'opus';
   sessionMode?: 'chat' | 'agent';
-  /** SDK session ID to resume from (for programmatic forking) */
+  /** SDK session ID to resume from (for session continuity, rewind forks, etc.) */
   resumeSessionId?: string;
+  /** Specific message UUID to resume at (for forking at a point in the conversation) */
+  resumeSessionAt?: string;
   /** Whether to fork the session (create new branch) vs continue original */
   forkSession?: boolean;
-  // NOTE: resumeSessionAt was removed. For rewind scenarios, we DON'T use SDK's resume
-  // because it loads ALL messages. Instead, we prepend truncated conversation history
-  // to the first message. This matches how Claude Code handles rewind.
 }
 
 /**
@@ -399,6 +398,232 @@ function persistSessionUsage(
   } catch {
     // Non-critical — live usage still works, just won't survive restart
     logger.debug({ sdkSessionId }, 'Failed to persist session usage');
+  }
+}
+
+/**
+ * Find a session's JSONL file by searching all project directories.
+ * The JSONL might be in a different project folder than the current cwd
+ * (e.g., if the working directory changed during the session).
+ *
+ * @param sdkSessionId - The SDK session ID (JSONL filename without extension)
+ * @returns Full path to the JSONL file, or null if not found
+ */
+function findSessionJsonl(sdkSessionId: string): string | null {
+  const claudeDir = path.join(os.homedir(), '.claude', 'projects');
+
+  if (!fs.existsSync(claudeDir)) {
+    return null;
+  }
+
+  // Search all project directories for the session JSONL
+  const projectDirs = fs.readdirSync(claudeDir, { withFileTypes: true });
+  for (const dir of projectDirs) {
+    if (!dir.isDirectory()) continue;
+
+    const jsonlPath = path.join(claudeDir, dir.name, `${sdkSessionId}.jsonl`);
+    if (fs.existsSync(jsonlPath)) {
+      logger.debug({ sdkSessionId, jsonlPath, projectDir: dir.name }, 'Found JSONL file');
+      return jsonlPath;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Result of truncating a session's JSONL file
+ */
+interface TruncateResult {
+  /** Number of lines removed, or -1 if file not found */
+  linesRemoved: number;
+  /** The user message UUID that precedes the target (for resumeSessionAt) */
+  userMessageUuid: string | null;
+}
+
+/**
+ * Truncate a session's JSONL file to include only messages up to (and including)
+ * a specific message UUID. This is the key mechanism for rewind - we directly
+ * edit the file that the SDK reads from.
+ *
+ * The JSONL contains these line types:
+ * - type: "queue-operation" - dequeue events
+ * - type: "file-history-snapshot" - file state snapshots
+ * - type: "user" - user messages with uuid field
+ * - type: "assistant" - assistant responses with uuid field
+ *
+ * @param sdkSessionId - The SDK session ID (JSONL filename)
+ * @param cwd - Working directory (used as fallback, searches all projects first)
+ * @param targetMessageUuid - The message UUID to truncate AFTER (this message is INCLUDED)
+ * @returns TruncateResult with lines removed and the preceding user message UUID
+ */
+function truncateSessionJsonl(
+  sdkSessionId: string,
+  cwd: string,
+  targetMessageUuid: string
+): TruncateResult {
+  try {
+    // First, try to find the JSONL by searching all project directories
+    let jsonlPath = findSessionJsonl(sdkSessionId);
+
+    // Fallback: try the cwd-based path
+    if (!jsonlPath) {
+      const projectDir = path.join(os.homedir(), '.claude', 'projects', encodeWorkspacePath(cwd));
+      const fallbackPath = path.join(projectDir, `${sdkSessionId}.jsonl`);
+      if (fs.existsSync(fallbackPath)) {
+        jsonlPath = fallbackPath;
+      }
+    }
+
+    if (!jsonlPath) {
+      logger.warn(
+        { sdkSessionId, cwd },
+        'JSONL file not found for truncation (searched all projects)'
+      );
+      return { linesRemoved: -1, userMessageUuid: null };
+    }
+
+    // Read the entire file
+    const content = fs.readFileSync(jsonlPath, 'utf-8');
+    const lines = content.split('\n').filter((line) => line.trim() !== '');
+
+    // Parse all lines to find target and user messages
+    interface ParsedLine {
+      uuid?: string;
+      type?: string;
+      parentUuid?: string;
+    }
+    const parsedLines: (ParsedLine | null)[] = lines.map((line) => {
+      try {
+        return JSON.parse(line) as ParsedLine;
+      } catch {
+        return null;
+      }
+    });
+
+    // Find the line index where the target message UUID appears
+    let targetLineIndex = -1;
+    for (let i = 0; i < parsedLines.length; i++) {
+      const parsed = parsedLines[i];
+      if (parsed?.uuid === targetMessageUuid) {
+        targetLineIndex = i;
+        logger.debug(
+          { index: i, type: parsed.type, uuid: parsed.uuid },
+          'Found target message in JSONL'
+        );
+        break;
+      }
+    }
+
+    if (targetLineIndex === -1) {
+      logger.warn({ sdkSessionId, targetMessageUuid }, 'Target message UUID not found in JSONL');
+      return { linesRemoved: 0, userMessageUuid: null };
+    }
+
+    // Find the USER message that precedes the target (for resumeSessionAt)
+    // Walk backwards from target to find the most recent user message
+    let userMessageUuid: string | null = null;
+    const targetParsed = parsedLines[targetLineIndex];
+
+    // If target is an assistant message, look for its parent (should be user message)
+    if (targetParsed?.type === 'assistant' && targetParsed.parentUuid) {
+      userMessageUuid = targetParsed.parentUuid;
+      logger.debug(
+        { userMessageUuid, targetType: 'assistant' },
+        'Found user message via parentUuid'
+      );
+    } else if (targetParsed?.type === 'user') {
+      // Target itself is a user message
+      userMessageUuid = targetParsed.uuid ?? null;
+      logger.debug({ userMessageUuid, targetType: 'user' }, 'Target is user message');
+    } else {
+      // Fallback: walk backwards to find any user message
+      for (let i = targetLineIndex - 1; i >= 0; i--) {
+        const parsed = parsedLines[i];
+        if (parsed?.type === 'user' && parsed.uuid) {
+          userMessageUuid = parsed.uuid;
+          logger.debug({ userMessageUuid, foundAt: i }, 'Found user message by walking backwards');
+          break;
+        }
+      }
+    }
+
+    // Keep all lines up to and including the target message
+    const linesToKeep = lines.slice(0, targetLineIndex + 1);
+    const linesRemoved = lines.length - linesToKeep.length;
+
+    if (linesRemoved > 0) {
+      // Write the truncated content back
+      const truncatedContent = linesToKeep.join('\n') + '\n';
+      fs.writeFileSync(jsonlPath, truncatedContent, 'utf-8');
+      logger.info(
+        {
+          sdkSessionId,
+          targetMessageUuid,
+          userMessageUuid,
+          linesRemoved,
+          linesKept: linesToKeep.length,
+        },
+        'Truncated JSONL file for rewind'
+      );
+    }
+
+    return { linesRemoved, userMessageUuid };
+  } catch (error) {
+    logger.error({ error, sdkSessionId, targetMessageUuid }, 'Failed to truncate JSONL file');
+    return { linesRemoved: -1, userMessageUuid: null };
+  }
+}
+
+/**
+ * Copy a session's JSONL file to a new session ID.
+ * This is used when forking after truncation to avoid SDK cached state issues.
+ *
+ * @param oldSdkSessionId - The original SDK session ID (source file)
+ * @param newSdkSessionId - The new SDK session ID (destination file)
+ * @param cwd - Working directory (used to find the project directory)
+ * @returns Object with success status and any error message
+ */
+function copySessionJsonl(
+  oldSdkSessionId: string,
+  newSdkSessionId: string,
+  cwd: string
+): { success: boolean; error?: string } {
+  try {
+    // Find the source JSONL file
+    let sourcePath = findSessionJsonl(oldSdkSessionId);
+
+    // Fallback: try the cwd-based path
+    if (!sourcePath) {
+      const projectDir = path.join(os.homedir(), '.claude', 'projects', encodeWorkspacePath(cwd));
+      const fallbackPath = path.join(projectDir, `${oldSdkSessionId}.jsonl`);
+      if (fs.existsSync(fallbackPath)) {
+        sourcePath = fallbackPath;
+      }
+    }
+
+    if (!sourcePath) {
+      logger.warn({ oldSdkSessionId, cwd }, 'Source JSONL file not found for copy');
+      return { success: false, error: 'Source file not found' };
+    }
+
+    // Determine destination path (same directory as source)
+    const sourceDir = path.dirname(sourcePath);
+    const destPath = path.join(sourceDir, `${newSdkSessionId}.jsonl`);
+
+    // Copy the file
+    fs.copyFileSync(sourcePath, destPath);
+
+    logger.info(
+      { oldSdkSessionId, newSdkSessionId, sourcePath, destPath },
+      'Copied JSONL file to new session ID'
+    );
+
+    return { success: true };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.error({ error, oldSdkSessionId, newSdkSessionId }, 'Failed to copy JSONL file');
+    return { success: false, error: errorMsg };
   }
 }
 
@@ -666,9 +891,10 @@ export class SessionManager extends Disposable {
       cwd: config?.cwd,
       sessionMode: config?.sessionMode ?? 'agent',
       permissionRequestCallback: permissionCallback,
-      // NOTE: resumeSessionId and forkSession are only used for programmatic forking,
-      // NOT for rewind scenarios. Rewind uses context-prepend approach instead.
+      // Session resume/fork for continuity and rewind
+      // resumeSessionAt + forkSession=true creates a branch from a specific message
       resumeSessionId: config?.resumeSessionId,
+      resumeSessionAt: config?.resumeSessionAt,
       forkSession: config?.forkSession,
       onAuthFailure: (message: string) => {
         this._onAuthError.fire({
@@ -685,6 +911,7 @@ export class SessionManager extends Disposable {
         sessionId,
         sessionMode: finalConfig.sessionMode,
         resumeSessionId: finalConfig.resumeSessionId,
+        resumeSessionAt: finalConfig.resumeSessionAt,
         forkSession: finalConfig.forkSession,
       },
       'Creating session with config'
@@ -1466,6 +1693,106 @@ export class SessionManager extends Disposable {
       logger.error({ sessionId, checkpointId, err }, 'File rewind failed');
       throw err;
     }
+  }
+
+  /**
+   * Fork an SDK session at a specific message point by truncating the JSONL file.
+   *
+   * This is the DIRECT EDIT approach - instead of relying on SDK's resumeSessionAt
+   * (which has limitations around user vs assistant message boundaries), we directly
+   * truncate the JSONL file to include only messages up to the target UUID.
+   *
+   * Flow:
+   * 1. Get the current SDK session ID and working directory
+   * 2. Save session preferences (model, thinking mode, etc.)
+   * 3. TRUNCATE the JSONL file at the target message (removes all subsequent messages)
+   * 4. Delete the current session (clears SDK memory)
+   * 5. Create new session that resumes from the truncated JSONL
+   * 6. SDK reads the truncated file - Claude sees exactly what we want
+   *
+   * @param sessionId - The Orbit session ID
+   * @param atMessageUuid - The message UUID to truncate AFTER (this message is INCLUDED)
+   * @returns The new SDK session ID
+   */
+  async forkSessionAt(sessionId: string, atMessageUuid: string): Promise<string> {
+    logger.info({ sessionId, atMessageUuid }, 'Forking session at specific message point');
+
+    const agent = this.activeSessions.get(sessionId);
+    if (!agent) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
+
+    const sdkSessionId = agent.getCurrentSessionId();
+    if (!sdkSessionId) {
+      throw new Error(`No SDK session ID available for session ${sessionId}`);
+    }
+
+    // Save session preferences before deleting
+    const savedPrefs = this.modePreferences.get(sessionId) ?? {};
+    const savedCwd = agent.workingDirectory;
+
+    logger.info(
+      { sessionId, sdkSessionId, atMessageUuid, savedPrefs, savedCwd },
+      'Saving session state before fork'
+    );
+
+    // CRITICAL: Truncate the JSONL file BEFORE deleting the session
+    // This removes all messages after the target UUID, so when the SDK
+    // resumes, it only sees messages up to and including the target.
+    const truncateResult = truncateSessionJsonl(sdkSessionId, savedCwd, atMessageUuid);
+    logger.info({ sdkSessionId, atMessageUuid, ...truncateResult }, 'JSONL truncated for rewind');
+
+    // CRITICAL: Copy the truncated JSONL to a NEW session ID
+    // The SDK caches state about "where to continue from" for each session ID.
+    // If we resume the same session ID after truncation, the SDK tries to continue
+    // from a cached point that no longer exists, generating empty placeholder messages.
+    // By copying to a NEW session ID, the SDK has no cached state and reads the
+    // truncated JSONL fresh.
+    const newSdkSessionId = randomUUID();
+    const copyResult = copySessionJsonl(sdkSessionId, newSdkSessionId, savedCwd);
+    logger.info(
+      { oldSdkSessionId: sdkSessionId, newSdkSessionId, copyResult },
+      'Copied truncated JSONL to new session ID'
+    );
+
+    // Delete the current session (clears SDK memory)
+    await this.deleteSession(sessionId);
+
+    // Create new session that resumes from the COPIED JSONL with NEW session ID
+    //
+    // IMPORTANT: We use a NEW session ID (not the old one) because:
+    // 1. The SDK caches continuation state per session ID (outside the JSONL)
+    // 2. Resuming the old session ID after truncation causes empty message generation
+    // 3. A fresh session ID has no cached state, so the SDK reads the file cleanly
+    await this.createSession(sessionId, {
+      resumeSessionId: newSdkSessionId,
+      // NO resumeSessionAt - file is already truncated
+      // NO forkSession - we've done the "fork" by truncating and copying
+      cwd: savedCwd,
+      thinkingEnabled: savedPrefs.thinkingEnabled,
+      maxThinkingTokens: savedPrefs.maxThinkingTokens,
+      planEnabled: savedPrefs.planEnabled,
+      acceptEnabled: savedPrefs.acceptEnabled,
+      model: savedPrefs.model,
+    });
+
+    // Get the new SDK session ID (will be the one we passed)
+    const newAgent = this.activeSessions.get(sessionId);
+    const finalSdkSessionId = newAgent?.getCurrentSessionId();
+
+    logger.info(
+      {
+        sessionId,
+        oldSdkSessionId: sdkSessionId,
+        newSdkSessionId,
+        finalSdkSessionId,
+        atMessageUuid,
+        linesRemoved: truncateResult.linesRemoved,
+      },
+      'Session forked with new ID - Claude now has context up to target message'
+    );
+
+    return finalSdkSessionId ?? newSdkSessionId;
   }
 
   /**

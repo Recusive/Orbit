@@ -1,6 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
 
-import type { RewindContextMessage } from './types/tauri-types';
 import type { SessionConfig } from '@/lib/api';
 
 import { agentCreateSession, agentGetStoredSession, getWorkspacePath } from '@/lib/api';
@@ -19,26 +18,12 @@ export const createdSessions = new Set<string>();
 /**
  * Track forked sessions that should resume from an SDK session.
  * Key: new (forked) session ID
- * Value: { sdkSessionId } for file checkpoint access (NOT for message resume)
+ * Value: { sdkSessionId } for file checkpoint access
  *
- * IMPORTANT: For rewind scenarios, we DON'T use SDK's resume for messages.
- * The SDK's resume loads ALL messages from the previous session. Instead,
- * we use rewindContextMap to store truncated messages and prepend
- * them to the first message (like Claude Code does).
+ * NOTE: The new rewind system uses parentUuid chains (like Claude Code)
+ * instead of context prepending. This map is kept for file checkpoint tracking.
  */
 export const forkedSessionResumeMap = new Map<string, { sdkSessionId: string }>();
-
-/**
- * Store conversation context for rewind scenarios.
- * Key: new (forked) session ID
- * Value: { messages } - conversation history to prepend to first message
- *
- * This is the key fix: Instead of using SDK's resume (which loads ALL messages),
- * we truncate locally and prepend the context to the first message.
- * This matches how Claude Code handles rewind - they slice messages BEFORE
- * passing to the SDK.
- */
-export const rewindContextMap = new Map<string, RewindContextMessage[]>();
 
 // NOTE: We don't need to wait for system:init or use delays for forked sessions.
 // The SDK's MessageQueue iterator blocks until the first message is added.
@@ -57,35 +42,6 @@ export function markSessionAsForked(newSessionId: string, resumeFromSdkSessionId
     newSessionId,
     resumeFromSdkSessionId,
   });
-}
-
-/**
- * Store conversation context for a rewind fork.
- * This context will be prepended to the first message sent to this session.
- */
-export function setRewindContext(sessionId: string, messages: RewindContextMessage[]): void {
-  rewindContextMap.set(sessionId, messages);
-  logger.debug('Stored rewind context', {
-    sessionId,
-    messageCount: messages.length,
-  });
-}
-
-/**
- * Get and consume rewind context for a session.
- * Returns undefined if no context exists.
- * Context is deleted after retrieval (one-time use).
- */
-export function consumeRewindContext(sessionId: string): RewindContextMessage[] | undefined {
-  const context = rewindContextMap.get(sessionId);
-  if (context) {
-    rewindContextMap.delete(sessionId);
-    logger.debug('Consuming rewind context', {
-      sessionId,
-      messageCount: context.length,
-    });
-  }
-  return context;
 }
 
 /** Remap a created session from oldId to newId (e.g., Orbit UUID → SDK session ID).
@@ -127,23 +83,19 @@ export async function ensureSession(sessionId: string): Promise<void> {
   }
 
   // Check if this is a forked session (from rewind)
-  // NOTE: We intentionally DON'T use SDK's resume for rewind sessions.
-  // The SDK's resume loads ALL messages from the previous session, which breaks rewind.
-  // Instead, we:
-  // 1. Store the truncated messages in rewindContextMap
-  // 2. Create a fresh session (no resume)
-  // 3. Prepend the context to the first message
-  // This matches how Claude Code handles rewind - they slice messages BEFORE passing to SDK.
+  // For forks, we RESUME from the original SDK session to preserve conversation context.
+  // The parentUuid chain determines what the UI shows, but Claude needs the full context.
   const resumeConfig = forkedSessionResumeMap.get(sessionId);
 
   if (resumeConfig) {
-    // For rewind forks, we create a FRESH session (no SDK resume)
-    // The conversation context is handled by prepending to the first message
-    // File checkpoints were already rewound before the fork was created
-    logger.debug('Creating fresh session for rewind fork', {
+    // For rewind forks, resume from the original SDK session so Claude has context.
+    // This is critical: without resuming, Claude has no idea what the conversation was about.
+    // The parentUuid chain (like Claude Code) tells OUR UI which messages to show,
+    // but the SDK session must have the full conversation for Claude to understand context.
+    config.resumeSessionId = resumeConfig.sdkSessionId;
+    logger.debug('Resuming SDK session for rewind fork (preserving context)', {
       sessionId,
-      originalSdkSession: resumeConfig.sdkSessionId,
-      note: 'NOT using SDK resume - context will be prepended to first message',
+      resumeFromSdkSessionId: resumeConfig.sdkSessionId,
     });
     // Clean up the mapping
     forkedSessionResumeMap.delete(sessionId);
