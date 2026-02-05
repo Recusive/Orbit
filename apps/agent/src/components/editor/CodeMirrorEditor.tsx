@@ -123,7 +123,7 @@ const languages: Record<string, LanguageFactory> = {
 const darkTheme = EditorView.theme(
   {
     '&': {
-      backgroundColor: 'oklch(0.2 0.015 58)', // Same as --card in dark mode
+      backgroundColor: 'var(--editor-bg)', // Transparent in liquid glass, solid in solid mode
       color: '#e1e1e1',
     },
     '.cm-scroller': {
@@ -142,7 +142,7 @@ const darkTheme = EditorView.theme(
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
     '.cm-gutters': {
-      backgroundColor: 'oklch(0.2 0.015 58)', // Same as editor bg for horizontal scroll
+      backgroundColor: 'var(--editor-bg)', // Match editor background
       color: 'oklch(0.55 0.03 60)', // Warm brown matching --muted-foreground
       border: 'none',
     },
@@ -383,7 +383,7 @@ const darkHighlightStyle = HighlightStyle.define([
 
 const lightTheme = EditorView.theme({
   '&': {
-    backgroundColor: 'oklch(0.9 0.02 75)', // Same as --card in light mode
+    backgroundColor: 'var(--editor-bg)', // Transparent in liquid glass, solid in solid mode
     color: '#24292f',
   },
   '.cm-scroller': {
@@ -402,7 +402,7 @@ const lightTheme = EditorView.theme({
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   '.cm-gutters': {
-    backgroundColor: 'oklch(0.9 0.02 75)', // Same as editor bg for horizontal scroll
+    backgroundColor: 'var(--editor-bg)', // Match editor background
     color: 'oklch(0.50 0.03 60)', // Warm brown matching --muted-foreground
     border: 'none',
   },

@@ -154,7 +154,7 @@ export const RootLayout: FC = () => {
   ]);
 
   return (
-    <div className="h-full w-full flex overflow-hidden bg-background text-foreground">
+    <div className="h-full w-full flex overflow-hidden text-foreground">
       {/* Primary Sidebar - File explorer, conversations */}
       <PrimarySidebar width={leftSidebarWidth} />
 

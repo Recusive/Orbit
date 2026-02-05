@@ -32,7 +32,7 @@ const DialogContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className="flex items-center justify-center" />
+    <DialogOverlay className="flex items-center justify-center bg-black/40" />
     {/* Flexbox centering wrapper - avoids blurry text from transform translate(-50%) subpixel issues */}
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       <div className="relative">
@@ -41,9 +41,12 @@ const DialogContent = React.forwardRef<
         <DialogPrimitive.Content
           ref={ref}
           className={cn(
-            'relative z-10 grid w-full max-w-lg gap-4 border-[3px] border-border bg-card/50 backdrop-blur-md backdrop-saturate-150 p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-xl pointer-events-auto',
+            'relative z-10 grid w-full max-w-lg gap-4 border-[3px] border-border/40 bg-card/50 dark:bg-card/30 backdrop-blur-md backdrop-saturate-150 p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-xl pointer-events-auto',
             className
           )}
+          style={{
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.03)',
+          }}
           {...props}
         >
           {children}

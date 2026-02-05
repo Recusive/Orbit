@@ -280,6 +280,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_liquid_glass::init())
         .plugin(orbit_plugin_decorum::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         // Setup event callbacks for agent and configure window
@@ -290,10 +291,25 @@ pub fn run() {
             {
                 use orbit_plugin_decorum::WebviewWindowExt as _;
                 use tauri::Manager as _;
+                use tauri_plugin_liquid_glass::{GlassMaterialVariant, LiquidGlassConfig, LiquidGlassExt as _};
 
                 if let Some(window) = app.get_webview_window("main") {
                     // Enable ProMotion 120Hz on supported displays.
                     drop(window.enable_promotion());
+
+                    // Apply macOS Liquid Glass effect for frosted glass design system.
+                    // Uses Regular variant for the default Liquid Glass appearance.
+                    // Falls back to NSVisualEffectView on macOS < 26.
+                    if let Err(e) = app.liquid_glass().set_effect(
+                        &window,
+                        LiquidGlassConfig {
+                            corner_radius: 10.0,
+                            variant: GlassMaterialVariant::Regular,
+                            ..Default::default()
+                        },
+                    ) {
+                        log::warn!("Failed to apply Liquid Glass effect: {e}");
+                    }
                 }
             }
 

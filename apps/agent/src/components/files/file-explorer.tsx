@@ -410,8 +410,8 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
     return (
       <button
         className={cn(
-          'file-tree-item flex items-center w-full text-sm hover:bg-accent/50 transition-colors',
-          isSelected && 'bg-accent text-accent-foreground'
+          'file-tree-item flex items-center w-full text-sm hover:bg-muted/50 dark:hover:bg-accent/50 transition-colors',
+          isSelected && 'bg-muted/70 dark:bg-accent text-foreground dark:text-accent-foreground'
         )}
         style={{
           position: 'absolute',

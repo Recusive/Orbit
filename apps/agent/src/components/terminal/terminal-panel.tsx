@@ -450,7 +450,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
   }, []);
 
   const isFullWidth = variant === 'full-width';
-  const panelBackground = isFullWidth ? 'bg-background' : 'bg-card/30';
+  // No background - let macOS vibrancy show through
   const CycleIcon = terminalPosition === 'activity' ? ChevronsLeftRight : ChevronsRightLeft;
   const cycleTitle =
     terminalPosition === 'activity' ? 'Expand to full width' : 'Collapse to activity panel';
@@ -459,16 +459,12 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
   return (
     <div
       ref={panelRef}
-      className={cn(
-        panelBackground,
-        'relative flex flex-col min-h-[35px]',
-        collapsed ? 'shrink-0' : 'h-full'
-      )}
+      className={cn('relative flex flex-col min-h-[35px]', collapsed ? 'shrink-0' : 'h-full')}
       style={collapsed ? { height: TERMINAL_HEADER_HEIGHT } : undefined}
     >
       <header
         className={cn(
-          'relative z-10 flex items-center justify-between px-2 shrink-0 border-t-[3px] border-b-[3px] border-border/50 bg-card',
+          'relative z-10 flex items-center justify-between px-2 shrink-0 border-t-[3px] border-b-[3px] border-border/50',
           collapsed && 'border-b-0',
           !isFullWidth && 'border-l-[3px]'
         )}

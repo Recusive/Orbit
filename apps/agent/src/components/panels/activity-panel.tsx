@@ -636,7 +636,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   const showActivityTerminal = terminalPosition === 'activity' && canRenderTerminal;
 
   return (
-    <div className="@container h-full w-full flex flex-col bg-card">
+    <div className="@container h-full w-full flex flex-col">
       {/* Terminal in activity layout */}
       <div
         className="flex-1 flex flex-col"

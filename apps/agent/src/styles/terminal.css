@@ -24,7 +24,8 @@
 .terminal-outer-container {
   height: 100%;
   width: 100%;
-  background-color: var(--chat-area);
+  /* Semi-transparent surface for vibrancy - matches chat area */
+  background-color: var(--surface);
 }
 
 .terminal-groups-container {
@@ -48,7 +49,8 @@
   height: 100%;
   width: 100%;
   box-sizing: border-box;
-  background-color: var(--chat-area);
+  /* Transparent to let macOS vibrancy show through */
+  background-color: transparent;
 }
 
 /* Active terminal has no special styling currently - class used for JS targeting */

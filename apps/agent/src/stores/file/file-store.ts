@@ -705,6 +705,44 @@ export function useChangedFilesCount(): number {
   return Object.keys(filesById).length;
 }
 
+/**
+ * Session diff stats - total additions and deletions across all changed files.
+ *
+ * Used for the GitHub-style +/- indicator in the chat header.
+ */
+export interface SessionDiffStats {
+  additions: number;
+  deletions: number;
+  fileCount: number;
+}
+
+/**
+ * Hook to get aggregated diff stats for the current session.
+ *
+ * @example
+ * const { additions, deletions, fileCount } = useSessionDiffStats();
+ * // Display: +{additions} -{deletions}
+ */
+export function useSessionDiffStats(): SessionDiffStats {
+  const filesById = useFileStore((state) => state.filesById);
+
+  return useMemo(() => {
+    let additions = 0;
+    let deletions = 0;
+    let fileCount = 0;
+
+    for (const file of Object.values(filesById)) {
+      if (file.diff) {
+        additions += file.diff.additions;
+        deletions += file.diff.deletions;
+      }
+      fileCount++;
+    }
+
+    return { additions, deletions, fileCount };
+  }, [filesById]);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // File Tree Selector Hooks
 // ═══════════════════════════════════════════════════════════════

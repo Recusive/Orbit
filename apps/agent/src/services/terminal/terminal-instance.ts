@@ -564,6 +564,9 @@ export class TerminalInstance {
    * NOTE: getPropertyValue('--var') returns raw CSS (e.g., "oklch(0.93 0.015 75)").
    * We need to assign the variable to an element style and read the COMPUTED value,
    * which forces the browser to resolve oklch() → rgb().
+   *
+   * For Liquid Glass vibrancy, we use RGBA with transparency so the macOS
+   * window vibrancy effect shows through the terminal background.
    */
   private buildThemeFromCSSVars(): ITheme {
     const baseTheme = getBestTheme();
@@ -581,11 +584,15 @@ export class TerminalInstance {
         return getComputedStyle(tempEl)[property];
       };
 
-      const bgColor = getComputedColor('--chat-area', 'backgroundColor');
       const fgColor = getComputedColor('--foreground', 'color');
       const selectionColor = getComputedColor('--accent', 'backgroundColor');
 
       document.body.removeChild(tempEl);
+
+      // Use nearly-invisible background for xterm.js canvas
+      // 'transparent' doesn't work well with xterm canvas rendering
+      // 1% alpha is effectively invisible but gives xterm a valid color
+      const bgColor = 'rgba(0, 0, 0, 0.01)';
 
       // WARNING: Do NOT modify selectionBg to add rgba() transparency!
       // xterm.js internally handles selection opacity/blending. The accent color
@@ -596,7 +603,7 @@ export class TerminalInstance {
         background: bgColor,
         foreground: fgColor,
         cursor: fgColor,
-        cursorAccent: bgColor,
+        cursorAccent: fgColor, // Use foreground for cursor accent since bg is transparent
         selectionBackground: selectionColor,
         // Note: xterm.js uses native browser scrollbar styled via CSS in terminal.css
       };

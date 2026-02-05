@@ -127,7 +127,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
         className={cn(
           'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
           'transition-colors duration-150 cursor-pointer w-full text-left',
-          'rounded-lg hover:bg-muted/20',
+          'rounded-lg hover:bg-muted/40',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >

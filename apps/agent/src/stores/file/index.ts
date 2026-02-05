@@ -3,7 +3,7 @@
  */
 
 // File store
-export { useFileStore, flattenFileTree } from './file-store';
+export { useFileStore, flattenFileTree, useSessionDiffStats } from './file-store';
 export type {
   FileChangeType,
   FileChangeStatus,
@@ -13,6 +13,7 @@ export type {
   FileChange,
   FileState,
   FlattenedFile,
+  SessionDiffStats,
 } from './file-store';
 
 // File viewer store

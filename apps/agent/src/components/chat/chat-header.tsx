@@ -6,8 +6,70 @@
  */
 import type { FC } from 'react';
 
-import { HEIGHTS } from '@/lib/utils';
-import { useWorkspaceName, useActiveConversationTitle, useVaultOpen } from '@/stores/ui/ui-store';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn, HEIGHTS } from '@/lib/utils';
+import { useSessionDiffStats } from '@/stores/file/file-store';
+import {
+  useWorkspaceName,
+  useActiveConversationTitle,
+  useVaultOpen,
+  useUIStore,
+} from '@/stores/ui/ui-store';
+
+/**
+ * GitHub-style diff stats indicator showing additions/deletions
+ */
+const DiffStatsButton: FC = () => {
+  const { additions, deletions, fileCount } = useSessionDiffStats();
+  const setActivityTab = useUIStore((state) => state.setActivityTab);
+
+  const tooltipText =
+    fileCount === 0
+      ? 'No files changed in this session'
+      : `${String(fileCount)} file${fileCount !== 1 ? 's' : ''} changed in this session`;
+
+  const handleClick = (): void => {
+    setActivityTab('files');
+  };
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={handleClick}
+          className={cn(
+            'flex items-center h-6 rounded-lg overflow-hidden',
+            'text-[11px] font-medium tabular-nums',
+            'border-[3px] border-border/40',
+            'transition-all duration-150 hover:border-border/60'
+          )}
+        >
+          {/* Additions (green) */}
+          <span
+            className={cn(
+              'flex items-center gap-0.5 px-2 h-full',
+              'bg-success/20 text-success dark:text-success'
+            )}
+          >
+            <span>+{additions}</span>
+          </span>
+          {/* Divider */}
+          <span className="w-[2px] h-full bg-border/40" />
+          {/* Deletions (red) */}
+          <span
+            className={cn(
+              'flex items-center gap-0.5 px-2 h-full',
+              'bg-destructive/20 text-destructive'
+            )}
+          >
+            <span>−{deletions}</span>
+          </span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{tooltipText}</TooltipContent>
+    </Tooltip>
+  );
+};
 
 export const ChatHeader: FC = () => {
   const workspaceName = useWorkspaceName();
@@ -66,6 +128,11 @@ export const ChatHeader: FC = () => {
             ) : null}
           </>
         )}
+      </div>
+
+      {/* Right section: Diff stats */}
+      <div className="flex items-center gap-2">
+        <DiffStatsButton />
       </div>
     </header>
   );

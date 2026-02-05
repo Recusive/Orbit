@@ -83,7 +83,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
     <header
       data-tauri-drag-region
       className={cn(
-        'h-[35px] flex items-center justify-between border-b-[3px] border-border/50 shrink-0',
+        'h-[34px] flex items-center justify-between border-b-[3px] border-border/50 shrink-0',
         'bg-card shadow-lg',
         // Left padding for macOS traffic light buttons (matches Cursor: x:11 + ~69px for 3 buttons)
         'pl-[80px]',
@@ -122,93 +122,104 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
         <div />
       )}
 
-      {/* Right section: Search + Action buttons unified */}
+      {/* Right section: Search + Action buttons */}
       {workspaceName ? (
-        <div className="flex items-center gap-2 h-full px-2 bg-muted/50 dark:bg-muted/30 border-l-[3px] border-border/40">
-          {/* Search button */}
+        <div className="flex items-center gap-1 h-full pr-3">
+          {/* Search button - pill style */}
           <button
             data-tauri-drag-region={false}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-150"
+            className={cn(
+              'flex items-center gap-2 h-6 px-2.5 rounded-md',
+              'text-muted-foreground hover:text-foreground',
+              'hover:bg-muted/40 active:scale-[0.98]',
+              'transition-all duration-150'
+            )}
             title="Search files (⌘K)"
             onClick={handleOpenSearch}
           >
             <Search className="h-3.5 w-3.5 shrink-0" />
-            <span className="text-sm whitespace-nowrap overflow-hidden truncate max-w-[100px]">
-              {searchText}
-            </span>
-            <KbdGroup>
-              <Kbd className="bg-foreground/10 text-inherit border-foreground/15">⌘</Kbd>
-              <Kbd className="bg-foreground/10 text-inherit border-foreground/15">K</Kbd>
+            <span className="text-sm truncate max-w-[120px]">{searchText}</span>
+            <KbdGroup className="gap-0.5">
+              <Kbd className="h-[18px] text-[10px] px-1 bg-foreground/8 border-foreground/10">
+                ⌘
+              </Kbd>
+              <Kbd className="h-[18px] text-[10px] px-1 bg-foreground/8 border-foreground/10">
+                K
+              </Kbd>
             </KbdGroup>
           </button>
 
-          {/* Divider */}
-          <div className="w-px h-4 bg-border/50" />
+          {/* Panel toggles */}
+          <div className="flex items-center">
+            {/* Activity Panel Toggle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  data-tauri-drag-region={false}
+                  onClick={toggleReviewPanel}
+                  className={cn(
+                    'h-6 w-6 flex items-center justify-center rounded-md',
+                    'hover:bg-muted/40 active:scale-[0.98]',
+                    'transition-all duration-150',
+                    reviewPanelOpen
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <div className="rotate-180">
+                    <svg
+                      aria-hidden="true"
+                      width="16"
+                      height="16"
+                      viewBox="1 1 22 22"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
+                        fill="currentColor"
+                      />
+                      <rect
+                        x="7"
+                        y="7"
+                        width={reviewPanelOpen ? 5 : 2}
+                        height="10"
+                        rx="1"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </div>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="flex items-center gap-2">
+                <span>{reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}</span>
+                <Kbd className="bg-white/15 border-white/20">{getCommandKey()}B</Kbd>
+              </TooltipContent>
+            </Tooltip>
 
-          {/* Activity Panel Toggle */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                data-tauri-drag-region={false}
-                onClick={toggleReviewPanel}
-                className={cn(
-                  'h-6 w-6 flex items-center justify-center rounded-md hover:bg-primary/8 active:scale-95 transition-[background-color,color,transform] duration-150',
-                  reviewPanelOpen
-                    ? 'text-foreground'
-                    : 'text-muted-foreground/70 hover:text-foreground'
-                )}
-              >
-                <div className="rotate-180">
-                  <svg
-                    aria-hidden="true"
-                    width="16"
-                    height="16"
-                    viewBox="1 1 22 22"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
-                      fill="currentColor"
-                    />
-                    <rect
-                      x="7"
-                      y="7"
-                      width={reviewPanelOpen ? 5 : 2}
-                      height="10"
-                      rx="1"
-                      fill="currentColor"
-                    />
-                  </svg>
-                </div>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent className="flex items-center gap-2">
-              <span>{reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}</span>
-              <Kbd className="bg-white/15 text-inherit border-white/20">{getCommandKey()}B</Kbd>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Actions Bar Toggle */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                data-tauri-drag-region={false}
-                onClick={toggleRightSidebar}
-                className={cn(
-                  'h-6 w-6 flex items-center justify-center rounded-md hover:bg-primary/8 active:scale-95 transition-[background-color,color,transform] duration-150',
-                  rightSidebarOpen
-                    ? 'text-foreground'
-                    : 'text-muted-foreground/70 hover:text-foreground'
-                )}
-              >
-                <IconSquareGridCircle className="h-4 w-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
-            </TooltipContent>
-          </Tooltip>
+            {/* Actions Bar Toggle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  data-tauri-drag-region={false}
+                  onClick={toggleRightSidebar}
+                  className={cn(
+                    'h-6 w-6 flex items-center justify-center rounded-md',
+                    'hover:bg-muted/40 active:scale-[0.98]',
+                    'transition-all duration-150',
+                    rightSidebarOpen
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <IconSquareGridCircle className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       ) : (
         <div className="w-[122px]" />

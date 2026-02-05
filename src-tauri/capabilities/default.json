@@ -37,6 +37,8 @@
     "shell:allow-spawn",
     "shell:allow-execute",
     "shell:allow-stdin-write",
-    "shell:allow-kill"
+    "shell:allow-kill",
+
+    "liquid-glass:default"
   ]
 }

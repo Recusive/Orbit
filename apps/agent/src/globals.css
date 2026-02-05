@@ -70,6 +70,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-chat-area: var(--chat-area);
+  --color-editor-bg: var(--editor-bg);
 
   /* Brand colors as Tailwind utilities */
   --color-brand-oat: var(--brand-oat);
@@ -168,7 +169,8 @@
 
   /* Shadcn semantic (light) - following brand palette */
   /* 70% Oat/Sand (backgrounds), 20% Clay (secondary), 10% Coral (accents) */
-  --surface: oklch(0.87 0.02 75); /* Single unified surface color */
+  /* Liquid Glass: Semi-transparent surfaces allow vibrancy to show through */
+  --surface: oklch(0.87 0.02 75 / 70%); /* Warm tan surface - 70% opacity for vibrancy */
   --background: var(--surface);
   --foreground: oklch(0.24 0.02 55); /* Headline #3D3630 */
   --card: var(--surface);
@@ -179,17 +181,18 @@
   --primary-foreground: oklch(0.98 0.01 75);
   --secondary: oklch(0.73 0.06 70); /* Clay #C4A98B */
   --secondary-foreground: oklch(0.3 0.02 55);
-  --muted: oklch(0.82 0.03 70); /* Sand #D4C5B5 */
+  --muted: oklch(0.77 0.035 70); /* Sand - balanced for glass visibility */
   --muted-foreground: oklch(0.55 0.04 60); /* Brown #8B7355 */
   --accent: oklch(0.82 0.03 70); /* Sand - same as muted for subtle fills */
   --accent-foreground: oklch(0.24 0.02 55);
   --destructive: oklch(0.55 0.22 25);
-  --border: oklch(0.76 0.03 70); /* Visible border, sand-toned */
+  --border: oklch(0.70 0.035 70); /* Border - balanced for glass visibility */
   --border-panel: oklch(0.76 0.03 70 / 50%); /* Panel/separator borders - border at 50% alpha */
   --divider: oklch(0.84 0.025 70); /* Structural panel dividers - same as border for consistency */
   --input: var(--surface);
   --ring: oklch(0.56 0.18 35); /* Coral - darker */
   --chat-area: var(--surface);
+  --editor-bg: transparent; /* Liquid glass: see-through to vibrancy */
 
   /* Charts - coral gradient */
   --chart-1: oklch(0.837 0.128 66.29);
@@ -241,8 +244,8 @@
   --file-html: oklch(0.65 0.18 45);
   --file-css: oklch(0.55 0.18 300);
 
-  /* Terminal theme */
-  --terminal-bg: oklch(0.15 0.01 60);
+  /* Terminal theme - transparent for macOS vibrancy */
+  --terminal-bg: rgba(0, 0, 0, 0.01);
   --terminal-fg: oklch(0.85 0.01 75);
   --terminal-cursor: oklch(0.85 0.01 75);
 
@@ -300,7 +303,8 @@ html.dark {
   --mode-think: oklch(0.65 0.12 65); /* Warm amber/sand - adjusted for dark */
 
   /* Shadcn semantic (dark) - warm, not cold */
-  --surface: oklch(0.2 0.015 58); /* Single unified surface color */
+  /* Liquid Glass: Semi-transparent surfaces allow vibrancy to show through */
+  --surface: oklch(0.2 0.015 58 / 55%); /* Warm dark surface - 55% opacity for vibrancy */
   --background: var(--surface);
   --foreground: oklch(0.93 0.01 75); /* Warm cream white */
   --card: var(--surface);
@@ -322,6 +326,7 @@ html.dark {
   --input: var(--surface);
   --ring: oklch(0.55 0.15 38);
   --chat-area: var(--surface);
+  --editor-bg: transparent; /* Liquid glass: see-through to vibrancy */
 
   /* Charts - same */
   --chart-1: oklch(0.837 0.128 66.29);
@@ -370,14 +375,51 @@ html.dark {
   --file-html: oklch(0.7 0.18 45);
   --file-css: oklch(0.6 0.18 300);
 
-  /* Terminal theme */
-  --terminal-bg: oklch(0.15 0.01 60);
+  /* Terminal theme - transparent for macOS vibrancy */
+  --terminal-bg: rgba(0, 0, 0, 0.01);
   --terminal-fg: oklch(0.85 0.01 75);
   --terminal-cursor: oklch(0.85 0.01 75);
 
   /* Tooltip colors (dark mode specific) */
   --tooltip-bg: oklch(0.3 0.02 60);
   --tooltip-text: oklch(0.9 0.01 75);
+}
+
+/* ============================================
+   SOLID MODE OVERRIDES
+   Restores original warm solid colors (no transparency)
+   Values from origin/main before Liquid Glass changes
+   ============================================ */
+
+/* Light mode - Solid (original warm palette) */
+html.window-mode-solid:root,
+html.window-mode-solid.light {
+  --surface: oklch(0.95 0.01 75); /* Warm off-white - original background */
+  --background: oklch(0.95 0.01 75);
+  --card: oklch(0.87 0.02 75); /* Oat - original card */
+  --popover: oklch(0.92 0.015 75);
+  --chat-area: oklch(0.90 0.015 75);
+  --editor-bg: oklch(0.9 0.02 75); /* Solid: opaque editor background */
+  --sidebar: oklch(0.96 0.008 70);
+  --input: oklch(0.87 0.02 70);
+  --muted: oklch(0.82 0.03 70); /* Sand - original */
+  --accent: oklch(0.82 0.03 70);
+  --border: oklch(0.76 0.03 70); /* Original border */
+}
+
+/* Dark mode - Solid (original warm palette) */
+html.window-mode-solid.dark {
+  --surface: oklch(0.16 0.012 60); /* Warm dark - original background */
+  --background: oklch(0.16 0.012 60);
+  --card: oklch(0.2 0.015 58); /* Original card */
+  --popover: oklch(0.22 0.015 58);
+  --chat-area: oklch(0.18 0.012 60);
+  --editor-bg: oklch(0.2 0.015 58); /* Solid: opaque editor background */
+  --sidebar: oklch(0.2 0.015 58);
+  --input: oklch(1 0 0 / 12%); /* Original input */
+  --muted: oklch(0.25 0.015 58); /* Original muted */
+  --accent: oklch(0.3 0.02 55);
+  --border: oklch(1 0 0 / 10%); /* Original border */
 }
 
 /* Streamdown code block overrides - matches tool widget styling */
@@ -749,15 +791,23 @@ html.dark [data-streamdown='code-block-body'] code span::before {
   }
 
   html,
-  body,
+  body {
+    height: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    /* Transparent for macOS vibrancy effect - allows desktop to show through */
+    background: transparent !important;
+  }
+
   #root {
     height: 100%;
     margin: 0 !important;
     padding: 0 !important;
+    /* Transparent to let macOS window vibrancy show through */
+    background-color: transparent;
   }
 
   body {
-    background-color: var(--background);
     color: var(--foreground);
     font-feature-settings:
       'rlig' 1,
