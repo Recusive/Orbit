@@ -436,7 +436,7 @@ export const BrowserPanel: FC = () => {
           </div>
         ) : null}
 
-        {/* Reset button for stuck states */}
+        {/* Reset button for stuck states — properly closes native webview */}
         {(isActive || lifecycleState !== 'idle') &&
         !isCreating &&
         !error &&
@@ -444,10 +444,7 @@ export const BrowserPanel: FC = () => {
         lifecycleState !== 'closing' ? (
           <div className="absolute bottom-4 right-4">
             <button
-              onClick={(): void => {
-                useBrowserStore.getState().reset();
-                useBrowserLifecycleStore.getState().reset();
-              }}
+              onClick={handleCloseBrowser}
               className="px-3 py-1 text-xs font-medium bg-muted text-muted-foreground rounded hover:bg-muted/80 transition-colors"
             >
               Reset Browser State

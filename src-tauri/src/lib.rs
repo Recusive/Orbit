@@ -262,6 +262,10 @@ pub fn run() {
     let browser_state = Arc::new(BrowserWindowState::new());
     let browser_result_state = Arc::new(BrowserResultState::new());
 
+    // Clone browser state for the main-window focus listener (Arc is moved into .manage())
+    #[cfg(target_os = "macos")]
+    let browser_state_for_focus = Arc::clone(&browser_state);
+
     // Initialize file index state (empty until workspace is opened)
     let file_index_state: FileIndexState = Arc::new(RwLock::new(Option::<FileIndex>::None));
 
@@ -310,6 +314,30 @@ pub fn run() {
                     ) {
                         log::warn!("Failed to apply frosted vibrancy: {e}");
                     }
+
+                    // Fix macOS child window z-ordering: when the main window gains
+                    // focus, the browser child window can appear behind the parent.
+                    // Re-order visible child windows to front on every focus event
+                    // using NSWindow.orderFront: (does NOT steal keyboard focus).
+                    //
+                    // Safety guards:
+                    // - try_lock(): non-blocking to avoid deadlocking the main thread
+                    // - Only fires for Focused(true) when the browser window exists
+                    // - The decorum function itself skips hidden windows (isVisible check)
+                    window.on_window_event(move |event| {
+                        if !matches!(event, tauri::WindowEvent::Focused(true)) {
+                            return;
+                        }
+                        // Non-blocking check: returns None if lock is contended
+                        // (e.g., browser_create/browser_close on a Tokio thread).
+                        // This prevents deadlocking the main thread event loop.
+                        if browser_state_for_focus.try_is_active() != Some(true) {
+                            return;
+                        }
+                        // The decorum function itself skips hidden child windows
+                        // (checks NSWindow.isVisible before calling orderFront:).
+                        orbit_plugin_decorum::order_child_windows_front();
+                    });
                 }
             }
 

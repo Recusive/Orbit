@@ -229,7 +229,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
         <button
           onClick={onClose}
           aria-label="Close browser"
-          className="h-7 w-7 flex items-center justify-center rounded hover:bg-destructive/90 hover:text-destructive-foreground transition-colors"
+          className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:bg-destructive/20 hover:text-destructive dark:hover:bg-destructive/20 transition-colors"
           title="Close browser"
         >
           <X className="h-4 w-4" aria-hidden="true" />

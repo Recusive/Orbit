@@ -338,12 +338,6 @@ export class TerminalInstance {
 
           // Now request PTY with correct cols/rows
           this.requestPtyCreation();
-        } else {
-          logger.debug('Waiting for container dimensions', {
-            sessionId: this.sessionId,
-            width,
-            height,
-          });
         }
       });
 

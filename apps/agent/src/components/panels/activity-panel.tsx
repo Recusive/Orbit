@@ -62,6 +62,13 @@ interface ActivityPanelProps {
    * Defaults to true for backwards compatibility.
    */
   readonly canRenderTerminal?: boolean;
+  /**
+   * Whether this ActivityPanel instance manages browser visibility.
+   * Only ONE instance should have this set to true to prevent duplicate
+   * browser:show / browser:hide commands from competing effects.
+   * Defaults to true for backwards compatibility.
+   */
+  readonly canManageBrowser?: boolean;
 }
 
 interface EditorTabProps {
@@ -375,7 +382,10 @@ const TabsHeader: FC<TabsHeaderProps> = ({
   );
 };
 
-export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true }) => {
+export const ActivityPanel: FC<ActivityPanelProps> = ({
+  canRenderTerminal = true,
+  canManageBrowser = true,
+}) => {
   const hasOpenFiles = useHasOpenFiles();
   const openTabs = useOpenTabs();
   const activeTabPath = useFileViewerStore((state) => state.activeTabPath);
@@ -400,7 +410,6 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   const prevHasOpenFiles = useRef(hasOpenFiles);
   const isBrowserActive = useBrowserIsActive();
   const { postMessage } = useTauri({});
-  const prevActiveTab = useRef(activeTab);
 
   // Ref for terminal allotment - used to programmatically resize
   const terminalAllotmentRef = useRef<AllotmentHandle>(null);
@@ -476,103 +485,31 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
     prevHasOpenFiles.current = hasOpenFiles;
   }, [hasOpenFiles, setActiveTab]);
 
-  // Track if this is the first render (for mount logic)
-  const isFirstRender = useRef(true);
-  // Track previous browser active state to detect when browser is created
-  const prevBrowserActive = useRef(isBrowserActive);
-
-  // Send browser visibility messages when tab changes or panel mounts/unmounts
-  // This is handled here (in ActivityPanel) rather than in BrowserPanel because
-  // BrowserPanel unmounts when switching away, and cleanup effects are unreliable
-  useEffect(() => {
-    const isBrowserTab = activeTab === 'browser';
-    const browserJustBecameActive = isBrowserActive && !prevBrowserActive.current;
-
-    // Update browser active tracking
-    prevBrowserActive.current = isBrowserActive;
-
-    // Only send messages if browser has been created
-    if (!isBrowserActive) {
-      // Don't update prevActiveTab or isFirstRender when browser isn't active
-      // This ensures we send browser:show when it becomes active
-      return;
-    }
-
-    // Browser just became active - show it if on browser tab
-    if (browserJustBecameActive) {
-      if (isBrowserTab) {
-        postMessage({
-          type: 'browser:show',
-          uuid: generateUUID(),
-        });
-      }
-      prevActiveTab.current = activeTab;
-      isFirstRender.current = false;
-      return;
-    }
-
-    // On first render (panel just mounted/re-opened), show browser if on browser tab
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      if (isBrowserTab) {
-        postMessage({
-          type: 'browser:show',
-          uuid: generateUUID(),
-        });
-      }
-      prevActiveTab.current = activeTab;
-      return;
-    }
-
-    const wasBrowserTab = prevActiveTab.current === 'browser';
-
-    if (wasBrowserTab && !isBrowserTab) {
-      // Switching AWAY from Browser tab - hide the BrowserView
-      postMessage({
-        type: 'browser:hide',
-        uuid: generateUUID(),
-      });
-    } else if (!wasBrowserTab && isBrowserTab) {
-      // Switching TO Browser tab - show the BrowserView
-      postMessage({
-        type: 'browser:show',
-        uuid: generateUUID(),
-      });
-    }
-
-    prevActiveTab.current = activeTab;
-  }, [activeTab, isBrowserActive, postMessage]);
-
-  // Hide browser when activity panel collapses; restore visibility when reopened on browser tab.
-  useEffect(() => {
-    if (!isBrowserActive) {
-      return;
-    }
-
-    if (!reviewPanelOpen) {
-      postMessage({
-        type: 'browser:hide',
-        uuid: generateUUID(),
-      });
-      return;
-    }
-
-    if (activeTab === 'browser') {
-      postMessage({
-        type: 'browser:show',
-        uuid: generateUUID(),
-      });
-    }
-  }, [activeTab, isBrowserActive, postMessage, reviewPanelOpen]);
-
-  // Hide browser when ActivityPanel unmounts (panel collapsed)
-  // Use a ref to track current state for cleanup
+  // Browser visibility effect — sends show/hide based on current state.
+  // Only the instance with canManageBrowser=true runs this, preventing duplicate
+  // show/hide commands from competing ActivityPanel instances (CSS display toggle).
+  // IMPORTANT: No cleanup here! Cleanup in a multi-dep effect fires on EVERY dep
+  // change (not just unmount), which causes hide→show flashes that blank the webview.
   const isBrowserActiveRef = useRef(isBrowserActive);
   isBrowserActiveRef.current = isBrowserActive;
 
   useEffect(() => {
-    return () => {
-      // Cleanup: hide browser when panel collapses
+    if (!canManageBrowser || !isBrowserActive) return;
+
+    const shouldShow = reviewPanelOpen && activeTab === 'browser';
+
+    postMessage({
+      type: shouldShow ? 'browser:show' : 'browser:hide',
+      uuid: generateUUID(),
+    });
+  }, [canManageBrowser, activeTab, isBrowserActive, postMessage, reviewPanelOpen]);
+
+  // Separate unmount cleanup — only fires when component is truly destroyed
+  // (panel collapsed or layout switch), not on every dependency change.
+  useEffect(() => {
+    if (!canManageBrowser) return;
+
+    return (): void => {
       if (isBrowserActiveRef.current) {
         postMessage({
           type: 'browser:hide',
@@ -580,7 +517,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
         });
       }
     };
-  }, [postMessage]);
+  }, [canManageBrowser, postMessage]);
 
   // Handle closing a single tab with LSP notification
   // Only call lspDidClose for diff tabs - CodeMirrorEditor handles LSP lifecycle

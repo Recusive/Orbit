@@ -13,6 +13,8 @@ use tauri::{Runtime, WebviewWindow};
 
 #[cfg(target_os = "macos")]
 mod promotion;
+#[cfg(target_os = "macos")]
+mod window_order;
 
 /// Extensions to [`tauri::WebviewWindow`] for macOS window enhancements.
 pub trait WebviewWindowExt {
@@ -50,6 +52,23 @@ impl WebviewWindowExt for WebviewWindow {
         }
         Ok(())
     }
+}
+
+/// Re-order all child windows of the main window to the front.
+///
+/// This fixes macOS child window z-ordering: when the parent window gains
+/// keyboard focus, child windows can appear behind the parent's content.
+/// Calling this brings all **visible** child windows to the front using
+/// `NSWindow.orderFront:nil` (which does NOT steal keyboard focus).
+///
+/// Hidden child windows are skipped to avoid bypassing Tauri's state tracking.
+///
+/// On non-macOS platforms, this is a no-op.
+///
+/// **Must be called from the main thread** (Tauri event handlers are fine).
+pub fn order_child_windows_front() {
+    #[cfg(target_os = "macos")]
+    window_order::order_child_windows_front();
 }
 
 /// Initialize the decorum plugin.

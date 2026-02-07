@@ -255,9 +255,10 @@ export const ChatArea: FC = () => {
     />
   );
 
-  // Helper to create main content layout with configurable ActivityPanel terminal rendering
+  // Helper to create main content layout with configurable ActivityPanel rendering.
   // We need two versions because ActivityPanel appears in both layout divs (CSS display toggle),
-  // but only ONE should render the terminal to avoid duplicate xterm instances
+  // but only ONE should render the terminal (to avoid duplicate xterm instances)
+  // and only ONE should manage browser visibility (to avoid duplicate show/hide commands).
   const createMainContent = (canActivityRenderTerminal: boolean): JSX.Element => (
     <ResizablePanelGroup
       direction="horizontal"
@@ -281,7 +282,10 @@ export const ChatArea: FC = () => {
         maxSize={ACTIVITY_PANEL.MAX_WIDTH}
         visible={activityVisible}
       >
-        <ActivityPanel canRenderTerminal={canActivityRenderTerminal} />
+        <ActivityPanel
+          canRenderTerminal={canActivityRenderTerminal}
+          canManageBrowser={canActivityRenderTerminal}
+        />
       </ResizablePanel>
     </ResizablePanelGroup>
   );
