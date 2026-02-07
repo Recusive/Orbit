@@ -442,24 +442,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         const sdkSessionId = message.sdk_session_id;
         const currentSessionId = sessionIdRef.current;
 
-        // ── DIAGNOSTIC: Log system:init state ──
-        {
-          const toolStatePre = useToolStore.getState();
-          const hasPendingFork = useCheckpointStore
-            .getState()
-            .hasPendingConversationFork(currentSessionId);
-          logger.warn('[DIAG:INIT] system:init received', {
-            sdkSessionId,
-            currentSessionId,
-            willRemap: !!(sdkSessionId && currentSessionId && sdkSessionId !== currentSessionId),
-            hasPendingFork,
-            toolCountBefore: toolStatePre.completedTools.length,
-            toolStoreSessionId: toolStatePre.currentSessionId,
-            messageCount: messagesRef.current.length,
-            sidebarConversations: useUIStore.getState().conversations.map((c) => c.sessionId),
-          });
-        }
-
         if (sdkSessionId && currentSessionId && sdkSessionId !== currentSessionId) {
           // Mark the old temp ID so stale conversation:loaded responses are ignored
           remappedOrbitIds.add(currentSessionId);
@@ -520,24 +502,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           switchSession(sdkSessionId);
           // Remove stale temp entry from sidebar (if it appeared before remap)
           useUIStore.getState().removeConversation(currentSessionId);
-
-          // ── DIAGNOSTIC: Log state AFTER system:init remap ──
-          {
-            const toolStatePost = useToolStore.getState();
-            logger.warn('[DIAG:INIT] After system:init remap + switchSession', {
-              newSessionId: sdkSessionId,
-              removedSessionId: currentSessionId,
-              wasRewindFork: !!rewindMessageId,
-              toolCountAfter: toolStatePost.completedTools.length,
-              toolStoreSessionIdAfter: toolStatePost.currentSessionId,
-              toolEntriesAfter: toolStatePost.completedTools.map((t) => ({
-                toolId: t.id,
-                msgId: t.messageId,
-                name: t.toolName,
-              })),
-              sidebarAfterRemove: useUIStore.getState().conversations.map((c) => c.sessionId),
-            });
-          }
         } else if (!sessionIdRef.current || messagesRef.current.length === 0) {
           // No active session yet — adopt whatever session_id we received
           setSessionId(message.session_id);
@@ -733,23 +697,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // the file exists on disk. This is how new sessions appear in the sidebar
         // (Orbit is a pure reader — it never pre-adds sessions to the list).
         if (workspacePath) {
-          const sidebarBefore = useUIStore.getState().conversations.map((c) => c.sessionId);
           void conversationList(workspacePath).then((conversations) => {
             const summaries = toConversationSummaries(conversations);
-            // ── DIAGNOSTIC: Log sidebar refresh from disk ──
-            const newSessionIds = summaries.map((c) => c.sessionId);
-            const addedSessions = newSessionIds.filter((id) => !sidebarBefore.includes(id));
-            const removedSessions = sidebarBefore.filter((id) => !newSessionIds.includes(id));
-            if (addedSessions.length > 0 || removedSessions.length > 0) {
-              logger.warn('[DIAG:SIDEBAR] agent:complete disk refresh changed sidebar', {
-                activeSessionId: sessionIdRef.current,
-                sidebarBefore,
-                sidebarAfter: newSessionIds,
-                addedSessions,
-                removedSessions,
-                totalOnDisk: conversations.length,
-              });
-            }
             setConversations(summaries);
           });
         }
@@ -914,11 +863,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           const currentMsgs = messagesRef.current;
           if (currentSid && currentMsgs.length > 0 && currentSid !== message.session_id) {
             messagesCache.current.set(currentSid, currentMsgs);
-            logger.warn('[DIAG:LOAD] Cached outgoing session messages in conversation:loaded', {
-              cachedSessionId: currentSid,
-              messageCount: currentMsgs.length,
-              incomingSessionId: message.session_id,
-            });
           }
         }
 
@@ -987,11 +931,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               newMessages = backendMessages;
             } else if (backendMessages.length === 0) {
               // No backend - use cache directly (e.g., JSONL deleted by forkSessionAt)
-              logger.warn('[DIAG:LOAD] Using cache-only fallback (no backend messages)', {
-                sessionId: message.session_id,
-                cachedMessageCount: cachedMessages.length,
-                cachedMessageIds: cachedMessages.map((m) => m.id),
-              });
               newMessages = cachedMessages;
             } else {
               // Both exist - merge using backend as backbone + live trailing messages.
@@ -1112,26 +1051,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             setSessionId(message.session_id);
             setActiveConversation(message.session_id, message.title);
 
-            // ── DIAGNOSTIC: Pre-switchSession state ──
-            const preSwitchTools = useToolStore.getState().completedTools;
-            logger.warn('[DIAG:LOADED] Pre-switchSession', {
-              sessionId: message.session_id,
-              currentSessionId: useToolStore.getState().currentSessionId,
-              completedToolCount: preSwitchTools.length,
-              toolIds: preSwitchTools.map((t) => `${t.id}→${t.messageId}`),
-              newMessageIds: newMessages.map((m) => `${m.role}:${m.id}`),
-              backendMsgIds: backendMessages.map((m) => `${m.role}:${m.id}`),
-              activeChainSize: activeChainIds.size,
-            });
-
             switchSession(message.session_id);
-
-            // ── DIAGNOSTIC: Post-switchSession state ──
-            const postSwitchTools = useToolStore.getState().completedTools;
-            logger.warn('[DIAG:LOADED] Post-switchSession', {
-              completedToolCount: postSwitchTools.length,
-              toolIds: postSwitchTools.map((t) => `${t.id}→${t.messageId}`),
-            });
 
             // Restore tool executions from persisted messages (for tool widget display).
             // Only restore tools for messages in the active chain (orphaned branches excluded).
@@ -1139,15 +1059,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             // individual restoreToolsForMessage calls. startTransition only yields
             // between React renders, not between synchronous Zustand set() calls.
             // (Code review: Opus cycle 3, issue #1)
-            let restoredToolCount = 0;
             for (const m of message.messages) {
               if (activeChainIds.has(m.id) && m.toolUses.length > 0) {
-                logger.warn('[DIAG:LOADED] Restoring tools for message', {
-                  messageId: m.id,
-                  role: m.role,
-                  toolCount: m.toolUses.length,
-                  toolIds: m.toolUses.map((t) => t.id),
-                });
                 restoreToolsForMessage(
                   m.id,
                   m.toolUses.map((t) => ({
@@ -1159,17 +1072,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                     ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
                   }))
                 );
-                restoredToolCount += m.toolUses.length;
               }
             }
-
-            // ── DIAGNOSTIC: Post-restore state ──
-            const postRestoreTools = useToolStore.getState().completedTools;
-            logger.warn('[DIAG:LOADED] Post-restoreToolsForMessage', {
-              restoredToolCount,
-              completedToolCount: postRestoreTools.length,
-              toolIds: postRestoreTools.map((t) => `${t.id}→${t.messageId}`),
-            });
           });
         }, 0);
 
@@ -1190,32 +1094,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           displayedContent: m.content,
           ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
         }));
-
-        // ── DIAGNOSTIC: Log tool state BEFORE rewind ──
-        {
-          const toolState = useToolStore.getState();
-          const prevMessageIds = messagesRef.current.map((m) => m.id);
-          const rewoundMessageIds = rewoundMessages.map((m) => m.id);
-          const toolMessageIds = toolState.completedTools.map((t) => `${t.id}→msg:${t.messageId}`);
-          const toolUsesInPayload = message.messages
-            .filter((m) => m.toolUses && m.toolUses.length > 0)
-            .map((m) => ({ msgId: m.id, toolCount: m.toolUses?.length ?? 0 }));
-
-          logger.warn('[DIAG:REWIND] conversation:rewound received', {
-            sessionId: message.session_id,
-            newSessionId: message.new_session_id,
-            isSameSession: message.new_session_id === message.session_id,
-            rewindToMessageId: message.rewind_to_message_id,
-            prevMessageCount: prevMessageIds.length,
-            prevMessageIds,
-            rewoundMessageCount: rewoundMessageIds.length,
-            rewoundMessageIds,
-            completedToolCount: toolState.completedTools.length,
-            completedToolEntries: toolMessageIds,
-            toolUsesInPayload,
-            currentSessionId: toolState.currentSessionId,
-          });
-        }
 
         // CLAUDE CODE-STYLE REWIND:
         // If new_session_id === session_id, we're staying on the same session (no fork).
@@ -1286,30 +1164,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           }
         }
 
-        // ── DIAGNOSTIC: Log tool state AFTER rewind processing ──
-        {
-          const toolStateAfter = useToolStore.getState();
-          const rewoundMsgIds = rewoundMessages.map((m) => m.id);
-          const toolsMatchingRewound = toolStateAfter.completedTools.filter((t) =>
-            rewoundMsgIds.includes(t.messageId)
-          );
-          const toolsOrphaned = toolStateAfter.completedTools.filter(
-            (t) => !rewoundMsgIds.includes(t.messageId)
-          );
-
-          logger.warn('[DIAG:REWIND] After rewind processing', {
-            isSameSession,
-            toolRestorationRan: true,
-            totalCompletedTools: toolStateAfter.completedTools.length,
-            toolsMatchingRewoundMessages: toolsMatchingRewound.length,
-            toolsOrphaned: toolsOrphaned.map((t) => ({
-              toolId: t.id,
-              msgId: t.messageId,
-              name: t.toolName,
-            })),
-            rewoundMessageIds: rewoundMsgIds,
-          });
-        }
         break;
       }
 

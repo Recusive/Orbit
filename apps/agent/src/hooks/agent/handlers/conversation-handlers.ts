@@ -199,29 +199,24 @@ export async function handleConversationRewind(
     const checkpointStore = useCheckpointStore.getState();
     const rewindCheckpoints = checkpointStore.getRewindCheckpoints(session_id, user_message_id);
 
-    // Debug: Log checkpoint state
-    const sessionCheckpoints = checkpointStore.getSessionCheckpoints(session_id);
-    logger.debug('Rewind requested (Claude Code-style, same session)', {
-      session_id,
-      message_id,
-      user_message_id,
-      rewindCheckpoints,
-      sessionCheckpoints,
-    });
-
     // Step 2: Rewind files to the turn END checkpoint (file state after this message completed)
     // This restores all Write/Edit/NotebookEdit changes made after this point
     if (rewindCheckpoints?.rewindFiles) {
       try {
-        logger.debug('Calling agentRewindFiles with turnEnd checkpoint');
         await agentRewindFiles(session_id, rewindCheckpoints.rewindFiles);
-        logger.debug('Files rewound to checkpoint', { checkpoint: rewindCheckpoints.rewindFiles });
+        logger.debug('Files rewound to checkpoint', {
+          session_id,
+          checkpoint: rewindCheckpoints.rewindFiles,
+        });
       } catch (rewindErr) {
         // Log but continue with UI update even if file rewind fails
         logger.error('File rewind failed', rewindErr);
       }
     } else {
-      logger.debug('No checkpoints found for session, skipping file rewind');
+      logger.debug('No checkpoints found for file rewind', {
+        session_id,
+        user_message_id,
+      });
     }
 
     // Step 3: CRITICAL - Fork the session at the target message
