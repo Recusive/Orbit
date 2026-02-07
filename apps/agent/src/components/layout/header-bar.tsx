@@ -1,5 +1,5 @@
 import { IconSquareGridCircle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSquareGridCircle';
-import { Search } from 'lucide-react';
+import { Search, Terminal } from 'lucide-react';
 import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
@@ -63,19 +63,43 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
   const hasWorkspace = useHasWorkspace();
 
   // Use useShallow to prevent re-renders when unrelated store state changes
-  const { setActiveTab, toggleReviewPanel, toggleRightSidebar, reviewPanelOpen, rightSidebarOpen } =
-    useUIStore(
-      useShallow((s) => ({
-        setActiveTab: s.setActiveTab,
-        toggleReviewPanel: s.toggleReviewPanel,
-        toggleRightSidebar: s.toggleRightSidebar,
-        reviewPanelOpen: s.reviewPanelOpen,
-        rightSidebarOpen: s.rightSidebarOpen,
-      }))
-    );
+  const {
+    setActiveTab,
+    toggleReviewPanel,
+    toggleRightSidebar,
+    toggleBottomPanel,
+    setTerminalPosition,
+    reviewPanelOpen,
+    rightSidebarOpen,
+    bottomPanelOpen,
+  } = useUIStore(
+    useShallow((s) => ({
+      setActiveTab: s.setActiveTab,
+      toggleReviewPanel: s.toggleReviewPanel,
+      toggleRightSidebar: s.toggleRightSidebar,
+      toggleBottomPanel: s.toggleBottomPanel,
+      setTerminalPosition: s.setTerminalPosition,
+      reviewPanelOpen: s.reviewPanelOpen,
+      rightSidebarOpen: s.rightSidebarOpen,
+      bottomPanelOpen: s.bottomPanelOpen,
+    }))
+  );
 
   const handleOpenSearch = (): void => {
     window.dispatchEvent(new CustomEvent('openCommandPalette'));
+  };
+
+  // Smart terminal toggle: position depends on whether activity panel is open
+  const handleToggleTerminal = (): void => {
+    if (!bottomPanelOpen) {
+      // Opening terminal — choose position based on activity panel state
+      if (reviewPanelOpen) {
+        setTerminalPosition('activity');
+      } else {
+        setTerminalPosition('both');
+      }
+    }
+    toggleBottomPanel();
   };
 
   const searchText = workspaceName ?? 'Search...';
@@ -126,14 +150,15 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
 
       {/* Right section: Search + Action buttons */}
       {workspaceName ? (
-        <div className="flex items-center gap-1 h-full pr-3">
+        <div className="flex items-center gap-1 h-full pr-0.5">
           {/* Search button - pill style */}
           <button
             data-tauri-drag-region={false}
             className={cn(
-              'flex items-center gap-2 h-6 px-2.5 rounded-md',
+              'flex items-center gap-2 h-[30px] px-2.5 rounded-lg',
               'text-muted-foreground hover:text-foreground',
-              'hover:bg-muted/40 active:scale-[0.98]',
+              'bg-muted/40 dark:bg-background',
+              'hover:bg-muted/60 active:scale-[0.98]',
               'transition-all duration-150'
             )}
             title="Search files (⌘K)"
@@ -152,7 +177,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
           </button>
 
           {/* Panel toggles */}
-          <div className="flex items-center">
+          <div className="flex items-center gap-0.5 rounded-lg border border-border/50 px-1 py-0.5">
             {/* Activity Panel Toggle */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -196,6 +221,31 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
               <TooltipContent className="flex items-center gap-2">
                 <span>{reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}</span>
                 <Kbd className="bg-white/15 border-white/20">{getCommandKey()}B</Kbd>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Terminal Toggle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  data-tauri-drag-region={false}
+                  onClick={handleToggleTerminal}
+                  aria-label={bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}
+                  className={cn(
+                    'h-6 w-6 flex items-center justify-center rounded-md',
+                    'hover:bg-muted/40 active:scale-[0.98]',
+                    'transition-all duration-150',
+                    bottomPanelOpen
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Terminal className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="flex items-center gap-2">
+                <span>{bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}</span>
+                <Kbd className="bg-white/15 border-white/20">^J</Kbd>
               </TooltipContent>
             </Tooltip>
 

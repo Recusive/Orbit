@@ -22,11 +22,8 @@ import { useSourceControl } from './hooks/use-source-control';
 import type { SourceControlTabProps } from './types';
 
 import { cn } from '@/lib/utils';
-import { useUIStore } from '@/stores/ui/ui-store';
 
 export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = '' }) => {
-  const workspacePath = useUIStore((state) => state.workspacePath);
-
   const {
     // Status
     status,
@@ -36,6 +33,10 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     // File lists
     stagedFiles,
     unstagedFiles,
+
+    // Diffs
+    stagedDiffs,
+    unstagedDiffs,
 
     // Commit
     commitMessage,
@@ -75,7 +76,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     // Operations
     operationError,
     refresh,
-  } = useSourceControl({ workspacePath });
+  } = useSourceControl();
 
   // Loading state
   if (isLoading && !status) {
@@ -174,6 +175,8 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
         <ChangesList
           stagedFiles={stagedFiles}
           unstagedFiles={unstagedFiles}
+          stagedDiffs={stagedDiffs}
+          unstagedDiffs={unstagedDiffs}
           isStaging={isStaging}
           onStageFile={handleStageFile}
           onUnstageFile={handleUnstageFile}

@@ -85,6 +85,12 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
     }))
   );
 
+  const prevCollapsedRef = useRef(collapsed);
+  // Controls when terminal content becomes visible after opening.
+  // Stays false during the allotment animation so xterm resizes are invisible,
+  // then flips to true to fade content in with final correct dimensions.
+  const [contentReady, setContentReady] = useState(!collapsed);
+
   // State for inline tab renaming
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -97,6 +103,35 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
   const terminalContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const hasCreatedInitialSession = useRef(false);
   const previousWorkspacePath = useRef(workspacePath);
+
+  // Opening: keep content invisible during allotment animation (250ms),
+  // do a final layout, THEN reveal content with an opacity fade.
+  // Closing: hide content immediately (it's at h-0 so invisible anyway).
+  useEffect(() => {
+    if (prevCollapsedRef.current && !collapsed) {
+      // Opening — wait for animation to finish, layout, then reveal
+      setContentReady(false);
+      const timer = setTimeout(() => {
+        if (activeSessionId) {
+          const instance = terminalManager.getInstance(activeSessionId);
+          if (instance) {
+            instance.layout();
+          }
+        }
+        setContentReady(true);
+      }, 270);
+      prevCollapsedRef.current = collapsed;
+      return (): void => {
+        clearTimeout(timer);
+      };
+    }
+    if (!prevCollapsedRef.current && collapsed) {
+      // Closing — hide immediately
+      setContentReady(false);
+    }
+    prevCollapsedRef.current = collapsed;
+    return undefined;
+  }, [collapsed, activeSessionId, terminalManager]);
 
   // Reset hasCreatedInitialSession when workspace changes, so if all terminals are
   // closed, a new one will be created in the new workspace.
@@ -153,9 +188,10 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
   // Re-attach terminals when this mode becomes active (switching between Agent/Editor)
   // This is needed because React refs don't re-fire for already-mounted components
   // Using requestAnimationFrame for smoother visual transitions vs setTimeout
+  // Gated on contentReady (not collapsed) to avoid running during opening animation.
   const isThisModeActive = activeTab === mode;
   useEffect(() => {
-    if (!isThisModeActive || collapsed) return;
+    if (!isThisModeActive || !contentReady) return;
     if (!terminalManager.isInitialized()) return;
 
     // Use RAF to ensure DOM has updated after mode switch
@@ -175,7 +211,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
     return () => {
       cancelAnimationFrame(rafId);
     };
-  }, [isThisModeActive, collapsed, sessions, activeSessionId, terminalManager, mode]);
+  }, [isThisModeActive, contentReady, sessions, activeSessionId, terminalManager, mode]);
 
   // Callback to set container ref
   const setTerminalContainerRef = useCallback(
@@ -205,8 +241,9 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
   //
   // PERF: Debounced with RAF to avoid calling expensive fitAddon.fit() on every
   // frame during sidebar animation. The terminal only needs final dimensions.
+  // Gated on contentReady (not collapsed) so zero fit() calls happen during opening animation.
   useEffect(() => {
-    if (!activeSessionId || collapsed) return;
+    if (!activeSessionId || !contentReady) return;
 
     const panel = panelRef.current;
     if (!panel) return;
@@ -233,7 +270,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
       }
       observer.disconnect();
     };
-  }, [activeSessionId, terminalManager, collapsed]);
+  }, [activeSessionId, terminalManager, contentReady]);
 
   // Switch terminal with disableLayout to prevent expensive resize during DOM changes
   const handleSwitchTerminal = useCallback(
@@ -574,16 +611,24 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
           </button>
         </div>
       </header>
-      {/* Search bar - conditionally rendered */}
-      {!collapsed && showSearch ? (
-        <TerminalSearchBar
-          onFindNext={handleFindNext}
-          onFindPrevious={handleFindPrevious}
-          onClose={handleCloseSearch}
-          onClear={handleClearSearch}
-        />
-      ) : null}
-      {!collapsed ? (
+      {/* Terminal body — always mounted so xterm stays attached to its DOM containers.
+          Uses h-0 + opacity-0 when collapsed/animating so xterm resizes are invisible.
+          Content fades in only after the allotment animation finishes and final layout runs. */}
+      <div
+        className={cn(
+          'flex flex-col overflow-hidden transition-opacity duration-100 ease-out',
+          collapsed ? 'h-0 opacity-0 pointer-events-none' : 'flex-1',
+          !collapsed && (contentReady ? 'opacity-100' : 'opacity-0')
+        )}
+      >
+        {showSearch ? (
+          <TerminalSearchBar
+            onFindNext={handleFindNext}
+            onFindPrevious={handleFindPrevious}
+            onClose={handleCloseSearch}
+            onClear={handleClearSearch}
+          />
+        ) : null}
         <TerminalContextMenu
           onCopy={handleCopy}
           onPaste={handlePaste}
@@ -629,7 +674,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
             </div>
           </ContextMenuTrigger>
         </TerminalContextMenu>
-      ) : null}
+      </div>
     </div>
   );
 };

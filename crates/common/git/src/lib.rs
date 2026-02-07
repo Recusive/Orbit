@@ -376,8 +376,6 @@ pub fn unstage(path: &Path, files: &[&Path]) -> Result<()> {
     let repo = open(path)?;
     let head = repo.head().and_then(|h| h.peel_to_commit()).ok();
 
-    let head_tree = head.as_ref().and_then(|c| c.tree().ok());
-
     for file in files {
         let relative_path = if file.is_absolute() {
             file.strip_prefix(path).unwrap_or(file)
@@ -385,9 +383,9 @@ pub fn unstage(path: &Path, files: &[&Path]) -> Result<()> {
             file
         };
 
-        // Reset the file to HEAD state
-        if let Some(tree) = &head_tree {
-            repo.reset_default(Some(&tree.as_object().clone()), [relative_path])
+        // Reset the file to HEAD state (reset_default expects a committish, not a tree)
+        if let Some(commit) = &head {
+            repo.reset_default(Some(commit.as_object()), [relative_path])
                 .map_err(|e| {
                     Error::Git(format!(
                         "Failed to unstage {}: {e}",
@@ -492,7 +490,7 @@ pub fn get_diff(path: &Path) -> Result<Vec<FileDiff>> {
     let repo = open(path)?;
 
     let mut opts = DiffOptions::new();
-    let _self = opts.include_untracked(true);
+    let _self = opts.include_untracked(true).show_untracked_content(true);
 
     // Diff between index and workdir (unstaged changes)
     let diff = repo

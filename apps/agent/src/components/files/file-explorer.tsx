@@ -60,7 +60,7 @@ const GitStatusBadge: FC<GitStatusBadgeProps> = ({ status }) => {
   const style = GIT_STATUS_STYLES[status];
   return (
     <span
-      className={cn('text-xs font-bold shrink-0 w-4 text-center', style.color)}
+      className={cn('text-xs font-bold shrink-0 w-4 text-center mr-2', style.color)}
       title={style.title}
     >
       {style.label}

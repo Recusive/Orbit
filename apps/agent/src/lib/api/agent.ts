@@ -34,10 +34,20 @@ export interface AttachmentContentBlock {
     mediaType: string;
     data: string;
   };
-  content?: {
-    type: 'text';
-    text: string;
-  };
+  /** Plain text content (for type: 'text' attachments). Maps to Rust `text` field. */
+  text?: string;
+  /** Display name for the attachment (e.g., filename). */
+  name?: string;
+  /** File path for editor selection attachments. */
+  filePath?: string;
+  /** Start line number for editor selection attachments. */
+  lineStart?: number;
+  /** End line number for editor selection attachments. */
+  lineEnd?: number;
+  /** Terminal name for terminal output attachments. */
+  terminalName?: string;
+  /** Capture timestamp for terminal output attachments. */
+  timestamp?: string;
   title?: string;
   context?: string;
 }

@@ -405,16 +405,49 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   // Ref for terminal allotment - used to programmatically resize
   const terminalAllotmentRef = useRef<AllotmentHandle>(null);
 
-  // Resize terminal when bottomPanelOpen changes
+  // Animate terminal open/close in activity panel — same pattern as ChatArea.
+  // Temporarily adds .terminal-animate CSS class to enable height/top transitions,
+  // then removes it so manual drag resizing isn't affected.
+  const [terminalAnimating, setTerminalAnimating] = useState(false);
+  const prevBottomPanelOpen = useRef(bottomPanelOpen);
+
+  useEffect(() => {
+    if (prevBottomPanelOpen.current !== bottomPanelOpen && terminalPosition === 'activity') {
+      setTerminalAnimating(true);
+      const timer = setTimeout(() => {
+        setTerminalAnimating(false);
+      }, 300);
+      prevBottomPanelOpen.current = bottomPanelOpen;
+      return (): void => {
+        clearTimeout(timer);
+      };
+    }
+    prevBottomPanelOpen.current = bottomPanelOpen;
+    return undefined;
+  }, [bottomPanelOpen, terminalPosition]);
+
+  // Resize terminal when bottomPanelOpen changes.
+  // Opening: delay reset by one frame so .terminal-animate is in the DOM first.
+  // Closing: reset immediately (transition class applied from prior render).
   useEffect(() => {
     const allotment = terminalAllotmentRef.current;
     if (!allotment || terminalPosition !== 'activity') return;
 
-    // Reset to preferred sizes - allotment will respect minSize
+    if (bottomPanelOpen) {
+      const rafId = requestAnimationFrame(() => {
+        allotment.reset();
+      });
+      return (): void => {
+        cancelAnimationFrame(rafId);
+      };
+    }
     allotment.reset();
+    return undefined;
   }, [bottomPanelOpen, terminalPosition]);
 
   // Track terminal size when user drags - save to shared store
+  // PERF: Debounced to avoid triggering React re-renders on every drag frame.
+  const sizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleTerminalSizeChange = useCallback(
     (sizes: number[]): void => {
       const terminalSize = sizes[1];
@@ -423,8 +456,13 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
         terminalSize > TERMINAL_PANEL.DRAG_THRESHOLD &&
         bottomPanelOpen
       ) {
-        // Only save if it's a meaningful size (not collapsed)
-        setBottomPanelHeight(terminalSize);
+        if (sizeDebounceRef.current !== null) {
+          clearTimeout(sizeDebounceRef.current);
+        }
+        sizeDebounceRef.current = setTimeout(() => {
+          sizeDebounceRef.current = null;
+          setBottomPanelHeight(terminalSize);
+        }, 150);
       }
     },
     [bottomPanelOpen, setBottomPanelHeight]
@@ -645,7 +683,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
         <ResizablePanelGroup
           ref={terminalAllotmentRef}
           direction="vertical"
-          className="flex-1"
+          className={terminalAnimating ? 'flex-1 terminal-animate' : 'flex-1'}
           onChange={handleTerminalSizeChange}
         >
           <ResizablePanel minSize={0}>

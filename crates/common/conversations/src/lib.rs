@@ -128,6 +128,10 @@ enum JsonlLine {
         uuid: String,
         message: UserMessagePayload,
         timestamp: String,
+        /// SDK marks slash-command expansion messages as meta — these are internal
+        /// protocol messages (expanded prompt text) that should not render as user chat bubbles.
+        #[serde(default, rename = "isMeta")]
+        is_meta: bool,
     },
     #[serde(rename = "assistant")]
     Assistant {
@@ -163,15 +167,18 @@ enum UserContent {
 impl UserContent {
     fn to_text(&self) -> String {
         match self {
-            Self::Text(s) => s.clone(),
+            Self::Text(s) => clean_user_text(s),
             Self::Blocks(blocks) => {
-                let mut parts = Vec::new();
-                for block in blocks {
-                    if let Some(text) = block.get("text").and_then(serde_json::Value::as_str) {
-                        parts.push(text.to_owned());
-                    }
-                }
-                parts.join("\n")
+                // Return only the LAST text block — this is always the user's original
+                // typed text per buildContentBlocks() convention (attachments first, user
+                // text last). Earlier text blocks contain context metadata (file paths,
+                // command expansions) that should not render as user message content.
+                blocks
+                    .iter()
+                    .rev()
+                    .find_map(|b| b.get("text").and_then(serde_json::Value::as_str))
+                    .unwrap_or("")
+                    .to_owned()
             },
         }
     }
@@ -838,6 +845,12 @@ struct ParsedJsonl {
     last_timestamp: Option<u64>,
 }
 
+/// Tool result data extracted from `tool_result` content blocks.
+struct ToolResultData {
+    output: String,
+    is_error: bool,
+}
+
 /// Insert or replace a message in the dedup map.
 fn dedup_insert(
     raw_messages: &mut Vec<Message>,
@@ -884,6 +897,9 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
     let mut first_user_text: Option<String> = None;
     let mut first_timestamp: Option<u64> = None;
     let mut last_timestamp: Option<u64> = None;
+    // Collect tool results from tool_result-only user messages so we can
+    // backfill `output` onto the matching ToolUse entries in assistant messages.
+    let mut tool_results: HashMap<String, ToolResultData> = HashMap::new();
 
     for (line_num, line_result) in reader.lines().enumerate() {
         let Ok(line) = line_result else { continue };
@@ -897,9 +913,16 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
                 uuid,
                 message: payload,
                 timestamp,
+                is_meta,
                 ..
             }) => {
+                // Skip SDK meta messages (e.g., slash command expansion text).
+                // These are internal protocol messages, not real user input.
+                if is_meta {
+                    continue;
+                }
                 if payload.content.is_tool_result_only() {
+                    extract_tool_results(&payload.content, &mut tool_results);
                     continue;
                 }
 
@@ -961,6 +984,9 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
             },
         }
     }
+
+    // Backfill tool outputs onto assistant ToolUse entries.
+    backfill_tool_outputs(&mut raw_messages, tool_results);
 
     // Fall back to first user message text if no summary/custom-title was found.
     if title == "Untitled" {
@@ -1064,6 +1090,10 @@ fn extract_user_text_from_line(line: &str) -> Option<String> {
     if parsed.get("type").and_then(serde_json::Value::as_str) != Some("user") {
         return None;
     }
+    // Skip SDK meta messages (slash command expansions, etc.)
+    if parsed.get("isMeta").and_then(serde_json::Value::as_bool) == Some(true) {
+        return None;
+    }
     let msg = parsed.get("message")?;
     let content = msg.get("content")?;
 
@@ -1072,7 +1102,7 @@ fn extract_user_text_from_line(line: &str) -> Option<String> {
             if s.is_empty() {
                 return None;
             }
-            s.clone()
+            clean_user_text(s)
         },
         serde_json::Value::Array(blocks) => {
             let has_tool_result = blocks
@@ -1081,14 +1111,16 @@ fn extract_user_text_from_line(line: &str) -> Option<String> {
             if has_tool_result {
                 return None;
             }
-            let parts: Vec<&str> = blocks
+            // Use only the LAST text block (user's original text).
+            // Earlier blocks contain context metadata (file paths, command expansions).
+            let last_text = blocks
                 .iter()
-                .filter_map(|b| b.get("text").and_then(serde_json::Value::as_str))
-                .collect();
-            if parts.is_empty() {
-                return None;
+                .rev()
+                .find_map(|b| b.get("text").and_then(serde_json::Value::as_str));
+            match last_text {
+                Some(t) if !t.is_empty() => t.to_owned(),
+                _ => return None,
             }
-            parts.join(" ")
         },
         _ => return None,
     };
@@ -1172,6 +1204,72 @@ fn merge_consecutive_assistants(raw: Vec<Message>) -> Vec<Message> {
     }
 
     merged
+}
+
+/// Extract tool results from a `tool_result`-only user message into the collector map.
+///
+/// The Claude SDK stores tool outputs as separate user-type JSONL lines with
+/// `content: [{type: "tool_result", tool_use_id: "...", content: "output"}]`.
+/// This function extracts those outputs keyed by `tool_use_id` so they can be
+/// backfilled onto the corresponding `ToolUse` entries in assistant messages.
+fn extract_tool_results(content: &UserContent, results: &mut HashMap<String, ToolResultData>) {
+    if let UserContent::Blocks(blocks) = content {
+        for block in blocks {
+            if block.get("type").and_then(serde_json::Value::as_str) != Some("tool_result") {
+                continue;
+            }
+            let Some(tool_use_id) = block.get("tool_use_id").and_then(serde_json::Value::as_str)
+            else {
+                continue;
+            };
+
+            let output = match block.get("content") {
+                Some(serde_json::Value::String(s)) => s.clone(),
+                Some(serde_json::Value::Array(arr)) => {
+                    // Handle array-of-blocks content format:
+                    // [{type: "text", text: "..."}, ...]
+                    arr.iter()
+                        .filter_map(|b| b.get("text").and_then(serde_json::Value::as_str))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                },
+                _ => String::new(),
+            };
+
+            let is_error = block
+                .get("is_error")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false);
+
+            let _ = results.insert(tool_use_id.to_owned(), ToolResultData { output, is_error });
+        }
+    }
+}
+
+/// Match collected tool results to `ToolUse` entries in assistant messages.
+///
+/// After parsing all JSONL lines, tool_result user messages have been collected
+/// into a map keyed by `tool_use_id`. This function walks assistant messages and
+/// populates `output` and adjusts `success` for each matching tool use.
+fn backfill_tool_outputs(
+    messages: &mut [Message],
+    mut tool_results: HashMap<String, ToolResultData>,
+) {
+    if tool_results.is_empty() {
+        return;
+    }
+    for msg in messages.iter_mut() {
+        if msg.role == MessageRole::Assistant {
+            for tool in &mut msg.tool_uses {
+                if let Some(result) = tool_results.remove(&tool.id) {
+                    tool.output = Some(result.output);
+                    if result.is_error {
+                        tool.success = false;
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Extract text content, thinking, and tool uses from an assistant message.
@@ -1332,6 +1430,58 @@ fn current_timestamp() -> u64 {
 
 const fn default_true() -> bool {
     true
+}
+
+/// Strip the file context prefix that was prepended to user messages in older versions.
+///
+/// Old conversations stored file paths as a string prepend:
+/// "The user has attached the following files for context. ...\n- /path\n\nactual text"
+/// New conversations use separate content blocks instead. This function strips the
+/// old-style prefix so the user's original text renders cleanly on reload.
+fn strip_file_context_prefix(s: &str) -> String {
+    const PREFIX: &str = "The user has attached the following files for context.";
+    if s.starts_with(PREFIX) {
+        if let Some(idx) = s.find("\n\n") {
+            let rest = &s[idx + 2..];
+            if !rest.is_empty() {
+                return rest.to_owned();
+            }
+        }
+    }
+    s.to_owned()
+}
+
+/// Strip SDK command XML tags from user messages.
+///
+/// When the Claude SDK handles slash commands from `.claude/commands/` natively,
+/// it stores the user message with XML wrapping:
+///   `<command-name>/init</command-name>\n<command-message>init</command-message>`
+///
+/// For display, we extract just the command name (e.g., `/init`).
+fn strip_sdk_command_xml(s: &str) -> String {
+    const TAG_OPEN: &str = "<command-name>";
+    const TAG_CLOSE: &str = "</command-name>";
+
+    if let Some(start) = s.find(TAG_OPEN) {
+        if let Some(end) = s.find(TAG_CLOSE) {
+            let name_start = start + TAG_OPEN.len();
+            if name_start < end {
+                return s[name_start..end].to_owned();
+            }
+        }
+    }
+    s.to_owned()
+}
+
+/// Clean user message text for display by applying all stripping passes.
+///
+/// Handles three formats that can appear in JSONL:
+/// 1. Old-style file context prefix (plain string with prepended metadata)
+/// 2. SDK command XML tags (from `.claude/commands/` handled natively by SDK)
+/// 3. Clean text (returned as-is)
+fn clean_user_text(s: &str) -> String {
+    let stripped = strip_file_context_prefix(s);
+    strip_sdk_command_xml(&stripped)
 }
 
 /// Find the largest byte index at or before `index` that is a valid char boundary.
@@ -1641,6 +1791,65 @@ mod tests {
             Some(22),
             "Tool offset should account for preceding text from earlier lines"
         );
+
+        // Tool output should be backfilled from the tool_result user message.
+        assert_eq!(
+            conv.messages[1].tool_uses[0].output.as_deref(),
+            Some("file1.txt\nfile2.txt"),
+            "Tool output should be extracted from tool_result JSONL line"
+        );
+        assert!(
+            conv.messages[1].tool_uses[0].success,
+            "Tool without is_error should default to success"
+        );
+    }
+
+    #[test]
+    fn test_tool_output_backfill_multiple_tools_with_error() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Assistant uses two tools: Bash (succeeds) and Read (fails with is_error).
+        // Both tool_result lines appear as separate user messages.
+        let path = ws_dir.join("multi-tool-session.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"check files"},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Let me check."},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}},{"type":"tool_use","id":"t2","name":"Read","input":{"file_path":"/missing.txt"}}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+            // Both tool results in one user message (SDK batches them)
+            r#"{"type":"user","uuid":"tr1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"file1.txt\nfile2.txt"},{"type":"tool_result","tool_use_id":"t2","content":"Error: file not found","is_error":true}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:03.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"The file doesn't exist."}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:04.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("multi-tool-session", None)
+            .expect("load")
+            .expect("not found");
+
+        // user + merged assistant
+        assert_eq!(conv.messages.len(), 2);
+        let assistant = &conv.messages[1];
+        assert_eq!(assistant.tool_uses.len(), 2);
+
+        // First tool: Bash succeeded
+        assert_eq!(assistant.tool_uses[0].name, "Bash");
+        assert_eq!(
+            assistant.tool_uses[0].output.as_deref(),
+            Some("file1.txt\nfile2.txt")
+        );
+        assert!(assistant.tool_uses[0].success);
+
+        // Second tool: Read failed
+        assert_eq!(assistant.tool_uses[1].name, "Read");
+        assert_eq!(
+            assistant.tool_uses[1].output.as_deref(),
+            Some("Error: file not found")
+        );
+        assert!(
+            !assistant.tool_uses[1].success,
+            "Tool with is_error:true should have success=false"
+        );
     }
 
     #[test]
@@ -1711,6 +1920,173 @@ mod tests {
         assert_eq!(ws1[0].title, "WS1 Chat");
         assert_eq!(ws2.len(), 1);
         assert_eq!(ws2[0].title, "WS2 Chat");
+    }
+
+    // ============================================================================
+    // User content cleaning tests (file context, command XML, content blocks)
+    // ============================================================================
+
+    #[test]
+    fn test_content_blocks_extracts_last_text_block() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Message with multiple text blocks: file context first, user text last
+        let path = ws_dir.join("blocks-session.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":[{"type":"text","text":"The user has attached the following files for context. Use your Read tool to read them if needed:\n- /src/main.rs"},{"type":"text","text":"what does this do?"}]},"cwd":"/test","sessionId":"blocks-session","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"It's the entry point."}]},"cwd":"/test","sessionId":"blocks-session","timestamp":"2026-02-07T12:00:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("blocks-session", None)
+            .expect("load")
+            .expect("not found");
+
+        assert_eq!(conv.messages.len(), 2);
+        // Should only contain the last text block (user's original text)
+        assert_eq!(conv.messages[0].content, "what does this do?");
+    }
+
+    #[test]
+    fn test_strip_file_context_prefix_from_old_message() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Old-style message with file context prepended as a plain string
+        let path = ws_dir.join("old-file-context.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"The user has attached the following files for context. Use your Read tool to read them if needed:\n- /src/main.rs\n\nwhat does this do?"},"cwd":"/test","sessionId":"old-file-context","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"It's the entry point."}]},"cwd":"/test","sessionId":"old-file-context","timestamp":"2026-02-07T12:00:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("old-file-context", None)
+            .expect("load")
+            .expect("not found");
+
+        // Should strip the file context prefix, leaving only user's text
+        assert_eq!(conv.messages[0].content, "what does this do?");
+    }
+
+    #[test]
+    fn test_strip_sdk_command_xml_tags() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // SDK stores slash commands with XML wrapping
+        let path = ws_dir.join("cmd-xml-session.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"<command-name>/init</command-name>\n<command-message>init</command-message>"},"cwd":"/test","sessionId":"cmd-xml-session","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Analyzing codebase..."}]},"cwd":"/test","sessionId":"cmd-xml-session","timestamp":"2026-02-07T12:00:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("cmd-xml-session", None)
+            .expect("load")
+            .expect("not found");
+
+        // Should extract command name from XML, not show raw tags
+        assert_eq!(conv.messages[0].content, "/init");
+    }
+
+    #[test]
+    fn test_sdk_meta_messages_filtered_out() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // SDK stores slash commands as TWO user messages:
+        // 1. The command text with XML tags (isMeta absent or false)
+        // 2. The expanded prompt with isMeta: true
+        // Only the first should appear as a chat message.
+        let path = ws_dir.join("meta-session.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"<command-name>/init</command-name>\n<command-message>init</command-message>"},"cwd":"/test","sessionId":"meta-session","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+            r#"{"type":"user","uuid":"u2","parentUuid":"u1","isMeta":true,"message":{"role":"user","content":[{"type":"text","text":"Please analyze this codebase and create a CLAUDE.md file..."}]},"cwd":"/test","sessionId":"meta-session","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"I'll analyze the codebase."}]},"cwd":"/test","sessionId":"meta-session","timestamp":"2026-02-07T12:00:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("meta-session", None)
+            .expect("load")
+            .expect("not found");
+
+        // Should have 2 messages: command + assistant response (meta message filtered out)
+        assert_eq!(conv.messages.len(), 2);
+        assert_eq!(conv.messages[0].content, "/init");
+        assert_eq!(conv.messages[0].role, MessageRole::User);
+        assert_eq!(conv.messages[1].role, MessageRole::Assistant);
+    }
+
+    #[test]
+    fn test_plain_text_message_unchanged() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Normal plain text message should pass through unchanged
+        let path = ws_dir.join("plain-session.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"hello world"},"cwd":"/test","sessionId":"plain-session","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Hi!"}]},"cwd":"/test","sessionId":"plain-session","timestamp":"2026-02-07T12:00:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("plain-session", None)
+            .expect("load")
+            .expect("not found");
+
+        assert_eq!(conv.messages[0].content, "hello world");
+    }
+
+    #[test]
+    fn test_sidebar_title_strips_file_context() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Conversation with no summary — title falls back to first user message.
+        // Old-style file context prefix should be stripped from sidebar title.
+        let path = ws_dir.join("sidebar-strip.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"The user has attached the following files for context. Use your Read tool to read them if needed:\n- /src/main.rs\n\nreview this file"},"cwd":"/test","sessionId":"sidebar-strip","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let summaries = manager
+            .load_summaries_for_workspace(None)
+            .expect("load summaries");
+        let s = summaries.iter().find(|s| s.session_id == "sidebar-strip");
+        assert_eq!(s.expect("found").title, "review this file");
+    }
+
+    #[test]
+    fn test_sidebar_title_strips_command_xml() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // No summary — title falls back to first user message with SDK command XML
+        let path = ws_dir.join("sidebar-cmd.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"<command-name>/review-branch</command-name>\n<command-message>review-branch</command-message>"},"cwd":"/test","sessionId":"sidebar-cmd","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let summaries = manager
+            .load_summaries_for_workspace(None)
+            .expect("load summaries");
+        let s = summaries.iter().find(|s| s.session_id == "sidebar-cmd");
+        assert_eq!(s.expect("found").title, "/review-branch");
     }
 
     #[test]

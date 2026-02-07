@@ -2,18 +2,33 @@
  * useSourceControl - Git state management hook
  *
  * Consolidates all git operations and state for the source control tab.
+ *
+ * NOTE: Git status polling is handled globally by useGitPolling (mounted in RootLayout).
+ * This hook reads from the shared GitStore and provides operations (stage, commit, etc.).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { GIT_STATUS_POLL_INTERVAL, OPERATION_ERROR_TIMEOUT } from '../constants';
+import { OPERATION_ERROR_TIMEOUT } from '../constants';
 
 import type { DisplayFileStatus, FileItem } from '../types';
-import type { FileStatus as BackendFileStatus, GitSettings } from '@/lib/api';
+import type { FileStatus as BackendFileStatus, FileDiff } from '@/lib/api';
+import type { GitBranch, GitStatus } from '@/stores/git/git-store';
 
-import { useAutoFetch } from '@/hooks/git/use-auto-fetch';
-import { useGitStatus } from '@/hooks/git/use-git-status';
-import { useEffectivePath } from '@/hooks/use-effective-path';
-import { getSettings } from '@/lib/api';
+import {
+  gitBranches,
+  gitCheckout,
+  gitCommit,
+  gitDiffStructured,
+  gitDiscard,
+  gitFetch,
+  gitPull,
+  gitPush,
+  gitStage,
+  gitStagedDiff,
+  gitStatus,
+  gitUnstage,
+} from '@/lib/api';
+import { useGitStore } from '@/stores/git/git-store';
 
 /** Convert backend status to display status */
 const toDisplayStatus = (backendStatus: BackendFileStatus): DisplayFileStatus => {
@@ -39,13 +54,9 @@ const toDisplayStatus = (backendStatus: BackendFileStatus): DisplayFileStatus =>
   }
 };
 
-export interface UseSourceControlOptions {
-  workspacePath: string | null;
-}
-
 export interface UseSourceControlReturn {
   // Status
-  status: ReturnType<typeof useGitStatus>['status'];
+  status: GitStatus | null;
   isLoading: boolean;
   error: string | null;
 
@@ -53,6 +64,10 @@ export interface UseSourceControlReturn {
   stagedFiles: FileItem[];
   unstagedFiles: FileItem[];
   hasChanges: boolean;
+
+  // Diffs (structured, per-file)
+  stagedDiffs: FileDiff[];
+  unstagedDiffs: FileDiff[];
 
   // Commit
   commitMessage: string;
@@ -81,7 +96,7 @@ export interface UseSourceControlReturn {
   handlePull: () => Promise<void>;
 
   // Branches
-  branches: ReturnType<typeof useGitStatus>['branches'];
+  branches: GitBranch[];
   isCheckingOut: boolean;
   handleCheckout: (branch: string) => Promise<void>;
 
@@ -95,32 +110,15 @@ export interface UseSourceControlReturn {
   refresh: () => Promise<void>;
 }
 
-export function useSourceControl({
-  workspacePath,
-}: UseSourceControlOptions): UseSourceControlReturn {
-  // Use the effective path (active worktree or main workspace) for git operations
-  // This ensures git status/commit/push/pull target the correct worktree directory
-  const effectivePath = useEffectivePath();
-  const gitPath = effectivePath ?? workspacePath;
-
-  const {
-    status,
-    repoPath,
-    isLoading,
-    error,
-    refresh,
-    stage: gitStage,
-    unstage: gitUnstage,
-    commit: gitCommit,
-    discard: gitDiscard,
-    push: gitPush,
-    pull: gitPull,
-    branches,
-    listBranches,
-    checkout: gitCheckout,
-  } = useGitStatus(gitPath, {
-    pollInterval: GIT_STATUS_POLL_INTERVAL, // Extracted constant
-  });
+export function useSourceControl(): UseSourceControlReturn {
+  // Read all git state from the shared GitStore (populated by useGitPolling in RootLayout)
+  const status = useGitStore((s) => s.status);
+  const repoPath = useGitStore((s) => s.repoPath);
+  const isLoading = useGitStore((s) => s.isLoading);
+  const error = useGitStore((s) => s.error);
+  const branches = useGitStore((s) => s.branches);
+  const isFetching = useGitStore((s) => s.isFetching);
+  const lastFetchedAt = useGitStore((s) => s.lastFetchedAt);
 
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
@@ -132,36 +130,59 @@ export function useSourceControl({
   const [operationError, setOperationError] = useState<string | null>(null);
   const [pendingDiscard, setPendingDiscard] = useState<string | null>(null);
 
-  // Git settings for auto-fetch
-  const [gitSettings, setGitSettings] = useState<GitSettings | null>(null);
-
-  // Load git settings on mount
-  useEffect(() => {
-    void getSettings().then((settings) => {
-      setGitSettings(settings.git);
-    });
-  }, []);
-
-  // Auto-fetch hook
-  const {
-    fetch: autoFetch,
-    isFetching,
-    lastFetchedAt,
-  } = useAutoFetch(repoPath, {
-    enabled: gitSettings?.autoFetchEnabled ?? true,
-    intervalSeconds: gitSettings?.autoFetchInterval ?? 180,
-    pauseWhenHidden: true,
-  });
+  // Structured diffs for inline diff view
+  const [stagedDiffs, setStagedDiffs] = useState<FileDiff[]>([]);
+  const [unstagedDiffs, setUnstagedDiffs] = useState<FileDiff[]>([]);
 
   // Track ongoing operations to prevent concurrent actions
   const operationInProgress = useRef(false);
 
-  // Fetch branches when status loads
-  useEffect(() => {
-    if (status) {
-      void listBranches();
+  /** Fetch structured diffs for both staged and unstaged changes */
+  const fetchDiffs = useCallback(async (): Promise<void> => {
+    const repo = useGitStore.getState().repoPath;
+    if (!repo) return;
+    try {
+      const [staged, unstaged] = await Promise.all([gitStagedDiff(repo), gitDiffStructured(repo)]);
+      setStagedDiffs(staged);
+      setUnstagedDiffs(unstaged);
+    } catch {
+      // Diffs are an optional visual enhancement — don't block on failure
     }
-  }, [status, listBranches]);
+  }, []);
+
+  // Fetch branches when status first becomes available (for branch selector)
+  useEffect(() => {
+    if (status && repoPath) {
+      void gitBranches(repoPath).then((branchList) => {
+        useGitStore.getState().setBranches(branchList);
+      });
+    }
+  }, [status, repoPath]);
+
+  // Re-fetch diffs whenever status changes (picks up new files, external modifications, etc.)
+  useEffect(() => {
+    if (status && repoPath) {
+      void fetchDiffs();
+    }
+  }, [status, repoPath, fetchDiffs]);
+
+  /** Refresh git status by calling the API and writing to the store */
+  const refreshStatus = useCallback(async (): Promise<void> => {
+    const repo = useGitStore.getState().repoPath;
+    if (!repo) return;
+    const result = await gitStatus(repo);
+    useGitStore.getState().setStatus(result);
+    // Fire-and-forget: refresh diffs after status is updated
+    void fetchDiffs();
+  }, [fetchDiffs]);
+
+  /** Refresh branches from the repository */
+  const refreshBranches = useCallback(async (): Promise<void> => {
+    const repo = useGitStore.getState().repoPath;
+    if (!repo) return;
+    const branchList = await gitBranches(repo);
+    useGitStore.getState().setBranches(branchList);
+  }, []);
 
   // Build file lists from git status
   const stagedFiles = useMemo<FileItem[]>(
@@ -205,18 +226,19 @@ export function useSourceControl({
   const clearOperationError = useCallback((): void => {
     setTimeout(() => {
       setOperationError(null);
-    }, OPERATION_ERROR_TIMEOUT); // Extracted constant
+    }, OPERATION_ERROR_TIMEOUT);
   }, []);
 
   // Stage handlers
   const handleStageFile = useCallback(
     async (path: string): Promise<void> => {
-      if (operationInProgress.current) return;
+      if (operationInProgress.current || !repoPath) return;
       operationInProgress.current = true;
       setIsStaging(true);
       setOperationError(null);
       try {
-        await gitStage([path]);
+        await gitStage(repoPath, [path]);
+        await refreshStatus();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setOperationError(`Failed to stage: ${message}`);
@@ -226,17 +248,18 @@ export function useSourceControl({
         operationInProgress.current = false;
       }
     },
-    [gitStage, clearOperationError]
+    [repoPath, refreshStatus, clearOperationError]
   );
 
   const handleUnstageFile = useCallback(
     async (path: string): Promise<void> => {
-      if (operationInProgress.current) return;
+      if (operationInProgress.current || !repoPath) return;
       operationInProgress.current = true;
       setIsStaging(true);
       setOperationError(null);
       try {
-        await gitUnstage([path]);
+        await gitUnstage(repoPath, [path]);
+        await refreshStatus();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setOperationError(`Failed to unstage: ${message}`);
@@ -246,11 +269,11 @@ export function useSourceControl({
         operationInProgress.current = false;
       }
     },
-    [gitUnstage, clearOperationError]
+    [repoPath, refreshStatus, clearOperationError]
   );
 
   const handleStageAll = useCallback(async (): Promise<void> => {
-    if (operationInProgress.current) return;
+    if (operationInProgress.current || !repoPath) return;
     const allPaths = unstagedFiles.map((f) => f.path);
     if (allPaths.length === 0) return;
 
@@ -258,7 +281,8 @@ export function useSourceControl({
     setIsStaging(true);
     setOperationError(null);
     try {
-      await gitStage(allPaths);
+      await gitStage(repoPath, allPaths);
+      await refreshStatus();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setOperationError(`Failed to stage all: ${message}`);
@@ -267,10 +291,10 @@ export function useSourceControl({
       setIsStaging(false);
       operationInProgress.current = false;
     }
-  }, [unstagedFiles, gitStage, clearOperationError]);
+  }, [repoPath, unstagedFiles, refreshStatus, clearOperationError]);
 
   const handleUnstageAll = useCallback(async (): Promise<void> => {
-    if (operationInProgress.current) return;
+    if (operationInProgress.current || !repoPath) return;
     const allPaths = stagedFiles.map((f) => f.path);
     if (allPaths.length === 0) return;
 
@@ -278,7 +302,8 @@ export function useSourceControl({
     setIsStaging(true);
     setOperationError(null);
     try {
-      await gitUnstage(allPaths);
+      await gitUnstage(repoPath, allPaths);
+      await refreshStatus();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setOperationError(`Failed to unstage all: ${message}`);
@@ -287,7 +312,7 @@ export function useSourceControl({
       setIsStaging(false);
       operationInProgress.current = false;
     }
-  }, [stagedFiles, gitUnstage, clearOperationError]);
+  }, [repoPath, stagedFiles, refreshStatus, clearOperationError]);
 
   // Discard handlers
   const handleRequestDiscard = useCallback((path: string): void => {
@@ -299,7 +324,7 @@ export function useSourceControl({
   }, []);
 
   const handleConfirmDiscard = useCallback(async (): Promise<void> => {
-    if (!pendingDiscard || operationInProgress.current) return;
+    if (!pendingDiscard || operationInProgress.current || !repoPath) return;
 
     operationInProgress.current = true;
     setOperationError(null);
@@ -307,7 +332,8 @@ export function useSourceControl({
     setPendingDiscard(null);
 
     try {
-      await gitDiscard([pathToDiscard]);
+      await gitDiscard(repoPath, [pathToDiscard]);
+      await refreshStatus();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setOperationError(`Failed to discard: ${message}`);
@@ -315,11 +341,16 @@ export function useSourceControl({
     } finally {
       operationInProgress.current = false;
     }
-  }, [pendingDiscard, gitDiscard, clearOperationError]);
+  }, [pendingDiscard, repoPath, refreshStatus, clearOperationError]);
 
   // Commit handler
   const handleCommit = useCallback(async (): Promise<void> => {
-    if (!commitMessage.trim() || stagedFiles.length === 0 || operationInProgress.current) {
+    if (
+      !commitMessage.trim() ||
+      stagedFiles.length === 0 ||
+      operationInProgress.current ||
+      !repoPath
+    ) {
       return;
     }
 
@@ -327,8 +358,9 @@ export function useSourceControl({
     setIsCommitting(true);
     setCommitError(null);
     try {
-      await gitCommit(commitMessage.trim());
+      await gitCommit(repoPath, commitMessage.trim());
       setCommitMessage('');
+      await refreshStatus();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setCommitError(message);
@@ -336,16 +368,17 @@ export function useSourceControl({
       setIsCommitting(false);
       operationInProgress.current = false;
     }
-  }, [commitMessage, stagedFiles.length, gitCommit]);
+  }, [commitMessage, stagedFiles.length, repoPath, refreshStatus]);
 
   // Push/Pull handlers
   const handlePush = useCallback(async (): Promise<void> => {
-    if (operationInProgress.current) return;
+    if (operationInProgress.current || !repoPath) return;
     operationInProgress.current = true;
     setIsPushing(true);
     setOperationError(null);
     try {
-      await gitPush();
+      await gitPush(repoPath);
+      await refreshStatus();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setOperationError(`Push failed: ${message}`);
@@ -354,15 +387,16 @@ export function useSourceControl({
       setIsPushing(false);
       operationInProgress.current = false;
     }
-  }, [gitPush, clearOperationError]);
+  }, [repoPath, refreshStatus, clearOperationError]);
 
   const handlePull = useCallback(async (): Promise<void> => {
-    if (operationInProgress.current) return;
+    if (operationInProgress.current || !repoPath) return;
     operationInProgress.current = true;
     setIsPulling(true);
     setOperationError(null);
     try {
-      await gitPull();
+      await gitPull(repoPath);
+      await refreshStatus();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setOperationError(`Pull failed: ${message}`);
@@ -371,17 +405,19 @@ export function useSourceControl({
       setIsPulling(false);
       operationInProgress.current = false;
     }
-  }, [gitPull, clearOperationError]);
+  }, [repoPath, refreshStatus, clearOperationError]);
 
   // Checkout handler
   const handleCheckout = useCallback(
     async (branch: string): Promise<void> => {
-      if (operationInProgress.current) return;
+      if (operationInProgress.current || !repoPath) return;
       operationInProgress.current = true;
       setIsCheckingOut(true);
       setOperationError(null);
       try {
-        await gitCheckout(branch);
+        await gitCheckout(repoPath, branch);
+        await refreshStatus();
+        await refreshBranches();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setOperationError(`Checkout failed: ${message}`);
@@ -391,7 +427,7 @@ export function useSourceControl({
         operationInProgress.current = false;
       }
     },
-    [gitCheckout, clearOperationError]
+    [repoPath, refreshStatus, refreshBranches, clearOperationError]
   );
 
   // Wrapper for setCommitMessage that clears commit error
@@ -400,23 +436,26 @@ export function useSourceControl({
     setCommitError(null);
   }, []);
 
-  // Fetch handler - wraps autoFetch with error handling for UI
+  // Fetch handler - calls git fetch API directly + refreshes status
   const handleFetch = useCallback(async (): Promise<void> => {
-    if (operationInProgress.current) return;
+    if (operationInProgress.current || !repoPath) return;
     operationInProgress.current = true;
     setOperationError(null);
+    const store = useGitStore.getState();
+    store.setFetching(true);
     try {
-      await autoFetch();
-      // Refresh status after fetch to show updated ahead/behind
-      await refresh();
+      await gitFetch(repoPath);
+      useGitStore.getState().setLastFetchedAt(Date.now());
+      await refreshStatus();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setOperationError(`Fetch failed: ${message}`);
       clearOperationError();
     } finally {
+      useGitStore.getState().setFetching(false);
       operationInProgress.current = false;
     }
-  }, [autoFetch, refresh, clearOperationError]);
+  }, [repoPath, refreshStatus, clearOperationError]);
 
   return {
     // Status
@@ -428,6 +467,10 @@ export function useSourceControl({
     stagedFiles,
     unstagedFiles,
     hasChanges,
+
+    // Diffs
+    stagedDiffs,
+    unstagedDiffs,
 
     // Commit
     commitMessage,
@@ -467,6 +510,6 @@ export function useSourceControl({
 
     // Operations
     operationError,
-    refresh,
+    refresh: refreshStatus,
   };
 }

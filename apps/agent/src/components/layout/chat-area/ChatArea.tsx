@@ -9,7 +9,7 @@
  * To change chat max-width or CSS variable names,
  * update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts - DO NOT hardcode here.
  */
-import { lazy, Suspense, useCallback, useEffect, useRef } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
 import { ChatContent } from './ChatContent';
 import { useLayoutStabilization } from './use-layout-stabilization';
@@ -125,17 +125,51 @@ export const ChatArea: FC = () => {
   // Ref for terminal allotment - used to programmatically resize
   const terminalAllotmentRef = useRef<AllotmentHandle>(null);
 
-  // Resize terminal when bottomPanelOpen changes
+  // Animate terminal open/close by temporarily adding CSS transition to allotment panes.
+  // The .terminal-animate class enables height/top transitions for 300ms, then is removed
+  // so manual drag resizing isn't affected.
+  const [terminalAnimating, setTerminalAnimating] = useState(false);
+  const prevBottomPanelOpen = useRef(bottomPanelOpen);
+
+  useEffect(() => {
+    if (prevBottomPanelOpen.current !== bottomPanelOpen) {
+      setTerminalAnimating(true);
+      const timer = setTimeout(() => {
+        setTerminalAnimating(false);
+      }, 300);
+      prevBottomPanelOpen.current = bottomPanelOpen;
+      return (): void => {
+        clearTimeout(timer);
+      };
+    }
+    return undefined;
+  }, [bottomPanelOpen]);
+
+  // Resize terminal when bottomPanelOpen changes.
+  // When opening, delay reset by one frame so the CSS transition class is applied
+  // BEFORE allotment changes sizes — otherwise allotment snaps instantly.
   useEffect(() => {
     const allotment = terminalAllotmentRef.current;
     if (!allotment) return;
 
-    // Reset to preferred sizes - allotment will respect minSize
+    if (bottomPanelOpen) {
+      // Opening — wait one frame for .terminal-animate to be in the DOM
+      const rafId = requestAnimationFrame(() => {
+        allotment.reset();
+      });
+      return (): void => {
+        cancelAnimationFrame(rafId);
+      };
+    }
+    // Closing — reset immediately (transition class is already applied from previous render)
     allotment.reset();
+    return undefined;
   }, [bottomPanelOpen]);
 
   // Track terminal size when user drags - save to shared store
-  // PERF: Use getState() inside callback to avoid subscription to action
+  // PERF: Debounced to avoid triggering React re-renders on every drag frame.
+  // The store update changes preferredSize props which causes allotment to recalculate.
+  const sizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleTerminalSizeChange = useCallback(
     (sizes: number[]): void => {
       const terminalSize = sizes[1];
@@ -144,8 +178,13 @@ export const ChatArea: FC = () => {
         terminalSize > TERMINAL_PANEL.DRAG_THRESHOLD &&
         bottomPanelOpen
       ) {
-        // Only save if it's a meaningful size (not collapsed)
-        useUIStore.getState().setBottomPanelHeight(terminalSize);
+        if (sizeDebounceRef.current !== null) {
+          clearTimeout(sizeDebounceRef.current);
+        }
+        sizeDebounceRef.current = setTimeout(() => {
+          sizeDebounceRef.current = null;
+          useUIStore.getState().setBottomPanelHeight(terminalSize);
+        }, 150);
       }
     },
     [bottomPanelOpen]
@@ -232,7 +271,7 @@ export const ChatArea: FC = () => {
         <ResizablePanelGroup
           ref={terminalAllotmentRef}
           direction="vertical"
-          className="flex-1"
+          className={terminalAnimating ? 'flex-1 terminal-animate' : 'flex-1'}
           onChange={handleTerminalSizeChange}
         >
           <ResizablePanel minSize={0}>

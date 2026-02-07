@@ -46,14 +46,17 @@ export async function handleMessageSend(
       }
     }
 
-    // Prepend attached file paths so the agent knows which files the user is referencing.
-    // The agent can then use its Read tool to inspect file contents on demand,
-    // avoiding blowing the context window with large files.
-    let contentToSend = message.content;
+    // Attach file paths as a separate text content block so the agent knows
+    // which files the user is referencing. Sent as an attachment (not prepended
+    // to the message string) so the original user text is preserved in JSONL
+    // and renders cleanly on conversation reload.
+    const contentToSend = message.content;
     if (message.context?.files && message.context.files.length > 0) {
       const fileList = message.context.files.map((f) => `- ${f}`).join('\n');
-      const fileContext = `The user has attached the following files for context. Use your Read tool to read them if needed:\n${fileList}\n\n`;
-      contentToSend = fileContext + contentToSend;
+      attachments.push({
+        type: 'text',
+        text: `The user has attached the following files for context. Use your Read tool to read them if needed:\n${fileList}`,
+      });
     }
 
     // NOTE: The old rewind system prepended XML conversation context here.

@@ -1197,17 +1197,19 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       throw new Error('Session not started. Call startSession() first.');
     }
 
-    // Expand custom slash commands before sending to SDK
-    // The SDK only knows about commands in .claude/commands/ on disk,
-    // but our built-in/default commands are defined in code
-    let expandedMessage = message;
+    // Expand custom slash commands before sending to SDK.
+    // The expansion is sent as a text attachment (not replacing the message)
+    // so the original command text is preserved in JSONL and renders cleanly
+    // on conversation reload (instead of showing the full expanded prompt).
+    let attachmentsToSend = attachments;
     if (message.startsWith('/')) {
       const expanded = this.expandSlashCommand(message);
       if (expanded !== null) {
-        expandedMessage = expanded;
+        const expansionBlock: AttachmentContentBlock = { type: 'text', text: expanded };
+        attachmentsToSend = [expansionBlock, ...(attachments ?? [])];
         logger.info(
           { originalCommand: message.split(' ')[0], expandedLength: expanded.length },
-          'Expanded slash command to prompt content'
+          'Expanded slash command to text attachment'
         );
       }
     }
@@ -1232,14 +1234,13 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         acceptMode: this._acceptMode,
         critiqueMode: this._critiqueMode,
         sessionMode: this._sessionMode,
-        messagePreview:
-          expandedMessage.substring(0, 80) + (expandedMessage.length > 80 ? '...' : ''),
-        attachmentCount: attachments?.length ?? 0,
+        messagePreview: message.substring(0, 80) + (message.length > 80 ? '...' : ''),
+        attachmentCount: attachmentsToSend?.length ?? 0,
       },
       // allow-any-unicode-next-line
       'Sending message to Claude'
     );
-    this.messageQueue.add(expandedMessage, attachments);
+    this.messageQueue.add(message, attachmentsToSend);
   }
 
   /**
@@ -1268,6 +1269,17 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
 
     if (command === undefined) {
       logger.debug({ commandName }, 'Command not found in definitions, passing through to SDK');
+      return null;
+    }
+
+    // Only expand Orbit's default commands (defined in code, not on disk).
+    // Project and personal commands from .claude/commands/ are handled
+    // natively by the SDK, which preserves original text in JSONL via XML wrapping.
+    if (command.scope !== 'default') {
+      logger.debug(
+        { commandName, scope: command.scope },
+        'Passing user command to SDK for native handling'
+      );
       return null;
     }
 
