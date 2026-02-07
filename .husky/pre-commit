@@ -1,3 +1,5 @@
+export PATH="$HOME/.bun/bin:$PATH"
+
 # Frontend linting
 bunx lint-staged
 

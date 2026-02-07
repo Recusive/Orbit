@@ -1,3 +1,5 @@
+export PATH="$HOME/.bun/bin:$PATH"
+
 echo "Running checks before push..."
 
 # Frontend - all typechecks
