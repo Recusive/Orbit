@@ -127,7 +127,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   return (
     <aside
       data-sidebar="primary"
-      className="h-full flex flex-col bg-card overflow-hidden border-r-[3px] border-border/50"
+      className="h-full flex flex-col bg-card overflow-hidden border-r border-border/50"
       style={{
         width,
         transition: SIDEBAR_WIDTH_TRANSITION,
@@ -210,7 +210,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       >
         <button
           onClick={handleOpenQuickSearch}
-          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border-[3px] border-border/50 w-full bg-muted/40 hover:bg-muted/60 hover:border-border/60 transition-[background-color,border-color,color] duration-200"
+          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border-[3px] border-border/50 dark:border-transparent w-full bg-muted/40 dark:bg-background hover:bg-muted/60 hover:border-border/60 transition-[background-color,border-color,color] duration-200"
           title="Search files (⌘P)"
         >
           {/* Fixed-width icon column - never moves */}
@@ -235,7 +235,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       <div
         className={cn(
           'flex items-center shrink-0 px-1.5 gap-0.5 overflow-visible transition-opacity duration-150 ease-out',
-          isCollapsed ? '' : 'border-b-[3px] border-border/50'
+          isCollapsed ? '' : 'border-b border-border/50'
         )}
         style={{
           height: isCollapsed ? 0 : SIDEBAR.tabNavHeight,
@@ -262,7 +262,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {activeTab === 'conversations' ? (
         <div
           className={cn(
-            'flex flex-col border-b-[3px] border-border/50 shrink-0',
+            'flex flex-col border-b border-border/50 shrink-0',
             isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
           )}
         >
@@ -348,7 +348,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         )}
       </div>
 
-      <hr className="border-border/50 border-t-[3px] shrink-0 mt-2 mb-0" />
+      <hr className="border-border/50 border-t shrink-0 mt-2 mb-0" />
 
       {/* Utilities — pinned to bottom, spacing stays constant so buttons don't shift on collapse */}
       <div className="flex flex-col shrink-0 gap-1 py-1.5">

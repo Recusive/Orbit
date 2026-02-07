@@ -21,18 +21,18 @@ html.dark {
   --focus-border: var(--primary) !important;
 }
 
-/* ── Separator width: 3px (matches app's 3px border system) ── */
+/* ── Separator width: 1px (matches app's 1px border system) ── */
 
 /* Vertical layout → horizontal separator (top border of second pane) */
 .allotment-module_vertical__WSwwa.allotment-module_separatorBorder__x-rDS
   > .allotment-module_splitViewContainer__rQnVa
   > .allotment-module_splitViewView__MGZ6O:not(:first-child)::before {
-  height: 3px !important;
+  height: 1px !important;
 }
 
 /* Horizontal layout → vertical separator (left border of second pane) */
 .allotment-module_horizontal__7doS8.allotment-module_separatorBorder__x-rDS
   > .allotment-module_splitViewContainer__rQnVa
   > .allotment-module_splitViewView__MGZ6O:not(:first-child)::before {
-  width: 3px !important;
+  width: 1px !important;
 }

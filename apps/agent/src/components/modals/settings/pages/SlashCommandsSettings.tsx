@@ -267,7 +267,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-60 bg-black/40 backdrop-blur-sm flex items-center justify-center" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-60 bg-black/40 flex items-center justify-center" />
         {/* Flexbox centering wrapper - avoids blurry text from transform translate(-50%) subpixel issues */}
         <div className="fixed inset-0 z-60 flex items-center justify-center pointer-events-none">
           <DialogPrimitive.Content

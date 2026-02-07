@@ -94,7 +94,7 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
       className={cn(
         'flex flex-col items-center justify-center h-full w-full',
         'min-w-[420px] mx-auto p-12 gap-10 box-border',
-        'bg-background select-none',
+        'bg-card select-none',
         className
       )}
     >
@@ -176,7 +176,7 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
                 className={cn(
                   'group flex items-center gap-3 px-2 py-2 rounded-xl cursor-pointer',
                   'transition-[background-color] duration-150 ease',
-                  'hover:bg-card/80',
+                  'hover:bg-muted/40',
                   'text-left outline-none'
                 )}
               >

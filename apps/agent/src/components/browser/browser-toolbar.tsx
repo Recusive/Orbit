@@ -108,7 +108,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
 
   return (
     <div
-      className="flex items-center gap-1 px-2 border-b-3 border-border/50 bg-chat-area shrink-0"
+      className="flex items-center gap-1 px-2 border-b border-border/50 bg-chat-area shrink-0"
       style={{ height: 35 }}
     >
       {/* Navigation buttons - enabled when canGoBack/canGoForward is null (unknown) or true */}
@@ -175,7 +175,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
           onKeyDown={handleUrlKeyDown}
           placeholder="Enter URL..."
           aria-label="Browser URL"
-          className="w-full h-7 px-3 rounded-md border border-border bg-muted/50 text-sm outline-none placeholder:text-muted-foreground focus:bg-background focus:ring-1 focus:ring-ring"
+          className="w-full h-7 px-3 rounded-md bg-muted/50 dark:bg-background border-2 border-transparent text-sm outline-none placeholder:text-muted-foreground focus:border-primary/40 transition-colors duration-200"
         />
       </div>
 

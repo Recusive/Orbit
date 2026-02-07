@@ -7,6 +7,7 @@ import type { FC } from 'react';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, getCommandKey } from '@/lib/utils';
+import { HEIGHTS } from '@/lib/utils/constants';
 import { useUIStore, useWorkspaceName, useActiveTab, useHasWorkspace } from '@/stores/ui/ui-store';
 
 // Re-export for backwards compatibility
@@ -83,12 +84,13 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
     <header
       data-tauri-drag-region
       className={cn(
-        'h-[34px] flex items-center justify-between border-b-[3px] border-border/50 shrink-0',
+        'flex items-center justify-between border-b border-border/50 shrink-0',
         'bg-card shadow-lg',
         // Left padding for macOS traffic light buttons (matches Cursor: x:11 + ~69px for 3 buttons)
         'pl-[80px]',
         className
       )}
+      style={{ height: HEIGHTS.headerBar }}
     >
       {/* Left spacer for balance (reduced since we have traffic light padding) */}
       <div className="w-[122px]" />

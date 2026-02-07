@@ -390,9 +390,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     const base = cn(
       'w-full p-1 bg-muted/30 dark:bg-card border-[3px] transition-[border-color,box-shadow] duration-200',
       'rounded-xl',
-      'shadow-lg',
-      'focus-within:shadow-focus',
-      'dark:shadow-none dark:focus-within:shadow-none'
+      'shadow-none'
     );
     switch (inputMode) {
       case 'plan':

@@ -24,8 +24,8 @@
 .terminal-outer-container {
   height: 100%;
   width: 100%;
-  /* Semi-transparent surface for vibrancy - matches chat area */
-  background-color: var(--surface);
+  /* Match chat area background for visual consistency across all modes */
+  background-color: var(--chat-area);
 }
 
 .terminal-groups-container {

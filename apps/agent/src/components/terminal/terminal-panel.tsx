@@ -54,11 +54,7 @@ export interface TerminalPanelProps {
   readonly mode?: 'agent' | 'editor';
 }
 
-export const TerminalPanel: FC<TerminalPanelProps> = ({
-  variant,
-  collapsed = false,
-  mode = 'agent',
-}) => {
+export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode = 'agent' }) => {
   // Use useShallow to prevent re-renders when unrelated store state changes
   const { toggleBottomPanel, cycleTerminalPosition } = useUIStore(
     useShallow((s) => ({
@@ -449,7 +445,6 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
     setShowSearch(true);
   }, []);
 
-  const isFullWidth = variant === 'full-width';
   // No background - let macOS vibrancy show through
   const CycleIcon = terminalPosition === 'activity' ? ChevronsLeftRight : ChevronsRightLeft;
   const cycleTitle =
@@ -464,9 +459,8 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({
     >
       <header
         className={cn(
-          'relative z-10 flex items-center justify-between px-2 shrink-0 border-t-[3px] border-b-[3px] border-border/50',
-          collapsed && 'border-b-0',
-          !isFullWidth && 'border-l-[3px]'
+          'relative z-10 flex items-center justify-between px-2 shrink-0 border-b border-border/50',
+          collapsed && 'border-b-0'
         )}
         style={{ height: TERMINAL_HEADER_HEIGHT }}
       >

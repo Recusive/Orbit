@@ -153,7 +153,7 @@ export const ContextContent: FC<ContextContentProps> = ({ children, className })
       side="top"
       align="end"
       className={cn(
-        'w-56 p-0 rounded-xl border-[3px] border-border bg-card/50 backdrop-blur-md backdrop-saturate-150 shadow-lg',
+        'w-56 p-0 rounded-xl border-[3px] border-border/40 bg-card shadow-lg',
         className
       )}
     >

@@ -163,7 +163,7 @@ export class TerminalInstance {
       cursorBlink: true,
       cursorStyle: 'bar',
       fontSize: 13,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontFamily: '"Geist Mono Variable", "Geist Mono", Menlo, monospace',
       lineHeight: 1.2,
       scrollback: 10000,
       theme,
@@ -584,15 +584,19 @@ export class TerminalInstance {
         return getComputedStyle(tempEl)[property];
       };
 
+      const bgComputed = getComputedColor('--chat-area', 'backgroundColor');
       const fgColor = getComputedColor('--foreground', 'color');
       const selectionColor = getComputedColor('--accent', 'backgroundColor');
 
       document.body.removeChild(tempEl);
 
-      // Use nearly-invisible background for xterm.js canvas
-      // 'transparent' doesn't work well with xterm canvas rendering
-      // 1% alpha is effectively invisible but gives xterm a valid color
-      const bgColor = 'rgba(0, 0, 0, 0.01)';
+      // Use the computed --chat-area color for the xterm.js canvas.
+      // In solid mode this gives us an opaque rgb() value matching the chat area.
+      // In liquid glass mode, --chat-area is semi-transparent (rgba with alpha < 1)
+      // which xterm.js canvas doesn't render well. In that case, fall back to
+      // near-invisible so the CSS container (var(--chat-area)) provides the visual.
+      const isSemiTransparent = bgComputed.startsWith('rgba') && !/,\s*1\s*\)$/.test(bgComputed);
+      const bgColor = isSemiTransparent ? 'rgba(0, 0, 0, 0.01)' : bgComputed;
 
       // WARNING: Do NOT modify selectionBg to add rgba() transparency!
       // xterm.js internally handles selection opacity/blending. The accent color

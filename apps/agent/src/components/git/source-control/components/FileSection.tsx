@@ -38,14 +38,14 @@ export const FileSection: React.FC<FileSectionProps> = ({
   return (
     <div>
       {/* Section header */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/20">
-        <span className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wide">
+      <div className="flex items-center justify-between px-3 h-7 bg-muted/30 border-l-2 border-primary/30">
+        <span className="text-[10px] font-semibold text-muted-foreground/90 uppercase tracking-widest">
           {title} ({files.length})
         </span>
         <button
           onClick={() => void onBulkAction()}
           disabled={isLoading}
-          className="text-xs text-muted-foreground hover:text-foreground"
+          className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/40 active:scale-95 transition-[background-color,color,transform] duration-150"
           title={isStaged ? 'Unstage All' : 'Stage All'}
         >
           {isStaged ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
@@ -53,7 +53,7 @@ export const FileSection: React.FC<FileSectionProps> = ({
       </div>
 
       {/* File list */}
-      <div className="py-1">
+      <div>
         {files.map((file) => (
           <ChangeItem
             key={file.path}

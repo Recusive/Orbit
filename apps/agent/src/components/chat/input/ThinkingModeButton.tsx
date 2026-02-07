@@ -71,7 +71,7 @@ export const ThinkingModeButton: FC<ThinkingModeButtonProps> = ({
       <HoverCardContent
         side="top"
         align="center"
-        className="w-auto p-2.5 rounded-lg border-[3px] border-border/40 bg-card/50 backdrop-blur-md backdrop-saturate-150"
+        className="w-auto p-2.5 rounded-lg border-[3px] border-border/40 bg-card"
         onMouseEnter={() => {
           setThinkingHoverOpen(true);
         }}

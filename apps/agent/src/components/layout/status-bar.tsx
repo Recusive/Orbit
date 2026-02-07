@@ -114,8 +114,8 @@ interface StatusItemProps {
 }
 
 const StatusItem: FC<StatusItemProps> = ({ children, title, onClick, className }) => {
-  const baseClasses = 'flex items-center gap-1 px-1.5 py-0.5 text-sm leading-none';
-  const interactiveClasses = onClick ? 'hover:bg-accent/50 cursor-pointer rounded-sm' : '';
+  const baseClasses = 'flex items-center gap-1 px-1.5 h-full text-sm';
+  const interactiveClasses = onClick ? 'hover:bg-accent/50 cursor-pointer' : '';
 
   return (
     <div
@@ -169,14 +169,15 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
   return (
     <div
       className={cn(
-        'h-[22px] flex items-center justify-between px-3',
-        'bg-card border-t-[3px] border-border/50',
+        'relative h-[22px] flex items-stretch justify-between px-3',
+        'bg-card',
+        'before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50',
         'text-muted-foreground',
         className
       )}
     >
       {/* Left section - Git info */}
-      <div className="flex items-center gap-0.5 min-w-0">
+      <div className="flex items-stretch gap-0.5 min-w-0">
         {/* Git branch */}
         {error ? (
           <StatusItem
@@ -272,7 +273,7 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
       </div>
 
       {/* Right section - File info */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-stretch gap-0.5">
         {hasFile ? (
           <>
             {/* Cursor position */}

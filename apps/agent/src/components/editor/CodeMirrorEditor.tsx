@@ -21,8 +21,15 @@ import {
   HighlightStyle,
   indentOnInput,
   indentUnit,
+  StreamLanguage,
   syntaxHighlighting,
 } from '@codemirror/language';
+import { c, cpp, csharp, java, kotlin, scala } from '@codemirror/legacy-modes/mode/clike';
+import { dockerFile } from '@codemirror/legacy-modes/mode/dockerfile';
+import { ruby } from '@codemirror/legacy-modes/mode/ruby';
+import { shell } from '@codemirror/legacy-modes/mode/shell';
+import { sql } from '@codemirror/legacy-modes/mode/sql';
+import { swift } from '@codemirror/legacy-modes/mode/swift';
 import { linter, lintKeymap, setDiagnostics } from '@codemirror/lint';
 import { highlightSelectionMatches, openSearchPanel, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState } from '@codemirror/state';
@@ -114,6 +121,22 @@ const languages: Record<string, LanguageFactory> = {
   yaml: () => markdown(), // YAML is readable like markdown
   yml: () => markdown(),
   toml: () => markdown(),
+
+  // Legacy modes (CodeMirror 5 → 6 via StreamLanguage)
+  dockerfile: () => StreamLanguage.define(dockerFile),
+  bash: () => StreamLanguage.define(shell),
+  sh: () => StreamLanguage.define(shell),
+
+  // Systems languages (legacy)
+  c: () => StreamLanguage.define(c),
+  cpp: () => StreamLanguage.define(cpp),
+  java: () => StreamLanguage.define(java),
+  csharp: () => StreamLanguage.define(csharp),
+  kotlin: () => StreamLanguage.define(kotlin),
+  scala: () => StreamLanguage.define(scala),
+  swift: () => StreamLanguage.define(swift),
+  ruby: () => StreamLanguage.define(ruby),
+  sql: () => StreamLanguage.define(sql({})),
 };
 
 // ============================================
@@ -375,6 +398,21 @@ const darkHighlightStyle = HighlightStyle.define([
   { tag: tags.punctuation, color: '#e1e1e1' },
   { tag: tags.bracket, color: '#e1e1e1' },
   { tag: tags.meta, color: '#8b949e' },
+
+  // Markdown-specific tags
+  { tag: tags.heading1, color: '#79c0ff', fontWeight: 'bold' },
+  { tag: tags.heading2, color: '#79c0ff', fontWeight: 'bold' },
+  { tag: tags.heading3, color: '#79c0ff', fontWeight: 'bold' },
+  { tag: [tags.heading4, tags.heading5, tags.heading6], color: '#79c0ff', fontWeight: 'bold' },
+  { tag: tags.emphasis, fontStyle: 'italic', color: '#d2a8ff' },
+  { tag: tags.strong, fontWeight: 'bold', color: '#ffa657' },
+  { tag: tags.link, color: '#58a6ff', textDecoration: 'underline' },
+  { tag: tags.url, color: '#58a6ff' },
+  { tag: tags.monospace, color: '#7ee787' },
+  { tag: tags.strikethrough, textDecoration: 'line-through', color: '#8b949e' },
+  { tag: tags.quote, color: '#8b949e', fontStyle: 'italic' },
+  { tag: tags.list, color: '#ff7b72' },
+  { tag: tags.contentSeparator, color: '#30363d' },
 ]);
 
 // ============================================
@@ -634,6 +672,21 @@ const lightHighlightStyle = HighlightStyle.define([
   { tag: tags.punctuation, color: '#24292f' },
   { tag: tags.bracket, color: '#24292f' },
   { tag: tags.meta, color: '#6e7781' },
+
+  // Markdown-specific tags
+  { tag: tags.heading1, color: '#0550ae', fontWeight: 'bold' },
+  { tag: tags.heading2, color: '#0550ae', fontWeight: 'bold' },
+  { tag: tags.heading3, color: '#0550ae', fontWeight: 'bold' },
+  { tag: [tags.heading4, tags.heading5, tags.heading6], color: '#0550ae', fontWeight: 'bold' },
+  { tag: tags.emphasis, fontStyle: 'italic', color: '#8250df' },
+  { tag: tags.strong, fontWeight: 'bold', color: '#953800' },
+  { tag: tags.link, color: '#0969da', textDecoration: 'underline' },
+  { tag: tags.url, color: '#0969da' },
+  { tag: tags.monospace, color: '#116329' },
+  { tag: tags.strikethrough, textDecoration: 'line-through', color: '#6e7781' },
+  { tag: tags.quote, color: '#6e7781', fontStyle: 'italic' },
+  { tag: tags.list, color: '#cf222e' },
+  { tag: tags.contentSeparator, color: '#d0d7de' },
 ]);
 
 // ============================================
@@ -949,7 +1002,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
           fontSize: '13px',
         },
         '.cm-scroller': {
-          fontFamily: '"JetBrains Mono", "Fira Code", "Menlo", "Monaco", monospace',
+          fontFamily: '"Geist Mono Variable", "Geist Mono", "Menlo", monospace',
           lineHeight: '1.6',
         },
         '.cm-gutters': {
@@ -980,7 +1033,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
           padding: '0',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
-          fontFamily: '"JetBrains Mono", "Fira Code", "Menlo", "Monaco", monospace',
+          fontFamily: '"Geist Mono Variable", "Geist Mono", "Menlo", monospace',
         },
       }),
     ];

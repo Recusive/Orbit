@@ -146,7 +146,7 @@ export const INPUT_SIZES = {
  */
 export const RESIZE_HANDLE = {
   width: 1,
-  hoverWidth: 3,
+  hoverWidth: 1,
 } as const;
 
 // ============================================

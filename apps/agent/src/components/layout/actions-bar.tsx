@@ -47,8 +47,8 @@ const ActionButton: FC<ActionButtonProps> = ({
           {/* Active indicator - overlays the left border (VS Code style) */}
           {isActive ? (
             <div
-              className="absolute top-1/2 -translate-y-1/2 w-[3px] h-6 bg-primary rounded-r"
-              style={{ left: -3 }}
+              className="absolute top-1/2 -translate-y-1/2 w-[2px] h-6 bg-primary rounded-r"
+              style={{ left: -1.5 }}
             />
           ) : null}
 
@@ -93,7 +93,7 @@ export const ActionsBar: FC = () => {
 
   return (
     <aside
-      className="h-full flex flex-col border-l-[3px] border-border/50 bg-card"
+      className="h-full flex flex-col border-l border-border/50 bg-card"
       style={{ width: SIDEBAR.iconColumnWidth }}
       role="tablist"
       aria-label="Actions Bar"

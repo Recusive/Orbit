@@ -86,7 +86,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               aria-describedby={undefined}
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
-                'bg-card/85 dark:bg-card/50 backdrop-blur-md backdrop-saturate-150',
+                'bg-card',
                 'border-[3px] border-border/40 rounded-xl overflow-hidden flex flex-col',
                 'shadow-lg duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
@@ -100,7 +100,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               </DialogPrimitive.Title>
 
               {/* Title bar */}
-              <div className="flex items-center justify-between px-4 py-2.5 border-b-3 border-border/40 bg-transparent">
+              <div className="flex items-center justify-between px-4 py-2.5 bg-transparent">
                 <div className="flex items-center gap-2 font-medium text-base">
                   <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground/70" />
                   <span className="text-muted-foreground/70">Settings</span>
@@ -113,6 +113,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                   <span className="sr-only">Close</span>
                 </DialogPrimitive.Close>
               </div>
+              <div className="h-px bg-border/40 shrink-0" />
 
               {/* Content */}
               <div className="flex flex-1 overflow-hidden">

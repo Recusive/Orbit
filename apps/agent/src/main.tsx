@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/react';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import '@fontsource-variable/geist-mono';
 import '@xyflow/react/dist/style.css';
 import './globals.css';
 import App from './App';

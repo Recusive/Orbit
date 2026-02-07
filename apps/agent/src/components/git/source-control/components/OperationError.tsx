@@ -9,8 +9,8 @@ interface OperationErrorProps {
 
 export const OperationError: React.FC<OperationErrorProps> = ({ message }) => {
   return (
-    <div className="px-3 py-2 bg-destructive/10 border-b border-destructive/20">
-      <p className="text-xs text-destructive">{message}</p>
+    <div className="mx-3 my-2 px-2.5 py-2 rounded-lg bg-destructive/10 text-xs text-destructive">
+      {message}
     </div>
   );
 };
