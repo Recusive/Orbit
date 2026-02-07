@@ -37,19 +37,21 @@ html.dark {
   width: 1px !important;
 }
 
-/* ── Terminal open/close animation ── */
-/* Temporarily applied via .terminal-animate class during toggle.
-   Animates allotment pane top/height so the terminal slides up smoothly
-   and the chat area shrinks in sync. Removed after animation completes
-   so it doesn't interfere with manual drag resizing. */
-.terminal-animate .allotment-module_splitViewView__MGZ6O {
+/* ── Panel open/close animation ── */
+/* Temporarily applied via .allotment-animate class during toggle.
+   Animates allotment pane position/size so panels slide smoothly.
+   Works for both vertical (top/height) and horizontal (left/width) layouts.
+   Removed after animation completes so manual drag resizing isn't affected. */
+.allotment-animate .allotment-module_splitViewView__MGZ6O {
   transition:
     top 250ms cubic-bezier(0.22, 1, 0.36, 1),
-    height 250ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+    height 250ms cubic-bezier(0.22, 1, 0.36, 1),
+    left 250ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 250ms cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .terminal-animate .allotment-module_splitViewView__MGZ6O {
+  .allotment-animate .allotment-module_splitViewView__MGZ6O {
     transition: none !important;
   }
 }

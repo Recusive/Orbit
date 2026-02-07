@@ -406,7 +406,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   const terminalAllotmentRef = useRef<AllotmentHandle>(null);
 
   // Animate terminal open/close in activity panel — same pattern as ChatArea.
-  // Temporarily adds .terminal-animate CSS class to enable height/top transitions,
+  // Temporarily adds .allotment-animate CSS class to enable height/top transitions,
   // then removes it so manual drag resizing isn't affected.
   const [terminalAnimating, setTerminalAnimating] = useState(false);
   const prevBottomPanelOpen = useRef(bottomPanelOpen);
@@ -427,7 +427,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   }, [bottomPanelOpen, terminalPosition]);
 
   // Resize terminal when bottomPanelOpen changes.
-  // Opening: delay reset by one frame so .terminal-animate is in the DOM first.
+  // Opening: delay reset by one frame so .allotment-animate is in the DOM first.
   // Closing: reset immediately (transition class applied from prior render).
   useEffect(() => {
     const allotment = terminalAllotmentRef.current;
@@ -580,8 +580,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
         });
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- postMessage is stable, we want cleanup to run only on unmount
-  }, []);
+  }, [postMessage]);
 
   // Handle closing a single tab with LSP notification
   // Only call lspDidClose for diff tabs - CodeMirrorEditor handles LSP lifecycle
@@ -674,7 +673,10 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   const showActivityTerminal = terminalPosition === 'activity' && canRenderTerminal;
 
   return (
-    <div className="@container h-full w-full flex flex-col">
+    <div
+      className="@container h-full w-full flex flex-col"
+      style={{ minWidth: ACTIVITY_PANEL.MIN_WIDTH }}
+    >
       {/* Terminal in activity layout */}
       <div
         className="flex-1 flex flex-col"
@@ -683,7 +685,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
         <ResizablePanelGroup
           ref={terminalAllotmentRef}
           direction="vertical"
-          className={terminalAnimating ? 'flex-1 terminal-animate' : 'flex-1'}
+          className={terminalAnimating ? 'flex-1 allotment-animate' : 'flex-1'}
           onChange={handleTerminalSizeChange}
         >
           <ResizablePanel minSize={0}>

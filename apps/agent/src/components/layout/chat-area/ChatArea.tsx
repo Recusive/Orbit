@@ -126,7 +126,7 @@ export const ChatArea: FC = () => {
   const terminalAllotmentRef = useRef<AllotmentHandle>(null);
 
   // Animate terminal open/close by temporarily adding CSS transition to allotment panes.
-  // The .terminal-animate class enables height/top transitions for 300ms, then is removed
+  // The .allotment-animate class enables height/top transitions for 300ms, then is removed
   // so manual drag resizing isn't affected.
   const [terminalAnimating, setTerminalAnimating] = useState(false);
   const prevBottomPanelOpen = useRef(bottomPanelOpen);
@@ -153,7 +153,7 @@ export const ChatArea: FC = () => {
     if (!allotment) return;
 
     if (bottomPanelOpen) {
-      // Opening — wait one frame for .terminal-animate to be in the DOM
+      // Opening — wait one frame for .allotment-animate to be in the DOM
       const rafId = requestAnimationFrame(() => {
         allotment.reset();
       });
@@ -165,6 +165,41 @@ export const ChatArea: FC = () => {
     allotment.reset();
     return undefined;
   }, [bottomPanelOpen]);
+
+  // Animate activity panel open/close — same pattern as terminal.
+  // Uses a delayed `activityVisible` so the .allotment-animate class is in the DOM
+  // BEFORE allotment processes the visibility change (which triggers width transition).
+  const [activityAnimating, setActivityAnimating] = useState(false);
+  const [activityVisible, setActivityVisible] = useState(reviewPanelOpen);
+  const prevReviewPanelOpen = useRef(reviewPanelOpen);
+
+  useEffect(() => {
+    if (prevReviewPanelOpen.current !== reviewPanelOpen) {
+      setActivityAnimating(true);
+      const animTimer = setTimeout(() => {
+        setActivityAnimating(false);
+      }, 300);
+
+      if (reviewPanelOpen) {
+        // Opening — delay visible by one frame so animation class is applied first
+        const rafId = requestAnimationFrame(() => {
+          setActivityVisible(true);
+        });
+        prevReviewPanelOpen.current = reviewPanelOpen;
+        return (): void => {
+          cancelAnimationFrame(rafId);
+          clearTimeout(animTimer);
+        };
+      }
+      // Closing — set visible immediately (class is already applied from prior render)
+      setActivityVisible(false);
+      prevReviewPanelOpen.current = reviewPanelOpen;
+      return (): void => {
+        clearTimeout(animTimer);
+      };
+    }
+    return undefined;
+  }, [reviewPanelOpen]);
 
   // Track terminal size when user drags - save to shared store
   // PERF: Debounced to avoid triggering React re-renders on every drag frame.
@@ -224,7 +259,10 @@ export const ChatArea: FC = () => {
   // We need two versions because ActivityPanel appears in both layout divs (CSS display toggle),
   // but only ONE should render the terminal to avoid duplicate xterm instances
   const createMainContent = (canActivityRenderTerminal: boolean): JSX.Element => (
-    <ResizablePanelGroup direction="horizontal" className="h-full">
+    <ResizablePanelGroup
+      direction="horizontal"
+      className={activityAnimating ? 'h-full allotment-animate' : 'h-full'}
+    >
       {/* Chat Section (Header + Content) */}
       <ResizablePanel
         preferredSize={reviewPanelOpen ? CHAT_PANEL.WITH_ACTIVITY_WIDTH : '100%'}
@@ -236,12 +274,12 @@ export const ChatArea: FC = () => {
         </div>
       </ResizablePanel>
 
-      {/* Activity Panel (split view) - uses visible prop to show/hide */}
+      {/* Activity Panel (split view) - uses delayed visible for animation timing */}
       <ResizablePanel
         preferredSize={ACTIVITY_PANEL.PREFERRED_WIDTH}
         minSize={ACTIVITY_PANEL.MIN_WIDTH}
         maxSize={ACTIVITY_PANEL.MAX_WIDTH}
-        visible={reviewPanelOpen}
+        visible={activityVisible}
       >
         <ActivityPanel canRenderTerminal={canActivityRenderTerminal} />
       </ResizablePanel>
@@ -271,7 +309,7 @@ export const ChatArea: FC = () => {
         <ResizablePanelGroup
           ref={terminalAllotmentRef}
           direction="vertical"
-          className={terminalAnimating ? 'flex-1 terminal-animate' : 'flex-1'}
+          className={terminalAnimating ? 'flex-1 allotment-animate' : 'flex-1'}
           onChange={handleTerminalSizeChange}
         >
           <ResizablePanel minSize={0}>
