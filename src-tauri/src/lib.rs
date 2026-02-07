@@ -291,24 +291,24 @@ pub fn run() {
             {
                 use orbit_plugin_decorum::WebviewWindowExt as _;
                 use tauri::Manager as _;
-                use tauri_plugin_liquid_glass::{GlassMaterialVariant, LiquidGlassConfig, LiquidGlassExt as _};
+                use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 
                 if let Some(window) = app.get_webview_window("main") {
                     // Enable ProMotion 120Hz on supported displays.
                     drop(window.enable_promotion());
 
-                    // Apply macOS Liquid Glass effect for frosted glass design system.
-                    // Uses Regular variant for the default Liquid Glass appearance.
-                    // Falls back to NSVisualEffectView on macOS < 26.
-                    if let Err(e) = app.liquid_glass().set_effect(
+                    // Apply heavy frosted vibrancy (iOS 7 style).
+                    // FullScreenUI has the heaviest gaussian blur of all NSVisualEffectMaterials,
+                    // creating a deeply frosted diffusion instead of a straight see-through look.
+                    // CSS surfaces at 70%/55% opacity mask any material tinting — only the
+                    // blur effect shows through the transparent portion.
+                    if let Err(e) = apply_vibrancy(
                         &window,
-                        LiquidGlassConfig {
-                            corner_radius: 10.0,
-                            variant: GlassMaterialVariant::Regular,
-                            ..Default::default()
-                        },
+                        NSVisualEffectMaterial::FullScreenUI,
+                        None,
+                        None,
                     ) {
-                        log::warn!("Failed to apply Liquid Glass effect: {e}");
+                        log::warn!("Failed to apply frosted vibrancy: {e}");
                     }
                 }
             }

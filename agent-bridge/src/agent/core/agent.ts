@@ -1718,6 +1718,16 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     } catch (err) {
       logger.error({ checkpointId, err }, 'Error during file rewind');
       throw err;
+    } finally {
+      // Step 5: Explicitly terminate the CLI process spawned by query().
+      // The `break` above triggers the iterator's return(), but the underlying
+      // Claude CLI process may continue running and recreate the JSONL file
+      // after forkSessionAt deletes it (causing phantom sidebar entries).
+      try {
+        await rewindQuery.interrupt();
+      } catch {
+        // Ignore — process may already be exiting from the iterator return()
+      }
     }
   }
 }

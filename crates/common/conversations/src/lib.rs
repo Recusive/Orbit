@@ -443,9 +443,10 @@ impl ConversationManager {
     /// Load conversation summaries with a configurable limit.
     ///
     /// We first collect (session_id, mtime) pairs cheaply using only filesystem
-    /// metadata (no file reads), sort by mtime descending, then read titles only
-    /// for the top `limit` files. This avoids opening hundreds of JSONL files
-    /// when only the most recent conversations are shown in the sidebar.
+    /// metadata (no file reads), sort by mtime descending, then lazily read titles
+    /// until `limit` valid conversations are found. Non-conversation files (e.g.,
+    /// SDK file-history-snapshot checkpoint files) are skipped without counting
+    /// toward the limit.
     pub fn load_summaries_for_workspace_limited(
         &self,
         workspace_path: Option<&str>,
@@ -505,24 +506,33 @@ impl ConversationManager {
             candidates.push((path, session_id, updated_at));
         }
 
-        // Phase 2: Sort by mtime descending, take top N
+        // Phase 2: Sort by mtime descending (most recent first)
         candidates.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| b.1.cmp(&a.1)));
-        candidates.truncate(limit);
 
-        // Phase 3: Read titles only for the top N files
+        // Phase 3: Read titles lazily until we have `limit` valid conversations.
+        // Skip files with no conversation content (e.g., SDK file-history-snapshot
+        // checkpoint files that contain only snapshot records, not real messages).
+        // These would appear as phantom "Untitled" sidebar entries.
+        //
+        // NOTE: We do NOT truncate candidates before filtering (as was done previously).
+        // Truncating first caused the sidebar to show fewer than `limit` entries when
+        // non-conversation files (file-history-snapshots) occupied slots in the top N.
+        // Instead, we iterate lazily with `.take(limit)` after the filter, reading
+        // only as many files as needed to fill the sidebar.
         let summaries: Vec<ConversationSummary> = candidates
             .into_iter()
-            .map(|(path, session_id, updated_at)| {
-                let title = read_last_summary(&path).unwrap_or_else(|| String::from("Untitled"));
-                ConversationSummary {
+            .filter_map(|(path, session_id, updated_at)| {
+                let title = read_last_summary(&path)?;
+                Some(ConversationSummary {
                     session_id,
                     title,
                     updated_at,
                     message_count: 0,
                     workspace_path: workspace_path.map(str::to_owned),
                     worktree_path: None,
-                }
+                })
             })
+            .take(limit)
             .collect();
 
         tracing::debug!(
@@ -1701,5 +1711,43 @@ mod tests {
         assert_eq!(ws1[0].title, "WS1 Chat");
         assert_eq!(ws2.len(), 1);
         assert_eq!(ws2[0].title, "WS2 Chat");
+    }
+
+    #[test]
+    fn test_file_history_snapshot_only_excluded_from_summaries() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Create a real conversation
+        fs::write(
+            ws_dir.join("real-chat.jsonl"),
+            jsonl_content(&[
+                r#"{"type":"summary","summary":"Real Chat","leafUuid":""}"#,
+                r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"hello"},"cwd":"/test","sessionId":"real-chat","timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            ]),
+        )
+        .expect("write real chat");
+
+        // Create a file-history-snapshot-only file (SDK checkpoint artifact)
+        fs::write(
+            ws_dir.join("snapshot-only.jsonl"),
+            jsonl_content(&[
+                r#"{"type":"file-history-snapshot","messageId":"m1","snapshot":{},"isSnapshotUpdate":false}"#,
+                r#"{"type":"file-history-snapshot","messageId":"m2","snapshot":{"files":["/test.py"]},"isSnapshotUpdate":true}"#,
+            ]),
+        )
+        .expect("write snapshot file");
+
+        // Create an empty file (should also be excluded)
+        fs::write(ws_dir.join("empty.jsonl"), "").expect("write empty");
+
+        let summaries = manager
+            .load_summaries_for_workspace(None)
+            .expect("load summaries");
+
+        // Only the real conversation should appear — snapshot-only and empty files excluded
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].title, "Real Chat");
     }
 }

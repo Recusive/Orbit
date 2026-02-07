@@ -333,6 +333,19 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       );
     }
 
+    // ── DIAGNOSTIC: Log tool→message mapping ──
+    if (result.size > 0) {
+      const mappingEntries: string[] = [];
+      for (const [msgId, tools] of result) {
+        mappingEntries.push(`${msgId} → [${tools.map((t) => t.id).join(',')}]`);
+      }
+      logger.warn('[DIAG:RENDER] toolsByMessageId computed', {
+        totalMappedMessages: result.size,
+        totalTools: completedTools.length,
+        mapping: mappingEntries,
+      });
+    }
+
     return result;
   }, [activeTools, completedTools]);
 
@@ -488,6 +501,17 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             const isLastAssistant = msg.id === lastAssistantMessageId;
             const shouldAnimate = animatingMessageIds.has(msg.id);
             const tools = toolsByMessageId.get(msg.id) ?? [];
+
+            // ── DIAGNOSTIC: Log every assistant message render with tool lookup result ──
+            if (msg.role === 'assistant') {
+              logger.warn('[DIAG:VITEM] assistant render', {
+                msgId: msg.id,
+                toolCount: tools.length,
+                toolIds: tools.map((t) => t.id),
+                mapSize: toolsByMessageId.size,
+                mapKeys: Array.from(toolsByMessageId.keys()),
+              });
+            }
 
             return (
               <div

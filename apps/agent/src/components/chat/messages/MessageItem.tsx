@@ -5,6 +5,7 @@
  * To change message widths or assistant padding, update CHAT_WIDTH,
  * CHAT_WIDTH_VAR, and CHAT_SPACING in constants.ts - DO NOT hardcode here.
  */
+import { code } from '@streamdown/code';
 import { mermaid } from '@streamdown/mermaid';
 import { memo, useMemo } from 'react';
 import remarkGfm from 'remark-gfm';
@@ -37,8 +38,9 @@ const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS_STATIC: never[] = [];
 const REHYPE_PLUGINS_STREAMING = [rehypeFlowTokens];
 
-// Mermaid plugin for diagram rendering - defined outside component for reference stability
-const STREAMDOWN_PLUGINS = { mermaid };
+// Streamdown plugins for diagram and code rendering - defined outside component for reference stability.
+// The `code` plugin provides Shiki syntax highlighting with github-light/dark themes.
+const STREAMDOWN_PLUGINS = { mermaid, code };
 
 /**
  * Calculate dynamic animation duration based on content length.

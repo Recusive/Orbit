@@ -336,7 +336,7 @@ export async function handleConversationRewind(
 
       // Step 5: Send rewound response - same session ID (fork happens lazily)
       // The SDK fork is lazy - the actual new session ID comes when the first message is sent.
-      // At that point, the session remap handler will call conversationFork with the real ID.
+      // The agent-bridge handles JSONL cleanup (deleting original + intermediate copies).
       window.postMessage(
         {
           type: 'conversation:rewound',

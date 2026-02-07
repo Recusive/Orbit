@@ -168,6 +168,8 @@ export interface ConversationDropdownMenuProps extends ConversationMenuActions {
   visible?: boolean;
   /** Additional className for the trigger button */
   className?: string;
+  /** Callback when the dropdown open state changes */
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -180,11 +182,17 @@ export const ConversationDropdownMenu: FC<ConversationDropdownMenuProps> = ({
   onRename,
   onDelete,
   onDuplicate,
+  onOpenChange,
 }) => {
   const [open, setOpen] = useState(false);
 
+  const handleOpenChange = (newOpen: boolean): void => {
+    setOpen(newOpen);
+    onOpenChange?.(newOpen);
+  };
+
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
           className={cn(

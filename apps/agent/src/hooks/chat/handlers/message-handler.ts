@@ -7,12 +7,13 @@ import type { ExtensionMessage, Model } from '@/types/protocol';
 import { getActiveChain } from '@/components/chat/messages/message-utils';
 import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-handlers';
 import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
-import { conversationAddMessage, conversationFork, conversationList } from '@/lib/api';
+import { conversationAddMessage, conversationList } from '@/lib/api';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { toConversationSummaries } from '@/lib/mappers';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { rafBatch } from '@/lib/utils/event-batcher';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
+import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
@@ -440,6 +441,25 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // the sidebar (populated from disk) won't match our active session.
         const sdkSessionId = message.sdk_session_id;
         const currentSessionId = sessionIdRef.current;
+
+        // ── DIAGNOSTIC: Log system:init state ──
+        {
+          const toolStatePre = useToolStore.getState();
+          const hasPendingFork = useCheckpointStore
+            .getState()
+            .hasPendingConversationFork(currentSessionId);
+          logger.warn('[DIAG:INIT] system:init received', {
+            sdkSessionId,
+            currentSessionId,
+            willRemap: !!(sdkSessionId && currentSessionId && sdkSessionId !== currentSessionId),
+            hasPendingFork,
+            toolCountBefore: toolStatePre.completedTools.length,
+            toolStoreSessionId: toolStatePre.currentSessionId,
+            messageCount: messagesRef.current.length,
+            sidebarConversations: useUIStore.getState().conversations.map((c) => c.sessionId),
+          });
+        }
+
         if (sdkSessionId && currentSessionId && sdkSessionId !== currentSessionId) {
           // Mark the old temp ID so stale conversation:loaded responses are ignored
           remappedOrbitIds.add(currentSessionId);
@@ -461,22 +481,38 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           // Check if this is a forked session from a rewind operation.
           // The SDK fork is lazy - we only know the actual new session ID now.
           // Copy messages from the original session to the new forked session.
+          // Check if this is a post-rewind session remap.
+          // Consume the pending fork flag to prevent stale state, but do NOT
+          // call conversationFork/conversationDelete from here. The agent-bridge's
+          // forkSessionAt already handles JSONL lifecycle:
+          //   1. Truncates the original JSONL
+          //   2. Copies it to an intermediate session ID (for SDK to resume from)
+          //   3. Deletes the original JSONL immediately after copy
+          //   4. Deletes the intermediate JSONL when system:init fires
+          //
+          // Previously, calling conversationFork here caused a RACE CONDITION:
+          // the Rust conversationFork wrote to {sdkSessionId}.jsonl at the same
+          // time the SDK was writing to that same file, corrupting it. This led to:
+          //   - Empty user message bubbles after relaunch
+          //   - API error 400 ("cache_control cannot be set for empty text blocks")
+          //   - Missing tool widgets after relaunch
           const rewindMessageId = useCheckpointStore
             .getState()
             .consumePendingConversationFork(currentSessionId);
           if (rewindMessageId) {
-            logger.debug('Executing deferred conversationFork for rewind', {
+            logger.debug('Post-rewind session remap (agent-bridge handles JSONL cleanup)', {
               originalSessionId: currentSessionId,
               newSessionId: sdkSessionId,
               rewindMessageId,
             });
-            void conversationFork(
-              currentSessionId,
-              sdkSessionId,
-              rewindMessageId,
-              workspacePath ?? undefined
-            );
           }
+
+          // Mark the new SDK session ID as "load pending" so the useEffect in
+          // use-chat-messages.ts skips the redundant conversation:load.
+          // Without this, changing sessionId triggers a load for the new ID,
+          // but the JSONL is brand new and may not contain the post-rewind
+          // user message yet — the backend-backbone merge would drop live messages.
+          useMessageBufferStore.getState().markLoadPending(sdkSessionId);
 
           // Switch to the SDK session ID
           setSessionId(sdkSessionId);
@@ -484,6 +520,24 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           switchSession(sdkSessionId);
           // Remove stale temp entry from sidebar (if it appeared before remap)
           useUIStore.getState().removeConversation(currentSessionId);
+
+          // ── DIAGNOSTIC: Log state AFTER system:init remap ──
+          {
+            const toolStatePost = useToolStore.getState();
+            logger.warn('[DIAG:INIT] After system:init remap + switchSession', {
+              newSessionId: sdkSessionId,
+              removedSessionId: currentSessionId,
+              wasRewindFork: !!rewindMessageId,
+              toolCountAfter: toolStatePost.completedTools.length,
+              toolStoreSessionIdAfter: toolStatePost.currentSessionId,
+              toolEntriesAfter: toolStatePost.completedTools.map((t) => ({
+                toolId: t.id,
+                msgId: t.messageId,
+                name: t.toolName,
+              })),
+              sidebarAfterRemove: useUIStore.getState().conversations.map((c) => c.sessionId),
+            });
+          }
         } else if (!sessionIdRef.current || messagesRef.current.length === 0) {
           // No active session yet — adopt whatever session_id we received
           setSessionId(message.session_id);
@@ -679,8 +733,24 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // the file exists on disk. This is how new sessions appear in the sidebar
         // (Orbit is a pure reader — it never pre-adds sessions to the list).
         if (workspacePath) {
+          const sidebarBefore = useUIStore.getState().conversations.map((c) => c.sessionId);
           void conversationList(workspacePath).then((conversations) => {
-            setConversations(toConversationSummaries(conversations));
+            const summaries = toConversationSummaries(conversations);
+            // ── DIAGNOSTIC: Log sidebar refresh from disk ──
+            const newSessionIds = summaries.map((c) => c.sessionId);
+            const addedSessions = newSessionIds.filter((id) => !sidebarBefore.includes(id));
+            const removedSessions = sidebarBefore.filter((id) => !newSessionIds.includes(id));
+            if (addedSessions.length > 0 || removedSessions.length > 0) {
+              logger.warn('[DIAG:SIDEBAR] agent:complete disk refresh changed sidebar', {
+                activeSessionId: sessionIdRef.current,
+                sidebarBefore,
+                sidebarAfter: newSessionIds,
+                addedSessions,
+                removedSessions,
+                totalOnDisk: conversations.length,
+              });
+            }
+            setConversations(summaries);
           });
         }
         break;
@@ -831,6 +901,27 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // and useEffect firing are buffered safely because pendingLoads is
         // still set. (Code review: Opus cycle 1, issue #4)
 
+        // Cache current session's messages BEFORE switching.
+        // The sidebar's handleLoadConversation sends conversation:load directly
+        // (without conversation:loading), so the conversation:loading handler
+        // that normally caches messages never fires. Without this fallback,
+        // switching back to a session whose JSONL was deleted by forkSessionAt
+        // would show an empty chat — the backend returns no messages (file gone)
+        // and the cache would be empty too. By caching here, the messages survive
+        // sidebar round-trips even when the JSONL no longer exists on disk.
+        {
+          const currentSid = sessionIdRef.current;
+          const currentMsgs = messagesRef.current;
+          if (currentSid && currentMsgs.length > 0 && currentSid !== message.session_id) {
+            messagesCache.current.set(currentSid, currentMsgs);
+            logger.warn('[DIAG:LOAD] Cached outgoing session messages in conversation:loaded', {
+              cachedSessionId: currentSid,
+              messageCount: currentMsgs.length,
+              incomingSessionId: message.session_id,
+            });
+          }
+        }
+
         // Switch file store to new session (saves old files to cache, restores from cache if exists)
         useFileStore.getState().switchSession(message.session_id);
 
@@ -895,35 +986,58 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               // No cache - use backend directly
               newMessages = backendMessages;
             } else if (backendMessages.length === 0) {
-              // No backend - use cache directly
+              // No backend - use cache directly (e.g., JSONL deleted by forkSessionAt)
+              logger.warn('[DIAG:LOAD] Using cache-only fallback (no backend messages)', {
+                sessionId: message.session_id,
+                cachedMessageCount: cachedMessages.length,
+                cachedMessageIds: cachedMessages.map((m) => m.id),
+              });
               newMessages = cachedMessages;
             } else {
-              // Both exist - merge: user messages from backend, assistant from cache if exists
-              const cachedById = new Map<string, ChatMessage>(cachedMessages.map((m) => [m.id, m]));
-              const backendById = new Map<string, ChatMessage>(
-                backendMessages.map((m) => [m.id, m])
-              );
+              // Both exist - merge using backend as backbone + live trailing messages.
+              //
+              // Strategy:
+              // 1. Use backend messages as the canonical source (SDK-assigned UUIDs).
+              // 2. Append "live trailing" messages from the cache that represent genuinely
+              //    new messages not yet persisted to JSONL (e.g., post-rewind user message
+              //    + streaming response that the SDK hasn't written to disk yet).
+              //
+              // IMPORTANT: User message UUIDs do NOT match between frontend and SDK.
+              // The frontend generates its own UUID (crypto.randomUUID()), but the SDK
+              // writes a different UUID (checkpoint ID) to JSONL. We therefore use
+              // user message COUNT (not IDs) to detect live trailing messages.
+              // If the cache has more user messages than the backend, the extra ones
+              // are genuinely new and not yet persisted.
+              const backendUserCount = backendMessages.filter((m) => m.role === 'user').length;
+              const cachedUserMessages = cachedMessages.filter((m) => m.role === 'user');
+              const cachedUserCount = cachedUserMessages.length;
 
-              // Start with all backend messages (this gives us user messages)
-              const merged = new Map<string, ChatMessage>(backendById);
+              if (cachedUserCount <= backendUserCount) {
+                // Backend has all messages — use backend exclusively.
+                // No live trailing needed; cache would only create duplicates
+                // because frontend UUIDs differ from SDK JSONL UUIDs.
+                newMessages = backendMessages;
+              } else {
+                // Cache has more user messages than backend — the extra ones are live
+                // (not yet persisted). Find the Nth+1 user message in the cache
+                // (where N = backendUserCount) and take everything from that point.
+                let usersSeen = 0;
+                let liveStartIdx = -1;
+                for (let i = 0; i < cachedMessages.length; i++) {
+                  const cm = cachedMessages[i];
+                  if (cm?.role === 'user') {
+                    usersSeen++;
+                    if (usersSeen > backendUserCount) {
+                      liveStartIdx = i;
+                      break;
+                    }
+                  }
+                }
 
-              // For each cached message, prefer cache version (has latest streaming content)
-              for (const [id, msg] of cachedById) {
-                merged.set(id, msg);
+                const liveTrailingMessages =
+                  liveStartIdx >= 0 ? cachedMessages.slice(liveStartIdx) : [];
+                newMessages = [...backendMessages, ...liveTrailingMessages];
               }
-
-              // Also add any cached messages that aren't in backend (new streaming messages)
-              // These might have different IDs if streaming started after backend load
-
-              // Convert to array, preserving order: backend messages first, then any new cached ones
-              const backendOrder = backendMessages.map((m) => m.id);
-              const cachedOrder = cachedMessages.map((m) => m.id);
-
-              // Build ordered result: backend order for backend messages, then append new cached messages
-              const orderedIds = [...new Set([...backendOrder, ...cachedOrder])];
-              newMessages = orderedIds
-                .map((id) => merged.get(id))
-                .filter((m): m is NonNullable<typeof m> => m !== undefined);
             }
 
             // Build set of message IDs in the active chain for filtering usage/tools.
@@ -983,10 +1097,41 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               }
             }
 
+            // Pre-populate messagesCache BEFORE setSessionId.
+            // When React commits setSessionId, the useEffect in message-state.ts
+            // (line 30-48) detects sessionId changed and reads from messagesCache.
+            // Without this, it finds OLD cached messages (agent-bridge turn IDs)
+            // and overwrites our newMessages (JSONL IDs). The overwrite creates
+            // a permanent mismatch: messages use cached IDs but tools have JSONL
+            // IDs from restoreToolsForMessage → toolsByMessageId lookup fails.
+            // By writing newMessages to the cache here, the useEffect reads the
+            // correct data and setMessages is effectively a no-op (same reference).
+            messagesCache.current.set(message.session_id, newMessages);
+
             setMessages(newMessages);
             setSessionId(message.session_id);
             setActiveConversation(message.session_id, message.title);
+
+            // ── DIAGNOSTIC: Pre-switchSession state ──
+            const preSwitchTools = useToolStore.getState().completedTools;
+            logger.warn('[DIAG:LOADED] Pre-switchSession', {
+              sessionId: message.session_id,
+              currentSessionId: useToolStore.getState().currentSessionId,
+              completedToolCount: preSwitchTools.length,
+              toolIds: preSwitchTools.map((t) => `${t.id}→${t.messageId}`),
+              newMessageIds: newMessages.map((m) => `${m.role}:${m.id}`),
+              backendMsgIds: backendMessages.map((m) => `${m.role}:${m.id}`),
+              activeChainSize: activeChainIds.size,
+            });
+
             switchSession(message.session_id);
+
+            // ── DIAGNOSTIC: Post-switchSession state ──
+            const postSwitchTools = useToolStore.getState().completedTools;
+            logger.warn('[DIAG:LOADED] Post-switchSession', {
+              completedToolCount: postSwitchTools.length,
+              toolIds: postSwitchTools.map((t) => `${t.id}→${t.messageId}`),
+            });
 
             // Restore tool executions from persisted messages (for tool widget display).
             // Only restore tools for messages in the active chain (orphaned branches excluded).
@@ -994,8 +1139,15 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             // individual restoreToolsForMessage calls. startTransition only yields
             // between React renders, not between synchronous Zustand set() calls.
             // (Code review: Opus cycle 3, issue #1)
+            let restoredToolCount = 0;
             for (const m of message.messages) {
               if (activeChainIds.has(m.id) && m.toolUses.length > 0) {
+                logger.warn('[DIAG:LOADED] Restoring tools for message', {
+                  messageId: m.id,
+                  role: m.role,
+                  toolCount: m.toolUses.length,
+                  toolIds: m.toolUses.map((t) => t.id),
+                });
                 restoreToolsForMessage(
                   m.id,
                   m.toolUses.map((t) => ({
@@ -1007,8 +1159,17 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                     ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
                   }))
                 );
+                restoredToolCount += m.toolUses.length;
               }
             }
+
+            // ── DIAGNOSTIC: Post-restore state ──
+            const postRestoreTools = useToolStore.getState().completedTools;
+            logger.warn('[DIAG:LOADED] Post-restoreToolsForMessage', {
+              restoredToolCount,
+              completedToolCount: postRestoreTools.length,
+              toolIds: postRestoreTools.map((t) => `${t.id}→${t.messageId}`),
+            });
           });
         }, 0);
 
@@ -1030,6 +1191,32 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
         }));
 
+        // ── DIAGNOSTIC: Log tool state BEFORE rewind ──
+        {
+          const toolState = useToolStore.getState();
+          const prevMessageIds = messagesRef.current.map((m) => m.id);
+          const rewoundMessageIds = rewoundMessages.map((m) => m.id);
+          const toolMessageIds = toolState.completedTools.map((t) => `${t.id}→msg:${t.messageId}`);
+          const toolUsesInPayload = message.messages
+            .filter((m) => m.toolUses && m.toolUses.length > 0)
+            .map((m) => ({ msgId: m.id, toolCount: m.toolUses?.length ?? 0 }));
+
+          logger.warn('[DIAG:REWIND] conversation:rewound received', {
+            sessionId: message.session_id,
+            newSessionId: message.new_session_id,
+            isSameSession: message.new_session_id === message.session_id,
+            rewindToMessageId: message.rewind_to_message_id,
+            prevMessageCount: prevMessageIds.length,
+            prevMessageIds,
+            rewoundMessageCount: rewoundMessageIds.length,
+            rewoundMessageIds,
+            completedToolCount: toolState.completedTools.length,
+            completedToolEntries: toolMessageIds,
+            toolUsesInPayload,
+            currentSessionId: toolState.currentSessionId,
+          });
+        }
+
         // CLAUDE CODE-STYLE REWIND:
         // If new_session_id === session_id, we're staying on the same session (no fork).
         // This is the correct behavior for parentUuid-based rewind.
@@ -1046,7 +1233,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           });
         } else {
           // Session fork: SDK created a new session with context up to the rewind point.
-          // Messages have been copied to the new session via conversationFork().
+          // The agent-bridge handles JSONL lifecycle (truncate, copy, cleanup).
           // Switch the frontend to use the new session ID going forward.
           switchSession(message.new_session_id);
           useFileStore.getState().switchSession(message.new_session_id);
@@ -1077,23 +1264,51 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           }
         }
 
-        // Restore tool executions from persisted messages (for tool widget display)
-        // Only do this if switching sessions (legacy) - same session keeps existing tools
-        if (!isSameSession) {
-          for (const m of message.messages) {
-            if (m.toolUses && m.toolUses.length > 0) {
-              restoreToolsForMessage(
-                m.id,
-                m.toolUses.map((t) => ({
-                  id: t.id,
-                  name: t.name,
-                  input: t.input,
-                  success: t.success,
-                  ...(t.output !== undefined ? { output: t.output } : {}),
-                }))
-              );
-            }
+        // Restore tool executions from persisted messages (for tool widget display).
+        // ALWAYS restore — even for same-session rewind. After rewind, messages are
+        // reloaded from disk with SDK-generated UUIDs, but tools in the store still
+        // reference the frontend UUIDs from the live streaming session. This ID
+        // mismatch makes tools invisible. restoreToolsForMessage() re-keys the tools
+        // to the correct (disk) message IDs so toolsByMessageId lookup succeeds.
+        for (const m of message.messages) {
+          if (m.toolUses && m.toolUses.length > 0) {
+            restoreToolsForMessage(
+              m.id,
+              m.toolUses.map((t) => ({
+                id: t.id,
+                name: t.name,
+                input: t.input,
+                success: t.success,
+                ...(t.output !== undefined ? { output: t.output } : {}),
+                ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
+              }))
+            );
           }
+        }
+
+        // ── DIAGNOSTIC: Log tool state AFTER rewind processing ──
+        {
+          const toolStateAfter = useToolStore.getState();
+          const rewoundMsgIds = rewoundMessages.map((m) => m.id);
+          const toolsMatchingRewound = toolStateAfter.completedTools.filter((t) =>
+            rewoundMsgIds.includes(t.messageId)
+          );
+          const toolsOrphaned = toolStateAfter.completedTools.filter(
+            (t) => !rewoundMsgIds.includes(t.messageId)
+          );
+
+          logger.warn('[DIAG:REWIND] After rewind processing', {
+            isSameSession,
+            toolRestorationRan: true,
+            totalCompletedTools: toolStateAfter.completedTools.length,
+            toolsMatchingRewoundMessages: toolsMatchingRewound.length,
+            toolsOrphaned: toolsOrphaned.map((t) => ({
+              toolId: t.id,
+              msgId: t.messageId,
+              name: t.toolName,
+            })),
+            rewoundMessageIds: rewoundMsgIds,
+          });
         }
         break;
       }

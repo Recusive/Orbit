@@ -492,6 +492,10 @@ function truncateSessionJsonl(
       uuid?: string;
       type?: string;
       parentUuid?: string;
+      message?: {
+        id?: string;
+        content?: unknown;
+      };
     }
     const parsedLines: (ParsedLine | null)[] = lines.map((line) => {
       try {
@@ -548,7 +552,64 @@ function truncateSessionJsonl(
       }
     }
 
-    // Keep all lines up to and including the target message
+    // If the target is an assistant message, extend forward to include the
+    // COMPLETE agentic turn. The SDK writes each content block (text, tool_use)
+    // as separate JSONL lines with different UUIDs but the same API message ID.
+    // Without this extension, truncating at the text block's UUID would drop
+    // the tool_use blocks, tool_results, and assistant continuations that
+    // belong to the same turn — causing tool widgets to disappear after reload.
+    //
+    // A complete turn is: assistant blocks + user tool_results + assistant
+    // continuations, repeating until the next non-tool-result user message.
+    if (targetParsed?.type === 'assistant') {
+      const originalIndex = targetLineIndex;
+
+      for (let i = targetLineIndex + 1; i < parsedLines.length; i++) {
+        const parsed = parsedLines[i];
+
+        // Skip non-message lines (queue-operation, file-history-snapshot, etc.)
+        // They'll be included automatically by the slice if the turn extends past them.
+        if (!parsed?.type || (parsed.type !== 'assistant' && parsed.type !== 'user')) {
+          continue;
+        }
+
+        if (parsed.type === 'assistant') {
+          // More assistant content (tool_use, text continuation) — part of this turn
+          targetLineIndex = i;
+        } else {
+          // parsed.type === 'user' (only remaining option after guard above)
+          // Check if this is a tool_result (part of the turn) or a new user message (next turn).
+          // Tool results have content as an array with {type: "tool_result"} objects.
+          const content = parsed.message?.content;
+          const isToolResult =
+            Array.isArray(content) &&
+            content.length > 0 &&
+            typeof content[0] === 'object' &&
+            content[0] !== null &&
+            'type' in content[0] &&
+            (content[0] as { type: string }).type === 'tool_result';
+
+          if (isToolResult) {
+            targetLineIndex = i;
+          } else {
+            break; // New user turn — stop here
+          }
+        }
+      }
+
+      if (targetLineIndex > originalIndex) {
+        logger.info(
+          {
+            originalIndex,
+            extendedIndex: targetLineIndex,
+            linesAdded: targetLineIndex - originalIndex,
+          },
+          'Extended truncation point to include complete agentic turn'
+        );
+      }
+    }
+
+    // Keep all lines up to and including the (possibly extended) target
     const linesToKeep = lines.slice(0, targetLineIndex + 1);
     const linesRemoved = lines.length - linesToKeep.length;
 
@@ -624,6 +685,47 @@ function copySessionJsonl(
     const errorMsg = error instanceof Error ? error.message : String(error);
     logger.error({ error, oldSdkSessionId, newSdkSessionId }, 'Failed to copy JSONL file');
     return { success: false, error: errorMsg };
+  }
+}
+
+/**
+ * Delete a session's JSONL file (and its optional .usage.json sidecar).
+ * Used to clean up phantom JSONL entries created during the fork/rewind flow.
+ *
+ * @param sdkSessionId - The SDK session ID (JSONL filename without extension)
+ * @param cwd - Working directory (fallback for locating the project directory)
+ */
+function deleteSessionJsonl(sdkSessionId: string, cwd: string): void {
+  try {
+    let jsonlPath = findSessionJsonl(sdkSessionId);
+
+    if (!jsonlPath) {
+      const projectDir = path.join(os.homedir(), '.claude', 'projects', encodeWorkspacePath(cwd));
+      const fallbackPath = path.join(projectDir, `${sdkSessionId}.jsonl`);
+      if (fs.existsSync(fallbackPath)) {
+        jsonlPath = fallbackPath;
+      }
+    }
+
+    if (!jsonlPath) {
+      logger.debug(
+        { sdkSessionId, cwd },
+        'JSONL file not found for deletion (already cleaned up?)'
+      );
+      return;
+    }
+
+    fs.unlinkSync(jsonlPath);
+    logger.info({ sdkSessionId, jsonlPath }, 'Deleted JSONL file');
+
+    // Also delete the .usage.json sidecar if it exists
+    const usagePath = jsonlPath.replace(/\.jsonl$/, '.usage.json');
+    if (fs.existsSync(usagePath)) {
+      fs.unlinkSync(usagePath);
+      logger.debug({ sdkSessionId }, 'Deleted .usage.json sidecar');
+    }
+  } catch (error) {
+    logger.debug({ error, sdkSessionId }, 'Failed to delete JSONL file (non-critical)');
   }
 }
 
@@ -725,6 +827,17 @@ export class SessionManager extends Disposable {
   private pendingDisplayNames = new Map<string, string>();
   private browserToolUnsubscribers = new Map<string, () => void>();
 
+  /**
+   * Tracks intermediate JSONL files created by forkSessionAt that need cleanup.
+   * Key: orbit session ID (frontend-facing), Value: { intermediateId, cwd }
+   * Cleaned up when system:init fires (we learn the final SDK session ID)
+   * or when deleteSession is called (user navigated away without sending).
+   */
+  private pendingJsonlDeletions = new Map<
+    string,
+    { intermediateId: string; originalSdkId?: string; cwd: string }
+  >();
+
   // Track the current turn ID per session (our OWN stable ID, not SDK's uuid)
   // The SDK sends different UUIDs for each message (stream_event, assistant, etc.)
   // We generate our own stable turn ID when a turn starts and use it for ALL events
@@ -776,6 +889,7 @@ export class SessionManager extends Disposable {
     rekey(this.pendingDisplayNames);
     rekey(this.browserToolUnsubscribers);
     rekey(this.currentTurnId);
+    rekey(this.pendingJsonlDeletions);
 
     if (this.sessionInitFired.has(oldId)) {
       this.sessionInitFired.delete(oldId);
@@ -1035,6 +1149,41 @@ export class SessionManager extends Disposable {
                 isResumed: resumeState.isResumed,
                 isForked: resumeState.isForked,
               });
+
+              // Clean up intermediate JSONL from forkSessionAt.
+              // The intermediate was a copy of the truncated original, needed only
+              // for the SDK to read and create its own session. Now that system:init
+              // has fired, the SDK owns a new JSONL with sdkSessionId — the intermediate
+              // is an orphan that would appear as a phantom sidebar entry.
+              const pending = this.pendingJsonlDeletions.get(sessionId);
+              if (pending) {
+                // Delete intermediate JSONL if the SDK created its own (different ID)
+                if (pending.intermediateId !== sdkSessionId) {
+                  logger.info(
+                    { intermediateId: pending.intermediateId, finalSdkId: sdkSessionId },
+                    'Deleting intermediate JSONL (forkSessionAt cleanup)'
+                  );
+                  deleteSessionJsonl(pending.intermediateId, pending.cwd);
+                }
+
+                // Delete the original JSONL if the rewindFiles CLI zombie recreated it.
+                // The CLI process spawned by rewindFiles() may continue running after
+                // interrupt and recreate the JSONL we deleted in forkSessionAt.
+                // By the time system:init fires (first message sent), the CLI has
+                // definitely finished, so this catches any zombie-recreated files.
+                if (pending.originalSdkId && pending.originalSdkId !== sdkSessionId) {
+                  logger.info(
+                    { originalSdkId: pending.originalSdkId, finalSdkId: sdkSessionId },
+                    'Deleting original JSONL (rewindFiles zombie cleanup)'
+                  );
+                  deleteSessionJsonl(pending.originalSdkId, pending.cwd);
+                }
+
+                // Always clean up the map entry — previously this was skipped when
+                // intermediateId === sdkSessionId (SDK reused the intermediate ID),
+                // which caused the entry to leak in the map forever.
+                this.pendingJsonlDeletions.delete(sessionId);
+              }
             }
             continue;
           }
@@ -1448,6 +1597,22 @@ export class SessionManager extends Disposable {
       this.activeSessions.delete(sessionId);
     }
 
+    // Clean up intermediate JSONL from forkSessionAt if the user navigated away
+    // without sending a message (system:init never fired to clean it up).
+    const pendingDeletion = this.pendingJsonlDeletions.get(sessionId);
+    if (pendingDeletion) {
+      logger.info(
+        { sessionId, intermediateId: pendingDeletion.intermediateId },
+        'Deleting intermediate JSONL on session delete (user navigated away without sending)'
+      );
+      deleteSessionJsonl(pendingDeletion.intermediateId, pendingDeletion.cwd);
+      // Also clean up any zombie-recreated original JSONL
+      if (pendingDeletion.originalSdkId) {
+        deleteSessionJsonl(pendingDeletion.originalSdkId, pendingDeletion.cwd);
+      }
+      this.pendingJsonlDeletions.delete(sessionId);
+    }
+
     this.pendingTools.delete(sessionId);
     this.approvedToolNames.delete(sessionId);
     this.sessionResumeState.delete(sessionId);
@@ -1755,8 +1920,27 @@ export class SessionManager extends Disposable {
       'Copied truncated JSONL to new session ID'
     );
 
-    // Delete the current session (clears SDK memory)
+    // Delete the ORIGINAL truncated JSONL — the copy is all we need.
+    // Without this, conversationList() finds both files on disk and creates
+    // duplicate sidebar entries (the truncated original + the copy).
+    deleteSessionJsonl(sdkSessionId, savedCwd);
+
+    // Delete the current session (clears SDK memory).
+    // IMPORTANT: Do this BEFORE adding to pendingJsonlDeletions, because
+    // deleteSession() checks pendingJsonlDeletions and would delete the
+    // intermediate JSONL we still need for the new session's resumeSessionId.
     await this.deleteSession(sessionId);
+
+    // Track the intermediate copy for cleanup when system:init fires.
+    // At that point the SDK will have created its own JSONL with the final session ID.
+    // The intermediate is only needed until the SDK reads it and creates the real session.
+    // Also track the original SDK session ID: the rewindFiles CLI process may have
+    // recreated the original JSONL after we deleted it (zombie process race condition).
+    this.pendingJsonlDeletions.set(sessionId, {
+      intermediateId: newSdkSessionId,
+      originalSdkId: sdkSessionId,
+      cwd: savedCwd,
+    });
 
     // Create new session that resumes from the COPIED JSONL with NEW session ID
     //
@@ -2044,6 +2228,19 @@ Return ONLY the JSON object with the command definition.`;
       resolver({ decision: 'deny', always: false });
     }
     this.permissionResolvers.clear();
+
+    // Clean up zombie-recreated original JNONLs, but PRESERVE intermediates.
+    // The intermediate JSONL is the ONLY copy of the user's rewound conversation
+    // if they haven't sent a message yet. Deleting it on shutdown would silently
+    // destroy the user's work. The intermediate will remain on disk and appear
+    // in the sidebar when the app restarts — the user can resume from it.
+    for (const [, pending] of this.pendingJsonlDeletions.entries()) {
+      if (pending.originalSdkId) {
+        deleteSessionJsonl(pending.originalSdkId, pending.cwd);
+      }
+      // NOTE: We intentionally do NOT delete pending.intermediateId here.
+    }
+    this.pendingJsonlDeletions.clear();
 
     // Cancel all background consumers
     for (const [, consumer] of this.sessionConsumers.entries()) {

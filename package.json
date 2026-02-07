@@ -128,6 +128,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/react": "^10.36.0",
     "@sentry/vite-plugin": "^4.7.0",
+    "@streamdown/code": "^1.0.1",
     "@streamdown/mermaid": "^1.0.1",
     "@tabler/icons-react": "^3.36.1",
     "@tailwindcss/vite": "^4.1.18",

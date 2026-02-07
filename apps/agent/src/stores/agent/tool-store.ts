@@ -506,6 +506,19 @@ export const useToolStore = create<ToolState>()(
           // Detect initial load (first time setting currentSessionId)
           const isInitialLoad = state.currentSessionId === null;
 
+          // ── DIAGNOSTIC: Log switchSession decision ──
+          const hasCached = !!state.sessionCache[newSessionId];
+          const branch = hasCached ? 'cached' : isInitialLoad ? 'initialLoad' : 'newSession-RESET';
+          logger.warn(`[DIAG:TOOLS] switchSession: ${branch}`, {
+            from: state.currentSessionId,
+            to: newSessionId,
+            isInitialLoad,
+            hasCachedData: hasCached,
+            completedToolsBefore: state.completedTools.length,
+            activeToolsBefore: Object.keys(state.activeTools).length,
+            cachedSessionIds: Object.keys(state.sessionCache),
+          });
+
           // Save current session's data to cache (if we have a current session)
           if (state.currentSessionId) {
             state.sessionCache[state.currentSessionId] = {
@@ -533,6 +546,13 @@ export const useToolStore = create<ToolState>()(
             state.processedMessageIds = new Set(cached.processedIds);
             state.activeTools = { ...cached.activeTools };
             state.completedTools = [...cached.completedTools];
+
+            // ── DIAGNOSTIC: Log restored cache content ──
+            logger.warn('[DIAG:TOOLS] switchSession restored from cache', {
+              sessionId: newSessionId,
+              restoredToolCount: cached.completedTools.length,
+              restoredToolIds: cached.completedTools.map((t) => `${t.id}→${t.messageId}`),
+            });
           } else if (isInitialLoad) {
             // Initial load - DON'T clear tools! The restore effect will populate them
             // from the backend. Only reset usage tracking.
@@ -657,6 +677,17 @@ export const useToolStore = create<ToolState>()(
           for (const tool of tools) {
             const existingIdx = state.completedTools.findIndex((t) => t.id === tool.id);
 
+            // ── DIAGNOSTIC: Log tool matching ──
+            const existingTool = existingIdx >= 0 ? state.completedTools[existingIdx] : undefined;
+            logger.warn('[DIAG:RESTORE] restoreToolsForMessage matching', {
+              toolId: tool.id,
+              toolName: tool.name,
+              targetMessageId: messageId,
+              existingIdx,
+              existingMessageId: existingTool?.messageId ?? 'N/A',
+              action: existingTool ? 'REPLACE' : 'PUSH',
+            });
+
             const toolExecution: ToolExecution = {
               id: tool.id,
               messageId,
@@ -680,14 +711,22 @@ export const useToolStore = create<ToolState>()(
 
           // Also update sessionCache so tools survive session switches
           // Without this, switching away and back would lose the restored tools
-          if (state.currentSessionId) {
-            const existingCache = state.sessionCache[state.currentSessionId];
-            state.sessionCache[state.currentSessionId] = {
+          const sid = state.currentSessionId;
+          if (sid) {
+            const existingCache = state.sessionCache[sid];
+            state.sessionCache[sid] = {
               usage: existingCache?.usage ?? { ...initialUsage },
               processedIds: existingCache?.processedIds ?? [],
               activeTools: existingCache?.activeTools ?? {},
               completedTools: [...state.completedTools],
             };
+
+            // ── DIAGNOSTIC: Log sessionCache update ──
+            logger.warn('[DIAG:RESTORE] sessionCache updated', {
+              sessionId: sid,
+              cachedToolCount: state.completedTools.length,
+              cachedToolIds: state.completedTools.map((t) => `${t.id}→${t.messageId}`),
+            });
           }
         });
       },
