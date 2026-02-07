@@ -23,7 +23,7 @@ const HoverCardContent = React.forwardRef<
     align={align}
     sideOffset={sideOffset}
     className={cn(
-      'z-50 w-64 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none',
+      'z-50 w-64 rounded-md border bg-popover glass-float p-4 text-popover-foreground shadow-md outline-none',
       // Transform origin from Radix - scales from where it connects to trigger
       'origin-[--radix-hover-card-content-transform-origin]',
       // Enter animation: subtle scale + fade + directional slide

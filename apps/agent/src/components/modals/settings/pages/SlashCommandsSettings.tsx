@@ -85,7 +85,7 @@ const CommandCard: FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Slash className="h-3.5 w-3.5 -rotate-[25deg] text-primary/80" />
+            <Slash className="h-3.5 w-3.5 -rotate-25 text-primary/80" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -833,7 +833,7 @@ export const SlashCommandsSettings: FC = () => {
           {/* Empty state */}
           {commands.length === 0 && (
             <div className="text-center py-8 text-muted-foreground/90 text-sm">
-              <Slash className="h-8 w-8 mx-auto mb-2 opacity-50 -rotate-[25deg]" />
+              <Slash className="h-8 w-8 mx-auto mb-2 opacity-50 -rotate-25" />
               <p>No commands available.</p>
               <p className="text-xs mt-1">Create a command to quickly run common prompts.</p>
             </div>

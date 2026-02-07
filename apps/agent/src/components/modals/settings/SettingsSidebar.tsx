@@ -48,7 +48,7 @@ const NAV_ITEMS: NavItemConfig[] = [
   {
     id: 'commands',
     label: 'Commands',
-    icon: <Slash className="h-3.5 w-3.5 -rotate-[25deg]" />,
+    icon: <Slash className="h-3.5 w-3.5 -rotate-25" />,
   },
   {
     id: 'shortcuts',

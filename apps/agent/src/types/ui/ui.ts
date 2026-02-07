@@ -390,7 +390,7 @@ export function createDefaultUIPreferences(): UIPreferences {
     lineHeight: 1.5,
     compactMode: false,
     showLineNumbers: true,
-    wordWrap: true,
+    wordWrap: false,
     animations: true,
     soundEffects: false,
     autoSave: true,

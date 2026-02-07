@@ -737,7 +737,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
   gotoPosition,
   onGotoComplete,
   searchTrigger = null,
-  wordWrap = true,
+  wordWrap = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);

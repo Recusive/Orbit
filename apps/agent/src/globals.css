@@ -175,7 +175,7 @@
   --foreground: oklch(0.24 0.02 55); /* Headline #3D3630 */
   --card: var(--surface);
   --card-foreground: oklch(0.24 0.02 55);
-  --popover: var(--surface);
+  --popover: oklch(0.87 0.02 75 / 88%); /* Floating surfaces - more opaque than base surface for readability */
   --popover-foreground: oklch(0.24 0.02 55);
   --primary: oklch(0.56 0.18 35); /* Coral - darker for better contrast */
   --primary-foreground: oklch(0.98 0.01 75);
@@ -309,7 +309,7 @@ html.dark {
   --foreground: oklch(0.93 0.01 75); /* Warm cream white */
   --card: var(--surface);
   --card-foreground: oklch(0.93 0.01 75);
-  --popover: var(--surface);
+  --popover: oklch(0.2 0.015 58 / 75%); /* Floating surfaces - more opaque than base surface for readability */
   --popover-foreground: oklch(0.93 0.01 75);
   --primary: oklch(0.68 0.19 40); /* Coral - slightly brighter for dark */
   --primary-foreground: oklch(0.15 0.01 60);
@@ -1153,6 +1153,14 @@ html.dark .liquid-glass {
   box-shadow:
     0 1px 3px oklch(0 0 0 / 25%),
     inset 0 0.5px 0 oklch(1 0 0 / 6%);
+}
+
+/* Frosted glass surface for floating UI elements (dialogs, popovers, menus, selects).
+   Adds backdrop-filter blur so semi-transparent backgrounds look frosted, not see-through.
+   Only active in liquid glass mode — solid mode has fully opaque backgrounds. */
+html:not(.window-mode-solid) .glass-float {
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
 }
 
 /* Liquid hover effect - warm coral tint matching primary */

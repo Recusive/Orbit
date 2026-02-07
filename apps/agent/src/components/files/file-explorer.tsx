@@ -6,15 +6,7 @@
  */
 import { createLogger } from '@orbit/common/lib';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import {
-  AlertCircle,
-  ChevronDown,
-  ChevronRight,
-  FolderOpen,
-  Loader2,
-  RefreshCw,
-  Search,
-} from 'lucide-react';
+import { AlertCircle, ChevronRight, FolderOpen, Loader2, RefreshCw, Search } from 'lucide-react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 
 import type { FileStatus } from '@/lib/api';
@@ -427,17 +419,32 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
         onClick={handleClick}
         title={isGitIgnored ? `${path} (gitignored)` : path}
       >
+        {/* Indent guide lines - one vertical line per ancestor depth level */}
+        {depth > 0 &&
+          Array.from({ length: depth }, (_, i) => (
+            <span
+              key={i}
+              className="absolute top-0 bottom-0 w-px bg-muted-foreground/15 pointer-events-none"
+              style={{ left: i * 12 + 16 }}
+              aria-hidden="true"
+            />
+          ))}
+
         {/* Expand/collapse chevron for directories */}
         <span className="w-4 h-4 flex items-center justify-center shrink-0">
           {node.isDirectory ? (
-            isLoading ? (
-              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-            ) : error ? (
+            error ? (
               <AlertCircle className="h-3 w-3 text-destructive" />
-            ) : isExpanded ? (
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            ) : isLoading && !isExpanded ? (
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
             ) : (
-              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+              <ChevronRight
+                className={cn(
+                  'h-3 w-3 text-muted-foreground transition-transform duration-150',
+                  isExpanded && 'rotate-90'
+                )}
+                aria-hidden="true"
+              />
             )
           ) : null}
         </span>

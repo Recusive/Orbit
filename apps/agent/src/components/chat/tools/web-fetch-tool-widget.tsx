@@ -180,7 +180,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
                       </div>
                     ) : output ? (
                       <div className="bg-muted/30 rounded-md p-2 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
-                        <pre className="whitespace-pre-wrap break-words m-0">{output}</pre>
+                        <pre className="whitespace-pre-wrap wrap-break-word m-0">{output}</pre>
                       </div>
                     ) : (
                       <div className="text-sm text-muted-foreground/40 italic">

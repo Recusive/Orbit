@@ -225,7 +225,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                     </div>
                     {highlightedCommand ? (
                       <div
-                        className="bg-muted/40 rounded-md px-2 py-1 font-mono text-sm [&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_code]:!bg-transparent"
+                        className="bg-muted/40 rounded-md px-2 py-1 font-mono text-sm [&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word [&_code]:bg-transparent!"
                         dangerouslySetInnerHTML={{ __html: highlightedCommand }}
                       />
                     ) : (
@@ -263,11 +263,13 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                       <div className="bg-muted/30 rounded-md p-2 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
                         {highlightedOutput ? (
                           <div
-                            className="[&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-0 [&_code]:!bg-transparent [&_pre]:whitespace-pre-wrap [&_pre]:break-words"
+                            className="[&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_code]:bg-transparent! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word"
                             dangerouslySetInnerHTML={{ __html: highlightedOutput }}
                           />
                         ) : (
-                          <pre className="whitespace-pre-wrap break-words m-0">{displayOutput}</pre>
+                          <pre className="whitespace-pre-wrap wrap-break-word m-0">
+                            {displayOutput}
+                          </pre>
                         )}
                         {hasMoreLines ? (
                           <div className="mt-1.5 text-muted-foreground/70 text-xs">

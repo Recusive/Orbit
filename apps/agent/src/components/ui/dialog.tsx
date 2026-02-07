@@ -41,7 +41,7 @@ const DialogContent = React.forwardRef<
         <DialogPrimitive.Content
           ref={ref}
           className={cn(
-            'relative z-10 grid w-full max-w-lg gap-4 border-[3px] border-border/40 bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-xl pointer-events-auto',
+            'relative z-10 grid w-full max-w-lg gap-4 border-[3px] border-border/40 bg-popover glass-float p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-xl pointer-events-auto',
             className
           )}
           style={{
@@ -76,7 +76,7 @@ const DialogContentTopCenter = React.forwardRef<
         <DialogPrimitive.Content
           ref={ref}
           className={cn(
-            'relative z-10 grid border-[3px] border-border/40 bg-card rounded-xl',
+            'relative z-10 grid border-[3px] border-border/40 bg-popover glass-float rounded-xl',
             'duration-150 data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-[0.98] data-[state=open]:zoom-in-[0.98]',

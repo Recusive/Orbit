@@ -86,7 +86,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               aria-describedby={undefined}
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
-                'bg-card',
+                'bg-popover glass-float',
                 'border-[3px] border-border/40 rounded-xl overflow-hidden flex flex-col',
                 'shadow-lg duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
