@@ -6,6 +6,7 @@ import { FileChangeItem } from './file-change-item';
 import type { FileChange } from '@/stores/file/file-store';
 import type { FC } from 'react';
 
+import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { useChangedFiles, useFileStore } from '@/stores/file/file-store';
 
 export interface FilesChangedListProps {
@@ -30,9 +31,15 @@ export const FilesChangedList: FC<FilesChangedListProps> = ({ className = '', on
   if (filteredFiles.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-        <GitCompareArrows className="h-12 w-12 mb-4 opacity-50" />
-        <p className="text-sm">No files changed</p>
-        <p className="text-xs mt-1 opacity-70">Changes will appear here</p>
+        <div className="flex flex-col items-center gap-3 rounded-2xl bg-muted/50 dark:bg-background px-8 py-6 w-fit min-w-[14rem]">
+          <div className="flex items-center gap-3 opacity-50">
+            <OrbitLogo className="h-18 w-18" />
+            <div className="w-0.5 h-8 bg-current opacity-40" />
+            <GitCompareArrows className="h-12 w-12" />
+          </div>
+          <p className="text-sm">No files changed</p>
+          <p className="text-xs opacity-50">Changes will appear here</p>
+        </div>
       </div>
     );
   }

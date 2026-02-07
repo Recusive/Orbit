@@ -117,7 +117,7 @@ If cycle 2+, read `reviews/cycle-{PREV}-team.md` first. Escalate unfixed issues:
 ### Type Safety
 - No `any` without comment explaining why
 - No `@ts-ignore` without comment
-- Null/undefined handled explicitly (not `!` assertions without cause)
+- Null/undefined handled explicitly (no unwarranted non-null assertions)
 
 ### Security
 - No hardcoded secrets
@@ -197,7 +197,7 @@ If cycle 2+, read `reviews/cycle-{PREV}-team.md` first. Escalate unfixed issues:
 ### Type Safety
 - No `any` without comment explaining why
 - No `@ts-ignore` without comment
-- Null/undefined handled explicitly (not `!` assertions without cause)
+- Null/undefined handled explicitly (no unwarranted non-null assertions)
 - Zod schemas use .strict() for internal data, .passthrough() for external
 
 ### React Patterns

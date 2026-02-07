@@ -36,7 +36,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({ value, onChange, onCommi
         rows={COMMIT_TEXTAREA_ROWS} // Extracted constant
         className="
           w-full px-2.5 py-2 rounded-lg text-sm
-          bg-muted/30 border-3 border-border/50
+          bg-muted/50 dark:bg-background border-3 border-muted-foreground/15
           placeholder:text-muted-foreground/50
           focus:outline-none focus:border-primary/40 focus:bg-muted/40
           transition-[background-color,border-color,box-shadow] duration-200 resize-none

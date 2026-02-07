@@ -124,7 +124,7 @@ Review against these criteria. **Skip categories that don't apply** to the chang
 
 - No `any` without comment explaining why
 - No `@ts-ignore` without comment
-- Null/undefined handled explicitly (not `!` assertions without cause)
+- Null/undefined handled explicitly (no unwarranted non-null assertions)
 
 ### React Patterns
 
