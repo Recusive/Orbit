@@ -168,6 +168,11 @@ export const SendMessageRequestSchema = z
      * should have parentUuid set to the message we rewound to.
      * - null for the first message in a conversation
      * - undefined if not specified (default behavior)
+     *
+     * TODO(code-review/cycle-1#6): parentUuid is defined in the schema but not yet
+     * wired through to the SDK via sendMessage(). The forkSessionAt flow reads
+     * parentUuid from JSONL data, but the send_message handler in index.ts does
+     * not forward this field to session-manager. Wire to SDK or remove if unneeded.
      */
     parentUuid: z.string().nullish(),
   })

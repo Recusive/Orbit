@@ -270,6 +270,8 @@ export const BrowserPanel: FC = () => {
     const SASH_HOVER_INSET = 3;
     const sashCleanups: (() => void)[] = [];
 
+    // NOTE: Sash class name comes from allotment's CSS modules. This hash may change
+    // when allotment is updated — verify after upgrading allotment package.
     const splitView = viewportRef.current.closest('[class*="allotment-module_splitView"]');
     if (splitView) {
       const sashes = splitView.querySelectorAll('[class*="allotment-module_sash"]');

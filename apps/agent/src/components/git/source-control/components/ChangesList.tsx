@@ -45,8 +45,8 @@ export const ChangesList: React.FC<ChangesListProps> = ({
   const hasChanges = stagedFiles.length > 0 || unstagedFiles.length > 0;
 
   // Default to whichever tab has files (prefer changes — more common workflow)
-  const [activeTab, setActiveTab] = useState<ActiveTab>(
-    () => (unstagedFiles.length > 0 ? 'changes' : 'staged') as ActiveTab
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() =>
+    unstagedFiles.length > 0 ? 'changes' : 'staged'
   );
 
   // Build O(1) lookup maps for diffs by file path

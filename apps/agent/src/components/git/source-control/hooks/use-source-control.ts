@@ -6,6 +6,7 @@
  * NOTE: Git status polling is handled globally by useGitPolling (mounted in RootLayout).
  * This hook reads from the shared GitStore and provides operations (stage, commit, etc.).
  */
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { OPERATION_ERROR_TIMEOUT } from '../constants';
@@ -29,6 +30,8 @@ import {
   gitUnstage,
 } from '@/lib/api';
 import { useGitStore } from '@/stores/git/git-store';
+
+const logger = createLogger('useSourceControl');
 
 /** Convert backend status to display status */
 const toDisplayStatus = (backendStatus: BackendFileStatus): DisplayFileStatus => {
@@ -145,8 +148,8 @@ export function useSourceControl(): UseSourceControlReturn {
       const [staged, unstaged] = await Promise.all([gitStagedDiff(repo), gitDiffStructured(repo)]);
       setStagedDiffs(staged);
       setUnstagedDiffs(unstaged);
-    } catch {
-      // Diffs are an optional visual enhancement — don't block on failure
+    } catch (error: unknown) {
+      logger.debug('Failed to fetch diffs', { error });
     }
   }, []);
 

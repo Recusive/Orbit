@@ -25,6 +25,8 @@ import { useUIStore } from '@/stores/ui/ui-store';
 
 export interface StatusBarProps {
   className?: string;
+  /** When true, renders with a transparent background (used on welcome page) */
+  transparent?: boolean;
 }
 
 /** Maximum length for branch name before truncation */
@@ -134,7 +136,7 @@ const StatusItem: FC<StatusItemProps> = ({ children, title, onClick, className }
  * StatusBar displays git info, cursor position, and file info.
  * Styled similar to VS Code's status bar.
  */
-export const StatusBar: FC<StatusBarProps> = ({ className }) => {
+export const StatusBar: FC<StatusBarProps> = ({ className, transparent = false }) => {
   // Git state
   const branch = useGitStore(selectBranch);
   const ahead = useGitStore(selectAhead);
@@ -170,7 +172,7 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
     <div
       className={cn(
         'relative h-[22px] flex items-stretch justify-between px-3',
-        'bg-card',
+        transparent ? 'bg-transparent' : 'bg-card',
         'before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-border/50',
         'text-muted-foreground',
         className

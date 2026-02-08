@@ -335,7 +335,16 @@ export class OrbitAgent {
    * Set to the temp ID at creation, then updated to the SDK ID on system:init.
    * Closures use this instead of capturing a stale temp ID.
    */
-  effectiveSessionId = '';
+  private _effectiveSessionId = '';
+
+  /** @internal The canonical session ID used for Map keys and event emissions. */
+  get effectiveSessionId(): string {
+    return this._effectiveSessionId;
+  }
+
+  set effectiveSessionId(value: string) {
+    this._effectiveSessionId = value;
+  }
 
   /** The working directory for this agent session. */
   get workingDirectory(): string {
@@ -927,8 +936,9 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             'Categorized CLI stderr error'
           );
 
-          // On auth/session errors, attempt an automatic credential refresh
-          // before surfacing the error — the refreshed token may fix the issue
+          // On auth/session errors, attempt refresh FIRST — only surface the error
+          // to the frontend if the refresh also fails. This prevents premature error
+          // toasts when a simple token refresh would have resolved the issue.
           if (
             categorized.category === 'AUTH_FAILED' ||
             categorized.category === 'SESSION_EXPIRED'
@@ -936,20 +946,25 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             void ClaudeCredentials.refreshIfNeeded()
               .then((result) => {
                 if (result.refreshed) {
-                  logger.info('Auto-refreshed credentials after CLI auth error');
+                  logger.info(
+                    'Auto-refreshed credentials after CLI auth error — suppressing error'
+                  );
                 } else {
-                  // Refresh failed — notify via auth failure callback
+                  // Refresh failed — NOW surface both the stderr error and auth failure
+                  this._onStderrError?.(categorized);
                   this._onAuthFailure?.(categorized.message);
                 }
               })
               .catch((err: unknown) => {
                 const msg = err instanceof Error ? err.message : String(err);
                 logger.error({ error: msg }, 'Credential refresh threw during stderr recovery');
+                this._onStderrError?.(categorized);
                 this._onAuthFailure?.(categorized.message);
               });
+          } else {
+            // Non-auth errors: surface immediately
+            this._onStderrError(categorized);
           }
-
-          this._onStderrError(categorized);
         }
       }
     };

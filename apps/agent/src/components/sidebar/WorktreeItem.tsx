@@ -85,7 +85,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
       }}
     >
       <div
-        role="button"
+        role="group"
         tabIndex={0}
         className={cn(
           'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-100 hover:bg-muted/40 cursor-default',

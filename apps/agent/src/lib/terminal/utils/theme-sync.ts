@@ -89,7 +89,7 @@ function detectThemeFromCSSVars(): ITheme | undefined {
 /**
  * Get the best available theme for xterm.js
  *
- * Tries CSS variables first (--terminal-bg, --terminal-fg, --terminal-cursor),
+ * Tries CSS variables first (--chat-area, --terminal-fg, --terminal-cursor),
  * falls back to the default dark theme if no CSS variables are defined.
  *
  * @returns ITheme object compatible with xterm.js Terminal options

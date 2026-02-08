@@ -127,6 +127,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
 
   // Track thinking start times by message ID to calculate duration
   const thinkingStartTimes = useRef<Map<string, number>>(new Map());
+  // Track whether non-thinking content arrived since last thinking chunk (for multi-block detection)
+  const hasContentSinceLastThinking = useRef<Map<string, boolean>>(new Map());
 
   // ============================================
   // Isolated Reactive Selectors (Minimal Subscriptions)
@@ -248,6 +250,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       messagesRef,
       messagesCache,
       thinkingStartTimes,
+      hasContentSinceLastThinking,
     });
   }, [
     // Only reactive dependencies - actions come from getState() inside useMemo
@@ -261,6 +264,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     messagesRef,
     messagesCache,
     thinkingStartTimes,
+    hasContentSinceLastThinking,
   ]);
 
   // Cleanup RAF batchers when handler changes OR on unmount

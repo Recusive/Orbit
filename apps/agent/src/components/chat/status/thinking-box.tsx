@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, CircleCheck } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -50,15 +50,15 @@ interface ThinkingBoxProps {
 }
 
 const formatDuration = (ms: number): string => {
-  const seconds = Math.floor(ms / 1000);
+  if (ms < 1000) {
+    return `${String(ms)}ms`;
+  }
+  const seconds = Math.round(ms / 100) / 10; // one decimal place
   if (seconds < 60) {
-    return `${String(seconds)} second${seconds !== 1 ? 's' : ''}`;
+    return `${String(seconds)}s`;
   }
   const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  if (remainingSeconds === 0) {
-    return `${String(minutes)} minute${minutes !== 1 ? 's' : ''}`;
-  }
+  const remainingSeconds = Math.round(seconds % 60);
   return `${String(minutes)}m ${String(remainingSeconds)}s`;
 };
 
@@ -144,9 +144,9 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
           <span className="text-xs font-medium truncate text-muted-foreground/90 group-hover/status:text-foreground">
             {isStreaming ? 'Thinking' : 'Thought'}
           </span>
-          <span className="text-xs text-muted-foreground/50">
-            {isStreaming ? '' : `for ${durationText}`}
-          </span>
+          {!isStreaming && thinkingDurationMs > 0 ? (
+            <span className="text-xs text-muted-foreground/50">for {durationText}</span>
+          ) : null}
         </div>
 
         <ChevronDown
@@ -171,25 +171,34 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-px h-full bg-violet-500/40" />
+                  <div className="w-[2px] h-full rounded-full bg-violet-500/40" />
                 </div>
 
                 {/* Content box */}
                 <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card overflow-hidden">
                   <div className="px-3 py-2 max-h-[500px] overflow-y-auto">
-                    <div className="text-sm text-muted-foreground/60 leading-[1.7] whitespace-pre-wrap font-mono tracking-tighter">
+                    <div className="text-sm text-muted-foreground/90 dark:text-muted-foreground/60 leading-[1.7] whitespace-pre-wrap font-mono tracking-tighter">
                       {tokenizedThinking ?? thinking}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Bottom connector stub */}
-              <div className="flex flex-row h-1 px-2.5">
-                <div className="w-5 flex justify-center">
-                  <div className="w-px h-full bg-border/20" />
+              {/* Completed status */}
+              {!isStreaming ? (
+                <div className="flex flex-row items-center px-2.5 py-1">
+                  <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-violet-500/15">
+                    <CircleCheck className="h-3 w-3 text-violet-500/80" />
+                  </div>
+                  <span className="ml-2.5 text-xs text-muted-foreground/90">Completed</span>
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-row h-1 px-2.5">
+                  <div className="w-5 flex justify-center">
+                    <div className="w-px h-full bg-border/20" />
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         ) : null}

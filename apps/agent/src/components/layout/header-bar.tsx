@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
 
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, getCommandKey } from '@/lib/utils';
 import { HEIGHTS } from '@/lib/utils/constants';
@@ -15,6 +15,8 @@ export type { HeaderTab } from '@/stores/ui/ui-store';
 
 export interface HeaderBarProps {
   className?: string;
+  /** When true, renders with a transparent background (used on welcome page) */
+  transparent?: boolean;
 }
 
 interface TabButtonProps {
@@ -57,7 +59,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
  * HeaderBar at the top of the app with navigation tabs.
  * Matches the sidebar background color.
  */
-export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
+export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }) => {
   const activeTab = useActiveTab();
   const workspaceName = useWorkspaceName();
   const hasWorkspace = useHasWorkspace();
@@ -109,15 +111,82 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
       data-tauri-drag-region
       className={cn(
         'flex items-center justify-between border-b border-border/50 shrink-0',
-        'bg-card shadow-lg',
+        transparent ? 'bg-transparent' : 'bg-card shadow-lg',
         // Left padding for macOS traffic light buttons (matches Cursor: x:11 + ~69px for 3 buttons)
         'pl-[80px]',
         className
       )}
       style={{ height: HEIGHTS.headerBar }}
     >
-      {/* Left spacer for balance (reduced since we have traffic light padding) */}
-      <div className="w-[122px]" />
+      {/* Navigation arrows */}
+      <div className="flex items-center gap-0.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              data-tauri-drag-region={false}
+              aria-label="Go back"
+              className={cn(
+                'h-6 w-6 flex items-center justify-center rounded-md',
+                'text-muted-foreground/60 hover:text-foreground',
+                'hover:bg-muted/40 active:scale-[0.95]',
+                'transition-all duration-150'
+              )}
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M10 6L4 12L10 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M5 12H20"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Go back</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              data-tauri-drag-region={false}
+              aria-label="Go forward"
+              className={cn(
+                'h-6 w-6 flex items-center justify-center rounded-md',
+                'text-muted-foreground/60 hover:text-foreground',
+                'hover:bg-muted/40 active:scale-[0.95]',
+                'transition-all duration-150'
+              )}
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M14 6L20 12L14 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M19 12H4"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Go forward</TooltipContent>
+        </Tooltip>
+      </div>
 
       {/* Center tabs - only show when workspace is open */}
       {hasWorkspace ? (
@@ -150,127 +219,129 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
 
       {/* Right section: Search + Action buttons */}
       {workspaceName ? (
-        <div className="flex items-center gap-1 h-full pr-0.5">
-          {/* Search button - pill style */}
-          <button
-            data-tauri-drag-region={false}
-            className={cn(
-              'flex items-center gap-2 h-[30px] px-2.5 rounded-lg',
-              'text-muted-foreground hover:text-foreground',
-              'bg-muted/40 dark:bg-background',
-              'hover:bg-muted/60 active:scale-[0.98]',
-              'transition-all duration-150'
-            )}
-            title="Search files (⌘K)"
-            onClick={handleOpenSearch}
-          >
-            <Search className="h-3.5 w-3.5 shrink-0" />
-            <span className="text-sm truncate max-w-[120px]">{searchText}</span>
-            <KbdGroup className="gap-0.5">
-              <Kbd className="h-[18px] text-[10px] px-1 bg-foreground/8 border-foreground/10">
-                ⌘
+        <div className="flex items-center h-full pr-0.5">
+          {/* Unified search + panel toggles container */}
+          <div className="flex items-center h-[30px] rounded-md border border-border/50 bg-muted/70 dark:bg-muted/50 overflow-hidden">
+            {/* Search button */}
+            <button
+              data-tauri-drag-region={false}
+              className={cn(
+                'flex items-center gap-2 h-full px-2.5',
+                'text-muted-foreground hover:text-foreground',
+                'hover:bg-muted/60 active:scale-[0.98]',
+                'transition-all duration-150'
+              )}
+              title="Search files (⌘K)"
+              onClick={handleOpenSearch}
+            >
+              <Search className="h-3.5 w-3.5 shrink-0" />
+              <span className="text-sm truncate max-w-[120px]">{searchText}</span>
+              <Kbd className="h-[18px] !text-[12px] px-1.5 bg-foreground/8 border-foreground/10">
+                <span className="text-[14px] leading-none">⌘</span> K
               </Kbd>
-              <Kbd className="h-[18px] text-[10px] px-1 bg-foreground/8 border-foreground/10">
-                K
-              </Kbd>
-            </KbdGroup>
-          </button>
+            </button>
 
-          {/* Panel toggles */}
-          <div className="flex items-center gap-0.5 rounded-lg border border-border/50 px-1 py-0.5">
-            {/* Activity Panel Toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  data-tauri-drag-region={false}
-                  onClick={toggleReviewPanel}
-                  className={cn(
-                    'h-6 w-6 flex items-center justify-center rounded-md',
-                    'hover:bg-muted/40 active:scale-[0.98]',
-                    'transition-all duration-150',
-                    reviewPanelOpen
-                      ? 'text-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  <div className="rotate-180">
-                    <svg
-                      aria-hidden="true"
-                      width="16"
-                      height="16"
-                      viewBox="1 1 22 22"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
-                        fill="currentColor"
-                      />
-                      <rect
-                        x="7"
-                        y="7"
-                        width={reviewPanelOpen ? 5 : 2}
-                        height="10"
-                        rx="1"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  </div>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="flex items-center gap-2">
-                <span>{reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}</span>
-                <Kbd className="bg-white/15 border-white/20">{getCommandKey()}B</Kbd>
-              </TooltipContent>
-            </Tooltip>
+            {/* Divider */}
+            <div className="w-px h-4 bg-border/50 shrink-0" />
 
-            {/* Terminal Toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  data-tauri-drag-region={false}
-                  onClick={handleToggleTerminal}
-                  aria-label={bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}
-                  className={cn(
-                    'h-6 w-6 flex items-center justify-center rounded-md',
-                    'hover:bg-muted/40 active:scale-[0.98]',
-                    'transition-all duration-150',
-                    bottomPanelOpen
-                      ? 'text-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  <Terminal className="h-3.5 w-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="flex items-center gap-2">
-                <span>{bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}</span>
-                <Kbd className="bg-white/15 border-white/20">^J</Kbd>
-              </TooltipContent>
-            </Tooltip>
+            {/* Panel toggles */}
+            <div className="flex items-center gap-0.5 px-1">
+              {/* Activity Panel Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    data-tauri-drag-region={false}
+                    onClick={toggleReviewPanel}
+                    aria-label={reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}
+                    className={cn(
+                      'h-6 w-6 flex items-center justify-center rounded-md',
+                      'hover:bg-muted/40 active:scale-[0.98]',
+                      'transition-all duration-150',
+                      reviewPanelOpen
+                        ? 'text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <div className="rotate-180">
+                      <svg
+                        aria-hidden="true"
+                        width="16"
+                        height="16"
+                        viewBox="1 1 22 22"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
+                          fill="currentColor"
+                        />
+                        <rect
+                          x="7"
+                          y="7"
+                          width={reviewPanelOpen ? 5 : 2}
+                          height="10"
+                          rx="1"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    </div>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="flex items-center gap-2">
+                  <span>{reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}</span>
+                  <Kbd className="bg-white/15 border-white/20">{getCommandKey()}B</Kbd>
+                </TooltipContent>
+              </Tooltip>
 
-            {/* Actions Bar Toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  data-tauri-drag-region={false}
-                  onClick={toggleRightSidebar}
-                  className={cn(
-                    'h-6 w-6 flex items-center justify-center rounded-md',
-                    'hover:bg-muted/40 active:scale-[0.98]',
-                    'transition-all duration-150',
-                    rightSidebarOpen
-                      ? 'text-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  <IconSquareGridCircle className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
-              </TooltipContent>
-            </Tooltip>
+              {/* Terminal Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    data-tauri-drag-region={false}
+                    onClick={handleToggleTerminal}
+                    aria-label={bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}
+                    className={cn(
+                      'h-6 w-6 flex items-center justify-center rounded-md',
+                      'hover:bg-muted/40 active:scale-[0.98]',
+                      'transition-all duration-150',
+                      bottomPanelOpen
+                        ? 'text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <Terminal className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="flex items-center gap-2">
+                  <span>{bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}</span>
+                  <Kbd className="bg-white/15 border-white/20">^J</Kbd>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Actions Bar Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    data-tauri-drag-region={false}
+                    onClick={toggleRightSidebar}
+                    aria-label={rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
+                    className={cn(
+                      'h-6 w-6 flex items-center justify-center rounded-md',
+                      'hover:bg-muted/40 active:scale-[0.98]',
+                      'transition-all duration-150',
+                      rightSidebarOpen
+                        ? 'text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <IconSquareGridCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </div>
       ) : (

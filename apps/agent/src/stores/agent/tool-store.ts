@@ -501,12 +501,9 @@ export const useToolStore = create<ToolState>()(
       },
 
       switchSession: (newSessionId: string) => {
-        logger.debug(`Switching session to: ${newSessionId}`);
         set((state) => {
-          // Detect initial load (first time setting currentSessionId)
-          const isInitialLoad = state.currentSessionId === null;
+          const isInitLoad = state.currentSessionId === null;
 
-          // Save current session's data to cache (if we have a current session)
           if (state.currentSessionId) {
             state.sessionCache[state.currentSessionId] = {
               usage: { ...state.sessionUsage },
@@ -515,7 +512,6 @@ export const useToolStore = create<ToolState>()(
               completedTools: [...state.completedTools],
             };
 
-            // Evict oldest sessions to prevent unbounded memory growth.
             const cacheKeys = Object.keys(state.sessionCache);
             if (cacheKeys.length > MAX_CACHED_SESSIONS) {
               const evictCount = cacheKeys.length - MAX_CACHED_SESSIONS;
@@ -525,22 +521,16 @@ export const useToolStore = create<ToolState>()(
             }
           }
 
-          // Check if we have cached data for the new session
           const cached = state.sessionCache[newSessionId];
           if (cached) {
-            // Restore cached session data
             state.sessionUsage = { ...cached.usage };
             state.processedMessageIds = new Set(cached.processedIds);
             state.activeTools = { ...cached.activeTools };
             state.completedTools = [...cached.completedTools];
-          } else if (isInitialLoad) {
-            // Initial load - DON'T clear tools! The restore effect will populate them
-            // from the backend. Only reset usage tracking.
+          } else if (isInitLoad) {
             state.sessionUsage = { ...initialUsage };
             state.processedMessageIds = new Set<string>();
-            // Keep activeTools and completedTools intact for restore effect
           } else {
-            // Switching to a genuinely new session - reset everything
             state.sessionUsage = { ...initialUsage };
             state.processedMessageIds = new Set<string>();
             state.activeTools = {};

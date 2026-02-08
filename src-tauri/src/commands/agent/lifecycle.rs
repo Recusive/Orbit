@@ -405,9 +405,19 @@ pub async fn agent_rewind_files(
     checkpoint_id: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
-    state
+    log::warn!(
+        "[REWIND] Tauri cmd agent_rewind_files — session_id={}, checkpoint_id={}",
+        session_id,
+        &checkpoint_id[..8.min(checkpoint_id.len())]
+    );
+    let result = state
         .rewind_files(&session_id, &checkpoint_id)
-        .map_err(to_error)
+        .map_err(to_error);
+    log::warn!(
+        "[REWIND] Tauri cmd agent_rewind_files — result={}",
+        if result.is_ok() { "ok" } else { "err" }
+    );
+    result
 }
 
 /// Fork a session at a specific message point.
@@ -419,9 +429,22 @@ pub async fn agent_fork_session_at(
     at_message_uuid: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<String> {
-    state
+    log::warn!(
+        "[REWIND] Tauri cmd agent_fork_session_at — session_id={}, at_message_uuid={}",
+        session_id,
+        &at_message_uuid[..8.min(at_message_uuid.len())]
+    );
+    let result = state
         .fork_session_at(&session_id, &at_message_uuid)
-        .map_err(to_error)
+        .map_err(to_error);
+    log::warn!(
+        "[REWIND] Tauri cmd agent_fork_session_at — result={}",
+        match &result {
+            Ok(id) => format!("ok({})", &id[..8.min(id.len())]),
+            Err(e) => format!("err({e})"),
+        }
+    );
+    result
 }
 
 /// Generate an agent definition from a natural language description
@@ -481,6 +504,13 @@ fn emit_permission_request(app: &AppHandle, request: &PermissionRequest) {
 
 /// Emit session init event
 fn emit_session_init(app: &AppHandle, init_event: &SessionInitEvent) {
+    log::warn!(
+        "[REWIND] Tauri emit agent:session_init — sessionId={}, sdkSessionId={}, isResumed={}, isForked={}",
+        init_event.session_id,
+        &init_event.sdk_session_id[..8.min(init_event.sdk_session_id.len())],
+        init_event.is_resumed,
+        init_event.is_forked,
+    );
     drop(app.emit(
         "agent:session_init",
         serde_json::json!({
@@ -527,6 +557,11 @@ fn emit_error(app: &AppHandle, error: &SerializableError) {
 
 /// Emit checkpoint event
 fn emit_checkpoint(app: &AppHandle, session_id: &str, checkpoint_id: &str) {
+    log::warn!(
+        "[REWIND] Tauri emit agent:checkpoint — sessionId={}, checkpointId={}",
+        session_id,
+        &checkpoint_id[..8.min(checkpoint_id.len())]
+    );
     drop(app.emit(
         "agent:checkpoint",
         serde_json::json!({

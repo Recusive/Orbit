@@ -226,6 +226,18 @@ export interface CheckpointState {
   hasPendingConversationFork: (originalSessionId: string) => boolean;
 
   /**
+   * Called when agent:checkpoint arrives with the SDK's user message UUID.
+   * Replaces the frontend UUID stored in currentUserMessageId with the SDK UUID.
+   * Returns the old frontend UUID so the caller can update React state.
+   *
+   * Must be called BEFORE onMessageComplete() to ensure checkpoint maps use SDK UUID.
+   * Timing guarantee: agent:checkpoint fires when SDK receives user message (before
+   * generating response). agent:complete fires when response is done. So checkpoint
+   * always arrives first.
+   */
+  reconcileUserMessageId: (sessionId: string, sdkMessageId: string) => string | undefined;
+
+  /**
    * Remap checkpoints from old session ID to new session ID.
    * Called during session ID remapping when the frontend temp ID is replaced with SDK ID.
    *
@@ -329,19 +341,22 @@ export const useCheckpointStore = create<CheckpointState>()(
         }
         // Otherwise: intermediate checkpoint during tool execution, ignore for turn tracking
 
-        // Evict oldest sessions to prevent unbounded memory growth across all 4 records.
+        // Evict oldest sessions to prevent unbounded memory growth across all session-keyed records.
         // Object.keys preserves insertion order for non-integer string keys
         // (guaranteed by V8/JSC/SpiderMonkey; spec-guaranteed for all target engines).
-        const sessionKeys = Object.keys(state.checkpointOrder);
+        const sessionKeys = Object.keys(draft.checkpointOrder);
         if (sessionKeys.length > MAX_CHECKPOINT_SESSIONS) {
           const evictCount = sessionKeys.length - MAX_CHECKPOINT_SESSIONS;
           for (const key of sessionKeys.slice(0, evictCount)) {
             // Skip the current session being written to
             if (key === sessionId) continue;
-            Reflect.deleteProperty(state.turnStartCheckpoints, key);
-            Reflect.deleteProperty(state.turnEndCheckpoints, key);
-            Reflect.deleteProperty(state.checkpointOrder, key);
-            Reflect.deleteProperty(state.latestCheckpoints, key);
+            Reflect.deleteProperty(draft.turnStartCheckpoints, key);
+            Reflect.deleteProperty(draft.turnEndCheckpoints, key);
+            Reflect.deleteProperty(draft.checkpointOrder, key);
+            Reflect.deleteProperty(draft.latestCheckpoints, key);
+            Reflect.deleteProperty(draft.pendingMessagesQueue, key);
+            Reflect.deleteProperty(draft.rewindForkPoints, key);
+            Reflect.deleteProperty(draft.pendingConversationForks, key);
           }
         }
       });
@@ -392,7 +407,7 @@ export const useCheckpointStore = create<CheckpointState>()(
         // Also update legacy field for backwards compatibility
         state.pendingMessageForTurnEnd = { sessionId, messageId: userMessageId };
 
-        // Clear the current user message ID
+        // Clear the current user message ID (after consuming it above)
         state.currentUserMessageId = null;
       });
     },
@@ -401,7 +416,6 @@ export const useCheckpointStore = create<CheckpointState>()(
       const state = get();
 
       // Get the turnEnd checkpoint for this message
-      // This is the checkpoint ID (user message UUID) for the message itself
       let turnEnd = state.turnEndCheckpoints[sessionId]?.[messageId];
 
       // If this is the pending message (last message), use latest checkpoint
@@ -414,44 +428,15 @@ export const useCheckpointStore = create<CheckpointState>()(
         return undefined;
       }
 
-      // CRITICAL: The checkpoint ID is the USER MESSAGE UUID from replay-user-messages.
-      // When we use resumeSessionAt: userMessageUuid, the SDK includes messages
-      // UP TO AND INCLUDING that user message, but NOT its response!
-      //
-      // To include the response, we need to use the NEXT checkpoint in the order.
-      // The next checkpoint is the next user message's UUID, which comes AFTER
-      // the current message's response.
-      //
-      // Example: Conversation has [user1, assistant1, user2, assistant2]
-      // - turnEnd for user1 = cp1 (user1's UUID)
-      // - If we use resumeSessionAt: cp1, fork includes: user1 (NO response!)
-      // - If we use resumeSessionAt: cp2, fork includes: user1, assistant1, user2
-      //
-      // We want user1 + assistant1, so we use cp2. The extra user2 is unavoidable
-      // with the SDK's message-level granularity, but Claude will see proper context.
+      // Use the NEXT checkpoint to include the response in the fork.
+      // resumeSessionAt: userMessageUuid includes UP TO that message but NOT its response.
+      // The next checkpoint comes AFTER the current message's response.
       const order = state.checkpointOrder[sessionId] ?? [];
       const currentIndex = order.indexOf(turnEnd);
       const hasNextCheckpoint = currentIndex >= 0 && currentIndex < order.length - 1;
       const nextCheckpoint = hasNextCheckpoint ? order[currentIndex + 1] : undefined;
-
-      // For resumeSessionAt: Use NEXT checkpoint to include the response
-      // If there's no next checkpoint (last message), use turnEnd as fallback
-      // (the response won't be included, but there's no better option)
       const resumeAt = nextCheckpoint ?? turnEnd;
 
-      logger.debug('getRewindCheckpoints resolved', {
-        sessionId,
-        messageId,
-        turnEnd,
-        checkpointOrder: order,
-        currentIndex,
-        nextCheckpoint,
-        resumeAt,
-        usedNextCheckpoint: hasNextCheckpoint,
-      });
-
-      // For rewindFiles: Use turnEnd (file state after this turn's tools completed)
-      // Files are correctly restored to post-response state with the user message UUID
       return {
         resumeSessionAt: resumeAt,
         rewindFiles: turnEnd,
@@ -571,18 +556,14 @@ export const useCheckpointStore = create<CheckpointState>()(
     // ============================================
 
     setRewindForkPoint: (sessionId, messageUuid): void => {
-      logger.debug('Setting rewind fork point', { sessionId, messageUuid });
       set((state) => {
         state.rewindForkPoints[sessionId] = messageUuid;
       });
     },
 
     consumeRewindForkPoint: (sessionId): string | null => {
-      const state = get();
-      const forkPoint = state.rewindForkPoints[sessionId];
+      const forkPoint = get().rewindForkPoints[sessionId];
       if (forkPoint) {
-        logger.debug('Consuming rewind fork point', { sessionId, forkPoint });
-        // Clear the fork point after consuming (one-time use)
         set((draft) => {
           Reflect.deleteProperty(draft.rewindForkPoints, sessionId);
         });
@@ -596,7 +577,6 @@ export const useCheckpointStore = create<CheckpointState>()(
     },
 
     clearRewindForkPoint: (sessionId): void => {
-      logger.debug('Clearing rewind fork point', { sessionId });
       set((state) => {
         Reflect.deleteProperty(state.rewindForkPoints, sessionId);
       });
@@ -607,17 +587,14 @@ export const useCheckpointStore = create<CheckpointState>()(
     // ============================================
 
     setPendingConversationFork: (originalSessionId, rewindMessageId): void => {
-      logger.debug('Setting pending conversation fork', { originalSessionId, rewindMessageId });
       set((state) => {
         state.pendingConversationForks[originalSessionId] = rewindMessageId;
       });
     },
 
     consumePendingConversationFork: (originalSessionId): string | null => {
-      const state = get();
-      const rewindMessageId = state.pendingConversationForks[originalSessionId];
+      const rewindMessageId = get().pendingConversationForks[originalSessionId];
       if (rewindMessageId) {
-        logger.debug('Consuming pending conversation fork', { originalSessionId, rewindMessageId });
         set((draft) => {
           Reflect.deleteProperty(draft.pendingConversationForks, originalSessionId);
         });
@@ -630,18 +607,57 @@ export const useCheckpointStore = create<CheckpointState>()(
       return originalSessionId in get().pendingConversationForks;
     },
 
-    remapSession: (oldSessionId, newSessionId): void => {
-      logger.debug('Remapping session checkpoints', { oldSessionId, newSessionId });
+    reconcileUserMessageId: (sessionId, sdkMessageId): string | undefined => {
+      const current = get().currentUserMessageId;
+      if (current?.sessionId !== sessionId) {
+        logger.debug('reconcileUserMessageId: session mismatch', {
+          expected: sessionId.slice(0, 8),
+          actual: current?.sessionId.slice(0, 8) ?? 'none',
+        });
+        return undefined;
+      }
+
+      const oldFrontendId = current.messageId;
+      if (oldFrontendId === sdkMessageId) {
+        logger.debug('reconcileUserMessageId: already reconciled');
+        return undefined;
+      }
+
+      // Replace the whole object (not nested mutation) to ensure immer tracks the change.
+      // Mutating only .messageId was silently dropped by immer in some cases.
       set((state) => {
-        // Update in-flight state objects
+        if (state.currentUserMessageId?.sessionId === sessionId) {
+          state.currentUserMessageId = { sessionId, messageId: sdkMessageId };
+        }
+      });
+      logger.debug('reconcileUserMessageId: remapped', {
+        old: oldFrontendId.slice(0, 8),
+        new: sdkMessageId.slice(0, 8),
+      });
+      return oldFrontendId;
+    },
+
+    remapSession: (oldSessionId, newSessionId): void => {
+      set((state) => {
+        // Update in-flight state objects — replace whole objects (not nested mutation)
+        // to ensure immer tracks the change correctly.
         if (state.currentUserMessageId?.sessionId === oldSessionId) {
-          state.currentUserMessageId.sessionId = newSessionId;
+          state.currentUserMessageId = {
+            ...state.currentUserMessageId,
+            sessionId: newSessionId,
+          };
         }
         if (state.pendingMessageForTurnEnd?.sessionId === oldSessionId) {
-          state.pendingMessageForTurnEnd.sessionId = newSessionId;
+          state.pendingMessageForTurnEnd = {
+            ...state.pendingMessageForTurnEnd,
+            sessionId: newSessionId,
+          };
         }
         if (state.currentTurnStartCheckpoint?.sessionId === oldSessionId) {
-          state.currentTurnStartCheckpoint.sessionId = newSessionId;
+          state.currentTurnStartCheckpoint = {
+            ...state.currentTurnStartCheckpoint,
+            sessionId: newSessionId,
+          };
         }
 
         // Migrate session-keyed records (move data from old key to new key)

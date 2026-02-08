@@ -382,23 +382,21 @@ function persistSessionUsage(
   },
   totalCostUsd?: number
 ): void {
-  try {
-    const projectDir = path.join(os.homedir(), '.claude', 'projects', encodeWorkspacePath(cwd));
-    const usagePath = path.join(projectDir, `${sdkSessionId}.usage.json`);
+  const projectDir = path.join(os.homedir(), '.claude', 'projects', encodeWorkspacePath(cwd));
+  const usagePath = path.join(projectDir, `${sdkSessionId}.usage.json`);
 
-    const data = {
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      cacheReadInputTokens: usage.cacheReadInputTokens ?? 0,
-      cacheCreationInputTokens: usage.cacheCreationInputTokens ?? 0,
-      totalCostUsd: totalCostUsd ?? 0,
-    };
+  const data = {
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    cacheReadInputTokens: usage.cacheReadInputTokens ?? 0,
+    cacheCreationInputTokens: usage.cacheCreationInputTokens ?? 0,
+    totalCostUsd: totalCostUsd ?? 0,
+  };
 
-    fs.writeFileSync(usagePath, JSON.stringify(data), 'utf-8');
-  } catch {
-    // Non-critical — live usage still works, just won't survive restart
+  // Fire-and-forget async write — non-critical, live usage still works without it
+  void fs.promises.writeFile(usagePath, JSON.stringify(data), 'utf-8').catch(() => {
     logger.debug({ sdkSessionId }, 'Failed to persist session usage');
-  }
+  });
 }
 
 /**
@@ -463,6 +461,15 @@ function truncateSessionJsonl(
   targetMessageUuid: string
 ): TruncateResult {
   try {
+    logger.warn(
+      {
+        sdkSessionId: sdkSessionId.slice(0, 8),
+        targetMessageUuid: targetMessageUuid.slice(0, 8),
+        cwd,
+      },
+      '[REWIND] truncateSessionJsonl START'
+    );
+
     // First, try to find the JSONL by searching all project directories
     let jsonlPath = findSessionJsonl(sdkSessionId);
 
@@ -475,10 +482,19 @@ function truncateSessionJsonl(
       }
     }
 
+    logger.warn(
+      {
+        sdkSessionId: sdkSessionId.slice(0, 8),
+        found: jsonlPath !== null,
+        jsonlPath: jsonlPath ?? 'NOT FOUND',
+      },
+      '[REWIND] truncateSessionJsonl — JSONL lookup result'
+    );
+
     if (!jsonlPath) {
       logger.warn(
-        { sdkSessionId, cwd },
-        'JSONL file not found for truncation (searched all projects)'
+        { sdkSessionId: sdkSessionId.slice(0, 8), cwd },
+        '[REWIND] truncateSessionJsonl FAILED — JSONL not found (searched all projects)'
       );
       return { linesRemoved: -1, userMessageUuid: null };
     }
@@ -486,6 +502,15 @@ function truncateSessionJsonl(
     // Read the entire file
     const content = fs.readFileSync(jsonlPath, 'utf-8');
     const lines = content.split('\n').filter((line) => line.trim() !== '');
+
+    logger.warn(
+      {
+        sdkSessionId: sdkSessionId.slice(0, 8),
+        totalLines: lines.length,
+        targetMessageUuid: targetMessageUuid.slice(0, 8),
+      },
+      '[REWIND] truncateSessionJsonl — file read, searching for target'
+    );
 
     // Parse all lines to find target and user messages
     interface ParsedLine {
@@ -520,9 +545,24 @@ function truncateSessionJsonl(
     }
 
     if (targetLineIndex === -1) {
-      logger.warn({ sdkSessionId, targetMessageUuid }, 'Target message UUID not found in JSONL');
+      logger.warn(
+        {
+          sdkSessionId: sdkSessionId.slice(0, 8),
+          targetMessageUuid: targetMessageUuid.slice(0, 8),
+        },
+        '[REWIND] truncateSessionJsonl — target UUID NOT FOUND in JSONL'
+      );
       return { linesRemoved: 0, userMessageUuid: null };
     }
+
+    logger.warn(
+      {
+        targetLineIndex,
+        totalLines: lines.length,
+        targetType: parsedLines[targetLineIndex]?.type ?? 'unknown',
+      },
+      '[REWIND] truncateSessionJsonl — target found'
+    );
 
     // Find the USER message that precedes the target (for resumeSessionAt)
     // Walk backwards from target to find the most recent user message
@@ -617,21 +657,37 @@ function truncateSessionJsonl(
       // Write the truncated content back
       const truncatedContent = linesToKeep.join('\n') + '\n';
       fs.writeFileSync(jsonlPath, truncatedContent, 'utf-8');
-      logger.info(
+      logger.warn(
         {
-          sdkSessionId,
-          targetMessageUuid,
-          userMessageUuid,
+          sdkSessionId: sdkSessionId.slice(0, 8),
+          targetMessageUuid: targetMessageUuid.slice(0, 8),
+          userMessageUuid: userMessageUuid?.slice(0, 8) ?? 'none',
           linesRemoved,
           linesKept: linesToKeep.length,
         },
-        'Truncated JSONL file for rewind'
+        '[REWIND] truncateSessionJsonl COMPLETE — file truncated'
+      );
+    } else {
+      logger.warn(
+        {
+          sdkSessionId: sdkSessionId.slice(0, 8),
+          targetMessageUuid: targetMessageUuid.slice(0, 8),
+          linesRemoved,
+        },
+        '[REWIND] truncateSessionJsonl — no lines removed (target was at end)'
       );
     }
 
     return { linesRemoved, userMessageUuid };
   } catch (error) {
-    logger.error({ error, sdkSessionId, targetMessageUuid }, 'Failed to truncate JSONL file');
+    logger.error(
+      {
+        error,
+        sdkSessionId: sdkSessionId.slice(0, 8),
+        targetMessageUuid: targetMessageUuid.slice(0, 8),
+      },
+      '[REWIND] truncateSessionJsonl ERROR'
+    );
     return { linesRemoved: -1, userMessageUuid: null };
   }
 }
@@ -651,6 +707,14 @@ function copySessionJsonl(
   cwd: string
 ): { success: boolean; error?: string } {
   try {
+    logger.warn(
+      {
+        oldSdkSessionId: oldSdkSessionId.slice(0, 8),
+        newSdkSessionId: newSdkSessionId.slice(0, 8),
+      },
+      '[REWIND] copySessionJsonl START'
+    );
+
     // Find the source JSONL file
     let sourcePath = findSessionJsonl(oldSdkSessionId);
 
@@ -664,7 +728,10 @@ function copySessionJsonl(
     }
 
     if (!sourcePath) {
-      logger.warn({ oldSdkSessionId, cwd }, 'Source JSONL file not found for copy');
+      logger.warn(
+        { oldSdkSessionId: oldSdkSessionId.slice(0, 8), cwd },
+        '[REWIND] copySessionJsonl FAILED — source JSONL not found'
+      );
       return { success: false, error: 'Source file not found' };
     }
 
@@ -675,15 +742,27 @@ function copySessionJsonl(
     // Copy the file
     fs.copyFileSync(sourcePath, destPath);
 
-    logger.info(
-      { oldSdkSessionId, newSdkSessionId, sourcePath, destPath },
-      'Copied JSONL file to new session ID'
+    logger.warn(
+      {
+        oldSdkSessionId: oldSdkSessionId.slice(0, 8),
+        newSdkSessionId: newSdkSessionId.slice(0, 8),
+        sourcePath,
+        destPath,
+      },
+      '[REWIND] copySessionJsonl COMPLETE'
     );
 
     return { success: true };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    logger.error({ error, oldSdkSessionId, newSdkSessionId }, 'Failed to copy JSONL file');
+    logger.error(
+      {
+        error,
+        oldSdkSessionId: oldSdkSessionId.slice(0, 8),
+        newSdkSessionId: newSdkSessionId.slice(0, 8),
+      },
+      '[REWIND] copySessionJsonl ERROR'
+    );
     return { success: false, error: errorMsg };
   }
 }
@@ -697,6 +776,8 @@ function copySessionJsonl(
  */
 function deleteSessionJsonl(sdkSessionId: string, cwd: string): void {
   try {
+    logger.warn({ sdkSessionId: sdkSessionId.slice(0, 8) }, '[REWIND] deleteSessionJsonl START');
+
     let jsonlPath = findSessionJsonl(sdkSessionId);
 
     if (!jsonlPath) {
@@ -708,21 +789,27 @@ function deleteSessionJsonl(sdkSessionId: string, cwd: string): void {
     }
 
     if (!jsonlPath) {
-      logger.debug(
-        { sdkSessionId, cwd },
-        'JSONL file not found for deletion (already cleaned up?)'
+      logger.warn(
+        { sdkSessionId: sdkSessionId.slice(0, 8), cwd },
+        '[REWIND] deleteSessionJsonl — file not found (already cleaned up?)'
       );
       return;
     }
 
     fs.unlinkSync(jsonlPath);
-    logger.info({ sdkSessionId, jsonlPath }, 'Deleted JSONL file');
+    logger.warn(
+      { sdkSessionId: sdkSessionId.slice(0, 8), jsonlPath },
+      '[REWIND] deleteSessionJsonl — JSONL deleted'
+    );
 
     // Also delete the .usage.json sidecar if it exists
     const usagePath = jsonlPath.replace(/\.jsonl$/, '.usage.json');
     if (fs.existsSync(usagePath)) {
       fs.unlinkSync(usagePath);
-      logger.debug({ sdkSessionId }, 'Deleted .usage.json sidecar');
+      logger.warn(
+        { sdkSessionId: sdkSessionId.slice(0, 8) },
+        '[REWIND] deleteSessionJsonl — .usage.json sidecar deleted'
+      );
     }
   } catch (error) {
     logger.debug({ error, sdkSessionId }, 'Failed to delete JSONL file (non-critical)');
@@ -912,6 +999,9 @@ export class SessionManager extends Disposable {
     this.approvedToolNames.set(sessionId, new Set());
 
     // Create permission callback that fires events
+    // NOTE: These closures (permissionCallback, onAuthFailure) reference 'agent' which is declared
+    // below. Safe because closures are only invoked after agent construction completes — they are
+    // called by the SDK during tool execution and auth failure, never during OrbitAgent construction.
     const permissionCallback = async (
       toolName: string,
       toolInput: Record<string, unknown>,
@@ -1157,13 +1247,32 @@ export class SessionManager extends Disposable {
               // is an orphan that would appear as a phantom sidebar entry.
               const pending = this.pendingJsonlDeletions.get(sessionId);
               if (pending) {
+                logger.warn(
+                  {
+                    sessionId,
+                    intermediateId: pending.intermediateId.slice(0, 8),
+                    originalSdkId: pending.originalSdkId?.slice(0, 8) ?? 'none',
+                    finalSdkId: sdkSessionId.slice(0, 8),
+                    intermediateMatchesFinal: pending.intermediateId === sdkSessionId,
+                  },
+                  '[REWIND] system:init — cleaning up pendingJsonlDeletion'
+                );
+
                 // Delete intermediate JSONL if the SDK created its own (different ID)
                 if (pending.intermediateId !== sdkSessionId) {
-                  logger.info(
-                    { intermediateId: pending.intermediateId, finalSdkId: sdkSessionId },
-                    'Deleting intermediate JSONL (forkSessionAt cleanup)'
+                  logger.warn(
+                    {
+                      intermediateId: pending.intermediateId.slice(0, 8),
+                      finalSdkId: sdkSessionId.slice(0, 8),
+                    },
+                    '[REWIND] system:init — deleting intermediate JSONL (SDK created its own)'
                   );
                   deleteSessionJsonl(pending.intermediateId, pending.cwd);
+                } else {
+                  logger.warn(
+                    { intermediateId: pending.intermediateId.slice(0, 8) },
+                    '[REWIND] system:init — SDK reused intermediate ID, no deletion needed'
+                  );
                 }
 
                 // Delete the original JSONL if the rewindFiles CLI zombie recreated it.
@@ -1172,9 +1281,12 @@ export class SessionManager extends Disposable {
                 // By the time system:init fires (first message sent), the CLI has
                 // definitely finished, so this catches any zombie-recreated files.
                 if (pending.originalSdkId && pending.originalSdkId !== sdkSessionId) {
-                  logger.info(
-                    { originalSdkId: pending.originalSdkId, finalSdkId: sdkSessionId },
-                    'Deleting original JSONL (rewindFiles zombie cleanup)'
+                  logger.warn(
+                    {
+                      originalSdkId: pending.originalSdkId.slice(0, 8),
+                      finalSdkId: sdkSessionId.slice(0, 8),
+                    },
+                    '[REWIND] system:init — deleting original JSONL (zombie cleanup)'
                   );
                   deleteSessionJsonl(pending.originalSdkId, pending.cwd);
                 }
@@ -1601,9 +1713,13 @@ export class SessionManager extends Disposable {
     // without sending a message (system:init never fired to clean it up).
     const pendingDeletion = this.pendingJsonlDeletions.get(sessionId);
     if (pendingDeletion) {
-      logger.info(
-        { sessionId, intermediateId: pendingDeletion.intermediateId },
-        'Deleting intermediate JSONL on session delete (user navigated away without sending)'
+      logger.warn(
+        {
+          sessionId,
+          intermediateId: pendingDeletion.intermediateId.slice(0, 8),
+          originalSdkId: pendingDeletion.originalSdkId?.slice(0, 8) ?? 'none',
+        },
+        '[REWIND] deleteSession — cleaning up pendingJsonlDeletion (user navigated away without sending)'
       );
       deleteSessionJsonl(pendingDeletion.intermediateId, pendingDeletion.cwd);
       // Also clean up any zombie-recreated original JSONL
@@ -1879,75 +1995,139 @@ export class SessionManager extends Disposable {
    * @param atMessageUuid - The message UUID to truncate AFTER (this message is INCLUDED)
    * @returns The new SDK session ID
    */
+  // TODO(code-review/cycle-1#48): No test for invalid UUID handling (empty string, non-existent UUID).
+  // Test stub: agent-bridge/src/__tests__/rewind-e2e.test.ts (forkSessionAt invalid UUID section)
   async forkSessionAt(sessionId: string, atMessageUuid: string): Promise<string> {
-    logger.info({ sessionId, atMessageUuid }, 'Forking session at specific message point');
+    if (!atMessageUuid || atMessageUuid.trim() === '') {
+      throw new Error('forkSessionAt requires a valid message UUID');
+    }
 
+    logger.warn(
+      { sessionId, atMessageUuid: atMessageUuid.slice(0, 8) },
+      '[REWIND] forkSessionAt START'
+    );
+
+    // Step 1: Validate session exists and get current SDK session ID
     const agent = this.activeSessions.get(sessionId);
     if (!agent) {
+      logger.warn({ sessionId }, '[REWIND] forkSessionAt FAILED — session not found');
       throw new Error(`Session ${sessionId} not found`);
     }
 
     const sdkSessionId = agent.getCurrentSessionId();
     if (!sdkSessionId) {
+      logger.warn({ sessionId }, '[REWIND] forkSessionAt FAILED — no SDK session ID');
       throw new Error(`No SDK session ID available for session ${sessionId}`);
     }
 
     // Save session preferences before deleting
     const savedPrefs = this.modePreferences.get(sessionId) ?? {};
     const savedCwd = agent.workingDirectory;
+    const existingPendingDeletion = this.pendingJsonlDeletions.get(sessionId);
 
-    logger.info(
-      { sessionId, sdkSessionId, atMessageUuid, savedPrefs, savedCwd },
-      'Saving session state before fork'
+    logger.warn(
+      {
+        sessionId,
+        sdkSessionId: sdkSessionId.slice(0, 8),
+        atMessageUuid: atMessageUuid.slice(0, 8),
+        savedCwd,
+        hasPendingDeletion: existingPendingDeletion !== undefined,
+        pendingIntermediateId: existingPendingDeletion?.intermediateId.slice(0, 8) ?? 'none',
+        pendingOriginalSdkId: existingPendingDeletion?.originalSdkId?.slice(0, 8) ?? 'none',
+        activeSessionCount: this.activeSessions.size,
+      },
+      '[REWIND] Step 1: Session state before fork'
     );
 
-    // CRITICAL: Truncate the JSONL file BEFORE deleting the session
-    // This removes all messages after the target UUID, so when the SDK
-    // resumes, it only sees messages up to and including the target.
+    // Step 2: Truncate JSONL — removes all messages after the target UUID
+    logger.warn(
+      { sdkSessionId: sdkSessionId.slice(0, 8), atMessageUuid: atMessageUuid.slice(0, 8) },
+      '[REWIND] Step 2: Truncating JSONL'
+    );
     const truncateResult = truncateSessionJsonl(sdkSessionId, savedCwd, atMessageUuid);
-    logger.info({ sdkSessionId, atMessageUuid, ...truncateResult }, 'JSONL truncated for rewind');
-
-    // CRITICAL: Copy the truncated JSONL to a NEW session ID
-    // The SDK caches state about "where to continue from" for each session ID.
-    // If we resume the same session ID after truncation, the SDK tries to continue
-    // from a cached point that no longer exists, generating empty placeholder messages.
-    // By copying to a NEW session ID, the SDK has no cached state and reads the
-    // truncated JSONL fresh.
-    const newSdkSessionId = randomUUID();
-    const copyResult = copySessionJsonl(sdkSessionId, newSdkSessionId, savedCwd);
-    logger.info(
-      { oldSdkSessionId: sdkSessionId, newSdkSessionId, copyResult },
-      'Copied truncated JSONL to new session ID'
+    logger.warn(
+      {
+        sdkSessionId: sdkSessionId.slice(0, 8),
+        atMessageUuid: atMessageUuid.slice(0, 8),
+        linesRemoved: truncateResult.linesRemoved,
+        userMessageUuid: truncateResult.userMessageUuid?.slice(0, 8) ?? 'none',
+      },
+      '[REWIND] Step 2: JSONL truncation result'
     );
 
-    // Delete the ORIGINAL truncated JSONL — the copy is all we need.
-    // Without this, conversationList() finds both files on disk and creates
-    // duplicate sidebar entries (the truncated original + the copy).
+    if (truncateResult.linesRemoved < 0) {
+      logger.warn(
+        { sdkSessionId: sdkSessionId.slice(0, 8), savedCwd },
+        '[REWIND] Step 2: FAILED — source JSONL not found, aborting fork'
+      );
+      throw new Error(
+        `Source JSONL not found for session ${sdkSessionId} — cannot proceed with rewind. No data was modified.`
+      );
+    }
+
+    // Step 3: Copy truncated JSONL to a NEW session ID (avoids SDK cached state issues)
+    const newSdkSessionId = randomUUID();
+    logger.warn(
+      {
+        oldSdkSessionId: sdkSessionId.slice(0, 8),
+        newSdkSessionId: newSdkSessionId.slice(0, 8),
+      },
+      '[REWIND] Step 3: Copying truncated JSONL to new session ID'
+    );
+    const copyResult = copySessionJsonl(sdkSessionId, newSdkSessionId, savedCwd);
+    logger.warn(
+      {
+        oldSdkSessionId: sdkSessionId.slice(0, 8),
+        newSdkSessionId: newSdkSessionId.slice(0, 8),
+        success: copyResult.success,
+        error: copyResult.error ?? 'none',
+      },
+      '[REWIND] Step 3: Copy result'
+    );
+
+    if (!copyResult.success) {
+      throw new Error(
+        `Failed to copy JSONL for rewind: ${copyResult.error ?? 'unknown error'}. Original JSONL preserved.`
+      );
+    }
+
+    // Step 4: Delete the ORIGINAL truncated JSONL (prevents duplicate sidebar entries)
+    logger.warn(
+      { sdkSessionId: sdkSessionId.slice(0, 8) },
+      '[REWIND] Step 4: Deleting original JSONL'
+    );
     deleteSessionJsonl(sdkSessionId, savedCwd);
 
-    // Delete the current session (clears SDK memory).
+    // Step 5: Delete the current session (clears SDK memory)
     // IMPORTANT: Do this BEFORE adding to pendingJsonlDeletions, because
     // deleteSession() checks pendingJsonlDeletions and would delete the
     // intermediate JSONL we still need for the new session's resumeSessionId.
+    logger.warn({ sessionId }, '[REWIND] Step 5: Deleting current session (clearing SDK memory)');
     await this.deleteSession(sessionId);
 
-    // Track the intermediate copy for cleanup when system:init fires.
-    // At that point the SDK will have created its own JSONL with the final session ID.
-    // The intermediate is only needed until the SDK reads it and creates the real session.
-    // Also track the original SDK session ID: the rewindFiles CLI process may have
-    // recreated the original JSONL after we deleted it (zombie process race condition).
+    // Step 6: Track intermediate copy for cleanup when system:init fires
     this.pendingJsonlDeletions.set(sessionId, {
       intermediateId: newSdkSessionId,
       originalSdkId: sdkSessionId,
       cwd: savedCwd,
     });
+    logger.warn(
+      {
+        sessionId,
+        intermediateId: newSdkSessionId.slice(0, 8),
+        originalSdkId: sdkSessionId.slice(0, 8),
+      },
+      '[REWIND] Step 6: Registered pendingJsonlDeletion'
+    );
 
-    // Create new session that resumes from the COPIED JSONL with NEW session ID
-    //
-    // IMPORTANT: We use a NEW session ID (not the old one) because:
-    // 1. The SDK caches continuation state per session ID (outside the JSONL)
-    // 2. Resuming the old session ID after truncation causes empty message generation
-    // 3. A fresh session ID has no cached state, so the SDK reads the file cleanly
+    // Step 7: Create new session that resumes from the COPIED JSONL
+    logger.warn(
+      {
+        sessionId,
+        resumeSessionId: newSdkSessionId.slice(0, 8),
+      },
+      '[REWIND] Step 7: Creating new session with resumeSessionId'
+    );
     await this.createSession(sessionId, {
       resumeSessionId: newSdkSessionId,
       // NO resumeSessionAt - file is already truncated
@@ -1960,20 +2140,21 @@ export class SessionManager extends Disposable {
       model: savedPrefs.model,
     });
 
-    // Get the new SDK session ID (will be the one we passed)
+    // Step 8: Verify the new session was created successfully
     const newAgent = this.activeSessions.get(sessionId);
     const finalSdkSessionId = newAgent?.getCurrentSessionId();
 
-    logger.info(
+    logger.warn(
       {
         sessionId,
-        oldSdkSessionId: sdkSessionId,
-        newSdkSessionId,
-        finalSdkSessionId,
-        atMessageUuid,
+        oldSdkSessionId: sdkSessionId.slice(0, 8),
+        intermediateSdkSessionId: newSdkSessionId.slice(0, 8),
+        finalSdkSessionId: finalSdkSessionId?.slice(0, 8) ?? 'none',
+        atMessageUuid: atMessageUuid.slice(0, 8),
         linesRemoved: truncateResult.linesRemoved,
+        newAgentExists: newAgent !== undefined,
       },
-      'Session forked with new ID - Claude now has context up to target message'
+      '[REWIND] forkSessionAt COMPLETE'
     );
 
     return finalSdkSessionId ?? newSdkSessionId;

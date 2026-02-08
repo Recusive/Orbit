@@ -4,7 +4,7 @@
 import type { SidebarItemProps } from '../types';
 import type { FC } from 'react';
 
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { Kbd } from '@/components/ui/kbd';
 import { cn, getCollapseTransition, SIDEBAR } from '@/lib/utils';
 
 export const SidebarItem: FC<SidebarItemProps> = ({
@@ -82,13 +82,13 @@ export const SidebarItem: FC<SidebarItemProps> = ({
       ) : null}
       {/* Keyboard shortcut */}
       {shortcut && !collapsed ? (
-        <KbdGroup className="ml-auto mr-2">
+        <Kbd className="ml-auto mr-2 h-[18px] !text-[12px] px-1.5 bg-foreground/10 text-inherit border-foreground/15">
           {shortcut.map((key, index) => (
-            <Kbd key={index} className="bg-foreground/10 text-inherit border-foreground/15">
+            <span key={index} className={index === 0 ? 'text-[14px] leading-none' : ''}>
               {key}
-            </Kbd>
+            </span>
           ))}
-        </KbdGroup>
+        </Kbd>
       ) : null}
     </button>
   );

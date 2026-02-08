@@ -156,8 +156,21 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
         >
           {/* Content and tool segments */}
           <div className="space-y-2">
-            {/* Thinking Box - inside space-y-2 for consistent spacing with tools and text */}
-            {message.thinking ? (
+            {/* Thinking Boxes - one per thinking phase, inside space-y-2 for consistent spacing */}
+            {message.thinkingBlocks !== undefined && message.thinkingBlocks.length > 0 ? (
+              message.thinkingBlocks.map((block, i) => (
+                <ThinkingBox
+                  key={i}
+                  thinking={block.content}
+                  thinkingDurationMs={block.durationMs}
+                  isStreaming={
+                    message.isStreaming === true &&
+                    message.isThinkingActive === true &&
+                    i === (message.thinkingBlocks?.length ?? 0) - 1
+                  }
+                />
+              ))
+            ) : message.thinking ? (
               <ThinkingBox
                 thinking={message.thinking}
                 thinkingDurationMs={message.thinkingDurationMs}
@@ -211,7 +224,6 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           {/* Message actions - shown when complete */}
           {isComplete ? (
             <MessageActions
-              showDisclaimer={isLastAssistantMessage}
               rewindDisabled={isLastAssistantMessage}
               onCopy={() => {
                 void navigator.clipboard.writeText(message.content);

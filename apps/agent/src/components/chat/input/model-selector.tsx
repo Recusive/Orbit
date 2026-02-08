@@ -138,6 +138,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     }
   }, []);
 
+  // TODO(code-review/cycle-1#27): Consider useCallback ref for portal measurement to avoid brief position flash
   // Initial positioning (before paint, uses estimate since portal isn't mounted yet)
   useLayoutEffect(() => {
     if (!isOpen) return;
@@ -331,7 +332,9 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                 disabled={model.disabled === true}
                 title={model.disabled === true ? 'Coming soon' : undefined}
                 className={cn(
-                  `w-full flex items-center justify-between px-2 py-1.5 text-xs ${TRANSITION_CLASSES.item} mt-0.5 first:mt-0 group`,
+                  'w-full flex items-center justify-between px-2 py-1.5 text-xs',
+                  TRANSITION_CLASSES.item,
+                  'mt-0.5 first:mt-0 group',
                   model.disabled === true
                     ? 'opacity-40 cursor-not-allowed'
                     : selectedModel === model.id

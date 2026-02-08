@@ -4,7 +4,7 @@
  * NOTE: Icon column width comes from @/lib/utils/constants.
  * To change actions bar width, update SIDEBAR.iconColumnWidth in constants.ts.
  */
-import { FileCode, GitBranch, GitCompareArrows, Globe } from 'lucide-react';
+import { CircleAlert, FileCode, GitBranch, GitCompareArrows, Globe } from 'lucide-react';
 
 import type { ActivityTab } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
@@ -134,6 +134,20 @@ export const ActionsBar: FC = () => {
             handleTabClick('browser');
           }}
         />
+      </div>
+
+      {/* AI disclaimer icon - pinned to bottom */}
+      <div className="shrink-0 flex items-center justify-center">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center justify-center h-8 w-8 text-muted-foreground/40">
+              <CircleAlert className="h-4 w-4" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left" sideOffset={8}>
+            AI may make mistakes. Double-check all generated code.
+          </TooltipContent>
+        </Tooltip>
       </div>
     </aside>
   );

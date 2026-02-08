@@ -300,6 +300,22 @@ export const RewindConversationSchema = z
      * IDs while disk has SDK-generated IDs).
      */
     message_index: z.number().int().nonnegative(),
+    /**
+     * Current frontend messages truncated to the rewind point.
+     * Used as fallback when the JSONL on disk is corrupted/missing after a previous rewind
+     * (forkSessionAt truncates/deletes the original JSONL). After the first rewind, the
+     * frontend messages have SDK JSONL UUIDs which ARE the correct IDs.
+     */
+    current_messages: z
+      .array(
+        z.object({
+          id: z.string(),
+          role: z.enum(['user', 'assistant']),
+          content: z.string(),
+          parentUuid: z.string().nullish(),
+        })
+      )
+      .optional(),
   })
   .strict();
 
@@ -1401,6 +1417,7 @@ const PersistedMessageSchema = z
     role: z.enum(['user', 'assistant', 'system']),
     content: z.string(),
     thinking: z.string().optional(),
+    thinkingDurationMs: z.number().optional(),
     isInterrupted: z.boolean().optional(),
     // Support both old 'timestamp' and new 'createdAt' field names
     createdAt: z.number().optional(),
@@ -1421,6 +1438,7 @@ const PersistedMessageSchema = z
     role: msg.role,
     content: msg.content,
     thinking: msg.thinking,
+    thinkingDurationMs: msg.thinkingDurationMs,
     isInterrupted: msg.isInterrupted,
     // Prefer createdAt, fall back to timestamp, default to 0
     createdAt: msg.createdAt ?? msg.timestamp ?? 0,
@@ -1441,6 +1459,8 @@ export const ConversationLoadedSchema = z
     // When present, more accurate than summing per-message JSONL usage.
     session_usage: PersistedTokenUsageSchema.optional(),
   })
+  // NOTE: Using .strip() instead of .strict() to gracefully handle future backend fields.
+  // Stripped fields are silently dropped — acceptable for forward compatibility.
   .strip();
 
 export const ConversationRewoundSchema = z
@@ -1459,6 +1479,8 @@ export const ConversationRewoundSchema = z
           id: z.string(),
           role: z.enum(['user', 'assistant']),
           content: z.string(),
+          thinking: z.string().optional(),
+          thinkingDurationMs: z.number().optional(),
           timestamp: z.number(),
           /** Tool uses for this message (for restoring tool widgets) */
           toolUses: z

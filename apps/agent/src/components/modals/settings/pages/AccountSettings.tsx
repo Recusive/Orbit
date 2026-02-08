@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { invoke } from '@tauri-apps/api/core';
 import { Clock, Info, Key, Loader2, RefreshCw, ShieldCheck, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -10,6 +11,8 @@ import type { FC } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+
+const logger = createLogger('AccountSettings');
 
 // ---------------------------------------------------------------------------
 // Backend response types (mirrors Rust structs in credentials.rs / providers.rs)
@@ -156,8 +159,8 @@ export const AccountSettings: FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchStatus().catch(() => {
-      /* errors handled in fetchStatus */
+    fetchStatus().catch((error: unknown) => {
+      logger.error('Failed to fetch credential status', error);
     });
   }, [fetchStatus]);
 
@@ -342,8 +345,8 @@ export const AccountSettings: FC = () => {
                 className="h-8 text-xs shrink-0"
                 disabled={isRefreshing}
                 onClick={() => {
-                  handleRefreshToken().catch(() => {
-                    /* handled */
+                  handleRefreshToken().catch((error: unknown) => {
+                    logger.error('Failed to refresh token', error);
                   });
                 }}
               >
@@ -417,8 +420,8 @@ export const AccountSettings: FC = () => {
               className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
               disabled={isRemovingKey}
               onClick={() => {
-                handleRemoveKey().catch(() => {
-                  /* handled */
+                handleRemoveKey().catch((error: unknown) => {
+                  logger.error('Failed to remove API key', error);
                 });
               }}
             >
@@ -437,8 +440,8 @@ export const AccountSettings: FC = () => {
           className="space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
-            handleSaveKey().catch(() => {
-              /* handled */
+            handleSaveKey().catch((error: unknown) => {
+              logger.error('Failed to save API key', error);
             });
           }}
         >

@@ -175,6 +175,8 @@ const _CHAT_MESSAGE_KEYS_CHECK: Record<keyof ChatMessage, true> = {
   isInterrupted: true,
   thinking: true,
   thinkingDurationMs: true,
+  thinkingBlocks: true,
+  isThinkingActive: true,
   attachedFiles: true,
   attachedImages: true,
   parentUuid: true,
@@ -211,6 +213,9 @@ export function arePropsEqual(prev: MessageItemProps, next: MessageItemProps): b
   if (pm.isInterrupted !== nm.isInterrupted) return false;
   if (pm.thinking !== nm.thinking) return false;
   if (pm.thinkingDurationMs !== nm.thinkingDurationMs) return false;
+  if (pm.isThinkingActive !== nm.isThinkingActive) return false;
+  // Compare thinkingBlocks by reference (replaced on every batch update)
+  if (pm.thinkingBlocks !== nm.thinkingBlocks) return false;
   if (pm.parentUuid !== nm.parentUuid) return false;
 
   // Compare array fields with shallow equality
@@ -252,7 +257,9 @@ export function hasVisibleContent(
 ): boolean {
   if (message.role === 'user') return true;
 
-  const hasThinking = Boolean(message.thinking);
+  const hasThinking =
+    (message.thinkingBlocks !== undefined && message.thinkingBlocks.length > 0) ||
+    Boolean(message.thinking);
   const hasSegments = segments.length > 0;
 
   return hasThinking || hasSegments || isComplete || Boolean(message.isInterrupted);

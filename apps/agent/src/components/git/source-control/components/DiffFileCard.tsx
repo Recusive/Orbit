@@ -150,6 +150,7 @@ const DiffLineRow: FC<DiffLineRowProps> = ({ line, tokens }) => {
       {/* Content — syntax highlighted when tokens available */}
       <div className={cn('flex-1 px-2 whitespace-pre', isDel && 'opacity-70')}>
         {tokens ? (
+          /* key={ti} uses array index — acceptable since tokens are rebuilt per render and never reordered */
           tokens.map((token, ti) => (
             <span key={ti} style={token.color ? { color: token.color } : undefined}>
               {token.content}
@@ -325,6 +326,8 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
                   >
                     <div className="w-fit min-w-full">
                       {(() => {
+                        // NOTE: flatIndex is a mutable counter across nested maps. If hunks are ever
+                        // reordered, this will break — consider building a flat array in useMemo.
                         let flatIndex = 0;
                         return diff.hunks.map((hunk, hunkIndex) =>
                           hunk.lines.map((line, lineIndex) => {

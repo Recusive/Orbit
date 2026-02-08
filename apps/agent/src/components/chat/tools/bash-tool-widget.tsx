@@ -262,6 +262,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                     ) : output ? (
                       <div className="bg-muted/30 rounded-md p-2 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
                         {highlightedOutput ? (
+                          /* SECURITY: Safe — highlightedOutput comes from Shiki's codeToHtml() which HTML-escapes all content */
                           <div
                             className="[&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_code]:bg-transparent! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word"
                             dangerouslySetInnerHTML={{ __html: highlightedOutput }}

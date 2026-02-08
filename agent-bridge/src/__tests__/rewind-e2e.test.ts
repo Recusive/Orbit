@@ -540,12 +540,18 @@ describe('Rewind End-to-End Integration', () => {
 
       log('[STEP 5] Verification response:', verifyResult.text);
 
+      // Structural check: Verify Claude responded (non-empty response)
+      expect(verifyResult.text.length).toBeGreaterThan(0);
+
       // Claude SHOULD remember ALPHA and BETA
       const responseLower = verifyResult.text.toLowerCase();
       expect(responseLower).toContain('alpha');
       expect(responseLower).toContain('beta');
 
       // Claude SHOULD NOT remember GAMMA
+      // TODO(code-review/cycle-1#43): This assertion depends on LLM output and may be flaky.
+      // The JSONL truncation verified in STEP 4 structurally guarantees GAMMA is not in context.
+      // If this assertion fails intermittently, the structural checks above are the authoritative verification.
       const hasGamma = responseLower.includes('gamma');
       log('[STEP 5] Contains ALPHA:', responseLower.includes('alpha'));
       log('[STEP 5] Contains BETA:', responseLower.includes('beta'));
@@ -647,11 +653,17 @@ describe('Rewind End-to-End Integration', () => {
 
       log('[STEP 4] Verification response:', verifyResult.text.slice(0, 300));
 
+      // Structural check: Verify Claude responded (non-empty response)
+      expect(verifyResult.text.length).toBeGreaterThan(0);
+
       // Claude should know about v1 and v2
       expect(verifyResult.text).toContain('v1');
       expect(verifyResult.text).toContain('v2');
 
       // Claude should NOT know about v3
+      // TODO(code-review/cycle-1#43): This assertion depends on LLM output and may be flaky.
+      // The file rewind (STEP 2) and JSONL fork (STEP 3) structurally guarantee v3 is not in context.
+      // If this assertion fails intermittently, the structural checks are the authoritative verification.
       const hasV3 = verifyResult.text.includes('v3');
       log('[STEP 4] Contains v3:', hasV3);
       expect(hasV3).toBe(false);
@@ -713,8 +725,11 @@ describe('Rewind End-to-End Integration', () => {
       );
       log('[STEP 2] After first rewind:', verify1.text);
 
+      expect(verify1.text.length).toBeGreaterThan(0);
       expect(verify1.text.toLowerCase()).toContain('red');
       expect(verify1.text.toLowerCase()).toContain('blue');
+      // TODO(code-review/cycle-1#43): LLM-dependent negative assertion — may be flaky.
+      // JSONL truncation structurally guarantees GREEN is not in Claude's context.
       expect(verify1.text.toLowerCase()).not.toContain('green');
 
       // ─────────────────────────────────────────────────────────────────
@@ -738,6 +753,7 @@ describe('Rewind End-to-End Integration', () => {
       expect(verify2.text.toLowerCase()).toContain('red');
       expect(verify2.text.toLowerCase()).toContain('blue');
       expect(verify2.text.toLowerCase()).toContain('yellow');
+      // TODO(code-review/cycle-1#43): LLM-dependent negative assertion — may be flaky.
       expect(verify2.text.toLowerCase()).not.toContain('green');
 
       // ─────────────────────────────────────────────────────────────────
@@ -783,6 +799,8 @@ describe('Rewind End-to-End Integration', () => {
       log('[STEP 4] After second rewind:', verify3.text);
 
       expect(verify3.text.toLowerCase()).toContain('red');
+      // TODO(code-review/cycle-1#43): LLM-dependent negative assertions — may be flaky.
+      // Sequential JSONL truncation structurally guarantees these colors are not in context.
       expect(verify3.text.toLowerCase()).not.toContain('blue');
       expect(verify3.text.toLowerCase()).not.toContain('green');
       expect(verify3.text.toLowerCase()).not.toContain('yellow');
@@ -793,4 +811,27 @@ describe('Rewind End-to-End Integration', () => {
     },
     TIMEOUT_FULL
   );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TEST GAP: forkSessionAt with Invalid UUID (Task #48)
+  //
+  // Coverage gap identified in code review cycle-1.
+  // forkSessionAt has validation for empty strings but no test coverage for:
+  // - Empty string UUID
+  // - Non-existent message UUID (UUID not found in JSONL)
+  // - Session state corruption after failed fork attempt
+  //
+  // These tests require a REAL Claude API session to be meaningful because
+  // forkSessionAt operates on actual JSONL files on disk.
+  //
+  // TODO(code-review/cycle-1#48): Implement full tests with real API calls.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('forkSessionAt: invalid UUID handling', () => {
+    it.todo('should throw when called with empty string UUID');
+    it.todo('should throw when called with whitespace-only UUID');
+    it.todo('should throw when called with non-existent message UUID');
+    it.todo('should not corrupt session state on invalid UUID (session still usable after error)');
+    it.todo('should not delete or truncate JSONL when UUID is not found');
+  });
 });

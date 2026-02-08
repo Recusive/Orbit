@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { HeaderTab } from '@/stores/ui/ui-store';
 import type { CSSProperties, FC } from 'react';
 
+import welcomeBg from '@/assets/welcome-bg.png';
 import { HeaderBar } from '@/components/layout/header-bar';
 import { RootLayout } from '@/components/layout/root-layout';
 import { StatusBar } from '@/components/layout/status-bar';
@@ -192,9 +193,24 @@ const App: FC = () => {
     <ThemeProvider>
       <TauriProvider>
         <TooltipProvider delayDuration={0}>
-          <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground">
-            {/* Shared header with tabs */}
-            <HeaderBar />
+          <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground relative">
+            {/* Full-window background image — only on welcome page */}
+            {!hasWorkspace ? (
+              <>
+                <div
+                  className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                  style={{ backgroundImage: `url(${welcomeBg})` }}
+                  aria-hidden="true"
+                />
+                <div
+                  className="absolute inset-0 bg-gradient-to-t from-[#D4C5B5]/55 via-[#D4C5B5]/25 to-[#D4C5B5]/10 dark:from-[oklch(0.2_0.015_58_/_80%)] dark:via-[oklch(0.2_0.015_58_/_55%)] dark:to-[oklch(0.2_0.015_58_/_35%)]"
+                  aria-hidden="true"
+                />
+              </>
+            ) : null}
+
+            {/* Shared header with tabs — relative z-10 to sit above welcome bg */}
+            <HeaderBar transparent={!hasWorkspace} className="relative z-10" />
 
             {/* Mode content - show welcome page if no workspace, otherwise show active mode */}
             {/*
@@ -203,7 +219,7 @@ const App: FC = () => {
              * 1. Layout flashes when switching tabs (no remounting)
              * 2. Unnecessary memory usage for unvisited modes
              */}
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden relative z-10">
               {!hasWorkspace ? (
                 <WelcomePage />
               ) : (
@@ -257,8 +273,8 @@ const App: FC = () => {
               )}
             </div>
 
-            {/* Status Bar */}
-            <StatusBar />
+            {/* Status Bar — relative z-10 to sit above welcome bg */}
+            <StatusBar transparent={!hasWorkspace} className="relative z-10" />
 
             {/* Crash notification dialog */}
             {hasCrash && crashLog ? (

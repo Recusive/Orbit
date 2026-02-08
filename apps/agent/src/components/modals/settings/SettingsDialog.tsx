@@ -50,11 +50,10 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
   // Check if we're on an async section (subagents or commands)
   const isAsyncSection = activeSection === 'subagents' || activeSection === 'commands';
 
-  const getActiveItem = (): { label: string; icon: ReactNode } => {
-    if (activeSection === 'feedback') return FEEDBACK_ITEM;
-    const item = NAV_ITEMS.find((n) => n.id === activeSection);
-    return item ?? { label: 'Settings', icon: null };
-  };
+  const activeItem: { label: string; icon: ReactNode } =
+    activeSection === 'feedback'
+      ? FEEDBACK_ITEM
+      : (NAV_ITEMS.find((n) => n.id === activeSection) ?? { label: 'Settings', icon: null });
 
   // Render static content via lazy-loaded components
   const renderStaticContent = (): ReactNode => {
@@ -96,7 +95,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
             >
               {/* Accessibility: Hidden title for screen readers */}
               <DialogPrimitive.Title className="sr-only">
-                Settings &gt; {getActiveItem().label}
+                Settings &gt; {activeItem.label}
               </DialogPrimitive.Title>
 
               {/* Title bar */}
@@ -105,8 +104,8 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                   <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground/70" />
                   <span className="text-muted-foreground/70">Settings</span>
                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
-                  <span>{getActiveItem().icon}</span>
-                  <span>{getActiveItem().label}</span>
+                  <span>{activeItem.icon}</span>
+                  <span>{activeItem.label}</span>
                 </div>
                 <DialogPrimitive.Close className="rounded-md p-1 opacity-60 hover:opacity-100 hover:bg-muted active:scale-95 transition-[opacity,background-color,transform] duration-150">
                   <X className="h-4 w-4" />

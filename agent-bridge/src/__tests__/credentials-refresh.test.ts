@@ -144,31 +144,51 @@ describe('ClaudeCredentials.getCredentials()', () => {
     }
   );
 
-  it('returns hasCredentials=false when no credentials exist', async () => {
-    // Save env vars
-    const savedApiKey = process.env.ANTHROPIC_API_KEY;
-    const savedOAuthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
-    delete process.env.ANTHROPIC_API_KEY;
-    delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  // Task #44: Split conditional assertion into separate test cases to ensure
+  // both paths are validated (and clearly skipped when not applicable).
+  it.skipIf(hasKeychainCredentials)(
+    'returns hasCredentials=false when no credentials exist (no Keychain)',
+    async () => {
+      // Save env vars
+      const savedApiKey = process.env.ANTHROPIC_API_KEY;
+      const savedOAuthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      delete process.env.ANTHROPIC_API_KEY;
+      delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
 
-    try {
-      // On a machine with no Keychain creds AND no API key, this should return false
-      // On a dev machine with Keychain creds, this will still return true (expected)
-      const result = await ClaudeCredentials.getCredentials();
-      log('[getCredentials:none]', result);
+      try {
+        const result = await ClaudeCredentials.getCredentials();
+        log('[getCredentials:none]', result);
 
-      if (!hasKeychainCredentials) {
         expect(result.hasCredentials).toBe(false);
         expect(result.token).toBeUndefined();
-      } else {
-        // Keychain creds exist, so it should still return them
-        expect(result.hasCredentials).toBe(true);
+      } finally {
+        if (savedApiKey !== undefined) process.env.ANTHROPIC_API_KEY = savedApiKey;
+        if (savedOAuthToken !== undefined) process.env.CLAUDE_CODE_OAUTH_TOKEN = savedOAuthToken;
       }
-    } finally {
-      if (savedApiKey !== undefined) process.env.ANTHROPIC_API_KEY = savedApiKey;
-      if (savedOAuthToken !== undefined) process.env.CLAUDE_CODE_OAUTH_TOKEN = savedOAuthToken;
     }
-  });
+  );
+
+  it.skipIf(!hasKeychainCredentials)(
+    'returns hasCredentials=true from Keychain even when env vars are cleared',
+    async () => {
+      // Save env vars
+      const savedApiKey = process.env.ANTHROPIC_API_KEY;
+      const savedOAuthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      delete process.env.ANTHROPIC_API_KEY;
+      delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+
+      try {
+        // Keychain creds exist, so getCredentials should still return them
+        const result = await ClaudeCredentials.getCredentials();
+        log('[getCredentials:keychainFallback]', result);
+
+        expect(result.hasCredentials).toBe(true);
+      } finally {
+        if (savedApiKey !== undefined) process.env.ANTHROPIC_API_KEY = savedApiKey;
+        if (savedOAuthToken !== undefined) process.env.CLAUDE_CODE_OAUTH_TOKEN = savedOAuthToken;
+      }
+    }
+  );
 });
 
 // ============================================================================

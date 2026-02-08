@@ -353,23 +353,9 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         },
       },
       () => {
-        // We need THREE pieces of information:
-        // 1. message_id: The clicked message ID (for UI fork - includes up to this message)
-        // 2. user_message_id: The user message ID (for checkpoint lookup - checkpoints stored by user msg)
-        // 3. message_index: Position of clicked message in the UI list (fallback when IDs don't match disk)
-        //
-        // The index fallback is needed because:
-        // - Messages loaded from disk have SDK-generated UUIDs
-        // - New messages sent this session have frontend-generated UUIDs
-        // - On rewind, we load from disk (SDK IDs) but the clicked message might have a frontend ID
-        // - By also passing the index, we can filter by position if ID matching fails
-        //
-        // If clicked on assistant message: message_id = assistant, user_message_id = preceding user
-        // If clicked on user message: message_id = user_message_id = same
         const messageIndex = messages.findIndex((m) => m.id === messageId);
         let userMessageId = messageId;
         if (clickedMessage.role === 'assistant') {
-          // Look backwards for the preceding user message
           for (let i = messageIndex - 1; i >= 0; i--) {
             const prevMessage = messages[i];
             if (prevMessage?.role === 'user') {
@@ -379,13 +365,25 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           }
         }
 
+        // Include truncated messages as fallback for subsequent rewinds.
+        // After the first rewind, the JSONL on disk may be truncated/deleted by
+        // forkSessionAt. The frontend messages already have SDK JSONL UUIDs from
+        // the first rewind's conversation:rewound event, so they are reliable.
+        const truncatedMessages = messages.slice(0, messageIndex + 1).map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          parentUuid: m.parentUuid ?? null,
+        }));
+
         postMessage({
           type: 'conversation:rewind',
           uuid: crypto.randomUUID(),
           session_id: sessionId,
-          message_id: messageId, // Original clicked message (for UI fork)
-          user_message_id: userMessageId, // User message (for checkpoint lookup)
-          message_index: messageIndex, // Position fallback for ID mismatch
+          message_id: messageId,
+          user_message_id: userMessageId,
+          message_index: messageIndex,
+          current_messages: truncatedMessages,
         });
       }
     );

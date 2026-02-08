@@ -4,7 +4,6 @@ import { useState } from 'react';
 import type { FC } from 'react';
 
 interface MessageActionsProps {
-  readonly showDisclaimer?: boolean;
   readonly rewindDisabled?: boolean;
   readonly onCopy?: () => void;
   readonly onLike?: () => void;
@@ -13,7 +12,6 @@ interface MessageActionsProps {
 }
 
 export const MessageActions: FC<MessageActionsProps> = ({
-  showDisclaimer = false,
   rewindDisabled = false,
   onCopy,
   onLike,
@@ -78,11 +76,6 @@ export const MessageActions: FC<MessageActionsProps> = ({
           Rewind
         </button>
       </div>
-      {showDisclaimer ? (
-        <p className="text-sm text-muted-foreground/60">
-          AI may make mistakes. Double-check all generated code.
-        </p>
-      ) : null}
     </div>
   );
 };

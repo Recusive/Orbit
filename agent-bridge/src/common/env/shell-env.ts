@@ -40,6 +40,11 @@ export function getShellEnvironment(): Record<string, string> {
         TERM: 'xterm-256color',
         // LC_ALL ensures consistent output parsing
         LC_ALL: 'en_US.UTF-8',
+        // Some .zshrc files guard on TERM_PROGRAM / __CFBundleIdentifier
+        // for nvm/fnm/pyenv initialization. Provide terminal-like values so
+        // those guards pass and the env output includes tool paths.
+        TERM_PROGRAM: 'Apple_Terminal',
+        __CFBundleIdentifier: 'com.apple.Terminal',
       },
     });
 

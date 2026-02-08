@@ -2,7 +2,7 @@
  * ConversationItem - Individual conversation row
  * Features: inline editing, hover actions, context menu, active/selected state
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ConversationItemProps } from '../types';
 import type { FC } from 'react';
@@ -53,6 +53,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [editValue, setEditValue] = useState(conversation.title);
   const inputRef = useRef<HTMLInputElement>(null);
+  const submittedRef = useRef(false);
 
   // Hide timestamp when hovering OR when menu is open
   const showTimestamp = !isHovered && !isMenuOpen;
@@ -70,7 +71,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
     setEditValue(conversation.title);
   }, [conversation.title, isEditing]);
 
-  const handleSaveEdit = (): void => {
+  const handleSaveEdit = useCallback((): void => {
     const trimmed = editValue.trim();
     if (trimmed && trimmed !== conversation.title) {
       onRename?.(trimmed);
@@ -79,11 +80,21 @@ export const ConversationItem: FC<ConversationItemProps> = ({
       setEditValue(conversation.title);
       onCancelEdit?.();
     }
-  };
+  }, [editValue, conversation.title, onRename, onCancelEdit]);
+
+  const handleBlurEdit = useCallback((): void => {
+    // Guard against double-fire: if Enter already submitted, skip the blur handler
+    if (submittedRef.current) {
+      submittedRef.current = false;
+      return;
+    }
+    handleSaveEdit();
+  }, [handleSaveEdit]);
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      submittedRef.current = true;
       handleSaveEdit();
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -121,7 +132,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
           onChange={(e) => {
             setEditValue(e.target.value);
           }}
-          onBlur={handleSaveEdit}
+          onBlur={handleBlurEdit}
           onKeyDown={handleKeyDown}
           spellCheck={false}
           autoComplete="off"

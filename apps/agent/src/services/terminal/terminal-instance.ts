@@ -589,7 +589,17 @@ export class TerminalInstance {
       // In liquid glass mode, --chat-area is semi-transparent (rgba with alpha < 1)
       // which xterm.js canvas doesn't render well. In that case, fall back to
       // near-invisible so the CSS container (var(--chat-area)) provides the visual.
-      const isSemiTransparent = bgComputed.startsWith('rgba') && !/,\s*1\s*\)$/.test(bgComputed);
+      // Parse the alpha channel numerically instead of fragile regex matching.
+      // The previous regex (/,\s*1\s*\)$/) failed for values like "1.0" or "1.00".
+      let isSemiTransparent = false;
+      if (bgComputed.startsWith('rgba')) {
+        const parts = bgComputed
+          .replace(/^rgba?\(/, '')
+          .replace(/\)$/, '')
+          .split(',');
+        const alpha = parseFloat(parts[3]?.trim() ?? '1');
+        isSemiTransparent = alpha < 0.99;
+      }
       const bgColor = isSemiTransparent ? 'rgba(0, 0, 0, 0.01)' : bgComputed;
 
       // WARNING: Do NOT modify selectionBg to add rgba() transparency!
