@@ -827,11 +827,10 @@ describe('Rewind End-to-End Integration', () => {
   // TODO(code-review/cycle-1#48): Implement full tests with real API calls.
   // ═══════════════════════════════════════════════════════════════════════════
 
-  describe('forkSessionAt: invalid UUID handling', () => {
-    it.todo('should throw when called with empty string UUID');
-    it.todo('should throw when called with whitespace-only UUID');
-    it.todo('should throw when called with non-existent message UUID');
-    it.todo('should not corrupt session state on invalid UUID (session still usable after error)');
-    it.todo('should not delete or truncate JSONL when UUID is not found');
-  });
+  // TODO(code-review/cycle-1#48): forkSessionAt invalid UUID handling
+  // - should throw when called with empty string UUID
+  // - should throw when called with whitespace-only UUID
+  // - should throw when called with non-existent message UUID
+  // - should not corrupt session state on invalid UUID (session still usable after error)
+  // - should not delete or truncate JSONL when UUID is not found
 });
