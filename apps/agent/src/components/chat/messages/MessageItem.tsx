@@ -33,10 +33,17 @@ const LINK_SAFETY_DISABLED = { enabled: false } as const;
 // This is critical for Streamdown performance as it compares plugin arrays by reference.
 const REMARK_PLUGINS = [remarkGfm];
 
-// Two rehype configurations: streaming wraps text in <span class="flow-token">
-// for per-word blur-in animation; static renders plain text with zero DOM overhead.
-const REHYPE_PLUGINS_STATIC: never[] = [];
-const REHYPE_PLUGINS_STREAMING = [rehypeFlowTokens];
+// Rehype configuration: wraps text in <span class="flow-token"> for per-word
+// blur-in animation during streaming. These spans are visually inert when the
+// message is complete — the CSS animation only applies via [data-streaming="true"].
+//
+// IMPORTANT: We use ONE pipeline for both streaming and completed messages.
+// Previously, we switched from streaming→static (empty) plugins when isStreaming
+// changed. This caused a massive DOM restructuring (removing hundreds of spans
+// in one frame), creating a visible flash/glitch at the end of streaming.
+// Keeping the spans avoids the restructuring. The extra DOM weight is negligible
+// since the virtualizer limits to ~15 messages in the DOM.
+const REHYPE_PLUGINS = [rehypeFlowTokens];
 
 // Streamdown plugins for diagram and code rendering - defined outside component for reference stability.
 // The `code` plugin provides Shiki syntax highlighting with github-light/dark themes.
@@ -82,11 +89,10 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   // Note: JS animation hooks cause flash when combined with auto-scroll during streaming
   const animatedContent = message.displayedContent;
 
-  // Choose rehype plugins based on streaming state.
-  // During streaming, rehypeFlowTokens wraps words in <span class="flow-token"> for
-  // per-word fade-in animation. Once complete, we switch to the static (empty) pipeline
-  // so completed messages carry zero extra DOM weight.
-  const rehypePlugins = message.isStreaming ? REHYPE_PLUGINS_STREAMING : REHYPE_PLUGINS_STATIC;
+  // Use the same rehype pipeline for both streaming and completed messages.
+  // Flow-token spans are inert when data-streaming="false" (no animation CSS applies).
+  // See REHYPE_PLUGINS comment above for why we don't switch pipelines.
+  const rehypePlugins = REHYPE_PLUGINS;
 
   // Dynamic animation speed based on content length (see calculateFlowDuration)
   const flowDuration = message.isStreaming
