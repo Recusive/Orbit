@@ -177,7 +177,7 @@
   --card-foreground: oklch(0.24 0.02 55);
   --popover: oklch(0.87 0.02 75 / 88%); /* Floating surfaces - more opaque than base surface for readability */
   --popover-foreground: oklch(0.24 0.02 55);
-  --primary: oklch(0.56 0.18 35); /* Coral - darker for better contrast */
+  --primary: oklch(0.69 0.13 35); /* Coral #E07A6B */
   --primary-foreground: oklch(0.98 0.01 75);
   --secondary: oklch(0.73 0.06 70); /* Clay #C4A98B */
   --secondary-foreground: oklch(0.3 0.02 55);
@@ -190,7 +190,7 @@
   --border-panel: oklch(0.76 0.03 70 / 50%); /* Panel/separator borders - border at 50% alpha */
   --divider: oklch(0.84 0.025 70); /* Structural panel dividers - same as border for consistency */
   --input: var(--surface);
-  --ring: oklch(0.56 0.18 35); /* Coral - darker */
+  --ring: oklch(0.69 0.13 35); /* Coral #E07A6B */
   --chat-area: var(--surface);
   --editor-bg: transparent; /* Liquid glass: see-through to vibrancy */
 
@@ -204,12 +204,12 @@
   /* Sidebar - matches card for same look as input box */
   --sidebar: var(--surface);
   --sidebar-foreground: oklch(0.25 0.02 60);
-  --sidebar-primary: oklch(0.56 0.18 35);
+  --sidebar-primary: oklch(0.69 0.13 35);
   --sidebar-primary-foreground: oklch(0.98 0.01 75);
   --sidebar-accent: oklch(0.9 0.02 70);
   --sidebar-accent-foreground: oklch(0.3 0.02 60);
   --sidebar-border: oklch(0.88 0.02 70);
-  --sidebar-ring: oklch(0.56 0.18 35);
+  --sidebar-ring: oklch(0.69 0.13 35);
 
   /* Status colors */
   --success: oklch(0.65 0.18 155);
@@ -311,7 +311,7 @@ html.dark {
   --card-foreground: oklch(0.93 0.01 75);
   --popover: oklch(0.2 0.015 58 / 75%); /* Floating surfaces - more opaque than base surface for readability */
   --popover-foreground: oklch(0.93 0.01 75);
-  --primary: oklch(0.68 0.19 40); /* Coral - slightly brighter for dark */
+  --primary: oklch(0.69 0.13 35); /* Coral #E07A6B - same as light */
   --primary-foreground: oklch(0.15 0.01 60);
   --secondary: oklch(0.28 0.02 58);
   --secondary-foreground: oklch(0.9 0.01 75);
@@ -324,7 +324,7 @@ html.dark {
   --border-panel: oklch(1 0 0 / 5%); /* Panel/separator borders - border at 5% alpha */
   --divider: oklch(1 0 0 / 10%); /* Structural panel dividers - same as border for consistency */
   --input: var(--surface);
-  --ring: oklch(0.55 0.15 38);
+  --ring: oklch(0.60 0.12 35);
   --chat-area: var(--surface);
   --editor-bg: transparent; /* Liquid glass: see-through to vibrancy */
 
@@ -338,12 +338,12 @@ html.dark {
   /* Sidebar - matches card for same look as input box */
   --sidebar: var(--surface);
   --sidebar-foreground: oklch(0.93 0.01 75);
-  --sidebar-primary: oklch(0.68 0.19 40);
+  --sidebar-primary: oklch(0.69 0.13 35);
   --sidebar-primary-foreground: oklch(0.15 0.01 60);
   --sidebar-accent: oklch(0.26 0.015 58);
   --sidebar-accent-foreground: oklch(0.9 0.01 75);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.55 0.15 38);
+  --sidebar-ring: oklch(0.60 0.12 35);
 
   /* Status colors */
   --success: oklch(0.7 0.18 155);
@@ -1210,10 +1210,10 @@ html:not(.window-mode-solid) .glass-float {
 }
 
 .liquid-hover:hover {
-  background: oklch(0.56 0.18 35 / 8%);
+  background: oklch(0.69 0.13 35 / 8%);
 }
 
 html.dark .liquid-hover:hover {
-  background: oklch(0.68 0.19 40 / 12%);
+  background: oklch(0.69 0.13 35 / 12%);
 }
 

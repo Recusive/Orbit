@@ -180,7 +180,7 @@ export const OrbitAsciiLogo: FC<OrbitAsciiLogoProps> = ({ className }) => {
       {/* ASCII Logo + full-height cursor — negative margin offsets cursor so art stays centered */}
       <div className="flex items-stretch -mr-[48px]">
         <pre
-          className="font-mono text-[22px] leading-[1.15] text-[#8B7355] dark:text-[#E8E0D5] whitespace-pre select-none"
+          className="font-mono text-[22px] leading-[1.15] text-[#E07A6B] dark:text-[#F09080] whitespace-pre select-none"
           aria-label="ORBIT"
           role="img"
         >
@@ -190,7 +190,7 @@ export const OrbitAsciiLogo: FC<OrbitAsciiLogoProps> = ({ className }) => {
           className={cn(
             'w-[44px] ml-1',
             phase === 'decode-logo' || phase === 'scramble'
-              ? 'bg-[#8B7355] dark:bg-[#E8E0D5] animate-blink'
+              ? 'bg-[#E07A6B] dark:bg-[#F09080] animate-blink'
               : 'bg-transparent'
           )}
         />
@@ -201,7 +201,7 @@ export const OrbitAsciiLogo: FC<OrbitAsciiLogoProps> = ({ className }) => {
         <pre className="font-mono text-sm text-foreground/60 whitespace-pre select-none text-center">
           {taglineDisplay}
           {phase === 'decode-tagline' ? (
-            <span className="text-[#8B7355] dark:text-[#E8E0D5] animate-blink">█</span>
+            <span className="text-[#E07A6B] dark:text-[#F09080] animate-blink">█</span>
           ) : null}
         </pre>
       </div>
