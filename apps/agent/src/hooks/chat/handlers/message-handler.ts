@@ -136,6 +136,9 @@ interface MessageHandlerDeps {
   setSessionId: React.Dispatch<React.SetStateAction<string>>;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setIsAgentRunning: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Set to true by handleStop, cleared by agent:complete/agent:error.
+   *  Prevents rewind from firing while SDK is still flushing JSONL writes. */
+  isStopPendingRef: React.RefObject<boolean>;
   sessionIdRef: React.RefObject<string>;
   messagesRef: React.RefObject<ChatMessage[]>;
   messagesCache: React.RefObject<Map<string, ChatMessage[]>>;
@@ -184,6 +187,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
     setSessionId,
     setMessages,
     setIsAgentRunning,
+    isStopPendingRef,
     sessionIdRef,
     messagesRef,
     messagesCache,
@@ -772,6 +776,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           addUsage(message.message_id, usageForStore, message.total_cost_usd);
         }
         setIsAgentRunning(false);
+        // Clear the stop-pending gate — SDK has finished flushing JSONL, rewind is now safe.
+        isStopPendingRef.current = false;
 
         // Refresh conversation list from disk after agent completes.
         // The SDK writes JSONL files during the turn — by the time agent:complete fires,
@@ -800,6 +806,7 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         pendingChunkLengths.delete(message.message_id);
 
         setIsAgentRunning(false);
+        isStopPendingRef.current = false;
 
         // Detect auth-related errors and provide a user-friendly message
         // instead of dumping the raw SDK error into the chat

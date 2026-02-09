@@ -3,6 +3,8 @@ import { useState } from 'react';
 
 import type { FC } from 'react';
 
+import { cn } from '@/lib/utils';
+
 interface MessageActionsProps {
   readonly rewindDisabled?: boolean;
   readonly onCopy?: () => void;
@@ -63,11 +65,14 @@ export const MessageActions: FC<MessageActionsProps> = ({
           <ThumbsDown className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
         <button
-          className={`h-6 px-2.5 flex items-center rounded-md text-sm font-medium transition-[background-color,color,transform] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50 ${
+          className={cn(
+            'h-6 px-2.5 flex items-center rounded-md text-sm font-medium',
+            'transition-[background-color,color,transform] duration-150',
+            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
             rewindDisabled
               ? 'bg-muted/30 text-muted-foreground/50 cursor-not-allowed'
               : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground hover:scale-[1.02] active:scale-[0.98]'
-          }`}
+          )}
           aria-label={rewindDisabled ? 'Cannot rewind last message' : 'Rewind to this point'}
           title={rewindDisabled ? 'Cannot rewind last message' : 'Rewind'}
           onClick={rewindDisabled ? undefined : onRewind}

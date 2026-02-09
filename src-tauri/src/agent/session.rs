@@ -614,7 +614,7 @@ impl SessionManager {
     /// This restores all files modified by Write, Edit, NotebookEdit tools
     /// to their state at the given checkpoint UUID.
     pub fn rewind_files(&self, session_id: &str, checkpoint_id: &str) -> Result<()> {
-        log::warn!(
+        log::debug!(
             "[REWIND] Rust SessionManager.rewind_files — session_id={}, checkpoint_id={}",
             session_id,
             &checkpoint_id[..8.min(checkpoint_id.len())]
@@ -631,7 +631,7 @@ impl SessionManager {
         let response = bridge.send_request(&request)?;
         let result = Self::check_response(response);
 
-        log::warn!(
+        log::debug!(
             "[REWIND] Rust SessionManager.rewind_files — result={:?}",
             result.as_ref().map(|()| "ok").unwrap_or("err")
         );
@@ -647,7 +647,7 @@ impl SessionManager {
     /// (via `replay-user-messages` option). The SDK will create a new session branch
     /// starting from that exact checkpoint.
     pub fn fork_session_at(&self, session_id: &str, at_message_uuid: &str) -> Result<String> {
-        log::warn!(
+        log::debug!(
             "[REWIND] Rust SessionManager.fork_session_at — session_id={}, at_message_uuid={}",
             session_id,
             &at_message_uuid[..8.min(at_message_uuid.len())]
@@ -665,7 +665,7 @@ impl SessionManager {
         let result = Self::check_response_string(response)?
             .ok_or_else(|| BridgeError::SidecarError("Fork returned null".to_owned()));
 
-        log::warn!(
+        log::debug!(
             "[REWIND] Rust SessionManager.fork_session_at — result={}",
             match &result {
                 Ok(id) => format!("ok({})", &id[..8.min(id.len())]),

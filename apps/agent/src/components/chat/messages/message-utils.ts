@@ -63,12 +63,29 @@ export function getActiveChain<T extends ChainableMessage>(allMessages: T[]): T[
   // Build lookup map for O(1) parent access
   const byId = new Map<string, T>(allMessages.map((m) => [m.id, m]));
 
+  // Build set of IDs that are referenced as parentUuid (i.e., have children)
+  // The true head is a leaf node — no other message points to it as parent
+  const referencedAsParent = new Set<string>();
+  for (const m of allMessages) {
+    if (m.parentUuid !== undefined && m.parentUuid !== null) {
+      referencedAsParent.add(m.parentUuid);
+    }
+  }
+
   // Find the head (latest message by timestamp)
-  // This is the end of the active chain
+  // Tiebreaker: when timestamps are equal, prefer the message that is NOT
+  // referenced as a parent (true head is a leaf node with no children)
   const head = allMessages.reduce((latest, m) => {
     const latestTime = latest.createdAt ?? 0;
     const currentTime = m.createdAt ?? 0;
-    return currentTime > latestTime ? m : latest;
+    if (currentTime > latestTime) return m;
+    if (currentTime === latestTime) {
+      const latestIsParent = referencedAsParent.has(latest.id);
+      const currentIsParent = referencedAsParent.has(m.id);
+      // Prefer the one that is NOT a parent (leaf node)
+      if (latestIsParent && !currentIsParent) return m;
+    }
+    return latest;
   });
 
   // Walk backwards via parentUuid to build the chain

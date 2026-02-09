@@ -25,6 +25,8 @@ interface ChatActionsDeps {
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   isAgentRunning: boolean;
   setIsAgentRunning: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Gate rewind after Stop — true while SDK is still flushing JSONL. */
+  isStopPendingRef: React.RefObject<boolean>;
   conversations: Conversation[];
   workspacePath: string | null;
   activeWorktreePath: string | null;
@@ -79,6 +81,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     setMessages,
     isAgentRunning,
     setIsAgentRunning,
+    isStopPendingRef,
     conversations,
     workspacePath,
     activeWorktreePath,
@@ -280,6 +283,9 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
         // Update local state immediately for responsive UI
         setIsAgentRunning(false);
+        // Block rewind until SDK confirms stop (agent:complete/agent:error clears this).
+        // Without this, rewind can read a partially-written JSONL → corruption.
+        isStopPendingRef.current = true;
 
         // Clear any pending permission requests since agent is stopped
         clearPermissions();
@@ -336,7 +342,9 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   };
 
   const handleRewind = (messageId: string): void => {
-    if (!sessionId || isAgentRunning) return;
+    // Block rewind while agent is running OR while SDK is flushing after Stop.
+    // The stop-pending window is ~50-200ms between handleStop and agent:complete.
+    if (!sessionId || isAgentRunning || isStopPendingRef.current) return;
 
     // Find the clicked message
     const clickedMessage = messages.find((m) => m.id === messageId);
@@ -428,6 +436,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
     // Update local state immediately
     setIsAgentRunning(false);
+    isStopPendingRef.current = true;
 
     // Mark any streaming message as complete and interrupted, or create one if none exists
     setMessages((prev) => {

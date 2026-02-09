@@ -2039,40 +2039,15 @@ export class SessionManager extends Disposable {
       '[REWIND] Step 1: Session state before fork'
     );
 
-    // Step 2: Truncate JSONL — removes all messages after the target UUID
-    logger.warn(
-      { sdkSessionId: sdkSessionId.slice(0, 8), atMessageUuid: atMessageUuid.slice(0, 8) },
-      '[REWIND] Step 2: Truncating JSONL'
-    );
-    const truncateResult = truncateSessionJsonl(sdkSessionId, savedCwd, atMessageUuid);
-    logger.warn(
-      {
-        sdkSessionId: sdkSessionId.slice(0, 8),
-        atMessageUuid: atMessageUuid.slice(0, 8),
-        linesRemoved: truncateResult.linesRemoved,
-        userMessageUuid: truncateResult.userMessageUuid?.slice(0, 8) ?? 'none',
-      },
-      '[REWIND] Step 2: JSONL truncation result'
-    );
-
-    if (truncateResult.linesRemoved < 0) {
-      logger.warn(
-        { sdkSessionId: sdkSessionId.slice(0, 8), savedCwd },
-        '[REWIND] Step 2: FAILED — source JSONL not found, aborting fork'
-      );
-      throw new Error(
-        `Source JSONL not found for session ${sdkSessionId} — cannot proceed with rewind. No data was modified.`
-      );
-    }
-
-    // Step 3: Copy truncated JSONL to a NEW session ID (avoids SDK cached state issues)
+    // Step 2: Copy ORIGINAL (unmodified) JSONL to a NEW session ID first.
+    // This preserves the original — if truncation fails, no data is lost.
     const newSdkSessionId = randomUUID();
     logger.warn(
       {
         oldSdkSessionId: sdkSessionId.slice(0, 8),
         newSdkSessionId: newSdkSessionId.slice(0, 8),
       },
-      '[REWIND] Step 3: Copying truncated JSONL to new session ID'
+      '[REWIND] Step 2: Copying original JSONL to new session ID (before truncation)'
     );
     const copyResult = copySessionJsonl(sdkSessionId, newSdkSessionId, savedCwd);
     logger.warn(
@@ -2082,7 +2057,7 @@ export class SessionManager extends Disposable {
         success: copyResult.success,
         error: copyResult.error ?? 'none',
       },
-      '[REWIND] Step 3: Copy result'
+      '[REWIND] Step 2: Copy result'
     );
 
     if (!copyResult.success) {
@@ -2091,7 +2066,37 @@ export class SessionManager extends Disposable {
       );
     }
 
-    // Step 4: Delete the ORIGINAL truncated JSONL (prevents duplicate sidebar entries)
+    // Step 3: Truncate the COPY — removes all messages after the target UUID.
+    // Original JSONL is still intact at this point.
+    logger.warn(
+      { newSdkSessionId: newSdkSessionId.slice(0, 8), atMessageUuid: atMessageUuid.slice(0, 8) },
+      '[REWIND] Step 3: Truncating copied JSONL'
+    );
+    const truncateResult = truncateSessionJsonl(newSdkSessionId, savedCwd, atMessageUuid);
+    logger.warn(
+      {
+        newSdkSessionId: newSdkSessionId.slice(0, 8),
+        atMessageUuid: atMessageUuid.slice(0, 8),
+        linesRemoved: truncateResult.linesRemoved,
+        userMessageUuid: truncateResult.userMessageUuid?.slice(0, 8) ?? 'none',
+      },
+      '[REWIND] Step 3: JSONL truncation result'
+    );
+
+    if (truncateResult.linesRemoved < 0) {
+      // Truncation failed — clean up the copy, original is still intact
+      logger.warn(
+        { newSdkSessionId: newSdkSessionId.slice(0, 8), savedCwd },
+        '[REWIND] Step 3: FAILED — truncation failed, cleaning up copy'
+      );
+      deleteSessionJsonl(newSdkSessionId, savedCwd);
+      throw new Error(
+        `JSONL truncation failed for copied session ${newSdkSessionId} — original JSONL preserved. No data was modified.`
+      );
+    }
+
+    // Step 4: Delete the ORIGINAL JSONL (prevents duplicate sidebar entries).
+    // Safe to delete: the copy is already truncated and ready.
     logger.warn(
       { sdkSessionId: sdkSessionId.slice(0, 8) },
       '[REWIND] Step 4: Deleting original JSONL'

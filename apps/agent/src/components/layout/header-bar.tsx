@@ -130,7 +130,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                 'h-6 w-6 flex items-center justify-center rounded-md',
                 'text-muted-foreground/60 hover:text-foreground',
                 'hover:bg-muted/40 active:scale-[0.95]',
-                'transition-all duration-150'
+                'transition-[color,background-color,transform] duration-150'
               )}
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -163,7 +163,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                 'h-6 w-6 flex items-center justify-center rounded-md',
                 'text-muted-foreground/60 hover:text-foreground',
                 'hover:bg-muted/40 active:scale-[0.95]',
-                'transition-all duration-150'
+                'transition-[color,background-color,transform] duration-150'
               )}
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
@@ -229,7 +229,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                 'flex items-center gap-2 h-full px-2.5',
                 'text-muted-foreground hover:text-foreground',
                 'hover:bg-muted/60 active:scale-[0.98]',
-                'transition-all duration-150'
+                'transition-[color,background-color,transform] duration-150'
               )}
               title="Search files (⌘K)"
               onClick={handleOpenSearch}
@@ -256,7 +256,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                     className={cn(
                       'h-6 w-6 flex items-center justify-center rounded-md',
                       'hover:bg-muted/40 active:scale-[0.98]',
-                      'transition-all duration-150',
+                      'transition-[color,background-color,transform] duration-150',
                       reviewPanelOpen
                         ? 'text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
@@ -303,7 +303,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                     className={cn(
                       'h-6 w-6 flex items-center justify-center rounded-md',
                       'hover:bg-muted/40 active:scale-[0.98]',
-                      'transition-all duration-150',
+                      'transition-[color,background-color,transform] duration-150',
                       bottomPanelOpen
                         ? 'text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
@@ -328,7 +328,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                     className={cn(
                       'h-6 w-6 flex items-center justify-center rounded-md',
                       'hover:bg-muted/40 active:scale-[0.98]',
-                      'transition-all duration-150',
+                      'transition-[color,background-color,transform] duration-150',
                       rightSidebarOpen
                         ? 'text-foreground'
                         : 'text-muted-foreground hover:text-foreground'

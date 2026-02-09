@@ -8,6 +8,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useCallback } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
 
@@ -153,8 +154,14 @@ export const StatusBar: FC<StatusBarProps> = ({ className, transparent = false }
   // Diagnostics (LSP problems)
   const { totalErrors, totalWarnings } = useDiagnostics();
 
-  // UI actions
-  const { openSourceControl, openProblemsPanel, setGoToLineDialogOpen } = useUIStore();
+  // UI actions — use useShallow to prevent re-renders on unrelated store changes
+  const { openSourceControl, openProblemsPanel, setGoToLineDialogOpen } = useUIStore(
+    useShallow((s) => ({
+      openSourceControl: s.openSourceControl,
+      openProblemsPanel: s.openProblemsPanel,
+      setGoToLineDialogOpen: s.setGoToLineDialogOpen,
+    }))
+  );
 
   const isGitRepo = repoPath !== null;
   const hasFile = activeFile !== null;

@@ -13,7 +13,7 @@ export { ChangesList } from './components/ChangesList';
 export { CommitForm } from './components/CommitForm';
 export { DiffFileCard } from './components/DiffFileCard';
 export { DiscardConfirmation } from './components/DiscardConfirmation';
-export { FileSection } from './components/FileSection';
+
 export { GitActions } from './components/GitActions';
 export { OperationError } from './components/OperationError';
 export { SyncStatus } from './components/SyncStatus';

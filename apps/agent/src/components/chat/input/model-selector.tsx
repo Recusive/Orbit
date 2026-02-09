@@ -107,6 +107,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   const setModel = useToolStore((s) => s.setModel);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Calculate popover position from trigger's viewport rect.
   // Uses the actual popover height (when available) to decide whether to open
@@ -188,11 +189,21 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   const handleClose = useCallback((): void => {
     if (!isOpen || isAnimatingOut) return;
     setIsAnimatingOut(true);
-    setTimeout(() => {
+    exitTimerRef.current = setTimeout(() => {
+      exitTimerRef.current = null;
       setIsOpen(false);
       setIsAnimatingOut(false);
     }, POPOVER_ANIMATION.exitDurationMs);
   }, [isOpen, isAnimatingOut]);
+
+  // Clean up exit animation timer on unmount
+  useEffect(() => {
+    return (): void => {
+      if (exitTimerRef.current !== null) {
+        clearTimeout(exitTimerRef.current);
+      }
+    };
+  }, []);
 
   // Close popover when clicking outside or pressing Escape
   // Escape key is standard UX for dismissing popovers (code review: Opus cycle 1, issue #3)

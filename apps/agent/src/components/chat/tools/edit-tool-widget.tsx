@@ -106,16 +106,22 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span
+          <a
+            role="link"
+            tabIndex={0}
             className={cn(
               'text-xs font-medium truncate cursor-pointer hover:underline',
               isFailed ? 'text-muted-foreground line-through' : 'text-foreground/90'
             )}
             onClick={handleFileClick}
+            onKeyDown={(e): void => {
+              if (e.key === 'Enter' || e.key === ' ')
+                handleFileClick(e as unknown as React.MouseEvent);
+            }}
             title={filePath}
           >
             {fileName}
-          </span>
+          </a>
           <span
             className={cn(
               'text-xs shrink-0',

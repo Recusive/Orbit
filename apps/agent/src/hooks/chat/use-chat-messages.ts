@@ -125,6 +125,16 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
 
   const [isAgentRunning, setIsAgentRunning] = useState(false);
 
+  // Gate rewind after Stop: `agent:stop` sets isAgentRunning=false BEFORE the SDK
+  // finishes flushing its JSONL writes. If the user clicks Rewind in that window,
+  // `conversationLoad` / `agentForkSessionAt` read a partially-written JSONL, causing:
+  //   - Empty user message bubbles
+  //   - "[Request interrupted by user]" appearing as wrong role
+  //   - API 400 errors ("text content blocks must be non-empty")
+  // This ref is set true by handleStop and cleared by agent:complete/agent:error.
+  // handleRewind checks it to prevent rewind during the flush window.
+  const isStopPendingRef = useRef(false);
+
   // Track thinking start times by message ID to calculate duration
   const thinkingStartTimes = useRef<Map<string, number>>(new Map());
   // Track whether non-thinking content arrived since last thinking chunk (for multi-block detection)
@@ -246,6 +256,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setSessionId,
       setMessages,
       setIsAgentRunning,
+      isStopPendingRef,
       sessionIdRef,
       messagesRef,
       messagesCache,
@@ -513,6 +524,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setMessages,
       isAgentRunning,
       setIsAgentRunning,
+      isStopPendingRef,
       conversations,
       // Keep workspace path and worktree path separate for proper grouping
       workspacePath,

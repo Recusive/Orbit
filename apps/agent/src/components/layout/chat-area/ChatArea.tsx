@@ -205,6 +205,16 @@ export const ChatArea: FC = () => {
   // PERF: Debounced to avoid triggering React re-renders on every drag frame.
   // The store update changes preferredSize props which causes allotment to recalculate.
   const sizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up debounce timer on unmount to prevent firing on unmounted component
+  useEffect(() => {
+    return (): void => {
+      if (sizeDebounceRef.current !== null) {
+        clearTimeout(sizeDebounceRef.current);
+      }
+    };
+  }, []);
+
   const handleTerminalSizeChange = useCallback(
     (sizes: number[]): void => {
       const terminalSize = sizes[1];

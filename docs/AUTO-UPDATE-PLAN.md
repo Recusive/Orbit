@@ -42,7 +42,7 @@ Replace `"plugins": {}` (line 68) with:
   "updater": {
     "pubkey": "PLACEHOLDER_UNTIL_KEYS_GENERATED",
     "endpoints": [
-      "https://github.com/Recusive/Orbit/releases/latest/download/latest.json"
+      "https://github.com/Recursive/Orbit/releases/latest/download/latest.json"
     ],
     "windows": {
       "installMode": "passive"
