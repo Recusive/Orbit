@@ -259,7 +259,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
         <div className="flex items-baseline gap-1.5 min-w-0 flex-1">
           <span className="text-sm font-medium truncate text-foreground/90">{fileName}</span>
           {fileDir ? (
-            <span className="text-[11px] text-muted-foreground/50 truncate shrink-[2]">
+            <span className="text-[11px] text-muted-foreground/50 truncate shrink-2">
               {fileDir}
             </span>
           ) : null}
