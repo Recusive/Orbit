@@ -496,7 +496,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
     >
       <header
         className={cn(
-          'relative z-10 flex items-center justify-between px-2 shrink-0 border-b border-border/50',
+          'relative z-10 flex items-center justify-between px-2 shrink-0 border-b border-gray-5',
           collapsed && 'border-b-0'
         )}
         style={{ height: TERMINAL_HEADER_HEIGHT }}

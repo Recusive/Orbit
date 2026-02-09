@@ -3,7 +3,7 @@
  *
  * Mirrors the Edit/Write tool widget visual language:
  * - Header: icon badge → filename → label → DiffStat → actions → chevron
- * - Body: thick `border-3` colored border, tinted backgrounds,
+ * - Body: colored border, tinted backgrounds,
  *   sticky line numbers, `text-sm leading-4` monospace lines.
  *
  * Context lines (unchanged) are shown unhighlighted.
@@ -223,14 +223,22 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   return (
     <div className="min-w-0">
       {/* Header */}
-      <button
+      <div
         onClick={handleToggle}
+        onKeyDown={(e): void => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleToggle();
+          }
+        }}
+        role="button"
+        tabIndex={canExpand ? 0 : -1}
         aria-label={isExpanded ? `Collapse diff for ${fileName}` : `Expand diff for ${fileName}`}
         aria-expanded={isExpanded}
         className={cn(
           'group/card flex items-center gap-2 py-1.5 px-2.5 mx-1',
           'transition-colors duration-150 w-[calc(100%-0.5rem)] text-left',
-          'rounded-lg hover:bg-muted/40',
+          'rounded-lg hover:bg-gray-4',
           canExpand ? 'cursor-pointer' : 'cursor-default'
         )}
       >
@@ -267,7 +275,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
               <button
                 onClick={handleDiscard}
                 disabled={isLoading}
-                className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-muted/40 active:scale-95 transition-[background-color,color,transform] duration-150"
+                className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-accent active:scale-95 transition-[background-color,color,transform] duration-150"
                 title="Discard"
                 aria-label={`Discard changes to ${fileName}`}
               >
@@ -277,7 +285,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
             <button
               onClick={handleAction}
               disabled={isLoading}
-              className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted/40 active:scale-95 transition-[background-color,color,transform] duration-150"
+              className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-accent active:scale-95 transition-[background-color,color,transform] duration-150"
               title={isStaged ? 'Unstage' : 'Stage'}
               aria-label={isStaged ? `Unstage ${fileName}` : `Stage ${fileName}`}
             >
@@ -294,7 +302,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
             />
           ) : null}
         </div>
-      </button>
+      </div>
 
       {/* Expandable diff body — thick border box matching tool widget content */}
       <AnimatePresence initial={false}>

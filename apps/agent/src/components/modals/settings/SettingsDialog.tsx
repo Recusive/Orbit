@@ -71,22 +71,18 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
-        {/* Original used bg-black/40 with Framer Motion */}
-        <DialogOverlay className="bg-black/40" />
+        <DialogOverlay />
 
         {/* Centering wrapper */}
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="relative pointer-events-auto">
-            {/* Frosted stacked layer behind dialog */}
-            <div className="dialog-stack-layer z-0" />
-
             {/* Dialog content with CSS animations - matches delete dialog pattern */}
             <DialogPrimitive.Content
               aria-describedby={undefined}
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
-                'bg-popover glass-float',
-                'border-[3px] border-border/40 rounded-xl overflow-hidden flex flex-col',
+                'bg-card',
+                'border border-gray-5 rounded-lg overflow-hidden flex flex-col',
                 'shadow-lg duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
                 'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -101,13 +97,13 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               {/* Title bar */}
               <div className="flex items-center justify-between px-4 py-2.5 bg-transparent">
                 <div className="flex items-center gap-2 font-medium text-base">
-                  <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground/70" />
-                  <span className="text-muted-foreground/70">Settings</span>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
+                  <Settings2 className="h-4 w-4 shrink-0 text-gray-9" />
+                  <span className="text-gray-9">Settings</span>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-8" />
                   <span>{activeItem.icon}</span>
                   <span>{activeItem.label}</span>
                 </div>
-                <DialogPrimitive.Close className="rounded-md p-1 opacity-60 hover:opacity-100 hover:bg-muted active:scale-95 transition-[opacity,background-color,transform] duration-150">
+                <DialogPrimitive.Close className="rounded-md p-1 text-gray-11 hover:text-foreground hover:bg-gray-4 active:scale-95 transition-[opacity,background-color,color,transform] duration-150">
                   <X className="h-4 w-4" />
                   <span className="sr-only">Close</span>
                 </DialogPrimitive.Close>

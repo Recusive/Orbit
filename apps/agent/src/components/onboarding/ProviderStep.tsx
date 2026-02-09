@@ -234,7 +234,7 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
         <div
           className={cn(
             'flex flex-col items-center justify-center gap-3 p-6 w-full max-w-[380px]',
-            'rounded-lg border border-border bg-muted/30'
+            'rounded-lg border border-border bg-gray-3'
           )}
         >
           <Loader2 className="h-6 w-6 animate-spin text-primary/60" />
@@ -254,7 +254,7 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
         <div
           className={cn(
             'flex flex-col gap-4 p-5 w-full max-w-[380px]',
-            'rounded-lg border border-border bg-muted/30'
+            'rounded-lg border border-border bg-gray-3'
           )}
         >
           <div className="flex items-center gap-3">
@@ -283,7 +283,7 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
           <div
             className={cn(
               'flex items-center gap-3 px-4 py-3',
-              'rounded-lg border border-border bg-muted/30'
+              'rounded-lg border border-border bg-gray-3'
             )}
           >
             <Terminal className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -333,7 +333,7 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
                   href="https://console.anthropic.com/settings/keys"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline"
+                  className="text-gray-12 hover:text-gray-12 hover:underline"
                 >
                   console.anthropic.com
                 </a>

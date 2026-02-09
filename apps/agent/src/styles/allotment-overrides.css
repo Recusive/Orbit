@@ -10,10 +10,10 @@
 /* ── Separator color & sash hover ── */
 /* Override allotment's --separator-border and --focus-border variables.
    --separator-border: uses --border-panel token (stays in sync with theme).
-   --focus-border: uses --primary (coral) instead of allotment's default blue (#007fd4). */
+   --focus-border: uses gray-8 instead of allotment's default blue (#007fd4). */
 :root {
   --separator-border: color-mix(in oklch, var(--border) 50%, transparent) !important;
-  --focus-border: oklch(0.62 0.18 35) !important; /* Coral - midpoint for light mode visibility */
+  --focus-border: var(--gray-9) !important; /* Gray - visible focus without accent (+1 bump) */
 }
 
 html.dark {

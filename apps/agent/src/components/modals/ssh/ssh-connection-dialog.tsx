@@ -252,7 +252,7 @@ export const SSHConnectionDialog: FC<SSHConnectionDialogProps> = ({ open, onOpen
                 {recentHosts.map((host) => (
                   <div
                     key={host}
-                    className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer group"
+                    className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-4 cursor-pointer group"
                     onClick={() => {
                       handleSelectRecentHost(host);
                     }}

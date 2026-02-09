@@ -10,15 +10,15 @@
  * This is a pure side-effect hook — returns nothing.
  */
 import { createLogger } from '@orbit/common/lib';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useAutoFetch } from './use-auto-fetch';
 import { useGitStatus } from './use-git-status';
 
-import type { GitSettings } from '@/lib/api';
+import type { GitSettings, GitStatus } from '@/lib/api';
 
 import { useEffectivePath } from '@/hooks/use-effective-path';
-import { getSettings } from '@/lib/api';
+import { getSettings, gitBranchDiffStats } from '@/lib/api';
 import { useGitStore } from '@/stores/git/git-store';
 
 const logger = createLogger('GitPolling');
@@ -58,6 +58,31 @@ export function useGitPolling(): void {
       setGitSettings(settings.git);
     });
   }, []);
+
+  // Fetch branch diff stats only when git status meaningfully changes.
+  // The store's setStatus skips updates when nothing changed (only bumps lastUpdated),
+  // so the `status` object reference only changes on real changes — this effect
+  // won't fire on no-op background polls.
+  const status = useGitStore((s) => s.status);
+  const setBranchDiffStats = useGitStore((s) => s.setBranchDiffStats);
+  const prevStatusRef = useRef<GitStatus | null>(null);
+
+  useEffect(() => {
+    // Skip if status hasn't changed or no repo
+    if (!repoPath || status === prevStatusRef.current) return;
+    prevStatusRef.current = status;
+
+    if (!status) {
+      setBranchDiffStats(null);
+      return;
+    }
+
+    void gitBranchDiffStats(repoPath)
+      .then(setBranchDiffStats)
+      .catch(() => {
+        // Silently ignore — stats are non-critical
+      });
+  }, [repoPath, status, setBranchDiffStats]);
 
   // Start auto-fetch polling — keeps remote refs updated
   useAutoFetch(repoPath, {

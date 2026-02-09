@@ -33,7 +33,7 @@ export const DiscardConfirmation: React.FC<DiscardConfirmationProps> = ({
         </button>
         <button
           onClick={onCancel}
-          className="px-2.5 h-6 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 active:scale-[0.98] transition-[background-color,color,transform] duration-150"
+          className="px-2.5 h-6 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-accent active:scale-[0.98] transition-[background-color,color,transform] duration-150"
         >
           Cancel
         </button>

@@ -29,7 +29,7 @@ export const GitActions: React.FC<GitActionsProps> = ({
   const isSyncing = isPulling || isPushing;
 
   return (
-    <div className="px-2 py-2 flex gap-1.5 border-t border-border/50">
+    <div className="px-2 py-2 flex gap-1.5 border-t border-gray-6">
       {/* Commit button - primary action */}
       <button
         onClick={() => void onCommit()}
@@ -60,8 +60,8 @@ export const GitActions: React.FC<GitActionsProps> = ({
         className="
           h-7 px-2.5 flex items-center justify-center gap-1 rounded-lg
           text-sm text-muted-foreground
-          border-[3px] border-border/40
-          hover:bg-muted/40 hover:text-foreground hover:border-border/60
+          border border-gray-5
+          hover:bg-gray-4 hover:text-foreground hover:border-gray-7
           active:scale-[0.98] transition-[background-color,color,border-color,transform] duration-150
           disabled:opacity-30 disabled:cursor-not-allowed
         "
@@ -82,8 +82,8 @@ export const GitActions: React.FC<GitActionsProps> = ({
         className="
           h-7 px-2.5 flex items-center justify-center gap-1 rounded-lg
           text-sm text-muted-foreground
-          border-[3px] border-border/40
-          hover:bg-muted/40 hover:text-foreground hover:border-border/60
+          border border-gray-5
+          hover:bg-gray-4 hover:text-foreground hover:border-gray-7
           active:scale-[0.98] transition-[background-color,color,border-color,transform] duration-150
           disabled:opacity-30 disabled:cursor-not-allowed
         "

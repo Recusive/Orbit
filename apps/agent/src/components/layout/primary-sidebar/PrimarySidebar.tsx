@@ -127,7 +127,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   return (
     <aside
       data-sidebar="primary"
-      className="h-full flex flex-col bg-card overflow-hidden border-r border-border/50"
+      className="h-full flex flex-col bg-card overflow-hidden border-r border-gray-5"
       style={{
         width,
         transition: SIDEBAR_WIDTH_TRANSITION,
@@ -147,7 +147,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
                 <button
                   onClick={toggleLeftSidebar}
                   aria-label="Expand sidebar"
-                  className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
+                  className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
                 >
                   <SidebarToggleIcon expanded={false} />
                 </button>
@@ -180,7 +180,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
                 <button
                   onClick={toggleLeftSidebar}
                   aria-label="Collapse sidebar"
-                  className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
+                  className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
                 >
                   <SidebarToggleIcon expanded={true} />
                 </button>
@@ -210,7 +210,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       >
         <button
           onClick={handleOpenQuickSearch}
-          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border-[3px] dark:border border-border/50 w-full bg-muted/40 dark:bg-muted/50 hover:bg-muted/60 hover:border-border/60 transition-[background-color,border-color,color] duration-200"
+          className="flex items-center h-8 rounded-lg text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-4 hover:bg-gray-5 border border-gray-7 transition-[background-color] duration-100"
           title="Search files (⌘P)"
         >
           {/* Fixed-width icon column - never moves */}
@@ -224,7 +224,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           <span className="text-xs whitespace-nowrap overflow-hidden w-auto opacity-100">
             Search files...
           </span>
-          <Kbd className="ml-auto mr-2 h-[18px] !text-[12px] px-1.5 bg-foreground/10 text-inherit border-foreground/15">
+          <Kbd className="ml-auto mr-2 h-[18px] !text-[12px] px-1.5 bg-gray-5 text-inherit border-gray-6">
             <span className="text-[14px] leading-none">⌘</span> P
           </Kbd>
         </button>
@@ -234,7 +234,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       <div
         className={cn(
           'flex items-center shrink-0 px-1.5 gap-0.5 overflow-visible transition-opacity duration-150 ease-out',
-          isCollapsed ? '' : 'border-b border-border/50'
+          isCollapsed ? '' : 'border-b border-gray-5'
         )}
         style={{
           height: isCollapsed ? 0 : SIDEBAR.tabNavHeight,
@@ -261,7 +261,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       {activeTab === 'conversations' ? (
         <div
           className={cn(
-            'flex flex-col border-b border-border/50 shrink-0',
+            'flex flex-col border-b border-gray-5 shrink-0',
             isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
           )}
         >
@@ -347,7 +347,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         )}
       </div>
 
-      <hr className="border-border/50 border-t shrink-0 mt-2 mb-0" />
+      <hr className="border-gray-5 border-t shrink-0 mt-2 mb-0" />
 
       {/* Utilities — pinned to bottom, spacing stays constant so buttons don't shift on collapse */}
       <div className="flex flex-col shrink-0 gap-1 py-1.5">

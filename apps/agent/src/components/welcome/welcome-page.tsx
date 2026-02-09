@@ -22,14 +22,14 @@ export interface WelcomePageProps {
 }
 
 /** Action button config to eliminate repetition */
-/** Hardcoded solid-mode colors so welcome page is unaffected by liquid glass */
+/** Solid Radix scale colors so welcome page is unaffected by liquid glass */
 const ACTION_BUTTON_CLASS = cn(
-  'group relative flex flex-col items-start gap-3 p-4 rounded-2xl cursor-pointer',
-  'bg-[oklch(0.87_0.02_75_/_50%)] dark:bg-[oklch(0.2_0.015_58_/_50%)]',
-  'border-[3px] border-[#8B7355]/50 dark:border-border',
+  'group relative flex flex-col items-start gap-3 p-4 rounded-lg cursor-pointer',
+  'bg-gray-2 dark:bg-gray-3',
+  'border border-gray-4 dark:border-gray-5',
   'transition-[background-color,transform,border-color] duration-200 ease',
-  'hover:bg-[oklch(0.87_0.02_75_/_65%)] dark:hover:bg-[oklch(0.2_0.015_58_/_65%)]',
-  'hover:border-primary/30',
+  'hover:bg-gray-1 hover:border-gray-6',
+  'dark:hover:bg-gray-4 dark:hover:border-gray-7',
   'active:scale-[0.97]'
 );
 
@@ -112,10 +112,10 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
           onClick={handleOpenProject}
           className={ACTION_BUTTON_CLASS}
         >
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
-            <FolderOpen className="h-4 w-4 text-primary" aria-hidden="true" />
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-4 dark:bg-gray-5">
+            <FolderOpen className="h-4 w-4 text-gray-9 dark:text-gray-11" aria-hidden="true" />
           </div>
-          <span className="text-xs font-medium text-foreground">Open project</span>
+          <span className="text-xs font-medium text-gray-12">Open project</span>
         </button>
 
         <button
@@ -126,10 +126,10 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
           }}
           className={ACTION_BUTTON_CLASS}
         >
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
-            <GitBranch className="h-4 w-4 text-primary" aria-hidden="true" />
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-4 dark:bg-gray-5">
+            <GitBranch className="h-4 w-4 text-gray-9 dark:text-gray-11" aria-hidden="true" />
           </div>
-          <span className="text-xs font-medium text-foreground">Clone repo</span>
+          <span className="text-xs font-medium text-gray-12">Clone repo</span>
         </button>
 
         <button
@@ -140,28 +140,28 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
           }}
           className={ACTION_BUTTON_CLASS}
         >
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
-            <Terminal className="h-4 w-4 text-primary" aria-hidden="true" />
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-4 dark:bg-gray-5">
+            <Terminal className="h-4 w-4 text-gray-9 dark:text-gray-11" aria-hidden="true" />
           </div>
-          <span className="text-xs font-medium text-foreground">SSH</span>
+          <span className="text-xs font-medium text-gray-12">SSH</span>
         </button>
       </div>
 
       {/* Recent Projects — frosted glass card */}
       {projects.length > 0 ? (
-        <div className="w-full max-w-[420px] rounded-2xl bg-[oklch(0.87_0.02_75)] dark:bg-[oklch(0.25_0.02_58)] border-[3px] border-[#8B7355]/50 dark:border-border p-3">
+        <div className="w-full max-w-[420px] rounded-lg bg-gray-2 dark:bg-gray-3 border border-gray-4 dark:border-gray-5 p-3">
           {/* Section header */}
           <div className="flex items-center justify-between px-2 mb-2">
-            <span className="text-[10px] font-semibold tracking-widest text-foreground/60 dark:text-muted-foreground/50 uppercase">
+            <span className="text-[10px] font-semibold tracking-widest text-gray-9 dark:text-gray-10 uppercase">
               Recent
             </span>
             {projects.length > 5 ? (
               <button
                 type="button"
                 className={cn(
-                  'text-[10px] font-medium text-foreground/50 cursor-pointer',
+                  'text-[10px] font-medium text-gray-9 dark:text-gray-10 cursor-pointer',
                   'transition-colors duration-150 ease',
-                  'hover:text-foreground'
+                  'hover:text-gray-12'
                 )}
               >
                 View all
@@ -177,23 +177,24 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
                 type="button"
                 onClick={handleRecentProjectClick(project.path)}
                 className={cn(
-                  'group flex items-center gap-3 px-2 py-2 rounded-xl cursor-pointer',
+                  'group flex items-center gap-3 px-2 py-2 rounded-lg cursor-pointer',
                   'transition-[background-color] duration-150 ease',
-                  'hover:bg-foreground/8 dark:hover:bg-card/60',
+                  'hover:bg-gray-3 dark:hover:bg-gray-4',
                   'text-left outline-none'
                 )}
               >
                 {/* Folder icon */}
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 shrink-0">
-                  <FolderOpen className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-3 dark:bg-gray-5 shrink-0">
+                  <FolderOpen
+                    className="h-3.5 w-3.5 text-gray-9 dark:text-gray-10"
+                    aria-hidden="true"
+                  />
                 </div>
 
                 {/* Name + path stacked */}
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-sm font-medium text-foreground truncate">
-                    {project.name}
-                  </span>
-                  <span className="text-[10px] text-foreground/50 dark:text-muted-foreground/50 truncate">
+                  <span className="text-sm font-medium text-gray-12 truncate">{project.name}</span>
+                  <span className="text-[10px] text-gray-9 dark:text-gray-10 truncate">
                     {project.parentPath}
                   </span>
                 </div>
@@ -201,9 +202,9 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
                 {/* Arrow hint on hover */}
                 <ChevronRight
                   className={cn(
-                    'h-3.5 w-3.5 text-foreground/0 shrink-0',
+                    'h-3.5 w-3.5 text-transparent shrink-0',
                     'transition-[color] duration-150 ease',
-                    'group-hover:text-foreground/40'
+                    'group-hover:text-gray-8 dark:group-hover:text-gray-9'
                   )}
                   aria-hidden="true"
                 />

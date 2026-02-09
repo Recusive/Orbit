@@ -57,7 +57,7 @@ export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
         style={{ height: SIDEBAR.itemHeight, width: SIDEBAR.iconColumnWidth }}
       >
         <button
-          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150 text-muted-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
+          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
           aria-label="Powers"
           title="Powers — Coming soon"
         >
@@ -72,8 +72,8 @@ export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
       {/* Header — identical structure to SidebarItem expanded layout */}
       <button
         className={cn(
-          'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-muted/50 active:scale-[0.98] transition-[background-color,color,transform] duration-200 text-muted-foreground hover:text-foreground',
-          isExpanded && 'bg-muted/50 text-foreground'
+          'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground',
+          isExpanded && 'bg-gray-3 dark:bg-gray-4 text-foreground'
         )}
         onClick={handleToggle}
         aria-expanded={isExpanded}
@@ -98,8 +98,8 @@ export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
         <span
           className="ml-auto mr-2 shrink-0 inline-flex items-center h-4 rounded px-1.5 text-[10px] font-medium select-none"
           style={{
-            color: 'var(--primary)',
-            backgroundColor: 'color-mix(in oklch, var(--primary) 15%, transparent)',
+            color: 'var(--gray-11)',
+            backgroundColor: 'var(--gray-a4)',
           }}
         >
           Coming soon
@@ -119,7 +119,7 @@ export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
             {POWER_ITEMS.map((item) => (
               <div key={item.label} className="relative group mx-1.5 ml-2">
                 <button
-                  className="flex items-center gap-2 h-7 w-full rounded-lg pl-[7px] pr-3 overflow-hidden hover:bg-muted/40 transition-[background-color,color] duration-200 text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-2 h-7 w-full rounded-lg pl-[7px] pr-3 overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 transition-[background-color] duration-100 text-sidebar-foreground hover:text-foreground"
                   title={item.label}
                 >
                   <item.icon className="h-3.5 w-3.5 shrink-0" />

@@ -67,7 +67,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
   // Clean state — nothing to show
   if (!hasChanges) {
     return (
-      <div className="p-5 text-center text-base text-muted-foreground/70">
+      <div className="p-5 text-center text-base text-gray-11">
         <Check className="h-5 w-5 mx-auto mb-1.5 text-emerald-500/80" />
         Working tree clean
       </div>
@@ -77,7 +77,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex items-center gap-0.5 px-1.5 h-[34px] border-b border-border/50">
+      <div className="flex items-center gap-0.5 px-1.5 h-[34px] border-b border-gray-5">
         {/* Staged tab */}
         <button
           onClick={() => {
@@ -85,10 +85,10 @@ export const ChangesList: React.FC<ChangesListProps> = ({
           }}
           className={cn(
             'flex items-center gap-1 px-2 h-6 rounded-md text-xs tracking-wide',
-            'transition-all duration-200',
+            'transition-[background-color] duration-100',
             activeTab === 'staged'
-              ? 'bg-muted/70 text-foreground font-medium'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/70'
+              ? 'bg-gray-4 text-foreground font-medium'
+              : 'text-gray-12 hover:text-foreground hover:bg-gray-4'
           )}
         >
           Staged
@@ -96,9 +96,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             <span
               className={cn(
                 'inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded text-[9px] font-semibold tabular-nums',
-                activeTab === 'staged'
-                  ? 'bg-primary/12 text-primary/80'
-                  : 'text-muted-foreground/80'
+                activeTab === 'staged' ? 'bg-primary/12 text-primary/80' : 'text-gray-11'
               )}
             >
               {stagedFiles.length}
@@ -113,10 +111,10 @@ export const ChangesList: React.FC<ChangesListProps> = ({
           }}
           className={cn(
             'flex items-center gap-1 px-2 h-6 rounded-md text-xs tracking-wide',
-            'transition-all duration-200',
+            'transition-[background-color] duration-100',
             activeTab === 'changes'
-              ? 'bg-muted/70 text-foreground font-medium'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/70'
+              ? 'bg-gray-4 text-foreground font-medium'
+              : 'text-gray-12 hover:text-foreground hover:bg-gray-4'
           )}
         >
           Changes
@@ -124,9 +122,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             <span
               className={cn(
                 'inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded text-[9px] font-semibold tabular-nums',
-                activeTab === 'changes'
-                  ? 'bg-primary/12 text-primary/80'
-                  : 'text-muted-foreground/80'
+                activeTab === 'changes' ? 'bg-primary/12 text-primary/80' : 'text-gray-11'
               )}
             >
               {unstagedFiles.length}
@@ -141,7 +137,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
           <button
             onClick={() => void activeBulkAction()}
             disabled={isStaging}
-            className="flex items-center gap-1 px-2 h-6 rounded-md text-xs text-muted-foreground/90 hover:text-foreground hover:bg-muted/70 active:scale-95 transition-[background-color,color,transform] duration-150"
+            className="flex items-center gap-1 px-2 h-6 rounded-md text-xs text-gray-12 hover:text-foreground hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100"
             aria-label={isStaged ? 'Unstage all files' : 'Stage all files'}
           >
             {isStaged ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
@@ -165,7 +161,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             />
           ))
         ) : (
-          <div className="px-3 py-4 text-center text-xs text-muted-foreground/50">
+          <div className="px-3 py-4 text-center text-xs text-gray-11">
             {isStaged ? 'No staged changes' : 'No unstaged changes'}
           </div>
         )}

@@ -141,10 +141,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
       {message.role === 'user' ? (
         /* User message bubble */
         <div
-          className={cn(
-            'p-2 rounded-xl bg-muted/30 dark:bg-card border-[3px] border-border/50 shadow-none',
-            animate && 'animate-message-in'
-          )}
+          className={cn('p-2 rounded-lg bg-gray-4 shadow-none', animate && 'animate-message-in')}
           style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
         >
           <p className="text-base leading-relaxed whitespace-pre-wrap select-text">
@@ -211,7 +208,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                 <div key={segment.key} className="tool-widget">
                   <ErrorBoundary
                     fallback={
-                      <div className="p-2 rounded-md bg-muted/50 border border-border/50 text-muted-foreground text-sm">
+                      <div className="p-2 rounded-md bg-gray-3 border border-gray-5 text-gray-12 text-sm">
                         Failed to render tool: {segment.tool.toolName}
                       </div>
                     }
@@ -254,7 +251,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
             return (
               <div
                 key={filePath}
-                className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md hover:bg-muted/70 transition-colors cursor-pointer"
+                className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-gray-4 rounded-md hover:bg-accent transition-colors cursor-pointer"
                 title={filePath}
               >
                 <FileIcon fileName={fileName} className="h-3.5 w-3.5" monochrome={false} />
@@ -267,13 +264,13 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           {message.attachedImages?.map((image, index) => (
             <div
               key={`${image.name}-${String(index)}`}
-              className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md hover:bg-muted/70 transition-colors cursor-pointer"
+              className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-gray-4 rounded-md hover:bg-accent transition-colors cursor-pointer"
               title={image.name}
             >
               <img
                 src={image.previewUrl}
                 alt={image.name}
-                className="h-4 w-4 object-cover rounded-sm"
+                className="h-4 w-4 object-cover rounded-md"
               />
               <span className="text-sm text-foreground/70">{image.name}</span>
             </div>

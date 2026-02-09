@@ -132,7 +132,7 @@ export const OrbitDotMatrix: FC<OrbitDotMatrixProps> = ({ className, dotSize = 6
         row.map((lit, colIdx) => (
           <div
             key={`${String(rowIdx)}-${String(colIdx)}`}
-            className={cn('absolute rounded-full', lit ? 'bg-primary' : 'bg-muted-foreground/10')}
+            className={cn('absolute rounded-full', lit ? 'bg-gray-9' : 'bg-gray-5')}
             style={{
               width: dotSize,
               height: dotSize,

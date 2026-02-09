@@ -480,6 +480,7 @@ pub fn run() {
             git::git_diff,
             git::git_diff_structured,
             git::git_staged_diff,
+            git::git_branch_diff_stats,
             git::git_discard,
             git::git_log,
             git::git_branches,

@@ -45,7 +45,7 @@ function formatTimeRemaining(expiresAtMs: number): string {
 }
 
 function dotBgColor(expiresAtMs: number | null, hasCredentials: boolean): string {
-  if (!hasCredentials) return 'bg-muted-foreground/40';
+  if (!hasCredentials) return 'bg-gray-6';
   if (expiresAtMs === null) return 'bg-green-500';
   const diffMs = expiresAtMs - Date.now();
   if (diffMs <= 0) return 'bg-destructive';
@@ -85,8 +85,8 @@ function showAccountToast(status: KeychainStatus): string | number {
       >
         {/* Claude icon */}
         <div
-          className="flex items-center justify-center h-10 w-10 rounded-xl shrink-0"
-          style={{ backgroundColor: isConnected ? '#d9775715' : undefined }}
+          className="flex items-center justify-center h-10 w-10 rounded-lg shrink-0"
+          style={{ backgroundColor: isConnected ? 'var(--gray-a4)' : undefined }}
         >
           <SiClaude
             className={cn('h-5 w-5', isConnected ? undefined : 'text-muted-foreground/60')}
@@ -102,9 +102,7 @@ function showAccountToast(status: KeychainStatus): string | number {
             <span
               className={cn(
                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none',
-                isConnected
-                  ? 'bg-green-500/10 text-green-500'
-                  : 'bg-muted-foreground/10 text-muted-foreground'
+                isConnected ? 'bg-green-500/10 text-green-500' : 'bg-gray-3 text-gray-11'
               )}
             >
               <span
@@ -142,7 +140,7 @@ function showAccountToast(status: KeychainStatus): string | number {
     {
       duration: 5000,
       unstyled: true,
-      className: '!rounded-xl !border-[3px] !border-border !bg-card !shadow-lg w-full',
+      className: '!rounded-lg !border !border-gray-5 !bg-gray-2 dark:!bg-gray-3 !shadow-lg w-full',
     }
   );
 }

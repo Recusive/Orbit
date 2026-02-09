@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, Circle, ListTodo, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Circle, ListTodo, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -135,55 +135,47 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Todo output' : 'Expand Todo output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
-          'transition-colors duration-150 cursor-pointer w-full text-left',
-          'rounded-lg hover:bg-muted/40',
+          'group flex items-center py-1.5 px-2.5 text-sm',
+          'cursor-pointer w-full text-left rounded-lg',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div
-          className={cn(
-            'w-5 h-5 rounded flex items-center justify-center shrink-0',
-            'transition-colors duration-150',
-            isFailed
-              ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
-              : 'bg-primary/15 group-hover/status:bg-primary/25'
-          )}
-        >
-          <ListTodo
+        <div className="flex items-center gap-2 min-w-0">
+          <div
             className={cn(
-              'h-3 w-3 transition-colors duration-150',
-              isFailed
-                ? 'text-destructive/60 group-hover/status:text-destructive/80'
-                : 'text-primary/80 group-hover/status:text-primary',
-              isRunning && 'animate-pulse'
+              'w-5 h-5 rounded flex items-center justify-center shrink-0',
+              isFailed ? 'bg-destructive/8' : 'bg-primary/15'
             )}
-          />
-        </div>
+          >
+            <ListTodo
+              className={cn(
+                'h-3 w-3',
+                isFailed ? 'text-destructive/60' : 'text-primary/80',
+                isRunning && 'animate-pulse'
+              )}
+            />
+          </div>
 
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed
-                ? 'text-muted-foreground line-through'
-                : 'text-muted-foreground/90 group-hover/status:text-foreground'
+              isFailed ? 'text-muted-foreground line-through' : 'text-muted-foreground/90'
             )}
           >
             {statusLabel}
           </span>
+
           {!isRunning && !isFailed && totalCount > 0 ? (
             <span className="text-xs text-muted-foreground/70">
               ({String(completedCount)}/{String(totalCount)}
               {inProgressCount > 0 ? `, ${String(inProgressCount)} active` : ''})
             </span>
           ) : null}
+
           {isRunning ? (
             <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
           ) : null}
-        </div>
 
-        <div className="flex items-center gap-2 shrink-0">
           {!isExpanded && totalCount > 0 ? (
             <div className="flex items-center gap-1">
               <ProgressPie
@@ -194,10 +186,11 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
               </span>
             </div>
           ) : null}
-          <ChevronDown
+
+          <ChevronRight
             className={cn(
-              'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
-              isExpanded && 'rotate-180'
+              'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-90'
             )}
           />
         </div>
@@ -237,7 +230,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
                   <div className="px-3 py-2">
                     {isRunning && todos.length === 0 ? (
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -273,9 +266,9 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
 
                     {/* Progress bar */}
                     {totalCount > 0 ? (
-                      <div className="mt-2 pt-2 border-t border-border/30">
+                      <div className="mt-2 pt-2 border-t border-gray-5">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1 bg-muted/50 rounded-full overflow-hidden">
+                          <div className="flex-1 h-1 bg-gray-4 rounded-full overflow-hidden">
                             <div
                               className="h-full bg-success transition-transform duration-300 origin-left rounded-full"
                               style={{

@@ -136,7 +136,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
           onKeyDown={handleKeyDown}
           spellCheck={false}
           autoComplete="off"
-          className="h-7 w-full rounded-lg px-2 text-base bg-muted/50 border border-primary/50 outline-none focus:ring-1 focus:ring-primary/30"
+          className="h-7 w-full rounded-lg px-2 text-base bg-gray-4 border border-primary/50 outline-none focus:ring-1 focus:ring-primary/30"
         />
       </form>
     );
@@ -154,8 +154,8 @@ export const ConversationItem: FC<ConversationItemProps> = ({
     >
       <button
         className={cn(
-          'flex items-center h-7 w-full rounded-lg pl-[7px] pr-7 overflow-hidden hover:bg-muted/40 transition-[background-color,color] duration-200',
-          active ? 'bg-muted/50 text-foreground' : 'text-muted-foreground hover:text-foreground'
+          'flex items-center h-7 w-full rounded-lg pl-[7px] pr-7 overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 transition-[background-color] duration-100',
+          active ? 'bg-gray-4 dark:bg-gray-4 text-foreground' : 'text-gray-11 hover:text-gray-12'
         )}
         title={conversation.title}
         onClick={onClick}
@@ -191,11 +191,12 @@ export const ConversationItem: FC<ConversationItemProps> = ({
       {/* Right area: timestamp when not hovering/menu closed, dropdown menu when hovering or open */}
       {!collapsed ? (
         <>
-          {/* Relative timestamp - visible when NOT hovering AND menu is closed */}
+          {/* Relative timestamp - visible when NOT hovering AND menu is closed.
+              No opacity transition: instant swap feels snappier on fast pointer sweeps. */}
           <span
             className={cn(
               'absolute right-1.5 top-1/2 -translate-y-1/2',
-              'text-[11px] text-muted-foreground/60 tabular-nums transition-opacity duration-150',
+              'text-[11px] text-muted-foreground/60 tabular-nums',
               showTimestamp ? 'opacity-100' : 'opacity-0 pointer-events-none'
             )}
           >

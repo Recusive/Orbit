@@ -8,7 +8,7 @@ import type { FC } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, HEIGHTS } from '@/lib/utils';
-import { useSessionDiffStats } from '@/stores/file/file-store';
+import { useBranchDiffStats } from '@/stores/git/git-store';
 import {
   useWorkspaceName,
   useActiveConversationTitle,
@@ -20,13 +20,16 @@ import {
  * GitHub-style diff stats indicator showing additions/deletions
  */
 const DiffStatsButton: FC = () => {
-  const { additions, deletions, fileCount } = useSessionDiffStats();
+  const branchStats = useBranchDiffStats();
+  const additions = branchStats?.additions ?? 0;
+  const deletions = branchStats?.deletions ?? 0;
+  const fileCount = branchStats?.filesChanged ?? 0;
   const setActivityTab = useUIStore((state) => state.setActivityTab);
 
   const tooltipText =
     fileCount === 0
-      ? 'No files changed in this session'
-      : `${String(fileCount)} file${fileCount !== 1 ? 's' : ''} changed in this session`;
+      ? 'No changes on this branch'
+      : `${String(fileCount)} file${fileCount !== 1 ? 's' : ''} changed on branch`;
 
   const handleClick = (): void => {
     setActivityTab('files');
@@ -38,29 +41,30 @@ const DiffStatsButton: FC = () => {
         <button
           onClick={handleClick}
           className={cn(
-            'flex items-center h-6 rounded-lg overflow-hidden',
+            'flex items-center h-6 rounded-md overflow-hidden',
             'text-[11px] font-medium tabular-nums',
-            'border-[3px] border-border/40',
-            'transition-all duration-150 hover:border-border/60'
+            'transition-[background-color,color] duration-150'
           )}
         >
           {/* Additions (green) */}
           <span
-            className={cn(
-              'flex items-center gap-0.5 px-2 h-full',
-              'bg-success/20 text-success dark:text-success'
-            )}
+            className="flex items-center gap-0.5 px-2 h-full text-success"
+            style={{ backgroundColor: 'color-mix(in oklch, var(--success) 20%, transparent)' }}
           >
             <span>+{additions}</span>
           </span>
-          {/* Divider */}
-          <span className="w-[2px] h-full bg-border/40" />
+          {/* Gradient blend between green and red */}
+          <span
+            className="w-3 h-full shrink-0"
+            style={{
+              background:
+                'linear-gradient(to right, color-mix(in oklch, var(--success) 20%, transparent), color-mix(in oklch, var(--destructive) 20%, transparent))',
+            }}
+          />
           {/* Deletions (red) */}
           <span
-            className={cn(
-              'flex items-center gap-0.5 px-2 h-full',
-              'bg-destructive/20 text-destructive'
-            )}
+            className="flex items-center gap-0.5 px-2 h-full text-destructive"
+            style={{ backgroundColor: 'color-mix(in oklch, var(--destructive) 20%, transparent)' }}
           >
             <span>−{deletions}</span>
           </span>
@@ -78,7 +82,7 @@ export const ChatHeader: FC = () => {
 
   return (
     <header
-      className="flex items-center justify-between px-4 border-b border-border/50 shrink-0"
+      className="flex items-center justify-between px-4 border-b border-gray-5 shrink-0"
       style={{ height: HEIGHTS.headerBar }}
     >
       {/* Breadcrumb */}

@@ -291,7 +291,7 @@ export const AccountSettings: FC = () => {
       <SectionHeader title="Authentication">Manage your Claude authentication</SectionHeader>
 
       {/* ── OAuth Status Card ─────────────────────────────────────── */}
-      <div className="rounded-lg border-3 border-border/40 bg-muted/20 min-h-[120px] overflow-hidden">
+      <div className="rounded-lg border border-gray-5 bg-gray-2 min-h-[120px] overflow-hidden">
         {isChecking ? (
           <div className="flex items-center justify-center gap-3 p-6">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -305,7 +305,7 @@ export const AccountSettings: FC = () => {
                 {/* Status icon */}
                 <div
                   className="flex items-center justify-center h-9 w-9 rounded-lg shrink-0"
-                  style={{ backgroundColor: isConnected ? '#d9775720' : undefined }}
+                  style={{ backgroundColor: isConnected ? 'var(--gray-a4)' : undefined }}
                 >
                   <SiClaude
                     className={cn('h-4 w-4', isConnected ? undefined : 'text-muted-foreground/60')}
@@ -361,7 +361,7 @@ export const AccountSettings: FC = () => {
 
             {/* Token expiry details */}
             {isConnected && keychainStatus.expiresAt !== null ? (
-              <div className="mx-4 mb-4 rounded-md bg-muted/40 px-3 py-2.5 flex items-center justify-between">
+              <div className="mx-4 mb-4 rounded-md bg-gray-4 px-3 py-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock
                     className={cn('h-3.5 w-3.5 shrink-0', expiryColor(keychainStatus.expiresAt))}
@@ -403,7 +403,7 @@ export const AccountSettings: FC = () => {
 
       {storedApiKey !== null ? (
         /* Key is saved — show masked key with remove button */
-        <div className="rounded-lg border border-border/40 p-4 bg-muted/20">
+        <div className="rounded-lg border border-gray-5 p-4 bg-gray-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-2.5 w-2.5 rounded-full bg-green-600 shrink-0" />
@@ -482,7 +482,7 @@ export const AccountSettings: FC = () => {
               href="https://console.anthropic.com/settings/keys"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary hover:underline"
+              className="text-gray-11 hover:text-foreground hover:underline"
             >
               console.anthropic.com
             </a>
@@ -492,12 +492,12 @@ export const AccountSettings: FC = () => {
 
       {/* Refresh feedback bar */}
       {refreshMessage !== null ? (
-        <div className="mt-6 flex w-full items-center justify-between rounded-lg border border-border/40 bg-muted/20">
+        <div className="mt-6 flex w-full items-center justify-between rounded-lg border border-gray-5 bg-gray-2">
           <div className="flex flex-1 items-center gap-3 py-2.5 pl-3.5">
-            <Info className="h-4 w-4 shrink-0 text-primary" />
+            <Info className="h-4 w-4 shrink-0 text-gray-11" />
             <span className="text-sm font-medium">{refreshMessage}</span>
           </div>
-          <div className="flex items-center border-l border-border/40">
+          <div className="flex items-center border-l border-gray-5">
             <button
               type="button"
               className="flex items-center justify-center rounded-md p-2.5 text-muted-foreground hover:text-foreground transition-colors"

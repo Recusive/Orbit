@@ -44,17 +44,17 @@ const Toaster: FC<ToasterProps> = (props) => {
       toastOptions={{
         classNames: {
           toast:
-            'group toast group-[.toaster]:bg-card group-[.toaster]:text-foreground group-[.toaster]:border group-[.toaster]:border-border group-[.toaster]:shadow-lg group-[.toaster]:rounded-lg dark:group-[.toaster]:!bg-stone-800 dark:group-[.toaster]:border-stone-700',
-          description: 'group-[.toast]:text-muted-foreground',
-          actionButton: 'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground',
-          cancelButton: 'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground',
+            'group toast group-[.toaster]:bg-gray-2 group-[.toaster]:text-gray-12 group-[.toaster]:border group-[.toaster]:border-gray-5 group-[.toaster]:shadow-lg group-[.toaster]:rounded-lg dark:group-[.toaster]:bg-gray-3',
+          description: 'group-[.toast]:text-gray-10',
+          actionButton: 'group-[.toast]:bg-gray-12 group-[.toast]:text-gray-1',
+          cancelButton: 'group-[.toast]:bg-gray-4 group-[.toast]:text-gray-11',
           error:
-            'group-[.toaster]:bg-destructive/10 group-[.toaster]:border-destructive/50 group-[.toaster]:!text-destructive dark:group-[.toaster]:!bg-red-950 [&_[data-icon]>svg]:text-destructive',
+            'group-[.toaster]:border-destructive/40 group-[.toaster]:text-destructive [&_[data-icon]>svg]:text-destructive',
           success:
-            'group-[.toaster]:bg-green-500/10 group-[.toaster]:border-green-500/50 group-[.toaster]:text-green-700 dark:group-[.toaster]:!text-green-300 dark:group-[.toaster]:!bg-green-950 [&_[data-icon]>svg]:text-green-600 dark:[&_[data-icon]>svg]:text-green-400',
-          info: 'group-[.toaster]:bg-blue-500/10 group-[.toaster]:border-blue-500/50 group-[.toaster]:text-blue-700 dark:group-[.toaster]:!text-blue-300 dark:group-[.toaster]:!bg-blue-950 [&_[data-icon]>svg]:text-blue-600 dark:[&_[data-icon]>svg]:text-blue-400',
+            'group-[.toaster]:border-green-600/40 group-[.toaster]:text-green-700 dark:group-[.toaster]:text-green-400 [&_[data-icon]>svg]:text-green-600 dark:[&_[data-icon]>svg]:text-green-400',
+          info: 'group-[.toaster]:border-blue-600/40 group-[.toaster]:text-blue-700 dark:group-[.toaster]:text-blue-400 [&_[data-icon]>svg]:text-blue-600 dark:[&_[data-icon]>svg]:text-blue-400',
           warning:
-            'group-[.toaster]:bg-amber-500/10 group-[.toaster]:border-amber-500/50 group-[.toaster]:text-amber-700 dark:group-[.toaster]:!text-amber-300 dark:group-[.toaster]:!bg-amber-950 [&_[data-icon]>svg]:text-amber-600 dark:[&_[data-icon]>svg]:text-amber-400',
+            'group-[.toaster]:border-amber-600/40 group-[.toaster]:text-amber-700 dark:group-[.toaster]:text-amber-400 [&_[data-icon]>svg]:text-amber-600 dark:[&_[data-icon]>svg]:text-amber-400',
         },
       }}
       {...props}

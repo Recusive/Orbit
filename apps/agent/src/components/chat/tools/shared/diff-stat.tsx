@@ -1,8 +1,8 @@
 /**
- * DiffStat - GitHub-style addition/deletion indicator with colored squares.
+ * DiffStat - Proportional bar showing additions vs deletions.
  *
- * Shows +N / -N counts alongside a 5-square visual bar proportional to
- * the ratio of additions to deletions.
+ * Renders +N / -N counts alongside a thin horizontal bar where
+ * the green/red ratio reflects the proportion of changes.
  */
 
 import type { FC } from 'react';
@@ -12,58 +12,51 @@ interface DiffStatProps {
   readonly deletions: number;
 }
 
-const MAX_SQUARES = 5;
+/** Minimum visible percentage so a tiny slice is never invisible */
+const MIN_PERCENT = 8;
+const BAR_WIDTH = 32;
 
 export const DiffStat: FC<DiffStatProps> = ({ additions, deletions }) => {
   const total = additions + deletions;
 
-  let addSquares = 0;
-  let delSquares = 0;
-  let neutralSquares = 0;
+  // Calculate percentages with minimum visibility guarantee
+  let addPercent = 0;
+  let delPercent = 0;
 
   if (total > 0) {
-    // Allocate additions first, then derive deletions from the remainder
-    // to guarantee addSquares + delSquares <= MAX_SQUARES.
-    // (Code review: Codex cycle 1, issue #1 — Math.round on both sides
-    // could exceed MAX_SQUARES, e.g. additions=1, deletions=1 → 3+3=6)
-    addSquares = Math.round((additions / total) * MAX_SQUARES);
-    // Ensure at least 1 square when there are changes
-    if (additions > 0 && addSquares === 0) addSquares = 1;
-    // Clamp so deletions still have room when non-zero
-    if (deletions > 0 && addSquares >= MAX_SQUARES) addSquares = MAX_SQUARES - 1;
-    // Deletions get the remainder (at least 1 if non-zero)
-    const maxDel = MAX_SQUARES - addSquares;
-    delSquares = Math.round((deletions / total) * MAX_SQUARES);
-    if (deletions > 0 && delSquares === 0) delSquares = 1;
-    if (delSquares > maxDel) delSquares = maxDel;
-    // Fill remaining with neutral
-    neutralSquares = MAX_SQUARES - addSquares - delSquares;
-  } else {
-    neutralSquares = MAX_SQUARES;
+    addPercent = (additions / total) * 100;
+    delPercent = (deletions / total) * 100;
+
+    // Clamp so both sides are visible when non-zero
+    if (additions > 0 && addPercent < MIN_PERCENT) addPercent = MIN_PERCENT;
+    if (deletions > 0 && delPercent < MIN_PERCENT) delPercent = MIN_PERCENT;
+
+    // Re-normalize to 100
+    const scale = 100 / (addPercent + delPercent);
+    addPercent = addPercent * scale;
+    delPercent = delPercent * scale;
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1.5">
       {additions > 0 ? (
-        <span className="text-xs font-semibold text-success">+{additions}</span>
+        <span className="text-[11px] font-medium tabular-nums text-success/70">+{additions}</span>
       ) : null}
       {deletions > 0 ? (
-        <span className="text-xs font-semibold text-destructive">-{deletions}</span>
+        <span className="text-[11px] font-medium tabular-nums text-destructive/70">
+          -{deletions}
+        </span>
       ) : null}
-      <div className="flex gap-px">
-        {Array.from({ length: addSquares }).map((_, i) => (
-          <div key={`add-${String(i)}`} className="w-1.5 h-1.5 rounded-sm bg-success" />
-        ))}
-        {Array.from({ length: delSquares }).map((_, i) => (
-          <div key={`del-${String(i)}`} className="w-1.5 h-1.5 rounded-sm bg-destructive" />
-        ))}
-        {Array.from({ length: neutralSquares }).map((_, i) => (
-          <div
-            key={`neutral-${String(i)}`}
-            className="w-1.5 h-1.5 rounded-sm bg-muted-foreground/30"
-          />
-        ))}
-      </div>
+      {total > 0 ? (
+        <div className="h-[5px] rounded-full overflow-hidden flex" style={{ width: BAR_WIDTH }}>
+          {additions > 0 ? (
+            <div className="h-full bg-success/60" style={{ width: `${String(addPercent)}%` }} />
+          ) : null}
+          {deletions > 0 ? (
+            <div className="h-full bg-destructive/60" style={{ width: `${String(delPercent)}%` }} />
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 };

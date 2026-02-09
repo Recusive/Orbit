@@ -25,7 +25,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({ value, onChange, onCommi
   );
 
   return (
-    <div className="p-3 border-b border-border/50">
+    <div className="p-3 border-b border-gray-5">
       <textarea
         value={value}
         onChange={(e) => {
@@ -36,9 +36,11 @@ export const CommitForm: React.FC<CommitFormProps> = ({ value, onChange, onCommi
         rows={COMMIT_TEXTAREA_ROWS} // Extracted constant
         className="
           w-full px-2.5 py-2 rounded-lg text-sm
-          bg-muted/50 dark:bg-background border-3 border-muted-foreground/15
-          placeholder:text-muted-foreground/50
-          focus:outline-none focus:border-primary/40 focus:bg-muted/40
+          bg-background border-3 border-transparent
+          ring-1 ring-gray-5
+          placeholder:text-gray-10
+          hover:ring-gray-6
+          focus:outline-none focus:ring-0 focus:border-ring focus:bg-gray-4
           transition-[background-color,border-color,box-shadow] duration-200 resize-none
         "
       />

@@ -292,7 +292,7 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
             <AlertCircle className="h-5 w-5 text-destructive mb-2" />
             <span className="text-sm text-muted-foreground mb-2">{rootError}</span>
             <button
-              className="text-xs text-primary hover:underline"
+              className="text-xs text-gray-12 hover:text-foreground hover:underline"
               onClick={(): void => {
                 retryFolder(rootPath ?? '__root__');
               }}
@@ -402,8 +402,8 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
     return (
       <button
         className={cn(
-          'file-tree-item flex items-center w-full text-sm hover:bg-muted/50 dark:hover:bg-accent/50 transition-colors',
-          isSelected && 'bg-muted/70 dark:bg-accent text-foreground dark:text-accent-foreground'
+          'file-tree-item flex items-center w-full text-sm hover:bg-gray-4 transition-colors',
+          isSelected && 'bg-gray-6 text-foreground'
         )}
         style={{
           position: 'absolute',

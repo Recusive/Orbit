@@ -580,6 +580,7 @@ export class TerminalInstance {
 
       const bgComputed = getComputedColor('--chat-area', 'backgroundColor');
       const fgColor = getComputedColor('--foreground', 'color');
+      const cursorColor = getComputedColor('--terminal-cursor', 'color');
       const selectionColor = getComputedColor('--accent', 'backgroundColor');
 
       document.body.removeChild(tempEl);
@@ -610,8 +611,8 @@ export class TerminalInstance {
         ...baseTheme,
         background: bgColor,
         foreground: fgColor,
-        cursor: fgColor,
-        cursorAccent: fgColor, // Use foreground for cursor accent since bg is transparent
+        cursor: cursorColor,
+        cursorAccent: bgColor, // Cursor interior matches terminal bg for contrast
         selectionBackground: selectionColor,
         // Note: xterm.js uses native browser scrollbar styled via CSS in terminal.css
       };

@@ -51,7 +51,7 @@ const CommandInput = React.forwardRef<
   React.ComponentRef<typeof CommandPrimitive.Input>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b border-border/40 px-4" cmdk-input-wrapper="">
+  <div className="flex items-center border-b border-gray-5 px-4" cmdk-input-wrapper="">
     <Search className="mr-3 h-4 w-4 shrink-0 opacity-40" />
     <CommandPrimitive.Input
       ref={ref}
@@ -72,7 +72,7 @@ const CommandList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn('h-[320px] overflow-y-auto overflow-x-hidden pb-1.5', className)}
+    className={cn('max-h-[320px] overflow-y-auto overflow-x-hidden pb-1.5', className)}
     {...props}
   />
 ));
@@ -127,7 +127,7 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      'group relative flex cursor-default gap-3 select-none items-center border-l-2 border-transparent pl-[10px] pr-3 py-2 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected=false]:rounded-lg data-[selected=false]:hover:bg-muted/30 data-[selected=true]:rounded-r-lg data-[selected=true]:bg-primary/10 data-[selected=true]:text-foreground data-[selected=true]:border-primary/60 data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+      'group relative flex cursor-default gap-3 select-none items-center border-l-2 border-transparent pl-[10px] pr-3 py-2 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected=false]:rounded-lg data-[selected=false]:hover:bg-gray-3 data-[selected=true]:rounded-r-lg data-[selected=true]:bg-primary/10 data-[selected=true]:text-foreground data-[selected=true]:border-primary/60 data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
       className
     )}
     {...props}

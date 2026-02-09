@@ -99,7 +99,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       tabIndex={isActive ? 0 : -1}
       className={cn(
         'group relative flex items-center h-full px-3 text-base cursor-pointer select-none shrink-0',
-        'border-r border-border/50',
+        'border-r border-gray-5',
         isActive
           ? 'bg-card text-foreground'
           : 'bg-chat-area text-muted-foreground hover:text-foreground'
@@ -133,14 +133,14 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         {/* Modified dot - show when modified, inactive, and not hovering */}
         {isModified && !isActive ? (
           <div className="absolute inset-0 flex items-center justify-center group-hover:hidden">
-            <div className="w-2 h-2 rounded-full bg-foreground/50" />
+            <div className="w-2 h-2 rounded-full bg-gray-10" />
           </div>
         ) : null}
         {/* Close button - show on hover, or always when active */}
         <button
           onClick={handleCloseClick}
           className={cn(
-            'w-4 h-4 flex items-center justify-center rounded transition-[background-color,opacity] hover:bg-muted',
+            'w-4 h-4 flex items-center justify-center rounded transition-[background-color,opacity] hover:bg-accent',
             isActive ? 'opacity-70 hover:opacity-100' : 'opacity-0 group-hover:opacity-70'
           )}
           aria-label={`Close ${fileName}`}
@@ -337,7 +337,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
               onMouseDown={handleScrollbarMouseDown}
               className={cn(
                 'absolute top-[3px] h-[3px] rounded-full cursor-grab transition-colors',
-                isDragging ? 'bg-foreground/60' : 'bg-foreground/30 hover:bg-foreground/50'
+                isDragging ? 'bg-gray-9' : 'bg-gray-8/50 hover:bg-gray-8'
               )}
               style={{
                 width: scrollbarWidth,
@@ -354,7 +354,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
           onClick={() => {
             if (activeTabPath) onToggleSearch(activeTabPath);
           }}
-          className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+          className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-accent"
           title="Search (⌘F)"
         >
           <Search className="h-4 w-4" />
@@ -362,13 +362,13 @@ const TabsHeader: FC<TabsHeaderProps> = ({
         <Popover>
           <PopoverTrigger asChild>
             <button
-              className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+              className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-accent"
               title="More Actions..."
             >
               <Ellipsis className="h-4 w-4" />
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-48 p-2 border-border/50">
+          <PopoverContent align="end" className="w-48 p-2 border-gray-7">
             <div className="flex items-center justify-between">
               <label htmlFor="word-wrap-toggle" className="text-sm cursor-pointer">
                 Line Wrap

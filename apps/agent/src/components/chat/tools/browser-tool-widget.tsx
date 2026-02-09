@@ -1,6 +1,6 @@
 import {
   CheckCircle2,
-  ChevronDown,
+  ChevronRight,
   Globe,
   Loader2,
   Monitor,
@@ -183,54 +183,47 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Browser output' : 'Expand Browser output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
-          'transition-colors duration-150 cursor-pointer w-full text-left',
-          'rounded-lg hover:bg-muted/40',
+          'group flex items-center py-1.5 px-2.5 text-sm',
+          'cursor-pointer w-full text-left rounded-lg',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div
-          className={cn(
-            'w-5 h-5 rounded flex items-center justify-center shrink-0',
-            'transition-colors duration-150',
-            isFailed
-              ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
-              : 'bg-violet-500/10 group-hover/status:bg-violet-500/15'
-          )}
-        >
-          <Globe
+        <div className="flex items-center gap-2 min-w-0">
+          <div
             className={cn(
-              'h-3 w-3 transition-colors duration-150',
-              isFailed
-                ? 'text-destructive/60 group-hover/status:text-destructive/80'
-                : 'text-violet-500/70 group-hover/status:text-violet-500/90',
-              isRunning && 'animate-pulse'
+              'w-5 h-5 rounded flex items-center justify-center shrink-0',
+              isFailed ? 'bg-destructive/8' : 'bg-violet-500/10'
             )}
-          />
-        </div>
+          >
+            <Globe
+              className={cn(
+                'h-3 w-3',
+                isFailed ? 'text-destructive/60' : 'text-violet-500/70',
+                isRunning && 'animate-pulse'
+              )}
+            />
+          </div>
 
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span
             className={cn(
               'text-xs font-medium shrink-0',
-              isFailed
-                ? 'text-muted-foreground line-through'
-                : 'text-muted-foreground/90 group-hover/status:text-foreground'
+              isFailed ? 'text-muted-foreground line-through' : 'text-muted-foreground/90'
             )}
           >
             Browser
           </span>
+
           {isRunning ? (
             <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
           ) : null}
-        </div>
 
-        <ChevronDown
-          className={cn(
-            'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
-            isExpanded && 'rotate-180'
-          )}
-        />
+          <ChevronRight
+            className={cn(
+              'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-90'
+            )}
+          />
+        </div>
       </button>
 
       {/* Expanded — vertical timeline of steps */}
