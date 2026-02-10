@@ -388,7 +388,7 @@ describe('SidebarItem', () => {
       render(<SidebarItem {...createDefaultProps()} />);
 
       const button = getButton();
-      expect(button).toHaveClass('transition-[background-color,color,transform]');
+      expect(button).toHaveClass('transition-[background-color,transform]');
     });
 
     it('should have active scale effect class', () => {

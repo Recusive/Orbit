@@ -88,7 +88,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium',
-              isFailed ? 'text-muted-foreground line-through' : 'text-mode-plan'
+              isFailed ? 'text-gray-11 line-through' : 'text-mode-plan'
             )}
           >
             Plan
@@ -97,7 +97,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate cursor-pointer hover:underline',
-              isFailed ? 'text-muted-foreground line-through' : 'text-foreground/80'
+              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
             )}
             onClick={handleFileClick}
             title={filePath}
@@ -106,7 +106,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           </span>
 
           {isRunning ? (
-            <div className="flex items-center gap-1 text-muted-foreground">
+            <div className="flex items-center gap-1 text-gray-11">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
               <span className="text-xs">Creating plan...</span>
             </div>
@@ -116,7 +116,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
           />
@@ -156,9 +156,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
                           </Streamdown>
                         </div>
                       ) : (
-                        <div className="text-sm text-muted-foreground/40 italic">
-                          Plan content is empty
-                        </div>
+                        <div className="text-sm text-gray-9 italic">Plan content is empty</div>
                       )}
                     </div>
                   </div>

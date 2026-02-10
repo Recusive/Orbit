@@ -272,7 +272,11 @@ export function hasVisibleContent(
   segments: Segment[],
   isComplete: boolean
 ): boolean {
-  if (message.role === 'user') return true;
+  // User messages must have non-empty content to render. Empty user messages can appear
+  // from SDK protocol artifacts (e.g., interrupt markers stripped by backend, or edge
+  // cases where content blocks yield no text). Without this check, an empty <p> tag
+  // renders inside a bg-gray-4 bubble, creating a visible empty rectangle.
+  if (message.role === 'user') return message.content.trim().length > 0;
 
   const hasThinking =
     (message.thinkingBlocks !== undefined && message.thinkingBlocks.length > 0) ||

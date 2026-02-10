@@ -113,7 +113,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
             tabIndex={0}
             className={cn(
               'text-xs font-medium truncate cursor-pointer hover:underline',
-              isFailed ? 'text-muted-foreground line-through' : 'text-foreground/90'
+              isFailed ? 'text-gray-11 line-through' : 'text-gray-12'
             )}
             onClick={handleFileClick}
             onKeyDown={(e): void => {
@@ -126,23 +126,20 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
           </a>
 
           <span
-            className={cn(
-              'text-xs shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-muted-foreground/50'
-            )}
+            className={cn('text-xs shrink-0', isFailed ? 'text-destructive/60' : 'text-gray-9')}
           >
             {isFailed ? '(failed)' : '(new)'}
           </span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
           ) : null}
 
           {!isRunning && !isFailed ? <DiffStat additions={lineCount} deletions={0} /> : null}
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
           />
@@ -198,7 +195,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                             <div key={index} className="flex font-mono text-sm leading-4">
                               {/* Sticky gutter + line number */}
                               <div className="sticky left-0 flex shrink-0 bg-success/5">
-                                <div className="w-8 px-1.5 text-right text-muted-foreground/70 select-none bg-success/10">
+                                <div className="w-8 px-1.5 text-right text-gray-9 select-none bg-success/10">
                                   {index + 1}
                                 </div>
                               </div>
@@ -214,7 +211,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                                     </span>
                                   ))
                                 ) : (
-                                  <span className="text-foreground">{line || ' '}</span>
+                                  <span className="text-gray-12">{line || ' '}</span>
                                 )}
                               </div>
                             </div>
@@ -231,7 +228,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                         e.stopPropagation();
                         setShowAllLines(!showAllLines);
                       }}
-                      className="py-1 text-xs text-muted-foreground/60 hover:text-foreground transition-colors flex items-center gap-0.5"
+                      className="py-1 text-xs text-gray-9 hover:text-gray-12 transition-colors flex items-center gap-0.5"
                     >
                       <span>
                         {showAllLines
@@ -240,7 +237,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                       </span>
                       <ChevronDown
                         className={cn(
-                          'h-2.5 w-2.5 transition-transform duration-200 ease-out',
+                          'h-2.5 w-2.5 transition-[rotate] duration-200 ease-out',
                           showAllLines && 'rotate-180'
                         )}
                       />
@@ -264,7 +261,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                  <span className="ml-2.5 text-xs text-gray-11">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

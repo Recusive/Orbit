@@ -327,11 +327,6 @@ export async function handleConversationRewind(
         '*'
       );
     } else {
-      logger.warn('Rewind: conversation or target message not found', {
-        session_id,
-        convFound: conv !== null,
-        targetFound: targetMessage !== undefined,
-      });
       window.postMessage(
         {
           type: 'conversation:rewound',

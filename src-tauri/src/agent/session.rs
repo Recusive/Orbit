@@ -614,12 +614,6 @@ impl SessionManager {
     /// This restores all files modified by Write, Edit, NotebookEdit tools
     /// to their state at the given checkpoint UUID.
     pub fn rewind_files(&self, session_id: &str, checkpoint_id: &str) -> Result<()> {
-        log::debug!(
-            "[REWIND] Rust SessionManager.rewind_files — session_id={}, checkpoint_id={}",
-            session_id,
-            &checkpoint_id[..8.min(checkpoint_id.len())]
-        );
-
         self.ensure_running()?;
 
         let request = BridgeRequest::RewindFiles {
@@ -629,14 +623,7 @@ impl SessionManager {
 
         let bridge = self.bridge.lock();
         let response = bridge.send_request(&request)?;
-        let result = Self::check_response(response);
-
-        log::debug!(
-            "[REWIND] Rust SessionManager.rewind_files — result={:?}",
-            result.as_ref().map(|()| "ok").unwrap_or("err")
-        );
-
-        result
+        Self::check_response(response)
     }
 
     /// Fork a session at a specific message point.
@@ -647,12 +634,6 @@ impl SessionManager {
     /// (via `replay-user-messages` option). The SDK will create a new session branch
     /// starting from that exact checkpoint.
     pub fn fork_session_at(&self, session_id: &str, at_message_uuid: &str) -> Result<String> {
-        log::debug!(
-            "[REWIND] Rust SessionManager.fork_session_at — session_id={}, at_message_uuid={}",
-            session_id,
-            &at_message_uuid[..8.min(at_message_uuid.len())]
-        );
-
         self.ensure_running()?;
 
         let request = BridgeRequest::ForkSessionAt {
@@ -662,18 +643,8 @@ impl SessionManager {
 
         let bridge = self.bridge.lock();
         let response = bridge.send_request(&request)?;
-        let result = Self::check_response_string(response)?
-            .ok_or_else(|| BridgeError::SidecarError("Fork returned null".to_owned()));
-
-        log::debug!(
-            "[REWIND] Rust SessionManager.fork_session_at — result={}",
-            match &result {
-                Ok(id) => format!("ok({})", &id[..8.min(id.len())]),
-                Err(e) => format!("err({e})"),
-            }
-        );
-
-        result
+        Self::check_response_string(response)?
+            .ok_or_else(|| BridgeError::SidecarError("Fork returned null".to_owned()))
     }
 
     /// Generate an agent definition from a natural language description

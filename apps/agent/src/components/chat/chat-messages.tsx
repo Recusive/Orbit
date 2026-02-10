@@ -498,11 +498,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                 className="absolute left-0 w-full pb-3 select-auto"
                 style={{
                   top: `${String(virtualItem.start)}px`,
-                  // NOTE: content-visibility:auto was REMOVED here. TanStack Virtual
-                  // already ensures only ~15 items are in the DOM (viewport + overscan).
-                  // Adding browser-level content-visibility created redundant compositing
-                  // layers and internal IntersectionObserver callbacks that consumed 5.2s
-                  // of compositing time and caused a 220ms IO callback in profiling.
                 }}
               >
                 <MessageItem

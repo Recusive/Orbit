@@ -160,7 +160,7 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
               ? 'Searching...'
               : hasQuery
                 ? 'No matching files found.'
-                : null}
+                : 'No files found.'}
         </CommandEmpty>
 
         {/* Show recent files when no query */}

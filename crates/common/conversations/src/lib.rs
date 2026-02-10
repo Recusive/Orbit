@@ -889,6 +889,20 @@ fn build_assistant_message(uuid: &str, value: &serde_json::Value, ts: u64) -> Me
     }
 }
 
+/// Fall back to first user message text if no summary/custom-title was found.
+fn resolve_title(title: String, first_user_text: Option<String>) -> String {
+    if title != "Untitled" {
+        return title;
+    }
+    match first_user_text {
+        Some(text) if text.len() > 80 => {
+            format!("{}…", &text[..floor_char_boundary(&text, 77)])
+        },
+        Some(text) => text,
+        None => title,
+    }
+}
+
 /// Parse JSONL lines from a reader, collecting messages and metadata.
 fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
     let mut raw_messages: Vec<Message> = Vec::new();
@@ -933,7 +947,17 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
                 last_timestamp = Some(ts);
 
                 let text = payload.content.to_text();
-                if first_user_text.is_none() && !text.is_empty() {
+
+                // Skip SDK-injected synthetic user messages that are not real user input:
+                // - Empty content (edge case from content blocks with no text fields)
+                // - "[Request interrupted by user]" — SDK interrupt marker written when
+                //   a query is stopped (including during rewind). The assistant message
+                //   already has `is_interrupted: true`; this user-side marker is redundant.
+                if text.is_empty() || text == "[Request interrupted by user]" {
+                    continue;
+                }
+
+                if first_user_text.is_none() {
                     first_user_text = Some(text.clone());
                 }
 
@@ -988,16 +1012,7 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
     // Backfill tool outputs onto assistant ToolUse entries.
     backfill_tool_outputs(&mut raw_messages, tool_results);
 
-    // Fall back to first user message text if no summary/custom-title was found.
-    if title == "Untitled" {
-        if let Some(text) = first_user_text {
-            title = if text.len() > 80 {
-                format!("{}…", &text[..floor_char_boundary(&text, 77)])
-            } else {
-                text
-            };
-        }
-    }
+    let title = resolve_title(title, first_user_text);
 
     ParsedJsonl {
         raw_messages,
@@ -2125,5 +2140,47 @@ mod tests {
         // Only the real conversation should appear — snapshot-only and empty files excluded
         assert_eq!(summaries.len(), 1);
         assert_eq!(summaries[0].title, "Real Chat");
+    }
+
+    #[test]
+    fn test_sdk_interrupt_marker_and_empty_user_messages_filtered() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Scenario: user sends a message, assistant responds, gets interrupted (rewind or stop),
+        // SDK writes "[Request interrupted by user]" as a synthetic user message, then a new
+        // user message follows. Also include an empty user message edge case.
+        let path = ws_dir.join("interrupt-filter.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"hello"},"cwd":"/test","sessionId":"interrupt-filter","timestamp":"2026-02-09T12:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Working on it..."}],"stop_reason":"max_tokens"},"cwd":"/test","sessionId":"interrupt-filter","timestamp":"2026-02-09T12:00:01.000Z"}"#,
+            // SDK interrupt marker — should be filtered out
+            r#"{"type":"user","uuid":"u-int","message":{"role":"user","content":"[Request interrupted by user]"},"cwd":"/test","sessionId":"interrupt-filter","timestamp":"2026-02-09T12:00:02.000Z"}"#,
+            // Empty user message — should be filtered out
+            r#"{"type":"user","uuid":"u-empty","message":{"role":"user","content":""},"cwd":"/test","sessionId":"interrupt-filter","timestamp":"2026-02-09T12:00:03.000Z"}"#,
+            // Real follow-up message — should be kept
+            r#"{"type":"user","uuid":"u2","message":{"role":"user","content":"try again"},"cwd":"/test","sessionId":"interrupt-filter","timestamp":"2026-02-09T12:00:04.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"Done!"}]},"cwd":"/test","sessionId":"interrupt-filter","timestamp":"2026-02-09T12:00:05.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("interrupt-filter", None)
+            .expect("load")
+            .expect("not found");
+
+        // Should have exactly 4 messages: u1, a1, u2, a2
+        // The interrupt marker (u-int) and empty message (u-empty) should be gone.
+        assert_eq!(conv.messages.len(), 4);
+        assert_eq!(conv.messages[0].content, "hello");
+        assert_eq!(conv.messages[0].role, MessageRole::User);
+        assert_eq!(conv.messages[1].content, "Working on it...");
+        assert_eq!(conv.messages[1].role, MessageRole::Assistant);
+        assert!(conv.messages[1].is_interrupted == Some(true));
+        assert_eq!(conv.messages[2].content, "try again");
+        assert_eq!(conv.messages[2].role, MessageRole::User);
+        assert_eq!(conv.messages[3].content, "Done!");
+        assert_eq!(conv.messages[3].role, MessageRole::Assistant);
     }
 }

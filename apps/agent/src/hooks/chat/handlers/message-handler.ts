@@ -166,6 +166,11 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
   // Used to ignore stale conversation:loaded responses for the old Orbit ID.
   const remappedOrbitIds = new Set<string>();
 
+  // Monotonic counter bumped on every rewind. Used to detect stale conversation:loaded
+  // responses whose setTimeout(0) + startTransition deferred setMessages call arrives
+  // AFTER conversation:rewound has already set the correct messages.
+  let rewindEpoch = 0;
+
   const {
     setWorkspace,
     workspacePath,
@@ -981,7 +986,18 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         //   1. Finish the message event (~0ms of work left)
         //   2. Run any pending paint/layout
         //   3. Process our data + transition in a separate task
+        // Capture rewind epoch BEFORE the deferred callback. If a rewind happens
+        // between now and when setTimeout fires, the epoch will have advanced and
+        // we must skip this stale load to avoid overwriting rewound messages.
+        const epochAtLoad = rewindEpoch;
         setTimeout(() => {
+          // A rewind happened while this callback was deferred — the conversation:rewound
+          // handler already set the correct messages. Processing this stale load would
+          // overwrite them with the pre-rewind conversation, causing all original messages
+          // to reappear (the corruption pattern the user reported).
+          if (epochAtLoad !== rewindEpoch) {
+            return;
+          }
           startTransition(() => {
             // Prepare new messages (filter out system messages as they're not displayed)
             // Then extract the active chain using parentUuid links (Claude Code-style rewind)
@@ -1057,10 +1073,41 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               const cachedUserCount = cachedUserMessages.length;
 
               if (cachedUserCount <= backendUserCount) {
-                // Backend has all messages — use backend exclusively.
-                // No live trailing needed; cache would only create duplicates
-                // because frontend UUIDs differ from SDK JSONL UUIDs.
+                // Backend has all (or more) user messages — use backend as the base.
                 newMessages = backendMessages;
+
+                // Edge case: cache may have a trailing assistant message that the SDK
+                // hasn't flushed to JSONL yet. This happens when the user interrupts/
+                // stops a response and switches chats before the SDK writes the
+                // assistant entry. The user count heuristic misses this because no
+                // new USER message was added — only the assistant response is missing.
+                //
+                // Detection: backend ends with a user message, but cache has more
+                // total messages (the extra ones are assistant responses after that
+                // last user message, not yet persisted to disk).
+                const backendLast = backendMessages[backendMessages.length - 1];
+                if (
+                  backendLast?.role === 'user' &&
+                  cachedMessages.length > backendMessages.length
+                ) {
+                  // Find the position of the last user message in the cache (same
+                  // count as backend). Everything after it is live trailing content.
+                  let usersSeen = 0;
+                  let lastUserIdx = -1;
+                  for (let i = 0; i < cachedMessages.length; i++) {
+                    if (cachedMessages[i]?.role === 'user') {
+                      usersSeen++;
+                      if (usersSeen === backendUserCount) {
+                        lastUserIdx = i;
+                        break;
+                      }
+                    }
+                  }
+                  if (lastUserIdx >= 0 && lastUserIdx + 1 < cachedMessages.length) {
+                    const trailingMessages = cachedMessages.slice(lastUserIdx + 1);
+                    newMessages = [...backendMessages, ...trailingMessages];
+                  }
+                }
               } else {
                 // Cache has more user messages than backend — the extra ones are live
                 // (not yet persisted). Find the Nth+1 user message in the cache
@@ -1190,6 +1237,25 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
       }
 
       case 'conversation:rewound': {
+        // CRITICAL: Cancel all RAF batchers BEFORE setting messages.
+        // The handleConversationRewind function is async — between when the user clicks
+        // Rewind and when this event fires, agent:chunk events may have arrived and been
+        // queued in a RAF batcher. If we don't cancel, the RAF fires AFTER setMessages
+        // and the functional updater either appends stale chunks to rewound messages or
+        // CREATES entirely new messages (line ~326, the "first chunk of new response"
+        // fallback), producing the corruption the user sees:
+        //   - Empty user messages (from stale message IDs not matching)
+        //   - "[Request interrupted by user]" appearing with wrong role
+        // Discard (flush=false) because these chunks are from the pre-rewind turn.
+        batchedChunkHandler.cancel();
+        batchedThinkingHandler.cancel();
+        batchedToolHandler.cancel();
+        pendingChunkLengths.clear();
+
+        // Bump rewind epoch so any in-flight conversation:loaded (from setTimeout(0)
+        // + startTransition) is detected as stale and skipped.
+        rewindEpoch++;
+
         // Prepare new messages
         const rewoundMessages: ChatMessage[] = message.messages.map((m) => ({
           id: m.id,
@@ -1462,16 +1528,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // This ensures checkpoint maps (turnStart/turnEnd) get keyed by SDK UUID
         // when onMessageComplete fires later (agent:complete always arrives after checkpoint).
         const checkpointState = useCheckpointStore.getState();
-        logger.debug('agent:checkpoint received', {
-          checkpointSessionId: checkpointSessionId.slice(0, 8),
-          checkpointId: checkpoint_id.slice(0, 8),
-          currentUserMessageId: checkpointState.currentUserMessageId
-            ? {
-                sessionId: checkpointState.currentUserMessageId.sessionId.slice(0, 8),
-                messageId: checkpointState.currentUserMessageId.messageId.slice(0, 8),
-              }
-            : null,
-        });
 
         const oldFrontendId = checkpointState.reconcileUserMessageId(
           checkpointSessionId,
@@ -1482,13 +1538,11 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           // Update the user message's ID in React state from frontend UUID → SDK UUID.
           // After this, the message ID matches the JSONL on disk — enabling direct
           // lookup in rewind, conversation:loaded merge, and checkpoint resolution.
-          logger.debug('Reconciling user message ID', {
-            oldFrontendId: oldFrontendId.slice(0, 8),
-            newSdkId: checkpoint_id.slice(0, 8),
-          });
           setMessages((prev) => {
             const idx = prev.findIndex((m) => m.id === oldFrontendId && m.role === 'user');
-            if (idx === -1) return prev;
+            if (idx === -1) {
+              return prev;
+            }
 
             const target = prev[idx];
             if (!target) return prev;
@@ -1496,11 +1550,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
             const updated = prev.slice();
             updated[idx] = { ...target, id: checkpoint_id };
             return updated;
-          });
-        } else {
-          logger.debug('Checkpoint reconciliation skipped (no frontend ID to remap)', {
-            checkpointSessionId: checkpointSessionId.slice(0, 8),
-            checkpointId: checkpoint_id.slice(0, 8),
           });
         }
         break;

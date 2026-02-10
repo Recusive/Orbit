@@ -21,11 +21,8 @@
  * There's no way to fork exactly between a response and the next user message.
  */
 
-import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-
-const logger = createLogger('CheckpointStore');
 
 /** Maximum sessions to track checkpoints for — prevents unbounded memory growth */
 const MAX_CHECKPOINT_SESSIONS = 10;
@@ -57,9 +54,13 @@ export interface CheckpointState {
 
   // Current user message ID for this turn (set when user sends a message)
   // Used to associate checkpoints with the USER message, not the assistant message
+  // `reconciled` guards against stale cross-turn checkpoints (queued message race):
+  // after the first successful reconcileUserMessageId, further attempts are rejected
+  // until the next onUserMessageSent resets it.
   currentUserMessageId: {
     sessionId: string;
     messageId: string;
+    reconciled: boolean;
   } | null;
 
   // Pending message waiting for its turn END checkpoint
@@ -262,23 +263,15 @@ export const useCheckpointStore = create<CheckpointState>()(
     pendingConversationForks: {},
 
     onUserMessageSent: (sessionId, userMessageId): void => {
-      logger.debug(`User message sent`, { sessionId, userMessageId });
       set((state) => {
-        // Store the user message ID for this turn
-        // This will be used when agent:complete fires to associate checkpoints
-        state.currentUserMessageId = { sessionId, messageId: userMessageId };
+        // Store the user message ID for this turn.
+        // `reconciled: false` allows the first reconcileUserMessageId call to succeed.
+        // After that, it's set to true — blocking stale checkpoints from overwriting.
+        state.currentUserMessageId = { sessionId, messageId: userMessageId, reconciled: false };
       });
     },
 
     onCheckpointReceived: (sessionId, checkpointId): void => {
-      const state = get();
-      logger.debug(`Checkpoint received`, {
-        sessionId,
-        checkpointId,
-        pendingMessageForTurnEnd: state.pendingMessageForTurnEnd,
-        currentTurnStartCheckpoint: state.currentTurnStartCheckpoint,
-        currentUserMessageId: state.currentUserMessageId,
-      });
       set((draft) => {
         // Always track checkpoint in order and as latest
         draft.checkpointOrder[sessionId] ??= [];
@@ -295,12 +288,6 @@ export const useCheckpointStore = create<CheckpointState>()(
           if (oldestPending) {
             draft.turnEndCheckpoints[sessionId] ??= {};
             draft.turnEndCheckpoints[sessionId][oldestPending] = checkpointId;
-            logger.debug('Set turnEnd from queue', {
-              sessionId,
-              messageId: oldestPending,
-              checkpointId,
-              remainingInQueue: pendingQueue.length,
-            });
           }
           // Update legacy field: set to next pending message or null if queue empty
           const nextPending = pendingQueue[0];
@@ -320,11 +307,6 @@ export const useCheckpointStore = create<CheckpointState>()(
             // This checkpoint marks the END of that message's turn
             draft.turnEndCheckpoints[sessionId] ??= {};
             draft.turnEndCheckpoints[sessionId][pending.messageId] = checkpointId;
-            logger.debug('Set turnEnd from legacy pending', {
-              sessionId,
-              messageId: pending.messageId,
-              checkpointId,
-            });
 
             // Clear the pending message
             draft.pendingMessageForTurnEnd = null;
@@ -336,7 +318,8 @@ export const useCheckpointStore = create<CheckpointState>()(
             // No pending message and no current turn start for this session
             // This is the first checkpoint of the session (turn 1 start)
             draft.currentTurnStartCheckpoint = { sessionId, checkpointId };
-            logger.debug('Set as first turn start', { sessionId, checkpointId });
+          } else {
+            // Intermediate checkpoint during tool execution — ignored for turn tracking
           }
         }
         // Otherwise: intermediate checkpoint during tool execution, ignore for turn tracking
@@ -363,19 +346,11 @@ export const useCheckpointStore = create<CheckpointState>()(
     },
 
     onMessageComplete: (sessionId): void => {
-      const currentState = get();
-      logger.debug('Message complete', {
-        sessionId,
-        currentUserMessageId: currentState.currentUserMessageId,
-        currentTurnStartCheckpoint: currentState.currentTurnStartCheckpoint,
-        pendingMessagesQueue: currentState.pendingMessagesQueue[sessionId],
-      });
       set((state) => {
         // Get the USER message ID for this turn (set when user sent the message)
         const userMsg = state.currentUserMessageId;
         if (userMsg?.sessionId !== sessionId) {
           // No user message tracked - this shouldn't happen but handle gracefully
-          logger.warn('No user message tracked for session', { sessionId });
           return;
         }
 
@@ -386,23 +361,15 @@ export const useCheckpointStore = create<CheckpointState>()(
         if (turnStart?.sessionId === sessionId) {
           state.turnStartCheckpoints[sessionId] ??= {};
           state.turnStartCheckpoints[sessionId][userMessageId] = turnStart.checkpointId;
-          logger.debug('Associated turnStart with user message', {
-            sessionId,
-            userMessageId,
-            checkpointId: turnStart.checkpointId,
-          });
           state.currentTurnStartCheckpoint = null;
+        } else {
+          // No turnStart checkpoint available — this shouldn't happen but handle gracefully
         }
 
         // Add this USER message to the pending queue (FIFO)
         // Multiple messages can complete before the next checkpoint arrives
         state.pendingMessagesQueue[sessionId] ??= [];
         state.pendingMessagesQueue[sessionId].push(userMessageId);
-        logger.debug('Added to pending queue', {
-          sessionId,
-          userMessageId,
-          queueLength: state.pendingMessagesQueue[sessionId].length,
-        });
 
         // Also update legacy field for backwards compatibility
         state.pendingMessageForTurnEnd = { sessionId, messageId: userMessageId };
@@ -415,11 +382,13 @@ export const useCheckpointStore = create<CheckpointState>()(
     getRewindCheckpoints: (sessionId, messageId): RewindCheckpoints | undefined => {
       const state = get();
 
+      const order = state.checkpointOrder[sessionId] ?? [];
+      const pending = state.pendingMessageForTurnEnd;
+
       // Get the turnEnd checkpoint for this message
       let turnEnd = state.turnEndCheckpoints[sessionId]?.[messageId];
 
       // If this is the pending message (last message), use latest checkpoint
-      const pending = state.pendingMessageForTurnEnd;
       if (!turnEnd && pending?.sessionId === sessionId && pending.messageId === messageId) {
         turnEnd = state.latestCheckpoints[sessionId];
       }
@@ -431,7 +400,6 @@ export const useCheckpointStore = create<CheckpointState>()(
       // Use the NEXT checkpoint to include the response in the fork.
       // resumeSessionAt: userMessageUuid includes UP TO that message but NOT its response.
       // The next checkpoint comes AFTER the current message's response.
-      const order = state.checkpointOrder[sessionId] ?? [];
       const currentIndex = order.indexOf(turnEnd);
       const hasNextCheckpoint = currentIndex >= 0 && currentIndex < order.length - 1;
       const nextCheckpoint = hasNextCheckpoint ? order[currentIndex + 1] : undefined;
@@ -609,17 +577,21 @@ export const useCheckpointStore = create<CheckpointState>()(
 
     reconcileUserMessageId: (sessionId, sdkMessageId): string | undefined => {
       const current = get().currentUserMessageId;
+
       if (current?.sessionId !== sessionId) {
-        logger.debug('reconcileUserMessageId: session mismatch', {
-          expected: sessionId.slice(0, 8),
-          actual: current?.sessionId.slice(0, 8) ?? 'none',
-        });
+        return undefined;
+      }
+
+      // Guard: only allow ONE reconciliation per onUserMessageSent call.
+      // After the first successful reconciliation, `reconciled` is set to true.
+      // Stale checkpoints from a previous turn (queued message race) are rejected
+      // because they arrive after reconciliation has already completed.
+      if (current.reconciled) {
         return undefined;
       }
 
       const oldFrontendId = current.messageId;
       if (oldFrontendId === sdkMessageId) {
-        logger.debug('reconcileUserMessageId: already reconciled');
         return undefined;
       }
 
@@ -627,13 +599,10 @@ export const useCheckpointStore = create<CheckpointState>()(
       // Mutating only .messageId was silently dropped by immer in some cases.
       set((state) => {
         if (state.currentUserMessageId?.sessionId === sessionId) {
-          state.currentUserMessageId = { sessionId, messageId: sdkMessageId };
+          state.currentUserMessageId = { sessionId, messageId: sdkMessageId, reconciled: true };
         }
       });
-      logger.debug('reconcileUserMessageId: remapped', {
-        old: oldFrontendId.slice(0, 8),
-        new: sdkMessageId.slice(0, 8),
-      });
+
       return oldFrontendId;
     },
 

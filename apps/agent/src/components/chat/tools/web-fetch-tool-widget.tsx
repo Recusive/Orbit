@@ -83,19 +83,19 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed ? 'text-muted-foreground line-through' : 'text-muted-foreground/90'
+              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
             )}
           >
             {statusLabel}
           </span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
           ) : null}
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
           />
@@ -137,7 +137,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
                 <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
                   {/* URL */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
                       url
                     </div>
                     <button
@@ -147,38 +147,36 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
                       }}
                       className="flex items-center gap-1 group focus:outline-none"
                     >
-                      <code className="bg-gray-4 text-foreground rounded-md px-2 py-1 font-mono text-sm group-hover:bg-gray-4 transition-colors truncate max-w-full">
+                      <code className="bg-gray-4 text-gray-12 rounded-md px-2 py-1 font-mono text-sm group-hover:bg-gray-4 transition-colors truncate max-w-full">
                         {hostname}
                       </code>
-                      <ExternalLink className="h-2.5 w-2.5 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <ExternalLink className="h-2.5 w-2.5 text-gray-9 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
                   </div>
 
                   {/* Prompt */}
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1">
+                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1">
                       prompt
                     </div>
-                    <div className="text-sm text-foreground/80 line-clamp-2">{prompt}</div>
+                    <div className="text-sm text-gray-11 line-clamp-2">{prompt}</div>
                   </div>
 
                   {/* Output */}
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
                     {isRunning ? (
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Fetching and processing content...</span>
                       </div>
                     ) : output ? (
-                      <div className="bg-gray-3 rounded-md p-2 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
+                      <div className="bg-gray-3 rounded-md p-2 font-mono text-sm leading-relaxed text-gray-12 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
                         <pre className="whitespace-pre-wrap wrap-break-word m-0">{output}</pre>
                       </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground/40 italic">
-                        No content fetched
-                      </div>
+                      <div className="text-sm text-gray-9 italic">No content fetched</div>
                     )}
                   </div>
                 </div>
@@ -199,7 +197,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                  <span className="ml-2.5 text-xs text-gray-11">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

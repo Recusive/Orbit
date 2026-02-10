@@ -449,30 +449,29 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
           ) : null}
         </span>
 
-        {/* Icon */}
-        <span className="w-4 h-4 flex items-center justify-center shrink-0 mr-1">
+        {/* Icon — slightly oversized for visual clarity, container stays 16px to preserve row height */}
+        <span className="w-4 h-4 flex items-center justify-center shrink-0 mr-1 overflow-visible">
           {node.isDirectory ? (
             <FolderIcon
               folderName={node.name}
               isOpen={isExpanded}
               isSymlink={node.isSymlink ?? false}
-              className="h-4 w-4"
+              className="h-[18px] w-[18px]"
             />
           ) : (
             <FileIcon
               fileName={node.name}
               isSymlink={node.isSymlink ?? false}
-              className="h-4 w-4"
+              className="h-[18px] w-[18px]"
             />
           )}
         </span>
 
-        {/* Name */}
+        {/* Name — tinted by git status (VSCode-style) */}
         <span
           className={cn(
             'truncate text-left flex-1',
-            // Dim untracked files slightly
-            gitStatus === 'untracked' && 'text-muted-foreground'
+            gitStatus && GIT_STATUS_STYLES[gitStatus].fileColor
           )}
         >
           {node.name}

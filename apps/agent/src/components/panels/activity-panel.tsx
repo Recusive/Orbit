@@ -101,19 +101,11 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         'group relative flex items-center h-full px-3 text-base cursor-pointer select-none shrink-0',
         'border-r border-gray-5',
         isActive
-          ? 'bg-card text-foreground'
-          : 'bg-chat-area text-muted-foreground hover:text-foreground'
+          ? 'bg-card text-foreground border-t-2 border-t-primary'
+          : 'bg-chat-area text-muted-foreground hover:text-foreground border-t-2 border-t-transparent'
       )}
       style={{ maxWidth: 180 }}
     >
-      {/* Top border accent for active tab */}
-      <div
-        className={cn(
-          'absolute top-0 inset-x-0 h-px transition-colors',
-          isActive ? 'bg-primary' : 'bg-transparent'
-        )}
-      />
-
       {/* Bottom border - hide for active tab (connects to content) */}
       <div
         className={cn(

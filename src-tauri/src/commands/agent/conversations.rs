@@ -295,16 +295,7 @@ pub fn conversation_load(
     workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<Option<ConversationDto>> {
-    log::debug!(
-        "[REWIND] Tauri cmd conversation_load — session_id={}",
-        &session_id[..8.min(session_id.len())]
-    );
     let conv = manager.load(&session_id, workspace_path.as_deref())?;
-    log::debug!(
-        "[REWIND] Tauri cmd conversation_load — found={}, messages={}",
-        conv.is_some(),
-        conv.as_ref().map_or(0, |c| c.messages.len())
-    );
     Ok(conv.map(ConversationDto::from))
 }
 
@@ -354,22 +345,11 @@ pub fn conversation_fork(
     workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<Option<ConversationDto>> {
-    log::debug!(
-        "[REWIND] Tauri cmd conversation_fork — session_id={}, new_session_id={}, up_to_message_id={:?}",
-        &session_id[..8.min(session_id.len())],
-        &new_session_id[..8.min(new_session_id.len())],
-        up_to_message_id.as_deref().map(|id| &id[..8.min(id.len())])
-    );
     let forked = manager.fork(
         &session_id,
         &new_session_id,
         up_to_message_id.as_deref(),
         workspace_path.as_deref(),
     )?;
-    log::debug!(
-        "[REWIND] Tauri cmd conversation_fork — result found={}, messages={}",
-        forked.is_some(),
-        forked.as_ref().map_or(0, |c| c.messages.len())
-    );
     Ok(forked.map(ConversationDto::from))
 }

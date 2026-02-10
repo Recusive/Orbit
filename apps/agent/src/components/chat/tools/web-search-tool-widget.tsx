@@ -149,25 +149,25 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed ? 'text-muted-foreground line-through' : 'text-muted-foreground/90'
+              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
             )}
           >
             {statusLabel}
           </span>
 
           {!isRunning && !isFailed && resultCount > 0 ? (
-            <span className="text-xs text-muted-foreground/70">
+            <span className="text-xs text-gray-9">
               ({resultCount} {resultCount === 1 ? 'result' : 'results'})
             </span>
           ) : null}
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
           ) : null}
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
           />
@@ -209,10 +209,10 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                 <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
                   {/* Query */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
                       query
                     </div>
-                    <code className="block bg-gray-4 rounded-md px-2 py-1 font-mono text-sm text-foreground">
+                    <code className="block bg-gray-4 rounded-md px-2 py-1 font-mono text-sm text-gray-12">
                       {query}
                     </code>
                   </div>
@@ -221,7 +221,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
                     {isRunning ? (
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Searching for results...</span>
                       </div>
@@ -248,14 +248,14 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                                 <Globe className="h-2.5 w-2.5 text-info/70" />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="text-foreground mb-0.5 line-clamp-2 text-sm font-medium">
+                                <div className="text-gray-12 mb-0.5 line-clamp-2 text-sm font-medium">
                                   {result.title}
                                 </div>
-                                <div className="text-muted-foreground/60 truncate font-mono text-xs">
+                                <div className="text-gray-9 truncate font-mono text-xs">
                                   {getHostname(result.url)}
                                 </div>
                                 {result.snippet ? (
-                                  <div className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
+                                  <div className="text-gray-11 mt-0.5 line-clamp-2 text-xs">
                                     {result.snippet}
                                   </div>
                                 ) : null}
@@ -265,9 +265,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                         ))}
                       </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground/40 italic">
-                        No results found
-                      </div>
+                      <div className="text-sm text-gray-9 italic">No results found</div>
                     )}
                   </div>
                 </div>
@@ -288,7 +286,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                  <span className="ml-2.5 text-xs text-gray-11">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

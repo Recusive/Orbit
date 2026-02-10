@@ -155,19 +155,19 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed ? 'text-muted-foreground line-through' : 'text-muted-foreground/90'
+              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
             )}
           >
             {statusLabel}
           </span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
           ) : null}
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
           />
@@ -213,7 +213,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                 <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
                   {/* Command section */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
                       command
                     </div>
                     {highlightedCommand ? (
@@ -222,7 +222,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                         dangerouslySetInnerHTML={{ __html: highlightedCommand }}
                       />
                     ) : (
-                      <code className="block bg-gray-4 rounded-md px-2 py-1 font-mono text-sm text-foreground break-all">
+                      <code className="block bg-gray-4 rounded-md px-2 py-1 font-mono text-sm text-gray-12 break-all">
                         {command}
                       </code>
                     )}
@@ -233,10 +233,10 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                     <>
                       <div className="h-px bg-border/20 mx-3" />
                       <div className="px-3 py-2">
-                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1">
+                        <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1">
                           description
                         </div>
-                        <div className="text-sm text-muted-foreground/80">{description}</div>
+                        <div className="text-sm text-gray-11">{description}</div>
                       </div>
                     </>
                   ) : null}
@@ -244,16 +244,16 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                   {/* Output section */}
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
                       output
                     </div>
                     {isRunning && !output ? (
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Running command...</span>
                       </div>
                     ) : output ? (
-                      <div className="bg-gray-3 rounded-md p-2 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
+                      <div className="bg-gray-3 rounded-md p-2 font-mono text-sm leading-relaxed text-gray-12 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
                         {highlightedOutput ? (
                           /* SECURITY: Safe — highlightedOutput comes from Shiki's codeToHtml() which HTML-escapes all content */
                           <div
@@ -266,13 +266,13 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                           </pre>
                         )}
                         {hasMoreLines ? (
-                          <div className="mt-1.5 text-muted-foreground/70 text-xs">
+                          <div className="mt-1.5 text-gray-9 text-xs">
                             {String(outputLines.length)} lines total
                           </div>
                         ) : null}
                       </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground/40 italic">No output</div>
+                      <div className="text-sm text-gray-9 italic">No output</div>
                     )}
                   </div>
                 </div>
@@ -293,7 +293,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                  <span className="ml-2.5 text-xs text-gray-11">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

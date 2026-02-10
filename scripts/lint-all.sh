@@ -224,7 +224,7 @@ if [ "$RUST_ONLY" = false ]; then
 
   if [ "$NO_TEST" = false ]; then
     print_step "Running bridge tests (may skip API tests without credentials)..."
-    cd agent-bridge && bun test && cd ..
+    (cd agent-bridge && bun test)
     print_success "Bridge tests passed"
   else
     print_skip "Bridge tests"

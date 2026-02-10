@@ -86,7 +86,7 @@ export interface UseChatInputReturn {
   // Popover state
   popover: PopoverNavigationState;
   // Handlers
-  handleInputChange: (e: React.FormEvent<HTMLDivElement>) => void;
+  handleInputChange: (e: React.SyntheticEvent<HTMLDivElement>) => void;
   handleKeyDown: (e: React.KeyboardEvent) => void;
   handlePaste: (e: React.ClipboardEvent) => void;
   handleSend: () => void;

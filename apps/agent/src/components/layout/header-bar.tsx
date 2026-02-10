@@ -35,7 +35,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       data-tauri-drag-region={false}
       className={cn(
         'relative flex items-center justify-center h-7 px-3 transition-[background-color] duration-100',
-        active ? 'text-foreground' : 'text-gray-10 hover:text-gray-12'
+        active ? 'text-foreground' : 'text-gray-10 dark:text-gray-11 hover:text-gray-12'
       )}
       onClick={onClick}
     >

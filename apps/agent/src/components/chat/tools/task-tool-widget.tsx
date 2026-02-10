@@ -124,21 +124,21 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed ? 'text-muted-foreground line-through' : 'text-muted-foreground/90'
+              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
             )}
           >
             {statusLabel}
           </span>
 
-          <span className="text-xs text-muted-foreground/70 truncate">{description}</span>
+          <span className="text-xs text-gray-9 truncate">{description}</span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
           ) : null}
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
           />
@@ -181,20 +181,18 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                   {/* Task details */}
                   <div className="px-3 py-2">
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+                      <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase">
                         agent
                       </div>
-                      <span className="px-1 py-0.5 rounded bg-gray-4 text-sm font-medium text-foreground">
+                      <span className="px-1 py-0.5 rounded bg-gray-4 text-sm font-medium text-gray-12">
                         {formattedType}
                       </span>
-                      {model ? (
-                        <span className="text-sm text-muted-foreground/70">({model})</span>
-                      ) : null}
+                      {model ? <span className="text-sm text-gray-9">({model})</span> : null}
                     </div>
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1">
+                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1">
                       prompt
                     </div>
-                    <div className="text-sm text-foreground/80 line-clamp-3" title={prompt}>
+                    <div className="text-sm text-gray-11 line-clamp-3" title={prompt}>
                       {truncatePrompt(prompt, 300)}
                     </div>
                   </div>
@@ -203,7 +201,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
                     {isRunning ? (
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Agent is working on the task...</span>
                       </div>
@@ -218,7 +216,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                         </Streamdown>
                       </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground/40 italic">Task completed</div>
+                      <div className="text-sm text-gray-9 italic">Task completed</div>
                     )}
                   </div>
                 </div>
@@ -239,7 +237,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                  <span className="ml-2.5 text-xs text-gray-11">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

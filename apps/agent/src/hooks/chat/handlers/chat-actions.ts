@@ -344,11 +344,15 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   const handleRewind = (messageId: string): void => {
     // Block rewind while agent is running OR while SDK is flushing after Stop.
     // The stop-pending window is ~50-200ms between handleStop and agent:complete.
-    if (!sessionId || isAgentRunning || isStopPendingRef.current) return;
+    if (!sessionId || isAgentRunning || isStopPendingRef.current) {
+      return;
+    }
 
     // Find the clicked message
     const clickedMessage = messages.find((m) => m.id === messageId);
-    if (!clickedMessage) return;
+    if (!clickedMessage) {
+      return;
+    }
 
     // Wrap the rewind operation in a Sentry span for UI interaction tracing
     Sentry.startSpan(

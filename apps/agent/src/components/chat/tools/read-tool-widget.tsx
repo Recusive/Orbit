@@ -1,4 +1,4 @@
-import { File, Loader2 } from 'lucide-react';
+import { ArrowUpRight, File, Loader2 } from 'lucide-react';
 
 import type { FC } from 'react';
 
@@ -46,48 +46,48 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
       onClick={handleFileClick}
       title={filePath}
       className={cn(
-        'w-full flex items-center gap-2 py-1.5 px-2.5 text-left',
+        'group w-full flex items-center gap-2 py-1.5 px-2.5 text-left',
         'cursor-pointer rounded-lg',
         isFailed && 'border-2 border-dotted border-destructive/40 opacity-60'
       )}
     >
-      {/* Icon container */}
-      <div
-        className={cn(
-          'w-5 h-5 rounded flex items-center justify-center shrink-0',
-          isFailed ? 'bg-destructive/8' : 'bg-sky-500/8'
-        )}
-      >
-        <File
+      <div className="flex items-center gap-2 min-w-0">
+        {/* Icon container */}
+        <div
           className={cn(
-            'h-3 w-3',
-            isFailed ? 'text-destructive/60' : 'text-sky-500/60',
-            isRunning && 'animate-pulse'
+            'w-5 h-5 rounded flex items-center justify-center shrink-0',
+            isFailed ? 'bg-destructive/8' : 'bg-sky-500/8'
           )}
-        />
-      </div>
+        >
+          <File
+            className={cn(
+              'h-3 w-3',
+              isFailed ? 'text-destructive/60' : 'text-sky-500/60',
+              isRunning && 'animate-pulse'
+            )}
+          />
+        </div>
 
-      {/* Content */}
-      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-        <span className="text-xs text-muted-foreground/70 font-medium">Read</span>
+        <span className="text-xs text-gray-11 font-medium">Read</span>
         <span
           className={cn(
             'text-xs font-medium truncate',
-            isFailed ? 'text-muted-foreground line-through' : 'text-foreground/90'
+            isFailed ? 'text-gray-11 line-through' : 'text-gray-12'
           )}
         >
           {fileName}
           {!isRunning && !isFailed && lineCount > 0 ? (
-            <span className="text-muted-foreground/40 ml-1 font-mono text-xs">#L1-{lineCount}</span>
+            <span className="text-gray-11 ml-1 font-mono text-xs">#L1-{lineCount}</span>
           ) : null}
         </span>
         {isFailed ? <span className="text-xs text-destructive/60">Failed</span> : null}
-      </div>
 
-      {/* Loading spinner */}
-      {isRunning ? (
-        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
-      ) : null}
+        {isRunning ? (
+          <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+        ) : (
+          <ArrowUpRight className="h-3 w-3 text-gray-9 opacity-0 translate-y-0.5 -translate-x-0.5 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-[opacity,translate] duration-200 ease-out shrink-0" />
+        )}
+      </div>
     </button>
   );
 };

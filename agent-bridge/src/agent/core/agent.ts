@@ -1015,6 +1015,10 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // This tracks file changes made through Write, Edit, NotebookEdit tools
     // and allows rewinding to any previous checkpoint
     options.enableFileCheckpointing = true;
+    logger.warn(
+      { enableFileCheckpointing: true },
+      'CHECKPOINT _createOptions — enableFileCheckpointing set on SDK options'
+    );
 
     // Enable replay-user-messages for:
     // 1. NEW sessions: need checkpoint UUIDs for the rewind feature
@@ -1035,16 +1039,16 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         ...options.extraArgs,
         'replay-user-messages': null,
       };
-      logger.info(
+      logger.warn(
         {
           isNewSession: !this._resumeSessionId,
           isForkWithResumeAt: this._forkSession && !!this._resumeSessionAt,
         },
-        'replay-user-messages ENABLED (new session or fork with resumeSessionAt)'
+        'CHECKPOINT _createOptions — replay-user-messages ENABLED (checkpoint UUIDs will arrive)'
       );
     } else {
-      logger.info(
-        'replay-user-messages DISABLED for plain resumed session (prevents double-message)'
+      logger.warn(
+        'replay-user-messages DISABLED for plain resumed session (no checkpoint UUIDs expected)'
       );
     }
 
@@ -1058,12 +1062,17 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       ...process.env,
       CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1',
     };
-    logger.info(
+    logger.warn(
       {
         processEnvValue: process.env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING,
         optionsEnvValue: options.env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING,
+        enableFileCheckpointing: options.enableFileCheckpointing,
+        hasReplayUserMessages: options.extraArgs?.['replay-user-messages'] === null,
+        resume: options.resume ?? 'none',
+        resumeSessionAt: options.resumeSessionAt ?? 'none',
+        forkSession: options.forkSession ?? false,
       },
-      'File checkpointing enabled for rewind support'
+      'CHECKPOINT _createOptions — FULL checkpoint config summary'
     );
 
     return options;
@@ -1369,6 +1378,16 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           const initMessage = message as { session_id?: string };
           if (initMessage.session_id) {
             const isForkedSession = this._forkSession && this._resumeSessionAt !== undefined;
+            logger.warn(
+              {
+                previousSessionId: this._currentSessionId ?? 'none',
+                newSessionId: initMessage.session_id,
+                isForkedSession,
+                resumeSessionId: this._resumeSessionId ?? 'none',
+                resumeSessionAt: this._resumeSessionAt ?? 'none',
+              },
+              'CHECKPOINT system:init — capturing SDK session ID (required for rewindFiles)'
+            );
             this._currentSessionId = initMessage.session_id;
 
             // CRITICAL: After a fork completes, clear the fork options so subsequent
@@ -1642,13 +1661,21 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
    * @param checkpointId - The UUID of the checkpoint (from a user message)
    */
   async rewindFilesInLoop(checkpointId: string): Promise<void> {
-    logger.info(
-      { checkpointId, hasCurrentQuery: !!this.currentQuery },
-      'rewindFilesInLoop called (from inside message loop)'
+    logger.warn(
+      {
+        checkpointId,
+        hasCurrentQuery: !!this.currentQuery,
+        sdkSessionId: this._currentSessionId ?? 'none',
+        sessionActive: this.sessionActive,
+      },
+      'REWIND rewindFilesInLoop START (inside message loop)'
     );
 
     if (!this.currentQuery) {
-      logger.error({ checkpointId }, 'No active query for rewindFilesInLoop');
+      logger.error(
+        { checkpointId, sdkSessionId: this._currentSessionId ?? 'none' },
+        'REWIND rewindFilesInLoop FAILED — no active query'
+      );
       throw new Error(
         'No active query - rewindFilesInLoop must be called from inside the message loop'
       );
@@ -1657,12 +1684,21 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Call rewindFiles directly on the current Query object
     // This works because we're being called from inside the for-await loop
     const currentQuery = this.currentQuery;
-    await withRetry(async () => currentQuery.rewindFiles(checkpointId), {
-      ...RetryPresets.quick,
-      operationName: 'rewindFilesInLoop',
-    });
-
-    logger.info({ checkpointId }, 'rewindFilesInLoop completed successfully');
+    logger.warn({ checkpointId }, 'REWIND rewindFilesInLoop — calling query.rewindFiles()');
+    try {
+      await withRetry(async () => currentQuery.rewindFiles(checkpointId), {
+        ...RetryPresets.quick,
+        operationName: 'rewindFilesInLoop',
+      });
+      logger.warn({ checkpointId }, 'REWIND rewindFilesInLoop COMPLETE — files restored');
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.error(
+        { checkpointId, error: errMsg },
+        'REWIND rewindFilesInLoop FAILED — query.rewindFiles() threw'
+      );
+      throw err;
+    }
   }
 
   /**
@@ -1681,33 +1717,51 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
    */
   async rewindFiles(checkpointId: string): Promise<void> {
     const sdkSessionId = this._currentSessionId;
-    logger.info(
-      { checkpointId, sdkSessionId, hasCurrentQuery: !!this.currentQuery },
-      'rewindFiles called'
+    logger.warn(
+      {
+        checkpointId,
+        sdkSessionId: sdkSessionId ?? 'none',
+        hasCurrentQuery: !!this.currentQuery,
+        sessionActive: this.sessionActive,
+      },
+      'REWIND rewindFiles START (external — creates resumed query)'
     );
 
     if (!sdkSessionId) {
-      logger.error({ checkpointId }, 'No SDK session ID available for rewindFiles');
+      logger.error({ checkpointId }, 'REWIND rewindFiles FAILED — no SDK session ID available');
       throw new Error('No SDK session ID available - session may not have been started');
     }
 
     // Step 1: Interrupt the current query to "complete" the session
     // The SDK requires the session to finish before checkpoint data is accessible
     if (this.currentQuery) {
-      logger.info({ checkpointId }, 'Interrupting current query before rewind');
+      logger.warn(
+        { checkpointId, sdkSessionId },
+        'REWIND rewindFiles Step 1 — interrupting current query'
+      );
       try {
         await this.currentQuery.interrupt();
         // Give the SDK a moment to finalize the session and flush checkpoint data
         await new Promise((resolve) => setTimeout(resolve, 500));
-      } catch (interruptErr) {
         logger.warn(
-          { checkpointId, err: interruptErr },
-          'Error interrupting query (continuing anyway)'
+          { checkpointId },
+          'REWIND rewindFiles Step 1 — interrupt complete, waited 500ms'
+        );
+      } catch (interruptErr) {
+        const errMsg = interruptErr instanceof Error ? interruptErr.message : String(interruptErr);
+        logger.warn(
+          { checkpointId, error: errMsg },
+          'REWIND rewindFiles Step 1 — interrupt error (continuing anyway)'
         );
       }
+    } else {
+      logger.warn({ checkpointId }, 'REWIND rewindFiles Step 1 — no current query to interrupt');
     }
 
-    logger.info({ checkpointId, sdkSessionId }, 'Resuming session for file rewind');
+    logger.warn(
+      { checkpointId, sdkSessionId },
+      'REWIND rewindFiles Step 2 — building resumed query options'
+    );
 
     // Step 2: Build options for the rewind query - must resume the session
     // Important: Include the CLI path since bundled Bun environments need it
@@ -1723,6 +1777,17 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       },
     };
 
+    logger.warn(
+      {
+        checkpointId,
+        resume: sdkSessionId,
+        enableFileCheckpointing: true,
+        envCheckpointing: rewindOptions.env?.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING,
+        cwd: this.cwd,
+      },
+      'REWIND rewindFiles Step 3 — creating resumed query with empty prompt'
+    );
+
     // Step 3: Create a new query that resumes the session with an empty prompt
     const rewindQuery = query({
       prompt: '', // Empty prompt to open the connection
@@ -1732,30 +1797,58 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     try {
       // Step 4: Iterate through the resumed query and call rewindFiles
       // We need to enter the async iterator once to establish the connection
+      let msgCount = 0;
       for await (const msg of rewindQuery) {
+        msgCount++;
         // Log the message type we received (for debugging replay issues)
-        logger.info({ checkpointId, msgType: msg.type }, 'Calling rewindFiles on resumed query');
+        logger.warn(
+          {
+            checkpointId,
+            msgType: msg.type,
+            msgSubtype: (msg as { subtype?: string }).subtype,
+            msgCount,
+          },
+          'REWIND rewindFiles Step 4 — got message from resumed query, calling rewindFiles()'
+        );
         await withRetry(async () => rewindQuery.rewindFiles(checkpointId), {
           ...RetryPresets.quick,
           operationName: 'rewindFiles',
         });
-        logger.info({ checkpointId }, 'Files rewound successfully');
+        logger.warn(
+          { checkpointId },
+          'REWIND rewindFiles Step 4 — query.rewindFiles() returned successfully'
+        );
         break; // Exit after rewinding
       }
+      if (msgCount === 0) {
+        logger.error(
+          { checkpointId, sdkSessionId },
+          'REWIND rewindFiles — resumed query yielded ZERO messages (connection failed?)'
+        );
+      }
     } catch (err) {
-      logger.error({ checkpointId, err }, 'Error during file rewind');
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.error(
+        { checkpointId, error: errMsg },
+        'REWIND rewindFiles FAILED — error during file rewind'
+      );
       throw err;
     } finally {
       // Step 5: Explicitly terminate the CLI process spawned by query().
       // The `break` above triggers the iterator's return(), but the underlying
       // Claude CLI process may continue running and recreate the JSONL file
       // after forkSessionAt deletes it (causing phantom sidebar entries).
+      logger.warn(
+        { checkpointId },
+        'REWIND rewindFiles Step 5 — interrupting rewind query (cleanup)'
+      );
       try {
         await rewindQuery.interrupt();
       } catch {
         // Ignore — process may already be exiting from the iterator return()
       }
     }
+    logger.warn({ checkpointId, sdkSessionId }, 'REWIND rewindFiles COMPLETE');
   }
 }
 

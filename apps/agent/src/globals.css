@@ -586,45 +586,71 @@ html.window-mode-solid.dark {
   --sidebar: var(--gray-2);
 }
 
-/* Streamdown code block overrides - matches tool widget styling */
-[data-streamdown='code-block'] {
+/* ── Streamdown code blocks ──────────────────────────────
+   Claude.ai-style: hairline border, no header bar,
+   hover-reveal copy button with backdrop blur.
+   Easing: ease-out-quart — matches TOOL_EXPAND_TRANSITION.
+   ───────────────────────────────────────────────────────── */
+
+/* Outer frame — hairline border, card surface */
+[data-streamdown='code-block'],
+[data-streamdown='code-block-container'] {
+  position: relative !important;
   margin: 0.75rem 0 !important;
   border-radius: var(--radius-lg) !important;
-  border: 3px solid var(--border-panel) !important;
-  background-color: var(--card) !important;
-  box-shadow:
-    0 2px 8px -2px rgba(0, 0, 0, 0.06),
-    0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  border: 0.5px solid var(--gray-a4) !important;
+  background-color: var(--gray-3) !important;
   overflow: hidden !important;
 }
 
+html.dark [data-streamdown='code-block'],
+html.dark [data-streamdown='code-block-container'] {
+  border-color: var(--gray-a5) !important;
+}
+
+/* Header — no visual bar, label flows into code */
 [data-streamdown='code-block-header'] {
-  padding: 0.375rem 0.625rem !important;
+  padding: 0.75rem 0.75rem 0 !important;
   background-color: transparent !important;
   border-bottom: none !important;
 }
 
+/* Language label — Radix step 11: canonical secondary text */
 [data-streamdown='code-block-header'] span {
-  font-size: 0.6875rem !important; /* 11px - VS Code secondary label */
-  color: var(--muted-foreground);
-  opacity: 0.7;
+  font-size: 0.6875rem !important; /* 11px */
+  color: var(--gray-11) !important;
 }
 
+/* Hide download button */
 [data-streamdown='code-block-download-button'] {
   display: none;
 }
 
+/* Copy button — hidden by default, glass effect on reveal
+   ease-out-quart: cubic-bezier(0.165, 0.85, 0.45, 1) */
 [data-streamdown='code-block-copy-button'] {
-  height: 1.5rem !important;
-  width: 1.5rem !important;
+  height: 1.75rem !important;
+  width: 1.75rem !important;
   padding: 0 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border-radius: 0.375rem !important;
+  border-radius: var(--radius-md) !important;
   background: transparent !important;
-  color: color-mix(in srgb, var(--gray-10) 70%, transparent) !important;
-  transition: background-color 0.15s, color 0.15s, transform 0.15s !important;
+  color: var(--muted-foreground) !important;
+  opacity: 0 !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    opacity 300ms cubic-bezier(0.165, 0.85, 0.45, 1),
+    background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 80ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Reveal on container hover */
+[data-streamdown='code-block']:hover [data-streamdown='code-block-copy-button'] {
+  opacity: 1 !important;
 }
 
 [data-streamdown='code-block-copy-button'] svg {
@@ -633,48 +659,30 @@ html.window-mode-solid.dark {
 }
 
 [data-streamdown='code-block-copy-button']:hover {
-  background: color-mix(in srgb, var(--gray-4) 50%, transparent) !important;
+  background: var(--gray-a3) !important;
   color: var(--foreground) !important;
-  transform: scale(1.08);
 }
 
 [data-streamdown='code-block-copy-button']:active {
-  transform: scale(0.95);
+  transform: scale(0.95) !important;
 }
 
-
+/* Body — no separator, flows from label */
 [data-streamdown='code-block-body'] {
   margin: 0 !important;
-  padding: 0.625rem 0.75rem !important;
-  font-size: 0.75rem !important; /* 12px - VS Code code font size */
+  padding: 0.5rem 0.75rem 0.75rem !important;
+  font-size: 0.75rem !important; /* 12px */
   line-height: 1.5 !important;
-  background-color: var(--card) !important;
-  border-top: 1px solid var(--gray-a4) !important;
+  background-color: transparent !important;
+  border-top: none !important;
 }
 
-html.dark [data-streamdown='code-block-body'] {
-  background-color: var(--gray-2) !important;
-  border-top: 1px solid var(--gray-a5) !important;
-}
-
-/* Line numbers - more subtle (+1 bump) */
+/* Line numbers — Radix step 9: 3:1 contrast on bg, recedes behind code */
 [data-streamdown='code-block-body'] code span::before {
-  font-size: 0.625rem !important;
+  font-size: 0.625rem !important; /* 10px */
   color: var(--gray-9) !important;
   margin-right: 0.625rem !important;
   width: 1rem !important;
-}
-
-html.dark [data-streamdown='code-block-body'] code span::before {
-  color: var(--gray-9) !important;
-}
-
-[data-streamdown='code-block-container'] {
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  margin-top: 0.75rem;
-  margin-bottom: 0.75rem;
-  border: 3px solid var(--border-panel);
 }
 
 /* ============================================

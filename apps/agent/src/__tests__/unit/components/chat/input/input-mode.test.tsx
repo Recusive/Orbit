@@ -225,8 +225,8 @@ describe('InputControls Mode Picker Button', () => {
       });
 
       const button = getModePickerButton();
-      expect(button).toHaveClass('bg-gray-3');
-      expect(button).toHaveClass('text-gray-11');
+      expect(button).toHaveClass('bg-gray-4');
+      expect(button).toHaveClass('text-gray-12');
     });
 
     it('should have plan mode styling for plan mode', () => {
@@ -318,7 +318,7 @@ describe('InputControls Mode Picker Button', () => {
       // Initial state: default mode
       let button = getModePickerButton();
       expect(within(button).getByText('Default')).toBeInTheDocument();
-      expect(button).toHaveClass('bg-gray-3');
+      expect(button).toHaveClass('bg-gray-4');
 
       // Change to plan mode
       rerender(

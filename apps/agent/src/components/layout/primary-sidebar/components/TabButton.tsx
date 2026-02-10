@@ -11,7 +11,7 @@ export const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
     <button
       className={cn(
         'relative flex items-center justify-center h-full pt-1.5 px-3 flex-1 transition-[background-color] duration-100',
-        active ? 'text-foreground' : 'text-gray-10 hover:text-gray-12'
+        active ? 'text-foreground' : 'text-gray-10 dark:text-gray-11 hover:text-gray-12'
       )}
       onClick={onClick}
       title={label}

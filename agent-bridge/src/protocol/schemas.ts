@@ -451,6 +451,7 @@ export const CanvasSessionConfigSchema = z
     cwd: z.string().optional(),
     model: z.string().optional(),
     thinkingEnabled: z.boolean().optional(),
+    planModeEnabled: z.boolean().optional(),
   })
   .strict();
 export type CanvasSessionConfig = z.infer<typeof CanvasSessionConfigSchema>;
