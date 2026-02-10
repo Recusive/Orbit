@@ -398,7 +398,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
       case 'accept':
         return `${base} border-2 border-dotted border-mode-accept/40`;
       case 'default':
-        return `${base} border-gray-5`;
+        return `${base} border-gray-6`;
     }
   }, [inputMode]);
 
