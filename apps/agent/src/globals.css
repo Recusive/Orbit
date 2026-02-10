@@ -100,20 +100,9 @@
   --color-chat-area: var(--chat-area);
   --color-editor-bg: var(--editor-bg);
 
-  /* Brand colors as Tailwind utilities */
-  --color-brand-oat: var(--brand-oat);
-  --color-brand-clay: var(--brand-clay);
-  --color-brand-sand: var(--brand-sand);
-  --color-brand-coral: var(--brand-coral);
-  --color-brand-brown: var(--brand-brown);
-  --color-brand-heather: var(--brand-heather);
-  --color-brand-olive: var(--brand-olive);
-  --color-brand-fig: var(--brand-fig);
-
   /* Input modes */
   --color-mode-plan: var(--mode-plan);
   --color-mode-accept: var(--mode-accept);
-  --color-mode-think: var(--mode-think);
 
   /* Structural dividers (panel borders, separators) */
   --color-divider: var(--divider);
@@ -121,20 +110,6 @@
   /* Sidebar */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
-  --color-sidebar-ring: var(--sidebar-ring);
-
-  /* Charts */
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
 
   /* Status colors */
   --color-success: var(--success);
@@ -147,25 +122,6 @@
   --color-info-foreground: var(--info-foreground);
   --color-info-muted: var(--info-muted);
 
-  /* Diff colors */
-  --color-diff-added: var(--diff-added);
-  --color-diff-added-border: var(--diff-added-border);
-  --color-diff-added-text: var(--diff-added-text);
-  --color-diff-removed: var(--diff-removed);
-  --color-diff-removed-border: var(--diff-removed-border);
-  --color-diff-removed-text: var(--diff-removed-text);
-  --color-diff-hunk: var(--diff-hunk);
-  --color-diff-hunk-border: var(--diff-hunk-border);
-  --color-diff-hunk-text: var(--diff-hunk-text);
-
-  /* File type colors */
-  --color-file-typescript: var(--file-typescript);
-  --color-file-javascript: var(--file-javascript);
-  --color-file-python: var(--file-python);
-  --color-file-json: var(--file-json);
-  --color-file-html: var(--file-html);
-  --color-file-css: var(--file-css);
-
   /* Terminal theme */
   --color-terminal-bg: var(--terminal-bg);
   --color-terminal-fg: var(--terminal-fg);
@@ -175,9 +131,6 @@
 :root {
   /* Force light color scheme for native form controls (number spinners, scrollbars) */
   color-scheme: light;
-
-  /* Base border-radius (legacy — new system uses --radius-md / --radius-lg directly) */
-  --radius: 0.375rem;
 
   /* ── Radix 12-step raw scales (light) ──────────────────────────────── */
   /* Gray = structure (borders, text, backgrounds) */
@@ -246,22 +199,9 @@
   --gray-indicator: #8f6a5b;
   --gray-track: #8f6a5b;
 
-  /* Brand palette */
-  --brand-oat: #e8e0d5;
-  --brand-clay: #c4a98b;
-  --brand-sand: #d4c5b5;
-  --brand-coral: #e07a6b;
-  --brand-brown: #8b7355;
-  --brand-dark-brown: #5c4f3d;
-  --brand-headline: #3d3630;
-  --brand-heather: #9b8aa6;
-  --brand-olive: #8b9b7a;
-  --brand-fig: #7a6b8a;
-
   /* Input modes */
   --mode-plan: oklch(0.65 0.12 140); /* Olive green */
   --mode-accept: oklch(0.6 0.12 300); /* Heather purple */
-  --mode-think: oklch(0.7 0.14 65); /* Warm amber/sand */
 
   /* ── Semantic variables → Radix scale steps ────────────────────────── */
   /* Gray-only UI: No accent in product chrome. Accent reserved for logo only. */
@@ -293,23 +233,9 @@
   --chat-area: var(--gray-a2);
   --editor-bg: transparent; /* Liquid glass: see-through to vibrancy */
 
-  /* Charts - coral gradient */
-  --chart-1: oklch(0.837 0.128 66.29);
-  --chart-2: oklch(0.705 0.213 47.604);
-  --chart-3: oklch(0.646 0.222 41.116);
-  --chart-4: oklch(0.553 0.195 38.402);
-  --chart-5: oklch(0.47 0.157 37.304);
-
   /* Sidebar */
   --sidebar: var(--surface);
   --sidebar-foreground: var(--gray-11);
-  --sidebar-primary: var(--gray-10);
-  --sidebar-primary-foreground: #fff;
-  --sidebar-accent: var(--gray-6);
-  --sidebar-accent-foreground: var(--gray-12);
-  --sidebar-border: var(--gray-5);
-  --sidebar-muted-foreground: var(--gray-10);
-  --sidebar-ring: var(--gray-9);
 
   /* Status colors */
   --success: oklch(0.65 0.18 155);
@@ -324,25 +250,6 @@
 
   /* Terminal - syncs with TERMINAL.gutterWidth in constants.ts */
   --terminal-gutter-width: 20px;
-
-  /* Diff colors */
-  --diff-added: oklch(0.92 0.06 145);
-  --diff-added-border: oklch(0.65 0.18 145);
-  --diff-added-text: oklch(0.35 0.1 145);
-  --diff-removed: oklch(0.92 0.06 25);
-  --diff-removed-border: oklch(0.55 0.22 25);
-  --diff-removed-text: oklch(0.35 0.12 25);
-  --diff-hunk: oklch(0.95 0.04 240);
-  --diff-hunk-border: oklch(0.65 0.12 240);
-  --diff-hunk-text: oklch(0.35 0.1 240);
-
-  /* File type colors */
-  --file-typescript: oklch(0.6 0.15 240);
-  --file-javascript: oklch(0.75 0.18 90);
-  --file-python: oklch(0.55 0.12 240);
-  --file-json: oklch(0.6 0.18 145);
-  --file-html: oklch(0.65 0.18 45);
-  --file-css: oklch(0.55 0.18 300);
 
   /* Terminal theme - bg matches chat area for visual consistency
      Cursor uses gray-12 for maximum contrast */
@@ -453,20 +360,9 @@ html.dark {
   --gray-indicator: #856557;
   --gray-track: #856557;
 
-  /* Brand palette - adjusted for dark */
-  --brand-oat: oklch(0.35 0.015 60);
-  --brand-clay: oklch(0.55 0.08 55);
-  --brand-sand: oklch(0.4 0.02 60);
-  --brand-coral: #e07a6b;
-  --brand-brown: oklch(0.65 0.06 55);
-  --brand-heather: oklch(0.6 0.08 300);
-  --brand-olive: oklch(0.58 0.06 130);
-  --brand-fig: oklch(0.5 0.1 310);
-
   /* Input modes */
   --mode-plan: oklch(0.58 0.1 140);
   --mode-accept: oklch(0.55 0.1 300);
-  --mode-think: oklch(0.65 0.12 65);
 
   /* ── Semantic variables → Radix scale steps (dark) ─────────────────── */
   /* Gray-only UI: No accent in product chrome. Accent reserved for logo only. */
@@ -498,23 +394,9 @@ html.dark {
   --chat-area: var(--surface);
   --editor-bg: transparent;
 
-  /* Charts - same */
-  --chart-1: oklch(0.837 0.128 66.29);
-  --chart-2: oklch(0.705 0.213 47.604);
-  --chart-3: oklch(0.646 0.222 41.116);
-  --chart-4: oklch(0.553 0.195 38.402);
-  --chart-5: oklch(0.47 0.157 37.304);
-
-  /* Sidebar (+1 bump, foreground stays gray-11 → hover:text-foreground = gray-12) */
+  /* Sidebar */
   --sidebar: var(--surface);
   --sidebar-foreground: var(--gray-11);
-  --sidebar-primary: var(--gray-10);
-  --sidebar-primary-foreground: #fff;
-  --sidebar-accent: var(--gray-6);
-  --sidebar-accent-foreground: var(--gray-12);
-  --sidebar-border: var(--gray-5);
-  --sidebar-muted-foreground: var(--gray-11);
-  --sidebar-ring: var(--gray-9);
 
   /* Status colors */
   --success: oklch(0.7 0.18 155);
@@ -526,25 +408,6 @@ html.dark {
   --info: oklch(0.7 0.15 240);
   --info-foreground: oklch(0.95 0.04 240);
   --info-muted: oklch(0.25 0.06 240);
-
-  /* Diff colors */
-  --diff-added: oklch(0.28 0.06 145);
-  --diff-added-border: oklch(0.6 0.15 145);
-  --diff-added-text: oklch(0.8 0.1 145);
-  --diff-removed: oklch(0.28 0.08 25);
-  --diff-removed-border: oklch(0.55 0.18 25);
-  --diff-removed-text: oklch(0.8 0.1 25);
-  --diff-hunk: oklch(0.25 0.04 240);
-  --diff-hunk-border: oklch(0.55 0.12 240);
-  --diff-hunk-text: oklch(0.8 0.08 240);
-
-  /* File type colors */
-  --file-typescript: oklch(0.65 0.15 240);
-  --file-javascript: oklch(0.8 0.18 90);
-  --file-python: oklch(0.6 0.12 240);
-  --file-json: oklch(0.65 0.18 145);
-  --file-html: oklch(0.7 0.18 45);
-  --file-css: oklch(0.6 0.18 300);
 
   /* Terminal theme - bg matches chat area for visual consistency
      Cursor uses gray-12 for maximum contrast */
@@ -1005,26 +868,6 @@ html.dark [data-streamdown='code-block-container'] {
     position: absolute;
   }
 
-  /* Typing cursor - CSS-based to avoid unicode hygiene issues */
-  .typing-cursor {
-    display: inline-block;
-    width: 0.5em;
-    height: 1em;
-    background-color: currentColor;
-    vertical-align: text-bottom;
-    animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-
-  @keyframes pulse {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.5;
-    }
-  }
-
   /* Cursor blink — CSS-only, no React re-renders */
   @keyframes blink {
     0%,
@@ -1096,29 +939,6 @@ html.dark [data-streamdown='code-block-container'] {
     overflow: hidden;
   }
 
-  /* Terminal panel slide-up animation - for opening terminal */
-  @keyframes panel-slide-up {
-    from {
-      opacity: 0;
-      transform: translateY(100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .animate-panel-slide-up {
-    animation: panel-slide-up 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    will-change: transform, opacity;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .animate-panel-slide-up {
-      animation: none;
-    }
-  }
-
   /* ─── Flow Token: per-word streaming animation (FlowToken-style) ─── */
   @keyframes flow-token-in {
     from {
@@ -1157,12 +977,6 @@ html.dark [data-streamdown='code-block-container'] {
   /* Global reduced-motion utility for spinners */
   .motion-reduce\:animate-none {
     animation: none !important;
-  }
-
-  /* Pulse animation (typing cursor) */
-  .typing-cursor {
-    animation: none;
-    opacity: 1;
   }
 
   /* Message slide-up animation */
@@ -1273,44 +1087,15 @@ html.dark ::-webkit-scrollbar-thumb:hover {
    Performance Optimizations
    ============================================ */
 
-/* Skip rendering off-screen content */
-.content-hidden {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 100px;
-}
-
 /* For chat message items - layout containment */
 .message-item {
   contain: layout style paint;
 }
 
-/* Streaming message - no special CSS performance hints needed
- *
- * HISTORY (code review cycle 1, issue #5):
- * Originally had `will-change: contents` to hint GPU optimization during streaming.
- * This was REMOVED because:
- * 1. will-change: contents is expensive - creates new stacking context per element
- * 2. Can cause GPU memory exhaustion with many messages
- * 3. RAF batching in message-handler.ts already provides smooth streaming
- *
- * The backend batches text chunks at 50ms intervals, and the batchedChunkHandler
- * uses requestAnimationFrame to coalesce rapid state updates. This achieves
- * smooth rendering without CSS performance hints.
- */
-.message-item[data-streaming='true'] {
-  /* Intentionally empty - RAF batching in message-handler.ts handles optimization */
-}
-
 /* Completed messages - enable content-visibility for off-screen optimization */
 .message-item[data-streaming='false'] {
-  /* Delay content-visibility to let scroll animation complete (code review issue #11) */
   content-visibility: auto;
-  contain-intrinsic-size: auto 200px; /* Slightly higher estimate (code review issue #13) */
-}
-
-/* For diff viewer lines - tight containment */
-.diff-line {
-  contain: layout style paint;
+  contain-intrinsic-size: auto 200px;
 }
 
 /* Disable all transitions during conversation switching to prevent layout flash */
@@ -1324,12 +1109,6 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   content-visibility: auto;
   contain-intrinsic-size: auto 24px;
   contain: layout style paint;
-}
-
-/* Scroll containers - prevent paint bleeding and optimize for fast scroll */
-.scroll-container {
-  contain: strict;
-  overflow-anchor: none;
 }
 
 /* ============================================
@@ -1364,19 +1143,6 @@ html.dark .liquid-glass {
 html:not(.window-mode-solid) .glass-float {
   backdrop-filter: blur(16px) saturate(1.5);
   -webkit-backdrop-filter: blur(16px) saturate(1.5);
-}
-
-/* Liquid hover effect - subtle gray warmth */
-.liquid-hover {
-  transition: background-color 150ms ease;
-}
-
-.liquid-hover:hover {
-  background: color-mix(in srgb, var(--gray-10) 8%, transparent);
-}
-
-html.dark .liquid-hover:hover {
-  background: color-mix(in srgb, var(--gray-10) 12%, transparent);
 }
 
 /* ============================================
@@ -1511,4 +1277,3 @@ html.dark .liquid-hover:hover {
     }
   }
 }
-

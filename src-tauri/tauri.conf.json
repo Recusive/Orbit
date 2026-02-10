@@ -52,20 +52,17 @@
     "active": true,
     "targets": "all",
     "externalBin": ["binaries/agent-bridge", "binaries/claude"],
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns"],
     "category": "DeveloperTool",
     "shortDescription": "Modern AI-powered code editor",
     "longDescription": "Orbit is a modern code editor built with Tauri, React, and Rust, featuring an AI coding assistant.",
     "macOS": {
       "entitlements": "Entitlements.plist",
       "minimumSystemVersion": "10.15",
-      "signingIdentity": "Developer ID Application: Pranit sharma (QSAMZF2NJ7)"
+      "signingIdentity": "Developer ID Application: Pranit sharma (QSAMZF2NJ7)",
+      "files": {
+        "Resources/Assets.car": "resources/Assets.car"
+      }
     }
   },
   "plugins": {}

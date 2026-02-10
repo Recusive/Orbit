@@ -66,6 +66,8 @@ impl WebviewWindowExt for WebviewWindow {
 /// On non-macOS platforms, this is a no-op.
 ///
 /// **Must be called from the main thread** (Tauri event handlers are fine).
+// Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
+#[allow(clippy::missing_const_for_fn)]
 pub fn order_child_windows_front() {
     #[cfg(target_os = "macos")]
     window_order::order_child_windows_front();
