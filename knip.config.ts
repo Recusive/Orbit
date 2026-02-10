@@ -3,200 +3,93 @@ import type { KnipConfig } from 'knip';
 /**
  * Knip configuration for Orbit monorepo
  *
- * This monorepo has a unique structure:
- * - Root package.json contains ALL dependencies (not per-workspace)
- * - apps/agent and apps/Canvas-UI-Builder use root deps via imports
- * - agent-bridge has its own package.json with separate deps
- * - packages/shared-schemas exports types for IPC
+ * Key structural insight: apps/agent, apps/Canvas-UI-Builder, and apps/editor
+ * are NOT real workspaces (no package.json). They live under the root workspace
+ * and share root dependencies. Only apps/common, packages/shared-schemas, and
+ * agent-bridge are real Bun workspaces.
  *
- * We use workspace config but with root dependencies tracked at root level.
+ * Strategy:
+ * - Root workspace ('.') includes all app source files for dependency tracing
+ * - Real workspaces (apps/common, packages/shared-schemas) auto-detected
+ * - agent-bridge excluded (separate toolchain with its own knip)
+ * - Knip plugins auto-detect vite, vitest, eslint, lint-staged, typescript, etc.
  */
 const config: KnipConfig = {
   workspaces: {
-    // Root workspace - tracks all shared dependencies
+    // ── Root workspace ────────────────────────────────────────────────────
+    // apps/agent, apps/Canvas-UI-Builder, apps/editor don't have their own
+    // package.json, so we include their source files in the root workspace.
+    // This lets knip trace their imports against root package.json deps.
     '.': {
-      project: ['*.ts', '*.js'],
-      ignore: ['dist/**', 'target/**', 'src-tauri/**'],
-    },
-
-    // Main agent app
-    'apps/agent': {
-      entry: ['src/main.tsx', 'src/vite-env.d.ts'],
-      project: ['src/**/*.{ts,tsx}'],
-      ignore: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
-    },
-
-    // Canvas UI Builder app (embedded in agent)
-    'apps/Canvas-UI-Builder': {
-      entry: ['src/main.tsx', 'src/CanvasApp.tsx'],
-      project: ['src/**/*.{ts,tsx}'],
-      ignore: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
-    },
-
-    // Editor app (stub)
-    'apps/editor': {
-      entry: ['src/main.tsx'],
-      project: ['src/**/*.{ts,tsx}'],
-    },
-
-    // Common shared utilities
-    'apps/common': {
-      project: ['src/**/*.ts'],
-    },
-
-    // Shared schemas package
-    'packages/shared-schemas': {
-      // Note: src/index.ts is auto-detected by knip
-      // All module barrel exports are entry points (used by apps via @orbit/shared-schemas)
       entry: [
-        'src/agent/index.ts',
-        'src/common/index.ts',
-        'src/file/index.ts',
-        'src/sdk/index.ts',
-        'src/settings/index.ts',
-        'src/terminal/index.ts',
+        // App entry points (these start the dependency graph)
+        'apps/agent/src/main.tsx',
+        'apps/Canvas-UI-Builder/src/main.tsx',
+        'apps/editor/src/main.tsx',
       ],
-      project: ['src/**/*.ts'],
+      project: [
+        'apps/agent/src/**/*.{ts,tsx}',
+        'apps/Canvas-UI-Builder/src/**/*.{ts,tsx}',
+        'apps/editor/src/**/*.{ts,tsx}',
+        'vite-plugins/**/*.ts',
+        'scripts/**/*.ts',
+      ],
+      // Path aliases — knip needs these to resolve imports across the monorepo.
+      // Without this, `@orbit/common` imports appear as "unlisted dependencies".
+      paths: {
+        '@/*': ['apps/agent/src/*'],
+        '@canvas/*': ['apps/Canvas-UI-Builder/src/*'],
+        '@editor/*': ['apps/editor/src/*'],
+        '@orbit/common': ['apps/common/src/index.ts'],
+        '@orbit/common/*': ['apps/common/src/*'],
+      },
     },
+
+    // ── Real workspaces (auto-detected, entry from package.json exports) ──
+    // Knip auto-discovers entry points from package.json main/exports fields.
+    'apps/common': {},
+    'packages/shared-schemas': {},
   },
 
-  // Global ignore patterns
+  // Agent-bridge has its own deps, toolchain, and test runner (Bun)
+  ignoreWorkspaces: ['agent-bridge'],
+
+  // ── File exclusions ─────────────────────────────────────────────────────
+
   ignore: [
     '**/dist/**',
     '**/target/**',
     '**/node_modules/**',
+    'reference/**',
+    'SDK/**',
+    'docs/**',
     'src-tauri/**',
-    '**/*.test.ts',
-    '**/*.test.tsx',
-    '**/*.spec.ts',
-    '**/*.spec.tsx',
-    '**/__tests__/**',
     '**/*.d.ts',
-    'lint-staged.config.js',
   ],
 
-  // Dependencies that are used but knip can't trace
-  // (root deps used by app workspaces, dynamic imports, etc.)
+  // ── Dependency exclusions ───────────────────────────────────────────────
+  // Only list deps that are genuinely untraceable by static analysis.
+  // If knip can find the import, it should NOT be here.
+
   ignoreDependencies: [
-    // === Root package.json dependencies used by apps ===
-    // These are in root package.json but imported by apps/agent and apps/Canvas-UI-Builder
-
-    // React ecosystem
-    'react',
-    'react-dom',
-
-    // Tauri APIs (used via @tauri-apps/* imports)
-    '@tauri-apps/api',
-    '@tauri-apps/plugin-clipboard-manager',
-    '@tauri-apps/plugin-dialog',
-    '@tauri-apps/plugin-fs',
-    '@tauri-apps/plugin-shell',
-
-    // UI components (Radix)
-    '@radix-ui/react-collapsible',
-    '@radix-ui/react-context-menu',
-    '@radix-ui/react-dialog',
-    '@radix-ui/react-dropdown-menu',
-    '@radix-ui/react-hover-card',
-    '@radix-ui/react-icons',
-    '@radix-ui/react-popover',
-    '@radix-ui/react-scroll-area',
-    '@radix-ui/react-select',
-    '@radix-ui/react-separator',
-    '@radix-ui/react-slot',
-    '@radix-ui/react-switch',
-    '@radix-ui/react-tabs',
-    '@radix-ui/react-tooltip',
-
-    // CodeMirror (editor)
-    '@codemirror/autocomplete',
-    '@codemirror/commands',
-    '@codemirror/lang-css',
-    '@codemirror/lang-go',
-    '@codemirror/lang-html',
-    '@codemirror/lang-javascript',
-    '@codemirror/lang-json',
-    '@codemirror/lang-markdown',
-    '@codemirror/lang-python',
-    '@codemirror/lang-rust',
-    '@codemirror/language',
-    '@codemirror/lint',
-    '@codemirror/search',
-    '@codemirror/state',
-    '@codemirror/theme-one-dark',
-    '@codemirror/view',
-    '@lezer/highlight',
-    'codemirror',
-
-    // Terminal
-    '@xterm/addon-fit',
-    '@xterm/addon-search',
-    '@xterm/addon-web-links',
-    '@xterm/xterm',
-
-    // Canvas/ReactFlow
-    '@xyflow/react',
-    '@codesandbox/sandpack-client',
-    '@codesandbox/sandpack-react',
-
-    // Babel (AST parsing for code transforms)
-    '@babel/generator',
-    '@babel/parser',
-    '@babel/traverse',
-    '@babel/types',
-
-    // Icons
-    '@central-icons-react/all',
-    '@central-icons-react/round-outlined-radius-1-stroke-2',
-    '@lucide/lab',
-    'lucide-react',
-    'react-icons',
-
-    // UI utilities
-    'class-variance-authority',
-    'clsx',
-    'cmdk',
-    'tailwind-merge',
-    'framer-motion',
-    '@tanstack/react-virtual',
-    'react-resizable-panels',
-    'sonner',
-    'next-themes',
-
-    // Markdown/content rendering
-    'react-markdown',
-    'rehype-highlight',
-    'remark-gfm',
-    'streamdown',
-    'mermaid',
-    'dompurify',
-    'shiki',
-
-    // State management
-    'zustand',
-    'immer',
-    'zod',
-
-    // Workspace deps
-    '@orbit/shared-schemas',
-
-    // === Build tools and plugins (not imported, used by bundler) ===
+    // CSS-only deps — consumed via CSS @import/@plugin, not JS imports.
+    // Knip cannot trace CSS file imports.
     'tailwindcss',
     'tailwindcss-animate',
     'tw-animate-css',
 
-    // === Dev dependencies ===
-    '@types/react',
-    '@types/react-dom',
-    '@types/babel__generator',
-    '@types/babel__traverse',
+    // Workspace package resolved via tsconfig paths, not declared in root package.json.
+    // Apps import @orbit/common via tsconfig "paths" alias → apps/common/src/index.ts.
+    // Knip can't resolve this cross-workspace path alias and flags it as unlisted.
+    // TODO: Add "@orbit/common": "workspace:*" to root package.json to fix properly.
+    '@orbit/common',
   ],
 
-  // Binaries used in scripts
-  ignoreBinaries: ['open', 'scripts/build-claude-cli.mjs'],
-
-  // Don't check these workspaces (they're standalone or have separate checks)
-  ignoreWorkspaces: ['agent-bridge'],
+  // Shell commands/scripts used in npm scripts that aren't npm package binaries
+  ignoreBinaries: [
+    'open', // macOS `open` command used in scripts
+    'scripts/build-claude-cli.mjs', // Custom build script referenced in package.json
+  ],
 };
 
 export default config;

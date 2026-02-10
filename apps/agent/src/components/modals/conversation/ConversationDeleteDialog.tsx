@@ -1,14 +1,13 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 
 import type { FC } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 
@@ -36,20 +35,27 @@ export const ConversationDeleteDialog: FC<ConversationDeleteDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-            </div>
-            <DialogTitle>Delete conversation?</DialogTitle>
+      <DialogContent className="sm:max-w-[400px] gap-0 overflow-hidden p-0 [&>.absolute]:hidden">
+        {/* Header: icon + title + close, all on one line */}
+        <div className="flex items-center gap-3 px-3 pt-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
           </div>
-          <DialogDescription className="pt-2">
-            This will permanently delete &ldquo;{conversationTitle}&rdquo;. This action cannot be
-            undone.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="gap-2 sm:gap-0">
+          <DialogTitle className="flex-1">Delete conversation?</DialogTitle>
+          <DialogClose className="shrink-0 rounded-md p-1.5 opacity-70 transition-[opacity,background-color] duration-150 hover:opacity-100 hover:bg-gray-4">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+        </div>
+
+        {/* Body */}
+        <DialogDescription className="px-3 pt-3 pb-6">
+          This will permanently delete &ldquo;{conversationTitle}&rdquo;. This action cannot be
+          undone.
+        </DialogDescription>
+
+        {/* Footer with distinct background */}
+        <div className="flex justify-end gap-2 border-t border-gray-5 bg-gray-3 px-3 py-3">
           <Button
             variant="outline"
             className="text-base"
@@ -62,7 +68,7 @@ export const ConversationDeleteDialog: FC<ConversationDeleteDialogProps> = ({
           <Button variant="destructive" className="text-base" onClick={handleConfirm}>
             Delete
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

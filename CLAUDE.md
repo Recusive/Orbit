@@ -207,6 +207,12 @@ Orbit/
     <command name="cd agent-bridge &amp;&amp; bun test" description="Run agent-bridge tests (Bun test)"/>
     <command name="cargo test" description="Run Rust backend tests"/>
   </category>
+
+  <category name="Dead Code Analysis">
+    <command name="bun run knip" description="Find unused files, dependencies, and exports"/>
+    <command name="bun run knip:fix" description="Auto-remove unused exports and dependencies"/>
+    <command name="bun run knip:watch" description="Watch mode for continuous dead code detection"/>
+  </category>
 </commands>
 
 <testing_architecture>
@@ -294,6 +300,7 @@ Backend features (file system, terminal, etc.) won't work in browser-only mode.
 <file name="package.json" purpose="Bun workspace config (workspaces array)"/>
 <file name="tsconfig.json" purpose="TypeScript config (paths: apps/agent/src)"/>
 <file name="components.json" purpose="shadcn/ui configuration"/>
+<file name="knip.config.ts" purpose="Dead code analysis (unused files, deps, exports)"/>
 </configuration_files>
 </development_workflow>
 
@@ -522,6 +529,31 @@ This project includes AI coding assistant skills adapted from Vercel's agent-ski
 </guidelines>
 <reference>See CLAUDE-CONTINUOUS.md for detailed examples.</reference>
 </module_organization_patterns>
+
+<dead_code_analysis tool="knip" config="knip.config.ts">
+Knip scans for unused files, dependencies, and exports across the monorepo.
+
+<workspace_architecture importance="high">
+Key structural insight: `apps/agent`, `apps/Canvas-UI-Builder`, and `apps/editor` are NOT real Bun workspaces (no `package.json`). They live under the root workspace and share root `package.json` dependencies. Only `apps/common`, `packages/shared-schemas`, and `agent-bridge` are real workspaces.
+
+The knip config reflects this by scanning all app source files as part of the root workspace (`workspaces['.']`), with path aliases configured so knip can resolve cross-app imports (`@/*`, `@canvas/*`, `@editor/*`, `@orbit/common`).
+</workspace_architecture>
+
+<what_knip_finds>
+<finding type="Unused files">Dead components, unused barrel index.ts files</finding>
+<finding type="Unused dependencies">Packages in root package.json with zero imports</finding>
+<finding type="Unused exports">Exported functions/types/constants never imported elsewhere</finding>
+<finding type="Duplicate exports">Same symbol re-exported from multiple locations</finding>
+</what_knip_finds>
+
+<known_exceptions reason="Cannot be traced by static analysis">
+<exception name="CSS-only deps">tailwindcss, tailwindcss-animate, tw-animate-css — consumed via CSS @import/@plugin, not JS</exception>
+<exception name="@orbit/common">Resolved via tsconfig paths alias, not declared in root package.json</exception>
+<exception name="agent-bridge">Excluded entirely (separate toolchain with its own knip config)</exception>
+</known_exceptions>
+
+<auto_detected_plugins>Knip auto-discovers entry points from: vite, vitest, eslint, lint-staged, typescript, husky configs</auto_detected_plugins>
+</dead_code_analysis>
 
 <monorepo_structure>
 <apps location="apps/">
@@ -769,6 +801,9 @@ Search SDK docs whenever working on agent-bridge, SDK integration, permissions, 
 </sdk_documentation>
 
 <changelog>
+  <period date="February 2026">
+    <entry>Knip dead code analysis - Fixed config for non-standard monorepo workspace structure</entry>
+  </period>
   <period date="January 2026">
     <entry>Canvas UI Builder - Visual component builder with shadcn/ui (Rust backend + React frontend)</entry>
     <entry>Agent Skills - Vercel's react-best-practices and web-design-guidelines</entry>
