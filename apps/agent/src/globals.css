@@ -274,6 +274,10 @@
   --gradient-error-glow: 0 0 8px rgba(239, 68, 68, 0.3);
   --gradient-warning-glow: 0 0 8px rgba(245, 158, 11, 0.3);
   --gradient-success-glow: 0 0 8px rgba(16, 185, 129, 0.3);
+
+  /* Beam ASCII reveal animation — leading edge and glow colors */
+  --beam-hot: #c04020;           /* Saturated warm coral for light bg */
+  --beam-glow-rgb: 192, 64, 32; /* Same as hot, in RGB for rgba() */
 }
 
 /* Responsive chat widths - scales down on smaller screens */
@@ -418,6 +422,10 @@ html.dark {
   /* Tooltip colors (elevated surface on dark theme) */
   --tooltip-bg: var(--gray-5);
   --tooltip-text: var(--gray-12);
+
+  /* Beam ASCII reveal animation — white-hot on dark bg */
+  --beam-hot: #ffffff;
+  --beam-glow-rgb: 255, 255, 255;
 }
 
 /* ============================================

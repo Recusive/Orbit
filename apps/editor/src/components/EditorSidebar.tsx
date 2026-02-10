@@ -21,7 +21,7 @@ import type { FC } from 'react';
 import { FileExplorer } from '@/components/files';
 import { SourceControlTab } from '@/components/git';
 import { SidebarToggleIcon, TabButton } from '@/components/layout/primary-sidebar';
-import { ScrambleAsciiPre } from '@/components/shared';
+import { BeamAsciiPre } from '@/components/shared';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { HEIGHTS, SIDEBAR } from '@/lib/utils/constants';
@@ -168,8 +168,11 @@ export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
           /* Expanded: text on left, button on right */
           <div className="flex items-center justify-between w-full px-3">
             <div className="flex items-center gap-1.5">
-              <ScrambleAsciiPre
+              <BeamAsciiPre
                 ariaLabel="Orbit Editor"
+                className="text-[3.5px] leading-[1.1]"
+                duration={1400}
+                beamSize={20}
                 text={` ██████╗ ██████╗ ██████╗ ██╗████████╗    ███████╗██████╗ ██╗████████╗ ██████╗ ██████╗
 ██╔═══██╗██╔══██╗██╔══██╗██║╚══██╔══╝    ██╔════╝██╔══██╗██║╚══██╔══╝██╔═══██╗██╔══██╗
 ██║   ██║██████╔╝██████╔╝██║   ██║       █████╗  ██║  ██║██║   ██║   ██║   ██║██████╔╝
