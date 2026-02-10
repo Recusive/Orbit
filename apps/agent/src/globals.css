@@ -201,7 +201,7 @@
 
   /* Input modes */
   --mode-plan: oklch(0.65 0.12 140); /* Olive green */
-  --mode-accept: oklch(0.6 0.12 300); /* Heather purple */
+  --mode-accept: oklch(0.6 0.15 25); /* Destructive red */
 
   /* ── Semantic variables → Radix scale steps ────────────────────────── */
   /* Gray-only UI: No accent in product chrome. Accent reserved for logo only. */
@@ -362,7 +362,7 @@ html.dark {
 
   /* Input modes */
   --mode-plan: oklch(0.58 0.1 140);
-  --mode-accept: oklch(0.55 0.1 300);
+  --mode-accept: oklch(0.6 0.15 25);
 
   /* ── Semantic variables → Radix scale steps (dark) ─────────────────── */
   /* Gray-only UI: No accent in product chrome. Accent reserved for logo only. */

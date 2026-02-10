@@ -56,6 +56,9 @@ pub struct Message {
     /// Optional thinking content (for assistant messages with extended thinking)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thinking: Option<String>,
+    /// Duration of the thinking phase in milliseconds (for UI display on reload)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking_duration_ms: Option<u64>,
     /// Whether this message was interrupted by the user
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_interrupted: Option<bool>,
@@ -882,6 +885,7 @@ fn build_assistant_message(uuid: &str, value: &serde_json::Value, ts: u64) -> Me
         role: MessageRole::Assistant,
         content: text,
         thinking,
+        thinking_duration_ms: None,
         is_interrupted: is_interrupted.then_some(true),
         created_at: ts,
         tool_uses,
@@ -966,6 +970,7 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
                     role: MessageRole::User,
                     content: text,
                     thinking: None,
+                    thinking_duration_ms: None,
                     is_interrupted: None,
                     created_at: ts,
                     tool_uses: Vec::new(),
@@ -1565,6 +1570,7 @@ mod tests {
             role: MessageRole::User,
             content: "Hello".to_owned(),
             thinking: None,
+            thinking_duration_ms: None,
             is_interrupted: None,
             created_at: current_timestamp(),
             tool_uses: Vec::new(),

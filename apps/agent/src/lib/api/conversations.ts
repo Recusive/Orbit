@@ -15,6 +15,7 @@ export interface ConversationMessageDto {
   role: 'user' | 'assistant' | 'system';
   content: string;
   thinking?: string;
+  thinkingDurationMs?: number;
   createdAt: number;
   toolUses?: ToolUseDto[];
   usage?: TokenUsageDto;

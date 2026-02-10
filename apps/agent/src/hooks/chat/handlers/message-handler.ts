@@ -143,8 +143,6 @@ interface MessageHandlerDeps {
   messagesRef: React.RefObject<ChatMessage[]>;
   messagesCache: React.RefObject<Map<string, ChatMessage[]>>;
   thinkingStartTimes: React.RefObject<Map<string, number>>;
-  /** Tracks whether non-thinking content arrived since the last thinking chunk per message ID. */
-  hasContentSinceLastThinking: React.RefObject<Map<string, boolean>>;
 }
 
 /** Return type for createMessageHandler - handler function plus cleanup */
@@ -204,7 +202,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
     messagesRef,
     messagesCache,
     thinkingStartTimes,
-    hasContentSinceLastThinking,
   } = deps;
 
   // ============================================
@@ -306,8 +303,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
               };
             }
           }
-          hasContentSinceLastThinking.current.set(messageId, true);
-
           result[lastIdx] = {
             ...lastMsg,
             content: newContent,
@@ -385,15 +380,19 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           // Verify message ID matches to prevent thinking content misattribution
           // if multiple assistant messages exist. (Code review: Opus cycle 2, issue #8)
 
-          // Determine if we need a new thinking block (non-thinking content arrived since last thinking)
-          const needsNewBlock = hasContentSinceLastThinking.current.get(messageId) === true;
+          // Determine if we need a new thinking block:
+          // If isThinkingActive is NOT true, non-thinking content was processed since last thinking.
+          // This is immune to RAF timing races because it reads committed React state via prev[].
+          const needsNewBlock = lastMsg.isThinkingActive !== true;
           const blocks = [...(lastMsg.thinkingBlocks ?? [])];
 
           if (blocks.length === 0 || needsNewBlock) {
             // Start a new thinking block — either first block or content arrived since last thinking
-            thinkingStartTimes.current.set(messageId, Date.now());
+            // Only reset timer for subsequent blocks (block 0 timer set by agent:thinking handler)
+            if (blocks.length > 0) {
+              thinkingStartTimes.current.set(messageId, Date.now());
+            }
             blocks.push({ content: accumulatedThinking, durationMs: 0 });
-            hasContentSinceLastThinking.current.set(messageId, false);
           } else {
             // Append to the current (last) thinking block
             const lastBlock = blocks[blocks.length - 1];
@@ -422,7 +421,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           // Set parentUuid to the last message's ID to maintain the chain
           const parentUuid = result[result.length - 1]?.id ?? null;
           thinkingStartTimes.current.set(messageId, Date.now());
-          hasContentSinceLastThinking.current.set(messageId, false);
           result.push({
             id: messageId,
             role: 'assistant' as const,
@@ -660,9 +658,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         const finalThinkingDuration =
           thinkingStart !== undefined ? Date.now() - thinkingStart : undefined;
 
-        // Clean up the tracking refs
+        // Clean up the tracking ref
         thinkingStartTimes.current.delete(message.message_id);
-        hasContentSinceLastThinking.current.delete(message.message_id);
 
         setMessages((prev) => {
           const lastIdx = prev.length - 1;
@@ -754,6 +751,9 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                   role: 'assistant',
                   content: completedMsg.content,
                   ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
+                  ...(completedMsg.thinkingDurationMs !== undefined
+                    ? { thinkingDurationMs: completedMsg.thinkingDurationMs }
+                    : {}),
                   createdAt: Date.now(),
                   ...(usageDto ? { usage: usageDto } : {}),
                   ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
@@ -1402,9 +1402,6 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // RAF batching provides negligible performance benefit but delays the
         // Zustand store update that triggers the tool widget to appear.
         startTool(toolId, message.message_id, toolName, message.tool_input, contentOffset);
-
-        // Mark that non-thinking content arrived — next thinking chunk starts a new block
-        hasContentSinceLastThinking.current.set(message.message_id, true);
 
         // Finalize current thinking block and mark thinking phase complete
         if (currentMsg?.isThinkingActive === true) {

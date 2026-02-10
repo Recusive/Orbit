@@ -27,6 +27,9 @@ pub struct MessageDto {
     /// Optional thinking content
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thinking: Option<String>,
+    /// Duration of the thinking phase in milliseconds
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking_duration_ms: Option<u64>,
     /// Whether this message was interrupted by the user
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_interrupted: Option<bool>,
@@ -127,6 +130,7 @@ impl From<Message> for MessageDto {
             },
             content: msg.content,
             thinking: msg.thinking,
+            thinking_duration_ms: msg.thinking_duration_ms,
             is_interrupted: msg.is_interrupted,
             created_at: msg.created_at,
             tool_uses: msg.tool_uses.into_iter().map(ToolUseDto::from).collect(),
@@ -159,6 +163,7 @@ impl From<MessageDto> for Message {
             },
             content: dto.content,
             thinking: dto.thinking,
+            thinking_duration_ms: dto.thinking_duration_ms,
             is_interrupted: dto.is_interrupted,
             created_at: dto.created_at,
             tool_uses: dto.tool_uses.into_iter().map(ToolUse::from).collect(),
