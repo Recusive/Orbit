@@ -171,6 +171,13 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
   // AFTER conversation:rewound has already set the correct messages.
   let rewindEpoch = 0;
 
+  // Monotonic counter bumped on every conversation:loaded. Used to detect stale loads
+  // when the user rapidly switches sessions: if a newer conversation:loaded arrives
+  // while a previous one's setTimeout(0) is still deferred, the older one should be
+  // skipped. We cannot use sessionIdRef for this because setSessionId runs INSIDE the
+  // startTransition block — the ref isn't updated until after the guard check.
+  let conversationLoadEpoch = 0;
+
   const {
     setWorkspace,
     workspacePath,
@@ -991,7 +998,12 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // between now and when setTimeout fires, the epoch will have advanced and
         // we must skip this stale load to avoid overwriting rewound messages.
         const epochAtLoad = rewindEpoch;
-        const targetSessionId = message.session_id;
+        // Bump the load epoch BEFORE deferring — this happens synchronously in the
+        // message event handler. If another conversation:loaded arrives before our
+        // setTimeout(0) fires, it will bump the epoch again, and our stale callback
+        // will detect the mismatch and bail.
+        conversationLoadEpoch++;
+        const loadEpochAtCapture = conversationLoadEpoch;
         setTimeout(() => {
           // A rewind happened while this callback was deferred — the conversation:rewound
           // handler already set the correct messages. Processing this stale load would
@@ -1000,11 +1012,14 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
           if (epochAtLoad !== rewindEpoch) {
             return;
           }
-          // A newer conversation:loaded already ran — the user switched sessions again
-          // between when this was deferred and when it fires. Applying this stale load
-          // would overwrite the newer session's messages.
-          // (Code review: Opus cycle 3, issue #4)
-          if (sessionIdRef.current !== targetSessionId) {
+          // A newer conversation:loaded arrived and bumped the epoch — the user switched
+          // sessions again between when this was deferred and when it fires. Applying
+          // this stale load would overwrite the newer session's messages.
+          // (Code review: Opus cycle 3, issue #4 — fixed: the previous guard used
+          // sessionIdRef.current which isn't updated until setSessionId() inside
+          // startTransition below, creating a chicken-and-egg deadlock that blocked
+          // ALL conversation loads.)
+          if (loadEpochAtCapture !== conversationLoadEpoch) {
             return;
           }
           startTransition(() => {
