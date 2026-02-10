@@ -1743,10 +1743,20 @@ export class SessionManager extends Disposable {
   ): Promise<void> {
     const agent = this.activeSessions.get(sessionId);
     if (!agent) {
-      logger.debug(
-        { sessionId, effort },
-        'Session not found for setEffortLevel, storing preference'
-      );
+      // Store as thinking preference so session creation picks it up.
+      // Without this, the first effort:set is lost (fires before session exists)
+      // and the session creates with default budget instead of the user's choice.
+      const budgetMap: Record<string, number> = {
+        low: 1024,
+        medium: 4096,
+        high: 10240,
+        max: 32768,
+      };
+      const prefs = this.modePreferences.get(sessionId) ?? {};
+      prefs.thinkingEnabled = true;
+      prefs.maxThinkingTokens = budgetMap[effort] ?? 4096;
+      this.modePreferences.set(sessionId, prefs);
+      logger.debug({ sessionId, effort }, 'Stored effort preference for session creation');
       return;
     }
     await agent.setEffortLevel(effort);

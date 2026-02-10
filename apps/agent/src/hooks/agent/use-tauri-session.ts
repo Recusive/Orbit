@@ -3,7 +3,11 @@ import { createLogger } from '@orbit/common/lib';
 import type { SessionConfig } from '@/lib/api';
 
 import { agentCreateSession, agentGetStoredSession, getWorkspacePath } from '@/lib/api';
-import { useToolStore } from '@/stores/agent/tool-store';
+import {
+  ADAPTIVE_THINKING_DEFAULT_BUDGET,
+  isAdaptiveThinkingModel,
+  useToolStore,
+} from '@/stores/agent/tool-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('TauriSession');
@@ -71,10 +75,14 @@ export async function ensureSession(sessionId: string): Promise<void> {
   const toolState = useToolStore.getState();
   const inputMode = toolState.inputMode;
 
-  // Build config with optional cwd and current mode settings
+  // Build config with optional cwd and current mode settings.
+  // For adaptive thinking models (Opus 4.6), always enable thinking with a default
+  // budget so thinking works on the first message before effort:set can update it.
+  const isAdaptive = isAdaptiveThinkingModel(toolState.model);
   const config: SessionConfig = {
     model: toolState.model,
-    thinkingEnabled: toolState.thinkingMode !== 'off',
+    thinkingEnabled: isAdaptive || toolState.thinkingMode !== 'off',
+    ...(isAdaptive ? { maxThinkingTokens: ADAPTIVE_THINKING_DEFAULT_BUDGET } : {}),
     acceptEnabled: inputMode === 'accept',
     planEnabled: inputMode === 'plan',
   };

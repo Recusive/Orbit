@@ -11,7 +11,7 @@ import type { EffortLevel, Model, ReactElementContext, ThinkingMode } from '@/ty
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { conversationAddMessage, conversationLoad } from '@/lib/api';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
-import { useToolStore } from '@/stores/agent/tool-store';
+import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
 import { useQueuedMessageStore } from '@/stores/chat/queued-message-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -408,15 +408,17 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       const { text, contextFiles, images, elements } = pendingMessage;
       setPendingMessage(null);
 
-      // Send current thinking mode and model to backend BEFORE the message
-      // This ensures the session is created with the correct settings
+      // Send current thinking mode and model to backend BEFORE the message.
+      // Skip thinking:set for adaptive thinking models (Opus 4.6) — effort controls thinking.
       const toolState = useToolStore.getState();
-      postMessage({
-        type: 'thinking:set',
-        uuid: crypto.randomUUID(),
-        session_id: sessionId,
-        mode: toolState.thinkingMode,
-      });
+      if (!isAdaptiveThinkingModel(toolState.model)) {
+        postMessage({
+          type: 'thinking:set',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+          mode: toolState.thinkingMode,
+        });
+      }
       postMessage({
         type: 'model:set',
         uuid: crypto.randomUUID(),

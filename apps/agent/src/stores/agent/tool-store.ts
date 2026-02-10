@@ -57,6 +57,22 @@ const TRIM_BUFFER = 50;
 const MAX_CACHED_SESSIONS = 10;
 
 /**
+ * Default thinking budget for adaptive thinking models (Opus 4.6).
+ * Used at session creation to ensure thinking works on the first message,
+ * before effort:set can update it. Subsequent effort:set calls adjust
+ * the budget mid-session.
+ */
+export const ADAPTIVE_THINKING_DEFAULT_BUDGET = 32768;
+
+/**
+ * Opus 4.6 uses adaptive thinking (effort-based), not extended thinking (toggle-based).
+ * For adaptive models, thinking is always enabled via a budget — the effort level
+ * controls the budget size. The thinking toggle UI is hidden and `thinking:set`
+ * messages are skipped to prevent racing with effort:set.
+ */
+export const isAdaptiveThinkingModel = (model: Model): boolean => model === 'claude-opus-4-6';
+
+/**
  * Maximum size for toolInput values to persist (in characters).
  * Larger values are truncated to prevent localStorage bloat and
  * avoid persisting potentially sensitive data like file contents.

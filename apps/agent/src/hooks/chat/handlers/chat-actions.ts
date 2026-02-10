@@ -11,7 +11,7 @@ import type {
 
 import { conversationAddMessage } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
-import { useToolStore } from '@/stores/agent/tool-store';
+import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -181,14 +181,18 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         }
 
         // Always send current thinking mode and model BEFORE message:send
-        // This ensures the session uses the correct settings
+        // This ensures the session uses the correct settings.
+        // Skip thinking:set for adaptive thinking models (Opus 4.6) — effort controls thinking.
+        // Sending thinking:set with mode 'off' would race with effort:set and disable thinking.
         const toolState = useToolStore.getState();
-        postMessage({
-          type: 'thinking:set',
-          uuid: crypto.randomUUID(),
-          session_id: sessionId,
-          mode: toolState.thinkingMode,
-        });
+        if (!isAdaptiveThinkingModel(toolState.model)) {
+          postMessage({
+            type: 'thinking:set',
+            uuid: crypto.randomUUID(),
+            session_id: sessionId,
+            mode: toolState.thinkingMode,
+          });
+        }
         postMessage({
           type: 'model:set',
           uuid: crypto.randomUUID(),
@@ -544,7 +548,9 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
   const handleThinkingModeChange = (mode: ThinkingMode): void => {
     setThinkingMode(mode);
-    if (sessionId) {
+    // Skip thinking:set for adaptive thinking models — effort controls thinking.
+    // The UI already hides the toggle for Opus 4.6, but guard here for safety.
+    if (sessionId && !isAdaptiveThinkingModel(useToolStore.getState().model)) {
       postMessage({
         type: 'thinking:set',
         uuid: crypto.randomUUID(),

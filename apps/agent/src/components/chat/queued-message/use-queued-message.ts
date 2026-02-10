@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
 import type { ReactElementContext, WebviewMessage } from '@/types/protocol';
 
-import { useToolStore } from '@/stores/agent/tool-store';
+import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
 import { useQueuedMessageStore, useQueuedMessage } from '@/stores/chat/queued-message-store';
 
 interface UseQueuedMessageOptions {
@@ -38,14 +38,17 @@ export function useQueuedMessageHandler(options: UseQueuedMessageOptions): UseQu
       const { text, contextFiles, images, elements } = queuedMessage;
       clearQueue();
 
-      // Send thinking mode and model settings
+      // Send thinking mode and model settings.
+      // Skip thinking:set for adaptive thinking models (Opus 4.6) — effort controls thinking.
       const toolState = useToolStore.getState();
-      postMessage({
-        type: 'thinking:set',
-        uuid: crypto.randomUUID(),
-        session_id: sessionId,
-        mode: toolState.thinkingMode,
-      });
+      if (!isAdaptiveThinkingModel(toolState.model)) {
+        postMessage({
+          type: 'thinking:set',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+          mode: toolState.thinkingMode,
+        });
+      }
       postMessage({
         type: 'model:set',
         uuid: crypto.randomUUID(),

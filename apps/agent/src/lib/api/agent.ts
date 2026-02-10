@@ -14,7 +14,7 @@ export interface SessionConfig {
   cwd?: string;
   model?: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
   thinkingEnabled?: boolean;
-  thinkingTokens?: number;
+  maxThinkingTokens?: number;
   acceptEnabled?: boolean;
   planEnabled?: boolean;
   /** SDK session ID to resume from (for session continuity after app restart). */
