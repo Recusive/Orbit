@@ -29,7 +29,11 @@ export interface ChatInputProps {
   readonly maxTokens: number;
   /** Permission requests to render inside the input container */
   readonly permissions?: readonly PermissionRequest[];
-  readonly onPermissionApprove?: (requestId: string) => void;
+  readonly onPermissionApprove?: (
+    requestId: string,
+    always?: boolean,
+    answers?: Record<string, string>
+  ) => void;
   readonly onPermissionDeny?: (requestId: string) => void;
   readonly onSend: (
     text: string,

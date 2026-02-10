@@ -1055,7 +1055,17 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                   createdAt: m.createdAt,
                 };
                 if (m.isInterrupted === true) {
-                  return { ...base, isInterrupted: true as const };
+                  // Infer interruptReason for AskUserQuestion rejections.
+                  // When the user denies an AskUserQuestion permission, the SDK writes a
+                  // failed tool_use to JSONL. Detect this to restore the rejection indicator.
+                  const hasRejectedQuestion = m.toolUses.some(
+                    (t) => t.name.toLowerCase() === 'askuserquestion' && !t.success
+                  );
+                  return {
+                    ...base,
+                    isInterrupted: true as const,
+                    ...(hasRejectedQuestion ? { interruptReason: 'User rejected to answer' } : {}),
+                  };
                 }
                 return base;
               });
@@ -1152,6 +1162,23 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
                 const liveTrailingMessages =
                   liveStartIdx >= 0 ? cachedMessages.slice(liveStartIdx) : [];
                 newMessages = [...backendMessages, ...liveTrailingMessages];
+              }
+            }
+
+            // Enrich newMessages with client-side-only fields from cached messages.
+            // Fields like `interruptReason` only exist in React state (not persisted
+            // to JSONL) and would be lost when backend messages replace cached ones.
+            // Uses message ID matching (works because assistant IDs are SDK UUIDs and
+            // user IDs are reconciled via agent:checkpoint).
+            if (cachedMessages && cachedMessages.length > 0) {
+              const cachedById = new Map(cachedMessages.map((m) => [m.id, m]));
+              for (const msg of newMessages) {
+                if (msg.interruptReason === undefined) {
+                  const cached = cachedById.get(msg.id);
+                  if (cached?.interruptReason !== undefined) {
+                    msg.interruptReason = cached.interruptReason;
+                  }
+                }
               }
             }
 

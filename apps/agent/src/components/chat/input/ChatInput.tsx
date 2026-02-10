@@ -5,9 +5,10 @@
  * To change textarea sizes, chat max-width, or input box dimensions,
  * update CHAT_WIDTH, CHAT_WIDTH_VAR, and INPUT_SIZES in constants.ts.
  */
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useMemo } from 'react';
 
 import { InputControls } from './InputControls';
+import { AskUserQuestionModal } from './ask-user-question-modal';
 import { ContextChips } from './context-chips';
 import { MentionPopover } from './mention-popover';
 import { SlashCommandPopover } from './slash-command-popover';
@@ -20,6 +21,11 @@ import { ElementContextList } from '@/components/browser';
 import { PermissionModal } from '@/components/modals';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils';
 import { useModel } from '@/stores/agent/tool-store';
+
+/** Check if a permission request is for the AskUserQuestion tool */
+function isAskUserQuestion(toolName: string): boolean {
+  return toolName.toLowerCase() === 'askuserquestion';
+}
 
 export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   inputMode,
@@ -85,16 +91,35 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     onEffortChange,
   });
 
-  // Global keyboard shortcuts for permission modals
-  // Handled here to avoid conflicts when multiple permissions are pending
+  // Split permissions into AskUserQuestion vs regular tool permissions.
+  // AskUserQuestion gets its own interactive card; other tools use the compact modal.
+  const { askUserQuestions, regularPermissions } = useMemo(() => {
+    const ask: (typeof permissions)[number][] = [];
+    const regular: (typeof permissions)[number][] = [];
+    for (const p of permissions) {
+      if (isAskUserQuestion(p.toolName)) {
+        ask.push(p);
+      } else {
+        regular.push(p);
+      }
+    }
+    return { askUserQuestions: ask, regularPermissions: regular };
+  }, [permissions]);
+
+  // The active AskUserQuestion request (only one at a time — the first)
+  const activeAskQuestion = askUserQuestions[0];
+
+  // Global keyboard shortcuts for regular permission modals
+  // Handled here to avoid conflicts when multiple permissions are pending.
+  // AskUserQuestion handles its own keyboard shortcuts internally.
   useEffect(() => {
-    if (permissions.length === 0 || !onPermissionApprove || !onPermissionDeny) {
+    if (regularPermissions.length === 0 || !onPermissionApprove || !onPermissionDeny) {
       return;
     }
 
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.metaKey || e.ctrlKey) {
-        const firstPermission = permissions[0];
+        const firstPermission = regularPermissions[0];
         if (firstPermission === undefined) return;
 
         if (e.key === 'Enter') {
@@ -111,7 +136,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [permissions, onPermissionApprove, onPermissionDeny]);
+  }, [regularPermissions, onPermissionApprove, onPermissionDeny]);
 
   return (
     <div className="flex justify-center p-4 pt-0 shrink-0 relative">
@@ -119,100 +144,113 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
         className={getInputBoxClasses()}
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
-        {/* Permission Modals - rendered inside the bordered container
-            Using role="alert" because permissions require immediate user attention
-            (they block agent execution until approved/denied). The container announces
-            once when permissions appear; individual modals don't trigger announcements. */}
-        {permissions.length > 0 &&
+        {/* AskUserQuestion Modal — full overlay replacing the entire input box content */}
+        {activeAskQuestion !== undefined &&
         onPermissionApprove !== undefined &&
         onPermissionDeny !== undefined ? (
-          <div role="status" aria-live="polite">
-            {permissions.map((request, index) => (
-              <PermissionModal
-                key={request.requestId}
-                request={request}
-                onApprove={onPermissionApprove}
-                onDeny={onPermissionDeny}
-                isFirst={index === 0}
-                isLast={index === permissions.length - 1}
-              />
-            ))}
-          </div>
-        ) : null}
+          <AskUserQuestionModal
+            request={activeAskQuestion}
+            onApprove={onPermissionApprove}
+            onDeny={onPermissionDeny}
+          />
+        ) : (
+          <>
+            {/* Regular Permission Modals - rendered inside the bordered container
+                Using role="alert" because permissions require immediate user attention
+                (they block agent execution until approved/denied). The container announces
+                once when permissions appear; individual modals don't trigger announcements. */}
+            {regularPermissions.length > 0 &&
+            onPermissionApprove !== undefined &&
+            onPermissionDeny !== undefined ? (
+              <div role="status" aria-live="polite">
+                {regularPermissions.map((request, index) => (
+                  <PermissionModal
+                    key={request.requestId}
+                    request={request}
+                    onApprove={onPermissionApprove}
+                    onDeny={onPermissionDeny}
+                    isFirst={index === 0}
+                    isLast={index === regularPermissions.length - 1}
+                  />
+                ))}
+              </div>
+            ) : null}
 
-        {/* Element Context Chips - selected browser elements */}
-        <ElementContextList elements={elementContexts} onRemove={removeElementContext} />
+            {/* Element Context Chips - selected browser elements */}
+            <ElementContextList elements={elementContexts} onRemove={removeElementContext} />
 
-        {/* Context Chips Row - shown when items attached */}
-        {attachedContext.length > 0 ? (
-          <ContextChips items={attachedContext} onRemove={handleRemoveContext} />
-        ) : null}
+            {/* Context Chips Row - shown when items attached */}
+            {attachedContext.length > 0 ? (
+              <ContextChips items={attachedContext} onRemove={handleRemoveContext} />
+            ) : null}
 
-        {/* Input Area */}
-        <div
-          ref={inputRef}
-          className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden wrap-break-word"
-          style={{
-            minHeight: INPUT_SIZES.textareaMinHeight,
-            maxHeight: INPUT_SIZES.textareaMaxHeight,
-          }}
-          contentEditable
-          suppressContentEditableWarning
-          data-placeholder="Plan, @ for context, / for commands"
-          data-empty={isInputEmpty}
-          onInput={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-        />
+            {/* Input Area */}
+            <div
+              ref={inputRef}
+              className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden wrap-break-word"
+              style={{
+                minHeight: INPUT_SIZES.textareaMinHeight,
+                maxHeight: INPUT_SIZES.textareaMaxHeight,
+              }}
+              contentEditable
+              suppressContentEditableWarning
+              data-placeholder="Plan, @ for context, / for commands"
+              data-empty={isInputEmpty}
+              onInput={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+            />
 
-        {/* Mention Popover */}
-        <MentionPopover
-          open={popover.mentionOpen}
-          onOpenChange={popover.setMentionOpen}
-          query={popover.mentionQuery}
-          onQueryChange={popover.setMentionQuery}
-          onSelect={handleMentionSelect}
-          anchorRef={inputRef}
-        />
+            {/* Mention Popover */}
+            <MentionPopover
+              open={popover.mentionOpen}
+              onOpenChange={popover.setMentionOpen}
+              query={popover.mentionQuery}
+              onQueryChange={popover.setMentionQuery}
+              onSelect={handleMentionSelect}
+              anchorRef={inputRef}
+            />
 
-        {/* Slash Command Popover */}
-        <SlashCommandPopover
-          open={popover.slashOpen}
-          onOpenChange={popover.setSlashOpen}
-          query={popover.slashQuery}
-          onSelect={handleSlashSelect}
-          anchorRef={inputRef}
-          selectedIndex={popover.slashSelectedIndex}
-          commands={slashCommands}
-        />
+            {/* Slash Command Popover */}
+            <SlashCommandPopover
+              open={popover.slashOpen}
+              onOpenChange={popover.setSlashOpen}
+              query={popover.slashQuery}
+              onSelect={handleSlashSelect}
+              anchorRef={inputRef}
+              selectedIndex={popover.slashSelectedIndex}
+              commands={slashCommands}
+            />
 
-        {/* Controls Row */}
-        <InputControls
-          inputMode={inputMode}
-          model={model}
-          thinkingMode={thinkingMode}
-          effortLevel={effortLevel}
-          isAgentRunning={isAgentRunning}
-          isInputEmpty={isInputEmpty}
-          usage={usage}
-          maxTokens={maxTokens}
-          imageInputRef={imageInputRef}
-          thinkingHoverOpen={popover.thinkingHoverOpen}
-          setThinkingHoverOpen={popover.setThinkingHoverOpen}
-          effortHoverOpen={popover.effortHoverOpen}
-          setEffortHoverOpen={popover.setEffortHoverOpen}
-          onModelChange={onModelChange}
-          cycleInputMode={cycleInputMode}
-          cycleThinkingMode={cycleThinkingMode}
-          cycleEffortLevel={cycleEffortLevel}
-          handleImageClick={handleImageClick}
-          handleImageSelect={handleImageSelect}
-          handleSend={handleSend}
-          handleStop={handleStop}
-          getThinkingInfo={getThinkingInfo}
-          getActiveDots={getActiveDots}
-          getEffortInfo={getEffortInfo}
-        />
+            {/* Controls Row */}
+            <InputControls
+              inputMode={inputMode}
+              model={model}
+              thinkingMode={thinkingMode}
+              effortLevel={effortLevel}
+              isAgentRunning={isAgentRunning}
+              isInputEmpty={isInputEmpty}
+              usage={usage}
+              maxTokens={maxTokens}
+              imageInputRef={imageInputRef}
+              thinkingHoverOpen={popover.thinkingHoverOpen}
+              setThinkingHoverOpen={popover.setThinkingHoverOpen}
+              effortHoverOpen={popover.effortHoverOpen}
+              setEffortHoverOpen={popover.setEffortHoverOpen}
+              onModelChange={onModelChange}
+              cycleInputMode={cycleInputMode}
+              cycleThinkingMode={cycleThinkingMode}
+              cycleEffortLevel={cycleEffortLevel}
+              handleImageClick={handleImageClick}
+              handleImageSelect={handleImageSelect}
+              handleSend={handleSend}
+              handleStop={handleStop}
+              getThinkingInfo={getThinkingInfo}
+              getActiveDots={getActiveDots}
+              getEffortInfo={getEffortInfo}
+            />
+          </>
+        )}
       </div>
     </div>
   );

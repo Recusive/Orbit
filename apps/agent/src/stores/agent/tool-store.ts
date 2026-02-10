@@ -290,6 +290,8 @@ export interface ToolState {
   addPermissionRequest: (request: PermissionRequest) => void;
   removePermissionRequest: (requestId: string) => void;
   clearPermissions: () => void;
+  /** Merge answers into the active AskUserQuestion tool's toolInput */
+  mergeToolInputAnswers: (toolName: string, answers: Record<string, string>) => void;
 
   // Usage tracking
   addUsage: (
@@ -492,6 +494,18 @@ export const useToolStore = create<ToolState>()(
         });
       },
 
+      mergeToolInputAnswers: (toolName: string, answers: Record<string, string>) => {
+        set((state) => {
+          // Find the active tool by name (there should only be one AskUserQuestion at a time)
+          const tool = Object.values(state.activeTools).find(
+            (t) => t.toolName.toLowerCase() === toolName.toLowerCase()
+          );
+          if (tool) {
+            tool.toolInput = { ...tool.toolInput, answers };
+          }
+        });
+      },
+
       addUsage: (
         messageId: string,
         usage: {
@@ -689,7 +703,23 @@ export const useToolStore = create<ToolState>()(
             };
 
             if (existingIdx >= 0) {
-              // Replace stale entry with correct messageId and contentOffset
+              // Replace stale entry with correct messageId and contentOffset.
+              // Preserve client-side-only fields (e.g., answers merged by
+              // mergeToolInputAnswers for AskUserQuestion) that don't exist
+              // in JSONL. Without this, switching conversations wipes answers.
+              const existing = state.completedTools[existingIdx];
+              if (existing) {
+                const existingAnswers = existing.toolInput['answers'];
+                if (
+                  existingAnswers !== undefined &&
+                  toolExecution.toolInput['answers'] === undefined
+                ) {
+                  toolExecution.toolInput = {
+                    ...toolExecution.toolInput,
+                    answers: existingAnswers,
+                  };
+                }
+              }
               state.completedTools[existingIdx] = toolExecution;
             } else {
               state.completedTools.push(toolExecution);

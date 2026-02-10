@@ -66,6 +66,12 @@ export interface ChatMessage {
    * - undefined for legacy messages without this field
    */
   parentUuid?: string | null | undefined;
+  /**
+   * Reason the message was interrupted. When set, the interrupt indicator
+   * shows this text instead of the default feedback prompt.
+   * e.g. "User rejected to answer" for dismissed AskUserQuestion.
+   */
+  interruptReason?: string | undefined;
 }
 
 export interface MessageItemProps {

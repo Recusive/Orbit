@@ -1,3 +1,4 @@
+export { AskUserQuestionWidget } from './ask-user-question-widget';
 export { BashToolWidget } from './bash-tool-widget';
 export { BrowserToolWidget } from './browser-tool-widget';
 export { EditToolWidget } from './edit-tool-widget';

@@ -71,7 +71,11 @@ interface ChatActionsReturn {
   ) => void;
   handleStop: () => void;
   handleRewind: (messageId: string) => void;
-  handlePermissionApprove: (requestId: string, always?: boolean) => void;
+  handlePermissionApprove: (
+    requestId: string,
+    always?: boolean,
+    answers?: Record<string, string>
+  ) => void;
   handlePermissionDeny: (requestId: string) => void;
   handleOpenFile: (path: string) => void;
   handleOpenUrl: (url: string) => void;
@@ -420,8 +424,17 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     );
   };
 
-  const handlePermissionApprove = (requestId: string, always?: boolean): void => {
+  const handlePermissionApprove = (
+    requestId: string,
+    always?: boolean,
+    answers?: Record<string, string>
+  ): void => {
     if (!sessionId) return;
+
+    // For AskUserQuestion: merge answers into the tool's toolInput so the widget can display them
+    if (answers !== undefined) {
+      useToolStore.getState().mergeToolInputAnswers('askuserquestion', answers);
+    }
 
     postMessage({
       type: 'permission:response',
@@ -430,12 +443,20 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
       request_id: requestId,
       decision: 'approve',
       always,
+      answers,
     });
     removePermissionRequest(requestId);
   };
 
   const handlePermissionDeny = (requestId: string): void => {
     if (!sessionId) return;
+
+    // Check if this is an AskUserQuestion rejection (before clearing permissions)
+    const deniedRequest = useToolStore
+      .getState()
+      .pendingPermissions.find((p) => p.requestId === requestId);
+    const isQuestionRejection = deniedRequest?.toolName.toLowerCase() === 'askuserquestion';
+    const interruptReason = isQuestionRejection ? 'User rejected to answer' : undefined;
 
     // Send denial response to the SDK
     postMessage({
@@ -465,7 +486,12 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     setMessages((prev) => {
       const lastMsg = prev[prev.length - 1];
       if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-        const interruptedMsg = { ...lastMsg, isStreaming: false, isInterrupted: true };
+        const interruptedMsg = {
+          ...lastMsg,
+          isStreaming: false,
+          isInterrupted: true,
+          interruptReason,
+        };
 
         // Persist interrupted assistant message to backend (if it has content)
         if (interruptedMsg.content) {
@@ -502,6 +528,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
             displayedContent: '',
             isStreaming: false,
             isInterrupted: true,
+            interruptReason,
             parentUuid,
           },
         ];

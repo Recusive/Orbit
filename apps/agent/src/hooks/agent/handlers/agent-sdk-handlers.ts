@@ -100,7 +100,12 @@ export async function handlePermissionResponse(
   message: Extract<WebviewMessage, { type: 'permission:response' }>
 ): Promise<void> {
   try {
-    await agentRespondPermission(message.request_id, message.decision, message.always ?? false);
+    await agentRespondPermission(
+      message.request_id,
+      message.decision,
+      message.always ?? false,
+      message.answers
+    );
   } catch (err: unknown) {
     logger.error('Permission response error', err);
   }

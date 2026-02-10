@@ -197,6 +197,7 @@ const _CHAT_MESSAGE_KEYS_CHECK: Record<keyof ChatMessage, true> = {
   attachedFiles: true,
   attachedImages: true,
   parentUuid: true,
+  interruptReason: true,
 };
 // Prevent unused variable warning while keeping type check
 void _CHAT_MESSAGE_KEYS_CHECK;
@@ -234,6 +235,7 @@ export function arePropsEqual(prev: MessageItemProps, next: MessageItemProps): b
   // Compare thinkingBlocks by reference (replaced on every batch update)
   if (pm.thinkingBlocks !== nm.thinkingBlocks) return false;
   if (pm.parentUuid !== nm.parentUuid) return false;
+  if (pm.interruptReason !== nm.interruptReason) return false;
 
   // Compare array fields with shallow equality
   if (!arraysEqual(pm.attachedFiles, nm.attachedFiles)) return false;

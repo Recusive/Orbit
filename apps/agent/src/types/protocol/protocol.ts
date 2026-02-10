@@ -541,6 +541,8 @@ export const PermissionResponseSchema = z
     request_id: z.string(),
     decision: z.enum(['approve', 'deny']),
     always: z.boolean().optional(),
+    /** For AskUserQuestion tool — user's selected answers keyed by question text */
+    answers: z.record(z.string(), z.string()).optional(),
   })
   .strict();
 

@@ -5,6 +5,7 @@
  * the necessary props from the tool input/output.
  */
 import {
+  AskUserQuestionWidget,
   BashToolWidget,
   BrowserToolWidget,
   EditToolWidget,
@@ -194,6 +195,28 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
           success={statusProps.success}
         />
       );
+
+    case 'askuserquestion': {
+      const questionsInput = tool.toolInput['questions'];
+      const rawQuestions = Array.isArray(questionsInput)
+        ? (questionsInput as Record<string, unknown>[])
+        : [];
+      // answers are merged into toolInput at permission-approve time by mergeToolInputAnswers
+      const rawAnswers = tool.toolInput['answers'];
+      const answers =
+        typeof rawAnswers === 'object' && rawAnswers !== null && !Array.isArray(rawAnswers)
+          ? (rawAnswers as Record<string, string>)
+          : undefined;
+      return (
+        <AskUserQuestionWidget
+          questions={rawQuestions}
+          answers={answers}
+          isRunning={statusProps.isRunning}
+          success={statusProps.success}
+          output={statusProps.output}
+        />
+      );
+    }
 
     case 'exitplanmode':
       // ExitPlanMode is handled by the permission modal in ChatInput

@@ -55,7 +55,11 @@ export interface ChatContentProps {
   readonly onThinkingModeChange: (mode: ThinkingMode) => void;
   readonly onEffortLevelChange: (level: EffortLevel) => void;
   readonly onModelChange: (model: Model) => void;
-  readonly onPermissionApprove: (requestId: string) => void;
+  readonly onPermissionApprove: (
+    requestId: string,
+    always?: boolean,
+    answers?: Record<string, string>
+  ) => void;
   readonly onPermissionDeny: (requestId: string) => void;
 }
 

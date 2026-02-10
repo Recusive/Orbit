@@ -152,6 +152,19 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   // both fields are always equal. Streaming state is the authoritative signal.
   const isComplete = !message.isStreaming;
 
+  // Derive interrupt state from tools at render time.
+  // This survives chat switches because tools are restored from ToolStore session cache,
+  // unlike message.isInterrupted/interruptReason which are client-only React state lost
+  // when conversation:loaded rebuilds messages from JSONL (Rust only sets isInterrupted
+  // for stop_reason=="max_tokens", not for permission denials).
+  const rejectedQuestion = tools.find(
+    (t) => t.toolName.toLowerCase() === 'askuserquestion' && t.success === false
+  );
+  const showInterrupted = message.isInterrupted === true || rejectedQuestion !== undefined;
+  const interruptReason =
+    message.interruptReason ??
+    (rejectedQuestion !== undefined ? 'User rejected to answer' : undefined);
+
   // Use displayedContent directly - backend batching (50ms) provides smooth streaming
   // Note: JS animation hooks cause flash when combined with auto-scroll during streaming
   const animatedContent = message.displayedContent;
@@ -333,8 +346,12 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
             />
           ) : null}
 
-          {/* Interrupt indicator - shown when message was interrupted */}
-          {message.isInterrupted ? <InterruptIndicator onFeedback={onFeedback} /> : null}
+          {/* Interrupt indicator - shown when message was interrupted or question rejected */}
+          {showInterrupted ? (
+            <div className="mt-2">
+              <InterruptIndicator onFeedback={onFeedback} reason={interruptReason} />
+            </div>
+          ) : null}
         </div>
       )}
     </div>
