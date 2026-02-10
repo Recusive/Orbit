@@ -6,6 +6,8 @@
 import { ModelSchema, CommandScopeSchema, DecisionSchema } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
+import type { CanvasEdge, CanvasNode } from '../canvas/types/types.js';
+
 // Re-export shared schemas
 export {
   ModelSchema,
@@ -458,8 +460,13 @@ export type CanvasSessionConfig = z.infer<typeof CanvasSessionConfigSchema>;
 
 export const CanvasStateSchema = z
   .object({
-    nodes: z.array(z.any()),
-    edges: z.array(z.any()),
+    // ReactFlow nodes/edges — validated with z.custom to ensure each element is
+    // a non-null object while preserving CanvasNode/CanvasEdge TypeScript types.
+    // Full type definitions live in canvas/types/types.ts; the protocol layer
+    // does loose boundary validation without coupling to ReactFlow internals.
+    // (Code review: Opus cycle 3, issue #9)
+    nodes: z.array(z.custom<CanvasNode>((val) => typeof val === 'object' && val !== null)),
+    edges: z.array(z.custom<CanvasEdge>((val) => typeof val === 'object' && val !== null)),
     selectedNodeId: z.string().nullable().optional(),
     selectedNodeType: z.enum(['sandpack', 'page']).optional(),
   })

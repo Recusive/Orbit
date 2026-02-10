@@ -4,11 +4,6 @@
 //! Note: CLI detection removed - bundled app has its own claude binary.
 //! Note: Keychain reading is handled by agent-bridge TypeScript code.
 
-#![allow(
-    clippy::needless_pass_by_value,
-    reason = "Tauri commands receive owned types from JSON deserialization"
-)]
-
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};

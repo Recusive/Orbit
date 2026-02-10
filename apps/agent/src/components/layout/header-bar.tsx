@@ -118,74 +118,10 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
       )}
       style={{ height: HEIGHTS.headerBar }}
     >
-      {/* Navigation arrows */}
+      {/* Navigation arrows — hidden until handlers are implemented
+       * (Code review: Opus cycle 3, issue #18) */}
       <div className="flex items-center gap-0.5">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              data-tauri-drag-region={false}
-              aria-label="Go back"
-              className={cn(
-                'h-6 w-6 flex items-center justify-center rounded-md',
-                'text-sidebar-foreground hover:text-foreground',
-                'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.95]',
-                'transition-[color,background-color,transform] duration-150'
-              )}
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M10 6L4 12L10 18"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M5 12H20"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Go back</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              data-tauri-drag-region={false}
-              aria-label="Go forward"
-              className={cn(
-                'h-6 w-6 flex items-center justify-center rounded-md',
-                'text-sidebar-foreground hover:text-foreground',
-                'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.95]',
-                'transition-[color,background-color,transform] duration-150'
-              )}
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M14 6L20 12L14 18"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M19 12H4"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Go forward</TooltipContent>
-        </Tooltip>
+        {/* Spacer to maintain layout — buttons will go here when navigation is wired up */}
       </div>
 
       {/* Center tabs - only show when workspace is open */}

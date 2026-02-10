@@ -658,7 +658,8 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         hasContentSinceLastThinking.current.delete(message.message_id);
 
         setMessages((prev) => {
-          const lastMsg = prev[prev.length - 1];
+          const lastIdx = prev.length - 1;
+          const lastMsg = lastIdx >= 0 ? prev[lastIdx] : undefined;
           // Only update if still streaming (not already interrupted)
           if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
             // Finalize the last thinking block's duration if the agent was still thinking at completion
@@ -990,12 +991,20 @@ export function createMessageHandler(deps: MessageHandlerDeps): MessageHandlerRe
         // between now and when setTimeout fires, the epoch will have advanced and
         // we must skip this stale load to avoid overwriting rewound messages.
         const epochAtLoad = rewindEpoch;
+        const targetSessionId = message.session_id;
         setTimeout(() => {
           // A rewind happened while this callback was deferred — the conversation:rewound
           // handler already set the correct messages. Processing this stale load would
           // overwrite them with the pre-rewind conversation, causing all original messages
           // to reappear (the corruption pattern the user reported).
           if (epochAtLoad !== rewindEpoch) {
+            return;
+          }
+          // A newer conversation:loaded already ran — the user switched sessions again
+          // between when this was deferred and when it fires. Applying this stale load
+          // would overwrite the newer session's messages.
+          // (Code review: Opus cycle 3, issue #4)
+          if (sessionIdRef.current !== targetSessionId) {
             return;
           }
           startTransition(() => {

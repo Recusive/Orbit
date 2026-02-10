@@ -208,7 +208,10 @@ export function getLanguageFromPath(path: string): string {
 function isPathExternal(filePath: string): boolean {
   const workspacePath = useUIStore.getState().workspacePath;
   if (!workspacePath) return false;
-  return !filePath.startsWith(workspacePath);
+  // Append trailing / to prevent false matches: /project-backup matching workspace /project
+  // (Code review: Opus cycle 3, issue #27)
+  const wsPrefix = workspacePath.endsWith('/') ? workspacePath : `${workspacePath}/`;
+  return !filePath.startsWith(wsPrefix) && filePath !== workspacePath;
 }
 
 export const useFileViewerStore = create<FileViewerStore>()(

@@ -229,10 +229,17 @@ export async function handleConversationRewind(
             : undefined;
 
         const frontendTarget = current_messages?.find((m) => m.id === message_id);
+        // Content validation: strict equality for user messages (always complete),
+        // prefix match for assistant messages (may be interrupted mid-stream,
+        // so persisted content can be shorter than frontend content).
+        // (Code review: Opus cycle 3, issue #5)
         const contentMatches =
           positionCandidate !== undefined &&
           positionCandidate.role === frontendTarget?.role &&
-          positionCandidate.content === frontendTarget.content;
+          (positionCandidate.role === 'user'
+            ? positionCandidate.content === frontendTarget.content
+            : positionCandidate.content.startsWith(frontendTarget.content.slice(0, 200)) ||
+              frontendTarget.content.startsWith(positionCandidate.content.slice(0, 200)));
 
         if (positionCandidate && contentMatches) {
           targetMessage = positionCandidate;

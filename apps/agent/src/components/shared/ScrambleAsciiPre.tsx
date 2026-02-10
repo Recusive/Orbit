@@ -25,13 +25,20 @@ const SCRAMBLE_CHARS =
 /** Base ms between ticks — actual interval eases out */
 const BASE_TICK_MS = 14;
 
-/** Evaluate once — static for the session lifetime. */
-const PREFERS_REDUCED_MOTION =
-  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** Check reduced motion preference at call time (respects runtime changes).
+ * (Code review: Opus cycle 3, issue #16) */
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
 
-/** True when the device supports real hover (not touch tap-hover). */
-const SUPPORTS_HOVER =
-  typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+/** Check hover capability at call time (respects runtime changes). */
+function supportsHover(): boolean {
+  return (
+    typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  );
+}
 
 function randomChar(): string {
   return SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)] ?? '?';
@@ -84,7 +91,7 @@ export const ScrambleAsciiPre: FC<ScrambleAsciiPreProps> = ({ text, ariaLabel, c
 
   const handleMouseEnter = useCallback((): void => {
     // Skip animation for reduced-motion or touch devices
-    if (PREFERS_REDUCED_MOTION || !SUPPORTS_HOVER) return;
+    if (prefersReducedMotion() || !supportsHover()) return;
 
     hoveringRef.current = true;
     stop();

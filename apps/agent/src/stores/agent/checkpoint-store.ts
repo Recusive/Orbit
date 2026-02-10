@@ -493,6 +493,9 @@ export const useCheckpointStore = create<CheckpointState>()(
         state.pendingConversationForks = Object.fromEntries(
           Object.entries(state.pendingConversationForks).filter(([key]) => key !== sessionId)
         );
+        state.pendingMessagesQueue = Object.fromEntries(
+          Object.entries(state.pendingMessagesQueue).filter(([key]) => key !== sessionId)
+        );
         if (state.pendingMessageForTurnEnd?.sessionId === sessionId) {
           state.pendingMessageForTurnEnd = null;
         }
@@ -513,6 +516,7 @@ export const useCheckpointStore = create<CheckpointState>()(
         state.latestCheckpoints = {};
         state.rewindForkPoints = {};
         state.pendingConversationForks = {};
+        state.pendingMessagesQueue = {};
         state.pendingMessageForTurnEnd = null;
         state.currentTurnStartCheckpoint = null;
         state.currentUserMessageId = null;
