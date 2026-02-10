@@ -161,6 +161,18 @@ pub async fn agent_get_thinking_mode(
     state.get_thinking_mode(&session_id).map_err(to_error)
 }
 
+/// Set effort level for a session (Opus 4.6 adaptive thinking)
+#[tauri::command]
+pub async fn agent_set_effort_level(
+    session_id: String,
+    effort: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<()> {
+    state
+        .set_effort_level(&session_id, &effort)
+        .map_err(to_error)
+}
+
 /// Set model for a session
 #[tauri::command]
 pub async fn agent_set_model(

@@ -1,8 +1,9 @@
 import { IconImagine } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconImagine';
-import { AtSign, Globe, Settings2 } from 'lucide-react';
+import { Settings2 } from 'lucide-react';
 import { memo } from 'react';
 
 import type { MoreActionsMenuProps } from './types';
+import type { EffortLevel } from '@/types/protocol';
 import type { FC } from 'react';
 
 import {
@@ -14,7 +15,7 @@ import {
 import { cn, TRANSITION_CLASSES } from '@/lib/utils';
 
 /**
- * Collapsed menu for secondary input actions (@, Thinking, Globe).
+ * Collapsed menu for secondary input actions (Thinking/Effort).
  * Rendered when the input controls container is below the collapse breakpoint.
  *
  * Uses DropdownMenu (not Popover) for proper menu semantics:
@@ -23,13 +24,24 @@ import { cn, TRANSITION_CLASSES } from '@/lib/utils';
  * - Escape to close
  */
 export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActionsMenu({
-  handleAtClick,
+  model,
   cycleThinkingMode,
   thinkingMode,
   getThinkingInfo,
-  handleGlobeClick,
+  cycleEffortLevel,
+  effortLevel,
+  getEffortInfo,
 }) {
+  const isOpus46 = model === 'claude-opus-4-6';
   const thinkingInfo = getThinkingInfo();
+  const effortInfo = getEffortInfo();
+
+  const effortColorMap: Record<EffortLevel, string> = {
+    low: 'var(--info)',
+    medium: 'var(--success)',
+    high: 'var(--warning)',
+    max: 'var(--destructive)',
+  };
 
   return (
     <DropdownMenu>
@@ -49,26 +61,42 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem onClick={handleAtClick}>
-          <AtSign className="mr-2 h-4 w-4" />
-          Add context
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={cycleThinkingMode}>
-          <IconImagine size={16} className={cn('mr-2', thinkingMode !== 'off' && 'text-primary')} />
-          <span className="flex-1">Thinking</span>
-          <span className="text-xs text-muted-foreground">{thinkingInfo.level}</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => handleGlobeClick?.()}
-          disabled={handleGlobeClick === undefined}
-          className={cn(handleGlobeClick === undefined && 'opacity-50 cursor-not-allowed')}
-        >
-          <Globe className="mr-2 h-4 w-4" />
-          Web browser
-          {handleGlobeClick === undefined && (
-            <span className="ml-auto text-xs text-muted-foreground">Soon</span>
-          )}
-        </DropdownMenuItem>
+        {isOpus46 ? (
+          <DropdownMenuItem onClick={cycleEffortLevel}>
+            <svg width="16" height="16" viewBox="0 0 16 16" className="mr-2" aria-hidden="true">
+              <line
+                x1="0"
+                y1="8"
+                x2="16"
+                y2="8"
+                stroke="var(--gray-8)"
+                strokeWidth="0.5"
+                opacity="0.3"
+              />
+              <path
+                d="M 1 8 L 4.5 8 L 5.5 6.5 L 6.5 2.5 L 7.5 11 L 8 8 L 9 7 L 9.5 8 L 15 8"
+                fill="none"
+                stroke={effortColorMap[effortLevel]}
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="flex-1">Effort</span>
+            <span className="text-xs" style={{ color: effortColorMap[effortLevel] }}>
+              {effortInfo.level}
+            </span>
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem onClick={cycleThinkingMode}>
+            <IconImagine
+              size={16}
+              className={cn('mr-2', thinkingMode !== 'off' && 'text-primary')}
+            />
+            <span className="flex-1">Thinking</span>
+            <span className="text-xs text-muted-foreground">{thinkingInfo.level}</span>
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -80,6 +80,7 @@ export const EditorChatPanel: FC = () => {
     handleModeChange,
     handleThinkingModeChange,
     handleModelChange,
+    handleEffortLevelChange,
   } = useChatMessages();
 
   // Track content ref for layout stabilization
@@ -116,6 +117,7 @@ export const EditorChatPanel: FC = () => {
   const inputProps = {
     inputMode,
     thinkingMode,
+    effortLevel: 'high' as const,
     isAgentRunning,
     usage: sessionUsage,
     maxTokens,
@@ -124,6 +126,7 @@ export const EditorChatPanel: FC = () => {
     onStop: handleStop,
     onModeChange: handleModeChange,
     onThinkingModeChange: handleThinkingModeChange,
+    onEffortChange: handleEffortLevelChange,
     onModelChange: handleModelChange,
   } as const;
 

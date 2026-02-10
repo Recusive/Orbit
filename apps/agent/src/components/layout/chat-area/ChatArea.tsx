@@ -29,6 +29,7 @@ import {
   usePendingPermissions,
   useInputMode,
   useThinkingMode,
+  useEffortLevel,
   useSessionUsage,
   useMaxTokens,
 } from '@/stores/agent/tool-store';
@@ -66,6 +67,7 @@ export const ChatArea: FC = () => {
   const isTransitioning = useIsConversationTransitioning();
   const inputMode = useInputMode();
   const thinkingMode = useThinkingMode();
+  const effortLevel = useEffortLevel();
   const pendingPermissions = usePendingPermissions();
   const sessionUsage = useSessionUsage();
   const maxTokens = useMaxTokens();
@@ -85,6 +87,7 @@ export const ChatArea: FC = () => {
     handleOpenUrl,
     handleModeChange,
     handleThinkingModeChange,
+    handleEffortLevelChange,
     handleModelChange,
   } = useChatMessages();
 
@@ -248,6 +251,7 @@ export const ChatArea: FC = () => {
       pendingPermissions={pendingPermissions}
       inputMode={inputMode}
       thinkingMode={thinkingMode}
+      effortLevel={effortLevel}
       sessionUsage={sessionUsage}
       maxTokens={maxTokens}
       onSend={handleSend}
@@ -259,6 +263,7 @@ export const ChatArea: FC = () => {
       onFeedback={handleFeedback}
       onModeChange={handleModeChange}
       onThinkingModeChange={handleThinkingModeChange}
+      onEffortLevelChange={handleEffortLevelChange}
       onModelChange={handleModelChange}
       onPermissionApprove={handlePermissionApprove}
       onPermissionDeny={handlePermissionDeny}

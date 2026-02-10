@@ -26,6 +26,7 @@ export {
   useToolStore,
   useInputMode,
   useThinkingMode,
+  useEffortLevel,
   useModel,
   useActiveTools,
   useCompletedTools,

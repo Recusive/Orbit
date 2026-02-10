@@ -1735,6 +1735,24 @@ export class SessionManager extends Disposable {
   }
 
   /**
+   * Set effort level for a session (adaptive thinking for Opus 4.6)
+   */
+  async setEffortLevel(
+    sessionId: string,
+    effort: 'low' | 'medium' | 'high' | 'max'
+  ): Promise<void> {
+    const agent = this.activeSessions.get(sessionId);
+    if (!agent) {
+      logger.debug(
+        { sessionId, effort },
+        'Session not found for setEffortLevel, storing preference'
+      );
+      return;
+    }
+    await agent.setEffortLevel(effort);
+  }
+
+  /**
    * Get thinking mode for a session
    */
   getThinkingMode(sessionId: string): boolean {

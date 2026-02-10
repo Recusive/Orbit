@@ -1,7 +1,13 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { THINKING_MODE_DOTS, THINKING_MODE_INFO, THINKING_MODES } from './constants';
+import {
+  EFFORT_LEVEL_INFO,
+  EFFORT_LEVELS,
+  THINKING_MODE_DOTS,
+  THINKING_MODE_INFO,
+  THINKING_MODES,
+} from './constants';
 import { getFilteredCommandsCount, getCommandAtIndex } from './slash-command-popover';
 import { usePopoverNavigation, handlePopoverKeyDown } from './use-popover-navigation';
 
@@ -21,11 +27,13 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const {
     inputMode,
     thinkingMode,
+    effortLevel,
     isAgentRunning,
     onSend,
     onStop,
     onModeChange,
     onThinkingModeChange,
+    onEffortChange,
   } = options;
 
   // Core input state
@@ -279,25 +287,6 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     onStop();
   }, [onStop]);
 
-  // @ button click handler
-  const handleAtClick = useCallback((): void => {
-    if (inputRef.current) {
-      const text = inputRef.current.textContent || '';
-      inputRef.current.textContent = text + '@';
-      setInputText(text + '@');
-      popover.setMentionOpen(true);
-      popover.setMentionQuery('');
-      inputRef.current.focus();
-      // Move cursor to end
-      const range = document.createRange();
-      const sel = window.getSelection();
-      range.selectNodeContents(inputRef.current);
-      range.collapse(false);
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-    }
-  }, [popover]);
-
   // Keyboard handler
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent): void => {
@@ -377,6 +366,13 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     onThinkingModeChange(nextMode);
   }, [thinkingMode, onThinkingModeChange]);
 
+  const cycleEffortLevel = useCallback((): void => {
+    const currentIndex = EFFORT_LEVELS.indexOf(effortLevel);
+    const nextIndex = (currentIndex + 1) % EFFORT_LEVELS.length;
+    const nextLevel = EFFORT_LEVELS[nextIndex] ?? 'high';
+    onEffortChange(nextLevel);
+  }, [effortLevel, onEffortChange]);
+
   // Utility functions
   const getThinkingInfo = useCallback(() => {
     return THINKING_MODE_INFO[thinkingMode];
@@ -385,6 +381,10 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const getActiveDots = useCallback(() => {
     return THINKING_MODE_DOTS[thinkingMode];
   }, [thinkingMode]);
+
+  const getEffortInfo = useCallback(() => {
+    return EFFORT_LEVEL_INFO[effortLevel];
+  }, [effortLevel]);
 
   const getInputBoxClasses = useCallback((): string => {
     const base = cn(
@@ -425,13 +425,14 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     handleMentionSelect,
     handleSlashSelect,
     handleRemoveContext,
-    handleAtClick,
     handleStop,
     cycleInputMode,
     cycleThinkingMode,
+    cycleEffortLevel,
     // Utilities
     getThinkingInfo,
     getActiveDots,
+    getEffortInfo,
     getInputBoxClasses,
     // Browser context
     elementContexts,

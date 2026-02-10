@@ -2,7 +2,13 @@ import type { ImageAttachment } from '@/components/chat/input/types';
 import type { ChatMessage } from '@/components/chat/messages';
 import type { PermissionRequest, UsageData } from '@/stores/agent/tool-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
-import type { InputMode, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
+import type {
+  EffortLevel,
+  InputMode,
+  Model,
+  ReactElementContext,
+  ThinkingMode,
+} from '@/types/protocol';
 
 /** Props for ChatContent component */
 export interface ChatContentProps {
@@ -26,6 +32,8 @@ export interface ChatContentProps {
   readonly inputMode: InputMode;
   /** Current thinking mode */
   readonly thinkingMode: ThinkingMode;
+  /** Current effort level (Opus 4.6 adaptive thinking) */
+  readonly effortLevel: EffortLevel;
   /** Session token usage */
   readonly sessionUsage: UsageData;
   /** Max tokens limit */
@@ -45,6 +53,7 @@ export interface ChatContentProps {
   readonly onFeedback: () => void;
   readonly onModeChange: (mode: InputMode) => void;
   readonly onThinkingModeChange: (mode: ThinkingMode) => void;
+  readonly onEffortLevelChange: (level: EffortLevel) => void;
   readonly onModelChange: (model: Model) => void;
   readonly onPermissionApprove: (requestId: string) => void;
   readonly onPermissionDeny: (requestId: string) => void;

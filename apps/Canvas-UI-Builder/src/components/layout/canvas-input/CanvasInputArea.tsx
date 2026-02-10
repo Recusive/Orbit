@@ -6,7 +6,7 @@
  */
 import { useCallback, useState } from 'react';
 
-import type { InputMode, Model, ThinkingMode } from '@/types/protocol';
+import type { EffortLevel, InputMode, Model, ThinkingMode } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { ChatInput } from '@/components/chat/input';
@@ -42,6 +42,11 @@ export const CanvasInputArea: FC = () => {
   }, []);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleEffortChange = useCallback((_effort: EffortLevel): void => {
+    // Effort changes are handled by the backend - no local state needed
+  }, []);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleModelChange = useCallback((_model: Model): void => {
     // Model changes are handled by the backend - no local state needed
   }, []);
@@ -50,6 +55,7 @@ export const CanvasInputArea: FC = () => {
     <ChatInput
       inputMode={inputMode}
       thinkingMode={thinkingMode}
+      effortLevel="high"
       isAgentRunning={isAgentRunning}
       usage={{ inputTokens: 0, outputTokens: 0 }}
       maxTokens={200000}
@@ -57,6 +63,7 @@ export const CanvasInputArea: FC = () => {
       onStop={handleStop}
       onModeChange={handleModeChange}
       onThinkingModeChange={handleThinkingModeChange}
+      onEffortChange={handleEffortChange}
       onModelChange={handleModelChange}
     />
   );

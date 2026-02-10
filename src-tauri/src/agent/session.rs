@@ -266,6 +266,20 @@ impl SessionManager {
         Self::check_response_bool(response)
     }
 
+    /// Set effort level for a session (Opus 4.6 adaptive thinking)
+    pub fn set_effort_level(&self, session_id: &str, effort: &str) -> Result<()> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::SetEffortLevel {
+            session_id: session_id.to_owned(),
+            effort: effort.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response(response)
+    }
+
     /// Set model for a session
     pub fn set_model(&self, session_id: &str, model: Model) -> Result<()> {
         self.ensure_running()?;

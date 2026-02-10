@@ -5,7 +5,7 @@
  * MoreActionsMenu component.
  *
  * When container width falls below INPUT_CONTROLS.collapseBreakpoint (520px):
- * - Secondary buttons (@, Thinking, Globe) collapse into dropdown
+ * - Thinking/Effort button collapses into dropdown
  * - Image button stays visible
  * - MoreActionsMenu triggers the same handlers as expanded mode
  *
@@ -43,11 +43,13 @@ function TestWrapper({ children }: { readonly children: ReactNode }): ReactNode 
  */
 function createMenuProps(overrides: Partial<MoreActionsMenuProps> = {}): MoreActionsMenuProps {
   return {
-    handleAtClick: vi.fn(),
+    model: 'sonnet',
     cycleThinkingMode: vi.fn(),
     thinkingMode: 'off',
     getThinkingInfo: () => ({ level: 'Off', tokens: '0' }),
-    handleGlobeClick: vi.fn(),
+    cycleEffortLevel: vi.fn(),
+    effortLevel: 'high',
+    getEffortInfo: () => ({ level: 'High', description: 'Thorough analysis' }),
     ...overrides,
   };
 }
@@ -65,11 +67,10 @@ describe('MoreActionsMenu', () => {
       expect(trigger).toBeInTheDocument();
     });
 
-    it('should render the ellipsis icon in trigger', () => {
+    it('should render the icon in trigger', () => {
       render(<MoreActionsMenu {...createMenuProps()} />, { wrapper: TestWrapper });
 
       const trigger = screen.getByRole('button', { name: 'More actions' });
-      // The MoreHorizontal icon should be present as an SVG with aria-hidden
       const icon = trigger.querySelector('svg');
       expect(icon).toBeInTheDocument();
       expect(icon).toHaveAttribute('aria-hidden', 'true');
@@ -79,7 +80,7 @@ describe('MoreActionsMenu', () => {
       render(<MoreActionsMenu {...createMenuProps()} />, { wrapper: TestWrapper });
 
       // Menu items should not be visible until dropdown is opened
-      expect(screen.queryByRole('menuitem', { name: /Add context/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
     });
   });
 
@@ -93,39 +94,8 @@ describe('MoreActionsMenu', () => {
 
       // Menu items should now be visible
       await waitFor(() => {
-        expect(screen.getByRole('menuitem', { name: /Add context/i })).toBeInTheDocument();
-      });
-    });
-
-    it('should show all three menu items when opened', async () => {
-      const user = userEvent.setup();
-      render(<MoreActionsMenu {...createMenuProps()} />, { wrapper: TestWrapper });
-
-      const trigger = screen.getByRole('button', { name: 'More actions' });
-      await user.click(trigger);
-
-      await waitFor(() => {
-        expect(screen.getByRole('menuitem', { name: /Add context/i })).toBeInTheDocument();
         expect(screen.getByRole('menuitem', { name: /Thinking/i })).toBeInTheDocument();
-        expect(screen.getByRole('menuitem', { name: /Web browser/i })).toBeInTheDocument();
       });
-    });
-
-    it('should call handleAtClick when "Add context" is clicked', async () => {
-      const handleAtClick = vi.fn();
-      const user = userEvent.setup();
-
-      render(<MoreActionsMenu {...createMenuProps({ handleAtClick })} />, { wrapper: TestWrapper });
-
-      // Open dropdown
-      const trigger = screen.getByRole('button', { name: 'More actions' });
-      await user.click(trigger);
-
-      // Click "Add context" menu item
-      const addContextItem = await screen.findByRole('menuitem', { name: /Add context/i });
-      await user.click(addContextItem);
-
-      expect(handleAtClick).toHaveBeenCalledTimes(1);
     });
 
     it('should call cycleThinkingMode when "Thinking" is clicked', async () => {
@@ -147,23 +117,37 @@ describe('MoreActionsMenu', () => {
       expect(cycleThinkingMode).toHaveBeenCalledTimes(1);
     });
 
-    it('should call handleGlobeClick when "Web browser" is clicked', async () => {
-      const handleGlobeClick = vi.fn();
+    it('should show effort item instead of thinking for Opus 4.6', async () => {
       const user = userEvent.setup();
-
-      render(<MoreActionsMenu {...createMenuProps({ handleGlobeClick })} />, {
+      render(<MoreActionsMenu {...createMenuProps({ model: 'claude-opus-4-6' })} />, {
         wrapper: TestWrapper,
       });
 
-      // Open dropdown
       const trigger = screen.getByRole('button', { name: 'More actions' });
       await user.click(trigger);
 
-      // Click "Web browser" menu item
-      const browserItem = await screen.findByRole('menuitem', { name: /Web browser/i });
-      await user.click(browserItem);
+      await waitFor(() => {
+        expect(screen.getByRole('menuitem', { name: /Effort/i })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('menuitem', { name: /Thinking/i })).not.toBeInTheDocument();
+    });
 
-      expect(handleGlobeClick).toHaveBeenCalledTimes(1);
+    it('should call cycleEffortLevel when "Effort" is clicked', async () => {
+      const cycleEffortLevel = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <MoreActionsMenu {...createMenuProps({ model: 'claude-opus-4-6', cycleEffortLevel })} />,
+        { wrapper: TestWrapper }
+      );
+
+      const trigger = screen.getByRole('button', { name: 'More actions' });
+      await user.click(trigger);
+
+      const effortItem = await screen.findByRole('menuitem', { name: /Effort/i });
+      await user.click(effortItem);
+
+      expect(cycleEffortLevel).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -217,98 +201,6 @@ describe('MoreActionsMenu', () => {
     });
   });
 
-  describe('globe button disabled state', () => {
-    it('should disable globe item when handleGlobeClick is undefined', async () => {
-      const user = userEvent.setup();
-      render(<MoreActionsMenu {...createMenuProps({ handleGlobeClick: undefined })} />, {
-        wrapper: TestWrapper,
-      });
-
-      const trigger = screen.getByRole('button', { name: 'More actions' });
-      await user.click(trigger);
-
-      const browserItem = await screen.findByRole('menuitem', { name: /Web browser/i });
-      expect(browserItem).toHaveAttribute('data-disabled');
-    });
-
-    it('should show "Soon" label when globe is disabled', async () => {
-      const user = userEvent.setup();
-      render(<MoreActionsMenu {...createMenuProps({ handleGlobeClick: undefined })} />, {
-        wrapper: TestWrapper,
-      });
-
-      const trigger = screen.getByRole('button', { name: 'More actions' });
-      await user.click(trigger);
-
-      await waitFor(() => {
-        expect(screen.getByText('Soon')).toBeInTheDocument();
-      });
-    });
-
-    it('should have reduced opacity when globe is disabled', async () => {
-      const user = userEvent.setup();
-      render(<MoreActionsMenu {...createMenuProps({ handleGlobeClick: undefined })} />, {
-        wrapper: TestWrapper,
-      });
-
-      const trigger = screen.getByRole('button', { name: 'More actions' });
-      await user.click(trigger);
-
-      const browserItem = await screen.findByRole('menuitem', { name: /Web browser/i });
-      expect(browserItem).toHaveClass('opacity-50');
-      expect(browserItem).toHaveClass('cursor-not-allowed');
-    });
-
-    it('should not call handler when disabled globe is clicked', async () => {
-      const handleGlobeClick = vi.fn();
-      const user = userEvent.setup();
-
-      // First, verify it gets called when defined
-      const { rerender } = render(<MoreActionsMenu {...createMenuProps({ handleGlobeClick })} />, {
-        wrapper: TestWrapper,
-      });
-
-      let trigger = screen.getByRole('button', { name: 'More actions' });
-      await user.click(trigger);
-
-      let browserItem = await screen.findByRole('menuitem', { name: /Web browser/i });
-      await user.click(browserItem);
-      expect(handleGlobeClick).toHaveBeenCalledTimes(1);
-
-      // Now test with undefined handler
-      handleGlobeClick.mockClear();
-      rerender(
-        <TestWrapper>
-          <MoreActionsMenu {...createMenuProps({ handleGlobeClick: undefined })} />
-        </TestWrapper>
-      );
-
-      trigger = screen.getByRole('button', { name: 'More actions' });
-      await user.click(trigger);
-
-      browserItem = await screen.findByRole('menuitem', { name: /Web browser/i });
-      await user.click(browserItem);
-
-      // Handler should not be called (it's undefined)
-      expect(handleGlobeClick).not.toHaveBeenCalled();
-    });
-
-    it('should not show "Soon" label when globe is enabled', async () => {
-      const user = userEvent.setup();
-      render(<MoreActionsMenu {...createMenuProps({ handleGlobeClick: vi.fn() })} />, {
-        wrapper: TestWrapper,
-      });
-
-      const trigger = screen.getByRole('button', { name: 'More actions' });
-      await user.click(trigger);
-
-      await waitFor(() => {
-        expect(screen.getByRole('menuitem', { name: /Web browser/i })).toBeInTheDocument();
-      });
-      expect(screen.queryByText('Soon')).not.toBeInTheDocument();
-    });
-  });
-
   describe('accessibility', () => {
     it('should have proper ARIA attributes on trigger', () => {
       render(<MoreActionsMenu {...createMenuProps()} />, { wrapper: TestWrapper });
@@ -358,33 +250,6 @@ describe('MoreActionsMenu', () => {
 // =============================================================================
 
 describe('MoreActionsMenu Edge Cases', () => {
-  it('should handle rapid clicks on menu items without errors', async () => {
-    const handleAtClick = vi.fn();
-    const cycleThinkingMode = vi.fn();
-    const user = userEvent.setup();
-
-    render(<MoreActionsMenu {...createMenuProps({ handleAtClick, cycleThinkingMode })} />, {
-      wrapper: TestWrapper,
-    });
-
-    // Open dropdown
-    const trigger = screen.getByRole('button', { name: 'More actions' });
-    await user.click(trigger);
-
-    // Click multiple menu items quickly
-    const addContextItem = await screen.findByRole('menuitem', { name: /Add context/i });
-    await user.click(addContextItem);
-
-    // Dropdown closes after click, so we need to reopen
-    await user.click(trigger);
-
-    const thinkingItem = await screen.findByRole('menuitem', { name: /Thinking/i });
-    await user.click(thinkingItem);
-
-    expect(handleAtClick).toHaveBeenCalledTimes(1);
-    expect(cycleThinkingMode).toHaveBeenCalledTimes(1);
-  });
-
   it('should work with all thinking modes', async () => {
     const user = userEvent.setup();
 

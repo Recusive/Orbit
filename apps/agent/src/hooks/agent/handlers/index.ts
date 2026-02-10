@@ -3,6 +3,7 @@ import {
   handleAgentStop,
   handlePermissionResponse,
   handleThinkingSet,
+  handleEffortLevelSet,
   handleModelSet,
   handleInputModeSet,
 } from './agent-sdk-handlers';
@@ -159,6 +160,12 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
   // Handle thinking mode change
   if (message.type === 'thinking:set') {
     await handleThinkingSet(message);
+    return;
+  }
+
+  // Handle effort level change (Opus 4.6 adaptive thinking)
+  if (message.type === 'effort:set') {
+    await handleEffortLevelSet(message);
     return;
   }
 

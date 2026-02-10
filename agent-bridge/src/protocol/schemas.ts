@@ -221,6 +221,15 @@ export const GetThinkingModeRequestSchema = z
   .strict();
 export type GetThinkingModeRequest = z.infer<typeof GetThinkingModeRequestSchema>;
 
+export const SetEffortLevelRequestSchema = z
+  .object({
+    type: z.literal('set_effort_level'),
+    sessionId: z.string(),
+    effort: z.enum(['low', 'medium', 'high', 'max']),
+  })
+  .strict();
+export type SetEffortLevelRequest = z.infer<typeof SetEffortLevelRequestSchema>;
+
 export const SetModelRequestSchema = z
   .object({
     type: z.literal('set_model'),
@@ -555,6 +564,7 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   PermissionResponseRequestSchema,
   SetThinkingModeRequestSchema,
   GetThinkingModeRequestSchema,
+  SetEffortLevelRequestSchema,
   SetModelRequestSchema,
   SetPlanModeRequestSchema,
   GetPlanModeRequestSchema,

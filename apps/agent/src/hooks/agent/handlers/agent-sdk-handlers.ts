@@ -12,6 +12,7 @@ import {
   agentInterrupt,
   agentRespondPermission,
   agentSetThinkingMode,
+  agentSetEffortLevel,
   agentSetModel,
   agentSetPlanMode,
   agentSetAcceptMode,
@@ -121,6 +122,16 @@ export async function handleThinkingSet(
     await agentSetThinkingMode(message.session_id, enabled, maxTokens);
   } catch (err: unknown) {
     logger.error('Set thinking mode error', err);
+  }
+}
+
+export async function handleEffortLevelSet(
+  message: Extract<WebviewMessage, { type: 'effort:set' }>
+): Promise<void> {
+  try {
+    await agentSetEffortLevel(message.session_id, message.effort);
+  } catch (err: unknown) {
+    logger.error('Set effort level error', err);
   }
 }
 

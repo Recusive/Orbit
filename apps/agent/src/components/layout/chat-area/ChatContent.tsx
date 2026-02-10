@@ -27,6 +27,7 @@ export const ChatContent: FC<ChatContentProps> = ({
   pendingPermissions,
   inputMode,
   thinkingMode,
+  effortLevel,
   sessionUsage,
   maxTokens,
   onSend,
@@ -38,6 +39,7 @@ export const ChatContent: FC<ChatContentProps> = ({
   onFeedback,
   onModeChange,
   onThinkingModeChange,
+  onEffortLevelChange,
   onModelChange,
   onPermissionApprove,
   onPermissionDeny,
@@ -49,6 +51,7 @@ export const ChatContent: FC<ChatContentProps> = ({
   const inputProps = {
     inputMode,
     thinkingMode,
+    effortLevel,
     isAgentRunning,
     usage: sessionUsage,
     maxTokens,
@@ -59,6 +62,7 @@ export const ChatContent: FC<ChatContentProps> = ({
     onStop,
     onModeChange,
     onThinkingModeChange,
+    onEffortChange: onEffortLevelChange,
     onModelChange,
   } as const;
 

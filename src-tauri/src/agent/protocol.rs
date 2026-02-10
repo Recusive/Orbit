@@ -323,6 +323,11 @@ pub enum BridgeRequest {
         #[serde(rename = "sessionId")]
         session_id: String,
     },
+    SetEffortLevel {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        effort: String,
+    },
     SetModel {
         #[serde(rename = "sessionId")]
         session_id: String,

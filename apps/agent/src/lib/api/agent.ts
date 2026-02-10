@@ -251,6 +251,13 @@ export async function agentGetAcceptMode(sessionId: string): Promise<boolean> {
   return invoke<boolean>('agent_get_accept_mode', { sessionId });
 }
 
+export async function agentSetEffortLevel(
+  sessionId: string,
+  effort: 'low' | 'medium' | 'high' | 'max'
+): Promise<void> {
+  return invoke('agent_set_effort_level', { sessionId, effort });
+}
+
 // ============================================
 // Agent Event Listeners
 // ============================================

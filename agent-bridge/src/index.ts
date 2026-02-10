@@ -440,6 +440,12 @@ async function handleRequest(
       break;
     }
 
+    case 'set_effort_level': {
+      await sessionManager.setEffortLevel(request.sessionId, request.effort);
+      sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
     case 'get_thinking_mode': {
       const enabled = sessionManager.getThinkingMode(request.sessionId);
       sendResponse({ type: 'boolean', requestType: request.type, value: enabled });

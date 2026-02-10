@@ -1,6 +1,7 @@
-import { ArrowUp, AtSign, Globe, Image, Square } from 'lucide-react';
+import { ArrowUp, Image, Square } from 'lucide-react';
 import { memo, useEffect, useRef } from 'react';
 
+import { EffortLevelButton } from './EffortLevelButton';
 import { MoreActionsMenu } from './MoreActionsMenu';
 import { ThinkingModeButton } from './ThinkingModeButton';
 import { INPUT_MODE_LABELS } from './constants';
@@ -24,7 +25,9 @@ import { cn, INPUT_CONTROLS, TRANSITION_CLASSES } from '@/lib/utils';
 
 export const InputControls: FC<InputControlsProps> = memo(function InputControls({
   inputMode,
+  model,
   thinkingMode,
+  effortLevel,
   isAgentRunning,
   isInputEmpty,
   usage,
@@ -32,18 +35,21 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   imageInputRef,
   thinkingHoverOpen,
   setThinkingHoverOpen,
+  effortHoverOpen,
+  setEffortHoverOpen,
   onModelChange,
   cycleInputMode,
   cycleThinkingMode,
-  handleAtClick,
-  handleGlobeClick,
+  cycleEffortLevel,
   handleImageClick,
   handleImageSelect,
   handleSend,
   handleStop,
   getThinkingInfo,
   getActiveDots,
+  getEffortInfo,
 }) {
+  const isOpus46 = model === 'claude-opus-4-6';
   const containerRef = useRef<HTMLDivElement>(null);
   const width = useContainerWidth(containerRef);
 
@@ -51,13 +57,14 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   const hasMeasured = width > 0;
   const isCompact = hasMeasured && width < INPUT_CONTROLS.collapseBreakpoint;
 
-  // Reset thinking hover state when switching to compact mode
+  // Reset hover states when switching to compact mode
   // Prevents stuck hover card if it was open during resize
   useEffect(() => {
     if (isCompact) {
       setThinkingHoverOpen(false);
+      setEffortHoverOpen(false);
     }
-  }, [isCompact, setThinkingHoverOpen]);
+  }, [isCompact, setThinkingHoverOpen, setEffortHoverOpen]);
 
   return (
     <div ref={containerRef} className="flex w-full items-center justify-between gap-1 px-1 pb-1">
@@ -92,16 +99,18 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
       {/* Right Controls - Action Buttons */}
       <div className="flex items-center gap-0.5">
         {isCompact ? (
-          // Compact mode: @, Thinking, Globe collapsed into dropdown; Image stays visible
+          // Compact mode: Thinking/Effort collapsed into dropdown; Image stays visible
           // Order: Menu → Image → Context → Send
           <>
-            {/* More Actions Dropdown - contains @, Thinking, Globe */}
+            {/* More Actions Dropdown - contains Thinking/Effort */}
             <MoreActionsMenu
-              handleAtClick={handleAtClick}
+              model={model}
               cycleThinkingMode={cycleThinkingMode}
               thinkingMode={thinkingMode}
               getThinkingInfo={getThinkingInfo}
-              handleGlobeClick={handleGlobeClick}
+              cycleEffortLevel={cycleEffortLevel}
+              effortLevel={effortLevel}
+              getEffortInfo={getEffortInfo}
             />
 
             {/* Image Button - stays visible in compact mode */}
@@ -128,61 +137,25 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
         ) : (
           // Expanded mode: all buttons inline
           <>
-            {/* @ Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleAtClick}
-                  aria-label="Add context"
-                  className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-lg',
-                    'bg-transparent text-muted-foreground/70',
-                    TRANSITION_CLASSES.button,
-                    'hover:bg-accent hover:text-foreground hover:scale-[1.08]',
-                    'active:scale-95',
-                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
-                  )}
-                >
-                  <AtSign className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Add context (@)</TooltipContent>
-            </Tooltip>
-
-            {/* Thinking Mode Button */}
-            <ThinkingModeButton
-              thinkingMode={thinkingMode}
-              thinkingHoverOpen={thinkingHoverOpen}
-              setThinkingHoverOpen={setThinkingHoverOpen}
-              cycleThinkingMode={cycleThinkingMode}
-              getThinkingInfo={getThinkingInfo}
-              getActiveDots={getActiveDots}
-            />
-
-            {/* Globe Button - opens browser panel (disabled when not available) */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => handleGlobeClick?.()}
-                  disabled={handleGlobeClick === undefined}
-                  aria-label="Open web browser"
-                  className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-lg',
-                    'bg-transparent text-muted-foreground/70',
-                    TRANSITION_CLASSES.button,
-                    handleGlobeClick === undefined
-                      ? 'opacity-50 cursor-not-allowed'
-                      : 'hover:bg-accent hover:text-foreground hover:scale-[1.08] active:scale-95',
-                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
-                  )}
-                >
-                  <Globe className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {handleGlobeClick === undefined ? 'Web browser (not available)' : 'Web browser'}
-              </TooltipContent>
-            </Tooltip>
+            {/* Thinking Mode / Effort Level Button — conditional on model */}
+            {isOpus46 ? (
+              <EffortLevelButton
+                effortLevel={effortLevel}
+                effortHoverOpen={effortHoverOpen}
+                setEffortHoverOpen={setEffortHoverOpen}
+                cycleEffortLevel={cycleEffortLevel}
+                getEffortInfo={getEffortInfo}
+              />
+            ) : (
+              <ThinkingModeButton
+                thinkingMode={thinkingMode}
+                thinkingHoverOpen={thinkingHoverOpen}
+                setThinkingHoverOpen={setThinkingHoverOpen}
+                cycleThinkingMode={cycleThinkingMode}
+                getThinkingInfo={getThinkingInfo}
+                getActiveDots={getActiveDots}
+              />
+            )}
 
             {/* Image Button */}
             <Tooltip>

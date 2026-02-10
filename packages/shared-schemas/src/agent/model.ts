@@ -21,6 +21,17 @@ export const ThinkingModeSchema = z.enum(['off', 'think', 'hard', 'ultra']);
 export type ThinkingMode = z.infer<typeof ThinkingModeSchema>;
 
 /**
+ * Effort level for Claude Opus 4.6 adaptive thinking
+ * Controls how much reasoning effort the model applies.
+ * - low: Fast & efficient (minimal thinking)
+ * - medium: Balanced (moderate thinking)
+ * - high: Deep reasoning (default for Opus 4.6)
+ * - max: Maximum capability (extensive thinking)
+ */
+export const EffortLevelSchema = z.enum(['low', 'medium', 'high', 'max']);
+export type EffortLevel = z.infer<typeof EffortLevelSchema>;
+
+/**
  * Input mode for agent behavior
  * - default: Ask for permission before actions
  * - accept: Auto-approve actions

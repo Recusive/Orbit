@@ -7,10 +7,10 @@
  * NOTE: Dropdown width comes from @/lib/utils/constants.
  * To change dropdown dimensions, update CHAT_WIDTH.dropdown in constants.ts.
  */
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Info } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { SiClaude, SiOpenai } from 'react-icons/si';
+import { SiClaude } from 'react-icons/si';
 
 import type { Model } from '@/types/protocol';
 import type { FC } from 'react';
@@ -32,27 +32,18 @@ const ClaudeIcon: FC<{ className?: string }> = ({ className }) => (
   />
 );
 
-const OpenAIIcon: FC<{ className?: string }> = ({ className }) => (
-  <SiOpenai
-    className={cn(
-      'w-3 h-3 opacity-70 group-hover:opacity-100 transition-opacity duration-150',
-      className
-    )}
-  />
-);
-
 interface ModelOption {
   id: string;
   name: string;
   icon: FC<{ className?: string }>;
   badge?: string;
-  /** When true, the option is shown but not selectable (coming soon placeholder) */
-  disabled?: boolean;
 }
 
 interface ModelGroup {
   label: string;
   models: ModelOption[];
+  /** When set, renders an info box instead of model buttons */
+  comingSoon?: boolean;
 }
 
 const MODEL_GROUPS: ModelGroup[] = [
@@ -62,28 +53,13 @@ const MODEL_GROUPS: ModelGroup[] = [
       { id: 'haiku', name: 'Haiku 4.5', icon: ClaudeIcon },
       { id: 'sonnet', name: 'Sonnet 4.5', icon: ClaudeIcon },
       { id: 'opus', name: 'Opus 4.5', icon: ClaudeIcon },
-      { id: 'claude-opus-4-6', name: 'Opus 4.6', icon: ClaudeIcon },
+      { id: 'claude-opus-4-6', name: 'Opus 4.6', icon: ClaudeIcon, badge: 'New' },
     ],
   },
   {
     label: 'Codex',
-    models: [
-      {
-        id: 'gpt5-nano',
-        name: 'GPT-5 Nano',
-        icon: OpenAIIcon,
-        badge: 'Coming soon',
-        disabled: true,
-      },
-      {
-        id: 'gpt5-mini',
-        name: 'GPT-5 Mini',
-        icon: OpenAIIcon,
-        badge: 'Coming soon',
-        disabled: true,
-      },
-      { id: 'gpt5', name: 'GPT-5', icon: OpenAIIcon, badge: 'Coming soon', disabled: true },
-    ],
+    models: [],
+    comingSoon: true,
   },
 ];
 
@@ -245,8 +221,6 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   );
 
   const handleSelectModel = (model: ModelOption): void => {
-    // Disabled models (coming soon) don't close the menu or change selection
-    if (model.disabled === true) return;
     // Only allow valid Model values
     if (
       model.id === 'haiku' ||
@@ -341,41 +315,51 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
             <div className="px-2 py-1.5 text-xs font-medium text-gray-10 uppercase tracking-wider">
               {group.label}
             </div>
-            {group.models.map((model) => (
-              <button
-                key={model.id}
-                onClick={() => {
-                  handleSelectModel(model);
-                }}
-                disabled={model.disabled === true}
-                title={model.disabled === true ? 'Coming soon' : undefined}
-                className={cn(
-                  'w-full flex items-center justify-between px-2 py-1.5 text-xs',
-                  TRANSITION_CLASSES.item,
-                  'mt-0.5 first:mt-0 group',
-                  model.disabled === true
-                    ? 'opacity-40 cursor-not-allowed'
-                    : selectedModel === model.id
+            {group.comingSoon === true ? (
+              <div className="mx-1.5 mt-0.5 mb-2 flex items-center gap-2 rounded-md bg-gray-3 px-2.5 py-2">
+                <Info className="h-3.5 w-3.5 shrink-0 text-gray-9" />
+                <span className="text-xs text-gray-10">Coming Soon</span>
+              </div>
+            ) : (
+              group.models.map((model) => (
+                <button
+                  key={model.id}
+                  onClick={() => {
+                    handleSelectModel(model);
+                  }}
+                  className={cn(
+                    'w-full flex items-center justify-between px-2 py-1.5 text-xs',
+                    TRANSITION_CLASSES.item,
+                    'mt-0.5 first:mt-0 group',
+                    selectedModel === model.id
                       ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
                       : 'rounded-md hover:bg-gray-4 active:scale-[0.98]'
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <model.icon className={selectedModel === model.id ? 'opacity-100' : ''} />
-                  <span>{model.name}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  {model.badge ? (
-                    <span className="text-[9px] font-medium text-gray-10 bg-gray-4 px-1.5 py-0.5 rounded-full">
-                      {model.badge}
-                    </span>
-                  ) : null}
-                  {selectedModel === model.id ? (
-                    <Check className="h-3.5 w-3.5 text-primary/80" />
-                  ) : null}
-                </div>
-              </button>
-            ))}
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <model.icon className={selectedModel === model.id ? 'opacity-100' : ''} />
+                    <span>{model.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {model.badge ? (
+                      <span
+                        className={cn(
+                          'text-[9px] font-medium px-1.5 py-0.5 rounded-full',
+                          model.badge === 'New'
+                            ? 'text-primary bg-primary/15'
+                            : 'text-gray-10 bg-gray-4'
+                        )}
+                      >
+                        {model.badge}
+                      </span>
+                    ) : null}
+                    {selectedModel === model.id ? (
+                      <Check className="h-3.5 w-3.5 text-primary/80" />
+                    ) : null}
+                  </div>
+                </button>
+              ))
+            )}
           </div>
         ))}
       </div>

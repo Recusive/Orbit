@@ -9,9 +9,11 @@
 export {
   ModelSchema,
   ThinkingModeSchema,
+  EffortLevelSchema,
   InputModeSchema,
   type Model,
   type ThinkingMode,
+  type EffortLevel,
   type InputMode,
 } from './agent/model';
 

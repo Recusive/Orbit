@@ -1,6 +1,7 @@
 import {
   ModelSchema,
   ThinkingModeSchema,
+  EffortLevelSchema,
   InputModeSchema,
   CommandScopeSchema,
   ShellTypeSchema,
@@ -11,11 +12,13 @@ import { z } from 'zod';
 export {
   ModelSchema,
   ThinkingModeSchema,
+  EffortLevelSchema,
   InputModeSchema,
   CommandScopeSchema,
   ShellTypeSchema,
   type Model,
   type ThinkingMode,
+  type EffortLevel,
   type InputMode,
   type CommandScope,
   type ShellType,
@@ -561,6 +564,16 @@ export const SetThinkingModeSchema = z
   })
   .strict();
 
+// Set effort level for Opus 4.6 adaptive thinking (webview → extension)
+export const SetEffortLevelSchema = z
+  .object({
+    type: z.literal('effort:set'),
+    uuid: UUIDSchema,
+    session_id: SessionIdSchema,
+    effort: EffortLevelSchema,
+  })
+  .strict();
+
 // Set model (webview → extension)
 export const SetModelSchema = z
   .object({
@@ -912,6 +925,8 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   SetInputModeSchema,
   // Thinking
   SetThinkingModeSchema,
+  // Effort (Opus 4.6 adaptive thinking)
+  SetEffortLevelSchema,
   // Model
   SetModelSchema,
   // Browser
@@ -1905,6 +1920,7 @@ export type WebviewReady = z.infer<typeof WebviewReadySchema>;
 export type PermissionResponse = z.infer<typeof PermissionResponseSchema>;
 export type SetInputMode = z.infer<typeof SetInputModeSchema>;
 export type SetThinkingMode = z.infer<typeof SetThinkingModeSchema>;
+export type SetEffortLevel = z.infer<typeof SetEffortLevelSchema>;
 export type SetModel = z.infer<typeof SetModelSchema>;
 // Note: Model type is exported from @orbit/shared-schemas at file top
 // Browser (Webview → Extension)

@@ -134,17 +134,15 @@ describe('ModelSelector Component', () => {
       expect(screen.getAllByText('Opus 4.6')).toHaveLength(1);
     });
 
-    it('should show Codex models with "Coming soon" badge', async () => {
+    it('should show Codex group with "Coming Soon" info box', async () => {
       const user = userEvent.setup();
       render(<ModelSelector />, { wrapper: TestWrapper });
 
       await user.click(screen.getByRole('button'));
 
-      // GPT-5 models should have badges
-      expect(screen.getByText('GPT-5 Nano')).toBeInTheDocument();
-      expect(screen.getByText('GPT-5 Mini')).toBeInTheDocument();
-      expect(screen.getByText('GPT-5')).toBeInTheDocument();
-      expect(screen.getAllByText('Coming soon')).toHaveLength(3);
+      // Codex heading and info box should be visible
+      expect(screen.getByText('Codex')).toBeInTheDocument();
+      expect(screen.getByText('Coming Soon')).toBeInTheDocument();
     });
 
     it('should close dropdown when clicking the button again', async () => {
@@ -213,7 +211,7 @@ describe('ModelSelector Component', () => {
       expect(onModelChange).toHaveBeenCalledWith('claude-opus-4-6');
     });
 
-    it('should NOT call onModelChange for GPT models (invalid)', async () => {
+    it('should NOT call onModelChange when clicking the Codex info box', async () => {
       const onModelChange = vi.fn();
       const user = userEvent.setup();
 
@@ -222,10 +220,10 @@ describe('ModelSelector Component', () => {
       // Open dropdown
       await user.click(screen.getByRole('button'));
 
-      // Try to select GPT-5 (should not trigger callback)
-      await user.click(screen.getByText('GPT-5'));
+      // Click the "Coming Soon" text (not a selectable model)
+      await user.click(screen.getByText('Coming Soon'));
 
-      // Callback should NOT be called for invalid models
+      // Callback should NOT be called
       expect(onModelChange).not.toHaveBeenCalled();
     });
 

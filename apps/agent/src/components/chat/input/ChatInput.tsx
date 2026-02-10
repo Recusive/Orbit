@@ -5,7 +5,7 @@
  * To change textarea sizes, chat max-width, or input box dimensions,
  * update CHAT_WIDTH, CHAT_WIDTH_VAR, and INPUT_SIZES in constants.ts.
  */
-import { memo, useCallback, useEffect } from 'react';
+import { memo, useEffect } from 'react';
 
 import { InputControls } from './InputControls';
 import { ContextChips } from './context-chips';
@@ -19,11 +19,12 @@ import type { FC } from 'react';
 import { ElementContextList } from '@/components/browser';
 import { PermissionModal } from '@/components/modals';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils';
-import { useUIStore } from '@/stores/ui/ui-store';
+import { useModel } from '@/stores/agent/tool-store';
 
 export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   inputMode,
   thinkingMode,
+  effortLevel,
   isAgentRunning,
   usage,
   maxTokens,
@@ -34,8 +35,12 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   onStop,
   onModeChange,
   onThinkingModeChange,
+  onEffortChange,
   onModelChange,
 }) {
+  // Read current model from store (used to conditionally render effort vs thinking UI)
+  const model = useModel();
+
   const {
     // State
     attachedContext,
@@ -56,13 +61,14 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     handleMentionSelect,
     handleSlashSelect,
     handleRemoveContext,
-    handleAtClick,
     handleStop,
     cycleInputMode,
     cycleThinkingMode,
+    cycleEffortLevel,
     // Utilities
     getThinkingInfo,
     getActiveDots,
+    getEffortInfo,
     getInputBoxClasses,
     // Browser context
     elementContexts,
@@ -70,20 +76,14 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   } = useChatInput({
     inputMode,
     thinkingMode,
+    effortLevel,
     isAgentRunning,
     onSend,
     onStop,
     onModeChange,
     onThinkingModeChange,
+    onEffortChange,
   });
-
-  // Get store action for opening browser panel
-  const setActivityTab = useUIStore((state) => state.setActivityTab);
-
-  // Handler to open browser panel
-  const handleGlobeClick = useCallback((): void => {
-    setActivityTab('browser');
-  }, [setActivityTab]);
 
   // Global keyboard shortcuts for permission modals
   // Handled here to avoid conflicts when multiple permissions are pending
@@ -189,7 +189,9 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
         {/* Controls Row */}
         <InputControls
           inputMode={inputMode}
+          model={model}
           thinkingMode={thinkingMode}
+          effortLevel={effortLevel}
           isAgentRunning={isAgentRunning}
           isInputEmpty={isInputEmpty}
           usage={usage}
@@ -197,17 +199,19 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
           imageInputRef={imageInputRef}
           thinkingHoverOpen={popover.thinkingHoverOpen}
           setThinkingHoverOpen={popover.setThinkingHoverOpen}
+          effortHoverOpen={popover.effortHoverOpen}
+          setEffortHoverOpen={popover.setEffortHoverOpen}
           onModelChange={onModelChange}
           cycleInputMode={cycleInputMode}
           cycleThinkingMode={cycleThinkingMode}
-          handleAtClick={handleAtClick}
-          handleGlobeClick={handleGlobeClick}
+          cycleEffortLevel={cycleEffortLevel}
           handleImageClick={handleImageClick}
           handleImageSelect={handleImageSelect}
           handleSend={handleSend}
           handleStop={handleStop}
           getThinkingInfo={getThinkingInfo}
           getActiveDots={getActiveDots}
+          getEffortInfo={getEffortInfo}
         />
       </div>
     </div>

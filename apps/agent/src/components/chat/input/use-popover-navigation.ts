@@ -20,6 +20,9 @@ export function usePopoverNavigation(): PopoverNavigationState {
   // Thinking mode hover state
   const [thinkingHoverOpen, setThinkingHoverOpen] = useState(false);
 
+  // Effort level hover state (Opus 4.6)
+  const [effortHoverOpen, setEffortHoverOpen] = useState(false);
+
   // Reset selection index when mention query changes
   useEffect(() => {
     setMentionSelectedIndex(0);
@@ -62,6 +65,9 @@ export function usePopoverNavigation(): PopoverNavigationState {
     // Thinking hover
     thinkingHoverOpen,
     setThinkingHoverOpen,
+    // Effort hover
+    effortHoverOpen,
+    setEffortHoverOpen,
     // Actions
     closeMentionPopover,
     closeSlashPopover,

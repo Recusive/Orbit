@@ -91,6 +91,15 @@ export interface GetThinkingModeRequest {
 }
 
 /**
+ * Set effort level (adaptive thinking for Opus 4.6)
+ */
+export interface SetEffortLevelRequest {
+  type: 'set_effort_level';
+  sessionId: string;
+  effort: 'low' | 'medium' | 'high' | 'max';
+}
+
+/**
  * Set model
  */
 export interface SetModelRequest {
@@ -402,6 +411,7 @@ export type BridgeRequest =
   | PermissionResponseRequest
   | SetThinkingModeRequest
   | GetThinkingModeRequest
+  | SetEffortLevelRequest
   | SetModelRequest
   | SetPlanModeRequest
   | GetPlanModeRequest

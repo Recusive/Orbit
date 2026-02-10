@@ -1,5 +1,5 @@
-import type { ThinkingModeInfo } from './types';
-import type { InputMode, ThinkingMode } from '@/types/protocol';
+import type { EffortLevelInfo, ThinkingModeInfo } from './types';
+import type { EffortLevel, InputMode, ThinkingMode } from '@/types/protocol';
 
 export const INPUT_MODE_LABELS: Record<InputMode, string> = {
   default: 'Default',
@@ -23,3 +23,17 @@ export const THINKING_MODE_DOTS: Record<ThinkingMode, number> = {
 
 // Thinking mode cycle order
 export const THINKING_MODES: readonly ThinkingMode[] = ['off', 'think', 'hard', 'ultra'] as const;
+
+// ─────────────────────────────────────────────────
+// Effort Level (Opus 4.6 adaptive thinking)
+// ─────────────────────────────────────────────────
+
+export const EFFORT_LEVEL_INFO: Record<EffortLevel, EffortLevelInfo> = {
+  low: { level: 'Low', description: 'Fast & efficient' },
+  medium: { level: 'Medium', description: 'Balanced' },
+  high: { level: 'High', description: 'Deep reasoning' },
+  max: { level: 'Max', description: 'Maximum capability' },
+};
+
+// Effort level cycle order
+export const EFFORT_LEVELS: readonly EffortLevel[] = ['low', 'medium', 'high', 'max'] as const;

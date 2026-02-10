@@ -1555,6 +1555,34 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     return this.currentQuery !== null;
   }
 
+  /**
+   * Set effort level for adaptive thinking (Opus 4.6).
+   * Maps effort levels to thinking token budgets via setMaxThinkingTokens.
+   */
+  async setEffortLevel(effort: 'low' | 'medium' | 'high' | 'max'): Promise<void> {
+    const budgetMap: Record<string, number> = {
+      low: 1024,
+      medium: 4096,
+      high: 10240,
+      max: 32768,
+    };
+
+    const budget = budgetMap[effort] ?? 4096;
+    this._thinkingMode = true;
+    this._thinkingBudget = budget;
+
+    if (this.currentQuery) {
+      const currentQuery = this.currentQuery;
+
+      await withRetry(async () => currentQuery.setMaxThinkingTokens(budget), {
+        ...RetryPresets.quick,
+        operationName: 'setEffortLevel',
+      });
+
+      logger.info({ effort, budget }, 'Effort level updated mid-session');
+    }
+  }
+
   async setThinkingMode(enabled: boolean, maxTokens?: number): Promise<void> {
     this._thinkingMode = enabled;
     if (maxTokens !== undefined) {

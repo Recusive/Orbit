@@ -1,7 +1,13 @@
 import * as Sentry from '@sentry/react';
 
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
-import type { Model, ReactElementContext, ThinkingMode, WebviewMessage } from '@/types/protocol';
+import type {
+  EffortLevel,
+  Model,
+  ReactElementContext,
+  ThinkingMode,
+  WebviewMessage,
+} from '@/types/protocol';
 
 import { conversationAddMessage } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
@@ -50,6 +56,7 @@ interface ChatActionsDeps {
   }) => void;
   setInputMode: (mode: 'default' | 'plan' | 'accept') => void;
   setThinkingMode: (mode: ThinkingMode) => void;
+  setEffortLevel: (level: EffortLevel) => void;
   setModel: (model: Model) => void;
   clearPermissions: () => void;
   removePermissionRequest: (requestId: string) => void;
@@ -70,6 +77,7 @@ interface ChatActionsReturn {
   handleOpenUrl: (url: string) => void;
   handleModeChange: (mode: 'default' | 'plan' | 'accept') => void;
   handleThinkingModeChange: (mode: ThinkingMode) => void;
+  handleEffortLevelChange: (level: EffortLevel) => void;
   handleModelChange: (model: Model) => void;
 }
 
@@ -92,6 +100,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     storeQueueMessage,
     setInputMode,
     setThinkingMode,
+    setEffortLevel,
     setModel,
     clearPermissions,
     removePermissionRequest,
@@ -185,6 +194,12 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           uuid: crypto.randomUUID(),
           session_id: sessionId,
           model: toolState.model,
+        });
+        postMessage({
+          type: 'effort:set',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+          effort: toolState.effortLevel,
         });
 
         // Get parentUuid for Claude Code-style rewind (linked list of messages)
@@ -539,6 +554,18 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     }
   };
 
+  const handleEffortLevelChange = (level: EffortLevel): void => {
+    setEffortLevel(level);
+    if (sessionId) {
+      postMessage({
+        type: 'effort:set',
+        uuid: crypto.randomUUID(),
+        session_id: sessionId,
+        effort: level,
+      });
+    }
+  };
+
   const handleModelChange = (model: Model): void => {
     setModel(model);
     if (sessionId) {
@@ -561,6 +588,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     handleOpenUrl,
     handleModeChange,
     handleThinkingModeChange,
+    handleEffortLevelChange,
     handleModelChange,
   };
 }

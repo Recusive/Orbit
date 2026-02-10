@@ -28,7 +28,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
-import type { InputMode, Model, ThinkingMode } from '@/types/protocol';
+import type { EffortLevel, InputMode, Model, ThinkingMode } from '@/types/protocol';
 
 const logger = createLogger('ToolStore');
 
@@ -227,6 +227,9 @@ export interface ToolState {
   // Thinking mode (off, think, hard, ultra)
   thinkingMode: ThinkingMode;
 
+  // Effort level for Opus 4.6 adaptive thinking (low, medium, high, max)
+  effortLevel: EffortLevel;
+
   // Model (haiku, sonnet, opus)
   model: Model;
 
@@ -254,6 +257,7 @@ export interface ToolState {
   // Actions
   setInputMode: (mode: InputMode) => void;
   setThinkingMode: (mode: ThinkingMode) => void;
+  setEffortLevel: (level: EffortLevel) => void;
   setModel: (model: Model) => void;
 
   // Tool lifecycle
@@ -362,6 +366,7 @@ export const useToolStore = create<ToolState>()(
     immer((set, get) => ({
       inputMode: 'default',
       thinkingMode: 'off',
+      effortLevel: 'high',
       model: 'sonnet',
       activeTools: {},
       completedTools: [],
@@ -380,6 +385,12 @@ export const useToolStore = create<ToolState>()(
       setThinkingMode: (mode: ThinkingMode) => {
         set((state) => {
           state.thinkingMode = mode;
+        });
+      },
+
+      setEffortLevel: (level: EffortLevel) => {
+        set((state) => {
+          state.effortLevel = level;
         });
       },
 
@@ -705,6 +716,7 @@ export const useToolStore = create<ToolState>()(
         set((state) => {
           state.inputMode = 'default';
           state.thinkingMode = 'off';
+          state.effortLevel = 'high';
           state.model = 'sonnet';
           state.activeTools = {};
           state.completedTools = [];
@@ -797,6 +809,7 @@ export const useToolStore = create<ToolState>()(
 // Selector hooks for common patterns
 export const useInputMode = (): InputMode => useToolStore((state) => state.inputMode);
 export const useThinkingMode = (): ThinkingMode => useToolStore((state) => state.thinkingMode);
+export const useEffortLevel = (): EffortLevel => useToolStore((state) => state.effortLevel);
 export const useModel = (): Model => useToolStore((state) => state.model);
 export const useActiveTools = (): Record<string, ToolExecution> =>
   useToolStore((state) => state.activeTools);

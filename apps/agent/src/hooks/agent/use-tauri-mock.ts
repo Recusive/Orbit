@@ -213,6 +213,7 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'permission:response':
     case 'inputMode:set':
     case 'thinking:set':
+    case 'effort:set':
     case 'model:set':
     case 'browser:create': {
       // Mock browser creation - send success response

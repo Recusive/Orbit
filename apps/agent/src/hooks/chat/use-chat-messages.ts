@@ -6,7 +6,7 @@ import { useMessageState } from './state/message-state';
 import { useSessionState } from './state/session-state';
 
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
-import type { Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
+import type { EffortLevel, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { conversationAddMessage, conversationLoad } from '@/lib/api';
@@ -45,6 +45,7 @@ const getToolActions = (): Pick<
   ReturnType<typeof useToolStore.getState>,
   | 'setInputMode'
   | 'setThinkingMode'
+  | 'setEffortLevel'
   | 'setModel'
   | 'startTool'
   | 'completeTool'
@@ -61,6 +62,7 @@ const getToolActions = (): Pick<
   return {
     setInputMode: state.setInputMode,
     setThinkingMode: state.setThinkingMode,
+    setEffortLevel: state.setEffortLevel,
     setModel: state.setModel,
     startTool: state.startTool,
     completeTool: state.completeTool,
@@ -110,6 +112,7 @@ interface UseChatMessagesReturn {
   handleOpenUrl: (url: string) => void;
   handleModeChange: (mode: 'default' | 'plan' | 'accept') => void;
   handleThinkingModeChange: (mode: ThinkingMode) => void;
+  handleEffortLevelChange: (level: EffortLevel) => void;
   handleModelChange: (model: Model) => void;
 }
 
@@ -536,6 +539,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       storeQueueMessage: queueActions.queueMessage,
       setInputMode: toolActions.setInputMode,
       setThinkingMode: toolActions.setThinkingMode,
+      setEffortLevel: toolActions.setEffortLevel,
       setModel: toolActions.setModel,
       clearPermissions: toolActions.clearPermissions,
       removePermissionRequest: toolActions.removePermissionRequest,
@@ -567,6 +571,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     handleOpenUrl,
     handleModeChange,
     handleThinkingModeChange,
+    handleEffortLevelChange,
     handleModelChange,
   } = chatActions;
 
@@ -587,6 +592,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     handleOpenUrl,
     handleModeChange,
     handleThinkingModeChange,
+    handleEffortLevelChange,
     handleModelChange,
   };
 }

@@ -356,6 +356,7 @@ pub fn run() {
             agent_cmd::browser_tool_response,
             agent_cmd::agent_set_thinking_mode,
             agent_cmd::agent_get_thinking_mode,
+            agent_cmd::agent_set_effort_level,
             agent_cmd::agent_set_model,
             agent_cmd::agent_set_plan_mode,
             agent_cmd::agent_get_plan_mode,

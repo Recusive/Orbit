@@ -1,6 +1,12 @@
 import type { PermissionRequest } from '@/stores/agent/tool-store';
 import type { ContextItem, FileEntry } from '@/types/agent/context';
-import type { InputMode, Model, ReactElementContext, ThinkingMode } from '@/types/protocol';
+import type {
+  EffortLevel,
+  InputMode,
+  Model,
+  ReactElementContext,
+  ThinkingMode,
+} from '@/types/protocol';
 
 export interface UsageData {
   readonly inputTokens: number;
@@ -17,6 +23,7 @@ export interface ImageAttachment {
 export interface ChatInputProps {
   readonly inputMode: InputMode;
   readonly thinkingMode: ThinkingMode;
+  readonly effortLevel: EffortLevel;
   readonly isAgentRunning: boolean;
   readonly usage: UsageData;
   readonly maxTokens: number;
@@ -33,12 +40,18 @@ export interface ChatInputProps {
   readonly onStop: () => void;
   readonly onModeChange: (mode: InputMode) => void;
   readonly onThinkingModeChange: (mode: ThinkingMode) => void;
+  readonly onEffortChange: (level: EffortLevel) => void;
   readonly onModelChange: (model: Model) => void;
 }
 
 export interface ThinkingModeInfo {
   readonly level: string;
   readonly tokens: string;
+}
+
+export interface EffortLevelInfo {
+  readonly level: string;
+  readonly description: string;
 }
 
 export interface PopoverNavigationState {
@@ -59,6 +72,9 @@ export interface PopoverNavigationState {
   // Thinking hover
   thinkingHoverOpen: boolean;
   setThinkingHoverOpen: (open: boolean) => void;
+  // Effort hover
+  effortHoverOpen: boolean;
+  setEffortHoverOpen: (open: boolean) => void;
   // Actions
   closeMentionPopover: () => void;
   closeSlashPopover: () => void;
@@ -67,11 +83,13 @@ export interface PopoverNavigationState {
 export interface UseChatInputOptions {
   readonly inputMode: InputMode;
   readonly thinkingMode: ThinkingMode;
+  readonly effortLevel: EffortLevel;
   readonly isAgentRunning: boolean;
   readonly onSend: ChatInputProps['onSend'];
   readonly onStop: () => void;
   readonly onModeChange: (mode: InputMode) => void;
   readonly onThinkingModeChange: (mode: ThinkingMode) => void;
+  readonly onEffortChange: (level: EffortLevel) => void;
 }
 
 export interface UseChatInputReturn {
@@ -95,13 +113,14 @@ export interface UseChatInputReturn {
   handleMentionSelect: (file: FileEntry) => void;
   handleSlashSelect: (command: SlashCommand) => void;
   handleRemoveContext: (id: string) => void;
-  handleAtClick: () => void;
   handleStop: () => void;
   cycleInputMode: () => void;
   cycleThinkingMode: () => void;
+  cycleEffortLevel: () => void;
   // Utilities
   getThinkingInfo: () => ThinkingModeInfo;
   getActiveDots: () => number;
+  getEffortInfo: () => EffortLevelInfo;
   getInputBoxClasses: () => string;
   // Browser context
   elementContexts: ReactElementContext[];
@@ -115,7 +134,9 @@ export interface SlashCommand {
 
 export interface InputControlsProps {
   readonly inputMode: InputMode;
+  readonly model: Model;
   readonly thinkingMode: ThinkingMode;
+  readonly effortLevel: EffortLevel;
   readonly isAgentRunning: boolean;
   readonly isInputEmpty: boolean;
   readonly usage: UsageData;
@@ -123,22 +144,19 @@ export interface InputControlsProps {
   readonly imageInputRef: React.RefObject<HTMLInputElement | null>;
   readonly thinkingHoverOpen: boolean;
   readonly setThinkingHoverOpen: (open: boolean) => void;
+  readonly effortHoverOpen: boolean;
+  readonly setEffortHoverOpen: (open: boolean) => void;
   readonly onModelChange: (model: Model) => void;
   readonly cycleInputMode: () => void;
   readonly cycleThinkingMode: () => void;
-  readonly handleAtClick: () => void;
-  /**
-   * Opens the browser panel. Optional - when undefined, the globe button
-   * is disabled. This happens in Editor mode where the Activity panel
-   * (and thus browser panel) is not available.
-   */
-  readonly handleGlobeClick?: () => void;
+  readonly cycleEffortLevel: () => void;
   readonly handleImageClick: () => void;
   readonly handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   readonly handleSend: () => void;
   readonly handleStop: () => void;
   readonly getThinkingInfo: () => ThinkingModeInfo;
   readonly getActiveDots: () => number;
+  readonly getEffortInfo: () => EffortLevelInfo;
 }
 
 export interface ThinkingModeButtonProps {
@@ -150,15 +168,20 @@ export interface ThinkingModeButtonProps {
   readonly getActiveDots: () => number;
 }
 
+export interface EffortLevelButtonProps {
+  readonly effortLevel: EffortLevel;
+  readonly effortHoverOpen: boolean;
+  readonly setEffortHoverOpen: (open: boolean) => void;
+  readonly cycleEffortLevel: () => void;
+  readonly getEffortInfo: () => EffortLevelInfo;
+}
+
 export interface MoreActionsMenuProps {
-  readonly handleAtClick: () => void;
+  readonly model: Model;
   readonly cycleThinkingMode: () => void;
   readonly thinkingMode: ThinkingMode;
   readonly getThinkingInfo: () => ThinkingModeInfo;
-  /**
-   * Opens the browser panel. Optional - when undefined, the globe item
-   * shows "Coming soon" and is disabled. This happens in Editor mode
-   * where the Activity panel is not available.
-   */
-  readonly handleGlobeClick: (() => void) | undefined;
+  readonly cycleEffortLevel: () => void;
+  readonly effortLevel: EffortLevel;
+  readonly getEffortInfo: () => EffortLevelInfo;
 }
