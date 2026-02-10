@@ -131,23 +131,33 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           isCheckingOut={isCheckingOut}
           onCheckout={(branch) => void handleCheckout(branch)}
         />
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <SyncStatus status={status} />
           <button
             onClick={() => void handleFetch()}
             disabled={isFetching}
-            className="p-1.5 rounded-md hover:bg-gray-4 text-gray-10 hover:text-foreground active:scale-95 transition-[background-color,color,transform] duration-150"
-            title="Fetch from remote"
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium',
+              'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
+              'active:scale-[0.97] transition-[background-color,color,transform] duration-150',
+              'disabled:opacity-40'
+            )}
           >
-            <CloudDownload className={cn('h-3.5 w-3.5', isFetching && 'animate-pulse')} />
+            <CloudDownload className={cn('h-3 w-3', isFetching && 'animate-pulse')} />
+            <span>Fetch</span>
           </button>
           <button
             onClick={() => void refresh()}
             disabled={isLoading}
-            className="p-1.5 rounded-md hover:bg-gray-4 text-gray-10 hover:text-foreground active:scale-95 transition-[background-color,color,transform] duration-150"
-            title="Refresh"
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium',
+              'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
+              'active:scale-[0.97] transition-[background-color,color,transform] duration-150',
+              'disabled:opacity-40'
+            )}
           >
-            <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
+            <RefreshCw className={cn('h-3 w-3', isLoading && 'animate-spin')} />
+            <span>Refresh</span>
           </button>
         </div>
       </div>

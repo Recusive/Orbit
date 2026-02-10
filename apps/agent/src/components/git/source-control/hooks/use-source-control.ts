@@ -8,6 +8,7 @@
  */
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import { OPERATION_ERROR_TIMEOUT } from '../constants';
 
@@ -421,16 +422,17 @@ export function useSourceControl(): UseSourceControlReturn {
         await gitCheckout(repoPath, branch);
         await refreshStatus();
         await refreshBranches();
+        toast.success(`Switched to ${branch}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        setOperationError(`Checkout failed: ${message}`);
-        clearOperationError();
+        const displayMessage = message.replace(/^Git error:\s*/i, '');
+        toast.error('Checkout failed', { description: displayMessage });
       } finally {
         setIsCheckingOut(false);
         operationInProgress.current = false;
       }
     },
-    [repoPath, refreshStatus, refreshBranches, clearOperationError]
+    [repoPath, refreshStatus, refreshBranches]
   );
 
   // Wrapper for setCommitMessage that clears commit error

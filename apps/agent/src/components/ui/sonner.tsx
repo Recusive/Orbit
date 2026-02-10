@@ -51,10 +51,10 @@ const Toaster: FC<ToasterProps> = (props) => {
           error:
             'group-[.toaster]:border-destructive/40 group-[.toaster]:text-destructive [&_[data-icon]>svg]:text-destructive',
           success:
-            'group-[.toaster]:border-green-600/40 group-[.toaster]:text-green-700 dark:group-[.toaster]:text-green-400 [&_[data-icon]>svg]:text-green-600 dark:[&_[data-icon]>svg]:text-green-400',
-          info: 'group-[.toaster]:border-blue-600/40 group-[.toaster]:text-blue-700 dark:group-[.toaster]:text-blue-400 [&_[data-icon]>svg]:text-blue-600 dark:[&_[data-icon]>svg]:text-blue-400',
+            'group-[.toaster]:border-success/40 group-[.toaster]:text-success [&_[data-icon]>svg]:text-success',
+          info: 'group-[.toaster]:border-info/40 group-[.toaster]:text-info [&_[data-icon]>svg]:text-info',
           warning:
-            'group-[.toaster]:border-amber-600/40 group-[.toaster]:text-amber-700 dark:group-[.toaster]:text-amber-400 [&_[data-icon]>svg]:text-amber-600 dark:[&_[data-icon]>svg]:text-amber-400',
+            'group-[.toaster]:border-warning/40 group-[.toaster]:text-warning [&_[data-icon]>svg]:text-warning',
         },
       }}
       {...props}
