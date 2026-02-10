@@ -172,7 +172,12 @@ pub async fn agent_set_model(
         "haiku" => Model::Haiku,
         "sonnet" => Model::Sonnet,
         "opus" => Model::Opus,
-        _ => return Err("Invalid model: must be 'haiku', 'sonnet', or 'opus'".to_owned()),
+        "claude-opus-4-6" => Model::ClaudeOpus46,
+        _ => {
+            return Err(
+                "Invalid model: must be 'haiku', 'sonnet', 'opus', or 'claude-opus-4-6'".to_owned(),
+            )
+        },
     };
 
     state.set_model(&session_id, model).map_err(to_error)

@@ -165,7 +165,9 @@ const CommandEditor: FC<CommandEditorProps> = ({
   const [content, setContent] = useState('');
   const [argumentHint, setArgumentHint] = useState('');
   const [tools, setTools] = useState<string[]>([]);
-  const [model, setModel] = useState<'sonnet' | 'opus' | 'haiku' | 'none'>('none');
+  const [model, setModel] = useState<'sonnet' | 'opus' | 'haiku' | 'claude-opus-4-6' | 'none'>(
+    'none'
+  );
   const [scope, setScope] = useState<'project' | 'personal'>('project');
 
   // AI Generation state
@@ -434,9 +436,10 @@ const CommandEditor: FC<CommandEditorProps> = ({
                     </SelectTrigger>
                     <SelectContent className="z-70">
                       <SelectItem value="none">Use current model</SelectItem>
-                      <SelectItem value="haiku">Haiku (fast)</SelectItem>
-                      <SelectItem value="sonnet">Sonnet (balanced)</SelectItem>
-                      <SelectItem value="opus">Opus (best)</SelectItem>
+                      <SelectItem value="haiku">Haiku 4.5 (fast)</SelectItem>
+                      <SelectItem value="sonnet">Sonnet 4.5 (balanced)</SelectItem>
+                      <SelectItem value="opus">Opus 4.5</SelectItem>
+                      <SelectItem value="claude-opus-4-6">Opus 4.6 (best)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

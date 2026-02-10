@@ -47,7 +47,7 @@ const GeneratedAgentSchema = z
       .optional()
       .describe('Optional list of specific tool names this agent should use'),
     model: z
-      .enum(['sonnet', 'opus', 'haiku', 'inherit'])
+      .enum(['sonnet', 'opus', 'haiku', 'claude-opus-4-6', 'inherit'])
       .optional()
       .describe('Model to use (default: inherit from parent)'),
   })
@@ -182,7 +182,7 @@ export interface SessionConfig {
   planEnabled?: boolean;
   acceptEnabled?: boolean;
   critiqueEnabled?: boolean;
-  model?: 'haiku' | 'sonnet' | 'opus';
+  model?: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
   sessionMode?: 'chat' | 'agent';
   /** SDK session ID to resume from (for session continuity, rewind forks, etc.) */
   resumeSessionId?: string;
@@ -797,7 +797,7 @@ export class SessionManager extends Disposable {
       planEnabled?: boolean;
       acceptEnabled?: boolean;
       critiqueEnabled?: boolean;
-      model?: 'haiku' | 'sonnet' | 'opus';
+      model?: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
     }
   >();
   private pendingTools = new Map<
@@ -1749,7 +1749,10 @@ export class SessionManager extends Disposable {
   /**
    * Set model for a session
    */
-  async setModel(sessionId: string, model: 'haiku' | 'sonnet' | 'opus'): Promise<void> {
+  async setModel(
+    sessionId: string,
+    model: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6'
+  ): Promise<void> {
     const agent = this.activeSessions.get(sessionId);
     if (!agent) {
       const prefs = this.modePreferences.get(sessionId) ?? {};

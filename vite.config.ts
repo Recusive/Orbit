@@ -172,6 +172,13 @@ export default defineConfig({
       '@codemirror/state',
       '@codemirror/view',
       '@lezer/highlight',
+      // xterm packages must be pre-bundled to prevent runtime discovery that triggers
+      // 504 "Outdated Optimize Dep" errors — especially in Tauri's WKWebView which
+      // doesn't handle Vite's full-reload recovery as well as a regular browser.
+      '@xterm/xterm',
+      '@xterm/addon-fit',
+      '@xterm/addon-search',
+      '@xterm/addon-web-links',
     ],
   },
   // Tauri expects a fixed port

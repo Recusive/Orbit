@@ -96,7 +96,7 @@ export interface GetThinkingModeRequest {
 export interface SetModelRequest {
   type: 'set_model';
   sessionId: string;
-  model: 'haiku' | 'sonnet' | 'opus';
+  model: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
 }
 
 /**

@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
 /**
- * AI Model selection
- * - haiku: Fast, efficient for simple tasks
- * - sonnet: Balanced performance and capability
- * - opus: Most capable, best for complex tasks
+ * AI Model selection (shorthand names resolved by Claude Agent SDK)
+ * - haiku: Haiku 4.5 — Fast, efficient for simple tasks
+ * - sonnet: Sonnet 4.5 — Balanced performance and capability
+ * - opus: Opus 4.5 — Capable, complex tasks
+ * - claude-opus-4-6: Opus 4.6 — Most capable, latest flagship model
  */
-export const ModelSchema = z.enum(['haiku', 'sonnet', 'opus']);
+export const ModelSchema = z.enum(['haiku', 'sonnet', 'opus', 'claude-opus-4-6']);
 export type Model = z.infer<typeof ModelSchema>;
 
 /**

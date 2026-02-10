@@ -105,6 +105,8 @@ pub enum Model {
     Haiku,
     Sonnet,
     Opus,
+    #[serde(rename = "claude-opus-4-6")]
+    ClaudeOpus46,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -659,6 +661,8 @@ pub enum AgentModel {
     Sonnet,
     Opus,
     Haiku,
+    #[serde(rename = "claude-opus-4-6")]
+    ClaudeOpus46,
     Inherit,
 }
 

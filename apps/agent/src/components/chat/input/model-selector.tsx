@@ -62,6 +62,7 @@ const MODEL_GROUPS: ModelGroup[] = [
       { id: 'haiku', name: 'Haiku 4.5', icon: ClaudeIcon },
       { id: 'sonnet', name: 'Sonnet 4.5', icon: ClaudeIcon },
       { id: 'opus', name: 'Opus 4.5', icon: ClaudeIcon },
+      { id: 'claude-opus-4-6', name: 'Opus 4.6', icon: ClaudeIcon },
     ],
   },
   {
@@ -247,7 +248,12 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     // Disabled models (coming soon) don't close the menu or change selection
     if (model.disabled === true) return;
     // Only allow valid Model values
-    if (model.id === 'haiku' || model.id === 'sonnet' || model.id === 'opus') {
+    if (
+      model.id === 'haiku' ||
+      model.id === 'sonnet' ||
+      model.id === 'opus' ||
+      model.id === 'claude-opus-4-6'
+    ) {
       setModel(model.id);
       onModelChange?.(model.id);
     }

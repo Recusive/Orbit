@@ -47,12 +47,13 @@ const TestWrapper: FC<{ children: ReactNode }> = ({ children }) => {
 // =============================================================================
 
 describe('Model Groups Configuration', () => {
-  it('should have Claude model group with Haiku, Sonnet, Opus', () => {
+  it('should have Claude model group with Haiku, Sonnet, Opus 4.5, Opus 4.6', () => {
     // These are the valid models that can be selected
-    const validModels = ['haiku', 'sonnet', 'opus'];
+    const validModels = ['haiku', 'sonnet', 'opus', 'claude-opus-4-6'];
     expect(validModels).toContain('haiku');
     expect(validModels).toContain('sonnet');
     expect(validModels).toContain('opus');
+    expect(validModels).toContain('claude-opus-4-6');
   });
 });
 
@@ -85,6 +86,13 @@ describe('ModelSelector Component', () => {
       render(<ModelSelector />, { wrapper: TestWrapper });
 
       expect(screen.getByText('Opus 4.5')).toBeInTheDocument();
+    });
+
+    it('should display Opus 4.6 when selected', () => {
+      useToolStore.setState({ model: 'claude-opus-4-6' });
+      render(<ModelSelector />, { wrapper: TestWrapper });
+
+      expect(screen.getByText('Opus 4.6')).toBeInTheDocument();
     });
 
     it('should have a chevron icon that rotates when open', async () => {
@@ -123,6 +131,7 @@ describe('ModelSelector Component', () => {
       // Sonnet appears twice: in button and dropdown
       expect(screen.getAllByText('Sonnet 4.5').length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('Opus 4.5')).toHaveLength(1);
+      expect(screen.getAllByText('Opus 4.6')).toHaveLength(1);
     });
 
     it('should show Codex models with "Coming soon" badge', async () => {
@@ -182,11 +191,26 @@ describe('ModelSelector Component', () => {
       // Open dropdown
       await user.click(screen.getByRole('button'));
 
-      // Select Opus
+      // Select Opus 4.5
       await user.click(screen.getByText('Opus 4.5'));
 
       // Store should be updated
       expect(useToolStore.getState().model).toBe('opus');
+    });
+
+    it('should call onModelChange when selecting Opus 4.6', async () => {
+      const onModelChange = vi.fn();
+      const user = userEvent.setup();
+
+      render(<ModelSelector onModelChange={onModelChange} />, { wrapper: TestWrapper });
+
+      // Open dropdown
+      await user.click(screen.getByRole('button'));
+
+      // Select Opus 4.6
+      await user.click(screen.getByText('Opus 4.6'));
+
+      expect(onModelChange).toHaveBeenCalledWith('claude-opus-4-6');
     });
 
     it('should NOT call onModelChange for GPT models (invalid)', async () => {

@@ -54,7 +54,13 @@ export type CommandName = z.infer<typeof CommandNameSchema>;
 export const AttachmentTypeSchema = z.enum(['document', 'image', 'text']);
 export type AttachmentType = z.infer<typeof AttachmentTypeSchema>;
 
-export const SubagentModelSchema = z.enum(['sonnet', 'opus', 'haiku', 'inherit']);
+export const SubagentModelSchema = z.enum([
+  'sonnet',
+  'opus',
+  'haiku',
+  'claude-opus-4-6',
+  'inherit',
+]);
 export type SubagentModel = z.infer<typeof SubagentModelSchema>;
 
 // ============================================================================

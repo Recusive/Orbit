@@ -182,6 +182,7 @@ const MODEL_CONTEXT_WINDOWS: Record<Model, number> = {
   haiku: 200000,
   sonnet: 200000,
   opus: 200000,
+  'claude-opus-4-6': 200000,
 };
 
 // Tool status

@@ -738,7 +738,7 @@ export const SubagentDefinitionSchema = z
     prompt: z.string(),
     tools: z.array(z.string()).optional(),
     disallowedTools: z.array(z.string()).optional(),
-    model: z.enum(['sonnet', 'opus', 'haiku', 'inherit']).optional(),
+    model: z.enum(['sonnet', 'opus', 'haiku', 'claude-opus-4-6', 'inherit']).optional(),
   })
   .strict();
 
@@ -794,7 +794,7 @@ export const SlashCommandDefinitionSchema = z
     content: z.string(), // The actual prompt content
     allowedTools: z.array(z.string()).optional(),
     argumentHint: z.string().optional(),
-    model: z.enum(['sonnet', 'opus', 'haiku']).optional(),
+    model: z.enum(['sonnet', 'opus', 'haiku', 'claude-opus-4-6']).optional(),
     scope: CommandScopeSchema,
     /** Whether this command is read-only (builtin/default commands) */
     readonly: z.boolean().optional(),
