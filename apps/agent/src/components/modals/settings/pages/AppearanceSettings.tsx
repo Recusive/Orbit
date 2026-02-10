@@ -4,6 +4,7 @@ import { SectionDivider, SectionHeader, SettingItem } from '../components';
 
 import type { WindowMode } from '@/providers/theme-provider';
 import type { IconThemeId } from '@/stores/ui/icon-theme-store';
+import type { WelcomeAnimationId } from '@/stores/ui/welcome-animation-store';
 import type { FC } from 'react';
 
 import {
@@ -16,6 +17,11 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/providers/theme-provider';
 import { AVAILABLE_THEMES, selectIconTheme, useIconThemeStore } from '@/stores/ui/icon-theme-store';
+import {
+  WELCOME_ANIMATIONS,
+  selectWelcomeAnimation,
+  useWelcomeAnimationStore,
+} from '@/stores/ui/welcome-animation-store';
 
 export const AppearanceSettings: FC = () => {
   // Color theme and window mode from ThemeProvider (persisted to localStorage)
@@ -23,7 +29,6 @@ export const AppearanceSettings: FC = () => {
 
   // TODO: These settings are placeholder UI - they don't persist or affect the app yet.
   // Implementation needed: Create a settings store and persist to localStorage or Tauri settings.
-  const [accentColor, setAccentColor] = useState('coral');
   const [fontSize, setFontSize] = useState('medium');
   const [reduceMotion, setReduceMotion] = useState(false);
   const [compactMode, setCompactMode] = useState(false);
@@ -31,6 +36,10 @@ export const AppearanceSettings: FC = () => {
   // Icon theme from Zustand store (persisted)
   const currentIconTheme = useIconThemeStore(selectIconTheme);
   const setIconTheme = useIconThemeStore((state) => state.setTheme);
+
+  // Welcome animation from Zustand store (persisted)
+  const currentWelcomeAnimation = useWelcomeAnimationStore(selectWelcomeAnimation);
+  const setWelcomeAnimation = useWelcomeAnimationStore((state) => state.setAnimation);
 
   const handleThemeChange = (value: string): void => {
     setTheme(value as 'light' | 'dark' | 'system');
@@ -42,6 +51,10 @@ export const AppearanceSettings: FC = () => {
 
   const handleIconThemeChange = (value: string): void => {
     setIconTheme(value as IconThemeId);
+  };
+
+  const handleWelcomeAnimationChange = (value: string): void => {
+    setWelcomeAnimation(value as WelcomeAnimationId);
   };
 
   return (
@@ -77,21 +90,6 @@ export const AppearanceSettings: FC = () => {
           </Select>
         </SettingItem>
 
-        <SettingItem label="Accent Color" description="Primary color for buttons and highlights">
-          <Select value={accentColor} onValueChange={setAccentColor}>
-            <SelectTrigger className="w-32 h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="coral">Coral</SelectItem>
-              <SelectItem value="blue">Blue</SelectItem>
-              <SelectItem value="green">Green</SelectItem>
-              <SelectItem value="purple">Purple</SelectItem>
-              <SelectItem value="orange">Orange</SelectItem>
-            </SelectContent>
-          </Select>
-        </SettingItem>
-
         <SettingItem
           label="File Icon Theme"
           description="Icons for files and folders in the explorer"
@@ -104,6 +102,23 @@ export const AppearanceSettings: FC = () => {
               {AVAILABLE_THEMES.map((iconTheme) => (
                 <SelectItem key={iconTheme.id} value={iconTheme.id}>
                   {iconTheme.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingItem>
+        <SettingItem
+          label="Welcome Animation"
+          description="Animation style for the welcome page logo"
+        >
+          <Select value={currentWelcomeAnimation} onValueChange={handleWelcomeAnimationChange}>
+            <SelectTrigger className="w-40 h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {WELCOME_ANIMATIONS.map((anim) => (
+                <SelectItem key={anim.id} value={anim.id}>
+                  {anim.label}
                 </SelectItem>
               ))}
             </SelectContent>

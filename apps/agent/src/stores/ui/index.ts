@@ -38,3 +38,11 @@ export type {
   BottomPanelTab,
   HeaderTab,
 } from './ui-store';
+
+export {
+  WELCOME_ANIMATIONS,
+  selectWelcomeAnimation,
+  useWelcomeAnimationStore,
+} from './welcome-animation-store';
+
+export type { WelcomeAnimationId, WelcomeAnimationInfo } from './welcome-animation-store';

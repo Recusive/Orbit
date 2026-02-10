@@ -1,13 +1,17 @@
 /**
- * OrbitAsciiLogo — Welcome page branding with beam reveal animation.
+ * OrbitAsciiLogo — Welcome page branding with selectable animation style.
  *
- * Uses the shared BeamAsciiPre component for the sweep effect,
- * with a tagline that fades in after the beam completes.
+ * Reads the user's preferred animation from the welcome-animation store:
+ * - "beam": BeamAsciiPre sweep with glow (default)
+ * - "scramble": Looping scramble-decode with cursor blink (classic)
  */
+import { useEffect, useRef, useState } from 'react';
+
 import type { FC } from 'react';
 
 import { BeamAsciiPre } from '@/components/shared';
 import { cn } from '@/lib/utils';
+import { selectWelcomeAnimation, useWelcomeAnimationStore } from '@/stores/ui';
 
 interface OrbitAsciiLogoProps {
   readonly className?: string;
@@ -23,6 +27,12 @@ const ORBIT_ART = ` ██████╗ ██████╗ █████�
 const TAGLINE = 'One workspace. Agent, editor, canvas.';
 
 export const OrbitAsciiLogo: FC<OrbitAsciiLogoProps> = ({ className }) => {
+  const animation = useWelcomeAnimationStore(selectWelcomeAnimation);
+
+  if (animation === 'scramble') {
+    return <ScrambleOrbitLogo className={className} />;
+  }
+
   return (
     <div className={cn('flex flex-col items-center', className)}>
       <BeamAsciiPre
@@ -44,6 +54,155 @@ export const OrbitAsciiLogo: FC<OrbitAsciiLogoProps> = ({ className }) => {
           delay={2400}
           settledColor="var(--foreground)"
         />
+      </div>
+    </div>
+  );
+};
+
+// ─── Scramble-decode animation (classic) ──────────────────────────────
+
+const SCRAMBLE_CHARS =
+  '!@#$%^&*()_+-=[]{}|;:,.<>?/\\~`0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+const BASE_TICK_MS = 28;
+const HOLD_MS = 4000;
+
+const PREFERS_REDUCED_MOTION =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function randomChar(): string {
+  return SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)] ?? '?';
+}
+
+function buildFrame(final: string, resolvedCount: number): string {
+  const chars: string[] = [];
+  for (let i = 0; i < final.length; i++) {
+    const char = final[i] ?? ' ';
+    if (char === '\n' || char === ' ') {
+      chars.push(char);
+    } else if (i < resolvedCount) {
+      chars.push(char);
+    } else {
+      chars.push(randomChar());
+    }
+  }
+  return chars.join('');
+}
+
+function easeOutInterval(progress: number, base: number): number {
+  return base * (1 + progress * progress * 1.5);
+}
+
+type Phase = 'decode-logo' | 'decode-tagline' | 'hold' | 'scramble';
+
+const ScrambleOrbitLogo: FC<{ readonly className?: string | undefined }> = ({ className }) => {
+  const [logoDisplay, setLogoDisplay] = useState(PREFERS_REDUCED_MOTION ? ORBIT_ART : '');
+  const [taglineDisplay, setTaglineDisplay] = useState(PREFERS_REDUCED_MOTION ? TAGLINE : '');
+
+  const phaseRef = useRef<Phase>('decode-logo');
+  const resolvedRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (PREFERS_REDUCED_MOTION) return;
+
+    const clearTimers = (): void => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      if (holdTimerRef.current !== null) clearTimeout(holdTimerRef.current);
+    };
+
+    const scheduleTick = (tickPhase: Phase, tickFn: () => void, progress: number): void => {
+      const interval =
+        tickPhase === 'decode-tagline'
+          ? easeOutInterval(progress, BASE_TICK_MS * 1.8)
+          : easeOutInterval(progress, BASE_TICK_MS);
+      timerRef.current = setTimeout(tickFn, interval);
+    };
+
+    const startPhase = (nextPhase: Phase): void => {
+      clearTimers();
+      phaseRef.current = nextPhase;
+      resolvedRef.current = 0;
+
+      if (nextPhase === 'decode-logo') {
+        const tick = (): void => {
+          resolvedRef.current += 3;
+          const progress = resolvedRef.current / ORBIT_ART.length;
+          setLogoDisplay(buildFrame(ORBIT_ART, resolvedRef.current));
+
+          if (resolvedRef.current >= ORBIT_ART.length) {
+            setLogoDisplay(ORBIT_ART);
+            startPhase('decode-tagline');
+          } else {
+            scheduleTick('decode-logo', tick, progress);
+          }
+        };
+        setLogoDisplay(buildFrame(ORBIT_ART, 0));
+        scheduleTick('decode-logo', tick, 0);
+      }
+
+      if (nextPhase === 'decode-tagline') {
+        setTaglineDisplay(buildFrame(TAGLINE, 0));
+        const tick = (): void => {
+          resolvedRef.current += 1;
+          const progress = resolvedRef.current / TAGLINE.length;
+          setTaglineDisplay(buildFrame(TAGLINE, resolvedRef.current));
+
+          if (resolvedRef.current >= TAGLINE.length) {
+            setTaglineDisplay(TAGLINE);
+            startPhase('hold');
+          } else {
+            scheduleTick('decode-tagline', tick, progress);
+          }
+        };
+        scheduleTick('decode-tagline', tick, 0);
+      }
+
+      if (nextPhase === 'hold') {
+        holdTimerRef.current = setTimeout(() => {
+          startPhase('scramble');
+        }, HOLD_MS);
+      }
+
+      if (nextPhase === 'scramble') {
+        resolvedRef.current = ORBIT_ART.length;
+        setTaglineDisplay('');
+        const tick = (): void => {
+          resolvedRef.current -= 3;
+          if (resolvedRef.current <= 0) {
+            resolvedRef.current = 0;
+            setLogoDisplay(buildFrame(ORBIT_ART, 0));
+            startPhase('decode-logo');
+          } else {
+            setLogoDisplay(buildFrame(ORBIT_ART, resolvedRef.current));
+            const progress = 1 - resolvedRef.current / ORBIT_ART.length;
+            scheduleTick('scramble', tick, progress);
+          }
+        };
+        scheduleTick('scramble', tick, 0);
+      }
+    };
+
+    startPhase('decode-logo');
+
+    return clearTimers;
+  }, []);
+
+  return (
+    <div className={cn('flex flex-col items-center', className)}>
+      <pre
+        className="font-mono text-[22px] leading-[1.15] text-accent-9 dark:text-accent-11 whitespace-pre select-none"
+        aria-label="ORBIT"
+        role="img"
+      >
+        {logoDisplay}
+      </pre>
+
+      <div className="h-6 mt-3">
+        <pre className="font-mono text-sm text-foreground/60 whitespace-pre select-none text-center">
+          {taglineDisplay}
+        </pre>
       </div>
     </div>
   );
