@@ -626,6 +626,27 @@ impl SessionManager {
         Self::check_response(response)
     }
 
+    /// Fork a session at a specific message point.
+    /// Creates a new SDK session that has context only UP TO the specified message.
+    /// Used for rewind operations - Claude only sees the conversation history up to that point.
+    ///
+    /// The `at_message_uuid` should be a user message UUID captured during streaming
+    /// (via `replay-user-messages` option). The SDK will create a new session branch
+    /// starting from that exact checkpoint.
+    pub fn fork_session_at(&self, session_id: &str, at_message_uuid: &str) -> Result<String> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::ForkSessionAt {
+            session_id: session_id.to_owned(),
+            at_message_uuid: at_message_uuid.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_string(response)?
+            .ok_or_else(|| BridgeError::SidecarError("Fork returned null".to_owned()))
+    }
+
     /// Generate an agent definition from a natural language description
     pub fn generate_agent_definition(&self, description: &str) -> Result<SubagentDefinition> {
         self.ensure_running()?;

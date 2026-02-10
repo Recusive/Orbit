@@ -69,7 +69,7 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[280px] p-0 rounded-lg border-[3px] border-border bg-card shadow-lg"
+        className="w-[280px] p-0 rounded-lg border border-gray-5 shadow-lg"
         side="top"
         align="start"
         sideOffset={8}
@@ -176,7 +176,7 @@ const CommandItem: FC<CommandItemProps> = ({ command, isSelected, isFirst, isLas
         'relative flex cursor-pointer gap-2.5 select-none items-center border-l-2 border-transparent pl-2 pr-2.5 py-2 outline-none',
         isSelected
           ? 'rounded-r-md bg-primary/10 text-foreground border-primary/60'
-          : 'rounded-md hover:bg-muted/50 active:scale-[0.99]'
+          : 'rounded-md hover:bg-accent active:scale-[0.99]'
       )}
     >
       <span className="text-muted-foreground/70 font-mono text-base">/</span>

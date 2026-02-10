@@ -51,7 +51,7 @@ export const FileChangeItem: React.FC<FileChangeItemProps> = ({
         {/* File Button - Clickable with border, takes full width */}
         <button
           onClick={handleFileClick}
-          className="flex items-center gap-2 px-2 py-0.5 rounded-md border border-border bg-muted/50 hover:bg-accent hover:border-accent transition-colors flex-1 min-w-0"
+          className="flex items-center gap-2 px-2 py-0.5 rounded-md border border-border bg-gray-4 hover:bg-accent hover:border-accent transition-colors flex-1 min-w-0"
         >
           <FileIcon fileName={fileName} className="h-4 w-4 shrink-0" />
           <span className="text-sm font-medium text-foreground truncate flex-1 text-left">

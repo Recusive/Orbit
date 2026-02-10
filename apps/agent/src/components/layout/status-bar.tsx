@@ -8,6 +8,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useCallback } from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
 
@@ -25,6 +26,8 @@ import { useUIStore } from '@/stores/ui/ui-store';
 
 export interface StatusBarProps {
   className?: string;
+  /** When true, renders with a transparent background (used on welcome page) */
+  transparent?: boolean;
 }
 
 /** Maximum length for branch name before truncation */
@@ -114,8 +117,8 @@ interface StatusItemProps {
 }
 
 const StatusItem: FC<StatusItemProps> = ({ children, title, onClick, className }) => {
-  const baseClasses = 'flex items-center gap-1 px-1.5 py-0.5 text-sm leading-none';
-  const interactiveClasses = onClick ? 'hover:bg-accent/50 cursor-pointer rounded-sm' : '';
+  const baseClasses = 'flex items-center gap-1 px-1.5 h-full text-sm';
+  const interactiveClasses = onClick ? 'hover:bg-accent/50 cursor-pointer' : '';
 
   return (
     <div
@@ -134,7 +137,7 @@ const StatusItem: FC<StatusItemProps> = ({ children, title, onClick, className }
  * StatusBar displays git info, cursor position, and file info.
  * Styled similar to VS Code's status bar.
  */
-export const StatusBar: FC<StatusBarProps> = ({ className }) => {
+export const StatusBar: FC<StatusBarProps> = ({ className, transparent = false }) => {
   // Git state
   const branch = useGitStore(selectBranch);
   const ahead = useGitStore(selectAhead);
@@ -151,8 +154,14 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
   // Diagnostics (LSP problems)
   const { totalErrors, totalWarnings } = useDiagnostics();
 
-  // UI actions
-  const { openSourceControl, openProblemsPanel, setGoToLineDialogOpen } = useUIStore();
+  // UI actions — use useShallow to prevent re-renders on unrelated store changes
+  const { openSourceControl, openProblemsPanel, setGoToLineDialogOpen } = useUIStore(
+    useShallow((s) => ({
+      openSourceControl: s.openSourceControl,
+      openProblemsPanel: s.openProblemsPanel,
+      setGoToLineDialogOpen: s.setGoToLineDialogOpen,
+    }))
+  );
 
   const isGitRepo = repoPath !== null;
   const hasFile = activeFile !== null;
@@ -169,14 +178,14 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
   return (
     <div
       className={cn(
-        'h-[22px] flex items-center justify-between px-3',
-        'bg-card border-t-[3px] border-border/50',
+        'relative h-[22px] flex items-stretch justify-between px-3 border-t',
+        transparent ? 'bg-transparent border-gray-8/35' : 'bg-card border-gray-5',
         'text-muted-foreground',
         className
       )}
     >
       {/* Left section - Git info */}
-      <div className="flex items-center gap-0.5 min-w-0">
+      <div className="flex items-stretch gap-0.5 min-w-0">
         {/* Git branch */}
         {error ? (
           <StatusItem
@@ -272,7 +281,7 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
       </div>
 
       {/* Right section - File info */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-stretch gap-0.5">
         {hasFile ? (
           <>
             {/* Cursor position */}

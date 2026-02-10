@@ -22,11 +22,8 @@ import { useSourceControl } from './hooks/use-source-control';
 import type { SourceControlTabProps } from './types';
 
 import { cn } from '@/lib/utils';
-import { useUIStore } from '@/stores/ui/ui-store';
 
 export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = '' }) => {
-  const workspacePath = useUIStore((state) => state.workspacePath);
-
   const {
     // Status
     status,
@@ -36,6 +33,10 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     // File lists
     stagedFiles,
     unstagedFiles,
+
+    // Diffs
+    stagedDiffs,
+    unstagedDiffs,
 
     // Commit
     commitMessage,
@@ -75,7 +76,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     // Operations
     operationError,
     refresh,
-  } = useSourceControl({ workspacePath });
+  } = useSourceControl();
 
   // Loading state
   if (isLoading && !status) {
@@ -95,7 +96,10 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           <span className="text-sm font-medium">Git Error</span>
         </div>
         <p className="text-sm text-muted-foreground">{error}</p>
-        <button onClick={() => void refresh()} className="text-sm text-primary hover:underline">
+        <button
+          onClick={() => void refresh()}
+          className="text-sm text-gray-12 hover:text-foreground hover:underline"
+        >
           Retry
         </button>
       </div>
@@ -118,7 +122,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header with Branch Dropdown */}
       <div
-        className="flex items-center justify-between px-4 border-b-3 border-border/50 shrink-0"
+        className="flex items-center justify-between px-4 border-b border-gray-5 shrink-0"
         style={{ height: HEADER_HEIGHT }} // Extracted constant
       >
         <BranchSelector
@@ -132,7 +136,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           <button
             onClick={() => void handleFetch()}
             disabled={isFetching}
-            className="p-1.5 rounded-md hover:bg-muted/60 text-muted-foreground/70 hover:text-foreground active:scale-95 transition-[background-color,color,transform] duration-150"
+            className="p-1.5 rounded-md hover:bg-gray-4 text-gray-10 hover:text-foreground active:scale-95 transition-[background-color,color,transform] duration-150"
             title="Fetch from remote"
           >
             <CloudDownload className={cn('h-3.5 w-3.5', isFetching && 'animate-pulse')} />
@@ -140,7 +144,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           <button
             onClick={() => void refresh()}
             disabled={isLoading}
-            className="p-1.5 rounded-md hover:bg-muted/60 text-muted-foreground/70 hover:text-foreground active:scale-95 transition-[background-color,color,transform] duration-150"
+            className="p-1.5 rounded-md hover:bg-gray-4 text-gray-10 hover:text-foreground active:scale-95 transition-[background-color,color,transform] duration-150"
             title="Refresh"
           >
             <RefreshCw className={cn('h-3.5 w-3.5', isLoading && 'animate-spin')} />
@@ -174,6 +178,8 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
         <ChangesList
           stagedFiles={stagedFiles}
           unstagedFiles={unstagedFiles}
+          stagedDiffs={stagedDiffs}
+          unstagedDiffs={unstagedDiffs}
           isStaging={isStaging}
           onStageFile={handleStageFile}
           onUnstageFile={handleUnstageFile}

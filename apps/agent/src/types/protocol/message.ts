@@ -136,6 +136,15 @@ export const ChatBaseMessageSchema = z
     timestamp: z.number(),
     status: z.enum(MessageStatus),
     content: z.array(MessageContentSchema),
+    /**
+     * UUID of the previous message in the conversation chain.
+     * Used for Claude Code-style rewind: when rewinding, the next message
+     * sent will have parentUuid set to the message we rewound to, creating
+     * a branch in the conversation history.
+     * - null for the first message in a conversation
+     * - undefined if not yet set (legacy messages)
+     */
+    parentUuid: z.string().nullish(),
     metadata: z
       .object({
         model: z.string().optional(),

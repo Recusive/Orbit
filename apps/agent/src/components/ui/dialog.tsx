@@ -19,7 +19,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+      'fixed inset-0 z-50 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className
     )}
     {...props}
@@ -35,20 +35,25 @@ const DialogContent = React.forwardRef<
     <DialogOverlay className="flex items-center justify-center" />
     {/* Flexbox centering wrapper - avoids blurry text from transform translate(-50%) subpixel issues */}
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-      <DialogPrimitive.Content
-        ref={ref}
-        className={cn(
-          'relative z-50 grid w-full max-w-lg gap-4 border-[3px] border-border bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-xl pointer-events-auto',
-          className
-        )}
-        {...props}
-      >
-        {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 opacity-70 ring-offset-background transition-[opacity,background-color] duration-150 hover:opacity-100 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      </DialogPrimitive.Content>
+      <div className="relative">
+        <DialogPrimitive.Content
+          ref={ref}
+          className={cn(
+            'relative z-10 grid w-full max-w-lg gap-4 border border-gray-5 bg-popover glass-float p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg pointer-events-auto',
+            className
+          )}
+          style={{
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.03)',
+          }}
+          {...props}
+        >
+          {children}
+          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-2 -m-1 opacity-70 ring-offset-background transition-[opacity,background-color] duration-150 hover:opacity-100 hover:bg-gray-4 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-gray-4 data-[state=open]:text-gray-12">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        </DialogPrimitive.Content>
+      </div>
     </div>
   </DialogPortal>
 ));
@@ -60,20 +65,28 @@ const DialogContentTopCenter = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className="bg-black/40 backdrop-blur-sm" />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        'fixed left-[50%] top-[15%] z-50 grid w-full max-w-xl translate-x-[-50%] border-[3px] border-border/40 bg-background/98 backdrop-blur-md duration-150 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-top-[2%] data-[state=open]:slide-in-from-top-[2%] rounded-xl',
-        className
-      )}
-      style={{
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.03)',
-      }}
-      {...props}
-    >
-      {children}
-    </DialogPrimitive.Content>
+    <DialogOverlay />
+    {/* Centering wrapper */}
+    <div className="fixed inset-x-0 top-[15%] z-50 flex justify-center pointer-events-none">
+      <div className="relative pointer-events-auto w-full max-w-xl">
+        <DialogPrimitive.Content
+          ref={ref}
+          className={cn(
+            'relative z-10 grid border border-gray-5 bg-popover glass-float rounded-lg',
+            'duration-150 data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+            'data-[state=closed]:zoom-out-[0.98] data-[state=open]:zoom-in-[0.98]',
+            className
+          )}
+          style={{
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.03)',
+          }}
+          {...props}
+        >
+          {children}
+        </DialogPrimitive.Content>
+      </div>
+    </div>
   </DialogPortal>
 ));
 DialogContentTopCenter.displayName = 'DialogContentTopCenter';

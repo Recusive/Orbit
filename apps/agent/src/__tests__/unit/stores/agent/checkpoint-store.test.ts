@@ -28,6 +28,7 @@ describe('checkpoint-store', () => {
       expect(state.turnEndCheckpoints).toEqual({});
       expect(state.checkpointOrder).toEqual({});
       expect(state.latestCheckpoints).toEqual({});
+      expect(state.rewindForkPoints).toEqual({});
     });
 
     it('should start with null pending states', () => {
@@ -122,9 +123,14 @@ describe('checkpoint-store', () => {
       expect(getTurnEndCheckpoint(sessionId, 'user-3')).toBe(checkpoint3);
 
       // Verify rewind checkpoints for turn 1
+      // Implementation now uses NEXT checkpoint for resumeSessionAt (see checkpoint-store.ts):
+      // - resumeSessionAt: cp-3 (next checkpoint) to include the RESPONSE to user-1
+      //   The SDK's resumeSessionAt includes messages UP TO the checkpoint, not AFTER
+      //   Using cp-2 would only include user-1, not its response
+      // - rewindFiles: cp-2 (turnEnd) for file state after user-1's turn completed
       const turn1Checkpoints = getRewindCheckpoints(sessionId, 'user-1');
-      expect(turn1Checkpoints?.resumeSessionAt).toBe(checkpoint1);
-      expect(turn1Checkpoints?.rewindFiles).toBe(checkpoint2);
+      expect(turn1Checkpoints?.resumeSessionAt).toBe(checkpoint3); // NEXT checkpoint
+      expect(turn1Checkpoints?.rewindFiles).toBe(checkpoint2); // turnEnd for file state
     });
   });
 
@@ -142,6 +148,7 @@ describe('checkpoint-store', () => {
       expect(state.currentUserMessageId).toEqual({
         sessionId,
         messageId: 'user-msg-1',
+        reconciled: false,
       });
     });
 
@@ -338,8 +345,11 @@ describe('checkpoint-store', () => {
       onMessageComplete(sessionId);
 
       const checkpoints = getRewindCheckpoints(sessionId, 'user-1');
+      // Implementation uses turnEnd for BOTH resumeSessionAt and rewindFiles:
+      // - First message has no turnStart (no checkpoint precedes it)
+      // - Using turnStart would only include user message, causing concatenation issues
       expect(checkpoints).toEqual({
-        resumeSessionAt: 'cp-1',
+        resumeSessionAt: 'cp-2',
         rewindFiles: 'cp-2',
       });
     });
@@ -477,12 +487,18 @@ describe('checkpoint-store', () => {
 
   describe('clearAll', () => {
     it('should clear all state', () => {
-      const { onUserMessageSent, onCheckpointReceived, onMessageComplete, clearAll } =
-        useCheckpointStore.getState();
+      const {
+        onUserMessageSent,
+        onCheckpointReceived,
+        onMessageComplete,
+        setRewindForkPoint,
+        clearAll,
+      } = useCheckpointStore.getState();
 
       onCheckpointReceived(sessionId, 'cp-1');
       onUserMessageSent(sessionId, 'user-1');
       onMessageComplete(sessionId);
+      setRewindForkPoint(sessionId, 'fork-point-1');
 
       clearAll();
 
@@ -491,9 +507,212 @@ describe('checkpoint-store', () => {
       expect(state.turnEndCheckpoints).toEqual({});
       expect(state.checkpointOrder).toEqual({});
       expect(state.latestCheckpoints).toEqual({});
+      expect(state.rewindForkPoints).toEqual({});
       expect(state.pendingMessageForTurnEnd).toBeNull();
       expect(state.currentTurnStartCheckpoint).toBeNull();
       expect(state.currentUserMessageId).toBeNull();
+    });
+  });
+
+  // ============================================================================
+  // Rewind Fork Points (Claude Code-style branching)
+  // ============================================================================
+
+  describe('rewind fork points', () => {
+    it('should set a fork point for a session', () => {
+      const { setRewindForkPoint, hasRewindForkPoint } = useCheckpointStore.getState();
+
+      expect(hasRewindForkPoint(sessionId)).toBe(false);
+
+      setRewindForkPoint(sessionId, 'msg-uuid-1');
+
+      expect(hasRewindForkPoint(sessionId)).toBe(true);
+      expect(useCheckpointStore.getState().rewindForkPoints[sessionId]).toBe('msg-uuid-1');
+    });
+
+    it('should consume and clear fork point (one-time use)', () => {
+      const { setRewindForkPoint, consumeRewindForkPoint, hasRewindForkPoint } =
+        useCheckpointStore.getState();
+
+      setRewindForkPoint(sessionId, 'msg-uuid-1');
+      expect(hasRewindForkPoint(sessionId)).toBe(true);
+
+      const forkPoint = consumeRewindForkPoint(sessionId);
+      expect(forkPoint).toBe('msg-uuid-1');
+      expect(hasRewindForkPoint(sessionId)).toBe(false);
+
+      // Second consume should return null
+      const secondConsume = consumeRewindForkPoint(sessionId);
+      expect(secondConsume).toBeNull();
+    });
+
+    it('should return null when consuming non-existent fork point', () => {
+      const { consumeRewindForkPoint } = useCheckpointStore.getState();
+
+      const result = consumeRewindForkPoint('non-existent-session');
+      expect(result).toBeNull();
+    });
+
+    it('should clear fork point without consuming', () => {
+      const { setRewindForkPoint, clearRewindForkPoint, hasRewindForkPoint } =
+        useCheckpointStore.getState();
+
+      setRewindForkPoint(sessionId, 'msg-uuid-1');
+      expect(hasRewindForkPoint(sessionId)).toBe(true);
+
+      clearRewindForkPoint(sessionId);
+      expect(hasRewindForkPoint(sessionId)).toBe(false);
+    });
+
+    it('should handle multiple sessions independently', () => {
+      const { setRewindForkPoint, consumeRewindForkPoint, hasRewindForkPoint } =
+        useCheckpointStore.getState();
+
+      setRewindForkPoint('session-1', 'msg-1');
+      setRewindForkPoint('session-2', 'msg-2');
+
+      expect(hasRewindForkPoint('session-1')).toBe(true);
+      expect(hasRewindForkPoint('session-2')).toBe(true);
+
+      const fork1 = consumeRewindForkPoint('session-1');
+      expect(fork1).toBe('msg-1');
+      expect(hasRewindForkPoint('session-1')).toBe(false);
+      expect(hasRewindForkPoint('session-2')).toBe(true);
+    });
+
+    it('should be cleared by clearSessionCheckpoints', () => {
+      const { setRewindForkPoint, clearSessionCheckpoints, hasRewindForkPoint } =
+        useCheckpointStore.getState();
+
+      setRewindForkPoint(sessionId, 'msg-uuid-1');
+      expect(hasRewindForkPoint(sessionId)).toBe(true);
+
+      clearSessionCheckpoints(sessionId);
+      expect(hasRewindForkPoint(sessionId)).toBe(false);
+    });
+
+    it('should overwrite previous fork point for same session', () => {
+      const { setRewindForkPoint, consumeRewindForkPoint } = useCheckpointStore.getState();
+
+      setRewindForkPoint(sessionId, 'msg-1');
+      setRewindForkPoint(sessionId, 'msg-2');
+
+      const forkPoint = consumeRewindForkPoint(sessionId);
+      expect(forkPoint).toBe('msg-2');
+    });
+  });
+
+  // ============================================================================
+  // reconcileUserMessageId (reconciled flag against cross-turn race)
+  // ============================================================================
+
+  describe('reconcileUserMessageId', () => {
+    it('should remap frontend UUID to SDK UUID for the current turn', () => {
+      const { onUserMessageSent, reconcileUserMessageId } = useCheckpointStore.getState();
+
+      onUserMessageSent(sessionId, 'frontend-uuid-1');
+
+      const oldId = reconcileUserMessageId(sessionId, 'sdk-uuid-1');
+      expect(oldId).toBe('frontend-uuid-1');
+      expect(useCheckpointStore.getState().currentUserMessageId?.messageId).toBe('sdk-uuid-1');
+    });
+
+    it('should mark message as reconciled after first reconciliation', () => {
+      const { onUserMessageSent, reconcileUserMessageId } = useCheckpointStore.getState();
+
+      onUserMessageSent(sessionId, 'frontend-uuid-1');
+      expect(useCheckpointStore.getState().currentUserMessageId?.reconciled).toBe(false);
+
+      reconcileUserMessageId(sessionId, 'sdk-uuid-1');
+      expect(useCheckpointStore.getState().currentUserMessageId?.reconciled).toBe(true);
+    });
+
+    it('should reject second reconciliation attempt (stale checkpoint from same turn)', () => {
+      const { onUserMessageSent, reconcileUserMessageId } = useCheckpointStore.getState();
+
+      onUserMessageSent(sessionId, 'frontend-uuid-1');
+      reconcileUserMessageId(sessionId, 'sdk-uuid-1');
+
+      // Second call with a DIFFERENT checkpoint ID should be rejected
+      const secondResult = reconcileUserMessageId(sessionId, 'stale-checkpoint-id');
+      expect(secondResult).toBeUndefined();
+      // SDK UUID should be preserved
+      expect(useCheckpointStore.getState().currentUserMessageId?.messageId).toBe('sdk-uuid-1');
+    });
+
+    it('should skip reconciliation for wrong session', () => {
+      const { onUserMessageSent, reconcileUserMessageId } = useCheckpointStore.getState();
+
+      onUserMessageSent(sessionId, 'frontend-uuid-1');
+
+      const result = reconcileUserMessageId('other-session', 'sdk-uuid-1');
+      expect(result).toBeUndefined();
+      // Original should be untouched
+      expect(useCheckpointStore.getState().currentUserMessageId?.messageId).toBe('frontend-uuid-1');
+    });
+
+    it('should prevent stale checkpoints from corrupting queued message (race condition)', () => {
+      const { onUserMessageSent, onCheckpointReceived, onMessageComplete, reconcileUserMessageId } =
+        useCheckpointStore.getState();
+
+      // Turn A: checkpoint arrives, user sends message, reconcile, complete
+      onCheckpointReceived(sessionId, 'cp-a');
+      onUserMessageSent(sessionId, 'frontend-uuid-A');
+      reconcileUserMessageId(sessionId, 'sdk-uuid-A'); // reconcile A — sets reconciled=true
+      onMessageComplete(sessionId);
+
+      // At this point, currentUserMessageId is null (cleared by onMessageComplete)
+      expect(useCheckpointStore.getState().currentUserMessageId).toBeNull();
+
+      // Queued message B is sent immediately
+      onUserMessageSent(sessionId, 'frontend-uuid-B'); // reconciled=false (fresh)
+
+      // B's first checkpoint arrives and reconciles correctly
+      const oldB = reconcileUserMessageId(sessionId, 'sdk-uuid-B');
+      expect(oldB).toBe('frontend-uuid-B');
+      expect(useCheckpointStore.getState().currentUserMessageId?.messageId).toBe('sdk-uuid-B');
+      expect(useCheckpointStore.getState().currentUserMessageId?.reconciled).toBe(true);
+
+      // A late/stale checkpoint arrives — should be REJECTED because B is already reconciled
+      const staleResult = reconcileUserMessageId(sessionId, 'stale-cp-from-A');
+      expect(staleResult).toBeUndefined();
+
+      // B's SDK UUID should be preserved (not overwritten)
+      expect(useCheckpointStore.getState().currentUserMessageId?.messageId).toBe('sdk-uuid-B');
+    });
+
+    it('should allow reconciliation for each new message', () => {
+      const { onUserMessageSent, onCheckpointReceived, onMessageComplete, reconcileUserMessageId } =
+        useCheckpointStore.getState();
+
+      // Turn A
+      onCheckpointReceived(sessionId, 'cp-a');
+      onUserMessageSent(sessionId, 'frontend-uuid-A');
+      reconcileUserMessageId(sessionId, 'sdk-uuid-A');
+      onMessageComplete(sessionId);
+
+      // Turn B — fresh onUserMessageSent resets reconciled=false
+      onCheckpointReceived(sessionId, 'cp-b');
+      onUserMessageSent(sessionId, 'frontend-uuid-B');
+
+      // B's own checkpoint arrives — this should succeed (reconciled=false)
+      const oldId = reconcileUserMessageId(sessionId, 'sdk-uuid-B');
+      expect(oldId).toBe('frontend-uuid-B');
+      expect(useCheckpointStore.getState().currentUserMessageId?.messageId).toBe('sdk-uuid-B');
+    });
+
+    it('should reset reconciled flag on each onUserMessageSent', () => {
+      const { onUserMessageSent, reconcileUserMessageId } = useCheckpointStore.getState();
+
+      onUserMessageSent(sessionId, 'msg-1');
+      expect(useCheckpointStore.getState().currentUserMessageId?.reconciled).toBe(false);
+
+      reconcileUserMessageId(sessionId, 'sdk-1');
+      expect(useCheckpointStore.getState().currentUserMessageId?.reconciled).toBe(true);
+
+      // Next message resets the flag
+      onUserMessageSent(sessionId, 'msg-2');
+      expect(useCheckpointStore.getState().currentUserMessageId?.reconciled).toBe(false);
     });
   });
 });

@@ -290,6 +290,20 @@ export interface RewindFilesRequest {
 }
 
 /**
+ * Restart an SDK session to force re-reading from JSONL.
+ * Used after rewind operations to ensure the SDK respects parentUuid chains.
+ * Fork a session at a specific message point.
+ * Creates a new SDK session that has context only UP TO the specified message.
+ * Used for rewind operations - Claude only sees the conversation history up to that point.
+ */
+export interface ForkSessionAtRequest {
+  type: 'fork_session_at';
+  sessionId: string;
+  /** User message UUID to fork at (captured via replay-user-messages during streaming) */
+  atMessageUuid: string;
+}
+
+/**
  * Fork session result
  */
 export interface ForkSessionResult {
@@ -409,6 +423,7 @@ export type BridgeRequest =
   | DeleteCommandRequest
   | ForkSessionRequest
   | RewindFilesRequest
+  | ForkSessionAtRequest
   | GenerateAgentDefinitionRequest
   | GenerateCommandDefinitionRequest
   | ShutdownRequest

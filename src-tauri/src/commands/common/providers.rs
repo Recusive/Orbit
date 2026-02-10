@@ -4,11 +4,6 @@
 //! Note: CLI detection removed - bundled app has its own claude binary.
 //! Note: Keychain reading is handled by agent-bridge TypeScript code.
 
-#![allow(
-    clippy::needless_pass_by_value,
-    reason = "Tauri commands receive owned types from JSON deserialization"
-)]
-
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -142,12 +137,15 @@ async fn trigger_claude_auth_inner(_app: &tauri::AppHandle) -> AuthTriggerResult
 
     log::info!("Triggering Claude auth via: {}", claude_path.display());
 
-    // Run claude with a tiny prompt. The CLI will:
+    // Run claude with a minimal prompt. The CLI will:
     // - Silently refresh an expired token (no browser needed)
     // - Open the browser for first-time OAuth login
     // The command itself may fail (budget limit), but auth still happens.
+    //
+    // SECURITY: Using "." as the prompt instead of a word like "hi" to avoid
+    // colliding with user-defined slash commands in ~/.claude/commands/.
     let result = Command::new(&claude_path)
-        .args(["-p", "hi", "--max-turns", "1"])
+        .args(["-p", ".", "--max-turns", "1"])
         .env("DISABLE_INTERACTIVITY", "1")
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
@@ -212,6 +210,7 @@ async fn check_macos_keychain_validated() -> KeychainStatus {
     match result {
         Ok(output) if output.status.success() => {
             let raw = String::from_utf8_lossy(&output.stdout);
+            // SECURITY: json_str contains OAuth secrets — do not log this value
             let json_str = raw.trim();
 
             match serde_json::from_str::<serde_json::Value>(json_str) {

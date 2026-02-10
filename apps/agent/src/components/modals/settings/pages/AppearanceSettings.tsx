@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { SectionDivider, SectionHeader, SettingItem } from '../components';
 
+import type { WindowMode } from '@/providers/theme-provider';
 import type { IconThemeId } from '@/stores/ui/icon-theme-store';
 import type { FC } from 'react';
 
@@ -17,8 +18,8 @@ import { useTheme } from '@/providers/theme-provider';
 import { AVAILABLE_THEMES, selectIconTheme, useIconThemeStore } from '@/stores/ui/icon-theme-store';
 
 export const AppearanceSettings: FC = () => {
-  // Color theme from ThemeProvider (persisted to localStorage)
-  const { theme, setTheme } = useTheme();
+  // Color theme and window mode from ThemeProvider (persisted to localStorage)
+  const { theme, setTheme, windowMode, setWindowMode } = useTheme();
 
   // TODO: These settings are placeholder UI - they don't persist or affect the app yet.
   // Implementation needed: Create a settings store and persist to localStorage or Tauri settings.
@@ -33,6 +34,10 @@ export const AppearanceSettings: FC = () => {
 
   const handleThemeChange = (value: string): void => {
     setTheme(value as 'light' | 'dark' | 'system');
+  };
+
+  const handleWindowModeChange = (value: string): void => {
+    setWindowMode(value as WindowMode);
   };
 
   const handleIconThemeChange = (value: string): void => {
@@ -53,6 +58,21 @@ export const AppearanceSettings: FC = () => {
               <SelectItem value="light">Light</SelectItem>
               <SelectItem value="dark">Dark</SelectItem>
               <SelectItem value="system">System</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingItem>
+
+        <SettingItem
+          label="Window Mode"
+          description="Liquid Glass uses transparency with macOS vibrancy"
+        >
+          <Select value={windowMode} onValueChange={handleWindowModeChange}>
+            <SelectTrigger className="w-36 h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="liquid-glass">Liquid Glass</SelectItem>
+              <SelectItem value="solid">Solid</SelectItem>
             </SelectContent>
           </Select>
         </SettingItem>

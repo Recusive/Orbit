@@ -90,7 +90,7 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
           {/* File path */}
           <div className="pt-2">
             <span className="text-xs text-muted-foreground">File:</span>
-            <div className="font-mono text-xs bg-muted px-2 py-1 rounded mt-1 truncate">
+            <div className="font-mono text-xs bg-gray-4 px-2 py-1 rounded mt-1 truncate">
               {element.filePath}:{element.lineNumber}
             </div>
           </div>
@@ -99,7 +99,7 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
           {Object.keys(element.props).length > 0 ? (
             <div>
               <span className="text-xs text-muted-foreground">Props:</span>
-              <div className="font-mono text-xs bg-muted px-2 py-1 rounded mt-1">
+              <div className="font-mono text-xs bg-gray-4 px-2 py-1 rounded mt-1">
                 {formatProps(element.props)}
               </div>
             </div>
@@ -109,7 +109,7 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
           {element.componentStack.length > 0 ? (
             <div>
               <span className="text-xs text-muted-foreground">Component Stack:</span>
-              <div className="font-mono text-xs bg-muted px-2 py-1 rounded mt-1 max-h-20 overflow-y-auto">
+              <div className="font-mono text-xs bg-gray-4 px-2 py-1 rounded mt-1 max-h-20 overflow-y-auto">
                 {element.componentStack.map((name, i) => (
                   <div key={i} className={cn(i > 0 && 'text-muted-foreground')}>
                     {i > 0 ? '└ ' : ''}
@@ -123,7 +123,7 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
           {/* Selector */}
           <div>
             <span className="text-xs text-muted-foreground">Selector:</span>
-            <div className="font-mono text-xs bg-muted px-2 py-1 rounded mt-1 truncate">
+            <div className="font-mono text-xs bg-gray-4 px-2 py-1 rounded mt-1 truncate">
               {element.selector}
             </div>
           </div>
@@ -143,7 +143,7 @@ export const ElementContextList: FC<ElementContextListProps> = ({ elements, onRe
   if (elements.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-1.5 px-3 py-2 border-b border-border bg-muted/30">
+    <div className="flex flex-wrap gap-1.5 px-3 py-2 border-b border-border bg-gray-3">
       {elements.map((element, index) => (
         <ElementContextChip
           key={`${element.displayName}-${String(index)}`}

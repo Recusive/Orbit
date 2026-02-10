@@ -11,7 +11,9 @@
 use std::path::Path;
 
 use orbit_core::{GitBranch, GitCommit, GitStatus, Result};
-use orbit_git::{BlameLine, BranchInfo, FileDiff, GitManager, WorktreeAddOptions, WorktreeInfo};
+use orbit_git::{
+    BlameLine, BranchDiffStats, BranchInfo, FileDiff, GitManager, WorktreeAddOptions, WorktreeInfo,
+};
 
 use crate::core::sentry_utils::SentryCapture as _;
 
@@ -74,6 +76,18 @@ pub fn git_diff_structured(repo_path: String) -> Result<Vec<FileDiff>> {
 #[tauri::command]
 pub fn git_staged_diff(repo_path: String) -> Result<Vec<FileDiff>> {
     orbit_git::get_staged_diff(Path::new(&repo_path)).capture("git_staged_diff")
+}
+
+/// Get diff stats for current branch vs a base branch (e.g. "main").
+///
+/// Returns total additions, deletions, and files changed.
+#[tauri::command]
+pub fn git_branch_diff_stats(
+    repo_path: String,
+    base_branch: Option<String>,
+) -> Result<BranchDiffStats> {
+    let base = base_branch.as_deref().unwrap_or("main");
+    orbit_git::branch_diff_stats(Path::new(&repo_path), base).capture("git_branch_diff_stats")
 }
 
 /// Discard changes in files.

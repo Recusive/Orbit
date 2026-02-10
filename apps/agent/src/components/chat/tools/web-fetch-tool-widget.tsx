@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, ExternalLink, Globe, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronRight, ExternalLink, Globe, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -59,54 +59,47 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Web Fetch output' : 'Expand Web Fetch output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
-          'transition-colors duration-150 cursor-pointer w-full text-left',
-          'rounded-lg hover:bg-muted/20',
+          'group flex items-center py-1.5 px-2.5 text-sm',
+          'cursor-pointer w-full text-left rounded-lg',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div
-          className={cn(
-            'w-5 h-5 rounded flex items-center justify-center shrink-0',
-            'transition-colors duration-150',
-            isFailed
-              ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
-              : 'bg-info/8 group-hover/status:bg-info/12'
-          )}
-        >
-          <Globe
+        <div className="flex items-center gap-2 min-w-0">
+          <div
             className={cn(
-              'h-3 w-3 transition-colors duration-150',
-              isFailed
-                ? 'text-destructive/60 group-hover/status:text-destructive/80'
-                : 'text-info/60 group-hover/status:text-info/80',
-              isRunning && 'animate-pulse'
+              'w-5 h-5 rounded flex items-center justify-center shrink-0',
+              isFailed ? 'bg-destructive/8' : 'bg-info/8'
             )}
-          />
-        </div>
+          >
+            <Globe
+              className={cn(
+                'h-3 w-3',
+                isFailed ? 'text-destructive/60' : 'text-info/60',
+                isRunning && 'animate-pulse'
+              )}
+            />
+          </div>
 
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed
-                ? 'text-muted-foreground line-through'
-                : 'text-muted-foreground/90 group-hover/status:text-foreground'
+              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
             )}
           >
             {statusLabel}
           </span>
-          {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
-          ) : null}
-        </div>
 
-        <ChevronDown
-          className={cn(
-            'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
-            isExpanded && 'rotate-180'
-          )}
-        />
+          {isRunning ? (
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+          ) : null}
+
+          <ChevronRight
+            className={cn(
+              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-90'
+            )}
+          />
+        </div>
       </button>
 
       {/* Tree-style expanded content */}
@@ -141,10 +134,10 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
                   {/* URL */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
                       url
                     </div>
                     <button
@@ -154,38 +147,36 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
                       }}
                       className="flex items-center gap-1 group focus:outline-none"
                     >
-                      <code className="bg-muted/40 text-foreground rounded-md px-2 py-1 font-mono text-sm group-hover:bg-muted/60 transition-colors truncate max-w-full">
+                      <code className="bg-gray-4 text-gray-12 rounded-md px-2 py-1 font-mono text-sm group-hover:bg-gray-4 transition-colors truncate max-w-full">
                         {hostname}
                       </code>
-                      <ExternalLink className="h-2.5 w-2.5 text-muted-foreground/40 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <ExternalLink className="h-2.5 w-2.5 text-gray-9 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
                   </div>
 
                   {/* Prompt */}
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1">
+                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1">
                       prompt
                     </div>
-                    <div className="text-sm text-foreground/80 line-clamp-2">{prompt}</div>
+                    <div className="text-sm text-gray-11 line-clamp-2">{prompt}</div>
                   </div>
 
                   {/* Output */}
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
                     {isRunning ? (
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Fetching and processing content...</span>
                       </div>
                     ) : output ? (
-                      <div className="bg-muted/30 rounded-md p-2 font-mono text-sm leading-relaxed text-foreground/90 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
-                        <pre className="whitespace-pre-wrap break-words m-0">{output}</pre>
+                      <div className="bg-gray-3 rounded-md p-2 font-mono text-sm leading-relaxed text-gray-12 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
+                        <pre className="whitespace-pre-wrap wrap-break-word m-0">{output}</pre>
                       </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground/40 italic">
-                        No content fetched
-                      </div>
+                      <div className="text-sm text-gray-9 italic">No content fetched</div>
                     )}
                   </div>
                 </div>
@@ -206,7 +197,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                  <span className="ml-2.5 text-xs text-gray-11">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

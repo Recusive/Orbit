@@ -11,6 +11,7 @@ import type { FC } from 'react';
 
 import { GoToLineDialog, QuickOpen } from '@/components/modals';
 import { useTauri } from '@/hooks/agent/use-tauri';
+import { useGitPolling } from '@/hooks/git/use-git-polling';
 import { useDefaultKeyboardShortcuts } from '@/hooks/ui/use-keyboard-shortcuts';
 import { useLeftSidebarWidth, useUIStore } from '@/stores/ui/ui-store';
 
@@ -55,6 +56,9 @@ export const RootLayout: FC = () => {
 
   // Enable global keyboard shortcuts (Cmd+P, Cmd+K, etc.)
   useDefaultKeyboardShortcuts();
+
+  // Start global git status polling (populates GitStore for file explorer badges, status bar, etc.)
+  useGitPolling();
 
   // Handle keyboard shortcut events (from webview's own shortcuts)
   const handleOpenCommandPalette = useCallback((): void => {
@@ -154,7 +158,7 @@ export const RootLayout: FC = () => {
   ]);
 
   return (
-    <div className="h-full w-full flex overflow-hidden bg-background text-foreground">
+    <div className="h-full w-full flex overflow-hidden text-foreground">
       {/* Primary Sidebar - File explorer, conversations */}
       <PrimarySidebar width={leftSidebarWidth} />
 

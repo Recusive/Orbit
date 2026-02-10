@@ -88,10 +88,10 @@ export const GitSettings: FC = () => {
         </SettingItem>
       </div>
 
-      <div className="mt-4 p-3 bg-muted/30 rounded-md">
+      <div className="mt-4 p-3 bg-gray-3 rounded-md">
         <p className="text-xs text-muted-foreground/90">
           Auto-fetch keeps your local repository in sync with the remote by periodically running{' '}
-          <code className="bg-muted px-1 rounded">git fetch</code>. This updates the ahead/behind
+          <code className="bg-gray-4 px-1 rounded">git fetch</code>. This updates the ahead/behind
           counts shown in source control without modifying your working directory.
         </p>
       </div>

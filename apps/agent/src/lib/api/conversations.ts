@@ -18,6 +18,13 @@ export interface ConversationMessageDto {
   createdAt: number;
   toolUses?: ToolUseDto[];
   usage?: TokenUsageDto;
+  /**
+   * UUID of the previous message in the conversation chain.
+   * Used for Claude Code-style rewind/branching.
+   * - null for first message in conversation
+   * - undefined for legacy messages without this field
+   */
+  parentUuid?: string | null;
 }
 
 export interface ToolUseDto {
@@ -26,6 +33,7 @@ export interface ToolUseDto {
   input: Record<string, unknown>;
   output?: string;
   success: boolean;
+  contentOffset?: number;
 }
 
 export interface TokenUsageDto {
@@ -45,6 +53,8 @@ export interface ConversationDto {
   workspacePath?: string;
   worktreePath?: string;
   forkedFrom?: string;
+  /** Authoritative cumulative session usage from SDK `result` event. */
+  sessionUsage?: TokenUsageDto;
 }
 
 export interface ConversationSummaryDto {
@@ -81,12 +91,15 @@ export async function conversationList(
   return invoke<ConversationSummaryDto[]>('conversation_list', { workspacePath, worktreePath });
 }
 
-export async function conversationLoad(sessionId: string): Promise<ConversationDto | null> {
-  return invoke<ConversationDto | null>('conversation_load', { sessionId });
+export async function conversationLoad(
+  sessionId: string,
+  workspacePath?: string
+): Promise<ConversationDto | null> {
+  return invoke<ConversationDto | null>('conversation_load', { sessionId, workspacePath });
 }
 
-export async function conversationDelete(sessionId: string): Promise<void> {
-  return invoke('conversation_delete', { sessionId });
+export async function conversationDelete(sessionId: string, workspacePath?: string): Promise<void> {
+  return invoke('conversation_delete', { sessionId, workspacePath });
 }
 
 export async function conversationUpdateTitle(sessionId: string, title: string): Promise<void> {
@@ -105,19 +118,13 @@ export async function conversationAddMessage(
 export async function conversationFork(
   sessionId: string,
   newSessionId: string,
-  upToMessageId?: string
+  upToMessageId?: string,
+  workspacePath?: string
 ): Promise<ConversationDto | null> {
   return invoke<ConversationDto | null>('conversation_fork', {
     sessionId,
     newSessionId,
     upToMessageId,
+    workspacePath,
   });
-}
-
-export async function conversationDataPath(): Promise<string> {
-  return invoke<string>('conversation_data_path');
-}
-
-export async function conversationCleanupOrphaned(): Promise<number> {
-  return invoke<number>('conversation_cleanup_orphaned');
 }

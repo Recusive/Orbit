@@ -16,7 +16,6 @@ import type { StoredConversationSummary } from '@/types/protocol';
 
 import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/utils';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
-import { StoredConversationSummaryArraySchema } from '@/types/protocol';
 
 const logger = createLogger('UIStore');
 
@@ -198,32 +197,7 @@ interface UIActions {
 
 type UIStore = UIState & UIActions;
 
-// Helper to load conversations from localStorage
-const loadConversationsFromStorage = (): ConversationSummary[] => {
-  try {
-    const saved = localStorage.getItem('orbit-conversations');
-    if (saved === null) {
-      return [];
-    }
-    const json: unknown = JSON.parse(saved);
-    const result = StoredConversationSummaryArraySchema.safeParse(json);
-    if (!result.success) {
-      return [];
-    }
-    return result.data;
-  } catch {
-    return [];
-  }
-};
-
-// Helper to save conversations to localStorage
-const saveConversationsToStorage = (conversations: ConversationSummary[]): void => {
-  try {
-    localStorage.setItem('orbit-conversations', JSON.stringify(conversations));
-  } catch {
-    // Ignore storage errors
-  }
-};
+// Conversations are loaded from disk (JSONL files) — no localStorage persistence needed.
 
 // Helper to load worktrees from localStorage
 // Uses Zod validation to prevent runtime errors from malformed data
@@ -291,7 +265,7 @@ export const useUIStore = create<UIStore>()(
     activeConversationTitle: null,
     isLoadingConversation: false,
     isConversationTransitioning: false,
-    conversations: loadConversationsFromStorage(),
+    conversations: [],
     editingConversationId: null,
     leftSidebarOpen: DEFAULT_UI_STATE.leftSidebarOpen,
     leftSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
@@ -371,8 +345,9 @@ export const useUIStore = create<UIStore>()(
 
     setConversations: (conversations: ConversationSummary[]): void => {
       set((state) => {
+        // Pure reader: replace the sidebar list entirely from disk-scanned JSONL files.
+        // The SDK writes JSONL files — Orbit just reads them.
         state.conversations = conversations;
-        saveConversationsToStorage(conversations);
       });
     },
 
@@ -383,7 +358,6 @@ export const useUIStore = create<UIStore>()(
         if (!exists) {
           // Add to front of list (most recent first)
           state.conversations = [conversation, ...state.conversations];
-          saveConversationsToStorage(state.conversations);
         }
       });
     },
@@ -398,7 +372,6 @@ export const useUIStore = create<UIStore>()(
         }
         // Clean up session-specific data (Code review: Opus cycle 3, #4)
         state.sessionWorktreeMap.delete(sessionId);
-        saveConversationsToStorage(state.conversations);
       });
       // Clean up checkpoint data for deleted conversation (Opus cycle 3, #5)
       useCheckpointStore.getState().clearSessionCheckpoints(sessionId);
@@ -409,7 +382,6 @@ export const useUIStore = create<UIStore>()(
         const conversation = state.conversations.find((c) => c.sessionId === sessionId);
         if (conversation) {
           conversation.title = title;
-          saveConversationsToStorage(state.conversations);
         }
         // Also update active title if this is the active conversation
         if (state.activeConversationId === sessionId) {

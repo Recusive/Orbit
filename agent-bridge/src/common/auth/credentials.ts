@@ -1,9 +1,55 @@
 import { spawnSync } from 'child_process';
 
 import { formatZodError } from '@orbit/shared-schemas';
+import { z } from 'zod';
 
-import { KeychainCredentialsSchema, OAuthRefreshResponseSchema } from '../../protocol/schemas.js';
+import { KeychainCredentialsSchema } from '../../protocol/schemas.js';
 import { createLogger } from '../logging/logger.js';
+
+/**
+ * Persist updated credentials back to macOS Keychain.
+ * Uses `security add-generic-password -U` to update the existing entry.
+ * (Code review: Opus cycle 3, issues #7 and #10 — 3rd cycle fix)
+ */
+function writeKeychainCredentials(credentials: z.infer<typeof KeychainCredentialsSchema>): boolean {
+  try {
+    const jsonStr = JSON.stringify(credentials);
+    const spawnResult = spawnSync(
+      'security',
+      [
+        'add-generic-password',
+        '-s',
+        'Claude Code-credentials',
+        '-a',
+        'credentials',
+        '-w',
+        jsonStr,
+        '-U',
+      ],
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+    if (spawnResult.error || spawnResult.status !== 0) {
+      logger.warn({ error: spawnResult.stderr }, 'Failed to write credentials to Keychain');
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logger.warn(
+      { error: err instanceof Error ? err.message : String(err) },
+      'Keychain write error'
+    );
+    return false;
+  }
+}
+
+/** OAuth token refresh response from Anthropic's token endpoint */
+const OAuthRefreshResponseSchema = z.object({
+  access_token: z.string().min(1),
+  token_type: z.string().optional(),
+  expires_in: z.number(),
+  refresh_token: z.string().optional(),
+  scope: z.string().optional(),
+});
 
 const logger = createLogger('ClaudeCredentials');
 
@@ -93,6 +139,26 @@ async function refreshOAuthToken(
 
     logger.info({ expiresIn: parseResult.data.expires_in }, 'OAuth token refreshed successfully');
 
+    // Persist rotated refresh token to Keychain so it survives process restarts.
+    // Without this, the old (now-revoked) token in Keychain causes permanent auth failure.
+    // (Code review: Opus cycle 3, issue #7 — 3rd cycle fix)
+    if (
+      parseResult.data.refresh_token !== undefined &&
+      parseResult.data.refresh_token !== refreshToken
+    ) {
+      logger.info('OAuth response contains a rotated refresh_token, persisting to Keychain');
+      const credentials = readKeychainCredentials();
+      if (credentials?.claudeAiOauth) {
+        credentials.claudeAiOauth.refreshToken = parseResult.data.refresh_token;
+        const written = writeKeychainCredentials(credentials);
+        if (!written) {
+          logger.warn(
+            'Failed to persist rotated refresh_token to Keychain — future refreshes may fail'
+          );
+        }
+      }
+    }
+
     return {
       accessToken: parseResult.data.access_token,
       expiresIn: parseResult.data.expires_in,
@@ -100,6 +166,27 @@ async function refreshOAuthToken(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error({ error: errorMessage }, 'OAuth token refresh error');
+    return null;
+  }
+}
+
+/**
+ * Read and parse credentials from macOS Keychain.
+ * Shared helper used by both `getOAuthTokenFromKeychain` and `getTokenExpiry`
+ * to avoid duplicating the spawnSync + Zod parse logic.
+ */
+function readKeychainCredentials(): z.infer<typeof KeychainCredentialsSchema> | null {
+  try {
+    const spawnResult = spawnSync(
+      'security',
+      ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+    if (spawnResult.error || spawnResult.status !== 0) return null;
+    const json: unknown = JSON.parse(spawnResult.stdout.trim());
+    const parseResult = KeychainCredentialsSchema.safeParse(json);
+    return parseResult.success ? parseResult.data : null;
+  } catch {
     return null;
   }
 }
@@ -114,43 +201,13 @@ async function refreshOAuthToken(
  */
 async function getOAuthTokenFromKeychain(): Promise<string | null> {
   try {
-    // Use spawnSync for better error capture than execSync
-    const spawnResult = spawnSync(
-      'security',
-      ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
-      {
-        encoding: 'utf-8',
-        timeout: 10000, // 10 second timeout
-      }
-    );
-
-    if (spawnResult.error) {
-      logger.error({ error: spawnResult.error.message }, 'Failed to spawn security command');
+    const credentials = readKeychainCredentials();
+    if (credentials === null) {
+      logger.debug('Failed to read or parse credentials from Keychain');
       return null;
     }
 
-    if (spawnResult.status !== 0) {
-      logger.warn(
-        { status: spawnResult.status, stderr: spawnResult.stderr.trim() },
-        'Security command failed'
-      );
-      return null;
-    }
-
-    const output = spawnResult.stdout.trim();
-
-    // Parse and validate the JSON credentials structure with Zod
-    const json: unknown = JSON.parse(output);
-    const parseResult = KeychainCredentialsSchema.safeParse(json);
-    if (!parseResult.success) {
-      logger.debug(
-        { error: formatZodError(parseResult.error) },
-        'Invalid credentials structure in Keychain'
-      );
-      return null;
-    }
-
-    const claudeAuth = parseResult.data.claudeAiOauth;
+    const claudeAuth = credentials.claudeAiOauth;
     if (claudeAuth === undefined) {
       logger.debug('No Claude OAuth credentials found in Keychain');
       return null;
@@ -185,6 +242,16 @@ async function getOAuthTokenFromKeychain(): Promise<string | null> {
           logger.info('Attempting automatic OAuth token refresh');
           const refreshed = await refreshOAuthToken(refreshToken);
           if (refreshed !== null) {
+            // Persist refreshed access token + expiry to Keychain to avoid re-refresh
+            // on cold start (~15s latency). (Code review: Opus cycle 3, issue #10)
+            const freshCredentials = readKeychainCredentials();
+            if (freshCredentials?.claudeAiOauth) {
+              freshCredentials.claudeAiOauth.accessToken = refreshed.accessToken;
+              freshCredentials.claudeAiOauth.expiresAt = String(
+                Date.now() + refreshed.expiresIn * 1000
+              );
+              writeKeychainCredentials(freshCredentials);
+            }
             return refreshed.accessToken;
           }
           logger.warn('OAuth token refresh failed, returning null');
@@ -234,31 +301,16 @@ function getApiKeyFromEnv(): string | null {
  * This is a lightweight check suitable for scheduling background refresh timers.
  */
 function getTokenExpiry(): number | null {
-  try {
-    const spawnResult = spawnSync(
-      'security',
-      ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
-      { encoding: 'utf-8', timeout: 10000 }
-    );
+  const credentials = readKeychainCredentials();
+  if (credentials === null) return null;
 
-    if (spawnResult.error || spawnResult.status !== 0) {
-      return null;
-    }
+  const claudeAuth = credentials.claudeAiOauth;
+  if (claudeAuth === undefined) return null;
 
-    const json: unknown = JSON.parse(spawnResult.stdout.trim());
-    const parseResult = KeychainCredentialsSchema.safeParse(json);
-    if (!parseResult.success) return null;
+  const expiresAt = claudeAuth.expiresAt;
+  if (expiresAt === undefined || expiresAt === '') return null;
 
-    const claudeAuth = parseResult.data.claudeAiOauth;
-    if (claudeAuth === undefined) return null;
-
-    const expiresAt = claudeAuth.expiresAt;
-    if (expiresAt === undefined || expiresAt === '') return null;
-
-    return parseExpiryMs(expiresAt);
-  } catch {
-    return null;
-  }
+  return parseExpiryMs(expiresAt);
 }
 
 /**
@@ -325,6 +377,19 @@ function scheduleAutoRefresh(onFailure: AutoRefreshFailureCallback): () => void 
    *  entirely due to timer coalescing after wake. (Code review: Opus cycle 2, issue #6) */
   const PERIODIC_CHECK_MS = 5 * 60_000;
 
+  /** Stop all timers. Called on permanent failure to prevent infinite retry spam. */
+  function stopAll(): void {
+    stopped = true;
+    if (timerId !== null) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+    if (periodicId !== null) {
+      clearInterval(periodicId);
+      periodicId = null;
+    }
+  }
+
   function doRefresh(): void {
     if (stopped) return;
 
@@ -336,7 +401,14 @@ function scheduleAutoRefresh(onFailure: AutoRefreshFailureCallback): () => void 
           logger.info('Auto-refresh succeeded, rescheduling');
           schedule(); // Reschedule for the new token's expiry
         } else if (result.error !== undefined) {
-          logger.warn({ error: result.error }, 'Auto-refresh failed, notifying caller');
+          // Permanent failure (e.g. 400 = revoked/expired refresh token).
+          // Stop all timers to prevent infinite retry spam — user must
+          // re-authenticate via `claude login` to get a fresh token.
+          logger.warn(
+            { error: result.error },
+            'Auto-refresh permanently failed, stopping retry loop'
+          );
+          stopAll();
           onFailure(result.error);
         } else {
           // Token still valid — periodic check found nothing to refresh
@@ -347,6 +419,7 @@ function scheduleAutoRefresh(onFailure: AutoRefreshFailureCallback): () => void 
         if (stopped) return;
         const msg = err instanceof Error ? err.message : String(err);
         logger.error({ error: msg }, 'Auto-refresh threw unexpectedly');
+        stopAll();
         onFailure('OAuth auto-refresh error. Please re-authenticate.');
       });
   }
@@ -387,17 +460,7 @@ function scheduleAutoRefresh(onFailure: AutoRefreshFailureCallback): () => void 
     }
   }, PERIODIC_CHECK_MS);
 
-  return () => {
-    stopped = true;
-    if (timerId !== null) {
-      clearTimeout(timerId);
-      timerId = null;
-    }
-    if (periodicId !== null) {
-      clearInterval(periodicId);
-      periodicId = null;
-    }
-  };
+  return stopAll;
 }
 
 /**

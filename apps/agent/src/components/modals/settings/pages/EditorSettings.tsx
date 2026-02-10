@@ -13,12 +13,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { useFileViewerStore, useWordWrap } from '@/stores/file/file-viewer-store';
 
 export const EditorSettings: FC = () => {
   const [theme, setTheme] = useState('dark');
   const [fontSize, setFontSize] = useState('13');
   const [tabSize, setTabSize] = useState('2');
-  const [wordWrap, setWordWrap] = useState(true);
+  const wordWrap = useWordWrap();
+  const toggleWordWrap = useFileViewerStore((s) => s.toggleWordWrap);
   const [minimap, setMinimap] = useState(false);
 
   return (
@@ -68,7 +70,7 @@ export const EditorSettings: FC = () => {
 
       <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Word Wrap" description="Wrap long lines to fit the editor width">
-          <Switch checked={wordWrap} onCheckedChange={setWordWrap} />
+          <Switch checked={wordWrap} onCheckedChange={toggleWordWrap} />
         </SettingItem>
 
         <SettingItem label="Minimap" description="Show code minimap on the side">

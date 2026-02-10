@@ -1,12 +1,13 @@
 import { IconSquareGridCircle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSquareGridCircle';
-import { Search } from 'lucide-react';
+import { Search, Terminal } from 'lucide-react';
 import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
 
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, getCommandKey } from '@/lib/utils';
+import { HEIGHTS } from '@/lib/utils/constants';
 import { useUIStore, useWorkspaceName, useActiveTab, useHasWorkspace } from '@/stores/ui/ui-store';
 
 // Re-export for backwards compatibility
@@ -14,6 +15,8 @@ export type { HeaderTab } from '@/stores/ui/ui-store';
 
 export interface HeaderBarProps {
   className?: string;
+  /** When true, renders with a transparent background (used on welcome page) */
+  transparent?: boolean;
 }
 
 interface TabButtonProps {
@@ -31,21 +34,21 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       tabIndex={active ? 0 : -1}
       data-tauri-drag-region={false}
       className={cn(
-        'relative flex items-center justify-center h-7 px-3 transition-colors duration-200',
-        active ? 'text-foreground' : 'text-muted-foreground/80 hover:text-foreground'
+        'relative flex items-center justify-center h-7 px-3 transition-[background-color] duration-100',
+        active ? 'text-foreground' : 'text-gray-10 dark:text-gray-11 hover:text-gray-12'
       )}
       onClick={onClick}
     >
       {/* Tab background */}
       <div
         className={cn(
-          'absolute inset-0 rounded-md transition-colors duration-200',
-          active ? 'bg-muted/70' : 'hover:bg-muted/40'
+          'absolute inset-0 rounded-md transition-[background-color] duration-100',
+          active ? 'bg-gray-4' : 'hover:bg-gray-4'
         )}
       />
       {/* Active indicator - offset to sit on header's bottom border */}
       {active ? (
-        <div className="absolute inset-x-0 h-0.5 bg-primary/80" style={{ bottom: '-3.5px' }} />
+        <div className="absolute inset-x-0 h-0.5 bg-primary" style={{ bottom: '-3.5px' }} />
       ) : null}
       <span className="relative text-base font-medium">{label}</span>
     </button>
@@ -56,25 +59,49 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
  * HeaderBar at the top of the app with navigation tabs.
  * Matches the sidebar background color.
  */
-export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
+export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }) => {
   const activeTab = useActiveTab();
   const workspaceName = useWorkspaceName();
   const hasWorkspace = useHasWorkspace();
 
   // Use useShallow to prevent re-renders when unrelated store state changes
-  const { setActiveTab, toggleReviewPanel, toggleRightSidebar, reviewPanelOpen, rightSidebarOpen } =
-    useUIStore(
-      useShallow((s) => ({
-        setActiveTab: s.setActiveTab,
-        toggleReviewPanel: s.toggleReviewPanel,
-        toggleRightSidebar: s.toggleRightSidebar,
-        reviewPanelOpen: s.reviewPanelOpen,
-        rightSidebarOpen: s.rightSidebarOpen,
-      }))
-    );
+  const {
+    setActiveTab,
+    toggleReviewPanel,
+    toggleRightSidebar,
+    toggleBottomPanel,
+    setTerminalPosition,
+    reviewPanelOpen,
+    rightSidebarOpen,
+    bottomPanelOpen,
+  } = useUIStore(
+    useShallow((s) => ({
+      setActiveTab: s.setActiveTab,
+      toggleReviewPanel: s.toggleReviewPanel,
+      toggleRightSidebar: s.toggleRightSidebar,
+      toggleBottomPanel: s.toggleBottomPanel,
+      setTerminalPosition: s.setTerminalPosition,
+      reviewPanelOpen: s.reviewPanelOpen,
+      rightSidebarOpen: s.rightSidebarOpen,
+      bottomPanelOpen: s.bottomPanelOpen,
+    }))
+  );
 
   const handleOpenSearch = (): void => {
     window.dispatchEvent(new CustomEvent('openCommandPalette'));
+  };
+
+  // Smart terminal toggle: position depends on whether activity panel is open
+  const handleToggleTerminal = (): void => {
+    if (!bottomPanelOpen) {
+      // Opening terminal — choose position based on activity panel state
+      if (reviewPanelOpen) {
+        setTerminalPosition('activity');
+      } else {
+        setTerminalPosition('both');
+      }
+    }
+    toggleBottomPanel();
   };
 
   const searchText = workspaceName ?? 'Search...';
@@ -83,15 +110,19 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
     <header
       data-tauri-drag-region
       className={cn(
-        'h-[35px] flex items-center justify-between pr-2 border-b-[3px] border-border/50 shrink-0',
-        'bg-card shadow-lg',
+        'flex items-center justify-between border-b shrink-0',
+        transparent ? 'bg-transparent border-gray-8/35' : 'bg-card shadow-lg border-gray-5',
         // Left padding for macOS traffic light buttons (matches Cursor: x:11 + ~69px for 3 buttons)
         'pl-[80px]',
         className
       )}
+      style={{ height: HEIGHTS.headerBar }}
     >
-      {/* Left spacer for balance (reduced since we have traffic light padding) */}
-      <div className="w-[122px]" />
+      {/* Navigation arrows — hidden until handlers are implemented
+       * (Code review: Opus cycle 3, issue #18) */}
+      <div className="flex items-center gap-0.5">
+        {/* Spacer to maintain layout — buttons will go here when navigation is wired up */}
+      </div>
 
       {/* Center tabs - only show when workspace is open */}
       {hasWorkspace ? (
@@ -122,38 +153,47 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
         <div />
       )}
 
-      {/* Right section: Search + Action buttons - only show when workspace is open */}
+      {/* Right section: Search + Action buttons */}
       {workspaceName ? (
-        <div className="flex items-center gap-2">
-          {/* Search button - VS Code style command palette */}
+        <div className="flex items-center gap-0.5 pr-0.5">
+          {/* Search button */}
           <button
             data-tauri-drag-region={false}
-            className="flex items-center gap-2 h-6 px-2 rounded-md text-foreground hover:text-foreground overflow-hidden border border-border/50 bg-muted hover:bg-muted/80 transition-colors duration-200"
-            title="Search files (⌘P)"
+            className={cn(
+              'flex items-center gap-2 h-7 px-2.5 rounded-md',
+              'text-sidebar-foreground hover:text-foreground',
+              'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+              'transition-[color,background-color,transform] duration-150'
+            )}
+            title="Search files (⌘K)"
             onClick={handleOpenSearch}
           >
-            <Search className="h-3 w-3 shrink-0 opacity-50" />
-            <span className="text-base whitespace-nowrap overflow-hidden truncate max-w-[120px] opacity-60">
-              {searchText}
-            </span>
-            <KbdGroup>
-              <Kbd className="border-0 bg-background/60 shadow-xs">⌘</Kbd>
-              <Kbd className="border-0 bg-background/60 shadow-xs">P</Kbd>
-            </KbdGroup>
+            <Search className="h-3.5 w-3.5 shrink-0" />
+            <span className="text-sm truncate max-w-[120px]">{searchText}</span>
+            <Kbd className="h-[18px] !text-[12px] px-1.5 bg-gray-5 text-inherit border-gray-6">
+              <span className="text-[14px] leading-none">⌘</span> K
+            </Kbd>
           </button>
 
-          <div className="flex items-center gap-1">
+          {/* Divider */}
+          <div className="w-px h-4 bg-gray-5 shrink-0" />
+
+          {/* Panel toggles */}
+          <div className="flex items-center gap-0.5 px-1">
             {/* Activity Panel Toggle */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   data-tauri-drag-region={false}
                   onClick={toggleReviewPanel}
+                  aria-label={reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}
                   className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150',
+                    'h-6 w-6 flex items-center justify-center rounded-md',
+                    'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                    'transition-[color,background-color,transform] duration-150',
                     reviewPanelOpen
                       ? 'text-foreground'
-                      : 'text-muted-foreground/80 hover:text-foreground'
+                      : 'text-sidebar-foreground hover:text-foreground'
                   )}
                 >
                   <div className="rotate-180">
@@ -183,10 +223,32 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
               </TooltipTrigger>
               <TooltipContent className="flex items-center gap-2">
                 <span>{reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}</span>
-                <KbdGroup>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">{getCommandKey()}</Kbd>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">B</Kbd>
-                </KbdGroup>
+                <Kbd className="bg-white/15 border-white/20">{getCommandKey()}B</Kbd>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Terminal Toggle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  data-tauri-drag-region={false}
+                  onClick={handleToggleTerminal}
+                  aria-label={bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}
+                  className={cn(
+                    'h-6 w-6 flex items-center justify-center rounded-md',
+                    'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                    'transition-[color,background-color,transform] duration-150',
+                    bottomPanelOpen
+                      ? 'text-foreground'
+                      : 'text-sidebar-foreground hover:text-foreground'
+                  )}
+                >
+                  <Terminal className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="flex items-center gap-2">
+                <span>{bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}</span>
+                <Kbd className="bg-white/15 border-white/20">^J</Kbd>
               </TooltipContent>
             </Tooltip>
 
@@ -196,11 +258,14 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className }) => {
                 <button
                   data-tauri-drag-region={false}
                   onClick={toggleRightSidebar}
+                  aria-label={rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
                   className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted/60 active:scale-95 transition-[background-color,color,transform] duration-150',
+                    'h-6 w-6 flex items-center justify-center rounded-md',
+                    'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                    'transition-[color,background-color,transform] duration-150',
                     rightSidebarOpen
                       ? 'text-foreground'
-                      : 'text-muted-foreground/80 hover:text-foreground'
+                      : 'text-sidebar-foreground hover:text-foreground'
                   )}
                 >
                   <IconSquareGridCircle className="h-4 w-4" />

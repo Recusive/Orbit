@@ -21,8 +21,15 @@ import {
   HighlightStyle,
   indentOnInput,
   indentUnit,
+  StreamLanguage,
   syntaxHighlighting,
 } from '@codemirror/language';
+import { c, cpp, csharp, java, kotlin, scala } from '@codemirror/legacy-modes/mode/clike';
+import { dockerFile } from '@codemirror/legacy-modes/mode/dockerfile';
+import { ruby } from '@codemirror/legacy-modes/mode/ruby';
+import { shell } from '@codemirror/legacy-modes/mode/shell';
+import { sql } from '@codemirror/legacy-modes/mode/sql';
+import { swift } from '@codemirror/legacy-modes/mode/swift';
 import { linter, lintKeymap, setDiagnostics } from '@codemirror/lint';
 import { highlightSelectionMatches, openSearchPanel, searchKeymap } from '@codemirror/search';
 import { Compartment, EditorState } from '@codemirror/state';
@@ -114,6 +121,22 @@ const languages: Record<string, LanguageFactory> = {
   yaml: () => markdown(), // YAML is readable like markdown
   yml: () => markdown(),
   toml: () => markdown(),
+
+  // Legacy modes (CodeMirror 5 → 6 via StreamLanguage)
+  dockerfile: () => StreamLanguage.define(dockerFile),
+  bash: () => StreamLanguage.define(shell),
+  sh: () => StreamLanguage.define(shell),
+
+  // Systems languages (legacy)
+  c: () => StreamLanguage.define(c),
+  cpp: () => StreamLanguage.define(cpp),
+  java: () => StreamLanguage.define(java),
+  csharp: () => StreamLanguage.define(csharp),
+  kotlin: () => StreamLanguage.define(kotlin),
+  scala: () => StreamLanguage.define(scala),
+  swift: () => StreamLanguage.define(swift),
+  ruby: () => StreamLanguage.define(ruby),
+  sql: () => StreamLanguage.define(sql({})),
 };
 
 // ============================================
@@ -123,42 +146,42 @@ const languages: Record<string, LanguageFactory> = {
 const darkTheme = EditorView.theme(
   {
     '&': {
-      backgroundColor: 'oklch(0.2 0.015 58)', // Same as --card in dark mode
-      color: '#e1e1e1',
+      backgroundColor: 'var(--editor-bg)', // Transparent in liquid glass, solid in solid mode
+      color: 'var(--gray-12)',
     },
     '.cm-scroller': {
       overflow: 'auto',
     },
     '.cm-content': {
-      caretColor: '#e1e1e1',
+      caretColor: 'var(--gray-12)',
     },
     '&.cm-focused .cm-cursor': {
-      borderLeftColor: '#e1e1e1',
+      borderLeftColor: 'var(--gray-12)',
     },
     '.cm-dropCursor': {
-      borderLeftColor: '#e1e1e1',
+      borderLeftColor: 'var(--gray-12)',
     },
     '&.cm-focused .cm-selectionBackground, ::selection': {
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      backgroundColor: 'var(--gray-a5)',
     },
     '.cm-gutters': {
-      backgroundColor: 'oklch(0.2 0.015 58)', // Same as editor bg for horizontal scroll
-      color: 'oklch(0.55 0.03 60)', // Warm brown matching --muted-foreground
+      backgroundColor: 'var(--editor-bg)', // Match editor background
+      color: 'var(--gray-10)', // Warm brown matching --muted-foreground (+1 bump)
       border: 'none',
     },
     '.cm-activeLineGutter': {
       backgroundColor: 'inherit',
     },
     '.cm-activeLine': {
-      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      backgroundColor: 'var(--gray-a4)',
     },
     // Hover tooltip dark theme
     '.cm-tooltip': {
-      backgroundColor: 'oklch(0.22 0.012 60)',
-      color: '#e1e1e1',
+      backgroundColor: 'var(--gray-4)',
+      color: 'var(--gray-12)',
     },
     '.cm-tooltip .cm-lsp-hover': {
-      backgroundColor: 'oklch(0.22 0.012 60)',
+      backgroundColor: 'var(--gray-4)',
     },
     // Diagnostic squiggles
     '.cm-lintRange-error': {
@@ -202,7 +225,7 @@ const darkTheme = EditorView.theme(
     '.cm-search.cm-panel': {
       position: 'relative',
       // Use solid background - backdropFilter causes blur in Tauri WebView
-      backgroundColor: 'oklch(0.20 0.012 60)',
+      backgroundColor: 'var(--gray-3)',
       borderRadius: '12px',
       border: 'none',
       boxShadow: '0 8px 32px -8px rgba(0,0,0,0.4), 0 4px 16px -4px rgba(0,0,0,0.2)',
@@ -214,12 +237,12 @@ const darkTheme = EditorView.theme(
       alignItems: 'center',
       gap: '8px',
     },
-    // Input fields
+    // Input fields (+1 bump)
     '.cm-search.cm-panel input.cm-textfield': {
-      backgroundColor: 'oklch(0.16 0.012 60 / 0.6)',
-      border: '1px solid oklch(0.30 0.012 60 / 0.4)',
+      backgroundColor: 'var(--gray-a4)',
+      border: '1px solid var(--gray-a6)',
       borderRadius: '8px',
-      color: '#e1e1e1',
+      color: 'var(--gray-12)',
       padding: '0 10px',
       fontSize: '12px',
       outline: 'none',
@@ -229,20 +252,20 @@ const darkTheme = EditorView.theme(
       transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
     },
     '.cm-search.cm-panel input.cm-textfield:focus': {
-      backgroundColor: 'oklch(0.2 0.015 58 / 0.8)',
-      borderColor: 'oklch(0.40 0.012 60 / 0.6)',
-      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.15), 0 0 0 1px oklch(0.40 0.012 60 / 0.3)',
+      backgroundColor: 'var(--gray-a5)',
+      borderColor: 'var(--gray-a8)',
+      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.15), 0 0 0 1px var(--gray-a6)',
     },
     '.cm-search.cm-panel input.cm-textfield::placeholder': {
-      color: 'oklch(0.50 0.02 60 / 0.5)',
+      color: 'var(--gray-a9)',
     },
-    // All buttons base styling - coral/brown theme
+    // All buttons base styling - gray monochrome (+1 bump)
     '.cm-search.cm-panel .cm-button': {
-      backgroundColor: 'oklch(0.28 0.04 50 / 0.5)',
+      backgroundColor: 'var(--gray-a5)',
       backgroundImage: 'none',
-      border: '1px solid oklch(0.40 0.06 50 / 0.3)',
+      border: '1px solid var(--gray-a6)',
       borderRadius: '6px',
-      color: 'oklch(0.80 0.06 50)',
+      color: 'var(--gray-12)',
       padding: '0 10px',
       fontSize: '11px',
       fontWeight: '500',
@@ -252,18 +275,18 @@ const darkTheme = EditorView.theme(
       boxShadow: 'none',
     },
     '.cm-search.cm-panel .cm-button:hover': {
-      backgroundColor: 'oklch(0.35 0.08 45 / 0.6)',
+      backgroundColor: 'var(--gray-a6)',
       backgroundImage: 'none',
-      borderColor: 'oklch(0.50 0.10 45 / 0.5)',
-      color: 'oklch(0.90 0.08 45)',
+      borderColor: 'var(--gray-a8)',
+      color: 'var(--gray-12)',
       transform: 'scale(1.02)',
     },
     '.cm-search.cm-panel .cm-button:active': {
-      backgroundColor: 'oklch(0.30 0.06 50 / 0.7)',
+      backgroundColor: 'var(--gray-a7)',
       backgroundImage: 'none',
       transform: 'scale(0.98)',
     },
-    // Close button - positioned top right
+    // Close button - positioned top right (+1 bump)
     '.cm-search.cm-panel button[name="close"]': {
       position: 'absolute',
       top: '10px',
@@ -271,7 +294,7 @@ const darkTheme = EditorView.theme(
       backgroundColor: 'transparent',
       border: 'none',
       borderRadius: '6px',
-      color: 'oklch(0.50 0.02 60 / 0.5)',
+      color: 'var(--gray-a9)',
       fontSize: '16px',
       width: '24px',
       height: '24px',
@@ -284,8 +307,8 @@ const darkTheme = EditorView.theme(
       lineHeight: '1',
     },
     '.cm-search.cm-panel button[name="close"]:hover': {
-      backgroundColor: 'oklch(0.25 0.012 60 / 0.6)',
-      color: '#e1e1e1',
+      backgroundColor: 'var(--gray-a5)',
+      color: 'var(--gray-12)',
       transform: 'scale(1.1)',
     },
     '.cm-search.cm-panel button[name="close"]:active': {
@@ -302,7 +325,7 @@ const darkTheme = EditorView.theme(
       fontSize: '10px',
       fontWeight: '500',
       letterSpacing: '0.02em',
-      color: 'oklch(0.55 0.02 60 / 0.6)',
+      color: 'var(--gray-a10)',
       backgroundColor: 'transparent',
       border: '1px solid transparent',
       cursor: 'pointer',
@@ -310,8 +333,8 @@ const darkTheme = EditorView.theme(
       transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
     },
     '.cm-search.cm-panel label:hover': {
-      backgroundColor: 'oklch(0.25 0.012 60 / 0.5)',
-      color: 'oklch(0.70 0.02 60)',
+      backgroundColor: 'var(--gray-a5)',
+      color: 'var(--gray-12)',
     },
     '.cm-search.cm-panel label:has(input:checked)': {
       backgroundColor: 'oklch(0.55 0.15 250 / 0.15)',
@@ -375,6 +398,21 @@ const darkHighlightStyle = HighlightStyle.define([
   { tag: tags.punctuation, color: '#e1e1e1' },
   { tag: tags.bracket, color: '#e1e1e1' },
   { tag: tags.meta, color: '#8b949e' },
+
+  // Markdown-specific tags
+  { tag: tags.heading1, color: '#79c0ff', fontWeight: 'bold' },
+  { tag: tags.heading2, color: '#79c0ff', fontWeight: 'bold' },
+  { tag: tags.heading3, color: '#79c0ff', fontWeight: 'bold' },
+  { tag: [tags.heading4, tags.heading5, tags.heading6], color: '#79c0ff', fontWeight: 'bold' },
+  { tag: tags.emphasis, fontStyle: 'italic', color: '#d2a8ff' },
+  { tag: tags.strong, fontWeight: 'bold', color: '#ffa657' },
+  { tag: tags.link, color: '#58a6ff', textDecoration: 'underline' },
+  { tag: tags.url, color: '#58a6ff' },
+  { tag: tags.monospace, color: '#7ee787' },
+  { tag: tags.strikethrough, textDecoration: 'line-through', color: '#8b949e' },
+  { tag: tags.quote, color: '#8b949e', fontStyle: 'italic' },
+  { tag: tags.list, color: '#ff7b72' },
+  { tag: tags.contentSeparator, color: '#30363d' },
 ]);
 
 // ============================================
@@ -383,43 +421,43 @@ const darkHighlightStyle = HighlightStyle.define([
 
 const lightTheme = EditorView.theme({
   '&': {
-    backgroundColor: 'oklch(0.9 0.02 75)', // Same as --card in light mode
-    color: '#24292f',
+    backgroundColor: 'var(--editor-bg)', // Transparent in liquid glass, solid in solid mode
+    color: 'var(--gray-12)',
   },
   '.cm-scroller': {
     overflow: 'auto',
   },
   '.cm-content': {
-    caretColor: '#24292f',
+    caretColor: 'var(--gray-12)',
   },
   '&.cm-focused .cm-cursor': {
-    borderLeftColor: '#24292f',
+    borderLeftColor: 'var(--gray-12)',
   },
   '.cm-dropCursor': {
-    borderLeftColor: '#24292f',
+    borderLeftColor: 'var(--gray-12)',
   },
   '&.cm-focused .cm-selectionBackground, ::selection': {
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: 'var(--gray-a5)',
   },
   '.cm-gutters': {
-    backgroundColor: 'oklch(0.9 0.02 75)', // Same as editor bg for horizontal scroll
-    color: 'oklch(0.50 0.03 60)', // Warm brown matching --muted-foreground
+    backgroundColor: 'var(--editor-bg)', // Match editor background
+    color: 'var(--gray-10)', // Warm brown matching --muted-foreground (+1 bump)
     border: 'none',
   },
   '.cm-activeLineGutter': {
     backgroundColor: 'inherit',
   },
   '.cm-activeLine': {
-    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    backgroundColor: 'var(--gray-a4)',
   },
-  // Hover tooltip light theme
+  // Hover tooltip light theme (+1 bump)
   '.cm-tooltip': {
-    backgroundColor: '#ffffff',
-    color: '#24292f',
-    border: '1px solid rgba(0, 0, 0, 0.1)',
+    backgroundColor: 'var(--gray-2)',
+    color: 'var(--gray-12)',
+    border: '1px solid var(--gray-a5)',
   },
   '.cm-tooltip .cm-lsp-hover': {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'var(--gray-2)',
   },
   // Diagnostic squiggles (darker colors for light mode)
   '.cm-lintRange-error': {
@@ -463,7 +501,7 @@ const lightTheme = EditorView.theme({
   '.cm-search.cm-panel': {
     position: 'relative',
     // Use solid background - backdropFilter causes blur in Tauri WebView
-    backgroundColor: 'oklch(0.98 0.005 75)',
+    backgroundColor: 'var(--gray-2)',
     borderRadius: '12px',
     border: 'none',
     boxShadow: '0 8px 32px -8px rgba(0,0,0,0.12), 0 4px 16px -4px rgba(0,0,0,0.06)',
@@ -477,10 +515,10 @@ const lightTheme = EditorView.theme({
   },
   // Input fields
   '.cm-search.cm-panel input.cm-textfield': {
-    backgroundColor: 'oklch(0.96 0.005 75 / 0.5)',
-    border: '1px solid oklch(0.88 0.005 75 / 0.4)',
+    backgroundColor: 'var(--gray-a3)',
+    border: '1px solid var(--gray-a5)',
     borderRadius: '8px',
-    color: '#24292f',
+    color: 'var(--gray-12)',
     padding: '0 10px',
     fontSize: '12px',
     outline: 'none',
@@ -490,20 +528,20 @@ const lightTheme = EditorView.theme({
     transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
   },
   '.cm-search.cm-panel input.cm-textfield:focus': {
-    backgroundColor: '#ffffff',
-    borderColor: 'oklch(0.80 0.005 75 / 0.6)',
-    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05), 0 0 0 1px oklch(0.80 0.005 75 / 0.3)',
+    backgroundColor: 'var(--gray-contrast)',
+    borderColor: 'var(--gray-a7)',
+    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05), 0 0 0 1px var(--gray-a5)',
   },
   '.cm-search.cm-panel input.cm-textfield::placeholder': {
-    color: 'oklch(0.60 0.02 60 / 0.5)',
+    color: 'var(--gray-a9)',
   },
-  // All buttons base styling - coral/brown theme
+  // All buttons base styling - gray monochrome (+1 bump)
   '.cm-search.cm-panel .cm-button': {
-    backgroundColor: 'oklch(0.92 0.04 50 / 0.5)',
+    backgroundColor: 'var(--gray-a4)',
     backgroundImage: 'none',
-    border: '1px solid oklch(0.80 0.06 50 / 0.3)',
+    border: '1px solid var(--gray-a5)',
     borderRadius: '6px',
-    color: 'oklch(0.45 0.08 50)',
+    color: 'var(--gray-12)',
     padding: '0 10px',
     fontSize: '11px',
     fontWeight: '500',
@@ -513,18 +551,18 @@ const lightTheme = EditorView.theme({
     boxShadow: 'none',
   },
   '.cm-search.cm-panel .cm-button:hover': {
-    backgroundColor: 'oklch(0.88 0.06 45 / 0.6)',
+    backgroundColor: 'var(--gray-a5)',
     backgroundImage: 'none',
-    borderColor: 'oklch(0.70 0.10 45 / 0.5)',
-    color: 'oklch(0.35 0.10 45)',
+    borderColor: 'var(--gray-a7)',
+    color: 'var(--gray-12)',
     transform: 'scale(1.02)',
   },
   '.cm-search.cm-panel .cm-button:active': {
-    backgroundColor: 'oklch(0.85 0.05 50 / 0.7)',
+    backgroundColor: 'var(--gray-a6)',
     backgroundImage: 'none',
     transform: 'scale(0.98)',
   },
-  // Close button - positioned top right
+  // Close button - positioned top right (+1 bump)
   '.cm-search.cm-panel button[name="close"]': {
     position: 'absolute',
     top: '10px',
@@ -532,7 +570,7 @@ const lightTheme = EditorView.theme({
     backgroundColor: 'transparent',
     border: 'none',
     borderRadius: '6px',
-    color: 'oklch(0.60 0.02 60 / 0.5)',
+    color: 'var(--gray-a9)',
     fontSize: '16px',
     width: '24px',
     height: '24px',
@@ -545,14 +583,14 @@ const lightTheme = EditorView.theme({
     lineHeight: '1',
   },
   '.cm-search.cm-panel button[name="close"]:hover': {
-    backgroundColor: 'oklch(0.92 0.005 75 / 0.6)',
-    color: '#24292f',
+    backgroundColor: 'var(--gray-a4)',
+    color: 'var(--gray-12)',
     transform: 'scale(1.1)',
   },
   '.cm-search.cm-panel button[name="close"]:active': {
     transform: 'scale(0.95)',
   },
-  // Checkbox labels as pill toggles
+  // Checkbox labels as pill toggles (+1 bump)
   '.cm-search.cm-panel label': {
     display: 'inline-flex',
     alignItems: 'center',
@@ -563,7 +601,7 @@ const lightTheme = EditorView.theme({
     fontSize: '10px',
     fontWeight: '500',
     letterSpacing: '0.02em',
-    color: 'oklch(0.55 0.02 60 / 0.6)',
+    color: 'var(--gray-a10)',
     backgroundColor: 'transparent',
     border: '1px solid transparent',
     cursor: 'pointer',
@@ -571,8 +609,8 @@ const lightTheme = EditorView.theme({
     transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
   },
   '.cm-search.cm-panel label:hover': {
-    backgroundColor: 'oklch(0.94 0.005 75 / 0.5)',
-    color: 'oklch(0.40 0.02 60)',
+    backgroundColor: 'var(--gray-a4)',
+    color: 'var(--gray-12)',
   },
   '.cm-search.cm-panel label:has(input:checked)': {
     backgroundColor: 'oklch(0.55 0.15 250 / 0.12)',
@@ -634,6 +672,21 @@ const lightHighlightStyle = HighlightStyle.define([
   { tag: tags.punctuation, color: '#24292f' },
   { tag: tags.bracket, color: '#24292f' },
   { tag: tags.meta, color: '#6e7781' },
+
+  // Markdown-specific tags
+  { tag: tags.heading1, color: '#0550ae', fontWeight: 'bold' },
+  { tag: tags.heading2, color: '#0550ae', fontWeight: 'bold' },
+  { tag: tags.heading3, color: '#0550ae', fontWeight: 'bold' },
+  { tag: [tags.heading4, tags.heading5, tags.heading6], color: '#0550ae', fontWeight: 'bold' },
+  { tag: tags.emphasis, fontStyle: 'italic', color: '#8250df' },
+  { tag: tags.strong, fontWeight: 'bold', color: '#953800' },
+  { tag: tags.link, color: '#0969da', textDecoration: 'underline' },
+  { tag: tags.url, color: '#0969da' },
+  { tag: tags.monospace, color: '#116329' },
+  { tag: tags.strikethrough, textDecoration: 'line-through', color: '#6e7781' },
+  { tag: tags.quote, color: '#6e7781', fontStyle: 'italic' },
+  { tag: tags.list, color: '#cf222e' },
+  { tag: tags.contentSeparator, color: '#d0d7de' },
 ]);
 
 // ============================================
@@ -684,7 +737,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
   gotoPosition,
   onGotoComplete,
   searchTrigger = null,
-  wordWrap = true,
+  wordWrap = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -949,7 +1002,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
           fontSize: '13px',
         },
         '.cm-scroller': {
-          fontFamily: '"JetBrains Mono", "Fira Code", "Menlo", "Monaco", monospace',
+          fontFamily: '"Geist Mono Variable", "Geist Mono", "Menlo", monospace',
           lineHeight: '1.6',
         },
         '.cm-gutters': {
@@ -980,7 +1033,7 @@ export const CodeMirrorEditor: FC<CodeMirrorEditorProps> = ({
           padding: '0',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
-          fontFamily: '"JetBrains Mono", "Fira Code", "Menlo", "Monaco", monospace',
+          fontFamily: '"Geist Mono Variable", "Geist Mono", "Menlo", monospace',
         },
       }),
     ];

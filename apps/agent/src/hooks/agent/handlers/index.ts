@@ -97,7 +97,7 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
 
   // Handle conversation creation
   if (message.type === 'conversation:create') {
-    await handleConversationCreate(message);
+    handleConversationCreate(message);
     return;
   }
 

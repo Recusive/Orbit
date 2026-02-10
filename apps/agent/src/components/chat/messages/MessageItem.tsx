@@ -5,8 +5,9 @@
  * To change message widths or assistant padding, update CHAT_WIDTH,
  * CHAT_WIDTH_VAR, and CHAT_SPACING in constants.ts - DO NOT hardcode here.
  */
+import { code } from '@streamdown/code';
 import { mermaid } from '@streamdown/mermaid';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
@@ -24,6 +25,9 @@ import { ErrorBoundary } from '@/components/shared';
 import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
 import { cn, CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
+/** Max collapsed height for user message bubbles (px). Content taller than this gets a "Show more" toggle. */
+const USER_MESSAGE_MAX_HEIGHT = 200;
+
 // Disable Streamdown's built-in link safety modal. Links render as plain <a> tags instead
 // of <button> elements, letting our handleContentClick route them through onOpenUrl → Tauri.
 const LINK_SAFETY_DISABLED = { enabled: false } as const;
@@ -32,13 +36,21 @@ const LINK_SAFETY_DISABLED = { enabled: false } as const;
 // This is critical for Streamdown performance as it compares plugin arrays by reference.
 const REMARK_PLUGINS = [remarkGfm];
 
-// Two rehype configurations: streaming wraps text in <span class="flow-token">
-// for per-word blur-in animation; static renders plain text with zero DOM overhead.
-const REHYPE_PLUGINS_STATIC: never[] = [];
-const REHYPE_PLUGINS_STREAMING = [rehypeFlowTokens];
+// Rehype configuration: wraps text in <span class="flow-token"> for per-word
+// blur-in animation during streaming. These spans are visually inert when the
+// message is complete — the CSS animation only applies via [data-streaming="true"].
+//
+// IMPORTANT: We use ONE pipeline for both streaming and completed messages.
+// Previously, we switched from streaming→static (empty) plugins when isStreaming
+// changed. This caused a massive DOM restructuring (removing hundreds of spans
+// in one frame), creating a visible flash/glitch at the end of streaming.
+// Keeping the spans avoids the restructuring. The extra DOM weight is negligible
+// since the virtualizer limits to ~15 messages in the DOM.
+const REHYPE_PLUGINS = [rehypeFlowTokens];
 
-// Mermaid plugin for diagram rendering - defined outside component for reference stability
-const STREAMDOWN_PLUGINS = { mermaid };
+// Streamdown plugins for diagram and code rendering - defined outside component for reference stability.
+// The `code` plugin provides Shiki syntax highlighting with github-light/dark themes.
+const STREAMDOWN_PLUGINS = { mermaid, code };
 
 /**
  * Calculate dynamic animation duration based on content length.
@@ -61,6 +73,70 @@ function calculateFlowDuration(contentLength: number): string {
   return `${duration.toString()}s`;
 }
 
+/** Collapsible user message bubble — clamps long content behind a "Show more" toggle. */
+const UserMessageBubble: FC<{ readonly content: string; readonly animate: boolean | undefined }> =
+  memo(function UserMessageBubble({ content, animate }) {
+    const contentRef = useRef<HTMLParagraphElement>(null);
+    const [isOverflowing, setIsOverflowing] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    // Detect overflow after layout to decide whether the toggle is needed.
+    // useLayoutEffect fires synchronously before paint → no flash of "Show more" on short messages.
+    useLayoutEffect(() => {
+      const el = contentRef.current;
+      if (el === null) return;
+      setIsOverflowing(el.scrollHeight > USER_MESSAGE_MAX_HEIGHT);
+    }, [content]);
+
+    const toggleExpanded = useCallback(() => {
+      setIsExpanded((prev) => !prev);
+    }, []);
+
+    const isCollapsed = isOverflowing && !isExpanded;
+
+    return (
+      <div
+        className={cn(
+          'w-fit rounded-lg bg-gray-4 px-3.5 pt-2.5',
+          isCollapsed ? 'pb-0' : 'pb-2.5',
+          animate === true && 'animate-message-in'
+        )}
+        style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
+      >
+        {/* Content area with optional height clamp */}
+        <div className="relative">
+          <p
+            ref={contentRef}
+            className="text-base leading-relaxed whitespace-pre-wrap select-text"
+            style={
+              isCollapsed
+                ? { maxHeight: `${String(USER_MESSAGE_MAX_HEIGHT)}px`, overflow: 'hidden' }
+                : undefined
+            }
+          >
+            {content}
+          </p>
+
+          {/* Gradient fade overlay when collapsed */}
+          {isCollapsed ? (
+            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-gray-4 to-transparent pointer-events-none" />
+          ) : null}
+        </div>
+
+        {/* Show more / Show less toggle */}
+        {isOverflowing ? (
+          <button
+            type="button"
+            onClick={toggleExpanded}
+            className="pt-1 pb-2.5 text-xs text-foreground/50 hover:text-foreground transition-colors w-3/4 text-left"
+          >
+            {isExpanded ? 'Show less' : 'Show more'}
+          </button>
+        ) : null}
+      </div>
+    );
+  });
+
 export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
   tools,
@@ -80,11 +156,10 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   // Note: JS animation hooks cause flash when combined with auto-scroll during streaming
   const animatedContent = message.displayedContent;
 
-  // Choose rehype plugins based on streaming state.
-  // During streaming, rehypeFlowTokens wraps words in <span class="flow-token"> for
-  // per-word fade-in animation. Once complete, we switch to the static (empty) pipeline
-  // so completed messages carry zero extra DOM weight.
-  const rehypePlugins = message.isStreaming ? REHYPE_PLUGINS_STREAMING : REHYPE_PLUGINS_STATIC;
+  // Use the same rehype pipeline for both streaming and completed messages.
+  // Flow-token spans are inert when data-streaming="false" (no animation CSS applies).
+  // See REHYPE_PLUGINS comment above for why we don't switch pipelines.
+  const rehypePlugins = REHYPE_PLUGINS;
 
   // Dynamic animation speed based on content length (see calculateFlowDuration)
   const flowDuration = message.isStreaming
@@ -131,17 +206,43 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
     >
       {/* Message block */}
       {message.role === 'user' ? (
-        /* User message bubble */
-        <div
-          className={cn(
-            'p-2 rounded-lg bg-card border-[3px] border-border/40 shadow-sm',
-            animate && 'animate-message-in'
-          )}
-          style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
-        >
-          <p className="text-base leading-relaxed whitespace-pre-wrap select-text">
-            {message.displayedContent}
-          </p>
+        /* User message — right-aligned bubble with collapsible long content */
+        <div className="flex flex-col items-end gap-1">
+          <UserMessageBubble content={message.displayedContent} animate={animate} />
+
+          {/* Attached context — right-aligned alongside the bubble */}
+          {hasAttachments ? (
+            <div className="chat-attached-context flex flex-wrap justify-end gap-1.5">
+              {message.attachedFiles?.map((filePath) => {
+                const fileName = filePath.split('/').pop() ?? filePath;
+                return (
+                  <div
+                    key={filePath}
+                    className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-gray-4 rounded-md hover:bg-accent transition-colors cursor-pointer"
+                    title={filePath}
+                  >
+                    <FileIcon fileName={fileName} className="h-3.5 w-3.5" monochrome={false} />
+                    <span className="text-sm text-foreground/70">{fileName}</span>
+                  </div>
+                );
+              })}
+
+              {message.attachedImages?.map((image, index) => (
+                <div
+                  key={`${image.name}-${String(index)}`}
+                  className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-gray-4 rounded-md hover:bg-accent transition-colors cursor-pointer"
+                  title={image.name}
+                >
+                  <img
+                    src={image.previewUrl}
+                    alt={image.name}
+                    className="h-4 w-4 object-cover rounded-md"
+                  />
+                  <span className="text-sm text-foreground/70">{image.name}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : (
         /* Assistant message - no bubble, content flows naturally */
@@ -154,8 +255,21 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
         >
           {/* Content and tool segments */}
           <div className="space-y-2">
-            {/* Thinking Box - inside space-y-2 for consistent spacing with tools and text */}
-            {message.thinking ? (
+            {/* Thinking Boxes - one per thinking phase, inside space-y-2 for consistent spacing */}
+            {message.thinkingBlocks !== undefined && message.thinkingBlocks.length > 0 ? (
+              message.thinkingBlocks.map((block, i) => (
+                <ThinkingBox
+                  key={i}
+                  thinking={block.content}
+                  thinkingDurationMs={block.durationMs}
+                  isStreaming={
+                    message.isStreaming === true &&
+                    message.isThinkingActive === true &&
+                    i === (message.thinkingBlocks?.length ?? 0) - 1
+                  }
+                />
+              ))
+            ) : message.thinking ? (
               <ThinkingBox
                 thinking={message.thinking}
                 thinkingDurationMs={message.thinkingDurationMs}
@@ -190,7 +304,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                 <div key={segment.key} className="tool-widget">
                   <ErrorBoundary
                     fallback={
-                      <div className="p-2 rounded-md bg-muted/50 border border-border/50 text-muted-foreground text-sm">
+                      <div className="p-2 rounded-md bg-gray-3 border border-gray-5 text-gray-12 text-sm">
                         Failed to render tool: {segment.tool.toolName}
                       </div>
                     }
@@ -209,7 +323,6 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           {/* Message actions - shown when complete */}
           {isComplete ? (
             <MessageActions
-              showDisclaimer={isLastAssistantMessage}
               rewindDisabled={isLastAssistantMessage}
               onCopy={() => {
                 void navigator.clipboard.writeText(message.content);
@@ -224,42 +337,6 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           {message.isInterrupted ? <InterruptIndicator onFeedback={onFeedback} /> : null}
         </div>
       )}
-
-      {/* Attached context - outside the bubble */}
-      {message.role === 'user' && hasAttachments ? (
-        <div className="chat-attached-context flex flex-wrap gap-1.5 px-3.5">
-          {/* Attached files */}
-          {message.attachedFiles?.map((filePath) => {
-            const fileName = filePath.split('/').pop() ?? filePath;
-            return (
-              <div
-                key={filePath}
-                className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md hover:bg-muted/70 transition-colors cursor-pointer"
-                title={filePath}
-              >
-                <FileIcon fileName={fileName} className="h-3.5 w-3.5" monochrome={false} />
-                <span className="text-sm text-foreground/70">{fileName}</span>
-              </div>
-            );
-          })}
-
-          {/* Attached images */}
-          {message.attachedImages?.map((image, index) => (
-            <div
-              key={`${image.name}-${String(index)}`}
-              className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md hover:bg-muted/70 transition-colors cursor-pointer"
-              title={image.name}
-            >
-              <img
-                src={image.previewUrl}
-                alt={image.name}
-                className="h-4 w-4 object-cover rounded-sm"
-              />
-              <span className="text-sm text-foreground/70">{image.name}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }, arePropsEqual);

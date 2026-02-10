@@ -100,6 +100,12 @@ export interface FileDiff {
   isBinary: boolean;
 }
 
+export interface BranchDiffStats {
+  additions: number;
+  deletions: number;
+  filesChanged: number;
+}
+
 export interface BlameLine {
   lineNumber: number;
   commitHash: string;
@@ -228,6 +234,17 @@ export async function gitFetch(repoPath: string, remote?: string): Promise<void>
  */
 export async function gitClone(url: string, targetPath: string): Promise<void> {
   return invoke('git_clone', { url, targetPath });
+}
+
+// ============================================
+// Git Branch Diff Stats
+// ============================================
+
+export async function gitBranchDiffStats(
+  repoPath: string,
+  baseBranch?: string
+): Promise<BranchDiffStats> {
+  return invoke<BranchDiffStats>('git_branch_diff_stats', { repoPath, baseBranch });
 }
 
 // ============================================

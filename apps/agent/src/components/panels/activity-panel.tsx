@@ -62,6 +62,13 @@ interface ActivityPanelProps {
    * Defaults to true for backwards compatibility.
    */
   readonly canRenderTerminal?: boolean;
+  /**
+   * Whether this ActivityPanel instance manages browser visibility.
+   * Only ONE instance should have this set to true to prevent duplicate
+   * browser:show / browser:hide commands from competing effects.
+   * Defaults to true for backwards compatibility.
+   */
+  readonly canManageBrowser?: boolean;
 }
 
 interface EditorTabProps {
@@ -92,21 +99,13 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       tabIndex={isActive ? 0 : -1}
       className={cn(
         'group relative flex items-center h-full px-3 text-base cursor-pointer select-none shrink-0',
-        'border-r border-border/50',
+        'border-r border-gray-5',
         isActive
-          ? 'bg-card text-foreground'
-          : 'bg-chat-area text-muted-foreground hover:text-foreground'
+          ? 'bg-card text-foreground border-t-2 border-t-primary'
+          : 'bg-chat-area text-muted-foreground hover:text-foreground border-t-2 border-t-transparent'
       )}
       style={{ maxWidth: 180 }}
     >
-      {/* Top border accent for active tab */}
-      <div
-        className={cn(
-          'absolute top-0 inset-x-0 h-px transition-colors',
-          isActive ? 'bg-primary' : 'bg-transparent'
-        )}
-      />
-
       {/* Bottom border - hide for active tab (connects to content) */}
       <div
         className={cn(
@@ -126,14 +125,14 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         {/* Modified dot - show when modified, inactive, and not hovering */}
         {isModified && !isActive ? (
           <div className="absolute inset-0 flex items-center justify-center group-hover:hidden">
-            <div className="w-2 h-2 rounded-full bg-foreground/50" />
+            <div className="w-2 h-2 rounded-full bg-gray-10" />
           </div>
         ) : null}
         {/* Close button - show on hover, or always when active */}
         <button
           onClick={handleCloseClick}
           className={cn(
-            'w-4 h-4 flex items-center justify-center rounded transition-[background-color,opacity] hover:bg-muted',
+            'w-4 h-4 flex items-center justify-center rounded transition-[background-color,opacity] hover:bg-accent',
             isActive ? 'opacity-70 hover:opacity-100' : 'opacity-0 group-hover:opacity-70'
           )}
           aria-label={`Close ${fileName}`}
@@ -330,7 +329,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
               onMouseDown={handleScrollbarMouseDown}
               className={cn(
                 'absolute top-[3px] h-[3px] rounded-full cursor-grab transition-colors',
-                isDragging ? 'bg-foreground/60' : 'bg-foreground/30 hover:bg-foreground/50'
+                isDragging ? 'bg-gray-9' : 'bg-gray-8/50 hover:bg-gray-8'
               )}
               style={{
                 width: scrollbarWidth,
@@ -347,7 +346,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
           onClick={() => {
             if (activeTabPath) onToggleSearch(activeTabPath);
           }}
-          className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+          className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-accent"
           title="Search (⌘F)"
         >
           <Search className="h-4 w-4" />
@@ -355,13 +354,13 @@ const TabsHeader: FC<TabsHeaderProps> = ({
         <Popover>
           <PopoverTrigger asChild>
             <button
-              className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
+              className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-accent"
               title="More Actions..."
             >
               <Ellipsis className="h-4 w-4" />
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-48 p-2 border-border/50">
+          <PopoverContent align="end" className="w-48 p-2 border-gray-7">
             <div className="flex items-center justify-between">
               <label htmlFor="word-wrap-toggle" className="text-sm cursor-pointer">
                 Line Wrap
@@ -375,7 +374,10 @@ const TabsHeader: FC<TabsHeaderProps> = ({
   );
 };
 
-export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true }) => {
+export const ActivityPanel: FC<ActivityPanelProps> = ({
+  canRenderTerminal = true,
+  canManageBrowser = true,
+}) => {
   const hasOpenFiles = useHasOpenFiles();
   const openTabs = useOpenTabs();
   const activeTabPath = useFileViewerStore((state) => state.activeTabPath);
@@ -400,21 +402,53 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   const prevHasOpenFiles = useRef(hasOpenFiles);
   const isBrowserActive = useBrowserIsActive();
   const { postMessage } = useTauri({});
-  const prevActiveTab = useRef(activeTab);
 
   // Ref for terminal allotment - used to programmatically resize
   const terminalAllotmentRef = useRef<AllotmentHandle>(null);
 
-  // Resize terminal when bottomPanelOpen changes
+  // Animate terminal open/close in activity panel — same pattern as ChatArea.
+  // Temporarily adds .allotment-animate CSS class to enable height/top transitions,
+  // then removes it so manual drag resizing isn't affected.
+  const [terminalAnimating, setTerminalAnimating] = useState(false);
+  const prevBottomPanelOpen = useRef(bottomPanelOpen);
+
+  useEffect(() => {
+    if (prevBottomPanelOpen.current !== bottomPanelOpen && terminalPosition === 'activity') {
+      setTerminalAnimating(true);
+      const timer = setTimeout(() => {
+        setTerminalAnimating(false);
+      }, 300);
+      prevBottomPanelOpen.current = bottomPanelOpen;
+      return (): void => {
+        clearTimeout(timer);
+      };
+    }
+    prevBottomPanelOpen.current = bottomPanelOpen;
+    return undefined;
+  }, [bottomPanelOpen, terminalPosition]);
+
+  // Resize terminal when bottomPanelOpen changes.
+  // Opening: delay reset by one frame so .allotment-animate is in the DOM first.
+  // Closing: reset immediately (transition class applied from prior render).
   useEffect(() => {
     const allotment = terminalAllotmentRef.current;
     if (!allotment || terminalPosition !== 'activity') return;
 
-    // Reset to preferred sizes - allotment will respect minSize
+    if (bottomPanelOpen) {
+      const rafId = requestAnimationFrame(() => {
+        allotment.reset();
+      });
+      return (): void => {
+        cancelAnimationFrame(rafId);
+      };
+    }
     allotment.reset();
+    return undefined;
   }, [bottomPanelOpen, terminalPosition]);
 
   // Track terminal size when user drags - save to shared store
+  // PERF: Debounced to avoid triggering React re-renders on every drag frame.
+  const sizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleTerminalSizeChange = useCallback(
     (sizes: number[]): void => {
       const terminalSize = sizes[1];
@@ -423,8 +457,13 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
         terminalSize > TERMINAL_PANEL.DRAG_THRESHOLD &&
         bottomPanelOpen
       ) {
-        // Only save if it's a meaningful size (not collapsed)
-        setBottomPanelHeight(terminalSize);
+        if (sizeDebounceRef.current !== null) {
+          clearTimeout(sizeDebounceRef.current);
+        }
+        sizeDebounceRef.current = setTimeout(() => {
+          sizeDebounceRef.current = null;
+          setBottomPanelHeight(terminalSize);
+        }, 150);
       }
     },
     [bottomPanelOpen, setBottomPanelHeight]
@@ -438,103 +477,31 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
     prevHasOpenFiles.current = hasOpenFiles;
   }, [hasOpenFiles, setActiveTab]);
 
-  // Track if this is the first render (for mount logic)
-  const isFirstRender = useRef(true);
-  // Track previous browser active state to detect when browser is created
-  const prevBrowserActive = useRef(isBrowserActive);
-
-  // Send browser visibility messages when tab changes or panel mounts/unmounts
-  // This is handled here (in ActivityPanel) rather than in BrowserPanel because
-  // BrowserPanel unmounts when switching away, and cleanup effects are unreliable
-  useEffect(() => {
-    const isBrowserTab = activeTab === 'browser';
-    const browserJustBecameActive = isBrowserActive && !prevBrowserActive.current;
-
-    // Update browser active tracking
-    prevBrowserActive.current = isBrowserActive;
-
-    // Only send messages if browser has been created
-    if (!isBrowserActive) {
-      // Don't update prevActiveTab or isFirstRender when browser isn't active
-      // This ensures we send browser:show when it becomes active
-      return;
-    }
-
-    // Browser just became active - show it if on browser tab
-    if (browserJustBecameActive) {
-      if (isBrowserTab) {
-        postMessage({
-          type: 'browser:show',
-          uuid: generateUUID(),
-        });
-      }
-      prevActiveTab.current = activeTab;
-      isFirstRender.current = false;
-      return;
-    }
-
-    // On first render (panel just mounted/re-opened), show browser if on browser tab
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      if (isBrowserTab) {
-        postMessage({
-          type: 'browser:show',
-          uuid: generateUUID(),
-        });
-      }
-      prevActiveTab.current = activeTab;
-      return;
-    }
-
-    const wasBrowserTab = prevActiveTab.current === 'browser';
-
-    if (wasBrowserTab && !isBrowserTab) {
-      // Switching AWAY from Browser tab - hide the BrowserView
-      postMessage({
-        type: 'browser:hide',
-        uuid: generateUUID(),
-      });
-    } else if (!wasBrowserTab && isBrowserTab) {
-      // Switching TO Browser tab - show the BrowserView
-      postMessage({
-        type: 'browser:show',
-        uuid: generateUUID(),
-      });
-    }
-
-    prevActiveTab.current = activeTab;
-  }, [activeTab, isBrowserActive, postMessage]);
-
-  // Hide browser when activity panel collapses; restore visibility when reopened on browser tab.
-  useEffect(() => {
-    if (!isBrowserActive) {
-      return;
-    }
-
-    if (!reviewPanelOpen) {
-      postMessage({
-        type: 'browser:hide',
-        uuid: generateUUID(),
-      });
-      return;
-    }
-
-    if (activeTab === 'browser') {
-      postMessage({
-        type: 'browser:show',
-        uuid: generateUUID(),
-      });
-    }
-  }, [activeTab, isBrowserActive, postMessage, reviewPanelOpen]);
-
-  // Hide browser when ActivityPanel unmounts (panel collapsed)
-  // Use a ref to track current state for cleanup
+  // Browser visibility effect — sends show/hide based on current state.
+  // Only the instance with canManageBrowser=true runs this, preventing duplicate
+  // show/hide commands from competing ActivityPanel instances (CSS display toggle).
+  // IMPORTANT: No cleanup here! Cleanup in a multi-dep effect fires on EVERY dep
+  // change (not just unmount), which causes hide→show flashes that blank the webview.
   const isBrowserActiveRef = useRef(isBrowserActive);
   isBrowserActiveRef.current = isBrowserActive;
 
   useEffect(() => {
-    return () => {
-      // Cleanup: hide browser when panel collapses
+    if (!canManageBrowser || !isBrowserActive) return;
+
+    const shouldShow = reviewPanelOpen && activeTab === 'browser';
+
+    postMessage({
+      type: shouldShow ? 'browser:show' : 'browser:hide',
+      uuid: generateUUID(),
+    });
+  }, [canManageBrowser, activeTab, isBrowserActive, postMessage, reviewPanelOpen]);
+
+  // Separate unmount cleanup — only fires when component is truly destroyed
+  // (panel collapsed or layout switch), not on every dependency change.
+  useEffect(() => {
+    if (!canManageBrowser) return;
+
+    return (): void => {
       if (isBrowserActiveRef.current) {
         postMessage({
           type: 'browser:hide',
@@ -542,8 +509,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
         });
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- postMessage is stable, we want cleanup to run only on unmount
-  }, []);
+  }, [canManageBrowser, postMessage]);
 
   // Handle closing a single tab with LSP notification
   // Only call lspDidClose for diff tabs - CodeMirrorEditor handles LSP lifecycle
@@ -636,7 +602,10 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
   const showActivityTerminal = terminalPosition === 'activity' && canRenderTerminal;
 
   return (
-    <div className="@container h-full w-full flex flex-col bg-card">
+    <div
+      className="@container h-full w-full flex flex-col"
+      style={{ minWidth: ACTIVITY_PANEL.MIN_WIDTH }}
+    >
       {/* Terminal in activity layout */}
       <div
         className="flex-1 flex flex-col"
@@ -645,7 +614,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canRenderTerminal = true
         <ResizablePanelGroup
           ref={terminalAllotmentRef}
           direction="vertical"
-          className="flex-1"
+          className={terminalAnimating ? 'flex-1 allotment-animate' : 'flex-1'}
           onChange={handleTerminalSizeChange}
         >
           <ResizablePanel minSize={0}>

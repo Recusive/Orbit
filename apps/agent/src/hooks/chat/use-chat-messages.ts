@@ -28,7 +28,6 @@ const getUIActions = (): Pick<
   | 'setActiveConversation'
   | 'setConversationTransitioning'
   | 'setConversations'
-  | 'addConversation'
   | 'updateConversationTitle'
 > => {
   const state = useUIStore.getState();
@@ -37,7 +36,6 @@ const getUIActions = (): Pick<
     setActiveConversation: state.setActiveConversation,
     setConversationTransitioning: state.setConversationTransitioning,
     setConversations: state.setConversations,
-    addConversation: state.addConversation,
     updateConversationTitle: state.updateConversationTitle,
   };
 };
@@ -127,8 +125,20 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
 
   const [isAgentRunning, setIsAgentRunning] = useState(false);
 
+  // Gate rewind after Stop: `agent:stop` sets isAgentRunning=false BEFORE the SDK
+  // finishes flushing its JSONL writes. If the user clicks Rewind in that window,
+  // `conversationLoad` / `agentForkSessionAt` read a partially-written JSONL, causing:
+  //   - Empty user message bubbles
+  //   - "[Request interrupted by user]" appearing as wrong role
+  //   - API 400 errors ("text content blocks must be non-empty")
+  // This ref is set true by handleStop and cleared by agent:complete/agent:error.
+  // handleRewind checks it to prevent rewind during the flush window.
+  const isStopPendingRef = useRef(false);
+
   // Track thinking start times by message ID to calculate duration
   const thinkingStartTimes = useRef<Map<string, number>>(new Map());
+  // Track whether non-thinking content arrived since last thinking chunk (for multi-block detection)
+  const hasContentSinceLastThinking = useRef<Map<string, boolean>>(new Map());
 
   // ============================================
   // Isolated Reactive Selectors (Minimal Subscriptions)
@@ -232,7 +242,6 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setActiveConversation: uiActions.setActiveConversation,
       setConversationTransitioning: uiActions.setConversationTransitioning,
       setConversations: uiActions.setConversations,
-      addConversation: uiActions.addConversation,
       setInputMode: toolActions.setInputMode,
       setModel: toolActions.setModel,
       startTool: toolActions.startTool,
@@ -247,10 +256,12 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setSessionId,
       setMessages,
       setIsAgentRunning,
+      isStopPendingRef,
       sessionIdRef,
       messagesRef,
       messagesCache,
       thinkingStartTimes,
+      hasContentSinceLastThinking,
     });
   }, [
     // Only reactive dependencies - actions come from getState() inside useMemo
@@ -264,6 +275,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     messagesRef,
     messagesCache,
     thinkingStartTimes,
+    hasContentSinceLastThinking,
   ]);
 
   // Cleanup RAF batchers when handler changes OR on unmount
@@ -422,6 +434,12 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         title: text,
       });
 
+      // Get the last message's ID to establish parentUuid chain (Claude Code-style rewind)
+      // For new conversations (after conversation:created), this will be null
+      // For existing conversations with pending messages, this links to the previous message
+      const lastMessage = messagesRef.current[messagesRef.current.length - 1];
+      const parentUuid = lastMessage?.id ?? null;
+
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'user',
@@ -429,6 +447,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
         displayedContent: text,
         attachedFiles: contextFiles,
         attachedImages: images,
+        parentUuid,
       };
       setMessages((prev: ChatMessage[]) => [...prev, userMessage]);
       setIsAgentRunning(true);
@@ -442,6 +461,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           role: 'user',
           content: text,
           createdAt: Date.now(),
+          parentUuid,
         },
         workspacePath ?? undefined,
         activeWorktreePath ?? undefined
@@ -467,11 +487,13 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
           : undefined;
 
       // IMPORTANT: Use userMessage.id so checkpoints are associated correctly with the rewind target
+      // Include parent_uuid for Claude Code-style rewind (linked list of messages)
       postMessage({
         type: 'message:send',
         uuid: userMessage.id,
         session_id: sessionId,
         content: text,
+        parent_uuid: parentUuid,
         context,
       });
     }
@@ -484,6 +506,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     setIsAgentRunning,
     workspacePath,
     activeWorktreePath,
+    messagesRef,
   ]);
 
   // Create chat actions - memoized to prevent unnecessary recreations
@@ -501,6 +524,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       setMessages,
       isAgentRunning,
       setIsAgentRunning,
+      isStopPendingRef,
       conversations,
       // Keep workspace path and worktree path separate for proper grouping
       workspacePath,

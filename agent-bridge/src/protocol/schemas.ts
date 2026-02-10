@@ -6,6 +6,8 @@
 import { ModelSchema, CommandScopeSchema, DecisionSchema } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
+import type { CanvasEdge, CanvasNode } from '../canvas/types/types.js';
+
 // Re-export shared schemas
 export {
   ModelSchema,
@@ -162,6 +164,19 @@ export const SendMessageRequestSchema = z
     sessionId: z.string(),
     message: z.string(),
     attachments: z.array(AttachmentContentBlockSchema).optional(),
+    /**
+     * UUID of the previous message in the conversation chain.
+     * Used for Claude Code-style rewind: after rewinding, the next message
+     * should have parentUuid set to the message we rewound to.
+     * - null for the first message in a conversation
+     * - undefined if not specified (default behavior)
+     *
+     * TODO(code-review/cycle-1#6): parentUuid is defined in the schema but not yet
+     * wired through to the SDK via sendMessage(). The forkSessionAt flow reads
+     * parentUuid from JSONL data, but the send_message handler in index.ts does
+     * not forward this field to session-manager. Wire to SDK or remove if unneeded.
+     */
+    parentUuid: z.string().nullish(),
   })
   .strict();
 export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
@@ -394,6 +409,15 @@ export const RewindFilesRequestSchema = z
   .strict();
 export type RewindFilesRequest = z.infer<typeof RewindFilesRequestSchema>;
 
+export const ForkSessionAtRequestSchema = z
+  .object({
+    type: z.literal('fork_session_at'),
+    sessionId: z.string(),
+    atMessageUuid: z.string(),
+  })
+  .strict();
+export type ForkSessionAtRequest = z.infer<typeof ForkSessionAtRequestSchema>;
+
 export const GenerateAgentDefinitionRequestSchema = z
   .object({
     type: z.literal('generate_agent_definition'),
@@ -429,14 +453,20 @@ export const CanvasSessionConfigSchema = z
     cwd: z.string().optional(),
     model: z.string().optional(),
     thinkingEnabled: z.boolean().optional(),
+    planModeEnabled: z.boolean().optional(),
   })
   .strict();
 export type CanvasSessionConfig = z.infer<typeof CanvasSessionConfigSchema>;
 
 export const CanvasStateSchema = z
   .object({
-    nodes: z.array(z.any()),
-    edges: z.array(z.any()),
+    // ReactFlow nodes/edges — validated with z.custom to ensure each element is
+    // a non-null object while preserving CanvasNode/CanvasEdge TypeScript types.
+    // Full type definitions live in canvas/types/types.ts; the protocol layer
+    // does loose boundary validation without coupling to ReactFlow internals.
+    // (Code review: Opus cycle 3, issue #9)
+    nodes: z.array(z.custom<CanvasNode>((val) => typeof val === 'object' && val !== null)),
+    edges: z.array(z.custom<CanvasEdge>((val) => typeof val === 'object' && val !== null)),
     selectedNodeId: z.string().nullable().optional(),
     selectedNodeType: z.enum(['sandpack', 'page']).optional(),
   })
@@ -540,6 +570,7 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   DeleteCommandRequestSchema,
   ForkSessionRequestSchema,
   RewindFilesRequestSchema,
+  ForkSessionAtRequestSchema,
   GenerateAgentDefinitionRequestSchema,
   GenerateCommandDefinitionRequestSchema,
   ShutdownRequestSchema,
@@ -582,34 +613,23 @@ export type SessionStorageData = z.infer<typeof SessionStorageDataSchema>;
 
 // OAuth token schema - allows additional fields from Claude CLI (refreshToken, scopes, etc.)
 // expiresAt can be number (timestamp) or string (ISO date or stringified timestamp)
-export const OAuthTokenSchema = z
-  .object({
-    accessToken: z.string().optional(),
-    expiresAt: z.union([z.number(), z.string()]).optional(),
-    // Additional fields that may be present (not strictly required)
-    refreshToken: z.string().optional(),
-    scopes: z.array(z.string()).optional(),
-    subscriptionType: z.string().optional(),
-    rateLimitTier: z.string().optional(),
-  })
-  .loose(); // Allow any additional fields we don't know about
+// External API schemas: default strip mode accepts unknown keys without error,
+// strips them from output. No .loose()/.catchall() needed since we only read known fields.
+
+export const OAuthTokenSchema = z.object({
+  accessToken: z.string().optional(),
+  expiresAt: z.union([z.number(), z.string()]).optional(),
+  refreshToken: z.string().optional(),
+  scopes: z.array(z.string()).optional(),
+  subscriptionType: z.string().optional(),
+  rateLimitTier: z.string().optional(),
+});
 export type OAuthToken = z.infer<typeof OAuthTokenSchema>;
 
-export const KeychainCredentialsSchema = z
-  .object({
-    claudeAiOauth: OAuthTokenSchema.optional(),
-  })
-  .loose(); // Allow any additional fields
+export const KeychainCredentialsSchema = z.object({
+  claudeAiOauth: OAuthTokenSchema.optional(),
+});
 export type KeychainCredentials = z.infer<typeof KeychainCredentialsSchema>;
 
-// OAuth token refresh response from Anthropic's token endpoint
-export const OAuthRefreshResponseSchema = z
-  .object({
-    access_token: z.string().min(1),
-    token_type: z.string().optional(),
-    expires_in: z.number(),
-    refresh_token: z.string().optional(),
-    scope: z.string().optional(),
-  })
-  .loose(); // Allow additional fields from the OAuth endpoint
-export type OAuthRefreshResponse = z.infer<typeof OAuthRefreshResponseSchema>;
+// OAuthRefreshResponseSchema is defined locally in credentials.ts (its sole consumer)
+// to avoid cross-file type resolution issues with ESLint's projectService.

@@ -28,6 +28,7 @@ const ClaudeIcon: FC<{ className?: string }> = ({ className }) => (
       'w-3 h-3 opacity-70 group-hover:opacity-100 transition-opacity duration-150',
       className
     )}
+    style={{ color: '#d97757' }}
   />
 );
 
@@ -107,6 +108,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   const setModel = useToolStore((s) => s.setModel);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Calculate popover position from trigger's viewport rect.
   // Uses the actual popover height (when available) to decide whether to open
@@ -138,6 +140,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
     }
   }, []);
 
+  // TODO(code-review/cycle-1#27): Consider useCallback ref for portal measurement to avoid brief position flash
   // Initial positioning (before paint, uses estimate since portal isn't mounted yet)
   useLayoutEffect(() => {
     if (!isOpen) return;
@@ -187,11 +190,21 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
   const handleClose = useCallback((): void => {
     if (!isOpen || isAnimatingOut) return;
     setIsAnimatingOut(true);
-    setTimeout(() => {
+    exitTimerRef.current = setTimeout(() => {
+      exitTimerRef.current = null;
       setIsOpen(false);
       setIsAnimatingOut(false);
     }, POPOVER_ANIMATION.exitDurationMs);
   }, [isOpen, isAnimatingOut]);
+
+  // Clean up exit animation timer on unmount
+  useEffect(() => {
+    return (): void => {
+      if (exitTimerRef.current !== null) {
+        clearTimeout(exitTimerRef.current);
+      }
+    };
+  }, []);
 
   // Close popover when clicking outside or pressing Escape
   // Escape key is standard UX for dismissing popovers (code review: Opus cycle 1, issue #3)
@@ -290,7 +303,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       tabIndex={-1}
       onKeyDown={handlePopoverKeyDown}
       className={cn(
-        'fixed bg-card border-[3px] border-border rounded-lg shadow-lg overflow-hidden z-50',
+        'fixed bg-popover glass-float border border-gray-5 rounded-lg shadow-lg overflow-hidden z-50 outline-none',
         position.side === 'top' ? 'origin-bottom-left' : 'origin-top-left',
         // Enter: rich 3-property animation (scale + fade + slide), ease-out
         !isAnimatingOut &&
@@ -319,7 +332,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       <div className="p-1.5">
         {MODEL_GROUPS.map((group) => (
           <div key={group.label} className="mb-1 last:mb-0">
-            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground/60 uppercase tracking-wider">
+            <div className="px-2 py-1.5 text-xs font-medium text-gray-10 uppercase tracking-wider">
               {group.label}
             </div>
             {group.models.map((model) => (
@@ -331,12 +344,14 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                 disabled={model.disabled === true}
                 title={model.disabled === true ? 'Coming soon' : undefined}
                 className={cn(
-                  `w-full flex items-center justify-between px-2 py-1.5 text-xs ${TRANSITION_CLASSES.item} mt-0.5 first:mt-0 group`,
+                  'w-full flex items-center justify-between px-2 py-1.5 text-xs',
+                  TRANSITION_CLASSES.item,
+                  'mt-0.5 first:mt-0 group',
                   model.disabled === true
                     ? 'opacity-40 cursor-not-allowed'
                     : selectedModel === model.id
                       ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
-                      : 'rounded-md hover:bg-muted/80 active:scale-[0.98]'
+                      : 'rounded-md hover:bg-gray-4 active:scale-[0.98]'
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -345,7 +360,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                 </div>
                 <div className="flex items-center gap-1">
                   {model.badge ? (
-                    <span className="text-[9px] font-medium text-muted-foreground/70 bg-muted/60 px-1.5 py-0.5 rounded-full">
+                    <span className="text-[9px] font-medium text-gray-10 bg-gray-4 px-1.5 py-0.5 rounded-full">
                       {model.badge}
                     </span>
                   ) : null}
@@ -371,17 +386,17 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
           'h-7 px-2.5 flex items-center gap-1.5 rounded-lg',
           'bg-transparent text-muted-foreground',
           TRANSITION_CLASSES.button,
-          'hover:bg-muted/50 hover:text-foreground',
+          'hover:bg-gray-4 hover:text-foreground',
           'active:scale-[0.98]',
           'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
-          isOpen && 'bg-muted/50 text-foreground'
+          isOpen && 'bg-gray-4 text-foreground'
         )}
       >
         {selectedModelData ? <selectedModelData.icon /> : null}
         <span className="text-sm font-medium">{selectedModelData?.name ?? 'Select Model'}</span>
         <ChevronDown
           className={cn(
-            'h-3 w-3 text-muted-foreground/60 transition-transform duration-150',
+            'h-3 w-3 text-gray-10 transition-transform duration-150',
             isOpen && 'rotate-180'
           )}
         />

@@ -20,5 +20,6 @@ export {
   useGitIsClean,
   useGitTotalChanges,
   useIsGitRepo,
+  useBranchDiffStats,
 } from './git-store';
-export type { FileStatus, GitBranch, GitStatus, StatusEntry } from './git-store';
+export type { BranchDiffStats, FileStatus, GitBranch, GitStatus, StatusEntry } from './git-store';

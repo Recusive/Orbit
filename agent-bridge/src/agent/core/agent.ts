@@ -133,11 +133,12 @@ export interface OrbitAgentConfig {
   snapshotCallback?: SnapshotCallback;
   /** SDK session ID to resume from (for programmatic forking only) */
   resumeSessionId?: string;
+  /** Specific message UUID to resume at (for forking at a point in the conversation).
+   *  When used with forkSession=true, this creates a new branch starting from that message.
+   *  Claude only sees context UP TO this message, not messages that came after. */
+  resumeSessionAt?: string;
   /** Whether to fork the session (for programmatic forking only) */
   forkSession?: boolean;
-  // NOTE: resumeSessionAt was removed. For rewind scenarios, we DON'T use SDK's resume
-  // because it loads ALL messages. Instead, the frontend prepends truncated conversation
-  // history to the first message. This matches how Claude Code handles rewind.
   model?: string;
   /** Fallback model to use if primary model fails */
   fallbackModel?: string;
@@ -323,10 +324,32 @@ export class OrbitAgent {
   private _fallbackModel?: string;
   private _sessionMode: OrbitSessionMode;
 
-  // Session resume/fork fields (for programmatic forking only, NOT rewind)
+  // Session resume/fork fields (for programmatic forking and rewind)
   private _resumeSessionId?: string;
+  private _resumeSessionAt?: string;
   private _forkSession: boolean;
   private _currentSessionId?: string;
+
+  /**
+   * The canonical session ID used for Map keys and event emissions.
+   * Set to the temp ID at creation, then updated to the SDK ID on system:init.
+   * Closures use this instead of capturing a stale temp ID.
+   */
+  private _effectiveSessionId = '';
+
+  /** @internal The canonical session ID used for Map keys and event emissions. */
+  get effectiveSessionId(): string {
+    return this._effectiveSessionId;
+  }
+
+  set effectiveSessionId(value: string) {
+    this._effectiveSessionId = value;
+  }
+
+  /** The working directory for this agent session. */
+  get workingDirectory(): string {
+    return this.cwd;
+  }
 
   // Streaming input mode fields
   private messageQueue: MessageQueue | null = null;
@@ -367,10 +390,17 @@ export class OrbitAgent {
     this._acceptMode = config.acceptEnabled ?? false;
     this._critiqueMode = config.critiqueEnabled ?? false;
     this._sessionMode = config.sessionMode ?? 'agent';
-    // NOTE: resumeSessionId and forkSession are for programmatic forking only.
-    // For rewind scenarios, we don't use SDK resume - the frontend prepends context instead.
+    // Session resume/fork for programmatic forking and rewind
+    // resumeSessionAt + forkSession=true creates a new branch from a specific message
     this._resumeSessionId = config.resumeSessionId;
+    this._resumeSessionAt = config.resumeSessionAt;
     this._forkSession = config.forkSession ?? false;
+    // For resumed sessions, pre-populate _currentSessionId since the SDK won't emit
+    // a new system:init message - it just replays existing messages from the JSONL file.
+    // This ensures getCurrentSessionId() returns the correct value immediately.
+    if (config.resumeSessionId) {
+      this._currentSessionId = config.resumeSessionId;
+    }
     if (config.model !== undefined) {
       this.model = config.model;
     }
@@ -906,8 +936,9 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             'Categorized CLI stderr error'
           );
 
-          // On auth/session errors, attempt an automatic credential refresh
-          // before surfacing the error — the refreshed token may fix the issue
+          // On auth/session errors, attempt refresh FIRST — only surface the error
+          // to the frontend if the refresh also fails. This prevents premature error
+          // toasts when a simple token refresh would have resolved the issue.
           if (
             categorized.category === 'AUTH_FAILED' ||
             categorized.category === 'SESSION_EXPIRED'
@@ -915,20 +946,25 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             void ClaudeCredentials.refreshIfNeeded()
               .then((result) => {
                 if (result.refreshed) {
-                  logger.info('Auto-refreshed credentials after CLI auth error');
+                  logger.info(
+                    'Auto-refreshed credentials after CLI auth error — suppressing error'
+                  );
                 } else {
-                  // Refresh failed — notify via auth failure callback
+                  // Refresh failed — NOW surface both the stderr error and auth failure
+                  this._onStderrError?.(categorized);
                   this._onAuthFailure?.(categorized.message);
                 }
               })
               .catch((err: unknown) => {
                 const msg = err instanceof Error ? err.message : String(err);
                 logger.error({ error: msg }, 'Credential refresh threw during stderr recovery');
+                this._onStderrError?.(categorized);
                 this._onAuthFailure?.(categorized.message);
               });
+          } else {
+            // Non-auth errors: surface immediately
+            this._onStderrError(categorized);
           }
-
-          this._onStderrError(categorized);
         }
       }
     };
@@ -936,18 +972,24 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Enable streaming partial messages for real-time text streaming
     options.includePartialMessages = true;
 
-    // Session resume/fork options (for programmatic forking only)
-    // NOTE: For rewind scenarios, we DON'T use SDK resume because it loads ALL messages.
-    // Instead, the frontend prepends truncated conversation history to the first message.
-    // This matches how Claude Code handles rewind - they slice messages BEFORE passing to SDK.
+    // Session resume/fork options
+    // With resumeSessionAt + forkSession=true, SDK resumes at that specific message
+    // and creates a new branch - Claude only sees context UP TO that message
     if (this._resumeSessionId) {
       options.resume = this._resumeSessionId;
+      if (this._resumeSessionAt) {
+        options.resumeSessionAt = this._resumeSessionAt;
+      }
       if (this._forkSession) {
         options.forkSession = true;
       }
       logger.info(
-        { resumeFrom: this._resumeSessionId, fork: this._forkSession },
-        'Session resume/fork configured (programmatic fork)'
+        {
+          resumeFrom: this._resumeSessionId,
+          resumeAt: this._resumeSessionAt,
+          fork: this._forkSession,
+        },
+        'Session resume/fork configured'
       );
     }
 
@@ -973,22 +1015,41 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // This tracks file changes made through Write, Edit, NotebookEdit tools
     // and allows rewinding to any previous checkpoint
     options.enableFileCheckpointing = true;
+    logger.warn(
+      { enableFileCheckpointing: true },
+      'CHECKPOINT _createOptions — enableFileCheckpointing set on SDK options'
+    );
 
-    // Only enable replay-user-messages for NEW sessions (not forked/resumed)
-    // This flag causes the SDK to replay user messages from the resumed session.
-    // For forked sessions, this would cause Claude to see BOTH the replayed message
-    // AND the new message, creating a "replay bug" where Claude responds to both.
+    // Enable replay-user-messages for:
+    // 1. NEW sessions: need checkpoint UUIDs for the rewind feature
+    // 2. FORKED sessions with resumeSessionAt: need conversation context replayed UP TO the fork point
+    //    (The SDK will only replay messages up to resumeSessionAt, so no double-message bug)
     //
-    // For new sessions: We need checkpoint UUIDs for the rewind feature
-    // For forked sessions: We already have checkpoints from the original session
-    if (!this._resumeSessionId) {
+    // Disable for:
+    // - Plain resumed sessions (continue where left off): would replay ALL messages causing double-response
+    //
+    // Key insight: resumeSessionAt tells the SDK WHERE to stop replaying, making it safe to enable.
+    // Without resumeSessionAt, replay goes to the END of the session, then adds the new message.
+    const shouldEnableReplay =
+      this._resumeSessionId === undefined ||
+      (this._forkSession && this._resumeSessionAt !== undefined);
+
+    if (shouldEnableReplay) {
       options.extraArgs = {
         ...options.extraArgs,
         'replay-user-messages': null,
       };
-      logger.info('replay-user-messages enabled for new session (checkpoint tracking)');
+      logger.warn(
+        {
+          isNewSession: !this._resumeSessionId,
+          isForkWithResumeAt: this._forkSession && !!this._resumeSessionAt,
+        },
+        'CHECKPOINT _createOptions — replay-user-messages ENABLED (checkpoint UUIDs will arrive)'
+      );
     } else {
-      logger.info('replay-user-messages DISABLED for forked session (prevents replay bug)');
+      logger.warn(
+        'replay-user-messages DISABLED for plain resumed session (no checkpoint UUIDs expected)'
+      );
     }
 
     // CRITICAL: Pass the env variable through options.env (not just process.env)
@@ -1001,12 +1062,17 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       ...process.env,
       CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1',
     };
-    logger.info(
+    logger.warn(
       {
         processEnvValue: process.env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING,
         optionsEnvValue: options.env.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING,
+        enableFileCheckpointing: options.enableFileCheckpointing,
+        hasReplayUserMessages: options.extraArgs?.['replay-user-messages'] === null,
+        resume: options.resume ?? 'none',
+        resumeSessionAt: options.resumeSessionAt ?? 'none',
+        forkSession: options.forkSession ?? false,
       },
-      'File checkpointing enabled for rewind support'
+      'CHECKPOINT _createOptions — FULL checkpoint config summary'
     );
 
     return options;
@@ -1155,17 +1221,19 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       throw new Error('Session not started. Call startSession() first.');
     }
 
-    // Expand custom slash commands before sending to SDK
-    // The SDK only knows about commands in .claude/commands/ on disk,
-    // but our built-in/default commands are defined in code
-    let expandedMessage = message;
+    // Expand custom slash commands before sending to SDK.
+    // The expansion is sent as a text attachment (not replacing the message)
+    // so the original command text is preserved in JSONL and renders cleanly
+    // on conversation reload (instead of showing the full expanded prompt).
+    let attachmentsToSend = attachments;
     if (message.startsWith('/')) {
       const expanded = this.expandSlashCommand(message);
       if (expanded !== null) {
-        expandedMessage = expanded;
+        const expansionBlock: AttachmentContentBlock = { type: 'text', text: expanded };
+        attachmentsToSend = [expansionBlock, ...(attachments ?? [])];
         logger.info(
           { originalCommand: message.split(' ')[0], expandedLength: expanded.length },
-          'Expanded slash command to prompt content'
+          'Expanded slash command to text attachment'
         );
       }
     }
@@ -1190,14 +1258,13 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         acceptMode: this._acceptMode,
         critiqueMode: this._critiqueMode,
         sessionMode: this._sessionMode,
-        messagePreview:
-          expandedMessage.substring(0, 80) + (expandedMessage.length > 80 ? '...' : ''),
-        attachmentCount: attachments?.length ?? 0,
+        messagePreview: message.substring(0, 80) + (message.length > 80 ? '...' : ''),
+        attachmentCount: attachmentsToSend?.length ?? 0,
       },
       // allow-any-unicode-next-line
       'Sending message to Claude'
     );
-    this.messageQueue.add(expandedMessage, attachments);
+    this.messageQueue.add(message, attachmentsToSend);
   }
 
   /**
@@ -1226,6 +1293,17 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
 
     if (command === undefined) {
       logger.debug({ commandName }, 'Command not found in definitions, passing through to SDK');
+      return null;
+    }
+
+    // Only expand Orbit's default commands (defined in code, not on disk).
+    // Project and personal commands from .claude/commands/ are handled
+    // natively by the SDK, which preserves original text in JSONL via XML wrapping.
+    if (command.scope !== 'default') {
+      logger.debug(
+        { commandName, scope: command.scope },
+        'Passing user command to SDK for native handling'
+      );
       return null;
     }
 
@@ -1299,7 +1377,35 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         if (message.type === 'system' && (message as { subtype?: string }).subtype === 'init') {
           const initMessage = message as { session_id?: string };
           if (initMessage.session_id) {
+            const isForkedSession = this._forkSession && this._resumeSessionAt !== undefined;
+            logger.warn(
+              {
+                previousSessionId: this._currentSessionId ?? 'none',
+                newSessionId: initMessage.session_id,
+                isForkedSession,
+                resumeSessionId: this._resumeSessionId ?? 'none',
+                resumeSessionAt: this._resumeSessionAt ?? 'none',
+              },
+              'CHECKPOINT system:init — capturing SDK session ID (required for rewindFiles)'
+            );
             this._currentSessionId = initMessage.session_id;
+
+            // CRITICAL: After a fork completes, clear the fork options so subsequent
+            // messages continue the forked session instead of re-forking.
+            // Update _resumeSessionId to the new forked session ID.
+            if (isForkedSession) {
+              logger.info(
+                {
+                  oldResumeId: this._resumeSessionId,
+                  newSessionId: initMessage.session_id,
+                  clearedForkPoint: this._resumeSessionAt,
+                },
+                'Fork completed - clearing fork options for subsequent messages'
+              );
+              this._resumeSessionId = initMessage.session_id;
+              this._resumeSessionAt = undefined;
+              this._forkSession = false;
+            }
           }
         }
 
@@ -1555,13 +1661,21 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
    * @param checkpointId - The UUID of the checkpoint (from a user message)
    */
   async rewindFilesInLoop(checkpointId: string): Promise<void> {
-    logger.info(
-      { checkpointId, hasCurrentQuery: !!this.currentQuery },
-      'rewindFilesInLoop called (from inside message loop)'
+    logger.warn(
+      {
+        checkpointId,
+        hasCurrentQuery: !!this.currentQuery,
+        sdkSessionId: this._currentSessionId ?? 'none',
+        sessionActive: this.sessionActive,
+      },
+      'REWIND rewindFilesInLoop START (inside message loop)'
     );
 
     if (!this.currentQuery) {
-      logger.error({ checkpointId }, 'No active query for rewindFilesInLoop');
+      logger.error(
+        { checkpointId, sdkSessionId: this._currentSessionId ?? 'none' },
+        'REWIND rewindFilesInLoop FAILED — no active query'
+      );
       throw new Error(
         'No active query - rewindFilesInLoop must be called from inside the message loop'
       );
@@ -1570,12 +1684,21 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Call rewindFiles directly on the current Query object
     // This works because we're being called from inside the for-await loop
     const currentQuery = this.currentQuery;
-    await withRetry(async () => currentQuery.rewindFiles(checkpointId), {
-      ...RetryPresets.quick,
-      operationName: 'rewindFilesInLoop',
-    });
-
-    logger.info({ checkpointId }, 'rewindFilesInLoop completed successfully');
+    logger.warn({ checkpointId }, 'REWIND rewindFilesInLoop — calling query.rewindFiles()');
+    try {
+      await withRetry(async () => currentQuery.rewindFiles(checkpointId), {
+        ...RetryPresets.quick,
+        operationName: 'rewindFilesInLoop',
+      });
+      logger.warn({ checkpointId }, 'REWIND rewindFilesInLoop COMPLETE — files restored');
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.error(
+        { checkpointId, error: errMsg },
+        'REWIND rewindFilesInLoop FAILED — query.rewindFiles() threw'
+      );
+      throw err;
+    }
   }
 
   /**
@@ -1594,33 +1717,51 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
    */
   async rewindFiles(checkpointId: string): Promise<void> {
     const sdkSessionId = this._currentSessionId;
-    logger.info(
-      { checkpointId, sdkSessionId, hasCurrentQuery: !!this.currentQuery },
-      'rewindFiles called'
+    logger.warn(
+      {
+        checkpointId,
+        sdkSessionId: sdkSessionId ?? 'none',
+        hasCurrentQuery: !!this.currentQuery,
+        sessionActive: this.sessionActive,
+      },
+      'REWIND rewindFiles START (external — creates resumed query)'
     );
 
     if (!sdkSessionId) {
-      logger.error({ checkpointId }, 'No SDK session ID available for rewindFiles');
+      logger.error({ checkpointId }, 'REWIND rewindFiles FAILED — no SDK session ID available');
       throw new Error('No SDK session ID available - session may not have been started');
     }
 
     // Step 1: Interrupt the current query to "complete" the session
     // The SDK requires the session to finish before checkpoint data is accessible
     if (this.currentQuery) {
-      logger.info({ checkpointId }, 'Interrupting current query before rewind');
+      logger.warn(
+        { checkpointId, sdkSessionId },
+        'REWIND rewindFiles Step 1 — interrupting current query'
+      );
       try {
         await this.currentQuery.interrupt();
         // Give the SDK a moment to finalize the session and flush checkpoint data
         await new Promise((resolve) => setTimeout(resolve, 500));
-      } catch (interruptErr) {
         logger.warn(
-          { checkpointId, err: interruptErr },
-          'Error interrupting query (continuing anyway)'
+          { checkpointId },
+          'REWIND rewindFiles Step 1 — interrupt complete, waited 500ms'
+        );
+      } catch (interruptErr) {
+        const errMsg = interruptErr instanceof Error ? interruptErr.message : String(interruptErr);
+        logger.warn(
+          { checkpointId, error: errMsg },
+          'REWIND rewindFiles Step 1 — interrupt error (continuing anyway)'
         );
       }
+    } else {
+      logger.warn({ checkpointId }, 'REWIND rewindFiles Step 1 — no current query to interrupt');
     }
 
-    logger.info({ checkpointId, sdkSessionId }, 'Resuming session for file rewind');
+    logger.warn(
+      { checkpointId, sdkSessionId },
+      'REWIND rewindFiles Step 2 — building resumed query options'
+    );
 
     // Step 2: Build options for the rewind query - must resume the session
     // Important: Include the CLI path since bundled Bun environments need it
@@ -1636,6 +1777,17 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       },
     };
 
+    logger.warn(
+      {
+        checkpointId,
+        resume: sdkSessionId,
+        enableFileCheckpointing: true,
+        envCheckpointing: rewindOptions.env?.CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING,
+        cwd: this.cwd,
+      },
+      'REWIND rewindFiles Step 3 — creating resumed query with empty prompt'
+    );
+
     // Step 3: Create a new query that resumes the session with an empty prompt
     const rewindQuery = query({
       prompt: '', // Empty prompt to open the connection
@@ -1645,20 +1797,58 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     try {
       // Step 4: Iterate through the resumed query and call rewindFiles
       // We need to enter the async iterator once to establish the connection
+      let msgCount = 0;
       for await (const msg of rewindQuery) {
+        msgCount++;
         // Log the message type we received (for debugging replay issues)
-        logger.info({ checkpointId, msgType: msg.type }, 'Calling rewindFiles on resumed query');
+        logger.warn(
+          {
+            checkpointId,
+            msgType: msg.type,
+            msgSubtype: (msg as { subtype?: string }).subtype,
+            msgCount,
+          },
+          'REWIND rewindFiles Step 4 — got message from resumed query, calling rewindFiles()'
+        );
         await withRetry(async () => rewindQuery.rewindFiles(checkpointId), {
           ...RetryPresets.quick,
           operationName: 'rewindFiles',
         });
-        logger.info({ checkpointId }, 'Files rewound successfully');
+        logger.warn(
+          { checkpointId },
+          'REWIND rewindFiles Step 4 — query.rewindFiles() returned successfully'
+        );
         break; // Exit after rewinding
       }
+      if (msgCount === 0) {
+        logger.error(
+          { checkpointId, sdkSessionId },
+          'REWIND rewindFiles — resumed query yielded ZERO messages (connection failed?)'
+        );
+      }
     } catch (err) {
-      logger.error({ checkpointId, err }, 'Error during file rewind');
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.error(
+        { checkpointId, error: errMsg },
+        'REWIND rewindFiles FAILED — error during file rewind'
+      );
       throw err;
+    } finally {
+      // Step 5: Explicitly terminate the CLI process spawned by query().
+      // The `break` above triggers the iterator's return(), but the underlying
+      // Claude CLI process may continue running and recreate the JSONL file
+      // after forkSessionAt deletes it (causing phantom sidebar entries).
+      logger.warn(
+        { checkpointId },
+        'REWIND rewindFiles Step 5 — interrupting rewind query (cleanup)'
+      );
+      try {
+        await rewindQuery.interrupt();
+      } catch {
+        // Ignore — process may already be exiting from the iterator return()
+      }
     }
+    logger.warn({ checkpointId, sdkSessionId }, 'REWIND rewindFiles COMPLETE');
   }
 }
 

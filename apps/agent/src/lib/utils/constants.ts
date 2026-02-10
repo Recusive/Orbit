@@ -47,7 +47,7 @@ export const SIDEBAR = {
   iconColumnWidth: 35,
   itemPadding: 12, // 6px mx-1.5 each side
   itemHeight: 32,
-  searchBarHeight: 40,
+  searchBarHeight: 32,
   tabNavHeight: 40,
   previewBadgeFontSize: 9,
 } as const;
@@ -146,7 +146,7 @@ export const INPUT_SIZES = {
  */
 export const RESIZE_HANDLE = {
   width: 1,
-  hoverWidth: 3,
+  hoverWidth: 1,
 } as const;
 
 // ============================================
@@ -491,8 +491,10 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
 export interface GitStatusStyle {
   /** Single character label (A, M, D, etc.) */
   label: string;
-  /** Tailwind text color class */
+  /** Tailwind text color class for the badge */
   color: string;
+  /** Tailwind text color class for the filename (VSCode-style status tinting) */
+  fileColor: string;
   /** Human-readable description */
   title: string;
 }
@@ -501,14 +503,29 @@ export interface GitStatusStyle {
  * Styling for each git file status type
  */
 export const GIT_STATUS_STYLES = {
-  added: { label: 'A', color: 'text-green-500', title: 'Added' },
-  modified: { label: 'M', color: 'text-yellow-500', title: 'Modified' },
-  deleted: { label: 'D', color: 'text-red-500', title: 'Deleted' },
-  renamed: { label: 'R', color: 'text-blue-500', title: 'Renamed' },
-  copied: { label: 'C', color: 'text-blue-500', title: 'Copied' },
-  untracked: { label: 'U', color: 'text-gray-400', title: 'Untracked' },
-  conflicted: { label: '!', color: 'text-orange-500', title: 'Conflict' },
-  typechange: { label: 'T', color: 'text-purple-500', title: 'Type Changed' },
+  added: { label: 'A', color: 'text-green-500', fileColor: 'text-green-500', title: 'Added' },
+  modified: {
+    label: 'M',
+    color: 'text-yellow-500',
+    fileColor: 'text-yellow-500',
+    title: 'Modified',
+  },
+  deleted: { label: 'D', color: 'text-red-500', fileColor: 'text-red-500', title: 'Deleted' },
+  renamed: { label: 'R', color: 'text-blue-500', fileColor: 'text-blue-500', title: 'Renamed' },
+  copied: { label: 'C', color: 'text-blue-500', fileColor: 'text-blue-500', title: 'Copied' },
+  untracked: { label: 'U', color: 'text-blue-400', fileColor: 'text-blue-400', title: 'Untracked' },
+  conflicted: {
+    label: '!',
+    color: 'text-orange-500',
+    fileColor: 'text-orange-500',
+    title: 'Conflict',
+  },
+  typechange: {
+    label: 'T',
+    color: 'text-purple-500',
+    fileColor: 'text-purple-500',
+    title: 'Type Changed',
+  },
 } as const satisfies Record<string, GitStatusStyle>;
 
 // =============================================================================

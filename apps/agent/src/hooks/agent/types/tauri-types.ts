@@ -18,15 +18,6 @@ export interface UseTauriReturn {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Rewind Context Types
-// ═══════════════════════════════════════════════════════════════
-
-export interface RewindContextMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-// ═══════════════════════════════════════════════════════════════
 // Global Window Extensions
 // ═══════════════════════════════════════════════════════════════
 

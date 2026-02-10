@@ -49,13 +49,13 @@ const ContextChip: FC<ContextChipProps> = ({ item, onRemove }) => {
   const isImage = item.type === 'image';
 
   return (
-    <div className="group flex items-center gap-1.5 pl-2 pr-1 py-1 text-xs bg-muted/50 hover:bg-muted rounded-md border border-border/50 transition-colors shrink-0 max-w-[180px]">
+    <div className="group flex items-center gap-1.5 pl-2 pr-1 py-1 text-xs bg-gray-4 hover:bg-gray-5 rounded-md border border-gray-7 transition-colors shrink-0 max-w-[180px]">
       {/* Image thumbnail or file icon */}
       {isImage && item.previewUrl ? (
         <img
           src={item.previewUrl}
           alt={item.name}
-          className="h-5 w-5 object-cover rounded-sm shrink-0"
+          className="h-5 w-5 object-cover rounded-md shrink-0"
         />
       ) : (
         <FileIcon fileName={item.name} className="h-3.5 w-3.5" monochrome={false} />

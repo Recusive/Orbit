@@ -138,6 +138,11 @@ pub struct BrowserLoadingPayload {
 pub struct BrowserWindowState {
     /// Whether the browser window exists.
     exists: Mutex<bool>,
+    /// Whether the browser is currently "hidden" (moved offscreen).
+    ///
+    /// When true, `browser_set_bounds` skips position/size updates to prevent
+    /// the ResizeObserver from moving the window back on-screen after a hide.
+    hidden: Mutex<bool>,
     /// Last known bounds for restoring after hide.
     last_bounds: Mutex<Option<BrowserBounds>>,
 }
@@ -147,6 +152,16 @@ impl BrowserWindowState {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Non-blocking check whether the browser window currently exists.
+    ///
+    /// Returns `None` if the lock is contended (another thread holds it),
+    /// which callers should treat as "don't know / skip". This is designed
+    /// for the main-thread focus handler where blocking would deadlock the
+    /// macOS event loop.
+    pub fn try_is_active(&self) -> Option<bool> {
+        self.exists.try_lock().map(|guard| *guard)
     }
 }
 
@@ -358,6 +373,7 @@ pub async fn browser_create(
 
     // Update state
     *state.exists.lock() = true;
+    *state.hidden.lock() = false;
     *state.last_bounds.lock() = Some(BrowserBounds {
         x,
         y,
@@ -420,6 +436,13 @@ pub async fn browser_set_bounds(
         return Err("No browser exists".to_owned());
     }
 
+    // Skip position/size updates while the browser is hidden (offscreen).
+    // The ResizeObserver continues firing during panel collapse animations,
+    // which would move the window back on-screen if we applied the bounds.
+    if *state.hidden.lock() {
+        return Ok(());
+    }
+
     let window = app
         .get_webview_window(BROWSER_WINDOW_LABEL)
         .ok_or("Browser window not found")?;
@@ -464,6 +487,7 @@ pub async fn browser_close(
     }
 
     *state.exists.lock() = false;
+    *state.hidden.lock() = false;
     *state.last_bounds.lock() = None;
     log::info!("Closed browser window");
     Ok(())
@@ -743,6 +767,9 @@ pub async fn browser_show(app: AppHandle, state: State<'_, Arc<BrowserWindowStat
         .get_webview_window(BROWSER_WINDOW_LABEL)
         .ok_or("Browser window not found")?;
 
+    // Clear hidden flag so browser_set_bounds resumes accepting updates.
+    *state.hidden.lock() = false;
+
     // Get main window for coordinate conversion (HiDPI-aware)
     let main_window = app.get_webview_window("main");
 
@@ -759,35 +786,33 @@ pub async fn browser_show(app: AppHandle, state: State<'_, Arc<BrowserWindowStat
         let _ = window.set_size(LogicalSize::new(bounds.width, bounds.height));
     }
 
-    window
-        .show()
-        .map_err(|e| format!("Failed to show browser: {e}"))?;
-
-    // WORKAROUND: Force repaint by briefly resizing (reuse saved_bounds).
+    // No show() or orderFront needed here.
     //
-    // Code review cycle 1, issue #10: On some macOS versions, child windows do not
-    // repaint correctly after being shown. This brief resize cycle forces WebKit
-    // to redraw the content. The -1px size change is imperceptible but triggers
-    // the necessary repaint.
+    // Since browser_hide() never calls window.hide() (to preserve the
+    // parent-child NSWindow relationship), the window is always "visible"
+    // to macOS — just offscreen at (-10000, -10000) when hidden. Restoring
+    // bounds above is sufficient to make it visible to the user again.
     //
-    // Alternative approaches considered:
-    // - window.invalidate() / requestAnimationFrame: Not available in Tauri API
-    // - setNeedsDisplay on NSWindow: Requires unsafe objc calls
-    // - This resize approach is simple and reliable, though slightly hacky
-    //
-    // If Tauri exposes a proper redraw API in the future, this should be replaced.
-    if let Some(bounds) = saved_bounds {
-        let _ = window.set_size(LogicalSize::new(
-            bounds.width - 1.0_f64,
-            bounds.height - 1.0_f64,
-        ));
-        let _ = window.set_size(LogicalSize::new(bounds.width, bounds.height));
-    }
+    // The parent-child relationship keeps the browser above the main window.
+    // If z-ordering ever drifts, the focus handler in lib.rs calls
+    // orderFront:nil on the main thread (NSWindow APIs require main thread;
+    // this command runs on a Tokio thread, so we must not call them here).
 
     Ok(())
 }
 
-/// Hide the browser window.
+/// Hide the browser window by moving it offscreen.
+///
+/// **Important:** We do NOT call `window.hide()` (which maps to `NSWindow.orderOut:` on
+/// macOS). `orderOut:` removes the window from the parent's child window list, breaking
+/// the parent-child relationship established by `addChildWindow:ordered:NSWindowAbove`.
+/// When `window.show()` (`makeKeyAndOrderFront:`) is later called, the window reappears
+/// as an **independent** window instead of a child — causing it to go behind the parent
+/// when the user clicks the main app.
+///
+/// Instead, we move the window offscreen and shrink it to 1x1. This makes it invisible
+/// to the user while preserving the parent-child relationship, so the browser correctly
+/// stays above the parent window when restored.
 #[tauri::command]
 pub async fn browser_hide(app: AppHandle, state: State<'_, Arc<BrowserWindowState>>) -> Result<()> {
     if !*state.exists.lock() {
@@ -798,13 +823,16 @@ pub async fn browser_hide(app: AppHandle, state: State<'_, Arc<BrowserWindowStat
         .get_webview_window(BROWSER_WINDOW_LABEL)
         .ok_or("Browser window not found")?;
 
-    // Move offscreen before hiding to prevent artifacts
+    // Mark as hidden so browser_set_bounds skips position updates
+    // (prevents ResizeObserver from moving the window back on-screen).
+    *state.hidden.lock() = true;
+
+    // Move offscreen and shrink — but do NOT call window.hide().
+    // See doc comment above for why hide() must be avoided.
     let _ = window.set_position(LogicalPosition::new(-10_000.0_f64, -10_000.0_f64));
     let _ = window.set_size(LogicalSize::new(1.0_f64, 1.0_f64));
 
-    window
-        .hide()
-        .map_err(|e| format!("Failed to hide browser: {e}"))
+    Ok(())
 }
 
 // ═══════════════════════════════════════════════════════════════

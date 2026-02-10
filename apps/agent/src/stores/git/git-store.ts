@@ -3,12 +3,12 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
-import type { FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/api';
+import type { BranchDiffStats, FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/api';
 
 const logger = createLogger('GitStore');
 
 // Re-export types for convenience
-export type { FileStatus, GitBranch, GitStatus, StatusEntry };
+export type { BranchDiffStats, FileStatus, GitBranch, GitStatus, StatusEntry };
 
 // ============================================
 // State Interface
@@ -31,6 +31,8 @@ interface GitState {
   isFetching: boolean;
   /** Timestamp of last successful fetch from remote */
   lastFetchedAt: number | null;
+  /** Branch diff stats (current branch vs main) */
+  branchDiffStats: BranchDiffStats | null;
 }
 
 interface GitActions {
@@ -48,6 +50,8 @@ interface GitActions {
   setFetching: (fetching: boolean) => void;
   /** Set timestamp of last successful fetch from remote */
   setLastFetchedAt: (timestamp: number) => void;
+  /** Set branch diff stats */
+  setBranchDiffStats: (stats: BranchDiffStats | null) => void;
   /** Reset all state to initial values */
   reset: () => void;
 }
@@ -67,6 +71,7 @@ const initialState: GitState = {
   branches: [],
   isFetching: false,
   lastFetchedAt: null,
+  branchDiffStats: null,
 };
 
 // ============================================
@@ -155,6 +160,12 @@ export const useGitStore = create<GitStore>()(
         });
       },
 
+      setBranchDiffStats: (stats): void => {
+        set((state) => {
+          state.branchDiffStats = stats;
+        });
+      },
+
       reset: (): void => {
         set((state) => {
           state.repoPath = initialState.repoPath;
@@ -165,6 +176,7 @@ export const useGitStore = create<GitStore>()(
           state.branches = initialState.branches;
           state.isFetching = initialState.isFetching;
           state.lastFetchedAt = initialState.lastFetchedAt;
+          state.branchDiffStats = initialState.branchDiffStats;
         });
       },
     }))
@@ -262,3 +274,7 @@ export const useGitTotalChanges = (): number => useGitStore(selectTotalChanges);
 
 /** Hook to check if in a git repo */
 export const useIsGitRepo = (): boolean => useGitStore((state) => state.repoPath !== null);
+
+/** Hook to get branch diff stats */
+export const useBranchDiffStats = (): BranchDiffStats | null =>
+  useGitStore((state) => state.branchDiffStats);

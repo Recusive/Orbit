@@ -21,6 +21,7 @@ import type { CanvasLeftSidebarProps, CanvasSidebarTab } from './types';
 import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { FC } from 'react';
 
+import { ScrambleAsciiPre } from '@/components/shared';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
@@ -143,13 +144,15 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
           /* Expanded: text on left, button on right */
           <div className="flex items-center justify-between w-full px-3">
             <div className="flex items-center gap-1.5">
-              <span className="text-lg font-semibold whitespace-nowrap">Orbit Canvas</span>
-              <span
-                className="bg-primary/8 text-primary/70 rounded-full px-1.5 py-0.5 font-medium tracking-wide whitespace-nowrap"
-                style={{ fontSize: SIDEBAR.previewBadgeFontSize }}
-              >
-                Preview
-              </span>
+              <ScrambleAsciiPre
+                ariaLabel="Orbit Canvas"
+                text={` ██████╗ ██████╗ ██████╗ ██╗████████╗     ██████╗ █████╗ ███╗   ██╗██╗   ██╗ █████╗ ███████╗
+██╔═══██╗██╔══██╗██╔══██╗██║╚══██╔══╝    ██╔════╝██╔══██╗████╗  ██║██║   ██║██╔══██╗██╔════╝
+██║   ██║██████╔╝██████╔╝██║   ██║       ██║     ███████║██╔██╗ ██║██║   ██║███████║███████╗
+██║   ██║██╔══██╗██╔══██╗██║   ██║       ██║     ██╔══██║██║╚██╗██║╚██╗ ██╔╝██╔══██║╚════██║
+╚██████╔╝██║  ██║██████╔╝██║   ██║       ╚██████╗██║  ██║██║ ╚████║ ╚████╔╝ ██║  ██║███████║
+ ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝        ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝  ╚═══╝  ╚═╝  ╚═╝╚══════╝`}
+              />
             </div>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -177,7 +180,7 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
       <div
         className={cn(
           'shrink-0 mx-1.5 overflow-hidden transition-[height,opacity] duration-150 ease-in-out',
-          isCollapsed ? 'py-0' : 'py-1'
+          isCollapsed ? 'py-0' : ''
         )}
         style={{
           height: isCollapsed ? 0 : SIDEBAR.searchBarHeight,
@@ -185,7 +188,7 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
         }}
       >
         <button
-          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border border-border/50 w-full bg-muted/40 hover:bg-muted/60 hover:border-border/60 transition-[background-color,border-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border border-gray-5 w-full bg-muted/40 hover:bg-muted/60 hover:border-gray-6 transition-[background-color,border-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="Search components"
           role="searchbox"
           aria-readonly="true"

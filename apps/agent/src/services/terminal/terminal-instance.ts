@@ -163,7 +163,7 @@ export class TerminalInstance {
       cursorBlink: true,
       cursorStyle: 'bar',
       fontSize: 13,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontFamily: '"Geist Mono Variable", "Geist Mono", Menlo, monospace',
       lineHeight: 1.2,
       scrollback: 10000,
       theme,
@@ -338,12 +338,6 @@ export class TerminalInstance {
 
           // Now request PTY with correct cols/rows
           this.requestPtyCreation();
-        } else {
-          logger.debug('Waiting for container dimensions', {
-            sessionId: this.sessionId,
-            width,
-            height,
-          });
         }
       });
 
@@ -564,6 +558,9 @@ export class TerminalInstance {
    * NOTE: getPropertyValue('--var') returns raw CSS (e.g., "oklch(0.93 0.015 75)").
    * We need to assign the variable to an element style and read the COMPUTED value,
    * which forces the browser to resolve oklch() → rgb().
+   *
+   * For Liquid Glass vibrancy, we use RGBA with transparency so the macOS
+   * window vibrancy effect shows through the terminal background.
    */
   private buildThemeFromCSSVars(): ITheme {
     const baseTheme = getBestTheme();
@@ -581,11 +578,30 @@ export class TerminalInstance {
         return getComputedStyle(tempEl)[property];
       };
 
-      const bgColor = getComputedColor('--chat-area', 'backgroundColor');
+      const bgComputed = getComputedColor('--chat-area', 'backgroundColor');
       const fgColor = getComputedColor('--foreground', 'color');
+      const cursorColor = getComputedColor('--terminal-cursor', 'color');
       const selectionColor = getComputedColor('--accent', 'backgroundColor');
 
       document.body.removeChild(tempEl);
+
+      // Use the computed --chat-area color for the xterm.js canvas.
+      // In solid mode this gives us an opaque rgb() value matching the chat area.
+      // In liquid glass mode, --chat-area is semi-transparent (rgba with alpha < 1)
+      // which xterm.js canvas doesn't render well. In that case, fall back to
+      // near-invisible so the CSS container (var(--chat-area)) provides the visual.
+      // Parse the alpha channel numerically instead of fragile regex matching.
+      // The previous regex (/,\s*1\s*\)$/) failed for values like "1.0" or "1.00".
+      let isSemiTransparent = false;
+      if (bgComputed.startsWith('rgba')) {
+        const parts = bgComputed
+          .replace(/^rgba?\(/, '')
+          .replace(/\)$/, '')
+          .split(',');
+        const alpha = parseFloat(parts[3]?.trim() ?? '1');
+        isSemiTransparent = alpha < 0.99;
+      }
+      const bgColor = isSemiTransparent ? 'rgba(0, 0, 0, 0.01)' : bgComputed;
 
       // WARNING: Do NOT modify selectionBg to add rgba() transparency!
       // xterm.js internally handles selection opacity/blending. The accent color
@@ -595,8 +611,8 @@ export class TerminalInstance {
         ...baseTheme,
         background: bgColor,
         foreground: fgColor,
-        cursor: fgColor,
-        cursorAccent: bgColor,
+        cursor: cursorColor,
+        cursorAccent: bgColor, // Cursor interior matches terminal bg for contrast
         selectionBackground: selectionColor,
         // Note: xterm.js uses native browser scrollbar styled via CSS in terminal.css
       };

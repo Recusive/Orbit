@@ -147,18 +147,18 @@ describe('SidebarItem', () => {
       expect(button).toHaveClass('text-foreground');
     });
 
-    it('should have muted text color when active=false', () => {
+    it('should have sidebar text color when active=false', () => {
       render(<SidebarItem {...createDefaultProps({ active: false })} />);
 
       const button = getButton();
-      expect(button).toHaveClass('text-muted-foreground');
+      expect(button).toHaveClass('text-sidebar-foreground');
     });
 
-    it('should have muted text color by default (no active prop)', () => {
+    it('should have sidebar text color by default (no active prop)', () => {
       render(<SidebarItem {...createDefaultProps()} />);
 
       const button = getButton();
-      expect(button).toHaveClass('text-muted-foreground');
+      expect(button).toHaveClass('text-sidebar-foreground');
     });
   });
 
@@ -269,11 +269,11 @@ describe('SidebarItem', () => {
       expect(button).toHaveClass('text-foreground');
     });
 
-    it('should have muted styling in equalSpacing variant when active=false', () => {
+    it('should have sidebar text styling in equalSpacing variant when active=false', () => {
       render(<SidebarItem {...createDefaultProps({ equalSpacing: true, active: false })} />);
 
       const button = getButton();
-      expect(button).toHaveClass('text-muted-foreground');
+      expect(button).toHaveClass('text-sidebar-foreground');
     });
 
     it('should not render label text in equalSpacing variant', () => {
@@ -388,7 +388,7 @@ describe('SidebarItem', () => {
       render(<SidebarItem {...createDefaultProps()} />);
 
       const button = getButton();
-      expect(button).toHaveClass('transition-[background-color,color,transform]');
+      expect(button).toHaveClass('transition-[background-color,transform]');
     });
 
     it('should have active scale effect class', () => {
@@ -402,7 +402,7 @@ describe('SidebarItem', () => {
       render(<SidebarItem {...createDefaultProps()} />);
 
       const button = getButton();
-      expect(button).toHaveClass('hover:bg-muted/50');
+      expect(button).toHaveClass('hover:bg-gray-3');
     });
   });
 

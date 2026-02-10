@@ -18,7 +18,7 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
   return (
     <div className="space-y-2">
       {/* Queued message bubble - muted with dashed border */}
-      <div className="p-3 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30">
+      <div className="p-3 rounded-lg border-2 border-dashed border-gray-7 bg-gray-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             {/* Queued indicator */}
@@ -32,7 +32,7 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
           {/* Cancel button */}
           <button
             onClick={onCancel}
-            className="shrink-0 h-5 w-5 flex items-center justify-center rounded hover:bg-muted-foreground/20 text-muted-foreground hover:text-foreground transition-colors"
+            className="shrink-0 h-5 w-5 flex items-center justify-center rounded hover:bg-accent text-gray-12 hover:text-foreground transition-colors"
             title="Cancel queued message"
           >
             <X className="h-3.5 w-3.5" />
@@ -49,7 +49,7 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
             return (
               <div
                 key={filePath}
-                className="flex items-center gap-1.5 px-1.5 py-1 bg-muted/20 rounded border border-dashed border-border/40"
+                className="flex items-center gap-1.5 px-1.5 py-1 bg-gray-3 rounded border border-dashed border-gray-6"
                 title={filePath}
               >
                 <FileIcon
@@ -65,13 +65,13 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
           {message.images?.map((image, index) => (
             <div
               key={`${image.name}-${String(index)}`}
-              className="flex items-center gap-1.5 px-1.5 py-1 bg-muted/20 rounded border border-dashed border-border/40"
+              className="flex items-center gap-1.5 px-1.5 py-1 bg-gray-3 rounded border border-dashed border-gray-6"
               title={image.name}
             >
               <img
                 src={image.previewUrl}
                 alt={image.name}
-                className="h-4 w-4 object-cover rounded-sm opacity-50"
+                className="h-4 w-4 object-cover rounded-md opacity-50"
               />
               <span className="text-sm text-muted-foreground/70">{image.name}</span>
             </div>

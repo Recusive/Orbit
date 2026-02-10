@@ -139,10 +139,13 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
           break;
 
         case 'Enter':
-          if (itemCount > 0 && results[selectedIndex]) {
-            e.preventDefault();
-            e.stopPropagation();
-            handleSelect(results[selectedIndex]);
+          {
+            const selected = results[selectedIndex];
+            if (itemCount > 0 && selected !== undefined) {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSelect(selected);
+            }
           }
           break;
 
@@ -168,7 +171,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[320px] p-0 rounded-lg border-[3px] border-border bg-card shadow-lg"
+        className="w-[320px] p-0 rounded-lg border border-gray-5 shadow-lg"
         side="top"
         align="start"
         sideOffset={8}
@@ -281,7 +284,7 @@ const FileItem: FC<FileItemProps> = ({ result, isSelected, isFirst, isLast, onSe
         'relative flex cursor-pointer gap-2.5 select-none items-center border-l-2 border-transparent pl-2 pr-2.5 py-2 outline-none',
         isSelected
           ? 'rounded-r-md bg-primary/10 text-foreground border-primary/60'
-          : 'rounded-md hover:bg-muted/50 active:scale-[0.99]'
+          : 'rounded-md hover:bg-gray-4 active:scale-[0.99]'
       )}
     >
       <FileIcon fileName={result.name} className="h-4 w-4 shrink-0" monochrome={false} />

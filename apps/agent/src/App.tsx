@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { HeaderTab } from '@/stores/ui/ui-store';
 import type { CSSProperties, FC } from 'react';
 
+import welcomeBg from '@/assets/welcome-bg.png';
 import { HeaderBar } from '@/components/layout/header-bar';
 import { RootLayout } from '@/components/layout/root-layout';
 import { StatusBar } from '@/components/layout/status-bar';
@@ -99,33 +100,57 @@ const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error, onReset })
   };
 
   return (
-    <div className="h-full w-full flex items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-4 max-w-md text-center p-6">
-        <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
-          <AlertTriangle className="h-6 w-6 text-destructive" />
+    <div className="h-full w-full flex items-center justify-center bg-chat-area">
+      <div
+        className="flex flex-col items-center gap-4 max-w-sm text-center px-8 py-7 rounded-2xl"
+        style={{
+          backgroundColor: 'var(--gray-1)',
+          boxShadow: '0 0 0 3px color-mix(in oklch, var(--destructive) 20%, transparent)',
+        }}
+      >
+        {/* Icon */}
+        <div
+          className="h-10 w-10 rounded-xl flex items-center justify-center"
+          style={{ backgroundColor: 'color-mix(in oklch, var(--destructive) 12%, transparent)' }}
+          aria-hidden="true"
+        >
+          <AlertTriangle className="h-[18px] w-[18px] text-destructive" />
         </div>
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold text-foreground">
-            {MODE_LABELS[mode]} Mode Crashed
+
+        {/* Copy */}
+        <div className="space-y-1">
+          <h2 className="text-[15px] font-semibold text-foreground" style={{ textWrap: 'balance' }}>
+            {MODE_LABELS[mode]} Crashed
           </h2>
           <p className="text-sm text-muted-foreground">
-            An unexpected error occurred. You can try again, continue using other modes, or reload
-            the app.
+            Something went wrong. Try again or reload the app.
           </p>
-          {error ? (
-            <p className="text-xs text-destructive/80 font-mono bg-destructive/5 p-2 rounded">
+        </div>
+
+        {/* Error detail */}
+        {error ? (
+          <div
+            className="w-full rounded-lg px-3 py-2"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--destructive) 8%, transparent)',
+              boxShadow: 'inset 0 0 0 1px color-mix(in oklch, var(--destructive) 15%, transparent)',
+            }}
+          >
+            <p className="text-xs text-destructive font-mono text-left break-all leading-relaxed">
               {error.message}
             </p>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
+
+        {/* Actions */}
         <div className="flex gap-2">
           {onReset ? (
-            <Button variant="default" size="sm" onClick={onReset}>
-              <RotateCcw className="h-4 w-4 mr-2" />
+            <Button variant="outline" size="sm" onClick={onReset}>
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
               Try Again
             </Button>
           ) : null}
-          <Button variant="outline" size="sm" onClick={handleReload}>
+          <Button variant="ghost" size="sm" onClick={handleReload}>
             Reload App
           </Button>
         </div>
@@ -192,9 +217,24 @@ const App: FC = () => {
     <ThemeProvider>
       <TauriProvider>
         <TooltipProvider delayDuration={0}>
-          <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground">
-            {/* Shared header with tabs */}
-            <HeaderBar />
+          <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground relative">
+            {/* Full-window background image — only on welcome page */}
+            {!hasWorkspace ? (
+              <>
+                <div
+                  className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                  style={{ backgroundImage: `url(${welcomeBg})` }}
+                  aria-hidden="true"
+                />
+                <div
+                  className="absolute inset-0 bg-gradient-to-t from-gray-5/55 via-gray-5/25 to-gray-5/10 dark:from-gray-3/80 dark:via-gray-3/55 dark:to-gray-3/35"
+                  aria-hidden="true"
+                />
+              </>
+            ) : null}
+
+            {/* Shared header with tabs — relative z-10 to sit above welcome bg */}
+            <HeaderBar transparent={!hasWorkspace} className="relative z-10" />
 
             {/* Mode content - show welcome page if no workspace, otherwise show active mode */}
             {/*
@@ -203,7 +243,7 @@ const App: FC = () => {
              * 1. Layout flashes when switching tabs (no remounting)
              * 2. Unnecessary memory usage for unvisited modes
              */}
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden relative z-10">
               {!hasWorkspace ? (
                 <WelcomePage />
               ) : (
@@ -257,8 +297,8 @@ const App: FC = () => {
               )}
             </div>
 
-            {/* Status Bar */}
-            <StatusBar />
+            {/* Status Bar — relative z-10 to sit above welcome bg */}
+            <StatusBar transparent={!hasWorkspace} className="relative z-10" />
 
             {/* Crash notification dialog */}
             {hasCrash && crashLog ? (
@@ -271,7 +311,7 @@ const App: FC = () => {
             ) : null}
 
             {/* Toast notifications */}
-            <Toaster position="bottom-right" />
+            <Toaster position="bottom-right" offset={40} />
           </div>
         </TooltipProvider>
       </TauriProvider>

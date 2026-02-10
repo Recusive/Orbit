@@ -22,20 +22,20 @@
         "resizable": true,
         "fullscreen": false,
         "decorations": true,
-        "transparent": false,
+        "transparent": true,
         "center": false,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": {
           "x": 11,
-          "y": 18
+          "y": 19
         }
       }
     ],
     "security": {
       "csp": {
         "default-src": "'self'",
-        "script-src": "'self' 'unsafe-eval' https://streamdown.ai http://localhost:*",
+        "script-src": "'self' 'unsafe-eval' https://streamdown.ai http://localhost:5176 http://localhost:5199",
         "style-src": "'self' 'unsafe-inline' https://streamdown.ai http://localhost:*",
         "connect-src": "'self' https://api.anthropic.com ipc://localhost https://streamdown.ai http://localhost:* ws://localhost:*",
         "img-src": "'self' data: blob:",
@@ -64,7 +64,8 @@
     "longDescription": "Orbit is a modern code editor built with Tauri, React, and Rust, featuring an AI coding assistant.",
     "macOS": {
       "entitlements": "Entitlements.plist",
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": "Developer ID Application: Pranit sharma (QSAMZF2NJ7)"
     }
   },
   "plugins": {}

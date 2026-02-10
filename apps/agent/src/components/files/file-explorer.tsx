@@ -6,15 +6,7 @@
  */
 import { createLogger } from '@orbit/common/lib';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import {
-  AlertCircle,
-  ChevronDown,
-  ChevronRight,
-  FolderOpen,
-  Loader2,
-  RefreshCw,
-  Search,
-} from 'lucide-react';
+import { AlertCircle, ChevronRight, FolderOpen, Loader2, RefreshCw, Search } from 'lucide-react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 
 import type { FileStatus } from '@/lib/api';
@@ -68,7 +60,7 @@ const GitStatusBadge: FC<GitStatusBadgeProps> = ({ status }) => {
   const style = GIT_STATUS_STYLES[status];
   return (
     <span
-      className={cn('text-xs font-bold shrink-0 w-4 text-center', style.color)}
+      className={cn('text-xs font-bold shrink-0 w-4 text-center mr-2', style.color)}
       title={style.title}
     >
       {style.label}
@@ -300,7 +292,7 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
             <AlertCircle className="h-5 w-5 text-destructive mb-2" />
             <span className="text-sm text-muted-foreground mb-2">{rootError}</span>
             <button
-              className="text-xs text-primary hover:underline"
+              className="text-xs text-gray-12 hover:text-foreground hover:underline"
               onClick={(): void => {
                 retryFolder(rootPath ?? '__root__');
               }}
@@ -410,8 +402,8 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
     return (
       <button
         className={cn(
-          'file-tree-item flex items-center w-full text-sm hover:bg-accent/50 transition-colors',
-          isSelected && 'bg-accent text-accent-foreground'
+          'file-tree-item flex items-center w-full text-sm hover:bg-gray-4 transition-colors',
+          isSelected && 'bg-gray-6 text-foreground'
         )}
         style={{
           position: 'absolute',
@@ -427,45 +419,59 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
         onClick={handleClick}
         title={isGitIgnored ? `${path} (gitignored)` : path}
       >
+        {/* Indent guide lines - one vertical line per ancestor depth level */}
+        {depth > 0 &&
+          Array.from({ length: depth }, (_, i) => (
+            <span
+              key={i}
+              className="absolute top-0 bottom-0 w-px bg-muted-foreground/15 pointer-events-none"
+              style={{ left: i * 12 + 16 }}
+              aria-hidden="true"
+            />
+          ))}
+
         {/* Expand/collapse chevron for directories */}
         <span className="w-4 h-4 flex items-center justify-center shrink-0">
           {node.isDirectory ? (
-            isLoading ? (
-              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-            ) : error ? (
+            error ? (
               <AlertCircle className="h-3 w-3 text-destructive" />
-            ) : isExpanded ? (
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            ) : isLoading && !isExpanded ? (
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
             ) : (
-              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+              <ChevronRight
+                className={cn(
+                  'h-3 w-3 text-muted-foreground transition-transform duration-150',
+                  isExpanded && 'rotate-90'
+                )}
+                aria-hidden="true"
+              />
             )
           ) : null}
         </span>
 
-        {/* Icon */}
-        <span className="w-4 h-4 flex items-center justify-center shrink-0 mr-1">
+        {/* Icon — slightly oversized for visual clarity, container stays 16px to preserve row height */}
+        <span className="w-4 h-4 flex items-center justify-center shrink-0 mr-1 overflow-visible">
           {node.isDirectory ? (
             <FolderIcon
               folderName={node.name}
               isOpen={isExpanded}
               isSymlink={node.isSymlink ?? false}
-              className="h-4 w-4"
+              className="h-[18px] w-[18px]"
             />
           ) : (
             <FileIcon
               fileName={node.name}
               isSymlink={node.isSymlink ?? false}
-              className="h-4 w-4"
+              className="h-[18px] w-[18px]"
             />
           )}
         </span>
 
-        {/* Name */}
+        {/* Name — tinted by git status (VSCode-style) */}
         <span
           className={cn(
             'truncate text-left flex-1',
-            // Dim untracked files slightly
-            gitStatus === 'untracked' && 'text-muted-foreground'
+            gitStatus && GIT_STATUS_STYLES[gitStatus].fileColor
           )}
         >
           {node.name}

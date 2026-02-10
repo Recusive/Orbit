@@ -244,11 +244,8 @@ pub fn run() {
         log::warn!("Failed to load settings: {e}");
     }
 
-    // Initialize conversation manager and load summaries
+    // Initialize conversation manager (pure disk reader — no cache to warm)
     let conversation_manager = ConversationManager::new();
-    if let Err(e) = conversation_manager.load_summaries() {
-        log::warn!("Failed to load conversation summaries: {e}");
-    }
 
     // Initialize agent session manager
     // The sidecar path is resolved based on environment:
@@ -264,6 +261,10 @@ pub fn run() {
     // Initialize browser window state
     let browser_state = Arc::new(BrowserWindowState::new());
     let browser_result_state = Arc::new(BrowserResultState::new());
+
+    // Clone browser state for the main-window focus listener (Arc is moved into .manage())
+    #[cfg(target_os = "macos")]
+    let browser_state_for_focus = Arc::clone(&browser_state);
 
     // Initialize file index state (empty until workspace is opened)
     let file_index_state: FileIndexState = Arc::new(RwLock::new(Option::<FileIndex>::None));
@@ -283,6 +284,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_liquid_glass::init())
         .plugin(orbit_plugin_decorum::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         // Setup event callbacks for agent and configure window
@@ -293,10 +295,49 @@ pub fn run() {
             {
                 use orbit_plugin_decorum::WebviewWindowExt as _;
                 use tauri::Manager as _;
+                use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 
                 if let Some(window) = app.get_webview_window("main") {
                     // Enable ProMotion 120Hz on supported displays.
                     drop(window.enable_promotion());
+
+                    // Apply heavy frosted vibrancy (iOS 7 style).
+                    // FullScreenUI has the heaviest gaussian blur of all NSVisualEffectMaterials,
+                    // creating a deeply frosted diffusion instead of a straight see-through look.
+                    // CSS surfaces at 70%/55% opacity mask any material tinting — only the
+                    // blur effect shows through the transparent portion.
+                    if let Err(e) = apply_vibrancy(
+                        &window,
+                        NSVisualEffectMaterial::FullScreenUI,
+                        None,
+                        None,
+                    ) {
+                        log::warn!("Failed to apply frosted vibrancy: {e}");
+                    }
+
+                    // Fix macOS child window z-ordering: when the main window gains
+                    // focus, the browser child window can appear behind the parent.
+                    // Re-order visible child windows to front on every focus event
+                    // using NSWindow.orderFront: (does NOT steal keyboard focus).
+                    //
+                    // Safety guards:
+                    // - try_lock(): non-blocking to avoid deadlocking the main thread
+                    // - Only fires for Focused(true) when the browser window exists
+                    // - The decorum function itself skips hidden windows (isVisible check)
+                    window.on_window_event(move |event| {
+                        if !matches!(event, tauri::WindowEvent::Focused(true)) {
+                            return;
+                        }
+                        // Non-blocking check: returns None if lock is contended
+                        // (e.g., browser_create/browser_close on a Tokio thread).
+                        // This prevents deadlocking the main thread event loop.
+                        if browser_state_for_focus.try_is_active() != Some(true) {
+                            return;
+                        }
+                        // The decorum function itself skips hidden child windows
+                        // (checks NSWindow.isVisible before calling orderFront:).
+                        orbit_plugin_decorum::order_child_windows_front();
+                    });
                 }
             }
 
@@ -338,6 +379,7 @@ pub fn run() {
             // Fork and generate commands
             agent_cmd::agent_fork_session,
             agent_cmd::agent_rewind_files,
+            agent_cmd::agent_fork_session_at,
             agent_cmd::agent_generate_agent_definition,
             agent_cmd::agent_generate_command_definition,
             // Canvas session commands
@@ -438,6 +480,7 @@ pub fn run() {
             git::git_diff,
             git::git_diff_structured,
             git::git_staged_diff,
+            git::git_branch_diff_stats,
             git::git_discard,
             git::git_log,
             git::git_branches,
@@ -493,8 +536,6 @@ pub fn run() {
             conversations::conversation_update_title,
             conversations::conversation_add_message,
             conversations::conversation_fork,
-            conversations::conversation_data_path,
-            conversations::conversation_cleanup_orphaned,
             // Dev-monitor commands (dev-only)
             dev_monitor::dev_monitor_ensure_dir,
             dev_monitor::dev_monitor_write_batch,

@@ -76,7 +76,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
 
   // Input change handler - detects @ mentions and / commands
   const handleInputChange = useCallback(
-    (e: React.FormEvent<HTMLDivElement>): void => {
+    (e: React.SyntheticEvent<HTMLDivElement>): void => {
       const text = e.currentTarget.textContent || '';
       setInputText(text);
 
@@ -388,11 +388,9 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
 
   const getInputBoxClasses = useCallback((): string => {
     const base = cn(
-      'w-full p-1 bg-card border-[3px] transition-[border-color,box-shadow] duration-200',
-      'rounded-xl',
-      'shadow-lg',
-      'focus-within:shadow-focus',
-      'dark:shadow-none dark:focus-within:shadow-none'
+      'w-full p-1 bg-gray-3 border transition-[border-color,box-shadow] duration-200',
+      'rounded-2xl',
+      'shadow-none'
     );
     switch (inputMode) {
       case 'plan':
@@ -400,7 +398,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
       case 'accept':
         return `${base} border-2 border-dotted border-mode-accept/40`;
       case 'default':
-        return `${base} border-border/50 focus-within:border-border/70`;
+        return `${base} border-gray-5`;
     }
   }, [inputMode]);
 

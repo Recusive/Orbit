@@ -5,6 +5,7 @@ import { BrowserToolbar } from './browser-toolbar';
 
 import type { FC } from 'react';
 
+import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import {
   selectFormattedIdleTime,
@@ -22,7 +23,8 @@ import { useActivityTab } from '@/stores/ui/ui-store';
 import { generateUUID } from '@/types/protocol';
 
 // Inset to prevent webview from overlapping panel drag handles (3px separator)
-const WEBVIEW_BORDER_INSET = 3;
+/** Minimal left inset to prevent native webview from overlapping the panel border */
+const WEBVIEW_LEFT_INSET = 1;
 
 export const BrowserPanel: FC = () => {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -90,10 +92,10 @@ export const BrowserPanel: FC = () => {
     // Apply inset to prevent webview from overlapping panel borders
     // Note: rect was already fetched above for validation
     const bounds = {
-      x: Math.round(rect.x) + WEBVIEW_BORDER_INSET,
+      x: Math.round(rect.x) + WEBVIEW_LEFT_INSET,
       y: Math.round(rect.y),
-      width: Math.round(rect.width) - WEBVIEW_BORDER_INSET,
-      height: Math.round(rect.height) - WEBVIEW_BORDER_INSET,
+      width: Math.round(rect.width) - WEBVIEW_LEFT_INSET,
+      height: Math.round(rect.height),
       url: initialUrl,
     };
 
@@ -201,6 +203,9 @@ export const BrowserPanel: FC = () => {
 
     let lastBounds = { x: 0, y: 0, width: 0, height: 0 };
     let rafId: number | null = null;
+    // Extra left inset applied when the allotment resize sash is hovered/dragged,
+    // so the native webview doesn't cover the sash visual feedback
+    let sashExtraInset = 0;
 
     const updateBounds = (): void => {
       // Use requestAnimationFrame to ensure layout is complete
@@ -212,11 +217,12 @@ export const BrowserPanel: FC = () => {
         if (!viewportRef.current) return;
         // Apply inset to prevent webview from overlapping panel borders
         const rect = viewportRef.current.getBoundingClientRect();
+        const totalLeftInset = WEBVIEW_LEFT_INSET + sashExtraInset;
         const bounds = {
-          x: Math.round(rect.x) + WEBVIEW_BORDER_INSET,
+          x: Math.round(rect.x) + totalLeftInset,
           y: Math.round(rect.y),
-          width: Math.round(rect.width) - WEBVIEW_BORDER_INSET,
-          height: Math.round(rect.height) - WEBVIEW_BORDER_INSET,
+          width: Math.round(rect.width) - totalLeftInset,
+          height: Math.round(rect.height),
         };
 
         // Only send if bounds actually changed
@@ -256,6 +262,38 @@ export const BrowserPanel: FC = () => {
     // Also update on scroll (in case webview is scrolled)
     window.addEventListener('scroll', updateBounds, true);
 
+    // ── Sash hover detection ──
+    // The browser is a native Tauri webview that renders above the parent webview's
+    // DOM, so CSS z-index cannot make the allotment sash appear on top. Instead,
+    // we detect sash hover/drag and temporarily push the native webview right to
+    // reveal the sash visual, then restore when the interaction ends.
+    const SASH_HOVER_INSET = 3;
+    const sashCleanups: (() => void)[] = [];
+
+    // NOTE: Sash class name comes from allotment's CSS modules. This hash may change
+    // when allotment is updated — verify after upgrading allotment package.
+    const splitView = viewportRef.current.closest('[class*="allotment-module_splitView"]');
+    if (splitView) {
+      const sashes = splitView.querySelectorAll('[class*="allotment-module_sash"]');
+      const handleSashEnter = (): void => {
+        sashExtraInset = SASH_HOVER_INSET;
+        updateBounds();
+      };
+      const handleSashLeave = (): void => {
+        sashExtraInset = 0;
+        updateBounds();
+      };
+
+      sashes.forEach((sash) => {
+        sash.addEventListener('mouseenter', handleSashEnter);
+        sash.addEventListener('mouseleave', handleSashLeave);
+        sashCleanups.push(() => {
+          sash.removeEventListener('mouseenter', handleSashEnter);
+          sash.removeEventListener('mouseleave', handleSashLeave);
+        });
+      });
+    }
+
     return (): void => {
       clearTimeout(initTimeout);
       if (rafId !== null) {
@@ -264,6 +302,9 @@ export const BrowserPanel: FC = () => {
       resizeObserver.disconnect();
       window.removeEventListener('resize', updateBounds);
       window.removeEventListener('scroll', updateBounds, true);
+      sashCleanups.forEach((fn) => {
+        fn();
+      });
     };
   }, [isActive, postMessage]);
 
@@ -319,7 +360,7 @@ export const BrowserPanel: FC = () => {
   }, [postMessage]);
 
   return (
-    <div className="h-full w-full flex flex-col bg-card">
+    <div className="h-full w-full flex flex-col">
       {/* Toolbar */}
       <BrowserToolbar
         onBack={handleBack}
@@ -351,7 +392,7 @@ export const BrowserPanel: FC = () => {
       ) : null}
 
       {/* Viewport area - Embedded webview will be positioned here */}
-      <div ref={viewportRef} className="flex-1 relative bg-muted/30">
+      <div ref={viewportRef} className="flex-1 relative bg-chat-area">
         {/* Loading state */}
         {isCreating || lifecycleState === 'starting' ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -377,7 +418,7 @@ export const BrowserPanel: FC = () => {
                 useBrowserStore.getState().reset();
                 useBrowserLifecycleStore.getState().reset();
               }}
-              className="px-3 py-1 text-xs font-medium bg-muted text-muted-foreground rounded hover:bg-muted/80 transition-colors"
+              className="px-3 py-1 text-xs font-medium bg-gray-4 text-gray-12 rounded hover:bg-accent transition-colors"
             >
               Reset
             </button>
@@ -386,19 +427,25 @@ export const BrowserPanel: FC = () => {
 
         {/* Empty state (before browser is created) */}
         {!isActive && !isCreating && !error && lifecycleState === 'idle' ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-card text-muted-foreground">
-            <Globe className="h-12 w-12 opacity-50" />
-            <span className="text-sm">Browser not active</span>
-            <button
-              onClick={handleLaunchBrowser}
-              className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-            >
-              Launch Browser
-            </button>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+            <div className="flex flex-col items-center gap-3 rounded-lg bg-gray-3 dark:bg-background px-8 py-6 w-fit min-w-[14rem]">
+              <div className="flex items-center gap-3 opacity-50">
+                <OrbitLogo className="h-18 w-18" />
+                <div className="w-0.5 h-8 bg-current opacity-40" />
+                <Globe className="h-12 w-12" />
+              </div>
+              <button
+                onClick={handleLaunchBrowser}
+                className="px-6 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+              >
+                Launch Browser
+              </button>
+              <span className="text-sm opacity-50">Browser not active</span>
+            </div>
           </div>
         ) : null}
 
-        {/* Reset button for stuck states */}
+        {/* Reset button for stuck states — properly closes native webview */}
         {(isActive || lifecycleState !== 'idle') &&
         !isCreating &&
         !error &&
@@ -406,11 +453,8 @@ export const BrowserPanel: FC = () => {
         lifecycleState !== 'closing' ? (
           <div className="absolute bottom-4 right-4">
             <button
-              onClick={(): void => {
-                useBrowserStore.getState().reset();
-                useBrowserLifecycleStore.getState().reset();
-              }}
-              className="px-3 py-1 text-xs font-medium bg-muted text-muted-foreground rounded hover:bg-muted/80 transition-colors"
+              onClick={handleCloseBrowser}
+              className="px-3 py-1 text-xs font-medium bg-gray-4 text-gray-12 rounded hover:bg-accent transition-colors"
             >
               Reset Browser State
             </button>

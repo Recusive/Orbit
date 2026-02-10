@@ -1,5 +1,6 @@
 import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
 import type { FileDiff } from '@/stores/file/file-store';
@@ -207,132 +208,96 @@ export function getLanguageFromPath(path: string): string {
 function isPathExternal(filePath: string): boolean {
   const workspacePath = useUIStore.getState().workspacePath;
   if (!workspacePath) return false;
-  return !filePath.startsWith(workspacePath);
+  // Append trailing / to prevent false matches: /project-backup matching workspace /project
+  // (Code review: Opus cycle 3, issue #27)
+  const wsPrefix = workspacePath.endsWith('/') ? workspacePath : `${workspacePath}/`;
+  return !filePath.startsWith(wsPrefix) && filePath !== workspacePath;
 }
 
 export const useFileViewerStore = create<FileViewerStore>()(
-  immer((set, get) => ({
-    // Initial state
-    openTabs: [],
-    activeTabPath: null,
-    cursorPositions: {}, // Per-file cursor positions for split view
-    history: [],
-    historyIndex: -1,
-    isLoading: false,
-    loadingPath: null,
-    searchOpen: false,
-    searchTrigger: null, // { path, id } for scoped search in split view
-    searchQuery: '',
-    pendingGoto: null,
-    wordWrap: true,
+  persist(
+    immer((set, get) => ({
+      // Initial state
+      openTabs: [],
+      activeTabPath: null,
+      cursorPositions: {}, // Per-file cursor positions for split view
+      history: [],
+      historyIndex: -1,
+      isLoading: false,
+      loadingPath: null,
+      searchOpen: false,
+      searchTrigger: null, // { path, id } for scoped search in split view
+      searchQuery: '',
+      pendingGoto: null,
+      wordWrap: false,
 
-    openFile: (path: string, content?: string): void => {
-      logger.debug(`Opening file: ${path}`);
-      set((state) => {
-        // Close search when opening/switching files
-        state.searchOpen = false;
-        state.searchQuery = '';
-
-        // Check if tab already exists
-        const existingTab = state.openTabs.find((tab) => tab.path === path);
-
-        if (existingTab) {
-          // Switch to existing tab, reset to file view mode
-          state.activeTabPath = path;
-          existingTab.viewMode = 'file';
-          // Update language in case detection was improved
-          existingTab.language = getLanguageFromPath(path);
-        } else {
-          // Create new tab
-          const fileContent = content ?? '';
-          const newTab: ViewedFile = {
-            path,
-            content: fileContent,
-            originalContent: fileContent,
-            language: getLanguageFromPath(path),
-            viewMode: 'file',
-            isModified: false,
-            isExternal: isPathExternal(path),
-          };
-          state.openTabs.push(newTab);
-          state.activeTabPath = path;
-        }
-
-        // Update history (only if different from current position)
-        if (state.history[state.historyIndex] !== path) {
-          // Truncate forward history and add new entry
-          state.history = state.history.slice(0, state.historyIndex + 1);
-          state.history.push(path);
-          state.historyIndex = state.history.length - 1;
-        }
-      });
-    },
-
-    openFileWithDiff: (path: string, diffData: ViewedFileDiff, language?: string): void => {
-      set((state) => {
-        // Check if tab already exists
-        const existingTab = state.openTabs.find((tab) => tab.path === path);
-
-        if (existingTab) {
-          // Update existing tab with diff data and switch to diff view
-          existingTab.diffData = diffData;
-          existingTab.viewMode = 'diff';
-          state.activeTabPath = path;
-        } else {
-          // Create new tab with diff data
-          const newTab: ViewedFile = {
-            path,
-            content: diffData.newContent,
-            originalContent: diffData.newContent,
-            language: language ?? getLanguageFromPath(path),
-            diffData,
-            viewMode: 'diff',
-            isModified: false,
-            isExternal: isPathExternal(path),
-          };
-          state.openTabs.push(newTab);
-          state.activeTabPath = path;
-        }
-
-        // Update history
-        if (state.history[state.historyIndex] !== path) {
-          state.history = state.history.slice(0, state.historyIndex + 1);
-          state.history.push(path);
-          state.historyIndex = state.history.length - 1;
-        }
-      });
-    },
-
-    closeTab: (path: string): void => {
-      logger.debug(`Closing tab: ${path}`);
-      set((state) => {
-        const tabIndex = state.openTabs.findIndex((tab) => tab.path === path);
-        if (tabIndex === -1) return;
-
-        // Remove the tab
-        state.openTabs.splice(tabIndex, 1);
-
-        // If closing active tab, switch to another
-        if (state.activeTabPath === path) {
-          if (state.openTabs.length === 0) {
-            state.activeTabPath = null;
-          } else {
-            // Switch to previous tab or first available
-            const newIndex = Math.min(tabIndex, state.openTabs.length - 1);
-            state.activeTabPath = state.openTabs[newIndex]?.path ?? null;
-          }
-        }
-      });
-    },
-
-    setActiveTab: (path: string): void => {
-      set((state) => {
-        const tab = state.openTabs.find((t) => t.path === path);
-        if (tab) {
-          state.activeTabPath = path;
-          // Close search when switching tabs
+      openFile: (path: string, content?: string): void => {
+        logger.debug(`Opening file: ${path}`);
+        set((state) => {
+          // Close search when opening/switching files
           state.searchOpen = false;
           state.searchQuery = '';
+
+          // Check if tab already exists
+          const existingTab = state.openTabs.find((tab) => tab.path === path);
+
+          if (existingTab) {
+            // Switch to existing tab, reset to file view mode
+            state.activeTabPath = path;
+            existingTab.viewMode = 'file';
+            // Update language in case detection was improved
+            existingTab.language = getLanguageFromPath(path);
+          } else {
+            // Create new tab
+            const fileContent = content ?? '';
+            const newTab: ViewedFile = {
+              path,
+              content: fileContent,
+              originalContent: fileContent,
+              language: getLanguageFromPath(path),
+              viewMode: 'file',
+              isModified: false,
+              isExternal: isPathExternal(path),
+            };
+            state.openTabs.push(newTab);
+            state.activeTabPath = path;
+          }
+
+          // Update history (only if different from current position)
+          if (state.history[state.historyIndex] !== path) {
+            // Truncate forward history and add new entry
+            state.history = state.history.slice(0, state.historyIndex + 1);
+            state.history.push(path);
+            state.historyIndex = state.history.length - 1;
+          }
+        });
+      },
+
+      openFileWithDiff: (path: string, diffData: ViewedFileDiff, language?: string): void => {
+        set((state) => {
+          // Check if tab already exists
+          const existingTab = state.openTabs.find((tab) => tab.path === path);
+
+          if (existingTab) {
+            // Update existing tab with diff data and switch to diff view
+            existingTab.diffData = diffData;
+            existingTab.viewMode = 'diff';
+            state.activeTabPath = path;
+          } else {
+            // Create new tab with diff data
+            const newTab: ViewedFile = {
+              path,
+              content: diffData.newContent,
+              originalContent: diffData.newContent,
+              language: language ?? getLanguageFromPath(path),
+              diffData,
+              viewMode: 'diff',
+              isModified: false,
+              isExternal: isPathExternal(path),
+            };
+            state.openTabs.push(newTab);
+            state.activeTabPath = path;
+          }
 
           // Update history
           if (state.history[state.historyIndex] !== path) {
@@ -340,137 +305,184 @@ export const useFileViewerStore = create<FileViewerStore>()(
             state.history.push(path);
             state.historyIndex = state.history.length - 1;
           }
-        }
-      });
-    },
+        });
+      },
 
-    closeAllTabs: (): void => {
-      set((state) => {
-        state.openTabs = [];
-        state.activeTabPath = null;
-        state.history = [];
-        state.historyIndex = -1;
-      });
-    },
+      closeTab: (path: string): void => {
+        logger.debug(`Closing tab: ${path}`);
+        set((state) => {
+          const tabIndex = state.openTabs.findIndex((tab) => tab.path === path);
+          if (tabIndex === -1) return;
 
-    setFileContent: (path: string, content: string, language?: string): void => {
-      set((state) => {
-        const tab = state.openTabs.find((t) => t.path === path);
-        if (tab) {
-          tab.content = content;
-          tab.originalContent = content;
-          tab.isModified = false;
-          if (language) {
-            tab.language = language;
+          // Remove the tab
+          state.openTabs.splice(tabIndex, 1);
+
+          // If closing active tab, switch to another
+          if (state.activeTabPath === path) {
+            if (state.openTabs.length === 0) {
+              state.activeTabPath = null;
+            } else {
+              // Switch to previous tab or first available
+              const newIndex = Math.min(tabIndex, state.openTabs.length - 1);
+              state.activeTabPath = state.openTabs[newIndex]?.path ?? null;
+            }
           }
-        } else {
-          // Create new tab with content
-          state.openTabs.push({
-            path,
-            content,
-            originalContent: content,
-            language: language ?? getLanguageFromPath(path),
-            viewMode: 'file',
-            isModified: false,
-            isExternal: isPathExternal(path),
-          });
-          state.activeTabPath = path;
-        }
-        state.isLoading = false;
-        state.loadingPath = null;
-      });
-    },
+        });
+      },
 
-    updateContent: (path: string, content: string): void => {
-      set((state) => {
-        const tab = state.openTabs.find((t) => t.path === path);
-        if (tab) {
-          tab.content = content;
-          tab.isModified = content !== tab.originalContent;
-        }
-      });
-    },
+      setActiveTab: (path: string): void => {
+        set((state) => {
+          const tab = state.openTabs.find((t) => t.path === path);
+          if (tab) {
+            state.activeTabPath = path;
+            // Close search when switching tabs
+            state.searchOpen = false;
+            state.searchQuery = '';
 
-    markSaved: (path: string): void => {
-      logger.info(`File saved: ${path}`);
-      set((state) => {
-        const tab = state.openTabs.find((t) => t.path === path);
-        if (tab) {
-          tab.originalContent = tab.content;
-          tab.isModified = false;
-        }
-      });
-    },
+            // Update history
+            if (state.history[state.historyIndex] !== path) {
+              state.history = state.history.slice(0, state.historyIndex + 1);
+              state.history.push(path);
+              state.historyIndex = state.history.length - 1;
+            }
+          }
+        });
+      },
 
-    setLoading: (isLoading: boolean, path?: string): void => {
-      set((state) => {
-        state.isLoading = isLoading;
-        state.loadingPath = path ?? null;
-      });
-    },
+      closeAllTabs: (): void => {
+        set((state) => {
+          state.openTabs = [];
+          state.activeTabPath = null;
+          state.history = [];
+          state.historyIndex = -1;
+        });
+      },
 
-    toggleSearch: (path: string): void => {
-      set((state) => {
-        if (state.searchOpen && state.searchTrigger?.path === path) {
-          // Closing: clear search state for this file
+      setFileContent: (path: string, content: string, language?: string): void => {
+        set((state) => {
+          const tab = state.openTabs.find((t) => t.path === path);
+          if (tab) {
+            tab.content = content;
+            tab.originalContent = content;
+            tab.isModified = false;
+            if (language) {
+              tab.language = language;
+            }
+          } else {
+            // Create new tab with content
+            state.openTabs.push({
+              path,
+              content,
+              originalContent: content,
+              language: language ?? getLanguageFromPath(path),
+              viewMode: 'file',
+              isModified: false,
+              isExternal: isPathExternal(path),
+            });
+            state.activeTabPath = path;
+          }
+          state.isLoading = false;
+          state.loadingPath = null;
+        });
+      },
+
+      updateContent: (path: string, content: string): void => {
+        set((state) => {
+          const tab = state.openTabs.find((t) => t.path === path);
+          if (tab) {
+            tab.content = content;
+            tab.isModified = content !== tab.originalContent;
+          }
+        });
+      },
+
+      markSaved: (path: string): void => {
+        logger.info(`File saved: ${path}`);
+        set((state) => {
+          const tab = state.openTabs.find((t) => t.path === path);
+          if (tab) {
+            tab.originalContent = tab.content;
+            tab.isModified = false;
+          }
+        });
+      },
+
+      setLoading: (isLoading: boolean, path?: string): void => {
+        set((state) => {
+          state.isLoading = isLoading;
+          state.loadingPath = path ?? null;
+        });
+      },
+
+      toggleSearch: (path: string): void => {
+        set((state) => {
+          if (state.searchOpen && state.searchTrigger?.path === path) {
+            // Closing: clear search state for this file
+            state.searchOpen = false;
+            state.searchQuery = '';
+            state.searchTrigger = null;
+          } else {
+            // Opening: set scoped trigger so only matching editor opens search
+            // Use monotonic counter for guaranteed unique IDs
+            searchIdCounter += 1;
+            state.searchTrigger = { path, id: searchIdCounter };
+            state.searchOpen = true;
+          }
+        });
+      },
+
+      setSearchQuery: (query: string): void => {
+        set((state) => {
+          state.searchQuery = query;
+        });
+      },
+
+      closeSearch: (): void => {
+        set((state) => {
           state.searchOpen = false;
           state.searchQuery = '';
           state.searchTrigger = null;
-        } else {
-          // Opening: set scoped trigger so only matching editor opens search
-          // Use monotonic counter for guaranteed unique IDs
-          searchIdCounter += 1;
-          state.searchTrigger = { path, id: searchIdCounter };
-          state.searchOpen = true;
-        }
-      });
-    },
+        });
+      },
 
-    setSearchQuery: (query: string): void => {
-      set((state) => {
-        state.searchQuery = query;
-      });
-    },
+      gotoPosition: (path: string, line: number, column: number, content?: string): void => {
+        // Open the file (or switch to it if already open)
+        get().openFile(path, content);
 
-    closeSearch: (): void => {
-      set((state) => {
-        state.searchOpen = false;
-        state.searchQuery = '';
-        state.searchTrigger = null;
-      });
-    },
+        // Set the pending goto position with unique ID to ensure effect re-triggers
+        // Include path for split view scoping - only matching editor should navigate
+        // Use monotonic counter for guaranteed unique IDs (Date.now() can collide)
+        gotoIdCounter += 1;
+        set((state) => {
+          state.pendingGoto = { path, line, column, id: gotoIdCounter };
+        });
+      },
 
-    gotoPosition: (path: string, line: number, column: number, content?: string): void => {
-      // Open the file (or switch to it if already open)
-      get().openFile(path, content);
+      clearPendingGoto: (): void => {
+        set((state) => {
+          state.pendingGoto = null;
+        });
+      },
 
-      // Set the pending goto position with unique ID to ensure effect re-triggers
-      // Include path for split view scoping - only matching editor should navigate
-      // Use monotonic counter for guaranteed unique IDs (Date.now() can collide)
-      gotoIdCounter += 1;
-      set((state) => {
-        state.pendingGoto = { path, line, column, id: gotoIdCounter };
-      });
-    },
+      setCursorPosition: (path: string, line: number, column: number): void => {
+        set((state) => {
+          state.cursorPositions[path] = { line, column };
+        });
+      },
 
-    clearPendingGoto: (): void => {
-      set((state) => {
-        state.pendingGoto = null;
-      });
-    },
-
-    setCursorPosition: (path: string, line: number, column: number): void => {
-      set((state) => {
-        state.cursorPositions[path] = { line, column };
-      });
-    },
-
-    toggleWordWrap: (): void => {
-      set((state) => {
-        state.wordWrap = !state.wordWrap;
-      });
-    },
-  }))
+      toggleWordWrap: (): void => {
+        set((state) => {
+          state.wordWrap = !state.wordWrap;
+        });
+      },
+    })),
+    {
+      name: 'orbit-file-viewer',
+      partialize: (state) => ({
+        wordWrap: state.wordWrap,
+      }),
+    }
+  )
 );
 
 // Selector hooks

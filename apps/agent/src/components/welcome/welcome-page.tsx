@@ -1,12 +1,13 @@
 import { createLogger } from '@orbit/common/lib';
-import { FolderOpen, GitBranch, Terminal } from 'lucide-react';
+import { ChevronRight, FolderOpen, GitBranch, Terminal } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import type { FC } from 'react';
 
-import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { CloneRepositoryDialog } from '@/components/modals/git';
 import { SSHConnectionDialog } from '@/components/modals/ssh';
+import { AccountBanner } from '@/components/welcome/account-banner';
+import { OrbitAsciiLogo } from '@/components/welcome/orbit-ascii-logo';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
@@ -19,6 +20,18 @@ const logger = createLogger('WelcomePage');
 export interface WelcomePageProps {
   className?: string;
 }
+
+/** Action button config to eliminate repetition */
+/** Solid Radix scale colors so welcome page is unaffected by liquid glass */
+const ACTION_BUTTON_CLASS = cn(
+  'group relative flex flex-col items-start gap-3 p-4 rounded-lg cursor-pointer',
+  'bg-gray-2 dark:bg-gray-3',
+  'border border-gray-4 dark:border-gray-5',
+  'transition-[background-color,transform,border-color] duration-200 ease',
+  'hover:bg-gray-1 hover:border-gray-6',
+  'dark:hover:bg-gray-4 dark:hover:border-gray-7',
+  'active:scale-[0.97]'
+);
 
 /**
  * Welcome page shown on startup when no workspace is open.
@@ -83,108 +96,126 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
     <div
       className={cn(
         'flex flex-col items-center justify-center h-full w-full',
-        'min-w-[420px] mx-auto p-12 gap-6 box-border',
-        'bg-background',
+        'min-w-[420px] mx-auto p-12 gap-10 box-border',
+        'select-none',
         className
       )}
     >
-      {/* Logo/Branding - consistent with onboarding */}
-      <div className="flex items-center gap-4 w-full max-w-[380px]">
-        <div className="flex items-center justify-center w-14 h-14 rounded-lg bg-primary/10">
-          <OrbitLogo size={40} className="text-primary" />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-2xl font-semibold text-foreground tracking-tight">Orbit</span>
-          <span className="text-sm text-muted-foreground">AI Code Editor</span>
-        </div>
-      </div>
+      {/* Hero — ASCII block art wordmark */}
+      <OrbitAsciiLogo />
 
       {/* Action Buttons */}
-      <div className="grid grid-cols-3 gap-2.5 w-full max-w-[380px]">
+      <div className="grid grid-cols-3 gap-3 w-full max-w-[420px]">
         <button
           type="button"
+          aria-label="Open project folder"
           onClick={handleOpenProject}
-          className={cn(
-            'flex flex-col items-start justify-center gap-1.5 p-3 rounded-lg cursor-pointer',
-            'bg-muted/30 border border-border',
-            'hover:bg-muted/50'
-          )}
+          className={ACTION_BUTTON_CLASS}
         >
-          <FolderOpen className="h-4 w-4 text-foreground" />
-          <span className="text-xs text-foreground">Open project</span>
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-4 dark:bg-gray-5">
+            <FolderOpen className="h-4 w-4 text-gray-9 dark:text-gray-11" aria-hidden="true" />
+          </div>
+          <span className="text-xs font-medium text-gray-12">Open project</span>
         </button>
 
         <button
           type="button"
+          aria-label="Clone a git repository"
           onClick={() => {
             setCloneDialogOpen(true);
           }}
-          className={cn(
-            'flex flex-col items-start justify-center gap-1.5 p-3 rounded-lg cursor-pointer',
-            'bg-muted/30 border border-border',
-            'hover:bg-muted/50'
-          )}
+          className={ACTION_BUTTON_CLASS}
         >
-          <GitBranch className="h-4 w-4 text-foreground" />
-          <span className="text-xs text-foreground">Clone repo</span>
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-4 dark:bg-gray-5">
+            <GitBranch className="h-4 w-4 text-gray-9 dark:text-gray-11" aria-hidden="true" />
+          </div>
+          <span className="text-xs font-medium text-gray-12">Clone repo</span>
         </button>
 
         <button
           type="button"
+          aria-label="Connect via SSH"
           onClick={() => {
             setSshDialogOpen(true);
           }}
-          className={cn(
-            'flex flex-col items-start justify-center gap-1.5 p-3 rounded-lg cursor-pointer',
-            'bg-muted/30 border border-border',
-            'hover:bg-muted/50'
-          )}
+          className={ACTION_BUTTON_CLASS}
         >
-          <Terminal className="h-4 w-4 text-foreground" />
-          <span className="text-xs text-foreground">SSH</span>
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-4 dark:bg-gray-5">
+            <Terminal className="h-4 w-4 text-gray-9 dark:text-gray-11" aria-hidden="true" />
+          </div>
+          <span className="text-xs font-medium text-gray-12">SSH</span>
         </button>
       </div>
 
-      {/* Recent Projects */}
-      <div className="w-full max-w-[380px]">
-        {/* Header */}
-        <div className="flex items-center justify-between px-1 py-0.5 text-base leading-tight mb-0.5">
-          <span className="font-normal text-muted-foreground/60">Recent projects</span>
-          {projects.length > 5 ? (
-            <button
-              type="button"
-              className="text-muted-foreground/60 hover:text-foreground cursor-pointer"
-            >
-              View all ({projects.length})
-            </button>
-          ) : null}
-        </div>
+      {/* Recent Projects — frosted glass card */}
+      {projects.length > 0 ? (
+        <div className="w-full max-w-[420px] rounded-lg bg-gray-2 dark:bg-gray-3 border border-gray-4 dark:border-gray-5 p-3">
+          {/* Section header */}
+          <div className="flex items-center justify-between px-2 mb-2">
+            <span className="text-[10px] font-semibold tracking-widest text-gray-9 dark:text-gray-10 uppercase">
+              Recent
+            </span>
+            {projects.length > 5 ? (
+              <button
+                type="button"
+                className={cn(
+                  'text-[10px] font-medium text-gray-9 dark:text-gray-10 cursor-pointer',
+                  'transition-colors duration-150 ease',
+                  'hover:text-gray-12'
+                )}
+              >
+                View all
+              </button>
+            ) : null}
+          </div>
 
-        {/* Project List */}
-        <div className="flex flex-col gap-0.5">
-          {projects.length === 0 ? (
-            <div className="text-base text-muted-foreground/50 px-1 py-2">No recent projects</div>
-          ) : (
-            projects.slice(0, 5).map((project) => (
+          {/* Project rows */}
+          <div className="flex flex-col gap-0.5">
+            {projects.slice(0, 5).map((project) => (
               <button
                 key={project.path}
                 type="button"
                 onClick={handleRecentProjectClick(project.path)}
                 className={cn(
-                  'flex items-center px-1 py-0.5 rounded cursor-pointer',
-                  'hover:bg-accent/50',
+                  'group flex items-center gap-3 px-2 py-2 rounded-lg cursor-pointer',
+                  'transition-[background-color] duration-150 ease',
+                  'hover:bg-gray-3 dark:hover:bg-gray-4',
                   'text-left outline-none'
                 )}
               >
-                <span className="flex-1 text-base text-foreground/80 truncate">{project.name}</span>
-                <span className="text-base text-muted-foreground/60 ml-3 truncate max-w-[50%]">
-                  {project.parentPath}
-                </span>
+                {/* Folder icon */}
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-3 dark:bg-gray-5 shrink-0">
+                  <FolderOpen
+                    className="h-3.5 w-3.5 text-gray-9 dark:text-gray-10"
+                    aria-hidden="true"
+                  />
+                </div>
+
+                {/* Name + path stacked */}
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-sm font-medium text-gray-12 truncate">{project.name}</span>
+                  <span className="text-[10px] text-gray-9 dark:text-gray-10 truncate">
+                    {project.parentPath}
+                  </span>
+                </div>
+
+                {/* Arrow hint on hover */}
+                <ChevronRight
+                  className={cn(
+                    'h-3.5 w-3.5 text-transparent shrink-0',
+                    'transition-[color] duration-150 ease',
+                    'group-hover:text-gray-8 dark:group-hover:text-gray-9'
+                  )}
+                  aria-hidden="true"
+                />
               </button>
-            ))
-          )}
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
+
+      {/* Account Status Banner */}
+      <AccountBanner />
 
       {/* Clone Repository Dialog */}
       <CloneRepositoryDialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen} />

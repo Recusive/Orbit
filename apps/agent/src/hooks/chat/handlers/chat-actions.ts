@@ -4,6 +4,7 @@ import type { ChatMessage, ImageAttachment } from '@/components/chat';
 import type { Model, ReactElementContext, ThinkingMode, WebviewMessage } from '@/types/protocol';
 
 import { conversationAddMessage } from '@/lib/api';
+import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -24,6 +25,8 @@ interface ChatActionsDeps {
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   isAgentRunning: boolean;
   setIsAgentRunning: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Gate rewind after Stop — true while SDK is still flushing JSONL. */
+  isStopPendingRef: React.RefObject<boolean>;
   conversations: Conversation[];
   workspacePath: string | null;
   activeWorktreePath: string | null;
@@ -78,6 +81,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     setMessages,
     isAgentRunning,
     setIsAgentRunning,
+    isStopPendingRef,
     conversations,
     workspacePath,
     activeWorktreePath,
@@ -183,6 +187,20 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           model: toolState.model,
         });
 
+        // Get parentUuid for Claude Code-style rewind (linked list of messages)
+        // Priority:
+        // 1. Rewind fork point (if user just rewound, create a branch)
+        // 2. Last message in current chain (normal flow)
+        // 3. null (first message in conversation)
+        //
+        // The fork point creates a BRANCH in the conversation tree:
+        //   msg1 -> msg2 -> msg3 -> msg4
+        //                \-> msg5 (fork from msg2 via rewind)
+        const checkpointStore = useCheckpointStore.getState();
+        const forkPoint = checkpointStore.consumeRewindForkPoint(sessionId);
+        const lastMessage = messages[messages.length - 1];
+        const parentUuid = forkPoint ?? lastMessage?.id ?? null;
+
         const userMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'user',
@@ -190,6 +208,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           displayedContent: text,
           attachedFiles: contextFiles,
           attachedImages: images,
+          parentUuid,
         };
         setMessages((prev) => [...prev, userMessage]);
         setIsAgentRunning(true);
@@ -203,6 +222,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
             role: 'user',
             content: text,
             createdAt: Date.now(),
+            parentUuid,
           },
           workspacePath ?? undefined,
           activeWorktreePath ?? undefined
@@ -228,11 +248,13 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
             : undefined;
 
         // IMPORTANT: Use userMessage.id so checkpoints are associated correctly with the rewind target
+        // Include parent_uuid for Claude Code-style rewind (linked list of messages)
         postMessage({
           type: 'message:send',
           uuid: userMessage.id,
           session_id: sessionId,
           content: text,
+          parent_uuid: parentUuid,
           context,
         });
       }
@@ -261,6 +283,9 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
         // Update local state immediately for responsive UI
         setIsAgentRunning(false);
+        // Block rewind until SDK confirms stop (agent:complete/agent:error clears this).
+        // Without this, rewind can read a partially-written JSONL → corruption.
+        isStopPendingRef.current = true;
 
         // Clear any pending permission requests since agent is stopped
         clearPermissions();
@@ -281,6 +306,10 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
                   content: interruptedMsg.content,
                   ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
                   createdAt: Date.now(),
+                  // Include parentUuid for Claude Code-style rewind chain
+                  ...(interruptedMsg.parentUuid !== undefined
+                    ? { parentUuid: interruptedMsg.parentUuid }
+                    : {}),
                 },
                 workspacePath ?? undefined,
                 activeWorktreePath ?? undefined
@@ -291,6 +320,8 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           }
           // If no assistant message exists yet, create an interrupted placeholder
           if (!lastMsg || lastMsg.role === 'user') {
+            // Set parentUuid to the last message's ID to maintain the chain
+            const parentUuid = lastMsg?.id ?? null;
             return [
               ...prev,
               {
@@ -300,6 +331,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
                 displayedContent: '',
                 isStreaming: false,
                 isInterrupted: true,
+                parentUuid,
               },
             ];
           }
@@ -310,11 +342,17 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   };
 
   const handleRewind = (messageId: string): void => {
-    if (!sessionId || isAgentRunning) return;
+    // Block rewind while agent is running OR while SDK is flushing after Stop.
+    // The stop-pending window is ~50-200ms between handleStop and agent:complete.
+    if (!sessionId || isAgentRunning || isStopPendingRef.current) {
+      return;
+    }
 
     // Find the clicked message
     const clickedMessage = messages.find((m) => m.id === messageId);
-    if (!clickedMessage) return;
+    if (!clickedMessage) {
+      return;
+    }
 
     // Wrap the rewind operation in a Sentry span for UI interaction tracing
     Sentry.startSpan(
@@ -327,16 +365,9 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         },
       },
       () => {
-        // We need TWO message IDs:
-        // 1. message_id: The clicked message (for UI fork - includes up to this message)
-        // 2. user_message_id: The user message (for checkpoint lookup - checkpoints stored by user msg)
-        //
-        // If clicked on assistant message: message_id = assistant, user_message_id = preceding user
-        // If clicked on user message: message_id = user_message_id = same
+        const messageIndex = messages.findIndex((m) => m.id === messageId);
         let userMessageId = messageId;
         if (clickedMessage.role === 'assistant') {
-          const messageIndex = messages.findIndex((m) => m.id === messageId);
-          // Look backwards for the preceding user message
           for (let i = messageIndex - 1; i >= 0; i--) {
             const prevMessage = messages[i];
             if (prevMessage?.role === 'user') {
@@ -346,12 +377,25 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           }
         }
 
+        // Include truncated messages as fallback for subsequent rewinds.
+        // After the first rewind, the JSONL on disk may be truncated/deleted by
+        // forkSessionAt. The frontend messages already have SDK JSONL UUIDs from
+        // the first rewind's conversation:rewound event, so they are reliable.
+        const truncatedMessages = messages.slice(0, messageIndex + 1).map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          parentUuid: m.parentUuid ?? null,
+        }));
+
         postMessage({
           type: 'conversation:rewind',
           uuid: crypto.randomUUID(),
           session_id: sessionId,
-          message_id: messageId, // Original clicked message (for UI fork)
-          user_message_id: userMessageId, // User message (for checkpoint lookup)
+          message_id: messageId,
+          user_message_id: userMessageId,
+          message_index: messageIndex,
+          current_messages: truncatedMessages,
         });
       }
     );
@@ -396,6 +440,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
     // Update local state immediately
     setIsAgentRunning(false);
+    isStopPendingRef.current = true;
 
     // Mark any streaming message as complete and interrupted, or create one if none exists
     setMessages((prev) => {
@@ -413,6 +458,10 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
               content: interruptedMsg.content,
               ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
               createdAt: Date.now(),
+              // Include parentUuid for Claude Code-style rewind chain
+              ...(interruptedMsg.parentUuid !== undefined
+                ? { parentUuid: interruptedMsg.parentUuid }
+                : {}),
             },
             workspacePath ?? undefined,
             activeWorktreePath ?? undefined
@@ -423,6 +472,8 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
       }
       // If no assistant message exists yet, create an interrupted placeholder
       if (!lastMsg || lastMsg.role === 'user') {
+        // Set parentUuid to the last message's ID to maintain the chain
+        const parentUuid = lastMsg?.id ?? null;
         return [
           ...prev,
           {
@@ -432,6 +483,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
             displayedContent: '',
             isStreaming: false,
             isInterrupted: true,
+            parentUuid,
           },
         ];
       }

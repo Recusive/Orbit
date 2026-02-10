@@ -289,7 +289,8 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
       // Agent messages
       listenerPromises.push(
         onAgentMessage((event) => {
-          const { sessionId, message } = event;
+          const sessionId = event.sessionId;
+          const { message } = event;
           const content = message.content ?? '';
           // Use SDK's stable message ID if available (all events in a turn share this ID)
           // Fall back to random UUID only if SDK doesn't provide one (shouldn't happen normally)

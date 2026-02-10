@@ -156,6 +156,13 @@ export const StoredChatMessageSchema = z
     thinkingDurationMs: z.number().optional(),
     attachedFiles: z.array(z.string()).optional(),
     attachedImages: z.array(StoredImageAttachmentSchema).optional(),
+    /**
+     * UUID of the previous message in the conversation chain.
+     * Used for Claude Code-style rewind/branching.
+     * - null for first message in conversation
+     * - undefined for legacy messages without this field
+     */
+    parentUuid: z.string().nullish(),
   })
   .strict();
 
@@ -196,6 +203,14 @@ export const SendMessageSchema = z
     uuid: UUIDSchema,
     session_id: SessionIdSchema,
     content: z.string().min(1),
+    /**
+     * UUID of the previous message in the conversation chain.
+     * Used for Claude Code-style rewind: after rewinding, the next message
+     * should have parentUuid set to the message we rewound to.
+     * - null for the first message in a conversation
+     * - undefined if not specified (default linear behavior)
+     */
+    parent_uuid: z.string().nullish(),
     context: z
       .object({
         files: z.array(z.string()).optional(),
@@ -279,6 +294,28 @@ export const RewindConversationSchema = z
     message_id: z.string(),
     /** The user message ID for checkpoint lookup (checkpoints are stored by user message) */
     user_message_id: z.string(),
+    /**
+     * The index (0-based position) of the clicked message in the UI's message list.
+     * Used as fallback when ID-based matching fails (e.g., new messages have frontend-generated
+     * IDs while disk has SDK-generated IDs).
+     */
+    message_index: z.number().int().nonnegative(),
+    /**
+     * Current frontend messages truncated to the rewind point.
+     * Used as fallback when the JSONL on disk is corrupted/missing after a previous rewind
+     * (forkSessionAt truncates/deletes the original JSONL). After the first rewind, the
+     * frontend messages have SDK JSONL UUIDs which ARE the correct IDs.
+     */
+    current_messages: z
+      .array(
+        z.object({
+          id: z.string(),
+          role: z.enum(['user', 'assistant']),
+          content: z.string(),
+          parentUuid: z.string().nullish(),
+        })
+      )
+      .optional(),
   })
   .strict();
 
@@ -1356,6 +1393,7 @@ const PersistedToolUseSchema = z
     input: z.record(z.string(), z.unknown()),
     output: z.string().optional(),
     success: z.boolean().default(true),
+    contentOffset: z.number().optional(),
   })
   .strict();
 
@@ -1379,11 +1417,20 @@ const PersistedMessageSchema = z
     role: z.enum(['user', 'assistant', 'system']),
     content: z.string(),
     thinking: z.string().optional(),
+    thinkingDurationMs: z.number().optional(),
+    isInterrupted: z.boolean().optional(),
     // Support both old 'timestamp' and new 'createdAt' field names
     createdAt: z.number().optional(),
     timestamp: z.number().optional(),
     toolUses: z.array(PersistedToolUseSchema).optional(),
     usage: PersistedTokenUsageSchema.optional(),
+    /**
+     * UUID of the previous message in the conversation chain.
+     * Used for Claude Code-style rewind/branching.
+     * - null for first message in conversation
+     * - undefined for legacy messages without this field
+     */
+    parentUuid: z.string().nullish(),
   })
   .strip() // Remove extra fields from old data instead of rejecting
   .transform((msg) => ({
@@ -1391,10 +1438,13 @@ const PersistedMessageSchema = z
     role: msg.role,
     content: msg.content,
     thinking: msg.thinking,
+    thinkingDurationMs: msg.thinkingDurationMs,
+    isInterrupted: msg.isInterrupted,
     // Prefer createdAt, fall back to timestamp, default to 0
     createdAt: msg.createdAt ?? msg.timestamp ?? 0,
     toolUses: msg.toolUses ?? [],
     usage: msg.usage,
+    parentUuid: msg.parentUuid,
   }));
 
 export const ConversationLoadedSchema = z
@@ -1404,8 +1454,14 @@ export const ConversationLoadedSchema = z
     session_id: SessionIdSchema,
     title: z.string(),
     messages: z.array(PersistedMessageSchema),
+    // Authoritative cumulative session usage from the SDK `result` event,
+    // persisted by agent-bridge to a .usage.json sidecar file.
+    // When present, more accurate than summing per-message JSONL usage.
+    session_usage: PersistedTokenUsageSchema.optional(),
   })
-  .strict();
+  // NOTE: Using .strip() instead of .strict() to gracefully handle future backend fields.
+  // Stripped fields are silently dropped — acceptable for forward compatibility.
+  .strip();
 
 export const ConversationRewoundSchema = z
   .object({
@@ -1423,6 +1479,8 @@ export const ConversationRewoundSchema = z
           id: z.string(),
           role: z.enum(['user', 'assistant']),
           content: z.string(),
+          thinking: z.string().optional(),
+          thinkingDurationMs: z.number().optional(),
           timestamp: z.number(),
           /** Tool uses for this message (for restoring tool widgets) */
           toolUses: z
@@ -1433,9 +1491,15 @@ export const ConversationRewoundSchema = z
                 input: z.record(z.string(), z.unknown()),
                 output: z.string().optional(),
                 success: z.boolean(),
+                contentOffset: z.number().optional(),
               })
             )
             .optional(),
+          /**
+           * UUID of the previous message in the conversation chain.
+           * Used for Claude Code-style rewind/branching.
+           */
+          parentUuid: z.string().nullish(),
         })
         .strict()
     ),

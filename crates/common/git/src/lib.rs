@@ -104,6 +104,18 @@ pub struct BlameLine {
     pub content: String,
 }
 
+/// Summary statistics for a branch diff (e.g. current branch vs main).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchDiffStats {
+    /// Total lines added across all files.
+    pub additions: usize,
+    /// Total lines deleted across all files.
+    pub deletions: usize,
+    /// Number of files changed.
+    pub files_changed: usize,
+}
+
 /// Information about a git worktree.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -376,8 +388,6 @@ pub fn unstage(path: &Path, files: &[&Path]) -> Result<()> {
     let repo = open(path)?;
     let head = repo.head().and_then(|h| h.peel_to_commit()).ok();
 
-    let head_tree = head.as_ref().and_then(|c| c.tree().ok());
-
     for file in files {
         let relative_path = if file.is_absolute() {
             file.strip_prefix(path).unwrap_or(file)
@@ -385,9 +395,9 @@ pub fn unstage(path: &Path, files: &[&Path]) -> Result<()> {
             file
         };
 
-        // Reset the file to HEAD state
-        if let Some(tree) = &head_tree {
-            repo.reset_default(Some(&tree.as_object().clone()), [relative_path])
+        // Reset the file to HEAD state (reset_default expects a committish, not a tree)
+        if let Some(commit) = &head {
+            repo.reset_default(Some(commit.as_object()), [relative_path])
                 .map_err(|e| {
                     Error::Git(format!(
                         "Failed to unstage {}: {e}",
@@ -492,7 +502,7 @@ pub fn get_diff(path: &Path) -> Result<Vec<FileDiff>> {
     let repo = open(path)?;
 
     let mut opts = DiffOptions::new();
-    let _self = opts.include_untracked(true);
+    let _self = opts.include_untracked(true).show_untracked_content(true);
 
     // Diff between index and workdir (unstaged changes)
     let diff = repo
@@ -547,6 +557,38 @@ pub fn get_file_diff(path: &Path, file: &Path) -> Result<FileDiff> {
             "No diff found for file: {}",
             relative_path.display()
         ))
+    })
+}
+
+/// Get diff stats for all uncommitted changes (staged + unstaged vs HEAD).
+///
+/// This is equivalent to `git diff HEAD --stat` — it shows everything that
+/// would appear in the source control panel.
+///
+/// # Errors
+/// Returns an error if the repository cannot be opened.
+pub fn branch_diff_stats(path: &Path, _base_branch: &str) -> Result<BranchDiffStats> {
+    let repo = open(path)?;
+
+    // Get HEAD tree (None for initial commit with no HEAD yet)
+    let head_tree = repo.head().and_then(|h| h.peel_to_tree()).ok();
+
+    let mut opts = DiffOptions::new();
+    let _self = opts.include_untracked(true).show_untracked_content(true);
+
+    // Diff HEAD tree → working directory (includes both staged and unstaged)
+    let diff = repo
+        .diff_tree_to_workdir_with_index(head_tree.as_ref(), Some(&mut opts))
+        .map_err(|e| Error::Git(format!("Failed to compute diff: {e}")))?;
+
+    let stats = diff
+        .stats()
+        .map_err(|e| Error::Git(format!("Failed to get diff stats: {e}")))?;
+
+    Ok(BranchDiffStats {
+        additions: stats.insertions(),
+        deletions: stats.deletions(),
+        files_changed: stats.files_changed(),
     })
 }
 

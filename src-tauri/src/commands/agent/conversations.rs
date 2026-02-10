@@ -56,6 +56,9 @@ pub struct ToolUseDto {
     /// Success status
     #[serde(default = "default_true")]
     pub success: bool,
+    /// Byte offset into the message content where this tool was invoked
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_offset: Option<u32>,
 }
 
 /// Serializable token usage for frontend
@@ -140,6 +143,7 @@ impl From<ToolUse> for ToolUseDto {
             input: tu.input,
             output: tu.output,
             success: tu.success,
+            content_offset: tu.content_offset,
         }
     }
 }
@@ -171,6 +175,7 @@ impl From<ToolUseDto> for ToolUse {
             input: dto.input,
             output: dto.output,
             success: dto.success,
+            content_offset: dto.content_offset,
         }
     }
 }
@@ -198,6 +203,10 @@ pub struct ConversationDto {
     /// Forked from session ID
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forked_from: Option<String>,
+    /// Authoritative cumulative session usage from SDK `result` event.
+    /// More accurate than summing per-message usage from JSONL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_usage: Option<TokenUsageDto>,
 }
 
 impl From<Conversation> for ConversationDto {
@@ -211,6 +220,7 @@ impl From<Conversation> for ConversationDto {
             workspace_path: conv.workspace_path,
             worktree_path: conv.worktree_path,
             forked_from: conv.forked_from,
+            session_usage: conv.session_usage.map(TokenUsageDto::from),
         }
     }
 }
@@ -282,9 +292,10 @@ pub fn conversation_list(
 #[tauri::command]
 pub fn conversation_load(
     session_id: String,
+    workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<Option<ConversationDto>> {
-    let conv = manager.load(&session_id)?;
+    let conv = manager.load(&session_id, workspace_path.as_deref())?;
     Ok(conv.map(ConversationDto::from))
 }
 
@@ -292,9 +303,10 @@ pub fn conversation_load(
 #[tauri::command]
 pub fn conversation_delete(
     session_id: String,
+    workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<()> {
-    manager.delete(&session_id)
+    manager.delete(&session_id, workspace_path.as_deref())
 }
 
 /// Update conversation title
@@ -330,20 +342,14 @@ pub fn conversation_fork(
     session_id: String,
     new_session_id: String,
     up_to_message_id: Option<String>,
+    workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<Option<ConversationDto>> {
-    let forked = manager.fork(&session_id, new_session_id, up_to_message_id.as_deref())?;
+    let forked = manager.fork(
+        &session_id,
+        &new_session_id,
+        up_to_message_id.as_deref(),
+        workspace_path.as_deref(),
+    )?;
     Ok(forked.map(ConversationDto::from))
-}
-
-/// Get the conversations data directory path
-#[tauri::command]
-pub fn conversation_data_path(manager: State<'_, ConversationManager>) -> String {
-    manager.data_dir().to_string_lossy().to_string()
-}
-
-/// Delete all conversations without a workspace path (orphaned)
-#[tauri::command]
-pub fn conversation_cleanup_orphaned(manager: State<'_, ConversationManager>) -> Result<usize> {
-    manager.cleanup_orphaned_conversations()
 }

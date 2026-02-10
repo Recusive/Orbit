@@ -25,7 +25,7 @@ function resetStore(): void {
     searchTrigger: null,
     searchQuery: '',
     pendingGoto: null,
-    wordWrap: true,
+    wordWrap: false,
   });
 }
 
@@ -91,8 +91,8 @@ describe('file-viewer-store', () => {
       expect(useFileViewerStore.getState().pendingGoto).toBeNull();
     });
 
-    it('should start with wordWrap enabled', () => {
-      expect(useFileViewerStore.getState().wordWrap).toBe(true);
+    it('should start with wordWrap disabled', () => {
+      expect(useFileViewerStore.getState().wordWrap).toBe(false);
     });
   });
 
@@ -764,13 +764,13 @@ describe('file-viewer-store', () => {
     it('should toggle word wrap setting', () => {
       const { toggleWordWrap } = useFileViewerStore.getState();
 
-      expect(useFileViewerStore.getState().wordWrap).toBe(true);
-
-      toggleWordWrap();
       expect(useFileViewerStore.getState().wordWrap).toBe(false);
 
       toggleWordWrap();
       expect(useFileViewerStore.getState().wordWrap).toBe(true);
+
+      toggleWordWrap();
+      expect(useFileViewerStore.getState().wordWrap).toBe(false);
     });
   });
 

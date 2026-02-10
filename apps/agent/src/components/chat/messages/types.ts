@@ -4,6 +4,12 @@
 import type { ImageAttachment } from '../input';
 import type { ToolExecution } from '@/stores/agent/tool-store';
 
+/** A single phase of extended thinking within an assistant message. */
+export interface ThinkingBlock {
+  content: string;
+  durationMs: number;
+}
+
 /**
  * Chat message structure for user and assistant messages.
  *
@@ -30,12 +36,36 @@ export interface ChatMessage {
   displayedContent: string;
   isStreaming?: boolean | undefined;
   isInterrupted?: boolean | undefined;
+  /**
+   * Flat thinking string for persistence compatibility.
+   * During live streaming, prefer `thinkingBlocks` for per-phase rendering.
+   * When loading persisted messages, this is the only field populated.
+   */
   thinking?: string | undefined;
   thinkingDurationMs?: number | undefined;
+  /**
+   * Per-phase thinking blocks for multi-turn rendering.
+   * Each block represents one thinking phase (separated by tool/text content).
+   * Populated during live streaming; for loaded messages, derived from `thinking`.
+   */
+  thinkingBlocks?: ThinkingBlock[] | undefined;
+  /**
+   * Whether the agent is currently in a thinking phase.
+   * True when `agent:thinking` chunks are arriving, false when text/tools arrive.
+   * Used to determine if the last thinking block is still streaming.
+   */
+  isThinkingActive?: boolean | undefined;
   /** Attached file paths for user messages */
   attachedFiles?: string[] | undefined;
   /** Attached images for user messages */
   attachedImages?: ImageAttachment[] | undefined;
+  /**
+   * UUID of the previous message in the conversation chain.
+   * Used for Claude Code-style rewind/branching.
+   * - null for first message in conversation
+   * - undefined for legacy messages without this field
+   */
+  parentUuid?: string | null | undefined;
 }
 
 export interface MessageItemProps {

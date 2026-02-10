@@ -11,15 +11,16 @@ export { BranchSelector } from './components/BranchSelector';
 export { ChangeItem } from './components/ChangeItem';
 export { ChangesList } from './components/ChangesList';
 export { CommitForm } from './components/CommitForm';
+export { DiffFileCard } from './components/DiffFileCard';
 export { DiscardConfirmation } from './components/DiscardConfirmation';
-export { FileSection } from './components/FileSection';
+
 export { GitActions } from './components/GitActions';
 export { OperationError } from './components/OperationError';
 export { SyncStatus } from './components/SyncStatus';
 
 // Hook
 export { useSourceControl } from './hooks/use-source-control';
-export type { UseSourceControlOptions, UseSourceControlReturn } from './hooks/use-source-control';
+export type { UseSourceControlReturn } from './hooks/use-source-control';
 
 // Types
 export type { DisplayFileStatus, FileItem, FileActionHandlers, BranchInfo } from './types';
@@ -30,4 +31,6 @@ export {
   OPERATION_ERROR_TIMEOUT,
   HEADER_HEIGHT,
   COMMIT_TEXTAREA_ROWS,
+  DIFF_EXPAND_TRANSITION,
+  DIFF_EXPAND_TRANSITION_NONE,
 } from './constants';

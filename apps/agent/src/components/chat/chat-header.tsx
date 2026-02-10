@@ -6,8 +6,74 @@
  */
 import type { FC } from 'react';
 
-import { HEIGHTS } from '@/lib/utils';
-import { useWorkspaceName, useActiveConversationTitle, useVaultOpen } from '@/stores/ui/ui-store';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn, HEIGHTS } from '@/lib/utils';
+import { useBranchDiffStats } from '@/stores/git/git-store';
+import {
+  useWorkspaceName,
+  useActiveConversationTitle,
+  useVaultOpen,
+  useUIStore,
+} from '@/stores/ui/ui-store';
+
+/**
+ * GitHub-style diff stats indicator showing additions/deletions
+ */
+const DiffStatsButton: FC = () => {
+  const branchStats = useBranchDiffStats();
+  const additions = branchStats?.additions ?? 0;
+  const deletions = branchStats?.deletions ?? 0;
+  const fileCount = branchStats?.filesChanged ?? 0;
+  const setActivityTab = useUIStore((state) => state.setActivityTab);
+
+  const tooltipText =
+    fileCount === 0
+      ? 'No changes on this branch'
+      : `${String(fileCount)} file${fileCount !== 1 ? 's' : ''} changed on branch`;
+
+  const handleClick = (): void => {
+    setActivityTab('files');
+  };
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={handleClick}
+          className={cn(
+            'flex items-center h-6 rounded-md overflow-hidden',
+            'text-[11px] font-medium tabular-nums',
+            'transition-[background-color,color] duration-150'
+          )}
+        >
+          {/* Additions (green) */}
+          <span
+            className="flex items-center gap-0.5 px-2 h-full text-success"
+            style={{ backgroundColor: 'color-mix(in oklch, var(--success) 20%, transparent)' }}
+          >
+            <span>+{additions}</span>
+          </span>
+          {/* Gradient blend between green and red */}
+          <span
+            className="w-3 h-full shrink-0"
+            style={{
+              background:
+                'linear-gradient(to right, color-mix(in oklch, var(--success) 20%, transparent), color-mix(in oklch, var(--destructive) 20%, transparent))',
+            }}
+          />
+          {/* Deletions (red) */}
+          <span
+            className="flex items-center gap-0.5 px-2 h-full text-destructive"
+            style={{ backgroundColor: 'color-mix(in oklch, var(--destructive) 20%, transparent)' }}
+          >
+            <span>−{deletions}</span>
+          </span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{tooltipText}</TooltipContent>
+    </Tooltip>
+  );
+};
 
 export const ChatHeader: FC = () => {
   const workspaceName = useWorkspaceName();
@@ -16,7 +82,7 @@ export const ChatHeader: FC = () => {
 
   return (
     <header
-      className="flex items-center justify-between px-4 border-b-[3px] border-border/50 shrink-0"
+      className="flex items-center justify-between px-4 border-b border-gray-5 shrink-0"
       style={{ height: HEIGHTS.headerBar }}
     >
       {/* Breadcrumb */}
@@ -28,16 +94,7 @@ export const ChatHeader: FC = () => {
               Vault
             </span>
             <span className="mx-2 opacity-30 shrink-0">/</span>
-            <span
-              className="opacity-70 whitespace-nowrap overflow-hidden flex-1 min-w-0"
-              title="All Notes"
-              style={{
-                maskImage: 'linear-gradient(to right, black 78%, transparent 95%)',
-                WebkitMaskImage: 'linear-gradient(to right, black 78%, transparent 95%)',
-                maskSize: '100% 100%',
-                WebkitMaskSize: '100% 100%',
-              }}
-            >
+            <span className="opacity-70 truncate flex-1 min-w-0" title="All Notes">
               All Notes
             </span>
           </>
@@ -51,14 +108,8 @@ export const ChatHeader: FC = () => {
               <>
                 <span className="mx-2 opacity-30 shrink-0">/</span>
                 <span
-                  className="opacity-70 whitespace-nowrap overflow-hidden flex-1 min-w-0"
+                  className="opacity-70 truncate flex-1 min-w-0"
                   title={activeConversationTitle}
-                  style={{
-                    maskImage: 'linear-gradient(to right, black 78%, transparent 95%)',
-                    WebkitMaskImage: 'linear-gradient(to right, black 78%, transparent 95%)',
-                    maskSize: '100% 100%',
-                    WebkitMaskSize: '100% 100%',
-                  }}
                 >
                   {activeConversationTitle}
                 </span>
@@ -66,6 +117,11 @@ export const ChatHeader: FC = () => {
             ) : null}
           </>
         )}
+      </div>
+
+      {/* Right section: Diff stats */}
+      <div className="flex items-center gap-2">
+        <DiffStatsButton />
       </div>
     </header>
   );

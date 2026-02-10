@@ -44,6 +44,9 @@ const DARK_THEME: ITheme = {
 
 /**
  * Try to detect theme from CSS custom properties (internal)
+ *
+ * Background uses --background (the app background) for consistency.
+ * Foreground and cursor still use --terminal-fg / --terminal-cursor.
  */
 function detectThemeFromCSSVars(): ITheme | undefined {
   if (typeof document === 'undefined') {
@@ -53,9 +56,9 @@ function detectThemeFromCSSVars(): ITheme | undefined {
   const root = document.documentElement;
   const style = getComputedStyle(root);
 
-  // Check if we have terminal CSS variables
-  const bgColor = style.getPropertyValue('--terminal-bg').trim();
-  if (!bgColor) {
+  // Check if terminal CSS variables exist
+  const fgColor = style.getPropertyValue('--terminal-fg').trim();
+  if (!fgColor) {
     return undefined;
   }
 
@@ -66,7 +69,10 @@ function detectThemeFromCSSVars(): ITheme | undefined {
 
   const theme: ITheme = { ...DARK_THEME };
 
-  const bg = getCSSVar('--terminal-bg');
+  // Use --chat-area for the base theme since the terminal sits inside the chat area.
+  // buildThemeFromCSSVars() in TerminalInstance will override this with a
+  // computed value anyway, but this keeps the fallback chain consistent.
+  const bg = getCSSVar('--chat-area');
   if (bg) theme.background = bg;
   const fg = getCSSVar('--terminal-fg');
   if (fg) theme.foreground = fg;
@@ -83,7 +89,7 @@ function detectThemeFromCSSVars(): ITheme | undefined {
 /**
  * Get the best available theme for xterm.js
  *
- * Tries CSS variables first (--terminal-bg, --terminal-fg, --terminal-cursor),
+ * Tries CSS variables first (--chat-area, --terminal-fg, --terminal-cursor),
  * falls back to the default dark theme if no CSS variables are defined.
  *
  * @returns ITheme object compatible with xterm.js Terminal options

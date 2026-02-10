@@ -7,6 +7,112 @@
 import type { ChatMessage, MessageItemProps, Segment } from './types';
 import type { ToolExecution } from '@/stores/agent/tool-store';
 
+// ============================================
+// Active Chain Extraction (Claude Code-style)
+// ============================================
+
+/**
+ * Message interface for chain extraction (minimal fields needed).
+ * Works with both ChatMessage and persisted message DTOs.
+ */
+interface ChainableMessage {
+  id: string;
+  parentUuid?: string | null | undefined;
+  createdAt?: number | undefined;
+}
+
+/**
+ * Extract the active message chain from a list of all messages.
+ *
+ * Claude Code handles conversation forks (rewinds) by storing a parentUuid on each
+ * message, forming a linked list. When there are forks, multiple messages can have
+ * the same parent. To display only the ACTIVE branch:
+ *
+ * 1. Find the "head" (latest message by timestamp)
+ * 2. Walk backwards via parentUuid until reaching null
+ * 3. Reverse to get chronological order
+ *
+ * Messages not in this chain are orphaned (from abandoned branches) and excluded.
+ *
+ * @param allMessages - All messages from persistence (may contain multiple branches)
+ * @returns Messages in the active chain, chronological order (oldest first)
+ *
+ * @example
+ * // Conversation with a fork:
+ * // msg1 (user) -> msg2 (assistant) -> msg3 (user) -> msg4 (assistant)
+ * //                                 -> msg5 (user, after rewind) -> msg6 (assistant)
+ * //
+ * // If msg6 is the latest, active chain is: [msg1, msg2, msg5, msg6]
+ * // msg3 and msg4 are orphaned (not in the active branch)
+ */
+export function getActiveChain<T extends ChainableMessage>(allMessages: T[]): T[] {
+  if (allMessages.length === 0) return [];
+
+  // Check if any message has parentUuid set (non-legacy conversation)
+  // Legacy conversations have no parentUuid - just return all messages in order
+  const hasParentUuids = allMessages.some(
+    (m) => m.parentUuid !== undefined && m.parentUuid !== null
+  );
+
+  if (!hasParentUuids) {
+    // Legacy conversation - no chain tracking, return all messages as-is
+    // Sort by createdAt to ensure chronological order
+    return [...allMessages].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+  }
+
+  // Build lookup map for O(1) parent access
+  const byId = new Map<string, T>(allMessages.map((m) => [m.id, m]));
+
+  // Build set of IDs that are referenced as parentUuid (i.e., have children)
+  // The true head is a leaf node — no other message points to it as parent
+  const referencedAsParent = new Set<string>();
+  for (const m of allMessages) {
+    if (m.parentUuid !== undefined && m.parentUuid !== null) {
+      referencedAsParent.add(m.parentUuid);
+    }
+  }
+
+  // Find the head (latest message by timestamp)
+  // Tiebreaker: when timestamps are equal, prefer the message that is NOT
+  // referenced as a parent (true head is a leaf node with no children)
+  const head = allMessages.reduce((latest, m) => {
+    const latestTime = latest.createdAt ?? 0;
+    const currentTime = m.createdAt ?? 0;
+    if (currentTime > latestTime) return m;
+    if (currentTime === latestTime) {
+      const latestIsParent = referencedAsParent.has(latest.id);
+      const currentIsParent = referencedAsParent.has(m.id);
+      // Prefer the one that is NOT a parent (leaf node)
+      if (latestIsParent && !currentIsParent) return m;
+    }
+    return latest;
+  });
+
+  // Walk backwards via parentUuid to build the chain
+  const chain: T[] = [];
+  let current: T | undefined = head;
+  const visited = new Set<string>(); // Prevent infinite loops from corrupt data
+
+  while (current !== undefined) {
+    // Detect cycles
+    if (visited.has(current.id)) {
+      break;
+    }
+    visited.add(current.id);
+
+    chain.unshift(current); // Add to front (building in reverse)
+
+    // Move to parent
+    if (current.parentUuid !== undefined && current.parentUuid !== null) {
+      current = byId.get(current.parentUuid);
+    } else {
+      current = undefined; // Reached the root
+    }
+  }
+
+  return chain;
+}
+
 /**
  * Build interleaved segments for assistant messages.
  * Segments alternate between content and tool widgets based on contentOffset.
@@ -86,8 +192,11 @@ const _CHAT_MESSAGE_KEYS_CHECK: Record<keyof ChatMessage, true> = {
   isInterrupted: true,
   thinking: true,
   thinkingDurationMs: true,
+  thinkingBlocks: true,
+  isThinkingActive: true,
   attachedFiles: true,
   attachedImages: true,
+  parentUuid: true,
 };
 // Prevent unused variable warning while keeping type check
 void _CHAT_MESSAGE_KEYS_CHECK;
@@ -121,6 +230,10 @@ export function arePropsEqual(prev: MessageItemProps, next: MessageItemProps): b
   if (pm.isInterrupted !== nm.isInterrupted) return false;
   if (pm.thinking !== nm.thinking) return false;
   if (pm.thinkingDurationMs !== nm.thinkingDurationMs) return false;
+  if (pm.isThinkingActive !== nm.isThinkingActive) return false;
+  // Compare thinkingBlocks by reference (replaced on every batch update)
+  if (pm.thinkingBlocks !== nm.thinkingBlocks) return false;
+  if (pm.parentUuid !== nm.parentUuid) return false;
 
   // Compare array fields with shallow equality
   if (!arraysEqual(pm.attachedFiles, nm.attachedFiles)) return false;
@@ -159,9 +272,15 @@ export function hasVisibleContent(
   segments: Segment[],
   isComplete: boolean
 ): boolean {
-  if (message.role === 'user') return true;
+  // User messages must have non-empty content to render. Empty user messages can appear
+  // from SDK protocol artifacts (e.g., interrupt markers stripped by backend, or edge
+  // cases where content blocks yield no text). Without this check, an empty <p> tag
+  // renders inside a bg-gray-4 bubble, creating a visible empty rectangle.
+  if (message.role === 'user') return message.content.trim().length > 0;
 
-  const hasThinking = Boolean(message.thinking);
+  const hasThinking =
+    (message.thinkingBlocks !== undefined && message.thinkingBlocks.length > 0) ||
+    Boolean(message.thinking);
   const hasSegments = segments.length > 0;
 
   return hasThinking || hasSegments || isComplete || Boolean(message.isInterrupted);

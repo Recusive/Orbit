@@ -108,7 +108,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
 
   return (
     <div
-      className="flex items-center gap-1 px-2 border-b-3 border-border/50 bg-chat-area shrink-0"
+      className="flex items-center gap-1 px-2 border-b border-gray-5 bg-chat-area shrink-0"
       style={{ height: 35 }}
     >
       {/* Navigation buttons - enabled when canGoBack/canGoForward is null (unknown) or true */}
@@ -175,7 +175,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
           onKeyDown={handleUrlKeyDown}
           placeholder="Enter URL..."
           aria-label="Browser URL"
-          className="w-full h-7 px-3 rounded-md border border-border bg-muted/50 text-sm outline-none placeholder:text-muted-foreground focus:bg-background focus:ring-1 focus:ring-ring"
+          className="w-full h-7 px-3 rounded-md bg-gray-4 dark:bg-background border-2 border-transparent text-sm outline-none placeholder:text-gray-10 focus:border-primary/40 transition-colors duration-200"
         />
       </div>
 
@@ -229,7 +229,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
         <button
           onClick={onClose}
           aria-label="Close browser"
-          className="h-7 w-7 flex items-center justify-center rounded hover:bg-destructive/90 hover:text-destructive-foreground transition-colors"
+          className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:bg-destructive/20 hover:text-destructive dark:hover:bg-destructive/20 transition-colors"
           title="Close browser"
         >
           <X className="h-4 w-4" aria-hidden="true" />

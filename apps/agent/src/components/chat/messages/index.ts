@@ -14,4 +14,4 @@ export type { ToolWidgetRendererProps } from './ToolWidgetRenderer';
 export type { ChatMessage, MessageItemProps, Segment } from './types';
 
 // Utilities
-export { arePropsEqual, buildSegments, hasVisibleContent } from './message-utils';
+export { arePropsEqual, buildSegments, getActiveChain, hasVisibleContent } from './message-utils';

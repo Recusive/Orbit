@@ -156,7 +156,7 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
         <CommandEmpty>
           {isIndexing
             ? 'Indexing files...'
-            : isLoading
+            : hasQuery && isLoading
               ? 'Searching...'
               : hasQuery
                 ? 'No matching files found.'

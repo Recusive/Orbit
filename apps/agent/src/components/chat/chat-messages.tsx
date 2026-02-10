@@ -298,6 +298,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // activeTools/completedTools change, then O(1) lookup per message render.
   // Without this, deduplicateAndSortTools() runs O(messages x tools) per cycle.
   // (Code review: Opus cycle 1, issue #1)
+  // TODO(code-review/cycle-1#28): Consider shallow equality selector to avoid rebuilding on every tool status change during streaming
   const toolsByMessageId = useMemo(() => {
     const activeByMsg = new Map<string, ToolExecution[]>();
     const completedByMsg = new Map<string, ToolExecution[]>();
@@ -494,14 +495,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                 key={virtualItem.key}
                 data-index={virtualItem.index}
                 ref={virtualizer.measureElement}
-                className="absolute left-0 w-full pb-3 select-none"
+                className="absolute left-0 w-full pb-3 select-auto"
                 style={{
                   top: `${String(virtualItem.start)}px`,
-                  // NOTE: content-visibility:auto was REMOVED here. TanStack Virtual
-                  // already ensures only ~15 items are in the DOM (viewport + overscan).
-                  // Adding browser-level content-visibility created redundant compositing
-                  // layers and internal IntersectionObserver callbacks that consumed 5.2s
-                  // of compositing time and caused a 220ms IO callback in profiling.
                 }}
               >
                 <MessageItem

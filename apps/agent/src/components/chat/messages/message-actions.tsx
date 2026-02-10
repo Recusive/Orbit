@@ -3,8 +3,9 @@ import { useState } from 'react';
 
 import type { FC } from 'react';
 
+import { cn } from '@/lib/utils';
+
 interface MessageActionsProps {
-  readonly showDisclaimer?: boolean;
   readonly rewindDisabled?: boolean;
   readonly onCopy?: () => void;
   readonly onLike?: () => void;
@@ -13,7 +14,6 @@ interface MessageActionsProps {
 }
 
 export const MessageActions: FC<MessageActionsProps> = ({
-  showDisclaimer = false,
   rewindDisabled = false,
   onCopy,
   onLike,
@@ -31,7 +31,7 @@ export const MessageActions: FC<MessageActionsProps> = ({
   };
 
   const iconButtonClasses =
-    'h-6 w-6 flex items-center justify-center rounded-md bg-transparent text-muted-foreground/70 transition-[background-color,color,transform] duration-150 hover:bg-muted/50 hover:text-foreground hover:scale-[1.08] active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50';
+    'h-6 w-6 flex items-center justify-center rounded-md bg-transparent text-muted-foreground/70 transition-[background-color,color,transform] duration-150 hover:bg-accent hover:text-foreground hover:scale-[1.08] active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50';
 
   return (
     <div className="mt-3 flex flex-col gap-2 items-end">
@@ -65,11 +65,14 @@ export const MessageActions: FC<MessageActionsProps> = ({
           <ThumbsDown className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
         <button
-          className={`h-6 px-2.5 flex items-center rounded-md text-sm font-medium transition-[background-color,color,transform] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50 ${
+          className={cn(
+            'h-6 px-2.5 flex items-center rounded-md text-sm font-medium',
+            'transition-[background-color,color,transform] duration-150',
+            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
             rewindDisabled
-              ? 'bg-muted/30 text-muted-foreground/50 cursor-not-allowed'
-              : 'bg-muted/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground hover:scale-[1.02] active:scale-[0.98]'
-          }`}
+              ? 'bg-gray-4/50 text-muted-foreground/50 cursor-not-allowed'
+              : 'bg-gray-4 text-gray-12 hover:bg-gray-5 hover:text-foreground hover:scale-[1.02] active:scale-[0.98]'
+          )}
           aria-label={rewindDisabled ? 'Cannot rewind last message' : 'Rewind to this point'}
           title={rewindDisabled ? 'Cannot rewind last message' : 'Rewind'}
           onClick={rewindDisabled ? undefined : onRewind}
@@ -78,11 +81,6 @@ export const MessageActions: FC<MessageActionsProps> = ({
           Rewind
         </button>
       </div>
-      {showDisclaimer ? (
-        <p className="text-sm text-muted-foreground/60">
-          AI may make mistakes. Double-check all generated code.
-        </p>
-      ) : null}
     </div>
   );
 };

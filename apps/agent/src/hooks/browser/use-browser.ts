@@ -1,5 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import type { ExtensionMessage } from '@/types/protocol';
@@ -45,19 +45,10 @@ export function useBrowser(): void {
   const handleMessage = useCallback(
     (message: ExtensionMessage): void => {
       switch (message.type) {
-        // Handle panel visibility - show browser when VS Code panel becomes visible
-        case 'panel:visible': {
-          const browserState = useBrowserStore.getState();
-          const uiState = useUIStore.getState();
-
-          if (browserState.isActive && uiState.activityTab === 'browser') {
-            postMessage({
-              type: 'browser:show',
-              uuid: generateUUID(),
-            });
-          }
+        // panel:visible — legacy VS Code event; browser visibility is now managed
+        // by the consolidated effect in ActivityPanel (canManageBrowser gate).
+        case 'panel:visible':
           break;
-        }
 
         // browser:open - command from extension to open browser panel and navigate
         case 'browser:open': {
@@ -234,34 +225,9 @@ export function useBrowser(): void {
     ]
   );
 
-  // Track if we've already sent browser:show on mount
-  const hasShownBrowserRef = useRef(false);
-
-  // On mount, if we have a persisted active browser, tell Orbit to show it
-  useEffect(() => {
-    if (hasShownBrowserRef.current) return;
-
-    const browserState = useBrowserStore.getState();
-    const uiState = useUIStore.getState();
-
-    // If we have a viewId from localStorage (persisted through reload) and browser tab is active
-    if (browserState.isActive && browserState.viewId && uiState.activityTab === 'browser') {
-      hasShownBrowserRef.current = true;
-      // Small delay to ensure Orbit is ready
-      const timeoutId = setTimeout(() => {
-        postMessage({
-          type: 'browser:show',
-          uuid: generateUUID(),
-        });
-      }, 100);
-
-      return (): void => {
-        clearTimeout(timeoutId);
-      };
-    }
-
-    return undefined;
-  }, [postMessage]);
+  // Browser visibility on mount is handled by ActivityPanel's consolidated effect.
+  // No mount-time browser:show needed here — ActivityPanel fires it when
+  // isBrowserActive is true and activeTab === 'browser'.
 
   // Subscribe to backend messages
   useTauri({ onMessage: handleMessage });

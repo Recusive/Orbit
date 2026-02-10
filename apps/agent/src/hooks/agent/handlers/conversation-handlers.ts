@@ -1,60 +1,39 @@
 import { createLogger } from '@orbit/common/lib';
 
-import { markSessionAsForked, setRewindContext } from '../use-tauri-session';
-
-import type { RewindContextMessage } from '../types/tauri-types';
+import type { ConversationMessageDto } from '@/lib/api/conversations';
 import type { WebviewMessage } from '@/types/protocol';
-
-const logger = createLogger('ConversationHandlers');
 
 import {
   agentRewindFiles,
-  agentGetSdkSessionId,
-  conversationCreate,
+  agentForkSessionAt,
   conversationList,
   conversationLoad,
   conversationDelete,
   conversationUpdateTitle,
-  conversationFork,
 } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 
-export async function handleConversationCreate(
+const logger = createLogger('ConversationHandlers');
+
+export function handleConversationCreate(
   message: Extract<WebviewMessage, { type: 'conversation:create' }>
-): Promise<void> {
-  try {
-    const sessionId = crypto.randomUUID();
-    const title = message.title ?? 'New Conversation';
-    const workspacePath = message.workspace_path;
-    const worktreePath = message.worktree_path;
-    await conversationCreate(sessionId, title, workspacePath, worktreePath);
-    window.postMessage(
-      {
-        type: 'conversation:created',
-        uuid: crypto.randomUUID(),
-        session_id: sessionId,
-        title,
-        workspace_path: workspacePath,
-        worktree_path: worktreePath,
-      },
-      '*'
-    );
-  } catch (err: unknown) {
-    logger.error('Conversation create error', err);
-    // Still emit created event so UI can proceed (will use localStorage fallback)
-    const sessionId = crypto.randomUUID();
-    window.postMessage(
-      {
-        type: 'conversation:created',
-        uuid: crypto.randomUUID(),
-        session_id: sessionId,
-        title: message.title ?? 'New Conversation',
-        workspace_path: message.workspace_path,
-        worktree_path: message.worktree_path,
-      },
-      '*'
-    );
-  }
+): void {
+  // Generate a temp session ID for the frontend. The SDK will write the JSONL file
+  // when the first message is sent, using its own session ID. The system:init handler
+  // in message-handler.ts remaps the frontend to the SDK ID at that point.
+  const sessionId = crypto.randomUUID();
+  const title = message.title ?? 'New Conversation';
+  window.postMessage(
+    {
+      type: 'conversation:created',
+      uuid: crypto.randomUUID(),
+      session_id: sessionId,
+      title,
+      workspace_path: message.workspace_path,
+      worktree_path: message.worktree_path,
+    },
+    '*'
+  );
 }
 
 export async function handleConversationList(
@@ -115,17 +94,24 @@ export async function handleConversationLoad(
             ...(m.toolUses && m.toolUses.length > 0 ? { toolUses: m.toolUses } : {}),
             ...(m.usage ? { usage: m.usage } : {}),
           })),
+          // Authoritative session usage from SDK result event (via .usage.json sidecar)
+          ...(conv.sessionUsage ? { session_usage: conv.sessionUsage } : {}),
         },
         '*'
       );
     } else {
-      // Conversation not found in backend - return empty
+      // Conversation not found on disk — likely a cache-only session
+      // (created via "New Session" but SDK hasn't written the JSONL file yet).
+      // Return empty messages but preserve whatever title the sidebar already has.
+      logger.debug('Conversation not found on disk (cache-only?)', {
+        sessionId: message.session_id,
+      });
       window.postMessage(
         {
           type: 'conversation:loaded',
           uuid: crypto.randomUUID(),
           session_id: message.session_id,
-          title: 'Conversation',
+          title: 'Untitled',
           messages: [],
         },
         '*'
@@ -138,7 +124,7 @@ export async function handleConversationLoad(
         type: 'conversation:loaded',
         uuid: crypto.randomUUID(),
         session_id: message.session_id,
-        title: 'Conversation',
+        title: 'Untitled',
         messages: [],
       },
       '*'
@@ -177,116 +163,183 @@ export async function handleConversationUpdateTitle(
 // TESTED: This rewind flow is covered by integration tests.
 //     If you modify this, run: cd agent-bridge && bun test
 //     Test file: src/__tests__/combined-rewind.test.ts
+//
+// =============================================================================
+// SDK FORK-BASED REWIND (resumeSessionAt + forkSession)
+// =============================================================================
+//
+// How this works:
+// 1. User clicks "rewind to message X"
+// 2. We rewind files to the checkpoint state (restores file changes)
+// 3. We fork the session at message X using SDK's resumeSessionAt + forkSession
+// 4. The SDK creates a NEW session with context ONLY up to message X
+// 5. Claude genuinely doesn't see messages that came after the fork point
+//
+// This uses the SDK's built-in forking mechanism which is much cleaner than
+// trying to manipulate parentUuid chains manually. The user message UUIDs
+// captured via replay-user-messages are the exact checkpoints needed.
+//
 export async function handleConversationRewind(
   message: Extract<WebviewMessage, { type: 'conversation:rewind' }>
 ): Promise<void> {
   try {
-    // We receive TWO message IDs:
-    // - message_id: The clicked message (for UI fork - include up to this message)
-    // - user_message_id: The user message (for checkpoint lookup - checkpoints stored by user msg)
-    const { message_id, user_message_id } = message;
+    const { message_id, user_message_id, session_id, message_index, current_messages } = message;
 
     // Step 1: Get the checkpoint using the USER message ID
-    // (checkpoints are stored under user message IDs, not assistant IDs)
     const checkpointStore = useCheckpointStore.getState();
-    const rewindCheckpoints = checkpointStore.getRewindCheckpoints(
-      message.session_id,
-      user_message_id
-    );
+    const rewindCheckpoints = checkpointStore.getRewindCheckpoints(session_id, user_message_id);
 
-    // Debug: Log checkpoint state
-    const sessionCheckpoints = checkpointStore.getSessionCheckpoints(message.session_id);
-    logger.debug('Rewind requested', {
-      session_id: message.session_id,
-      message_id,
-      user_message_id,
-      rewindCheckpoints,
-      sessionCheckpoints,
-    });
-
-    // Step 2: Get SDK session ID BEFORE forking so we can resume from it
-    let sdkSessionId: string | null = null;
-    try {
-      sdkSessionId = await agentGetSdkSessionId(message.session_id);
-      logger.debug('Got SDK session ID for resume', { sdkSessionId });
-    } catch (sdkErr) {
-      logger.error('Could not get SDK session ID', sdkErr);
-    }
-
-    // Step 3: Rewind files to the turn END checkpoint (file state after this message completed)
-    // This restores all Write/Edit/NotebookEdit changes made after this point
+    // Step 2: Rewind files to the turn END checkpoint
     if (rewindCheckpoints?.rewindFiles) {
       try {
-        logger.debug('Calling agentRewindFiles with turnEnd checkpoint');
-        await agentRewindFiles(message.session_id, rewindCheckpoints.rewindFiles);
-        logger.debug('Files rewound to checkpoint', { checkpoint: rewindCheckpoints.rewindFiles });
+        await agentRewindFiles(session_id, rewindCheckpoints.rewindFiles);
       } catch (rewindErr) {
-        // Log but continue with conversation fork even if file rewind fails
         logger.error('File rewind failed', rewindErr);
       }
-    } else {
-      logger.debug('No checkpoints found for session, skipping file rewind');
     }
 
-    // Step 4: Fork the conversation to this point
-    const newSessionId = crypto.randomUUID();
+    // Step 3: Load conversation from disk to get the SDK message ID
+    const conv = await conversationLoad(session_id);
 
-    // Step 5: Fork the conversation using the CLICKED message ID
-    // This ensures we include up to and including the clicked message (user OR assistant)
-    const forked = await conversationFork(message.session_id, newSessionId, message_id);
+    // Find the target message — priority chain:
+    //   1. Direct disk ID match (message_id found in JSONL by ID)
+    //   2. Content-validated position match (first rewind: frontend UUID ≠ SDK UUID
+    //      but the message at message_index has matching content → disk is fresh)
+    //   3. Frontend messages fallback (rewind 2+: disk is stale/truncated)
+    //   4. Unvalidated position fallback (no frontend messages available — legacy)
+    let targetMessage: ConversationMessageDto | undefined;
+    let sdkMessageId: string | undefined;
+    let useFrontendMessages = false;
 
-    // Step 6: Store rewind context and mark session as forked
-    // NOTE: We DON'T use SDK's resume for message history anymore.
-    // The SDK's resume loads ALL messages which breaks rewind.
-    // Instead, we store the truncated messages and prepend them to the first message.
-    if (forked && forked.messages.length > 0) {
-      // Store the truncated messages as context for the first message
-      const contextMessages: RewindContextMessage[] = forked.messages.map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      }));
-      setRewindContext(forked.sessionId, contextMessages);
-      logger.debug('Stored rewind context for forked session', {
-        sessionId: forked.sessionId,
-        messageCount: contextMessages.length,
-      });
+    const messageMap = conv
+      ? new Map(conv.messages.map((m) => [m.id, m]))
+      : new Map<string, ConversationMessageDto>();
+
+    if (conv) {
+      // Priority 1: Direct ID match — works when message_id is already an SDK UUID
+      targetMessage = messageMap.get(message_id);
+
+      if (targetMessage) {
+        sdkMessageId = targetMessage.id;
+      } else {
+        // Priority 2: Content-validated position match
+        const positionCandidate =
+          message_index >= 0 && message_index < conv.messages.length
+            ? conv.messages[message_index]
+            : undefined;
+
+        const frontendTarget = current_messages?.find((m) => m.id === message_id);
+        // Content validation: strict equality for user messages (always complete),
+        // prefix match for assistant messages (may be interrupted mid-stream,
+        // so persisted content can be shorter than frontend content).
+        // (Code review: Opus cycle 3, issue #5)
+        const contentMatches =
+          positionCandidate !== undefined &&
+          positionCandidate.role === frontendTarget?.role &&
+          (positionCandidate.role === 'user'
+            ? positionCandidate.content === frontendTarget.content
+            : positionCandidate.content.startsWith(frontendTarget.content.slice(0, 200)) ||
+              frontendTarget.content.startsWith(positionCandidate.content.slice(0, 200)));
+
+        if (positionCandidate && contentMatches) {
+          targetMessage = positionCandidate;
+          sdkMessageId = targetMessage.id;
+        } else if (current_messages && current_messages.length > 0) {
+          // Priority 3: Frontend messages fallback — disk is stale (rewind 2+)
+          sdkMessageId = message_id;
+          useFrontendMessages = true;
+        } else if (positionCandidate) {
+          // Priority 4: Unvalidated position fallback — no frontend messages to validate
+          targetMessage = positionCandidate;
+          sdkMessageId = targetMessage.id;
+        }
+      }
+    } else if (current_messages && current_messages.length > 0) {
+      // No disk data at all — use frontend messages
+      sdkMessageId = message_id;
+      useFrontendMessages = true;
     }
 
-    // Mark session as forked (for file checkpoint tracking, NOT for SDK resume)
-    if (sdkSessionId) {
-      markSessionAsForked(newSessionId, sdkSessionId);
-      logger.debug('Marked forked session (context-based, no SDK resume)', {
-        newSessionId,
-        sdkSessionId,
-      });
+    // Step 4: Fork the session at the target message
+    //
+    // Only fork when the target was found in the current JSONL (first rewind).
+    // For rewind 2+, the target UUID isn't in the current JSONL — forkSessionAt
+    // would truncate 0 lines, destroy the session, and recreate it from the
+    // unchanged JSONL.
+    if (sdkMessageId && !useFrontendMessages) {
+      try {
+        await agentForkSessionAt(session_id, sdkMessageId);
+        checkpointStore.setPendingConversationFork(session_id, sdkMessageId);
+      } catch (forkErr) {
+        logger.error('Session fork failed', forkErr);
+      }
     }
 
-    if (forked) {
+    // Step 5: Build the message list to display
+    // Priority: disk messages (first rewind) > frontend messages (rewind 2+) > empty
+    if (conv && targetMessage && !useFrontendMessages) {
+      // Disk data available — use disk messages
+      const messagesUpToRewind: typeof conv.messages = [];
+
+      const chain: typeof conv.messages = [];
+      let current: (typeof conv.messages)[number] | undefined = targetMessage;
+      while (current) {
+        chain.unshift(current);
+        current = current.parentUuid ? messageMap.get(current.parentUuid) : undefined;
+      }
+
+      if (chain.length <= 1) {
+        const targetIndex = conv.messages.indexOf(targetMessage);
+        messagesUpToRewind.push(...conv.messages.slice(0, targetIndex + 1));
+      } else {
+        messagesUpToRewind.push(...chain);
+      }
+
       window.postMessage(
         {
           type: 'conversation:rewound',
           uuid: crypto.randomUUID(),
-          session_id: message.session_id,
-          new_session_id: forked.sessionId,
+          session_id,
+          new_session_id: session_id,
           rewind_to_message_id: message_id,
-          messages: forked.messages.map((m) => ({
+          messages: messagesUpToRewind.map((m) => ({
             id: m.id,
             role: m.role as 'user' | 'assistant',
             content: m.content,
             timestamp: m.createdAt,
             toolUses: m.toolUses,
+            parentUuid: m.parentUuid,
+          })),
+        },
+        '*'
+      );
+    } else if (current_messages && current_messages.length > 0) {
+      // Disk data unavailable but frontend messages exist — use them as fallback.
+      // This happens on subsequent rewinds after forkSessionAt deleted/truncated the JSONL.
+      window.postMessage(
+        {
+          type: 'conversation:rewound',
+          uuid: crypto.randomUUID(),
+          session_id,
+          new_session_id: session_id,
+          rewind_to_message_id: message_id,
+          messages: current_messages.map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            timestamp: Date.now(),
+            parentUuid: m.parentUuid,
           })),
         },
         '*'
       );
     } else {
-      // Original not found - just create empty fork
       window.postMessage(
         {
           type: 'conversation:rewound',
           uuid: crypto.randomUUID(),
-          session_id: message.session_id,
-          new_session_id: newSessionId,
+          session_id,
+          new_session_id: session_id,
           rewind_to_message_id: message_id,
           messages: [],
         },
@@ -294,14 +347,13 @@ export async function handleConversationRewind(
       );
     }
   } catch (err: unknown) {
-    logger.error('Conversation rewind error', err);
-    const newSessionId = crypto.randomUUID();
+    logger.error('handleConversationRewind failed', err);
     window.postMessage(
       {
         type: 'conversation:rewound',
         uuid: crypto.randomUUID(),
         session_id: message.session_id,
-        new_session_id: newSessionId,
+        new_session_id: message.session_id,
         rewind_to_message_id: message.message_id,
         messages: [],
       },

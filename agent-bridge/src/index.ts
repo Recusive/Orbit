@@ -151,6 +151,16 @@ function main(): void {
   });
 
   sessionManager.onSessionInit((event) => {
+    logger.warn(
+      {
+        sessionId: event.sessionId,
+        sdkSessionId: event.sdkSessionId,
+        isResumed: event.isResumed,
+        isForked: event.isForked,
+      },
+      'CHECKPOINT session_init — persisting session mapping and sending to Rust'
+    );
+
     // Persist session mapping for resume functionality
     saveSession({
       sessionId: event.sessionId,
@@ -198,6 +208,10 @@ function main(): void {
   // Emit checkpoint events when user messages with UUIDs are received
   // These UUIDs can be used to rewind files to that checkpoint
   sessionManager.onCheckpoint((data) => {
+    logger.warn(
+      { sessionId: data.sessionId, checkpointId: data.checkpointId },
+      'CHECKPOINT sending checkpoint event to Rust/frontend via IPC'
+    );
     sendEvent({
       type: 'checkpoint',
       sessionId: data.sessionId,
@@ -555,14 +569,57 @@ async function handleRequest(
 
     // Fork and Generate Operations
     case 'fork_session': {
+      logger.warn(
+        { sessionId: request.sessionId, options: request.options },
+        '\u{23EA} REWIND IPC received fork_session request from Rust'
+      );
       const result = await sessionManager.forkSession(request.sessionId, request.options);
+      logger.warn(
+        {
+          sessionId: request.sessionId,
+          newSdkSessionId: result.sdkSessionId.slice(0, 8),
+          orbitSessionId: result.orbitSessionId ?? 'none',
+        },
+        '\u{23EA} REWIND IPC fork_session completed'
+      );
       sendResponse({ type: 'fork_result', requestType: request.type, result });
       break;
     }
 
     case 'rewind_files': {
+      logger.warn(
+        { sessionId: request.sessionId, checkpointId: request.checkpointId },
+        '\u{23EA} REWIND IPC received rewind_files request from Rust'
+      );
       await sessionManager.rewindFiles(request.sessionId, request.checkpointId);
+      logger.warn(
+        { sessionId: request.sessionId, checkpointId: request.checkpointId },
+        '\u{23EA} REWIND IPC rewind_files completed — sending success response'
+      );
       sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
+    case 'fork_session_at': {
+      // Fork session at a specific message point for rewind
+      // Creates new SDK session with context only up to the specified message
+      logger.warn(
+        { sessionId: request.sessionId, atMessageUuid: request.atMessageUuid },
+        '\u{23EA} REWIND IPC received fork_session_at request from Rust'
+      );
+      const newSdkSessionId = await sessionManager.forkSessionAt(
+        request.sessionId,
+        request.atMessageUuid
+      );
+      logger.warn(
+        {
+          sessionId: request.sessionId,
+          atMessageUuid: request.atMessageUuid,
+          newSdkSessionId: newSdkSessionId.slice(0, 8),
+        },
+        '\u{23EA} REWIND IPC fork_session_at completed — sending new SDK session ID'
+      );
+      sendResponse({ type: 'string', requestType: request.type, value: newSdkSessionId });
       break;
     }
 

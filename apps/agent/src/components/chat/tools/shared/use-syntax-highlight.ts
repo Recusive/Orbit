@@ -9,27 +9,45 @@
  */
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
+import type { BundledLanguage, BundledTheme, ThemedToken } from 'shiki';
+
 // ---------------------------------------------------------------------------
 // Shiki singleton (shared with bash-tool-widget pattern)
 // ---------------------------------------------------------------------------
 
-interface ShikiModule {
+/**
+ * The subset of Shiki APIs we use for syntax highlighting.
+ * Defined explicitly to ensure type safety without `typeof import()`.
+ */
+interface ShikiAPI {
+  codeToHtml: (
+    code: string,
+    options: { lang: BundledLanguage; theme: BundledTheme }
+  ) => Promise<string>;
   codeToTokensBase: (
     code: string,
-    options: { lang: string; theme: string }
-  ) => Promise<{ content: string; color?: string }[][]>;
-  codeToHtml: (code: string, options: { lang: string; theme: string }) => Promise<string>;
+    options: { lang: BundledLanguage; theme: BundledTheme }
+  ) => Promise<ThemedToken[][]>;
 }
 
-let shikiPromise: Promise<ShikiModule> | null = null;
+let shikiPromise: Promise<ShikiAPI> | null = null;
 
-export function getShiki(): Promise<ShikiModule> {
-  shikiPromise ??= (import('shiki') as Promise<ShikiModule>).catch((error: unknown) => {
-    shikiPromise = null;
-    throw error;
-  });
+/**
+ * Lazily loads the Shiki module. The module is cached after first load.
+ * Callers should handle errors via try/catch.
+ */
+export async function getShiki(): Promise<ShikiAPI> {
+  shikiPromise ??= import('shiki').then(
+    (mod): ShikiAPI => ({
+      codeToHtml: mod.codeToHtml,
+      codeToTokensBase: mod.codeToTokensBase,
+    })
+  );
   return shikiPromise;
 }
+
+// Re-export types that consumers need
+export type { BundledLanguage, BundledTheme };
 
 // ---------------------------------------------------------------------------
 // Dark mode detection (useSyncExternalStore — concurrency-safe)
@@ -62,7 +80,7 @@ export function useIsDarkMode(): boolean {
 // File extension → Shiki language mapping
 // ---------------------------------------------------------------------------
 
-const EXT_TO_LANG: Record<string, string> = {
+const EXT_TO_LANG: Record<string, BundledLanguage> = {
   ts: 'typescript',
   tsx: 'tsx',
   js: 'javascript',
@@ -122,9 +140,9 @@ const EXT_TO_LANG: Record<string, string> = {
   astro: 'astro',
 };
 
-function getLangFromPath(filePath: string): string | undefined {
+function getLangFromPath(filePath: string): BundledLanguage | undefined {
   const ext = filePath.split('.').pop()?.toLowerCase();
-  if (!ext) return undefined;
+  if (ext === undefined) return undefined;
   return EXT_TO_LANG[ext];
 }
 
@@ -157,7 +175,7 @@ export function useHighlightedTokens(
     const lang = getLangFromPath(filePath);
 
     // No language detected — skip highlighting
-    if (!lang) {
+    if (lang === undefined) {
       setTokens(null);
       return;
     }
@@ -165,7 +183,7 @@ export function useHighlightedTokens(
     const highlight = async (): Promise<void> => {
       try {
         const { codeToTokensBase } = await getShiki();
-        const theme = isDarkMode ? 'github-dark' : 'github-light';
+        const theme: BundledTheme = isDarkMode ? 'github-dark' : 'github-light';
         const result = await codeToTokensBase(code, { lang, theme });
         if (mounted) {
           setTokens(result);

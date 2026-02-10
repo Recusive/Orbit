@@ -23,9 +23,16 @@ use tokio::time::sleep;
 
 use super::workspace;
 use crate::core::sentry_utils::SentryCapture as _;
+
 // ============================================
 // Basic File Operations
 // ============================================
+//
+// SECURITY NOTE: Read-only file operations (read_file, file_exists, is_directory,
+// get_file_info) are NOT restricted to the workspace directory. This matches VS Code
+// behavior where the editor can read any file on the system. Write operations remain
+// sandboxed to the workspace via ensure_workspace_paths(). The frontend must not
+// expose file paths to untrusted input (e.g., from web content or user-provided URLs).
 
 /// Read file contents as a string.
 ///

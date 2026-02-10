@@ -1,4 +1,11 @@
-import { CheckCircle2, ChevronDown, Loader2, SquarePlus, XCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  SquarePlus,
+  XCircle,
+} from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -67,7 +74,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
-      {/* Header — flat inline row */}
+      {/* Header — flat inline row, full-width click target */}
       <button
         onClick={() => {
           setIsExpanded(!isExpanded);
@@ -79,62 +86,61 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
         }
         aria-expanded={isExpanded}
         className={cn(
-          'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
-          'transition-colors duration-150 cursor-pointer w-full text-left',
-          'rounded-lg hover:bg-muted/20',
+          'group flex items-center py-1.5 px-2.5 text-sm',
+          'cursor-pointer w-full text-left rounded-lg',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div
-          className={cn(
-            'w-5 h-5 rounded flex items-center justify-center shrink-0',
-            'transition-colors duration-150',
-            isFailed
-              ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
-              : 'bg-success/8 group-hover/status:bg-success/12'
-          )}
-        >
-          <SquarePlus
+        {/* Grouped content — icon, filename, diff, chevron all together */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div
             className={cn(
-              'h-3 w-3 transition-colors duration-150',
-              isFailed
-                ? 'text-destructive/60 group-hover/status:text-destructive/80'
-                : 'text-success/60 group-hover/status:text-success/80',
-              isRunning && 'animate-pulse'
+              'w-5 h-5 rounded flex items-center justify-center shrink-0',
+              isFailed ? 'bg-destructive/8' : 'bg-success/8'
             )}
-          />
-        </div>
+          >
+            <SquarePlus
+              className={cn(
+                'h-3 w-3',
+                isFailed ? 'text-destructive/60' : 'text-success/60',
+                isRunning && 'animate-pulse'
+              )}
+            />
+          </div>
 
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span
+          <a
+            role="link"
+            tabIndex={0}
             className={cn(
               'text-xs font-medium truncate cursor-pointer hover:underline',
-              isFailed ? 'text-muted-foreground line-through' : 'text-foreground/90'
+              isFailed ? 'text-gray-11 line-through' : 'text-gray-12'
             )}
             onClick={handleFileClick}
+            onKeyDown={(e): void => {
+              if (e.key === 'Enter' || e.key === ' ')
+                handleFileClick(e as unknown as React.MouseEvent);
+            }}
             title={filePath}
           >
             {fileName}
-          </span>
+          </a>
+
           <span
-            className={cn(
-              'text-xs shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-muted-foreground/70'
-            )}
+            className={cn('text-xs shrink-0', isFailed ? 'text-destructive/60' : 'text-gray-9')}
           >
             {isFailed ? '(failed)' : '(new)'}
           </span>
-          {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
-          ) : null}
-        </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+          {isRunning ? (
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+          ) : null}
+
           {!isRunning && !isFailed ? <DiffStat additions={lineCount} deletions={0} /> : null}
-          <ChevronDown
+
+          <ChevronRight
             className={cn(
-              'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
-              isExpanded && 'rotate-180'
+              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-90'
             )}
           />
         </div>
@@ -152,7 +158,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
           >
             <div className="flex flex-col">
               <div className="flex flex-row px-2.5">
-                {/* Gutter: vertical connector line */}
+                {/* Gutter: single continuous vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
                   <div
                     className={cn(
@@ -163,91 +169,82 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                       success !== undefined
                         ? {
                             background: success
-                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-success) 40%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
-                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-success) 40%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
+                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-success) 40%, transparent), color-mix(in oklch, #22c55e 50%, transparent))'
+                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-success) 40%, transparent), color-mix(in oklch, #ef4444 50%, transparent))',
                           }
                         : undefined
                     }
                   />
                 </div>
 
-                {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-success/40 bg-card overflow-hidden">
-                  <div
-                    className={cn('overflow-auto bg-success/5', !showAllLines && 'max-h-[300px]')}
-                  >
-                    <div className="w-fit min-w-full">
-                      {displayLines.map((line, index) => {
-                        // When showAllLines is off, index maps directly to display slice
-                        // When showAllLines is on, index maps 1:1 to the full lines array
-                        const lineIndex = showAllLines ? index : index;
-                        const tokens = highlightedTokens?.[lineIndex];
+                {/* Content column — code preview + show-more toggle share one gutter line */}
+                <div className="flex-1 min-w-0 ml-2.5 flex flex-col">
+                  {/* Code content */}
+                  <div className="my-1.5 rounded-lg border-3 border-success/40 bg-card overflow-hidden">
+                    <div
+                      className={cn('overflow-auto bg-success/5', !showAllLines && 'max-h-[300px]')}
+                    >
+                      <div className="w-fit min-w-full">
+                        {displayLines.map((line, index) => {
+                          // When showAllLines is off, index maps directly to display slice
+                          // When showAllLines is on, index maps 1:1 to the full lines array
+                          const lineIndex = showAllLines ? index : index;
+                          const tokens = highlightedTokens?.[lineIndex];
 
-                        return (
-                          <div key={index} className="flex font-mono text-sm leading-4">
-                            {/* Sticky gutter + line number */}
-                            <div className="sticky left-0 flex shrink-0 bg-success/5">
-                              <div className="w-8 px-1.5 text-right text-muted-foreground/70 select-none bg-success/10">
-                                {index + 1}
+                          return (
+                            <div key={index} className="flex font-mono text-sm leading-4">
+                              {/* Sticky gutter + line number */}
+                              <div className="sticky left-0 flex shrink-0 bg-success/5">
+                                <div className="w-8 px-1.5 text-right text-gray-9 select-none bg-success/10">
+                                  {index + 1}
+                                </div>
+                              </div>
+                              {/* Content — syntax highlighted when available */}
+                              <div className="flex-1 px-2 whitespace-pre">
+                                {tokens ? (
+                                  tokens.map((token, ti) => (
+                                    <span
+                                      key={ti}
+                                      style={token.color ? { color: token.color } : undefined}
+                                    >
+                                      {token.content}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-gray-12">{line || ' '}</span>
+                                )}
                               </div>
                             </div>
-                            {/* Content — syntax highlighted when available */}
-                            <div className="flex-1 px-2 whitespace-pre">
-                              {tokens ? (
-                                tokens.map((token, ti) => (
-                                  <span
-                                    key={ti}
-                                    style={token.color ? { color: token.color } : undefined}
-                                  >
-                                    {token.content}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-foreground">{line || ' '}</span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Show all / Show less toggle — detached below the box */}
-              {(hasMore || showAllLines) && lines.length > maxPreviewLines ? (
-                <div className="flex flex-row px-2.5">
-                  <div className="w-5 flex justify-center shrink-0">
-                    <div
-                      className={cn(
-                        'w-[2px] rounded-full h-full',
-                        isFailed ? 'bg-destructive/40' : 'bg-success/40'
-                      )}
-                    />
-                  </div>
-                  <div className="flex-1 ml-2.5">
+                  {/* Show all / Show less toggle */}
+                  {(hasMore || showAllLines) && lines.length > maxPreviewLines ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowAllLines(!showAllLines);
                       }}
-                      className="py-1 text-xs text-muted-foreground/60 hover:text-foreground transition-colors flex items-center gap-0.5"
+                      className="py-1 text-xs text-gray-9 hover:text-gray-12 transition-colors flex items-center gap-0.5"
                     >
-                      <ChevronDown
-                        className={cn(
-                          'h-2.5 w-2.5 transition-transform duration-200 ease-out',
-                          showAllLines && 'rotate-180'
-                        )}
-                      />
                       <span>
                         {showAllLines
                           ? 'Show less'
                           : `${String(lines.length - maxPreviewLines)} more lines`}
                       </span>
+                      <ChevronDown
+                        className={cn(
+                          'h-2.5 w-2.5 transition-[rotate] duration-200 ease-out',
+                          showAllLines && 'rotate-180'
+                        )}
+                      />
                     </button>
-                  </div>
+                  ) : null}
                 </div>
-              ) : null}
+              </div>
 
               {/* Bottom status indicator */}
               {!isRunning && success !== undefined ? (
@@ -264,7 +261,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                  <span className="ml-2.5 text-xs text-gray-11">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

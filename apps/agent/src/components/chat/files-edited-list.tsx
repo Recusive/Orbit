@@ -40,7 +40,7 @@ export const FilesEditedList: FC<FilesEditedListProps> = ({
       case 'deleted':
         return 'text-destructive bg-destructive/10';
       default:
-        return 'text-muted-foreground bg-muted';
+        return 'text-gray-12 bg-gray-4';
     }
   };
 

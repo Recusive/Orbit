@@ -10,13 +10,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* Border radius tokens (base: 8px, matching Cursor)
-     sm: 4px, md: 6px, lg: 8px (default), xl: 12px, 2xl: 14px */
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 6px);
+  /* Border radius — developer tool, not a consumer app:
+     md (4px): buttons, inputs, badges, menu items
+     lg (6px): cards, modals, popovers, code blocks
+     2xl (8px): chat input box */
+  --radius-md: 0.25rem;
+  --radius-lg: 0.375rem;
+  --radius-2xl: 0.5rem;
 
   /* Font size tokens (VS Code typography scale)
      Matches VS Code/Copilot conventions for consistent IDE feel
@@ -49,6 +49,33 @@
   --tracking-wider: 0.06em;
   --tracking-widest: 0.08em;
 
+  /* Radix 12-step scale as Tailwind utilities (e.g., bg-gray-3, text-accent-9) */
+  --color-gray-1: var(--gray-1);
+  --color-gray-2: var(--gray-2);
+  --color-gray-3: var(--gray-3);
+  --color-gray-4: var(--gray-4);
+  --color-gray-5: var(--gray-5);
+  --color-gray-6: var(--gray-6);
+  --color-gray-7: var(--gray-7);
+  --color-gray-8: var(--gray-8);
+  --color-gray-9: var(--gray-9);
+  --color-gray-10: var(--gray-10);
+  --color-gray-11: var(--gray-11);
+  --color-gray-12: var(--gray-12);
+  --color-accent-1: var(--accent-1);
+  --color-accent-2: var(--accent-2);
+  --color-accent-3: var(--accent-3);
+  --color-accent-4: var(--accent-4);
+  --color-accent-5: var(--accent-5);
+  --color-accent-6: var(--accent-6);
+  --color-accent-7: var(--accent-7);
+  --color-accent-8: var(--accent-8);
+  --color-accent-9: var(--accent-9);
+  --color-accent-10: var(--accent-10);
+  --color-accent-11: var(--accent-11);
+  --color-accent-12: var(--accent-12);
+
+  --color-surface: var(--surface);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -64,11 +91,14 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-hover: var(--destructive-hover);
   --color-border: var(--border);
   --color-border-panel: var(--border-panel);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-chat-area: var(--chat-area);
+  --color-editor-bg: var(--editor-bg);
 
   /* Brand colors as Tailwind utilities */
   --color-brand-oat: var(--brand-oat);
@@ -96,6 +126,7 @@
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
 
   /* Charts */
@@ -142,11 +173,78 @@
 }
 
 :root {
-  /* Enable system color scheme for proper scrollbar colors in WKWebView */
-  color-scheme: light dark;
+  /* Force light color scheme for native form controls (number spinners, scrollbars) */
+  color-scheme: light;
 
-  /* Base border-radius: 8px (0.5rem) - matches Cursor's input box */
-  --radius: 0.5rem;
+  /* Base border-radius (legacy — new system uses --radius-md / --radius-lg directly) */
+  --radius: 0.375rem;
+
+  /* ── Radix 12-step raw scales (light) ──────────────────────────────── */
+  /* Gray = structure (borders, text, backgrounds) */
+  --gray-1: #eee9e8;
+  --gray-2: #eae4e1;
+  --gray-3: #e3d9d5;
+  --gray-4: #ddcfc9;
+  --gray-5: #d6c6c0;
+  --gray-6: #d0bcb4;
+  --gray-7: #c8afa5;
+  --gray-8: #ba998c;
+  --gray-9: #8f6a5b;
+  --gray-10: #826053;
+  --gray-11: #60463b;
+  --gray-12: #301910;
+
+  /* Accent = interaction (buttons, links, selected states, focus rings) */
+  --accent-1: #eceae9;
+  --accent-2: #f0e1dc;
+  --accent-3: #f9d4c6;
+  --accent-4: #ffbea4;
+  --accent-5: #fdb194;
+  --accent-6: #f0a589;
+  --accent-7: #dd9378;
+  --accent-8: #c87f64;
+  --accent-9: #6b4030;
+  --accent-10: #5a3121;
+  --accent-11: #945036;
+  --accent-12: #572e1e;
+
+  /* Gray alpha variants */
+  --gray-a1: #ccd3ff26;
+  --gray-a2: #0d1d9f0b;
+  --gray-a3: #2f053716;
+  --gray-a4: #43061421;
+  --gray-a5: #3e010a2a;
+  --gray-a6: #4b060236;
+  --gray-a7: #560f0147;
+  --gray-a8: #5f150263;
+  --gray-a9: #4c14029a;
+  --gray-a10: #421002a3;
+  --gray-a11: #2e0d02be;
+  --gray-a12: #220a01ee;
+
+  /* Accent alpha variants */
+  --accent-a1: #cadeff30;
+  --accent-a2: #a602480d;
+  --accent-a3: #ffb7a374;
+  --accent-a4: #ffbea4;
+  --accent-a5: #ffa483d1;
+  --accent-a6: #ea3a0166;
+  --accent-a7: #c42f0179;
+  --accent-a8: #a72b0290;
+  --accent-a9: #471301ca;
+  --accent-a10: #411301db;
+  --accent-a11: #772000c3;
+  --accent-a12: #3f1100de;
+
+  /* Scale surface tokens */
+  --accent-contrast: #fff;
+  --accent-surface: #efdfdacc;
+  --accent-indicator: #6b4030;
+  --accent-track: #6b4030;
+  --gray-contrast: #fff;
+  --gray-surface: #ffffffcc;
+  --gray-indicator: #8f6a5b;
+  --gray-track: #8f6a5b;
 
   /* Brand palette */
   --brand-oat: #e8e0d5;
@@ -165,29 +263,35 @@
   --mode-accept: oklch(0.6 0.12 300); /* Heather purple */
   --mode-think: oklch(0.7 0.14 65); /* Warm amber/sand */
 
-  /* Shadcn semantic (light) - following brand palette */
-  /* 70% Oat/Sand (backgrounds), 20% Clay (secondary), 10% Coral (accents) */
-  --background: oklch(0.95 0.01 75); /* Warm off-white, main chat area */
-  --foreground: oklch(0.24 0.02 55); /* Headline #3D3630 */
-  --card: oklch(0.87 0.02 75); /* Oat - sidebar/header/input */
-  --card-foreground: oklch(0.24 0.02 55);
-  --popover: oklch(0.92 0.015 75); /* Between bg and card */
-  --popover-foreground: oklch(0.24 0.02 55);
-  --primary: oklch(0.56 0.18 35); /* Coral - darker for better contrast */
-  --primary-foreground: oklch(0.98 0.01 75);
-  --secondary: oklch(0.73 0.06 70); /* Clay #C4A98B */
-  --secondary-foreground: oklch(0.3 0.02 55);
-  --muted: oklch(0.82 0.03 70); /* Sand #D4C5B5 */
-  --muted-foreground: oklch(0.55 0.04 60); /* Brown #8B7355 */
-  --accent: oklch(0.82 0.03 70); /* Sand - same as muted for subtle fills */
-  --accent-foreground: oklch(0.24 0.02 55);
-  --destructive: oklch(0.55 0.22 25);
-  --border: oklch(0.76 0.03 70); /* Visible border, sand-toned */
-  --border-panel: oklch(0.76 0.03 70 / 50%); /* Panel/separator borders - border at 50% alpha */
-  --divider: oklch(0.84 0.025 70); /* Structural panel dividers - same as border for consistency */
-  --input: oklch(0.87 0.02 70); /* Input fields */
-  --ring: oklch(0.56 0.18 35); /* Coral - darker */
-  --chat-area: oklch(0.90 0.015 75); /* 3% lighter than card (0.87) */
+  /* ── Semantic variables → Radix scale steps ────────────────────────── */
+  /* Gray-only UI: No accent in product chrome. Accent reserved for logo only. */
+  /* Liquid Glass: Radix alpha scale for semi-transparent surfaces */
+  /* NOTE: All gray steps bumped +1 for elevated base (matching dark mode bump) */
+  --surface: var(--gray-a2);
+  --background: var(--gray-2);
+  --foreground: var(--gray-12);
+  --card: var(--surface);
+  --card-foreground: var(--gray-12);
+  --popover: var(--gray-a2);
+  --popover-foreground: var(--gray-12);
+  --primary: var(--gray-10);
+  --primary-foreground: #fff;
+  --secondary: var(--gray-4);
+  --secondary-foreground: var(--gray-12);
+  --muted: var(--gray-4);
+  --muted-foreground: var(--gray-10);
+  --accent: var(--gray-6);
+  --accent-foreground: var(--gray-12);
+  --destructive: #e5484d;
+  --destructive-foreground: #fff;
+  --destructive-hover: #dc3d43;
+  --border: var(--gray-7);
+  --border-panel: var(--gray-5);
+  --divider: var(--gray-5);
+  --input: var(--gray-7);
+  --ring: var(--gray-8);
+  --chat-area: var(--gray-a2);
+  --editor-bg: transparent; /* Liquid glass: see-through to vibrancy */
 
   /* Charts - coral gradient */
   --chart-1: oklch(0.837 0.128 66.29);
@@ -196,15 +300,16 @@
   --chart-4: oklch(0.553 0.195 38.402);
   --chart-5: oklch(0.47 0.157 37.304);
 
-  /* Sidebar - matches card for same look as input box */
-  --sidebar: oklch(0.96 0.008 70);
-  --sidebar-foreground: oklch(0.25 0.02 60);
-  --sidebar-primary: oklch(0.56 0.18 35);
-  --sidebar-primary-foreground: oklch(0.98 0.01 75);
-  --sidebar-accent: oklch(0.9 0.02 70);
-  --sidebar-accent-foreground: oklch(0.3 0.02 60);
-  --sidebar-border: oklch(0.88 0.02 70);
-  --sidebar-ring: oklch(0.56 0.18 35);
+  /* Sidebar */
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--gray-11);
+  --sidebar-primary: var(--gray-10);
+  --sidebar-primary-foreground: #fff;
+  --sidebar-accent: var(--gray-6);
+  --sidebar-accent-foreground: var(--gray-12);
+  --sidebar-border: var(--gray-5);
+  --sidebar-muted-foreground: var(--gray-10);
+  --sidebar-ring: var(--gray-9);
 
   /* Status colors */
   --success: oklch(0.65 0.18 155);
@@ -239,10 +344,11 @@
   --file-html: oklch(0.65 0.18 45);
   --file-css: oklch(0.55 0.18 300);
 
-  /* Terminal theme */
-  --terminal-bg: oklch(0.15 0.01 60);
+  /* Terminal theme - bg matches chat area for visual consistency
+     Cursor uses gray-12 for maximum contrast */
+  --terminal-bg: var(--chat-area);
   --terminal-fg: oklch(0.85 0.01 75);
-  --terminal-cursor: oklch(0.85 0.01 75);
+  --terminal-cursor: var(--gray-12);
 
   /* Chat Layout Width System
      Primary = input box, user message bubbles, content wrapper
@@ -250,9 +356,9 @@
   --chat-max-width: 650px;
   --chat-width-primary: var(--chat-max-width);
 
-  /* Tooltip colors (light mode uses --popover variables) */
-  --tooltip-bg: var(--popover);
-  --tooltip-text: var(--popover-foreground);
+  /* Tooltip colors (inverted: dark bg on light theme) */
+  --tooltip-bg: var(--gray-12);
+  --tooltip-text: var(--gray-1);
 
   /* Progress bar gradients (context window indicator) */
   --gradient-error: linear-gradient(to right, rgb(239 68 68 / 0.9), rgb(248 113 113 / 0.9));
@@ -282,43 +388,115 @@ html.dark {
   /* Force dark color scheme for scrollbars in WKWebView */
   color-scheme: dark;
 
+  /* ── Radix 12-step raw scales (dark) ─────────────────────────────── */
+  --gray-1: #16110f;
+  --gray-2: #1d1816;
+  --gray-3: #28211d;
+  --gray-4: #302724;
+  --gray-5: #3a2e29;
+  --gray-6: #463630;
+  --gray-7: #56433b;
+  --gray-8: #75594e;
+  --gray-9: #856557;
+  --gray-10: #937265;
+  --gray-11: #caaca0;
+  --gray-12: #f5ece8;
+
+  --accent-1: #151110;
+  --accent-2: #1d1714;
+  --accent-3: #2e1f19;
+  --accent-4: #3e241a;
+  --accent-5: #4c2c20;
+  --accent-6: #5b382a;
+  --accent-7: #704737;
+  --accent-8: #905b46;
+  --accent-9: #7a5040;
+  --accent-10: #6a4232;
+  --accent-11: #e9ad97;
+  --accent-12: #fdddd1;
+
+  /* Gray alpha variants (dark) */
+  --gray-a1: #16118e02;
+  --gray-a2: #ddd8f009;
+  --gray-a3: #fcddce14;
+  --gray-a4: #fbd3d01d;
+  --gray-a5: #fbcabb28;
+  --gray-a6: #fdc4b235;
+  --gray-a7: #fcc5b047;
+  --gray-a8: #ffc2ab68;
+  --gray-a9: #ffc1a77a;
+  --gray-a10: #ffc6b089;
+  --gray-a11: #ffdacbc5;
+  --gray-a12: #fef5f0f5;
+
+  /* Accent alpha variants (dark) */
+  --accent-a1: #0011b803;
+  --accent-a2: #f6d1ce08;
+  --accent-a3: #f996761b;
+  --accent-a4: #fe80542c;
+  --accent-a5: #fc845b3c;
+  --accent-a6: #fe946c4c;
+  --accent-a7: #fe9d7763;
+  --accent-a8: #ff9e7886;
+  --accent-a9: #fda3826e;
+  --accent-a10: #ff99725c;
+  --accent-a11: #ffbda6e7;
+  --accent-a12: #ffdfd3fd;
+
+  /* Scale surface tokens (dark) */
+  --accent-contrast: #fff;
+  --accent-surface: #241d1a80;
+  --accent-indicator: #7a5040;
+  --accent-track: #7a5040;
+  --gray-contrast: #FFFFFF;
+  --gray-surface: rgba(0, 0, 0, 0.05);
+  --gray-indicator: #856557;
+  --gray-track: #856557;
+
   /* Brand palette - adjusted for dark */
-  --brand-oat: oklch(0.35 0.015 60); /* Darkened */
-  --brand-clay: oklch(0.55 0.08 55); /* Lighter for contrast */
+  --brand-oat: oklch(0.35 0.015 60);
+  --brand-clay: oklch(0.55 0.08 55);
   --brand-sand: oklch(0.4 0.02 60);
-  --brand-coral: #e07a6b; /* Same - accent pops */
-  --brand-brown: oklch(0.65 0.06 55); /* Lighter */
+  --brand-coral: #e07a6b;
+  --brand-brown: oklch(0.65 0.06 55);
   --brand-heather: oklch(0.6 0.08 300);
   --brand-olive: oklch(0.58 0.06 130);
   --brand-fig: oklch(0.5 0.1 310);
 
   /* Input modes */
-  --mode-plan: oklch(0.58 0.1 140); /* Olive green - adjusted for dark */
-  --mode-accept: oklch(0.55 0.1 300); /* Heather purple - adjusted for dark */
-  --mode-think: oklch(0.65 0.12 65); /* Warm amber/sand - adjusted for dark */
+  --mode-plan: oklch(0.58 0.1 140);
+  --mode-accept: oklch(0.55 0.1 300);
+  --mode-think: oklch(0.65 0.12 65);
 
-  /* Shadcn semantic (dark) - warm, not cold */
-  --background: oklch(0.16 0.012 60); /* Warm dark, not pure black */
-  --foreground: oklch(0.93 0.01 75); /* Warm cream white */
-  --card: oklch(0.2 0.015 58); /* Slightly elevated */
-  --card-foreground: oklch(0.93 0.01 75);
-  --popover: oklch(0.22 0.015 58);
-  --popover-foreground: oklch(0.93 0.01 75);
-  --primary: oklch(0.68 0.19 40); /* Coral - slightly brighter for dark */
-  --primary-foreground: oklch(0.15 0.01 60);
-  --secondary: oklch(0.28 0.02 58);
-  --secondary-foreground: oklch(0.9 0.01 75);
-  --muted: oklch(0.25 0.015 58);
-  --muted-foreground: oklch(0.65 0.03 60);
-  --accent: oklch(0.3 0.02 55);
-  --accent-foreground: oklch(0.93 0.01 75);
-  --destructive: oklch(0.65 0.2 25);
-  --border: oklch(1 0 0 / 10%);
-  --border-panel: oklch(1 0 0 / 5%); /* Panel/separator borders - border at 50% alpha */
-  --divider: oklch(1 0 0 / 10%); /* Structural panel dividers - same as border for consistency */
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.55 0.15 38);
-  --chat-area: oklch(0.18 0.012 60); /* Between background (0.16) and card (0.20) */
+  /* ── Semantic variables → Radix scale steps (dark) ─────────────────── */
+  /* Gray-only UI: No accent in product chrome. Accent reserved for logo only. */
+  /* Liquid Glass: Radix alpha scale for semi-transparent surfaces */
+  /* NOTE: All gray steps bumped +1 vs light mode for warmer dark theme */
+  --surface: var(--gray-a2);
+  --background: var(--gray-3);
+  --foreground: var(--gray-12);
+  --card: var(--surface);
+  --card-foreground: var(--gray-12);
+  --popover: var(--gray-a2);
+  --popover-foreground: var(--gray-12);
+  --primary: var(--gray-10);
+  --primary-foreground: #fff;
+  --secondary: var(--gray-4);
+  --secondary-foreground: var(--gray-12);
+  --muted: var(--gray-4);
+  --muted-foreground: var(--gray-11);
+  --accent: var(--gray-6);
+  --accent-foreground: var(--gray-12);
+  --destructive: #e5484d;
+  --destructive-foreground: #fff;
+  --destructive-hover: #ec5d5e;
+  --border: var(--gray-7);
+  --border-panel: var(--gray-5);
+  --divider: var(--gray-5);
+  --input: var(--gray-7);
+  --ring: var(--gray-8);
+  --chat-area: var(--surface);
+  --editor-bg: transparent;
 
   /* Charts - same */
   --chart-1: oklch(0.837 0.128 66.29);
@@ -327,15 +505,16 @@ html.dark {
   --chart-4: oklch(0.553 0.195 38.402);
   --chart-5: oklch(0.47 0.157 37.304);
 
-  /* Sidebar - matches card for same look as input box */
-  --sidebar: oklch(0.2 0.015 58);
-  --sidebar-foreground: oklch(0.93 0.01 75);
-  --sidebar-primary: oklch(0.68 0.19 40);
-  --sidebar-primary-foreground: oklch(0.15 0.01 60);
-  --sidebar-accent: oklch(0.26 0.015 58);
-  --sidebar-accent-foreground: oklch(0.9 0.01 75);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.55 0.15 38);
+  /* Sidebar (+1 bump, foreground stays gray-11 → hover:text-foreground = gray-12) */
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--gray-11);
+  --sidebar-primary: var(--gray-10);
+  --sidebar-primary-foreground: #fff;
+  --sidebar-accent: var(--gray-6);
+  --sidebar-accent-foreground: var(--gray-12);
+  --sidebar-border: var(--gray-5);
+  --sidebar-muted-foreground: var(--gray-11);
+  --sidebar-ring: var(--gray-9);
 
   /* Status colors */
   --success: oklch(0.7 0.18 155);
@@ -367,86 +546,143 @@ html.dark {
   --file-html: oklch(0.7 0.18 45);
   --file-css: oklch(0.6 0.18 300);
 
-  /* Terminal theme */
-  --terminal-bg: oklch(0.15 0.01 60);
+  /* Terminal theme - bg matches chat area for visual consistency
+     Cursor uses gray-12 for maximum contrast */
+  --terminal-bg: var(--chat-area);
   --terminal-fg: oklch(0.85 0.01 75);
-  --terminal-cursor: oklch(0.85 0.01 75);
+  --terminal-cursor: var(--gray-12);
 
-  /* Tooltip colors (dark mode specific) */
-  --tooltip-bg: oklch(0.3 0.02 60);
-  --tooltip-text: oklch(0.9 0.01 75);
+  /* Tooltip colors (elevated surface on dark theme) */
+  --tooltip-bg: var(--gray-5);
+  --tooltip-text: var(--gray-12);
 }
 
-/* Streamdown code block overrides - matches tool widget styling */
-[data-streamdown='code-block'] {
+/* ============================================
+   SOLID MODE OVERRIDES
+   Restores opaque surfaces (no transparency)
+   Uses Radix scale steps for consistent theming
+   ============================================ */
+
+/* Light mode - Solid (bg=gray-2, panels=gray-2) */
+html.window-mode-solid:root,
+html.window-mode-solid.light {
+  --surface: var(--gray-2);
+  --background: var(--gray-2);
+  --card: var(--gray-2);
+  --popover: var(--gray-2);
+  --chat-area: var(--gray-2);
+  --editor-bg: var(--gray-2);
+  --sidebar: var(--gray-2);
+}
+
+/* Dark mode - Solid (+1 bump) */
+html.window-mode-solid.dark {
+  --surface: var(--gray-2);
+  --background: var(--gray-3);
+  --card: var(--gray-2);
+  --popover: var(--gray-2);
+  --chat-area: var(--gray-2);
+  --editor-bg: var(--gray-2);
+  --sidebar: var(--gray-2);
+}
+
+/* ── Streamdown code blocks ──────────────────────────────
+   Claude.ai-style: hairline border, no header bar,
+   hover-reveal copy button with backdrop blur.
+   Easing: ease-out-quart — matches TOOL_EXPAND_TRANSITION.
+   ───────────────────────────────────────────────────────── */
+
+/* Outer frame — hairline border, card surface */
+[data-streamdown='code-block'],
+[data-streamdown='code-block-container'] {
+  position: relative !important;
   margin: 0.75rem 0 !important;
-  border-radius: var(--radius-xl) !important;
-  border: 1px solid var(--border) !important;
-  background-color: var(--card) !important;
-  box-shadow:
-    0 2px 8px -2px rgba(0, 0, 0, 0.06),
-    0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  border-radius: var(--radius-lg) !important;
+  border: 0.5px solid var(--gray-a4) !important;
+  background-color: var(--gray-3) !important;
   overflow: hidden !important;
 }
 
+html.dark [data-streamdown='code-block'],
+html.dark [data-streamdown='code-block-container'] {
+  border-color: var(--gray-a5) !important;
+}
+
+/* Header — no visual bar, label flows into code */
 [data-streamdown='code-block-header'] {
-  padding: 0.375rem 0.625rem !important;
+  padding: 0.75rem 0.75rem 0 !important;
   background-color: transparent !important;
   border-bottom: none !important;
 }
 
+/* Language label — Radix step 11: canonical secondary text */
 [data-streamdown='code-block-header'] span {
-  font-size: 0.6875rem !important; /* 11px - VS Code secondary label */
-  color: var(--muted-foreground);
-  opacity: 0.7;
+  font-size: 0.6875rem !important; /* 11px */
+  color: var(--gray-11) !important;
 }
 
+/* Hide download button */
 [data-streamdown='code-block-download-button'] {
   display: none;
 }
 
+/* Copy button — hidden by default, glass effect on reveal
+   ease-out-quart: cubic-bezier(0.165, 0.85, 0.45, 1) */
 [data-streamdown='code-block-copy-button'] {
-  padding: 0.25rem !important;
-  opacity: 0.5;
-  transition: opacity 0.15s;
+  height: 1.75rem !important;
+  width: 1.75rem !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: var(--radius-md) !important;
+  background: transparent !important;
+  color: var(--muted-foreground) !important;
+  opacity: 0 !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    opacity 300ms cubic-bezier(0.165, 0.85, 0.45, 1),
+    background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 80ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Reveal on container hover */
+[data-streamdown='code-block']:hover [data-streamdown='code-block-copy-button'] {
+  opacity: 1 !important;
+}
+
+[data-streamdown='code-block-copy-button'] svg {
+  width: 0.875rem !important;
+  height: 0.875rem !important;
 }
 
 [data-streamdown='code-block-copy-button']:hover {
-  opacity: 1;
+  background: var(--gray-a3) !important;
+  color: var(--foreground) !important;
 }
 
+[data-streamdown='code-block-copy-button']:active {
+  transform: scale(0.95) !important;
+}
+
+/* Body — no separator, flows from label */
 [data-streamdown='code-block-body'] {
   margin: 0 !important;
-  padding: 0.625rem 0.75rem !important;
-  font-size: 0.75rem !important; /* 12px - VS Code code font size */
+  padding: 0.5rem 0.75rem 0.75rem !important;
+  font-size: 0.75rem !important; /* 12px */
   line-height: 1.5 !important;
-  background-color: var(--card) !important;
-  border-top: 1px solid oklch(0 0 0 / 4%) !important;
+  background-color: transparent !important;
+  border-top: none !important;
 }
 
-html.dark [data-streamdown='code-block-body'] {
-  background-color: oklch(0.14 0.01 60) !important;
-  border-top: 1px solid oklch(1 0 0 / 6%) !important;
-}
-
-/* Line numbers - more subtle */
+/* Line numbers — Radix step 9: 3:1 contrast on bg, recedes behind code */
 [data-streamdown='code-block-body'] code span::before {
-  font-size: 0.625rem !important;
-  color: oklch(0.55 0.01 75) !important;
+  font-size: 0.625rem !important; /* 10px */
+  color: var(--gray-9) !important;
   margin-right: 0.625rem !important;
   width: 1rem !important;
-}
-
-html.dark [data-streamdown='code-block-body'] code span::before {
-  color: oklch(0.45 0.01 75) !important;
-}
-
-[data-streamdown='code-block-container'] {
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-  margin-top: 0.75rem;
-  margin-bottom: 0.75rem;
-  border: 1px solid var(--border);
 }
 
 /* ============================================
@@ -580,9 +816,9 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 .chat-markdown code:not(pre code) {
   position: relative;
   padding: 0.125rem 0.25rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background-color: var(--muted);
-  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-family: 'Geist Mono Variable', 'Geist Mono', ui-monospace, Menlo, monospace;
   font-size: 0.75rem; /* 12px - VS Code inline code */
   font-weight: 500;
   color: var(--foreground);
@@ -602,9 +838,9 @@ html.dark [data-streamdown='code-block-body'] code span::before {
   line-height: 1.5;
 }
 
-/* Links */
+/* Links — underline differentiates, not color */
 .chat-markdown a {
-  color: var(--primary);
+  color: var(--gray-12);
   font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -612,7 +848,7 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 }
 
 .chat-markdown a:hover {
-  opacity: 0.8;
+  color: var(--gray-11);
 }
 
 .chat-markdown a:focus {
@@ -732,19 +968,29 @@ html.dark [data-streamdown='code-block-body'] code span::before {
   }
 
   html,
-  body,
+  body {
+    height: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    /* Transparent for macOS vibrancy effect - allows desktop to show through */
+    background: transparent !important;
+  }
+
   #root {
     height: 100%;
     margin: 0 !important;
     padding: 0 !important;
+    /* Transparent to let macOS window vibrancy show through */
+    background-color: transparent;
   }
 
   body {
-    background-color: var(--background);
     color: var(--foreground);
     font-feature-settings:
       'rlig' 1,
       'calt' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* Contenteditable placeholder */
@@ -776,6 +1022,27 @@ html.dark [data-streamdown='code-block-body'] code span::before {
     }
     50% {
       opacity: 0.5;
+    }
+  }
+
+  /* Cursor blink — CSS-only, no React re-renders */
+  @keyframes blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
+  }
+
+  .animate-blink {
+    animation: blink 1.06s step-end infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-blink {
+      animation: none;
     }
   }
 
@@ -827,6 +1094,29 @@ html.dark [data-streamdown='code-block-body'] code span::before {
   .animate-permission-in {
     animation: permission-expand 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
     overflow: hidden;
+  }
+
+  /* Terminal panel slide-up animation - for opening terminal */
+  @keyframes panel-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-panel-slide-up {
+    animation: panel-slide-up 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    will-change: transform, opacity;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-panel-slide-up {
+      animation: none;
+    }
   }
 
   /* ─── Flow Token: per-word streaming animation (FlowToken-style) ─── */
@@ -943,14 +1233,14 @@ html.dark [data-streamdown='code-block-body'] code span::before {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.55 0.02 60 / 50%);
-  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--gray-8) 50%, transparent);
+  border-radius: var(--radius-md);
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.55 0.02 60 / 70%);
+  background: color-mix(in srgb, var(--gray-8) 70%, transparent);
   background-clip: padding-box;
 }
 
@@ -958,14 +1248,14 @@ html.dark [data-streamdown='code-block-body'] code span::before {
   background: transparent;
 }
 
-/* Dark mode scrollbar */
+/* Dark mode scrollbar (+1 bump) */
 html.dark ::-webkit-scrollbar-thumb {
-  background: oklch(0.65 0.02 60 / 40%);
+  background: color-mix(in srgb, var(--gray-8) 40%, transparent);
   background-clip: padding-box;
 }
 
 html.dark ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.65 0.02 60 / 60%);
+  background: color-mix(in srgb, var(--gray-8) 60%, transparent);
   background-clip: padding-box;
 }
 
@@ -1040,5 +1330,185 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 .scroll-container {
   contain: strict;
   overflow-anchor: none;
+}
+
+/* ============================================
+   Liquid Glass UI System
+   Frosted glass effect for floating controls
+   See: docs/architecture/LIQUID-GLASS.md
+   ============================================ */
+
+/* Light mode liquid glass - matches frosted glass theme (+1 bump) */
+.liquid-glass {
+  background: color-mix(in srgb, var(--gray-3) 85%, transparent);
+  backdrop-filter: blur(12px) saturate(1.5);
+  -webkit-backdrop-filter: blur(12px) saturate(1.5);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 6%),
+    inset 0 0.5px 0 oklch(1 0 0 / 30%);
+}
+
+/* Dark mode liquid glass (+1 bump) */
+html.dark .liquid-glass {
+  background: color-mix(in srgb, var(--gray-3) 50%, transparent);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 1px 3px oklch(0 0 0 / 25%),
+    inset 0 0.5px 0 oklch(1 0 0 / 6%);
+}
+
+/* Frosted glass surface for floating UI elements (dialogs, popovers, menus, selects).
+   Adds backdrop-filter blur so semi-transparent backgrounds look frosted, not see-through.
+   Only active in liquid glass mode — solid mode has fully opaque backgrounds. */
+html:not(.window-mode-solid) .glass-float {
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+}
+
+/* Liquid hover effect - subtle gray warmth */
+.liquid-hover {
+  transition: background-color 150ms ease;
+}
+
+.liquid-hover:hover {
+  background: color-mix(in srgb, var(--gray-10) 8%, transparent);
+}
+
+html.dark .liquid-hover:hover {
+  background: color-mix(in srgb, var(--gray-10) 12%, transparent);
+}
+
+/* ============================================
+   P3 Wide Gamut Support
+   Enhanced color precision on P3-capable displays
+   ============================================ */
+
+@supports (color: color(display-p3 1 1 1)) {
+  @media (color-gamut: p3) {
+    :root {
+      /* Accent P3 (light) */
+      --accent-1: oklch(93.7% 0.0026 41.09);
+      --accent-2: oklch(92.1% 0.0176 41.09);
+      --accent-3: oklch(89.7% 0.0454 41.09);
+      --accent-4: oklch(85.9% 0.0881 41.09);
+      --accent-5: oklch(82.6% 0.0985 41.09);
+      --accent-6: oklch(78.8% 0.0985 41.09);
+      --accent-7: oklch(73.2% 0.0985 41.09);
+      --accent-8: oklch(66.7% 0.0985 41.09);
+      --accent-9: oklch(41.9% 0.0657 41.09);
+      --accent-10: oklch(36.1% 0.0657 41.09);
+      --accent-11: oklch(50.7% 0.0985 41.09);
+      --accent-12: oklch(35.1% 0.0657 41.09);
+      --accent-a1: color(display-p3 0.7765 0.8549 1 / 0.154);
+      --accent-a2: color(display-p3 0.4549 0.0118 0.2314 / 0.047);
+      --accent-a3: color(display-p3 0.9529 0.1922 0.0039 / 0.127);
+      --accent-a4: color(display-p3 1 0 0 / 0.167);
+      --accent-a5: color(display-p3 0.9412 0.2588 0.0039 / 0.332);
+      --accent-a6: color(display-p3 0.8078 0.2196 0.0039 / 0.38);
+      --accent-a7: color(display-p3 0.6706 0.1804 0.0039 / 0.455);
+      --accent-a8: color(display-p3 0.5725 0.1529 0 / 0.542);
+      --accent-a9: color(display-p3 0.2392 0.0667 0 / 0.778);
+      --accent-a10: color(display-p3 0.2157 0.0667 0 / 0.843);
+      --accent-a11: color(display-p3 0.4078 0.1176 0 / 0.743);
+      --accent-a12: color(display-p3 0.2118 0.0627 0 / 0.856);
+      --accent-contrast: #fff;
+      --accent-surface: color(display-p3 0.9216 0.8784 0.8588 / 0.8);
+      --accent-indicator: oklch(41.9% 0.0657 41.09);
+      --accent-track: oklch(41.9% 0.0657 41.09);
+
+      /* Gray P3 (light) */
+      --gray-1: oklch(93.9% 0.0057 43.2);
+      --gray-2: oklch(92.3% 0.0076 43.2);
+      --gray-3: oklch(89.2% 0.0116 43.2);
+      --gray-4: oklch(86.5% 0.0174 43.2);
+      --gray-5: oklch(83.8% 0.0197 43.2);
+      --gray-6: oklch(81% 0.0256 43.2);
+      --gray-7: oklch(77.4% 0.032 43.2);
+      --gray-8: oklch(71% 0.0427 43.2);
+      --gray-9: oklch(55.7% 0.0529 43.2);
+      --gray-10: oklch(52.2% 0.0494 43.2);
+      --gray-11: oklch(41.8% 0.0406 43.2);
+      --gray-12: oklch(24.3% 0.0409 43.2);
+      --gray-a1: color(display-p3 0.7529 0.7961 1 / 0.116);
+      --gray-a2: color(display-p3 0.0196 0.0902 0.5255 / 0.042);
+      --gray-a3: color(display-p3 0.1255 0.0078 0.2039 / 0.085);
+      --gray-a4: color(display-p3 0.2157 0.0039 0.0667 / 0.127);
+      --gray-a5: color(display-p3 0.1765 0.0039 0.0235 / 0.161);
+      --gray-a6: color(display-p3 0.2471 0.0353 0.0039 / 0.21);
+      --gray-a7: color(display-p3 0.2863 0.0627 0.0039 / 0.276);
+      --gray-a8: color(display-p3 0.3137 0.0745 0.0039 / 0.38);
+      --gray-a9: color(display-p3 0.251 0.0745 0 / 0.594);
+      --gray-a10: color(display-p3 0.2196 0.0588 0 / 0.629);
+      --gray-a11: color(display-p3 0.1451 0.0431 0 / 0.734);
+      --gray-a12: color(display-p3 0.1098 0.0353 0 / 0.922);
+      --gray-contrast: #FFFFFF;
+      --gray-surface: color(display-p3 1 1 1 / 80%);
+      --gray-indicator: oklch(55.7% 0.0529 43.2);
+      --gray-track: oklch(55.7% 0.0529 43.2);
+    }
+
+    html.dark {
+      /* Accent P3 (dark) */
+      --accent-1: oklch(18.3% 0.0075 41.64);
+      --accent-2: oklch(21.1% 0.0117 41.64);
+      --accent-3: oklch(25.6% 0.0262 41.64);
+      --accent-4: oklch(29.1% 0.0442 41.64);
+      --accent-5: oklch(32.9% 0.052 41.64);
+      --accent-6: oklch(37.8% 0.0555 41.64);
+      --accent-7: oklch(44.1% 0.0623 41.64);
+      --accent-8: oklch(52.4% 0.0771 41.64);
+      --accent-9: oklch(47.4% 0.0623 41.64);
+      --accent-10: oklch(42.2% 0.0623 41.64);
+      --accent-11: oklch(79.8% 0.0771 41.64);
+      --accent-12: oklch(92.1% 0.0397 41.64);
+      --accent-a1: color(display-p3 0 0.0667 0.9294 / 0.009);
+      --accent-a2: color(display-p3 1 0.8549 0.8392 / 0.03);
+      --accent-a3: color(display-p3 0.9961 0.6627 0.5333 / 0.099);
+      --accent-a4: color(display-p3 0.9961 0.5608 0.4039 / 0.159);
+      --accent-a5: color(display-p3 1 0.5725 0.4157 / 0.218);
+      --accent-a6: color(display-p3 1 0.6471 0.4941 / 0.278);
+      --accent-a7: color(display-p3 1 0.6706 0.5294 / 0.364);
+      --accent-a8: color(display-p3 1 0.6706 0.5333 / 0.492);
+      --accent-a9: color(display-p3 1 0.698 0.5686 / 0.406);
+      --accent-a10: color(display-p3 1 0.6588 0.5098 / 0.338);
+      --accent-a11: color(display-p3 1 0.7804 0.6902 / 0.868);
+      --accent-a12: color(display-p3 0.9961 0.898 0.851 / 0.971);
+      --accent-contrast: #fff;
+      --accent-surface: color(display-p3 0.1333 0.1098 0.1098 / 0.5);
+      --accent-indicator: oklch(47.4% 0.0623 41.64);
+      --accent-track: oklch(47.4% 0.0623 41.64);
+
+      /* Gray P3 (dark) */
+      --gray-1: oklch(18.3% 0.0097 43.2);
+      --gray-2: oklch(21.5% 0.0092 43.2);
+      --gray-3: oklch(25.4% 0.0133 43.2);
+      --gray-4: oklch(28.3% 0.0152 43.2);
+      --gray-5: oklch(31.3% 0.019 43.2);
+      --gray-6: oklch(34.9% 0.0245 43.2);
+      --gray-7: oklch(40.1% 0.03 43.2);
+      --gray-8: oklch(49% 0.0406 43.2);
+      --gray-9: oklch(53.5% 0.0468 43.2);
+      --gray-10: oklch(58.1% 0.0459 43.2);
+      --gray-11: oklch(76.7% 0.039 43.2);
+      --gray-12: oklch(94.8% 0.0111 43.2);
+      --gray-a1: color(display-p3 0.0863 0.0706 0.8431 / 0.005);
+      --gray-a2: color(display-p3 0.8902 0.8745 0.9765 / 0.034);
+      --gray-a3: color(display-p3 1 0.8824 0.8706 / 0.077);
+      --gray-a4: color(display-p3 0.9961 0.8392 0.8275 / 0.112);
+      --gray-a5: color(display-p3 1 0.8275 0.7882 / 0.15);
+      --gray-a6: color(display-p3 1 0.8235 0.7529 / 0.197);
+      --gray-a7: color(display-p3 1 0.8235 0.7373 / 0.265);
+      --gray-a8: color(display-p3 1 0.7961 0.7137 / 0.394);
+      --gray-a9: color(display-p3 1 0.7961 0.6941 / 0.458);
+      --gray-a10: color(display-p3 1 0.8118 0.7294 / 0.518);
+      --gray-a11: color(display-p3 1 0.8824 0.8275 / 0.753);
+      --gray-a12: color(display-p3 1 0.9725 0.9569 / 0.949);
+      --gray-contrast: #FFFFFF;
+      --gray-surface: color(display-p3 0 0 0 / 5%);
+      --gray-indicator: oklch(53.5% 0.0468 43.2);
+      --gray-track: oklch(53.5% 0.0468 43.2);
+    }
+  }
 }
 

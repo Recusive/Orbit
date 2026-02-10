@@ -94,7 +94,7 @@ urlencoding = "2.1"
 # Note: "unstable" enables WebviewBuilder for embedded browser panel
 # This does NOT affect code safety - only API stability guarantees
 # Note: "devtools" enables open_devtools() in release builds
-tauri = { version = "2.9", features = ["unstable", "devtools"] }
+tauri = { version = "2.10", features = ["unstable", "devtools"] }
 tauri-build = "2.5"
 tauri-plugin-log = "2"
 tauri-plugin-fs = "2"

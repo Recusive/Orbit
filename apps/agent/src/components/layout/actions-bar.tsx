@@ -4,7 +4,7 @@
  * NOTE: Icon column width comes from @/lib/utils/constants.
  * To change actions bar width, update SIDEBAR.iconColumnWidth in constants.ts.
  */
-import { FileCode, GitBranch, GitCompareArrows, Globe } from 'lucide-react';
+import { CircleAlert, FileCode, GitBranch, GitCompareArrows, Globe } from 'lucide-react';
 
 import type { ActivityTab } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
@@ -47,8 +47,8 @@ const ActionButton: FC<ActionButtonProps> = ({
           {/* Active indicator - overlays the left border (VS Code style) */}
           {isActive ? (
             <div
-              className="absolute top-1/2 -translate-y-1/2 w-[3px] h-6 bg-primary rounded-r"
-              style={{ left: -3 }}
+              className="absolute top-1/2 -translate-y-1/2 w-[2px] h-6 bg-primary rounded-r"
+              style={{ left: -1.5 }}
             />
           ) : null}
 
@@ -93,7 +93,7 @@ export const ActionsBar: FC = () => {
 
   return (
     <aside
-      className="h-full flex flex-col border-l-[3px] border-border/50 bg-card"
+      className="h-full flex flex-col border-l border-gray-5 bg-card"
       style={{ width: SIDEBAR.iconColumnWidth }}
       role="tablist"
       aria-label="Actions Bar"
@@ -134,6 +134,20 @@ export const ActionsBar: FC = () => {
             handleTabClick('browser');
           }}
         />
+      </div>
+
+      {/* AI disclaimer icon - pinned to bottom */}
+      <div className="shrink-0 flex items-center justify-center">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center justify-center h-8 w-8 text-muted-foreground/40">
+              <CircleAlert className="h-4 w-4" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left" sideOffset={8}>
+            AI may make mistakes. Double-check all generated code.
+          </TooltipContent>
+        </Tooltip>
       </div>
     </aside>
   );

@@ -1,4 +1,4 @@
-import { Bot, CheckCircle2, ChevronDown, Loader2, XCircle } from 'lucide-react';
+import { Bot, CheckCircle2, ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import remarkGfm from 'remark-gfm';
@@ -100,55 +100,49 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Task output' : 'Expand Task output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group/status flex items-center gap-2 py-1.5 px-2.5 text-sm',
-          'transition-colors duration-150 cursor-pointer w-full text-left',
-          'rounded-lg hover:bg-muted/20',
+          'group flex items-center py-1.5 px-2.5 text-sm',
+          'cursor-pointer w-full text-left rounded-lg',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div
-          className={cn(
-            'w-5 h-5 rounded flex items-center justify-center shrink-0',
-            'transition-colors duration-150',
-            isFailed
-              ? 'bg-destructive/8 group-hover/status:bg-destructive/12'
-              : 'bg-primary/15 group-hover/status:bg-primary/25'
-          )}
-        >
-          <Bot
+        <div className="flex items-center gap-2 min-w-0">
+          <div
             className={cn(
-              'h-3 w-3 transition-colors duration-150',
-              isFailed
-                ? 'text-destructive/60 group-hover/status:text-destructive/80'
-                : 'text-primary/80 group-hover/status:text-primary',
-              isRunning && 'animate-pulse'
+              'w-5 h-5 rounded flex items-center justify-center shrink-0',
+              isFailed ? 'bg-destructive/8' : 'bg-primary/15'
             )}
-          />
-        </div>
+          >
+            <Bot
+              className={cn(
+                'h-3 w-3',
+                isFailed ? 'text-destructive/60' : 'text-primary/80',
+                isRunning && 'animate-pulse'
+              )}
+            />
+          </div>
 
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed
-                ? 'text-muted-foreground line-through'
-                : 'text-muted-foreground/90 group-hover/status:text-foreground'
+              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
             )}
           >
             {statusLabel}
           </span>
-          <span className="text-xs text-muted-foreground/70 truncate">{description}</span>
-          {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground shrink-0" />
-          ) : null}
-        </div>
 
-        <ChevronDown
-          className={cn(
-            'h-3 w-3 text-muted-foreground/70 transition-transform duration-200 ease-out shrink-0',
-            isExpanded && 'rotate-180'
-          )}
-        />
+          <span className="text-xs text-gray-9 truncate">{description}</span>
+
+          {isRunning ? (
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+          ) : null}
+
+          <ChevronRight
+            className={cn(
+              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-90'
+            )}
+          />
+        </div>
       </button>
 
       {/* Tree-style expanded content */}
@@ -183,24 +177,22 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border-3 border-border/40 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
                   {/* Task details */}
                   <div className="px-3 py-2">
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+                      <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase">
                         agent
                       </div>
-                      <span className="px-1 py-0.5 rounded bg-muted/50 text-sm font-medium text-foreground">
+                      <span className="px-1 py-0.5 rounded bg-gray-4 text-sm font-medium text-gray-12">
                         {formattedType}
                       </span>
-                      {model ? (
-                        <span className="text-sm text-muted-foreground/70">({model})</span>
-                      ) : null}
+                      {model ? <span className="text-sm text-gray-9">({model})</span> : null}
                     </div>
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground/70 uppercase mb-1">
+                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1">
                       prompt
                     </div>
-                    <div className="text-sm text-foreground/80 line-clamp-3" title={prompt}>
+                    <div className="text-sm text-gray-11 line-clamp-3" title={prompt}>
                       {truncatePrompt(prompt, 300)}
                     </div>
                   </div>
@@ -209,7 +201,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
                     {isRunning ? (
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Agent is working on the task...</span>
                       </div>
@@ -224,7 +216,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                         </Streamdown>
                       </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground/40 italic">Task completed</div>
+                      <div className="text-sm text-gray-9 italic">Task completed</div>
                     )}
                   </div>
                 </div>
@@ -245,7 +237,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-muted-foreground/90">
+                  <span className="ml-2.5 text-xs text-gray-11">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

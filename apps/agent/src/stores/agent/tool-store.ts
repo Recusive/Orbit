@@ -283,6 +283,7 @@ export interface ToolState {
   ) => void;
   resetUsage: () => void;
   switchSession: (newSessionId: string) => void;
+  remapSession: (oldSessionId: string, newSessionId: string) => void;
   restoreSessionUsage: (sessionId: string, usage: UsageData, processedIds?: string[]) => void;
 
   // Computed values
@@ -500,12 +501,9 @@ export const useToolStore = create<ToolState>()(
       },
 
       switchSession: (newSessionId: string) => {
-        logger.debug(`Switching session to: ${newSessionId}`);
         set((state) => {
-          // Detect initial load (first time setting currentSessionId)
-          const isInitialLoad = state.currentSessionId === null;
+          const isInitLoad = state.currentSessionId === null;
 
-          // Save current session's data to cache (if we have a current session)
           if (state.currentSessionId) {
             state.sessionCache[state.currentSessionId] = {
               usage: { ...state.sessionUsage },
@@ -514,7 +512,6 @@ export const useToolStore = create<ToolState>()(
               completedTools: [...state.completedTools],
             };
 
-            // Evict oldest sessions to prevent unbounded memory growth.
             const cacheKeys = Object.keys(state.sessionCache);
             if (cacheKeys.length > MAX_CACHED_SESSIONS) {
               const evictCount = cacheKeys.length - MAX_CACHED_SESSIONS;
@@ -524,22 +521,16 @@ export const useToolStore = create<ToolState>()(
             }
           }
 
-          // Check if we have cached data for the new session
           const cached = state.sessionCache[newSessionId];
           if (cached) {
-            // Restore cached session data
             state.sessionUsage = { ...cached.usage };
             state.processedMessageIds = new Set(cached.processedIds);
             state.activeTools = { ...cached.activeTools };
             state.completedTools = [...cached.completedTools];
-          } else if (isInitialLoad) {
-            // Initial load - DON'T clear tools! The restore effect will populate them
-            // from the backend. Only reset usage tracking.
+          } else if (isInitLoad) {
             state.sessionUsage = { ...initialUsage };
             state.processedMessageIds = new Set<string>();
-            // Keep activeTools and completedTools intact for restore effect
           } else {
-            // Switching to a genuinely new session - reset everything
             state.sessionUsage = { ...initialUsage };
             state.processedMessageIds = new Set<string>();
             state.activeTools = {};
@@ -550,23 +541,58 @@ export const useToolStore = create<ToolState>()(
         });
       },
 
+      remapSession: (oldSessionId: string, newSessionId: string) => {
+        set((state) => {
+          // Migrate session cache from old ID to new ID during session remap
+          // (e.g., Orbit temp UUID → SDK session ID from system:init).
+          // This preserves usage data so it's found under the new ID when
+          // the user navigates back to this conversation.
+          const cached = state.sessionCache[oldSessionId];
+          if (cached) {
+            state.sessionCache[newSessionId] = cached;
+            Reflect.deleteProperty(state.sessionCache, oldSessionId);
+          }
+
+          // If the store is currently tracking the old session, update the reference
+          if (state.currentSessionId === oldSessionId) {
+            state.currentSessionId = newSessionId;
+          }
+        });
+      },
+
       restoreSessionUsage: (sessionId: string, usage: UsageData, processedIds?: string[]) => {
         set((state) => {
-          // Pre-populate the session cache with usage from persisted data
-          // This is called when loading a conversation from disk
+          // Pre-populate the session cache with usage from persisted data.
+          // This is called when loading a conversation from disk.
+          //
+          // IMPORTANT: If the cache already has MORE tokens than disk data,
+          // the cache was populated from a live streaming session and is more
+          // accurate — disk data may lag behind. Only overwrite when disk data
+          // is richer (first load from history) or the cache is empty.
           const existingCache = state.sessionCache[sessionId];
-          state.sessionCache[sessionId] = {
-            usage: { ...usage },
-            processedIds: processedIds ?? existingCache?.processedIds ?? [],
-            activeTools: existingCache?.activeTools ?? {},
-            completedTools: existingCache?.completedTools ?? [],
-          };
+          const existingTotal =
+            (existingCache?.usage.inputTokens ?? 0) + (existingCache?.usage.outputTokens ?? 0);
+          const incomingTotal = usage.inputTokens + usage.outputTokens;
 
-          // If this is the current session, also update the active usage
+          if (incomingTotal >= existingTotal) {
+            state.sessionCache[sessionId] = {
+              usage: { ...usage },
+              processedIds: processedIds ?? existingCache?.processedIds ?? [],
+              activeTools: existingCache?.activeTools ?? {},
+              completedTools: existingCache?.completedTools ?? [],
+            };
+          }
+
+          // If this is the current session, only update the active usage when
+          // the incoming data is richer than what we already have (avoids
+          // overwriting live-tracked usage with stale disk data).
           if (state.currentSessionId === sessionId) {
-            state.sessionUsage = { ...usage };
-            if (processedIds) {
-              state.processedMessageIds = new Set(processedIds);
+            const liveTotal = state.sessionUsage.inputTokens + state.sessionUsage.outputTokens;
+            if (incomingTotal >= liveTotal) {
+              state.sessionUsage = { ...usage };
+              if (processedIds) {
+                state.processedMessageIds = new Set(processedIds);
+              }
             }
           }
         });
@@ -609,16 +635,17 @@ export const useToolStore = create<ToolState>()(
           input: Record<string, unknown>;
           output?: string | undefined;
           success: boolean;
+          contentOffset?: number | undefined;
         }[]
       ) => {
         set((state) => {
-          // Convert persisted tool data to ToolExecution format
+          // Convert persisted tool data to ToolExecution format.
+          // If a tool already exists (e.g., from localStorage rehydration), UPDATE it
+          // rather than skipping — the rehydrated copy may have a stale messageId
+          // (from the live streaming session) that doesn't match the merged JSONL
+          // message ID used after reload.
           for (const tool of tools) {
-            // Skip if we already have this tool (avoid duplicates on multiple loads)
-            const exists = state.completedTools.some((t) => t.id === tool.id);
-            if (exists) {
-              continue;
-            }
+            const existingIdx = state.completedTools.findIndex((t) => t.id === tool.id);
 
             const toolExecution: ToolExecution = {
               id: tool.id,
@@ -630,15 +657,23 @@ export const useToolStore = create<ToolState>()(
               startedAt: 0, // Not available from persisted data
               completedAt: 0, // Not available from persisted data
               success: tool.success,
+              contentOffset: tool.contentOffset,
             };
-            state.completedTools.push(toolExecution);
+
+            if (existingIdx >= 0) {
+              // Replace stale entry with correct messageId and contentOffset
+              state.completedTools[existingIdx] = toolExecution;
+            } else {
+              state.completedTools.push(toolExecution);
+            }
           }
 
           // Also update sessionCache so tools survive session switches
           // Without this, switching away and back would lose the restored tools
-          if (state.currentSessionId) {
-            const existingCache = state.sessionCache[state.currentSessionId];
-            state.sessionCache[state.currentSessionId] = {
+          const sid = state.currentSessionId;
+          if (sid) {
+            const existingCache = state.sessionCache[sid];
+            state.sessionCache[sid] = {
               usage: existingCache?.usage ?? { ...initialUsage },
               processedIds: existingCache?.processedIds ?? [],
               activeTools: existingCache?.activeTools ?? {},
@@ -700,8 +735,7 @@ export const useToolStore = create<ToolState>()(
 
         return {
           completedTools: sanitizedTools,
-          // Don't persist sessionCache - it grows unbounded and contains stale sessions
-          // Sessions are restored from backend (conversations:loaded) on app start
+          // Don't persist sessionCache - usage is restored from backend on conversation load
           sessionCache: {},
           currentSessionId: state.currentSessionId,
         };
@@ -750,7 +784,7 @@ export const useToolStore = create<ToolState>()(
           ...currentState,
           // Restore validated persisted tools (already capped by partialize)
           completedTools,
-          // Start with empty cache - will be populated from backend
+          // Start with empty cache - usage is restored from backend on conversation load
           sessionCache: {},
           currentSessionId,
         };

@@ -5,12 +5,15 @@ import type { FC, ReactNode } from 'react';
 
 const logger = createLogger('ThemeProvider');
 
-type Theme = 'light' | 'dark' | 'system';
+export type Theme = 'light' | 'dark' | 'system';
+export type WindowMode = 'liquid-glass' | 'solid';
 
 interface ThemeContextValue {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   effectiveTheme: 'light' | 'dark';
+  windowMode: WindowMode;
+  setWindowMode: (mode: WindowMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -18,13 +21,17 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 export interface ThemeProviderProps {
   children: ReactNode;
   defaultTheme?: Theme;
+  defaultWindowMode?: WindowMode;
   storageKey?: string;
+  windowModeStorageKey?: string;
 }
 
 export const ThemeProvider: FC<ThemeProviderProps> = ({
   children,
   defaultTheme = 'system',
+  defaultWindowMode = 'liquid-glass',
   storageKey = 'orbit-agent-theme',
+  windowModeStorageKey = 'orbit-agent-window-mode',
 }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
     const stored = localStorage.getItem(storageKey);
@@ -32,6 +39,14 @@ export const ThemeProvider: FC<ThemeProviderProps> = ({
       return stored;
     }
     return defaultTheme;
+  });
+
+  const [windowMode, setWindowModeState] = useState<WindowMode>(() => {
+    const stored = localStorage.getItem(windowModeStorageKey);
+    if (stored === 'liquid-glass' || stored === 'solid') {
+      return stored;
+    }
+    return defaultWindowMode;
   });
 
   const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('dark');
@@ -74,14 +89,27 @@ export const ThemeProvider: FC<ThemeProviderProps> = ({
     return undefined;
   }, [theme]);
 
+  // Window mode effect - adds class to HTML element for CSS overrides
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('window-mode-liquid-glass', 'window-mode-solid');
+    root.classList.add(`window-mode-${windowMode}`);
+  }, [windowMode]);
+
   const setTheme = (newTheme: Theme): void => {
     logger.debug('Theme changed', { theme: newTheme });
     localStorage.setItem(storageKey, newTheme);
     setThemeState(newTheme);
   };
 
+  const setWindowMode = (newMode: WindowMode): void => {
+    logger.debug('Window mode changed', { mode: newMode });
+    localStorage.setItem(windowModeStorageKey, newMode);
+    setWindowModeState(newMode);
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, effectiveTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, effectiveTheme, windowMode, setWindowMode }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -282,10 +282,6 @@ export function initWindowMessageListener(): void {
       // Capture the narrowed type before async closure (TypeScript loses narrowing in closures)
       const completeMessage = result.data;
       const { session_id, message_id } = completeMessage;
-      logger.debug('Message complete, waiting for next checkpoint', {
-        session_id,
-        message_id,
-      });
       // Associate checkpoints with the USER message (tracked via onUserMessageSent)
       // We pass only sessionId; the store uses the stored user message ID
       useCheckpointStore.getState().onMessageComplete(session_id);
