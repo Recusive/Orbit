@@ -145,6 +145,7 @@ interface UIActions {
   setConversations: (conversations: ConversationSummary[]) => void;
   addConversation: (conversation: ConversationSummary) => void;
   removeConversation: (sessionId: string) => void;
+  remapConversation: (oldSessionId: string, newSessionId: string) => void;
   updateConversationTitle: (sessionId: string, title: string) => void;
   setEditingConversationId: (id: string | null) => void;
   // Sidebar actions
@@ -345,9 +346,27 @@ export const useUIStore = create<UIStore>()(
 
     setConversations: (conversations: ConversationSummary[]): void => {
       set((state) => {
-        // Pure reader: replace the sidebar list entirely from disk-scanned JSONL files.
-        // The SDK writes JSONL files — Orbit just reads them.
-        state.conversations = conversations;
+        // Merge backend-scanned JSONL list with any optimistic conversations.
+        // handleConversationCreated adds a conversation to the sidebar immediately
+        // (messageCount === 0) before the SDK session exists on disk. If conversation:list
+        // fires before message:send → ensureSession writes the JSONL, the backend response
+        // won't include the new conversation. A naive replacement would wipe it, causing
+        // handleSend to misidentify the session as non-existent and create a duplicate.
+        //
+        // TTL guard: only preserve optimistic entries created in the last 60 seconds.
+        // Without this, stale entries from hours ago (e.g., from earlier test sessions
+        // where remap didn't clean up properly) would persist forever at position 0,
+        // appearing above the time-sorted backend list.
+        const OPTIMISTIC_TTL_MS = 60_000;
+        const now = Date.now();
+        const incomingIds = new Set(conversations.map((c) => c.sessionId));
+        const optimistic = state.conversations.filter(
+          (c) =>
+            c.messageCount === 0 &&
+            !incomingIds.has(c.sessionId) &&
+            now - c.updatedAt < OPTIMISTIC_TTL_MS
+        );
+        state.conversations = [...optimistic, ...conversations];
       });
     },
 
@@ -375,6 +394,28 @@ export const useUIStore = create<UIStore>()(
       });
       // Clean up checkpoint data for deleted conversation (Opus cycle 3, #5)
       useCheckpointStore.getState().clearSessionCheckpoints(sessionId);
+    },
+
+    remapConversation: (oldSessionId: string, newSessionId: string): void => {
+      set((state) => {
+        const conversation = state.conversations.find((c) => c.sessionId === oldSessionId);
+        if (conversation) {
+          // Swap sessionId in place — keeps the sidebar entry visible during session remap
+          // instead of removing + re-adding (which causes a flash of missing entry).
+          conversation.sessionId = newSessionId;
+          conversation.updatedAt = Date.now();
+        }
+        // Update active conversation pointer if it was the remapped session
+        if (state.activeConversationId === oldSessionId) {
+          state.activeConversationId = newSessionId;
+        }
+        // Migrate worktree mapping
+        const worktreePath = state.sessionWorktreeMap.get(oldSessionId);
+        if (worktreePath !== undefined) {
+          state.sessionWorktreeMap.delete(oldSessionId);
+          state.sessionWorktreeMap.set(newSessionId, worktreePath);
+        }
+      });
     },
 
     updateConversationTitle: (sessionId: string, title: string): void => {

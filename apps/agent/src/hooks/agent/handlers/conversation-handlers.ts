@@ -20,7 +20,7 @@ export function handleConversationCreate(
 ): void {
   // Generate a temp session ID for the frontend. The SDK will write the JSONL file
   // when the first message is sent, using its own session ID. The system:init handler
-  // in message-handler.ts remaps the frontend to the SDK ID at that point.
+  // in ChatMessageService remaps the frontend to the SDK ID at that point.
   const sessionId = crypto.randomUUID();
   const title = message.title ?? 'New Conversation';
   window.postMessage(

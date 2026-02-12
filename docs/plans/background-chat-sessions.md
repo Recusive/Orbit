@@ -1,486 +1,275 @@
-# Plan: Background Chat Sessions (Terminal-Inspired Architecture)
+# Background Chat Sessions — Centralized Store Architecture
 
 ## Context
 
-Chat sessions currently die when switching between them. The root cause is that the message handling pipeline is entirely owned by React — when `ChatArea`'s `useTauri` hook unmounts on session switch, the handler is deleted from the global `messageHandlers` Set (`use-tauri.ts:96-98`), so streaming events from the old session have no receiver. The stream continues running in agent-bridge but events are silently dropped.
+The current chat system stores messages in React `useState` inside the `useChatMessages` hook. A 1629-line `createMessageHandler` closure captures React state setters (`setMessages`, `setIsAgentRunning`, `setSessionId`) and is recreated every time its dependencies change. This architecture is fundamentally single-session — only one agent can run at a time because there's only one set of React state to write to.
 
-The terminal system already solves this exact problem: PTY processes and xterm.js instances live in module-level singletons that survive React lifecycle. Switching terminals is just a CSS visibility toggle — the backend never knows you switched. We replicate this pattern for chat sessions.
+The user wants to start a chat, create a new session, and have both agents run concurrently in the background. Switching between them should be instant and lossless — no dropped messages, no lost streaming state, no lifecycle bugs.
 
-**Goal**: Switch between chat sessions freely while streaming continues in the background. Return to any session and see all accumulated messages.
+**Root cause of all previous bugs**: Backend events route by `session_id`, but React state exists per-component-lifecycle. Session transitions (create, load, remap) break the coupling between event routing and state ownership.
 
-**Key difference from terminals**: Terminal output is write-only (ephemeral PTY bytes), but chat messages are read-write with complex merge semantics (conversation:loaded merges backend + cache, rewind truncates and forks, system:init remaps IDs across 6 stores). The instance owns message state, but React-specific side effects (setSessionId, setActiveConversation, startTransition) stay in the subscriber hook.
-
----
-
-## Architecture: Three-Layer Model
-
-```
-Layer 1: Agent-Bridge (already multi-session capable — NO CHANGES)
-  ↕ Tauri events with session_id
-Layer 2: ChatSessionManager (NEW — module-level singleton)
-  - Routes events by session_id to ChatSessionInstance
-  - Each instance owns messages, RAF batchers, streaming state
-  - Survives React mount/unmount
-  ↕ Subscribe/unsubscribe
-Layer 3: React Components (REFACTORED — view-only)
-  - Subscribes to active ChatSessionInstance
-  - Session switch = change subscription, NOT remount
-  - Owns React-specific side effects via subscriber callbacks
-```
-
-### Responsibility Split (Instance vs Subscriber)
-
-| Responsibility                          | Owner                   | Why                                     |
-| --------------------------------------- | ----------------------- | --------------------------------------- |
-| Message array (`_messages`)             | Instance                | Must survive unmount                    |
-| RAF batchers (chunk, thinking, tool)    | Instance                | Must accumulate in background           |
-| Epoch counters (rewind, load)           | Instance                | Guards stale loads for this session     |
-| Message merging (backend + cache)       | Instance                | Pure data logic, no React deps          |
-| `setSessionId`, `setActiveConversation` | Subscriber (React hook) | React state setters, trigger re-renders |
-| `startTransition` wrapping              | Subscriber (React hook) | React 18+ concurrent API                |
-| `switchSession` (ToolStore)             | Subscriber (React hook) | Cross-store side effect                 |
-| Tool restoration                        | Subscriber (React hook) | Feeds ToolStore via globalCallbacks     |
+**Solution**: Replace React useState with a Zustand store keyed by sessionId. Backend events write directly to the store. React reads reactively. No lifecycle coupling.
 
 ---
 
-## Phase 1: Create ChatSessionInstance
+## Architecture Change
 
-> Per-session message state owner, analogous to `TerminalInstance`
+```
+BEFORE:
+  Backend Event → window listener → messageHandlers Set → useTauri callback
+    → createMessageHandler closure (captures React setState)
+      → setMessages() / setIsAgentRunning() / setSessionId()
+        → React re-renders
 
-**New file: `apps/agent/src/services/chat/chat-session-instance.ts`**
-
-This class owns everything that currently lives in `createMessageHandler` closures and React state:
-
-| Currently in React/closure                                  | Moves to ChatSessionInstance field        |
-| ----------------------------------------------------------- | ----------------------------------------- |
-| `useState<ChatMessage[]>` (message-state.ts:17)             | `_messages: ChatMessage[]`                |
-| `useState(false)` isAgentRunning (use-chat-messages.ts:129) | `_isAgentRunning: boolean`                |
-| `useRef(false)` isStopPending (use-chat-messages.ts:139)    | `_isStopPending: boolean`                 |
-| `batchedChunkHandler` RAF batcher (message-handler.ts)      | `batchedChunkHandler: RafBatchHandler`    |
-| `batchedThinkingHandler` RAF batcher (message-handler.ts)   | `batchedThinkingHandler: RafBatchHandler` |
-| `batchedToolHandler` RAF batcher (message-handler.ts)       | `batchedToolHandler: RafBatchHandler`     |
-| `pendingChunkLengths` Map (message-handler.ts)              | `pendingChunkLengths: Map`                |
-| `thinkingStartTimes` Map (use-chat-messages.ts:142)         | `thinkingStartTimes: Map`                 |
-| `remappedOrbitIds` Set (message-handler.ts)                 | `remappedOrbitIds: Set`                   |
-| `rewindEpoch` (message-handler.ts)                          | `rewindEpoch: number`                     |
-| `conversationLoadEpoch` (message-handler.ts)                | `conversationLoadEpoch: number`           |
-| `messagesCache` per-component Map (message-state.ts:20)     | Stays on manager (cross-session)          |
-
-Key API:
-
-```typescript
-// Subscription (atomic — delivers current state immediately via callbacks)
-subscribe(subscriber: ChatSessionSubscriber): () => void
-getMessages(): readonly ChatMessage[]
-getIsAgentRunning(): boolean
-getIsStopPending(): boolean
-
-// Message handling (called by manager)
-handleMessage(message: ExtensionMessage): void
-handleCheckpoint(oldFrontendId: string, sdkCheckpointId: string): void
-
-// External mutation (called by chatActions)
-setMessages(messages: ChatMessage[]): void
-updateMessages(fn: (prev: ChatMessage[]) => ChatMessage[]): void
-setIsAgentRunning(running: boolean): void
-setIsStopPending(pending: boolean): void
-
-// Lifecycle
-updatePostMessage(fn: PostMessageFn): void
-flush(): void
-dispose(): void
+AFTER:
+  Backend Event → window listener → ChatMessageService (singleton)
+    → Writes to ChatStore by session_id from event
+      → React reads via Zustand selectors → re-renders
 ```
 
-**`subscribe()` is atomic** — it sets the subscriber reference AND immediately delivers current state via `onMessagesChanged` and `onStreamingStateChanged`. Because JS is single-threaded and we don't yield to the event loop between setting the subscriber and delivering state, no RAF batcher can fire during the gap. This eliminates the race condition where background messages could be lost between hydration and subscription.
+---
+
+## Phase 1: Create ChatStore
+
+**New file**: `apps/agent/src/stores/chat/chat-store.ts`
+
+A Zustand store with `immer` middleware, keyed by sessionId:
 
 ```typescript
-subscribe(subscriber: ChatSessionSubscriber): () => void {
-  this._subscriber = subscriber;
+interface ChatSessionData {
+  messages: ChatMessage[];
+  isAgentRunning: boolean;
+  isStopPending: boolean;
+}
 
-  // Deliver current state immediately — atomic with subscription
-  subscriber.onMessagesChanged(this._messages);
-  subscriber.onStreamingStateChanged(this._isAgentRunning);
+interface ChatStoreState {
+  sessions: Record<string, ChatSessionData>; // per-session data
+  activeSessionId: string | null; // what UI displays
+  lastCreatedSessionId: string | null; // set by conversation:created, hooks subscribe to react
+  pendingMessage: PendingMessage | null; // queued for new session
+  remappedOrbitIds: Record<string, true>; // stale ID filter (Record, not Set — immer can't structurally share Sets)
+  rewindEpoch: number; // staleness counter
+  conversationLoadEpoch: number; // staleness counter
 
-  return () => {
-    if (this._subscriber === subscriber) {
-      this._subscriber = null;
+  // Actions (all take sessionId — not coupled to "active")
+  getOrCreateSession(id: string): ChatSessionData;
+  setActiveSession(id: string): void;
+  setMessages(id: string, msgs: ChatMessage[]): void;
+  appendToLastMessage(id: string, messageId: string, content: string): void;
+  appendThinking(id: string, messageId: string, thinking: string): void;
+  addMessage(id: string, msg: ChatMessage): void;
+  updateMessage(id: string, messageId: string, updater: (m: ChatMessage) => ChatMessage): void;
+  reconcileMessageId(id: string, oldId: string, newId: string): void;
+  setAgentRunning(id: string, running: boolean): void;
+  setStopPending(id: string, pending: boolean): void;
+  remapSession(oldId: string, newId: string): void;
+  destroySession(id: string): void;
+  bumpRewindEpoch(): number;
+  bumpConversationLoadEpoch(): number;
+}
+```
+
+**Design decisions**:
+
+- `Record<string, ChatSessionData>` not `Map` — immer works with plain objects, Zustand selectors work naturally
+- `remappedOrbitIds` uses `Record<string, true>` not `Set<string>` — immer's structural sharing doesn't work with Sets (every mutation creates a new Set reference, triggering unnecessary re-renders). Check membership with `id in remappedOrbitIds`. Matches CheckpointStore's `rewindForkPoints` pattern.
+- `activeSessionId` persisted to localStorage via a manual `subscribe()` listener (NOT the `persist` middleware — serializing the entire sessions Record on every change would be catastrophic). Read initial value in store creation, write on change via subscriber.
+- Epoch counters move from closure variables into store state (accessible to both service and components)
+- Stable empty constant `EMPTY_MESSAGES: ChatMessage[] = []` prevents selector re-allocation
+- Export selector helpers: `useActiveMessages()`, `useActiveSession()` for common access patterns. Use Zustand's `useShallow` or `===` equality on the messages array to prevent re-renders when unrelated sessions change: `useChatStore((s) => s.sessions[s.activeSessionId]?.messages ?? EMPTY_MESSAGES)`. Verify with React DevTools Profiler during implementation.
+- **Zustand devtools**: Name the store `'chat-store'` in devtools middleware for Redux DevTools inspection during development.
+- **Session eviction**: `MAX_IN_MEMORY_SESSIONS = 20`. When exceeded, evict least-recently-active session (clear messages array but keep key so `isAgentRunning` is still tracked). Eviction runs inside `getOrCreateSession` when creating new entries. **Eviction clears `loadedSessions[id]`** so that switching back to an evicted session triggers a fresh `conversation:load` from backend. The active session is pinned and never evicted.
+- **Duplicate-load prevention**: `loadedSessions: Record<string, boolean>` tracks sessions that have been loaded from backend. Replaces `loadedSessionsRef` from the hook. Cleared when messages are reset to empty (allows reload after rewind). Also cleared on eviction (see above).
+
+**localStorage persistence** (manual subscriber, not persist middleware):
+
+```typescript
+const STORAGE_KEY = 'orbit-sessionId';
+
+// Read initial value synchronously
+const initialActiveSessionId = (() => {
+  try {
+    return localStorage.getItem(STORAGE_KEY) ?? null;
+  } catch {
+    return null;
+  }
+})();
+
+// After store creation, subscribe to activeSessionId changes only
+useChatStore.subscribe((state, prevState) => {
+  if (state.activeSessionId !== prevState.activeSessionId) {
+    try {
+      if (state.activeSessionId) {
+        localStorage.setItem(STORAGE_KEY, state.activeSessionId);
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {
+      /* ignore storage errors */
     }
-  };
-}
-```
-
-**`handleCheckpoint()` — ID reconciliation in `_messages`**: When `agent:checkpoint` arrives, the instance finds the user message with `oldFrontendId` in `_messages`, replaces its ID with `sdkCheckpointId`, and calls `notifySubscriber()`. This keeps `_messages` in sync with JSONL so rewind can match by ID.
-
-```typescript
-handleCheckpoint(oldFrontendId: string, sdkCheckpointId: string): void {
-  const idx = this._messages.findIndex((m) => m.id === oldFrontendId);
-  if (idx === -1) return;
-  this._messages = this._messages.map((m, i) =>
-    i === idx ? { ...m, id: sdkCheckpointId } : m
-  );
-  this.notifySubscriber();
-}
-```
-
-**`handleAgentComplete()` — persistence dedup**: The instance must integrate with `conversation-persistence.ts` to avoid duplicate backend writes. When the window listener persists via `persistBufferedAssistantMessage` (startup-race fallback), it calls `markMessagePersisted()`. When the instance persists, it must check `wasMessagePersisted()` first:
-
-```typescript
-// Inside ChatSessionInstance.handleAgentComplete():
-private handleAgentComplete(message: AgentCompleteMessage): void {
-  // Flush all pending RAF batchers BEFORE marking complete
-  this.batchedChunkHandler.cancel(FLUSH_PENDING);
-  this.batchedThinkingHandler.cancel(FLUSH_PENDING);
-  this.batchedToolHandler.cancel(FLUSH_PENDING);
-  this.pendingChunkLengths.delete(message.message_id);
-
-  // ... (finalize messages, calculate thinking duration — same as current handler)
-
-  // Persist to backend — dedup with conversation-persistence tracker
-  if (!wasMessagePersisted(this.sessionId, completedMsg.id)) {
-    void conversationAddMessage(
-      this.sessionId,
-      { id: completedMsg.id, role: 'assistant', content: completedMsg.content, /* ... */ },
-      this._manager.globalCallbacks.getWorkspacePath() ?? undefined,
-      this._manager.globalCallbacks.getActiveWorktreePath() ?? undefined
-    );
   }
-
-  // ... (track usage, clear isAgentRunning, refresh conversation list)
-}
+});
 ```
 
-**`dispose()` implementation**: Must cancel all 3 RAF batchers and release resources to prevent memory leaks from orphaned animation frame requests:
-
-```typescript
-dispose(): void {
-  this._disposed = true;
-  this.batchedChunkHandler.cancel();
-  this.batchedThinkingHandler.cancel();
-  this.batchedToolHandler.cancel();
-  this.pendingChunkLengths.clear();
-  this._subscriber = null;
-}
-```
-
-The `_disposed` flag is checked by deferred callbacks (e.g., `handleConversationLoaded`'s `setTimeout(0)`) to prevent invoking subscriber methods on a disposed instance.
-
-**Subscriber interface** (last-writer-wins — subscribing replaces any existing subscriber):
-
-```typescript
-interface ChatSessionSubscriber {
-  onMessagesChanged(messages: readonly ChatMessage[]): void;
-  onStreamingStateChanged(isAgentRunning: boolean): void;
-  // Delegate React-specific side effects back to the hook
-  onConversationLoaded(data: {
-    messages: ChatMessage[];
-    sessionId: string;
-    title: string;
-    sessionUsage?: SessionUsage;
-    rawMessages: BackendMessage[]; // For tool restoration
-  }): void;
-  onConversationCreated(data: { sessionId: string; title: string }): void;
-  onSessionRemapped(data: { oldSessionId: string; newSessionId: string }): void;
-}
-```
-
-When no subscriber (background), messages still accumulate silently via RAF batchers. The `onConversationLoaded`, `onConversationCreated`, and `onSessionRemapped` callbacks are no-ops when no subscriber is present — these events are only meaningful when React is actively viewing the session.
-
-**Message handling**: Extract the logic from `createMessageHandler` (message-handler.ts). The RAF batcher closures change from `setMessages((prev) => ...)` to `this._messages = mutated; this.notifySubscriber()`. The mutation logic itself is identical.
-
-**conversation:loaded — responsibility split**:
-The instance handles epoch guards, message merging (backend-backbone + live trailing), cache lookup, and usage aggregation. It does NOT call setSessionId, setActiveConversation, or startTransition. Instead, it prepares the merged data and invokes `subscriber.onConversationLoaded(data)`. The subscriber (React hook) wraps the side effects in startTransition.
-
-**Critical: `setTimeout(0)` deferral must be preserved**. The current implementation (message-handler.ts:992-996) uses `setTimeout(0)` to break out of the IPC message event handler. Without this yield, data processing + React rendering blocks the main thread in a single ~1,097ms task (V3 profiling). Epoch bumps happen synchronously before the setTimeout; epoch checks happen inside the callback:
-
-```typescript
-// Inside ChatSessionInstance.handleConversationLoaded():
-private handleConversationLoaded(message: ConversationLoadedMessage): void {
-  // Skip stale responses for remapped Orbit IDs (synchronous guard)
-  if (this.remappedOrbitIds.has(message.session_id)) return;
-
-  // Cache current session's messages BEFORE the deferred callback
-  // (matches current behavior at message-handler.ts:966-972)
-  const managerCache = this._manager.getMessagesCache();
-  if (this._messages.length > 0) {
-    managerCache.set(this.sessionId, this._messages);
-  }
-
-  // Bump load epoch SYNCHRONOUSLY (before setTimeout)
-  this.conversationLoadEpoch++;
-  const loadEpochAtCapture = this.conversationLoadEpoch;
-  const epochAtLoad = this.rewindEpoch;
-
-  // CRITICAL: Break out of IPC message event handler with setTimeout(0)
-  // Without this yield, data processing + React rendering blocks
-  // the main thread in a single ~1,097ms task (V3 profiling)
-  setTimeout(() => {
-    // Stale epoch guards
-    if (epochAtLoad !== this.rewindEpoch) return;
-    if (loadEpochAtCapture !== this.conversationLoadEpoch) return;
-    // Disposed guard — prevents invoking subscriber on a disposed instance
-    if (this._disposed) return;
-
-    const mergedMessages = this.mergeBackendAndCachedMessages(message);
-    this._messages = mergedMessages;
-
-    this._subscriber?.onConversationLoaded({
-      messages: mergedMessages,
-      sessionId: message.session_id,
-      title: message.title,
-      sessionUsage: message.session_usage,
-      rawMessages: message.messages,
-    });
-    // If no subscriber (background), messages are in _messages for later
-  }, 0);
-}
-```
-
-**updateMessages — functional updater for chatActions**:
-
-```typescript
-updateMessages(fn: (prev: ChatMessage[]) => ChatMessage[]): void {
-  const next = fn(this._messages);
-  if (next !== this._messages) {
-    this._messages = next;
-    this.notifySubscriber();
-  }
-}
-```
-
-**Store actions** (ToolStore, UIStore, CheckpointStore, FileStore, FileViewerStore): Accessed via manager's `globalCallbacks`, same pattern as `TerminalInstanceManager.globalCallbacks`. Full list of required store accesses documented in Phase 2.
+**Barrel export**: `apps/agent/src/stores/chat/index.ts`
 
 ---
 
-## Phase 2: Create ChatSessionManager
+## Phase 2: Create ChatMessageService
 
-> Module-level singleton, analogous to `TerminalInstanceManager`
+**New file**: `apps/agent/src/services/chat/chat-message-service.ts`
 
-**New file: `apps/agent/src/services/chat/chat-session-manager.ts`**
-
-Follows exact terminal singleton pattern:
+A module-level singleton class that handles ALL chat backend events. This is the refactored `createMessageHandler` — same logic, but writes to ChatStore instead of React setState.
 
 ```typescript
-// Module-level state (persists across React lifecycle)
-let globalPostMessage: PostMessageFn | null = null;
-let globalCallbacks: ChatManagerCallbacks = {};
-let instance: ChatSessionManager | null = null;
+class ChatMessageService {
+  // Per-session RAF batchers (key = sessionId)
+  private chunkBatchers = new Map<string, ReturnType<typeof rafBatch>>();
+  private thinkingBatchers = new Map<string, ReturnType<typeof rafBatch>>();
+  private toolBatchers = new Map<string, ReturnType<typeof rafBatch>>();
 
-export function getChatSessionManager(): ChatSessionManager {
-  instance ??= new ChatSessionManager();
-  return instance;
+  // Per-message tracking (same as current closure vars)
+  private pendingChunkLengths = new Map<string, number>();
+  private thinkingStartTimes = new Map<string, number>();
+
+  handleMessage(message: ExtensionMessage): void {
+    /* routes by type */
+  }
+  flushSession(sessionId: string): void {
+    /* flush batchers on agent:complete */
+  }
+  cancelSession(sessionId: string): void {
+    /* cancel batchers on rewind */
+  }
+  destroySession(sessionId: string): void {
+    /* cleanup on delete */
+  }
+  private cleanupBatchers(sessionId: string): void {
+    /* delete batcher Map entries */
+  }
 }
 
-// HMR: preserve instance state (unlike terminal, chat messages are NOT ephemeral)
+export const chatMessageService = new ChatMessageService();
+
+// HMR cleanup — cancel all batchers when module is replaced
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    // Do NOT reset — preserve in-progress streaming messages
-    // Only reset the initialized flag so the hook re-registers callbacks
-    if (instance) {
-      instance.markUninitialized();
-    }
+    chatMessageService.destroyAll();
   });
 }
 ```
 
-Key API:
+**Key architectural decisions**:
 
-- `initialize(postMessage, callbacks)` — called once by React hook
-- `markUninitialized()` — HMR only, preserves instances
-- `updatePostMessage(fn)` — called on every React render cycle
-- `updateCallbacks(callbacks)` — update store action refs
-- `getOrCreate(sessionId)` → ChatSessionInstance
-- `getInstance(sessionId)` → ChatSessionInstance | undefined
-- `handleMessage(message)` — routes by `session_id` to correct instance (lazy-creates for `conversation:loaded`). See checkpoint routing below.
-- `setActiveSession(sessionId)` — tracks which session React is viewing, increments `activeSessionEpoch`
-- `getActiveSessionEpoch()` — for stale load suppression
-- `destroyInstance(sessionId)` — explicit close only
-- `remapSession(oldId, newId)` — for system:init session remap
-- `cleanupOrphanedInstances(activeSessionIds)` — memory management
-- `getMessagesCache()` — cross-session messages cache (replaces messagesCache useRef)
+1. **RAF batchers are per-session** — Rewind on session A cancels only A's batchers, not B's active stream. `agent:complete` on B flushes only B's. No batcher recreation on React mount/unmount. **Cleanup**: Batcher Map entries are deleted on `agent:complete` (flush + delete from Map) and on `destroySession`, not just on destroy. This prevents memory leaks from accumulated batcher closures across many sessions. Batchers are recreated lazily if the session streams again.
 
-**Required globalCallbacks** (all stores accessed by message-handler.ts):
+2. **Store interactions via `getState()`** — The service reads/writes ChatStore, ToolStore, CheckpointStore, FileStore, UIStore via `.getState()` (same pattern as current message-handler.ts).
+
+3. **Minimal React import** — The service imports only `startTransition` from `react` (needed for `conversation:loaded` merge). No useState, no useRef, no Dispatch. `startTransition` works outside React components — it marks any synchronous Zustand `set()` calls as non-urgent via `useSyncExternalStore` integration, so React can interrupt the resulting re-renders.
+
+4. **conversation:loaded merge logic** — Moves verbatim (170 lines). **CRITICAL**: `cachedMessages` must be snapshot from `chatStore.getState().sessions[sessionId]?.messages` synchronously BEFORE the `setTimeout(0)` deferral — the store may change between event receipt and callback execution (e.g., another session's `agent:chunk` writes). This mirrors how the current code captures `messagesRef.current` before deferring. The `startTransition` wrapper is preserved for same performance reasons.
 
 ```typescript
-interface ChatManagerCallbacks {
-  // UIStore
-  setWorkspace: (path: string) => void;
-  setActiveConversation: (sessionId: string | null, title: string | null) => void;
-  setConversationTransitioning: (transitioning: boolean) => void;
-  setConversations: (conversations: Conversation[]) => void;
+// Snapshot BEFORE setTimeout(0) — store state may change during deferral
+const store = useChatStore.getState();
+const cachedMessages = store.sessions[message.session_id]?.messages ?? null;
+// ... cache current session's messages
 
-  // ToolStore
-  setInputMode: (mode: 'default' | 'plan' | 'accept') => void;
-  setModel: (model: Model) => void;
-  startTool: (...) => void;
-  completeTool: (...) => void;
-  addPermissionRequest: (...) => void;
-  addUsage: (...) => void;
-  switchSession: (sessionId: string) => void;
-  restoreSessionUsage: (...) => void;
-  restoreToolsForMessage: (...) => void;
-  clearSessionTools: (sessionId: string) => void;
-
-  // CheckpointStore (reconciliation only — batching stays in window listener)
-  reconcileUserMessageId: (sessionId: string, checkpointId: string) => string | null;
-  consumePendingConversationFork: (sessionId: string) => string | null;
-  setRewindForkPoint: (sessionId: string, messageId: string) => void;
-
-  // FileStore
-  switchSessionFiles: (sessionId: string) => void;
-  clearSessionFiles: (sessionId: string) => void;
-
-  // FileViewerStore
-  setFileContent: (path: string, content: string, language: string) => void;
-
-  // MessageBufferStore (pending loads only — buffering subsumed by instances)
-  markLoadPending: (sessionId: string) => void;
-  clearLoadPending: (sessionId: string) => void;
-  hasLoadPending: (sessionId: string) => boolean;
-
-  // UIStore (conversation management)
-  removeConversation: (sessionId: string) => void;
-
-  // UIStore (workspace paths — needed by agent:complete for persistence)
-  getWorkspacePath: () => string | null;
-  getActiveWorktreePath: () => string | null;
-
-  // Session remap
-  remapCreatedSession: (oldId: string, newId: string) => void;
-}
+setTimeout(() => {
+  // Use the SNAPSHOT cachedMessages captured above, not a live store read
+  startTransition(() => {
+    // merge logic using cachedMessages (already captured)
+  });
+}, 0);
 ```
 
-**Checkpoint routing in `handleMessage()`**: The manager coordinates between CheckpointStore reconciliation and instance-level `_messages` update. The window listener handles checkpoint batching separately (100ms debounce → `onCheckpointReceived`). The manager handles ID reconciliation synchronously:
+5. **system:init remap** — `chatStore.remapSession(oldId, newId)` atomically moves session data under new key, adds oldId to `remappedOrbitIds`. **CRITICAL**: Only updates `activeSessionId` if the remapped session IS the active one. Background session remaps must NOT steal focus from the foreground session. External stores (ToolStore, CheckpointStore, FileStore) remapped as before.
 
 ```typescript
-// In ChatSessionManager.handleMessage():
-case 'agent:checkpoint': {
-  const { session_id, checkpoint_id } = message;
-  // Step 1: Reconcile in CheckpointStore — returns the old frontend UUID if found
-  const oldFrontendId = globalCallbacks.reconcileUserMessageId(session_id, checkpoint_id);
-  // Step 2: Update _messages in the instance (replace frontend UUID with SDK UUID)
-  if (oldFrontendId) {
-    const instance = this.getInstance(session_id);
-    instance?.handleCheckpoint(oldFrontendId, checkpoint_id);
-  }
-  break;
-}
+// In ChatStore.remapSession():
+remapSession: (oldId, newId) => {
+  set((state) => {
+    if (state.sessions[oldId]) {
+      state.sessions[newId] = state.sessions[oldId];
+      delete state.sessions[oldId];
+    }
+    state.remappedOrbitIds[oldId] = true;
+    // ONLY update activeSessionId if THIS session is active
+    if (state.activeSessionId === oldId) {
+      state.activeSessionId = newId;
+    }
+  });
+},
 ```
 
-Note: This runs synchronously. The window listener's `batchedCheckpoint` (100ms debounce → `onCheckpointReceived` for turn boundary tracking) is completely independent and runs regardless. There is no ordering dependency between the two paths.
-
-**`conversation:deleted` routing**: Explicitly destroy the instance on deletion rather than waiting for `cleanupOrphanedInstances`:
+6. **tool:start contentOffset calculation** — The service reads displayed message content from `useChatStore.getState().sessions[sid].messages` (not a React ref). Combined with `pendingChunkLengths` tracking (same as current code), this provides accurate tool widget placement. Fast path checks last message first.
 
 ```typescript
-case 'conversation:deleted': {
-  globalCallbacks.clearSessionTools(message.session_id);
-  globalCallbacks.clearSessionFiles(message.session_id);
-  this.destroyInstance(message.session_id);
-  break;
-}
+// In ChatMessageService.handleToolStart():
+const store = useChatStore.getState();
+const session = store.sessions[message.session_id];
+const messages = session?.messages ?? [];
+const lastMsg = messages.at(-1);
+const currentMsg =
+  lastMsg?.id === message.message_id ? lastMsg : messages.find((m) => m.id === message.message_id);
+const displayedLength = currentMsg?.content.length ?? 0;
+const pendingLength = this.pendingChunkLengths.get(message.message_id) ?? 0;
+const maxKnownLength = displayedLength + pendingLength;
 ```
 
-**New file: `apps/agent/src/services/chat/index.ts`** — barrel export
+**What moves from message-handler.ts to ChatMessageService**:
 
-**Modify: `apps/agent/src/services/index.ts`** — add chat re-export
+| Handler                | Notes                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `agent:chunk`          | Batches via per-session RAF, writes to `chatStore.appendToLastMessage()`                                            |
+| `agent:thinking`       | Batches via per-session RAF, writes to `chatStore.appendThinking()`                                                 |
+| `agent:complete`       | Flushes batchers, sets `isAgentRunning=false`, clears `isStopPending` for this session, persists, refreshes sidebar |
+| `agent:error`          | Flushes batchers, appends error message, clears `isStopPending` for this session                                    |
+| `agent:checkpoint`     | Reconciles message IDs in ChatStore + CheckpointStore                                                               |
+| `conversation:created` | Creates new session, sets `activeSessionId`                                                                         |
+| `conversation:loaded`  | Merge logic, populates session, sets `activeSessionId`                                                              |
+| `conversation:rewound` | Cancels batchers, bumps epoch, replaces messages                                                                    |
+| `conversation:list`    | Updates UIStore conversations                                                                                       |
+| `system:init`          | Remaps session, sets workspace                                                                                      |
+| `tool:start/end`       | Delegates to ToolStore (unchanged)                                                                                  |
+| `permission:request`   | Flushes chunks, adds to ToolStore                                                                                   |
+| `inputMode:changed`    | Updates ToolStore                                                                                                   |
+| `model:changed`        | Updates ToolStore                                                                                                   |
+
+**Barrel export**: `apps/agent/src/services/chat/index.ts`
 
 ---
 
-## Phase 3: Create React Hook Wrapper
+## Phase 3: Refactor Existing Files
 
-> Initializes singleton, never cleans up, analogous to `use-terminal-instance-manager.ts`
+### 3a. `use-tauri-message-listener.ts` — Route chat events to service
 
-**New file: `apps/agent/src/hooks/chat/use-chat-session-manager.ts`**
-
-Pattern (from `use-terminal-instance-manager.ts:28-46`):
+**Change**: Instead of dispatching ALL events to the `messageHandlers` Set, chat events go to `chatMessageService.handleMessage()`. Non-chat events (terminal, file, browser) still dispatch to the Set.
 
 ```typescript
-let messageListenerRegistered = false;
+// Add a type check for chat events
+const CHAT_EVENT_TYPES = new Set([
+  'system:init',
+  'agent:chunk',
+  'agent:thinking',
+  'agent:complete',
+  'agent:error',
+  'agent:checkpoint',
+  'conversation:created',
+  'conversation:list',
+  'conversation:loaded',
+  'conversation:rewound',
+  'conversation:deleted',
+  'tool:start',
+  'tool:end',
+  'permission:request',
+  'inputMode:changed',
+  'model:changed',
+]);
 
-function registerGlobalChatMessageListener(): void {
-  if (messageListenerRegistered) return;
-  messageListenerRegistered = true;
-  // Route agent:/tool:/conversation:/system:/permission:/inputMode:/model: messages
-  // to ChatSessionManager.handleMessage()
-  // NO CLEANUP — intentionally never removed
-}
-```
-
-Hook responsibilities:
-
-1. Call `registerGlobalChatMessageListener()` once (empty deps useEffect)
-2. Initialize/update manager with latest `postMessage` and callbacks
-3. Return manager reference
-4. **NO cleanup** — manager persists across React lifecycle
-
----
-
-## Phase 4: Refactor Message Routing
-
-> Route chat events through ChatSessionManager instead of broadcast
-
-**Modify: `apps/agent/src/hooks/agent/use-tauri-message-listener.ts`**
-
-The current `initWindowMessageListener` (line 198-329) broadcasts events to all registered `messageHandlers`. We add a branch: if `ChatSessionManager` is initialized and the message is a chat-type event, route to the manager instead of broadcasting.
-
-The `messageHandlers` Set continues to work for non-chat events (terminal, browser, file). This preserves backward compatibility.
-
-### Event Routing Table
-
-| Event prefix                                                                                                       | Routed to manager?                   | Notes                                                                                                                                                                     |
-| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `agent:chunk`, `agent:thinking`, `agent:complete`, `agent:error`                                                   | Yes                                  | Core streaming events                                                                                                                                                     |
-| `agent:checkpoint`                                                                                                 | **Dual-routed**                      | Window listener handles checkpoint batching (feeds CheckpointStore.onCheckpointReceived). Manager handles ID reconciliation (reconcileUserMessageId → update \_messages). |
-| `agent:plan_mode`, `agent:accept_mode`                                                                             | Yes                                  | Input mode changes                                                                                                                                                        |
-| `tool:start`, `tool:end`                                                                                           | Yes                                  | Tool execution                                                                                                                                                            |
-| `permission:request`                                                                                               | Yes                                  | Permission modals                                                                                                                                                         |
-| `conversation:created`, `conversation:loaded`, `conversation:rewound`, `conversation:list`, `conversation:deleted` | Yes                                  | Session lifecycle                                                                                                                                                         |
-| `conversation:loading`                                                                                             | **Remove**                           | Orphaned — no code path sends this event. Its caching logic is subsumed by conversation:loaded handler's fallback cache.                                                  |
-| `system:init`                                                                                                      | Yes                                  | Session remap                                                                                                                                                             |
-| `inputMode:changed`, `model:changed`                                                                               | Yes                                  | State sync                                                                                                                                                                |
-| `file:content`                                                                                                     | **No** — broadcast                   | FileViewerStore update, not session-specific                                                                                                                              |
-| `file:changed`, `file:written`, `file:tree:*`                                                                      | No — broadcast                       | File system events                                                                                                                                                        |
-| `terminal:*`                                                                                                       | No — broadcast (or terminal manager) | Terminal events                                                                                                                                                           |
-| `browser:*`                                                                                                        | No — broadcast                       | Browser panel events                                                                                                                                                      |
-| `layout`, `error`                                                                                                  | No — broadcast                       | UI events                                                                                                                                                                 |
-| `thinking:changed`                                                                                                 | No — broadcast                       | Global setting                                                                                                                                                            |
-| `subagents:*`, `commands:*`, `panel:*`                                                                             | No — broadcast                       | Non-chat features                                                                                                                                                         |
-
-### Key change (around line 315-318):
-
-```typescript
-// Handle checkpoint events FIRST (global side effect)
-if (result.data.type === 'agent:checkpoint') {
-  const { session_id, checkpoint_id } = result.data;
-  batchedCheckpoint(session_id, checkpoint_id); // → CheckpointStore (100ms debounce)
-}
-
-// Handle agent:complete bookkeeping BEFORE routing (global side effect)
-if (result.data.type === 'agent:complete') {
-  const completeMessage = result.data;
-  const { session_id, message_id } = completeMessage;
-  useCheckpointStore.getState().onMessageComplete(session_id);
-
-  // Persistence boundary: instance handles persistence when initialized.
-  // Legacy fallback only runs when manager isn't ready (startup race).
-  const mgr = getChatSessionManager();
-  if (!mgr.isInitialized() || !mgr.getInstance(session_id)) {
-    // Startup race: manager not ready, use legacy persistence fallback
-    void persistBufferedAssistantMessage(session_id, completeMessage).then((persisted) => {
-      if (persisted) {
-        useMessageBufferStore.getState().clearMessage(session_id, message_id);
-      }
-    });
-  } else if (session_id) {
-    // Manager has the instance — instance.handleAgentComplete() handles persistence.
-    // Just clear any stale MessageBufferStore entries.
-    useMessageBufferStore.getState().clearBuffer(session_id);
-  }
-}
-
-// Route to manager or broadcast
-const manager = getChatSessionManager();
-if (manager.isInitialized() && isChatEvent(result.data.type)) {
-  manager.handleMessage(result.data);
+// In handleWindowMessage:
+if (CHAT_EVENT_TYPES.has(result.data.type)) {
+  chatMessageService.handleMessage(result.data);
 } else {
   for (const handler of messageHandlers) {
     handler(result.data);
@@ -488,385 +277,200 @@ if (manager.isInitialized() && isChatEvent(result.data.type)) {
 }
 ```
 
-### MessageBufferStore integration
+The `agent:checkpoint` batching and `agent:complete` persistence logic that currently lives in this file moves into `ChatMessageService` (they're chat concerns, not listener concerns).
 
-The `shouldBuffer` / `bufferMessage` path in use-tauri-message-listener.ts is **superseded** for sessions that have a ChatSessionInstance (the instance IS the buffer). Buffering remains as a fallback for edge cases where the manager isn't initialized yet.
+The buffering logic (`shouldBuffer`/`bufferMessage`) simplifies — the store always accepts writes, so buffering is only needed for the case where ChatMessageService hasn't initialized yet (app startup race). In practice, the service is a module-level singleton, so it's always available.
 
-The `pendingLoads` Map stays on MessageBufferStore — it's orthogonal to message buffering (tracks conversation:load dedup across components). The ChatSessionManager reads/writes it via globalCallbacks.
+### 3b. `use-chat-messages.ts` — Thin reader (~150 lines)
 
-### `persistBufferedAssistantMessage` fate and persistence boundary
+**Massive simplification**. The hook becomes a thin wrapper that reads from ChatStore and exposes actions.
 
-The `persistBufferedAssistantMessage` function (use-tauri-message-listener.ts:35-175) currently persists buffered messages on `agent:complete` for sessions without consumers. With instances subsuming buffering, the instance handles persistence directly in `handleAgentComplete()` using workspace paths from `globalCallbacks.getWorkspacePath()`.
+**Removed**:
 
-**Persistence decision tree** (implemented in the `agent:complete` handler above):
+- `useSessionState()` hook call — replaced by `chatStore.activeSessionId`
+- `useMessageState(sessionId)` hook call — replaced by `chatStore.sessions[activeSessionId]`
+- `messageHandler` useMemo + useEffect lifecycle — singleton service handles it
+- Buffer hydration `useLayoutEffect` — store always accepts writes
+- `loadedSessionsRef` tracking — replaced by `ChatStore.loadedSessions: Record<string, boolean>` to prevent duplicate `conversation:load` requests
+- The 12-item dependency array that caused handler recreation
 
-| Condition                                         | Who persists                                          | Why                                                                      |
-| ------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------ |
-| Manager initialized AND instance exists           | Instance's `handleAgentComplete()`                    | Instance has the complete message state                                  |
-| Manager NOT initialized OR instance doesn't exist | `persistBufferedAssistantMessage()` (legacy fallback) | Startup race — agent:complete arrives before ChatSessionManager is ready |
-| Both paths                                        | `wasMessagePersisted()` dedup prevents double-write   | `markMessagePersisted()` called after each successful persist            |
+**Kept**:
 
-Keep `persistBufferedAssistantMessage` **only as a startup-race fallback** — when `agent:complete` arrives before the ChatSessionManager is initialized (rare but possible during app startup with auto-start agents). It already calls `markMessagePersisted()` (line 165), so the instance's `handleAgentComplete()` will correctly skip if the fallback already persisted.
+- Usage restore on mount (reads backend, populates ToolStore)
+- Cross-instance sync (`orbit:user-message` window event)
+- Conversation list request on workspace change
+- Pending message sending — triggered by `useChatStore.subscribe()` on `pendingMessage` changes, or simpler: `handleSend` calls `sendPendingMessage()` directly after `conversation:created` fires
+- chatActions creation (now reads from store instead of React state)
 
-### `file:content` handler note
-
-The `file:content` handler at message-handler.ts:1511 lives in the file being deleted. This is **safe to drop** — `use-file-tree.ts:328` has a duplicate handler that survives the refactor and handles all `file:content` routing to FileViewerStore. The event routing table correctly marks `file:content` as "No — broadcast".
-
----
-
-## Phase 5: Refactor useChatMessages
-
-> Simplify from "owns everything" to "subscribes to instance"
-
-**Modify: `apps/agent/src/hooks/chat/use-chat-messages.ts`**
-
-Major changes:
-
-1. **Remove** `useMemo(createMessageHandler)` (lines 235-278) — no longer needed
-2. **Remove** `useEffect` cleanup for RAF batchers (lines 283-291) — instance manages lifecycle
-3. **Remove** `useTauri({ onMessage })` (line 293) — events routed via manager now
-4. **Add** `useChatSessionManager()` call
-5. **Add** subscription `useEffect` (atomic — no separate hydration step):
-
-   ```typescript
-   useEffect(() => {
-     const instance = manager.getOrCreate(sessionId);
-     manager.setActiveSession(sessionId);
-
-     // subscribe() atomically delivers current state via callbacks
-     // No separate hydration step needed — eliminates race window where
-     // RAF batchers could fire between getMessages() and subscribe()
-     const unsub = instance.subscribe({
-       onMessagesChanged: (msgs) => setMessages(msgs as ChatMessage[]),
-       onStreamingStateChanged: (running) => setIsAgentRunning(running),
-       onConversationLoaded: ({ messages, sessionId: sid, title, sessionUsage, rawMessages }) => {
-         startTransition(() => {
-           manager.getMessagesCache().set(sid, messages);
-           setMessages(messages);
-           setSessionId(sid);
-           setActiveConversation(sid, title);
-           // NOTE: switchSession is called here AND reactively by session-state.ts:62-69
-           // when setSessionId triggers the useEffect. The guard in session-state.ts
-           // (if toolState.currentSessionId !== sessionId) prevents actual double work.
-           // This is intentional — the subscriber call is immediate, the useEffect is
-           // a safety net for code paths that set sessionId without calling switchSession.
-           switchSession(sid);
-           // Restore tools
-           for (const m of rawMessages) {
-             if (m.toolUses.length > 0) {
-               restoreToolsForMessage(m.id, m.toolUses);
-             }
-           }
-         });
-       },
-       onConversationCreated: ({ sessionId: sid, title }) => {
-         setMessages([]);
-         setSessionId(sid);
-         setActiveConversation(sid, title);
-         switchSession(sid);
-       },
-       onSessionRemapped: ({ oldSessionId, newSessionId }) => {
-         setSessionId(newSessionId);
-         setActiveConversation(newSessionId, null);
-         switchSession(newSessionId);
-       },
-     });
-
-     // Cross-instance sync (Agent <-> Editor views)
-     // Both views mount their own useChatMessages with separate useState.
-     // Without this, a user message sent from one view is invisible to the other.
-     const syncHandler = (e: Event): void => {
-       const detail = (e as CustomEvent<{ sessionId: string; message: ChatMessage }>).detail;
-       if (detail.sessionId !== sessionId) return;
-       instance.updateMessages((prev) => {
-         if (prev.some((m) => m.id === detail.message.id)) return prev;
-         return [...prev, detail.message];
-       });
-     };
-     window.addEventListener('orbit:user-message', syncHandler);
-
-     return () => {
-       unsub();
-       window.removeEventListener('orbit:user-message', syncHandler);
-     };
-   }, [sessionId, manager]);
-   ```
-
-6. **Keep** `postMessage` from `useTauri({ debug: false })` (no onMessage handler needed)
-7. **Keep** conversation list loading, usage restoration, pending message logic
-8. **Remove** buffer hydration useLayoutEffect (lines 306-335) — instance handles this naturally
-
-**Modify: `apps/agent/src/hooks/chat/state/message-state.ts`**
-
-- Remove `messagesCache` useRef — moves to ChatSessionManager
-- Simplify to just `[messages, setMessages] = useState<ChatMessage[]>([])`
-
-**Modify: `apps/agent/src/hooks/chat/handlers/chat-actions.ts`**
-
-- `handleStop`, `handleSend`, `handlePermissionDeny` currently call `setMessages()` directly
-- Change to route through `ChatSessionInstance.updateMessages()` / `setIsAgentRunning()`
-- The instance then notifies its subscriber
-- chatActions calls `manager.getOrCreate(sessionId)` (not `getInstance`) to handle edge case where send fires before instance exists
-- `handleRewind` (line 370) currently reads `isStopPendingRef.current` as a gate — change to `instance.getIsStopPending()` instead
-
-**CRITICAL: Read state from instance, not closured React state**. After the refactor, `createChatActions` still receives `isAgentRunning` and `messages` as closure values from `useMemo` deps. But these can be stale during rapid interactions (e.g., send-stop-send). All chat actions must read from the instance:
-
-- `handleSend`: Replace `if (isAgentRunning)` → `if (instance.getIsAgentRunning())`
-- `handleRewind`: Replace `messages.find(...)` → `instance.getMessages().find(...)`, replace `isStopPendingRef.current` → `instance.getIsStopPending()`
-- `handleStop`: Replace `if (!isAgentRunning)` guard → `if (!instance.getIsAgentRunning())`
-- `handlePermissionDeny`: Same pattern as handleStop
-
-This also means `messages` and `isAgentRunning` can be **removed from `createChatActions`' `useMemo` deps**, reducing unnecessary recreations. `chatActions` no longer needs to close over these values at all — the instance is the source of truth.
-
-**Pending message useEffect** (use-chat-messages.ts:428-542): Currently calls `setMessages((prev) => [...prev, userMessage])` and `setIsAgentRunning(true)` directly. After the refactor, BOTH must route through the instance to prevent state divergence:
+**Return type unchanged** — ChatArea doesn't need any changes:
 
 ```typescript
-// In pending message useEffect (refactored):
-const instance = manager.getOrCreate(sessionId);
-instance.updateMessages((prev) => [...prev, userMessage]);
-instance.setIsAgentRunning(true);
-// Then broadcast orbit:user-message and postMessage as before
-```
-
-Example — handleStop refactored:
-
-```typescript
-const handleStop = (): void => {
-  const instance = getChatSessionManager().getOrCreate(sessionId);
-  if (!sessionId || !instance.getIsAgentRunning()) return;
-
-  postMessage({ type: 'agent:stop', uuid: crypto.randomUUID(), session_id: sessionId });
-  instance.setIsAgentRunning(false);
-  instance.setIsStopPending(true);
-  clearPermissions();
-
-  instance.updateMessages((prev) => {
-    const lastMsg = prev[prev.length - 1];
-    if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-      return [...prev.slice(0, -1), { ...lastMsg, isStreaming: false, isInterrupted: true }];
-    }
-    if (!lastMsg || lastMsg.role === 'user') {
-      const parentUuid = lastMsg?.id ?? null;
-      return [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: '',
-          displayedContent: '',
-          isStreaming: false,
-          isInterrupted: true,
-          parentUuid,
-        },
-      ];
-    }
-    return prev;
-  });
-};
-```
-
-Example — handleSend guard refactored:
-
-```typescript
-const handleSend = (text: string, ...): void => {
-  if (!text) return;
-  const instance = getChatSessionManager().getOrCreate(sessionId);
-
-  // Read from instance, not closured React state
-  if (instance.getIsAgentRunning()) {
-    storeQueueMessage({ text, sessionId, ... });
-    return;
-  }
-  // ... rest of send logic
-};
-```
-
-Example — handleRewind refactored:
-
-```typescript
-const handleRewind = (messageId: string): void => {
-  const instance = getChatSessionManager().getInstance(sessionId);
-  if (!instance || !sessionId || instance.getIsAgentRunning() || instance.getIsStopPending()) {
-    return;
-  }
-  // Read messages from instance, not closured React state
-  const currentMessages = instance.getMessages();
-  const clickedMessage = currentMessages.find((m) => m.id === messageId);
-  if (!clickedMessage) return;
-  // ... rest of rewind logic using currentMessages
-};
-```
-
----
-
-## Phase 6: Confirm No key={sessionId} Remount
-
-> Session switch = change subscription, not remount
-
-**Confirmed via audit**: ChatArea and ChatContent do NOT use `key={sessionId}`. No remount pattern exists. The current remount behavior comes from `useMemo(createMessageHandler)` recreating on `sessionId` change via dependency array. After refactoring, the handler is owned by the instance, so this recreation doesn't happen.
-
-No changes needed here — subscription swap in Phase 5's useEffect handles session transitions.
-
----
-
-## Phase 7: Cleanup and Memory Management
-
-> Prevent unbounded instance growth over long sessions
-
-**Add to ChatSessionManager:**
-
-```typescript
-cleanupOrphanedInstances(activeSessionIds: Set<string>): void {
-  for (const [sessionId, instance] of this.instances) {
-    if (!activeSessionIds.has(sessionId) && !instance.getIsAgentRunning()) {
-      instance.dispose();
-      this.instances.delete(sessionId);
-    }
-  }
+interface UseChatMessagesReturn {
+  messages: ChatMessage[];
+  isAgentRunning: boolean;
+  sessionId: string;
+  // ... all same handlers
 }
 ```
 
-**Call site**: After conversation list refreshes (triggered by `agent:complete` → `conversationList()` response). The React hook passes the current conversation list IDs to the manager.
+### 3c. `chat-actions.ts` — Read from ChatStore at call time
 
-**Remove dead code**:
+**Change**: Dependencies shrink from 20+ React state values to ~5 stable values. Actions read current state from `useChatStore.getState()` at the moment each action is invoked, not from captured React state.
 
-- Delete `conversation:loading` case from message-handler.ts (orphaned — no sender exists in codebase)
-- Remove `createMessageHandler` export after all logic is extracted to ChatSessionInstance
-- Clean up `message-handler.ts` file (can be deleted entirely once extraction is complete)
+Remove from deps: `messages`, `isAgentRunning`, `setMessages`, `setIsAgentRunning`, `setSessionId`, `messagesRef`, `messagesCache`, `isStopPendingRef`, `conversations`
+Keep: `postMessage`, `workspacePath`, `activeWorktreePath`
+
+**Critical**: `handleSend` checks `isAgentRunning` (to decide queueing) and `messages.length` (to decide conversation creation). These must read from `chatStore.getState()` at call time, not from React selector values passed as deps (which could be one render stale):
+
+```typescript
+const handleSend = (text: string): void => {
+  const store = useChatStore.getState();
+  const sessionId = store.activeSessionId;
+  const session = sessionId ? store.sessions[sessionId] : undefined;
+  if (session?.isAgentRunning) {
+    /* queue */
+  } // always fresh
+  if (!session || session.messages.length === 0) {
+    /* create */
+  } // always fresh
+};
+```
+
+### 3d. DELETE `message-state.ts`
+
+Entirely replaced by `ChatStore.sessions`. The `messagesCache` Map ref, session-switch detection useEffect, and `messagesRef` are all unnecessary.
+
+### 3e. DELETE `session-state.ts`
+
+Replaced by `ChatStore.activeSessionId`. The localStorage persistence of sessionId moves to ChatStore's initialization (read on create) and a store subscriber (write on change).
+
+### 3f. SIMPLIFY `message-buffer-store.ts`
+
+With a centralized store that always accepts writes, `shouldBuffer`/`bufferMessage`/`startConsuming`/`stopConsuming` are no longer needed. The `pendingLoads` tracking (preventing duplicate `conversation:load`) moves into ChatStore or stays as a minimal utility.
+
+---
+
+## Phase 4: Integration & Verification
+
+### 4a. Sidebar flow (no changes needed)
+
+`use-sidebar-actions.ts` still calls `postMessage({ type: 'conversation:load' })`. The `conversation:loaded` handler in ChatMessageService writes to ChatStore and sets `activeSessionId`. React selectors pick up the change. No sidebar code changes.
+
+### 4b. ChatArea (no changes needed)
+
+Still calls `useChatMessages()` which returns the same interface. The hook just reads from ChatStore selectors now.
+
+### 4c. Demo mode compatibility
+
+`demo-conversation.ts` posts events via `window.postMessage()` which flow through the global listener in `use-tauri-message-listener.ts`. After the route split, these demo events will be routed to `chatMessageService.handleMessage()` via the `CHAT_EVENT_TYPES` set — verify that `conversation:created`, `conversation:loaded`, `agent:chunk`, `tool:start`, `tool:end`, and `agent:complete` are all in the set (they are). No changes to `demo-conversation.ts` itself — it posts the same messages and the service processes them identically to real backend messages.
 
 ---
 
 ## Files Summary
 
-### New Files (3)
+| File                                              | Action       | Lines (est.)                                              |
+| ------------------------------------------------- | ------------ | --------------------------------------------------------- |
+| `stores/chat/chat-store.ts`                       | **CREATE**   | ~200                                                      |
+| `stores/chat/index.ts`                            | **CREATE**   | ~5                                                        |
+| `services/chat/chat-message-service.ts`           | **CREATE**   | ~400 (routing, lifecycle, batchers)                       |
+| `services/chat/handlers/streaming-handlers.ts`    | **CREATE**   | ~300 (chunk, thinking, complete, error)                   |
+| `services/chat/handlers/conversation-handlers.ts` | **CREATE**   | ~400 (created, loaded, rewound, list)                     |
+| `services/chat/handlers/tool-handlers.ts`         | **CREATE**   | ~200 (tool:start/end, permission, inputMode)              |
+| `services/chat/handlers/system-handlers.ts`       | **CREATE**   | ~100 (system:init remap)                                  |
+| `services/chat/merge-messages.ts`                 | **CREATE**   | ~170 (pure merge function)                                |
+| `services/chat/index.ts`                          | **CREATE**   | ~5                                                        |
+| `hooks/chat/handlers/message-handler.ts`          | **DELETE**   | -1629                                                     |
+| `hooks/chat/state/message-state.ts`               | **DELETE**   | -80                                                       |
+| `hooks/chat/state/session-state.ts`               | **DELETE**   | -79                                                       |
+| `hooks/chat/use-chat-messages.ts`                 | **REWRITE**  | ~150 (was 628)                                            |
+| `hooks/chat/handlers/chat-actions.ts`             | **MODIFY**   | deps change                                               |
+| `hooks/agent/use-tauri-message-listener.ts`       | **MODIFY**   | route split                                               |
+| `stores/agent/message-buffer-store.ts`            | **SIMPLIFY** | remove buffer logic                                       |
+| `hooks/agent/demo-conversation.ts`                | **MODIFY**   | write to store                                            |
+| `services/index.ts`                               | **MODIFY**   | add `export * from './chat'`                              |
+| `__tests__/integration/chat/rewind-e2e.test.ts`   | **MODIFY**   | update to use service/store instead of handler simulation |
 
-| File                                                    | Purpose                                                                         |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `apps/agent/src/services/chat/chat-session-instance.ts` | Per-session state owner (messages, RAF batchers, streaming state, epoch guards) |
-| `apps/agent/src/services/chat/chat-session-manager.ts`  | Module-level singleton (routes events, manages instances, cross-session cache)  |
-| `apps/agent/src/hooks/chat/use-chat-session-manager.ts` | React hook wrapper (init, update, no cleanup)                                   |
+**Net effect**: ~1800 lines deleted, ~1600 created. The new code is structurally cleaner (service class vs closure) and the store eliminates the lifecycle coupling that caused all previous bugs.
 
-### Modified Files (6)
+**Implementation note — service decomposition**: The service class targets ~1400 lines. To keep it maintainable, split handlers into domain-grouped private methods with clear section markers, or extract into delegate modules:
 
-| File                                                       | Change                                                                                     |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `apps/agent/src/hooks/agent/use-tauri-message-listener.ts` | Route chat events to ChatSessionManager; dual-route agent:checkpoint                       |
-| `apps/agent/src/hooks/chat/use-chat-messages.ts`           | Subscribe to instance instead of owning state; subscriber callbacks for React side effects |
-| `apps/agent/src/hooks/chat/state/message-state.ts`         | Remove messagesCache, simplify                                                             |
-| `apps/agent/src/hooks/chat/handlers/chat-actions.ts`       | Route state changes through instance.updateMessages()                                      |
-| `apps/agent/src/services/chat/index.ts`                    | Barrel export (new)                                                                        |
-| `apps/agent/src/services/index.ts`                         | Add chat re-export                                                                         |
+```
+services/chat/
+├── chat-message-service.ts        # Main service: routing, lifecycle, batcher management (~400 lines)
+├── handlers/
+│   ├── streaming-handlers.ts      # agent:chunk, agent:thinking, agent:complete, agent:error (~300 lines)
+│   ├── conversation-handlers.ts   # conversation:created, loaded, rewound, list, deleted (~400 lines)
+│   ├── tool-handlers.ts           # tool:start, tool:end, permission:request, inputMode/model (~200 lines)
+│   └── system-handlers.ts         # system:init remap (~100 lines)
+├── merge-messages.ts              # Pure function: mergeBackendAndCachedMessages (~170 lines)
+└── index.ts                       # Barrel export
+```
 
-### Deleted Files (1)
-
-| File                                                    | Reason                                                                                |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `apps/agent/src/hooks/chat/handlers/message-handler.ts` | Logic fully extracted into ChatSessionInstance. File can be removed after extraction. |
-
-### Existing Utilities Reused (no changes)
-
-| File                                                  | What's Reused                                                                            |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `apps/agent/src/lib/utils/event-batcher.ts`           | `rafBatch`, `RafBatchHandler` — used inside ChatSessionInstance                          |
-| `apps/agent/src/stores/agent/tool-store.ts`           | `switchSession()`, session LRU cache — already works                                     |
-| `apps/agent/src/stores/agent/checkpoint-store.ts`     | Per-session queue design — already works                                                 |
-| `apps/agent/src/stores/agent/message-buffer-store.ts` | `pendingLoads` Map retained for conversation:load dedup; buffering subsumed by instances |
-
-### No Changes Needed
-
-- Agent-bridge sidecar (already multi-session)
-- Rust backend / SessionManager
-- Protocol types (all include session_id)
-- TauriProvider (global event listeners)
-- ToolStore, CheckpointStore (already have per-session caching)
+Start with a single file and extract when it exceeds readability. The routing `handleMessage()` switch stays in the main service; handlers are called as `this.handleChunk(msg)` or as imported pure functions. Also extract a `ChatStore` unit test file (`__tests__/stores/chat/chat-store.test.ts`) for `getOrCreateSession`, `remapSession`, `destroySession`, and eviction logic — these are pure store tests with no DOM or service dependencies.
 
 ---
 
-## Edge Cases
+## Risk Mitigation
 
-| Scenario                                                        | Handling                                                                                                                                                                                                                                                                                                                             |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Concurrent streaming** (2+ sessions)                          | Each has own ChatSessionInstance with own RAF batchers. Manager routes by session_id. No cross-contamination.                                                                                                                                                                                                                        |
-| **Rewind**                                                      | Stays within ChatSessionInstance.handleMessage(). Bumps rewindEpoch, resets messages. Subscriber notified via onMessagesChanged.                                                                                                                                                                                                     |
-| **system:init session remap**                                   | Manager.remapSession(oldId, newId) re-keys the instance in the Map. Subscriber notified via onSessionRemapped for React state. ToolStore/CheckpointStore/FileStore/MessageBufferStore remap via globalCallbacks.                                                                                                                     |
-| **HMR during streaming**                                        | `import.meta.hot.dispose` does NOT reset instances (chat messages aren't ephemeral like PTY output). Only marks manager as uninitialized so the hook re-registers callbacks on next render. In-progress \_messages survive.                                                                                                          |
-| **React Strict Mode**                                           | Subscribe in useEffect → unsubscribe → re-subscribe. Instance persists, state is consistent. Subscription is last-writer-wins (not additive).                                                                                                                                                                                        |
-| **Auto-start agent** (Canvas review)                            | Manager.getOrCreate() creates instance on first event routed by window listener. Accumulates messages. ChatArea subscribes when mounted — hydrates from instance.getMessages(). Replaces MessageBufferStore buffering for this use case.                                                                                             |
-| **Conversation loading from sidebar**                           | conversation:loaded routes to instance. Instance merges messages, invokes subscriber.onConversationLoaded(). Subscriber applies in startTransition. If no subscriber (background load), messages cached in \_messages for later.                                                                                                     |
-| **handleSend before instance exists**                           | chatActions calls `manager.getOrCreate(sessionId)` — lazy-creates if needed.                                                                                                                                                                                                                                                         |
-| **Rapid session switches** (<100ms)                             | Manager tracks `activeSessionEpoch`, incremented on setActiveSession(). Subscriber notification checks epoch match before applying — stale loads for previous sessions are suppressed.                                                                                                                                               |
-| **conversation:loaded for destroyed instance**                  | Manager.handleMessage() calls getOrCreate() for conversation:loaded events — lazy-creates an instance rather than dropping the data.                                                                                                                                                                                                 |
-| **Two ChatArea mounts briefly overlap**                         | Subscription is last-writer-wins. New subscriber replaces old; old onMessagesChanged stops firing silently (not an error).                                                                                                                                                                                                           |
-| **Instance memory growth**                                      | cleanupOrphanedInstances(activeSessionIds) destroys instances not in the active conversation list AND not currently streaming. Called after conversation list refreshes.                                                                                                                                                             |
-| **Pending message creates user message while instance streams** | Pending message useEffect routes user message creation through `instance.updateMessages()` — both user message and streaming messages live in the same `_messages` array with no divergence.                                                                                                                                         |
-| **HMR during deferred conversation:loaded**                     | If `conversation:loaded`'s `setTimeout(0)` callback fires after HMR, the subscriber reference could point to a dead component tree. The `_disposed` guard short-circuits the callback. Epoch guards protect against stale data. Subscriber references are re-set by the new render's subscribe call.                                 |
-| **Two ChatArea instances on same session (Agent + Editor)**     | Last-writer-wins subscription. Second subscriber replaces first; first view's `onMessagesChanged` stops firing silently. `orbit:user-message` sync mitigates for user messages, but assistant streaming only renders in the latest subscriber's view. Acceptable trade-off — future multi-subscriber support can be added if needed. |
-| **cleanupOrphanedInstances during deferred callback**           | Instance disposed, but `setTimeout(0)` callback fires after disposal. The `_disposed` guard in `handleConversationLoaded` (and any other deferred methods) prevents invoking subscriber methods on a disposed instance.                                                                                                              |
-| **loadedSessionsRef interaction with instance-managed loading** | `loadedSessionsRef` (use-chat-messages.ts:377) prevents duplicate `conversation:load` requests. After refactor, keep this ref in the React hook — instance manages buffer state, but the hook still controls when to request loads from the backend. The instance doesn't call `conversationLoad` directly.                          |
-| **Rapid conversation creation** (3 "New" clicks in <500ms)      | Each click triggers `conversation:create` → `conversation:created`. Manager creates 3 instances, subscriber switches to each sequentially. `activeSessionEpoch` ensures only the last applies. 2 orphaned instances persist until `cleanupOrphanedInstances` runs on next `agent:complete`. Acceptable trade-off.                    |
-| **conversation:deleted while instance has deferred callback**   | `conversation:deleted` now explicitly calls `manager.destroyInstance()`. If a `setTimeout(0)` callback is pending, the `_disposed` guard prevents invoking subscriber methods. Same pattern as `cleanupOrphanedInstances`.                                                                                                           |
-| **Duplicate persistence from startup race + instance**          | `agent:complete` arrives before manager is initialized — `persistBufferedAssistantMessage` runs and calls `markMessagePersisted()`. Manager initializes, instance replays buffered events. Instance's `handleAgentComplete()` checks `wasMessagePersisted()` and skips. No double-write.                                             |
-| **chatActions reads stale closured state**                      | All chat actions (`handleSend`, `handleStop`, `handleRewind`, `handlePermissionDeny`) read from `instance.getIsAgentRunning()` / `instance.getMessages()` instead of closured React state. This eliminates stale-state bugs during rapid interactions.                                                                               |
+1. **conversation:loaded merge** (170 lines) — Move verbatim with no behavior changes. Preserve epoch guards, setTimeout(0), startTransition. Note: `startTransition` must be imported from `react` in the service — it works outside React components via `useSyncExternalStore` integration.
+
+2. **RAF batcher lifecycle** — Per-session batchers created lazily, deleted from Map on `agent:complete` (flush + cleanup) and on `destroySession`. This prevents accumulation of batcher closures. Test: two sessions streaming simultaneously, then complete one and verify its batcher Map entries are gone.
+
+3. **Session remap atomicity** — `remapSession` must move data + conditionally update activeSessionId + add to `remappedOrbitIds` in a single immer `set()` call. `activeSessionId` is ONLY updated when the remapped session is the active one (background remaps must not steal focus). Multiple concurrent remaps (two sessions remap in quick succession) must not interfere — each operates on different keys in the sessions Record.
+
+4. **Zustand selector stability** — Use `EMPTY_MESSAGES` constant for empty sessions. Immer's structural sharing ensures same-reference when data doesn't change. Export selector helpers (`useActiveMessages`, `useActiveSession`) that encapsulate the `?? EMPTY_MESSAGES` fallback.
+
+5. **Memory management** — `MAX_IN_MEMORY_SESSIONS = 20` with LRU eviction. Eviction clears messages but keeps session key (preserves `isAgentRunning` state). Without this, long sessions accumulate unbounded message arrays.
+
+6. **HMR cleanup** — `import.meta.hot?.dispose(() => chatMessageService.destroyAll())` cancels all batchers when module is hot-replaced. Without this, stale batcher closures from old module versions fire into dead code.
+
+7. **Background session deletion** — `destroySession` must: (a) cancel batchers via `cleanupBatchers`, (b) remove session from store, (c) clean up per-message tracking Maps. If the session has `isAgentRunning=true`, the caller (sidebar delete handler) should send `agent:stop` first.
+
+8. **Background session error** — `agent:error` handler writes the error message to `sessions[errorSessionId]`, not `sessions[activeSessionId]`. This is naturally correct because the handler reads `session_id` from the event, but must be verified in testing.
+
+9. **Session switch during deferred merge** — The `conversation:loaded` merge's `setTimeout(0)` callback captures `sessionId` from the event, not from `activeSessionId`. Changes to `activeSessionId` between the event and the deferred callback don't affect the merge target. `cachedMessages` is also snapshot synchronously before the deferral (see Phase 2 decision #4).
+
+10. **Existing tests** — `rewind-e2e.test.ts` simulates the `conversation:rewound` handler from `message-handler.ts`. After deletion, update the test to call `chatMessageService.handleMessage()` directly or simulate the equivalent store operations.
+
+11. **Per-session `isStopPending` clearing** — `agent:complete` and `agent:error` must call `chatStore.setStopPending(message.session_id, false)` — clearing only the completing session's flag, NOT a global clear. In the multi-session world, a global clear would unblock rewind on session A when session B completes.
+
+12. **Session deletion during active RAF batcher** — `destroySession` cancels batchers, but a queued RAF callback may have already been scheduled. The batcher processors read from `chatStore.getState().sessions[sessionId]` — after deletion this returns `undefined`. All batcher processors must handle `undefined` session data gracefully (bail early, no-op).
+
+13. **Sidebar refresh deduplication** — Two sessions completing `agent:complete` in the same RAF frame both trigger `conversationList()` for sidebar refresh. Use a dirty flag + `requestIdleCallback` coalescing: `agent:complete` sets `sidebarDirty = true` and schedules `requestIdleCallback(() => { if (sidebarDirty) { sidebarDirty = false; conversationList(); } })`. Multiple completions within the same idle period coalesce into one disk read. Falls back to `setTimeout(100)` if `requestIdleCallback` is unavailable.
+
+14. **LRU cache thrashing** — Users rapidly switching across 21+ sessions would repeatedly evict and recreate session data. `MAX_IN_MEMORY_SESSIONS = 20` is acceptable for v1 but monitor for thrashing patterns. Active session is pinned and never evicted (see Phase 1 eviction design).
+
+15. **HMR mid-stream** — When the service module is hot-replaced during an active stream, the new service instance starts with empty `pendingChunkLengths` and `thinkingStartTimes` Maps. Tool placement for the remainder of that stream may be inaccurate. Acceptable for dev-only; document this limitation.
+
+16. **`onSessionCreated` callback** — Do NOT use a mutable callback (`chatMessageService.onSessionCreated = cb`) — hook remounts would overwrite it. Instead, the service writes `lastCreatedSessionId` to ChatStore on `conversation:created`. The hook reacts via `useChatStore.subscribe((s) => s.lastCreatedSessionId)` and triggers any side effects (e.g., sending pending message). This keeps data flow unidirectional: service → store → hook subscription.
+
+17. **Service error isolation** — `handleMessage()` wraps the entire dispatch in a try-catch with structured error logging per session: `logger.error('ChatMessageService: unhandled error', { sessionId: message.session_id, type: message.type, error })`. Without this, a throw during a background session's event processing would silently swallow the error (no React error boundary wraps the service). Errors should never propagate to the caller (use-tauri-message-listener) — they're logged and the service continues processing other events.
+
+18. **startTransition outside React** — `startTransition` imported from `react` works in non-component code because Zustand v4+ uses `useSyncExternalStore` internally. The service code must include a comment confirming this Zustand version dependency so future devs don't break the assumption by downgrading. Example: `// IMPORTANT: startTransition works here because Zustand v4+ uses useSyncExternalStore internally.`
 
 ---
 
 ## Verification
 
-1. **Basic flow**: Start a chat, send a message, verify streaming works as before
-2. **Background streaming**: Send a message, switch to another conversation mid-stream, switch back — all messages should be present
-3. **Concurrent sessions**: Start streaming in Session A, switch to Session B, send a message in B, switch back to A — both should have complete responses
-4. **Rewind**: Verify rewind still works after the refactor (rewind within active session)
-5. **Auto-start agent**: Canvas review agent should buffer messages and display when ChatArea mounts
-6. **Session remap**: system:init should correctly remap session IDs across all stores
-7. **HMR**: Vite hot reload should not lose chat state (including mid-stream messages)
-8. **Rapid switching**: Click 3 sessions in <500ms — only the last should apply
-9. **Memory**: Open 20 conversations, verify cleanupOrphanedInstances trims idle instances
-10. **TypeScript**: `bun run typecheck` passes
-11. **Lint**: `bun run lint` passes with zero warnings
-12. **Tests**: `bun run test` passes (update existing tests as needed)
-13. **Concurrent streaming test**: Start streams in 2 sessions simultaneously, verify no cross-contamination
-14. **Cross-instance sync**: If Agent and Editor views are both open, send a message from one — verify it appears in the other via `orbit:user-message` event
-15. **Disposed instance guard**: Start a conversation load, quickly switch away and trigger cleanup — verify no errors from deferred callbacks on disposed instances
-
----
-
-## Audit Trail
-
-- **2026-02-11**: Initial plan created
-- **2026-02-11**: Updated per architectural audit Round 1 (`reviews/audit-plan.md`). Key changes:
-  - Added responsibility split table (instance vs subscriber) for conversation:loaded
-  - Added `onConversationLoaded`, `onConversationCreated`, `onSessionRemapped` subscriber callbacks
-  - Added `updateMessages(fn)` API for chatActions functional updater pattern
-  - Added dual-routing for `agent:checkpoint` (batching stays in window listener, reconciliation goes to manager)
-  - Added full event routing table documenting all routed vs non-routed event types
-  - Added `cleanupOrphanedInstances()` for memory management (Phase 7)
-  - Changed HMR strategy: preserve instances instead of resetting (chat isn't ephemeral like PTY)
-  - Removed `conversation:loading` handler (orphaned — no sender exists)
-  - Added `activeSessionEpoch` for rapid session switch protection
-  - Documented all 15+ globalCallbacks (full store access audit)
-  - Added 5 new edge cases from audit findings
-  - Confirmed Phase 6 (no key={sessionId} exists — verified via codebase search)
-- **2026-02-12**: Updated per architectural audit Round 2 (`reviews/audit-plan.md`). Key changes:
-  - **Critical #1**: Made `subscribe()` atomic — delivers current state immediately via callbacks, eliminating race window between hydration and subscription where RAF batchers could fire
-  - **Critical #2**: Preserved `setTimeout(0)` yield in `handleConversationLoaded` — epoch bumps synchronous before setTimeout, epoch checks + `_disposed` guard inside callback
-  - **Critical #3**: Added cross-instance `orbit:user-message` sync listener in Phase 5 subscription useEffect — required for Agent/Editor dual-view support
-  - **Critical #4**: Added `getWorkspacePath`/`getActiveWorktreePath` to `globalCallbacks` — needed by `agent:complete` for `conversationAddMessage` and `conversationList`
-  - Added `handleCheckpoint()` API for ID reconciliation (frontend UUID → SDK UUID) directly in `_messages`
-  - Added `getIsStopPending()` / `setIsStopPending()` API; documented `handleRewind` must use instance getter
-  - Detailed `dispose()` implementation: cancels 3 RAF batchers, clears pendingChunkLengths, nulls subscriber, sets `_disposed` flag
-  - Added `_disposed` guard for deferred callbacks on disposed instances
-  - Documented `persistBufferedAssistantMessage` fate (startup-race fallback only)
-  - Documented `file:content` handler redundancy (safe to drop — duplicate in use-file-tree.ts survives)
-  - Routed pending message user message creation through `instance.updateMessages()` to prevent state divergence
-  - Added 6 new edge cases (pending message divergence, HMR during deferred load, dual ChatArea, disposed cleanup, loadedSessionsRef interaction, cross-instance sync)
-  - Added 2 verification tests (cross-instance sync, disposed instance guard)
-- **2026-02-12**: Updated per architectural audit Round 3 (`reviews/audit-plan.md`). Key changes:
-  - **Critical #1**: Added explicit `agent:checkpoint` routing in `ChatSessionManager.handleMessage()` — manager calls `reconcileUserMessageId` first, passes both IDs to `instance.handleCheckpoint()`
-  - **Critical #2**: All chat actions (`handleSend`, `handleStop`, `handleRewind`, `handlePermissionDeny`) now read from instance (`getIsAgentRunning()`, `getMessages()`, `getIsStopPending()`) instead of closured React state. `messages` and `isAgentRunning` removed from `createChatActions` useMemo deps.
-  - **Critical #3**: Added persistence decision tree for `agent:complete` dual-handler boundary — instance persists when initialized, `persistBufferedAssistantMessage` only as startup-race fallback. Explicit gating in window listener: `!mgr.isInitialized() || !mgr.getInstance(session_id)`
-  - **Critical #4**: Added `wasMessagePersisted()` / `markMessagePersisted()` integration to instance's `handleAgentComplete()` — prevents duplicate backend writes when startup-race fallback already persisted
-  - Added `conversation:deleted` explicit instance destruction via `manager.destroyInstance()` (don't rely only on `cleanupOrphanedInstances`)
-  - Documented `switchSession` double-call between subscriber callbacks and `session-state.ts:62-69` useEffect — guard prevents actual double work
-  - Added pending message useEffect refactoring — both `updateMessages` and `setIsAgentRunning` route through instance
-  - Added `handleSend` and `handleRewind` refactored examples showing instance state reads
-  - Added 4 new edge cases (rapid conversation creation, conversation:deleted + deferred callback, duplicate persistence, stale closured state)
+1. **TypeScript**: `bun run typecheck` — must pass clean
+2. **ESLint**: `bun run lint` — zero warnings
+3. **Tests**: `bun run test` — all tests pass (update `rewind-e2e.test.ts` to work with service)
+4. **Manual testing — core flow**:
+   - Start a chat → send message → agent streams response
+   - Create new session → send message → agent streams in new session
+   - Switch back to first session → messages intact, agent still running if not complete
+   - Create third session while two are running → all three maintain independent state
+   - Sidebar click loads past conversation → messages display with tools
+   - Rewind in active session → works correctly, doesn't affect background sessions
+   - Close and reopen app → last session restored from localStorage
+5. **Manual testing — edge cases**:
+   - Delete a conversation while its agent is still running → agent stops, session removed
+   - Background session errors → error message appears in correct session, not active session
+   - Send message in session A → quickly switch to session B → send message → both remap correctly
+   - Stop agent in active session → immediately try rewind → blocked (isStopPending)
+   - Stop agent in background session → foreground session's isStopPending unaffected
+   - Background session's system:init remap → foreground session stays active (no focus steal)
+   - Demo mode (`?view=demo`) still plays correctly through the service
+   - Cross-instance sync: send message in one view → other view shows it (orbit:user-message event)
+   - Two sessions complete agent:complete simultaneously → sidebar refreshes once (debounced)
+   - Tool widget placement accurate during background streaming (contentOffset correct)

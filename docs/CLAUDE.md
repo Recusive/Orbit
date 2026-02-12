@@ -14,12 +14,13 @@ Use this to find the right file. Read the file directly — no links needed.
 | `reference/`    | SDK docs, prompts, external guides | API references, prompt templates |
 | `orbitweb/`     | Marketing site context             | Orbitweb-specific (read-only)    |
 
-## architecture/ (10 files)
+## architecture/ (11 files)
 
 - `TECH-STACK.md` — Complete technology overview
 - `EMBEDDED_BROWSER.md` — WebKit browser panel via Tauri multiwebview
 - `CSP-SECURITY.md` — Content Security Policy and unsafe-eval
 - `PROMOTION-120FPS.md` — 120Hz rendering in WKWebView via CADisplayLink
+- `CHATSTORE-SESSION-LIFECYCLE.md` — ChatStore/UIStore session lifecycle, remap flow, sidebar sync bugs & fixes
 - `PROCESS-PER-CHAT.md` — Process-per-chat session architecture
 - `REWIND_SYSTEM_CONTRACT.md` — Conversation rewind system contract
 - `REACT-19-ACTIVITY-OPTIMIZATION.md` — React 19 Activity API optimization

@@ -1118,6 +1118,10 @@ export class SessionManager extends Disposable {
               this.sessionInitFired.add(sessionId);
 
               const sdkSessionId = sdkMessage.session_id;
+              // Preserve the original frontend session ID BEFORE rekeying.
+              // The frontend needs this to identify which session to remap
+              // (activeSessionId is unreliable if the user switched chats).
+              const orbitSessionId = sessionId;
 
               // Re-key all Maps from temp ID to SDK ID.
               // After this, both the agent-bridge and frontend use one ID.
@@ -1132,7 +1136,7 @@ export class SessionManager extends Disposable {
                 isForked: false,
               };
               this._onSessionInit.fire({
-                sessionId,
+                sessionId: orbitSessionId,
                 sdkSessionId,
                 isResumed: resumeState.isResumed,
                 isForked: resumeState.isForked,

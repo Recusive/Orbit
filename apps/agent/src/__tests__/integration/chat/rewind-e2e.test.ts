@@ -11,7 +11,7 @@
  * │                                                                     │
  * │ 1. User clicks rewind → handleRewind builds conversation:rewind    │
  * │ 2. handleConversationRewind resolves target message from disk/cache │
- * │ 3. conversation:rewound arrives → message-handler processes it      │
+ * │ 3. conversation:rewound arrives → ChatMessageService processes it      │
  * │ 4. Fork point set → next send creates a branch via parentUuid      │
  * │ 5. system:init → session remap migrates stores to SDK session ID   │
  * │ 6. conversation:loaded → messages merge backend + live trailing     │
@@ -24,7 +24,7 @@
  * └──────────────────────────────────────────────────────────────────────┘
  *
  * @see conversation-handlers.ts - handleConversationRewind
- * @see message-handler.ts - conversation:rewound handler
+ * @see chat-message-service.ts - conversation:rewound handler
  * @see checkpoint-store.ts - fork points and checkpoint tracking
  * @see chat-actions.ts - handleRewind (UI entry point)
  * @see message-utils.ts - getActiveChain
@@ -67,7 +67,7 @@ interface TestToolUse {
 
 /**
  * Simulates the backend's conversation:rewound event payload.
- * This is what message-handler.ts receives.
+ * This is what ChatMessageService receives.
  */
 interface RewoundEvent {
   session_id: string;
@@ -89,7 +89,7 @@ interface RewoundEvent {
 // =============================================================================
 
 /**
- * Simulates the conversation:rewound handler from message-handler.ts (lines 1177-1293).
+ * Simulates the conversation:rewound handler from ChatMessageService.
  *
  * This is NOT a mock — it replicates the EXACT logic so the test validates
  * the algorithm, not just "did we call the right mock". If the logic changes,
@@ -289,7 +289,7 @@ function resolveTargetMessage(
 }
 
 /**
- * Simulates the conversation:loaded merge strategy (message-handler.ts lines 1018-1069).
+ * Simulates the conversation:loaded merge strategy from ChatMessageService.
  *
  * - Backend is the canonical source (SDK UUIDs).
  * - Live trailing: if cache has MORE user messages than backend, the extras are live.

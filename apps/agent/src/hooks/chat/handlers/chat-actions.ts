@@ -12,54 +12,17 @@ import type {
 import { conversationAddMessage } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
+import { useChatStore } from '@/stores/chat/chat-store';
+import { useQueuedMessageStore } from '@/stores/chat/queued-message-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
-interface Conversation {
-  sessionId: string;
-  title: string;
-  updatedAt: number;
-  messageCount: number;
-  workspacePath?: string | undefined;
-  worktreePath?: string | undefined;
-}
-
+/**
+ * Minimal deps for chat actions — only things that can't come from a Zustand store.
+ * Everything else is read from stores at invocation time (not captured as stale closures).
+ */
 interface ChatActionsDeps {
-  sessionId: string;
-  setSessionId: React.Dispatch<React.SetStateAction<string>>;
-  messages: ChatMessage[];
-  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
-  isAgentRunning: boolean;
-  setIsAgentRunning: React.Dispatch<React.SetStateAction<boolean>>;
-  /** Gate rewind after Stop — true while SDK is still flushing JSONL. */
-  isStopPendingRef: React.RefObject<boolean>;
-  conversations: Conversation[];
-  workspacePath: string | null;
-  activeWorktreePath: string | null;
-  messagesCache: React.RefObject<Map<string, ChatMessage[]>>;
-  setPendingMessage: React.Dispatch<
-    React.SetStateAction<{
-      text: string;
-      contextFiles?: string[] | undefined;
-      images?: ImageAttachment[] | undefined;
-      elements?: ReactElementContext[] | undefined;
-    } | null>
-  >;
   postMessage: (message: WebviewMessage) => void;
-  updateConversationTitle: (sessionId: string, title: string) => void;
-  storeQueueMessage: (message: {
-    text: string;
-    contextFiles?: string[];
-    images?: ImageAttachment[];
-    elements?: ReactElementContext[];
-    sessionId: string;
-  }) => void;
-  setInputMode: (mode: 'default' | 'plan' | 'accept') => void;
-  setThinkingMode: (mode: ThinkingMode) => void;
-  setEffortLevel: (level: EffortLevel) => void;
-  setModel: (model: Model) => void;
-  clearPermissions: () => void;
-  removePermissionRequest: (requestId: string) => void;
 }
 
 interface ChatActionsReturn {
@@ -86,29 +49,7 @@ interface ChatActionsReturn {
 }
 
 export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
-  const {
-    sessionId,
-    setSessionId,
-    messages,
-    setMessages,
-    isAgentRunning,
-    setIsAgentRunning,
-    isStopPendingRef,
-    conversations,
-    workspacePath,
-    activeWorktreePath,
-    messagesCache,
-    setPendingMessage,
-    postMessage,
-    updateConversationTitle,
-    storeQueueMessage,
-    setInputMode,
-    setThinkingMode,
-    setEffortLevel,
-    setModel,
-    clearPermissions,
-    removePermissionRequest,
-  } = deps;
+  const { postMessage } = deps;
 
   const handleSend = (
     text: string,
@@ -118,7 +59,6 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   ): void => {
     if (!text) return;
 
-    // Wrap the entire send operation in a Sentry span for UI interaction tracing
     Sentry.startSpan(
       {
         op: 'ui.action',
@@ -131,9 +71,16 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         },
       },
       () => {
+        // Read current state at invocation time — no stale closures
+        const chatStore = useChatStore.getState();
+        const sessionId = chatStore.activeSessionId ?? '';
+        const session = sessionId ? chatStore.sessions[sessionId] : undefined;
+        const messages = session?.messages ?? [];
+        const isAgentRunning = session?.isAgentRunning ?? false;
+
         // If agent is running, queue the message for later
         if (isAgentRunning) {
-          storeQueueMessage({
+          useQueuedMessageStore.getState().queueMessage({
             text,
             sessionId,
             ...(contextFiles ? { contextFiles } : {}),
@@ -143,25 +90,22 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           return;
         }
 
-        // Check if conversation already exists in sidebar
+        const uiState = useUIStore.getState();
+        const { workspacePath, activeWorktreePath, conversations } = uiState;
+
+        // Check if conversation already exists — use ChatStore session as primary authority.
+        // The UIStore sidebar list can be stale: conversation:list replaces it with
+        // disk-scanned JSONLs, which may not include optimistic conversations created
+        // by handleConversationCreated but not yet persisted by the SDK.
         const conversationExists =
-          sessionId !== '' && conversations.some((c) => c.sessionId === sessionId);
-
-        // Check if we have cached messages for the current session (even if local state is empty)
-        const hasCachedMessages =
           sessionId !== '' &&
-          messagesCache.current.has(sessionId) &&
-          (messagesCache.current.get(sessionId)?.length ?? 0) > 0;
+          (session !== undefined || conversations.some((c) => c.sessionId === sessionId));
 
-        // If no sessionId OR (first message AND conversation doesn't exist AND no cached messages),
+        // If no sessionId OR first message in a non-existent conversation,
         // we need to create a conversation first via the backend
-        if (!sessionId || (messages.length === 0 && !conversationExists && !hasCachedMessages)) {
-          // Store text, context files, images, and elements for pending message
-          setPendingMessage({ text, contextFiles, images, elements });
-          // Clear sessionId so the conversation:created handler will set the new one
-          if (sessionId) {
-            setSessionId('');
-          }
+        if (!sessionId || (messages.length === 0 && !conversationExists)) {
+          // Store pending message — will be sent after conversation:created
+          chatStore.setPendingMessage({ text, contextFiles, images, elements });
           postMessage({
             type: 'conversation:create',
             uuid: crypto.randomUUID(),
@@ -175,7 +119,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         // If first message but conversation exists (created via "New conversation" button),
         // update the title from "Untitled" to the message text
         if (messages.length === 0 && conversationExists) {
-          updateConversationTitle(sessionId, text);
+          useUIStore.getState().updateConversationTitle(sessionId, text);
           postMessage({
             type: 'conversation:updateTitle',
             uuid: crypto.randomUUID(),
@@ -185,9 +129,6 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         }
 
         // Always send current thinking mode and model BEFORE message:send
-        // This ensures the session uses the correct settings.
-        // Skip thinking:set for adaptive thinking models (Opus 4.6) — effort controls thinking.
-        // Sending thinking:set with mode 'off' would race with effort:set and disable thinking.
         const toolState = useToolStore.getState();
         if (!isAdaptiveThinkingModel(toolState.model)) {
           postMessage({
@@ -211,14 +152,6 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         });
 
         // Get parentUuid for Claude Code-style rewind (linked list of messages)
-        // Priority:
-        // 1. Rewind fork point (if user just rewound, create a branch)
-        // 2. Last message in current chain (normal flow)
-        // 3. null (first message in conversation)
-        //
-        // The fork point creates a BRANCH in the conversation tree:
-        //   msg1 -> msg2 -> msg3 -> msg4
-        //                \-> msg5 (fork from msg2 via rewind)
         const checkpointStore = useCheckpointStore.getState();
         const forkPoint = checkpointStore.consumeRewindForkPoint(sessionId);
         const lastMessage = messages[messages.length - 1];
@@ -233,11 +166,12 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           attachedImages: images,
           parentUuid,
         };
-        setMessages((prev) => [...prev, userMessage]);
-        setIsAgentRunning(true);
 
-        // Persist user message to backend with workspace/worktree context
-        // This ensures auto-created conversations go to the correct location, not _global
+        // Write to ChatStore (not React setState)
+        useChatStore.getState().addMessage(sessionId, userMessage);
+        useChatStore.getState().setAgentRunning(sessionId, true);
+
+        // Persist user message to backend
         void conversationAddMessage(
           sessionId,
           {
@@ -270,8 +204,6 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
               }
             : undefined;
 
-        // IMPORTANT: Use userMessage.id so checkpoints are associated correctly with the rewind target
-        // Include parent_uuid for Claude Code-style rewind (linked list of messages)
         postMessage({
           type: 'message:send',
           uuid: userMessage.id,
@@ -285,99 +217,101 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   };
 
   const handleStop = (): void => {
-    if (!sessionId || !isAgentRunning) return;
+    const chatStore = useChatStore.getState();
+    const sessionId = chatStore.activeSessionId ?? '';
+    const session = sessionId ? chatStore.sessions[sessionId] : undefined;
+    if (!sessionId || !(session?.isAgentRunning ?? false)) return;
 
-    // Wrap the stop operation in a Sentry span for UI interaction tracing
     Sentry.startSpan(
       {
         op: 'ui.action',
         name: 'Stop Agent',
-        attributes: {
-          'session.id': sessionId,
-        },
+        attributes: { 'session.id': sessionId },
       },
       () => {
-        // Send interrupt to stop the agent
         postMessage({
           type: 'agent:stop',
           uuid: crypto.randomUUID(),
           session_id: sessionId,
         });
 
-        // Update local state immediately for responsive UI
-        setIsAgentRunning(false);
-        // Block rewind until SDK confirms stop (agent:complete/agent:error clears this).
-        // Without this, rewind can read a partially-written JSONL → corruption.
-        isStopPendingRef.current = true;
+        // Update store immediately for responsive UI
+        useChatStore.getState().setAgentRunning(sessionId, false);
+        // Block rewind until SDK confirms stop (agent:complete/agent:error clears this)
+        useChatStore.getState().setStopPending(sessionId, true);
 
-        // Clear any pending permission requests since agent is stopped
-        clearPermissions();
+        // Clear any pending permission requests
+        useToolStore.getState().clearPermissions();
 
-        // Mark any streaming message as complete and interrupted, or create one if none exists
-        setMessages((prev) => {
-          const lastMsg = prev[prev.length - 1];
-          if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-            const interruptedMsg = { ...lastMsg, isStreaming: false, isInterrupted: true };
+        const { workspacePath, activeWorktreePath } = useUIStore.getState();
 
-            // Persist interrupted assistant message to backend (if it has content)
-            if (interruptedMsg.content) {
-              void conversationAddMessage(
-                sessionId,
-                {
-                  id: interruptedMsg.id,
-                  role: 'assistant',
-                  content: interruptedMsg.content,
-                  ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
-                  createdAt: Date.now(),
-                  // Include parentUuid for Claude Code-style rewind chain
-                  ...(interruptedMsg.parentUuid !== undefined
-                    ? { parentUuid: interruptedMsg.parentUuid }
-                    : {}),
-                },
-                workspacePath ?? undefined,
-                activeWorktreePath ?? undefined
-              );
-            }
+        // Mark any streaming message as interrupted
+        const currentSession = useChatStore.getState().sessions[sessionId];
+        const messages = currentSession?.messages ?? [];
+        const lastMsg = messages[messages.length - 1];
 
-            return [...prev.slice(0, -1), interruptedMsg];
-          }
-          // If no assistant message exists yet, create an interrupted placeholder
-          if (!lastMsg || lastMsg.role === 'user') {
-            // Set parentUuid to the last message's ID to maintain the chain
-            const parentUuid = lastMsg?.id ?? null;
-            return [
-              ...prev,
+        if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+          const interruptedMsg: ChatMessage = {
+            ...lastMsg,
+            isStreaming: false,
+            isInterrupted: true,
+          };
+
+          // Persist interrupted assistant message
+          if (interruptedMsg.content) {
+            void conversationAddMessage(
+              sessionId,
               {
-                id: crypto.randomUUID(),
-                role: 'assistant' as const,
-                content: '',
-                displayedContent: '',
-                isStreaming: false,
-                isInterrupted: true,
-                parentUuid,
+                id: interruptedMsg.id,
+                role: 'assistant',
+                content: interruptedMsg.content,
+                ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
+                createdAt: Date.now(),
+                ...(interruptedMsg.parentUuid !== undefined
+                  ? { parentUuid: interruptedMsg.parentUuid }
+                  : {}),
               },
-            ];
+              workspacePath ?? undefined,
+              activeWorktreePath ?? undefined
+            );
           }
-          return prev;
-        });
+
+          useChatStore.getState().updateMessage(sessionId, lastMsg.id, () => interruptedMsg);
+        } else if (!lastMsg || lastMsg.role === 'user') {
+          // Create an interrupted placeholder
+          const parentUuid = lastMsg?.id ?? null;
+          useChatStore.getState().addMessage(sessionId, {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: '',
+            displayedContent: '',
+            isStreaming: false,
+            isInterrupted: true,
+            parentUuid,
+          });
+        }
       }
     );
   };
 
   const handleRewind = (messageId: string): void => {
-    // Block rewind while agent is running OR while SDK is flushing after Stop.
-    // The stop-pending window is ~50-200ms between handleStop and agent:complete.
-    if (!sessionId || isAgentRunning || isStopPendingRef.current) {
+    const chatStore = useChatStore.getState();
+    const sessionId = chatStore.activeSessionId ?? '';
+    const session = sessionId ? chatStore.sessions[sessionId] : undefined;
+    const messages = session?.messages ?? [];
+    const isAgentRunning = session?.isAgentRunning ?? false;
+    const isStopPending = session?.isStopPending ?? false;
+
+    // Block rewind while agent is running OR while SDK is flushing after Stop
+    if (!sessionId || isAgentRunning || isStopPending) {
       return;
     }
 
-    // Find the clicked message
     const clickedMessage = messages.find((m) => m.id === messageId);
     if (!clickedMessage) {
       return;
     }
 
-    // Wrap the rewind operation in a Sentry span for UI interaction tracing
     Sentry.startSpan(
       {
         op: 'ui.action',
@@ -400,10 +334,6 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           }
         }
 
-        // Include truncated messages as fallback for subsequent rewinds.
-        // After the first rewind, the JSONL on disk may be truncated/deleted by
-        // forkSessionAt. The frontend messages already have SDK JSONL UUIDs from
-        // the first rewind's conversation:rewound event, so they are reliable.
         const truncatedMessages = messages.slice(0, messageIndex + 1).map((m) => ({
           id: m.id,
           role: m.role,
@@ -429,9 +359,9 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     always?: boolean,
     answers?: Record<string, string>
   ): void => {
+    const sessionId = useChatStore.getState().activeSessionId ?? '';
     if (!sessionId) return;
 
-    // For AskUserQuestion: merge answers into the tool's toolInput so the widget can display them
     if (answers !== undefined) {
       useToolStore.getState().mergeToolInputAnswers('askuserquestion', answers);
     }
@@ -445,20 +375,20 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
       always,
       answers,
     });
-    removePermissionRequest(requestId);
+    useToolStore.getState().removePermissionRequest(requestId);
   };
 
   const handlePermissionDeny = (requestId: string): void => {
+    const sessionId = useChatStore.getState().activeSessionId ?? '';
     if (!sessionId) return;
 
-    // Check if this is an AskUserQuestion rejection (before clearing permissions)
+    // Check if this is an AskUserQuestion rejection
     const deniedRequest = useToolStore
       .getState()
       .pendingPermissions.find((p) => p.requestId === requestId);
     const isQuestionRejection = deniedRequest?.toolName.toLowerCase() === 'askuserquestion';
     const interruptReason = isQuestionRejection ? 'User rejected to answer' : undefined;
 
-    // Send denial response to the SDK
     postMessage({
       type: 'permission:response',
       uuid: crypto.randomUUID(),
@@ -468,73 +398,66 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     });
 
     // Clear ALL pending permissions since we're stopping the agent
-    clearPermissions();
+    useToolStore.getState().clearPermissions();
 
-    // Also interrupt the agent - SDK continues after denial by default,
-    // but user expects declining permission to stop the agent
+    // Stop the agent — user expects declining permission to stop
     postMessage({
       type: 'agent:stop',
       uuid: crypto.randomUUID(),
       session_id: sessionId,
     });
 
-    // Update local state immediately
-    setIsAgentRunning(false);
-    isStopPendingRef.current = true;
+    // Update store immediately
+    useChatStore.getState().setAgentRunning(sessionId, false);
+    useChatStore.getState().setStopPending(sessionId, true);
 
-    // Mark any streaming message as complete and interrupted, or create one if none exists
-    setMessages((prev) => {
-      const lastMsg = prev[prev.length - 1];
-      if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-        const interruptedMsg = {
-          ...lastMsg,
-          isStreaming: false,
-          isInterrupted: true,
-          interruptReason,
-        };
+    const { workspacePath, activeWorktreePath } = useUIStore.getState();
 
-        // Persist interrupted assistant message to backend (if it has content)
-        if (interruptedMsg.content) {
-          void conversationAddMessage(
-            sessionId,
-            {
-              id: interruptedMsg.id,
-              role: 'assistant',
-              content: interruptedMsg.content,
-              ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
-              createdAt: Date.now(),
-              // Include parentUuid for Claude Code-style rewind chain
-              ...(interruptedMsg.parentUuid !== undefined
-                ? { parentUuid: interruptedMsg.parentUuid }
-                : {}),
-            },
-            workspacePath ?? undefined,
-            activeWorktreePath ?? undefined
-          );
-        }
+    // Mark any streaming message as interrupted
+    const currentSession = useChatStore.getState().sessions[sessionId];
+    const messages = currentSession?.messages ?? [];
+    const lastMsg = messages[messages.length - 1];
 
-        return [...prev.slice(0, -1), interruptedMsg];
-      }
-      // If no assistant message exists yet, create an interrupted placeholder
-      if (!lastMsg || lastMsg.role === 'user') {
-        // Set parentUuid to the last message's ID to maintain the chain
-        const parentUuid = lastMsg?.id ?? null;
-        return [
-          ...prev,
+    if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+      const interruptedMsg: ChatMessage = {
+        ...lastMsg,
+        isStreaming: false,
+        isInterrupted: true,
+        interruptReason,
+      };
+
+      if (interruptedMsg.content) {
+        void conversationAddMessage(
+          sessionId,
           {
-            id: crypto.randomUUID(),
-            role: 'assistant' as const,
-            content: '',
-            displayedContent: '',
-            isStreaming: false,
-            isInterrupted: true,
-            interruptReason,
-            parentUuid,
+            id: interruptedMsg.id,
+            role: 'assistant',
+            content: interruptedMsg.content,
+            ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
+            createdAt: Date.now(),
+            ...(interruptedMsg.parentUuid !== undefined
+              ? { parentUuid: interruptedMsg.parentUuid }
+              : {}),
           },
-        ];
+          workspacePath ?? undefined,
+          activeWorktreePath ?? undefined
+        );
       }
-      return prev;
-    });
+
+      useChatStore.getState().updateMessage(sessionId, lastMsg.id, () => interruptedMsg);
+    } else if (!lastMsg || lastMsg.role === 'user') {
+      const parentUuid = lastMsg?.id ?? null;
+      useChatStore.getState().addMessage(sessionId, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: '',
+        displayedContent: '',
+        isStreaming: false,
+        isInterrupted: true,
+        interruptReason,
+        parentUuid,
+      });
+    }
   };
 
   const handleOpenFile = (path: string): void => {
@@ -562,7 +485,8 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   };
 
   const handleModeChange = (mode: 'default' | 'plan' | 'accept'): void => {
-    setInputMode(mode);
+    useToolStore.getState().setInputMode(mode);
+    const sessionId = useChatStore.getState().activeSessionId ?? '';
     if (sessionId) {
       postMessage({
         type: 'inputMode:set',
@@ -574,9 +498,8 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   };
 
   const handleThinkingModeChange = (mode: ThinkingMode): void => {
-    setThinkingMode(mode);
-    // Skip thinking:set for adaptive thinking models — effort controls thinking.
-    // The UI already hides the toggle for Opus 4.6, but guard here for safety.
+    useToolStore.getState().setThinkingMode(mode);
+    const sessionId = useChatStore.getState().activeSessionId ?? '';
     if (sessionId && !isAdaptiveThinkingModel(useToolStore.getState().model)) {
       postMessage({
         type: 'thinking:set',
@@ -588,7 +511,8 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   };
 
   const handleEffortLevelChange = (level: EffortLevel): void => {
-    setEffortLevel(level);
+    useToolStore.getState().setEffortLevel(level);
+    const sessionId = useChatStore.getState().activeSessionId ?? '';
     if (sessionId) {
       postMessage({
         type: 'effort:set',
@@ -600,7 +524,8 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   };
 
   const handleModelChange = (model: Model): void => {
-    setModel(model);
+    useToolStore.getState().setModel(model);
+    const sessionId = useChatStore.getState().activeSessionId ?? '';
     if (sessionId) {
       postMessage({
         type: 'model:set',

@@ -17,6 +17,7 @@ import {
 } from '@/lib/api';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
+import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -243,6 +244,11 @@ export const useSidebarActions = ({
       // when the sessionId changes in response to conversation:loaded.
       // See message-buffer-store.ts:pendingLoads for the 30s safety timeout.
       useMessageBufferStore.getState().markLoadPending(sessionId);
+      // Switch active session IMMEDIATELY so handleConversationLoaded doesn't need to.
+      // This prevents stale conversation:loaded responses (e.g., from Effect 3's initial
+      // mount load) from hijacking activeSessionId back to a previous session when the
+      // user has already navigated away (by creating a new session or clicking another).
+      useChatStore.getState().setActiveSession(sessionId);
       // PERF: Wrap the network request in startTransition so React can yield to
       // the browser between the synchronous loading-state paint above and the
       // heavier conversation data processing. This reduces the click handler
@@ -334,7 +340,7 @@ export const useSidebarActions = ({
         setConversationToDelete(null);
 
         // Clean up cached session data to prevent memory leaks
-        // (mirrors cleanup in message-handler.ts conversation:deleted handler)
+        // (mirrors cleanup in ChatMessageService conversation:deleted handler)
         useToolStore.getState().clearSessionTools(sessionId);
         useFileStore.getState().clearSessionFiles(sessionId);
 

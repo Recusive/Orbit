@@ -6,8 +6,8 @@
  * Used by ?view=hero and ?view=demo demo views.
  *
  * Architecture: Posts ExtensionMessage events via window.postMessage to simulate
- * the backend message flow. The chat system's message-handler.ts processes these
- * identically to real backend messages — streaming, tool widgets, and all.
+ * the backend message flow. ChatMessageService processes these identically to
+ * real backend messages — streaming, tool widgets, and all.
  */
 
 // ============================================

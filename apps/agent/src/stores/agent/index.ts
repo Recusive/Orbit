@@ -6,9 +6,9 @@
 export { useCheckpointStore } from './checkpoint-store';
 export type { RewindCheckpoints, CheckpointState } from './checkpoint-store';
 
-// Message buffer store
+// Message buffer store (pending load tracking)
 export { useMessageBufferStore } from './message-buffer-store';
-export type { MessageBufferState, BufferedMessage, SessionBuffer } from './message-buffer-store';
+export type { MessageBufferState } from './message-buffer-store';
 
 // Commands store
 export {

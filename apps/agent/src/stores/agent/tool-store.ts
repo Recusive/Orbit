@@ -217,6 +217,9 @@ export interface ToolExecution {
   success?: boolean;
   // Content offset - where in the message content this tool was invoked
   contentOffset?: number | undefined;
+  // Session this tool belongs to — prevents cross-session cache contamination
+  // when tools arrive for a background streaming session while viewing another.
+  sessionId?: string | undefined;
 }
 
 // Permission request
@@ -282,7 +285,8 @@ export interface ToolState {
     messageId: string,
     toolName: string,
     toolInput: Record<string, unknown>,
-    contentOffset?: number
+    contentOffset?: number,
+    sessionId?: string
   ) => void;
   completeTool: (id: string, toolOutput: unknown, success: boolean) => void;
 
@@ -326,7 +330,8 @@ export interface ToolState {
       input: Record<string, unknown>;
       output?: string | undefined;
       success: boolean;
-    }[]
+    }[],
+    sessionId?: string
   ) => void;
 
   // Cleanup tools for a deleted session
@@ -423,7 +428,8 @@ export const useToolStore = create<ToolState>()(
         messageId: string,
         toolName: string,
         toolInput: Record<string, unknown>,
-        contentOffset?: number
+        contentOffset?: number,
+        sessionId?: string
       ) => {
         logger.debug(`Tool started: ${toolName}`, { id, messageId });
         set((state) => {
@@ -435,6 +441,7 @@ export const useToolStore = create<ToolState>()(
             status: 'running',
             startedAt: Date.now(),
             contentOffset,
+            sessionId,
           };
           state.activeTools[id] = tool;
         });
@@ -545,14 +552,70 @@ export const useToolStore = create<ToolState>()(
       switchSession: (newSessionId: string) => {
         set((state) => {
           const isInitLoad = state.currentSessionId === null;
+          const prevId = state.currentSessionId;
+          const prevToolCount = state.completedTools.length;
 
           if (state.currentSessionId) {
+            // Filter tools by session ownership to prevent cross-session contamination.
+            // Tools that arrived for a background streaming session (different sessionId)
+            // must NOT be cached under the leaving session's key — they'd be lost.
+            const ownedCompleted = state.completedTools.filter(
+              (t) => !t.sessionId || t.sessionId === state.currentSessionId
+            );
+            const ownedActive: Record<string, ToolExecution> = {};
+            const foreignActive: Record<string, ToolExecution> = {};
+            for (const [tid, tool] of Object.entries(state.activeTools)) {
+              if (!tool.sessionId || tool.sessionId === state.currentSessionId) {
+                ownedActive[tid] = tool;
+              } else {
+                foreignActive[tid] = tool;
+              }
+            }
+
             state.sessionCache[state.currentSessionId] = {
               usage: { ...state.sessionUsage },
               processedIds: Array.from(state.processedMessageIds),
-              activeTools: { ...state.activeTools },
-              completedTools: [...state.completedTools],
+              activeTools: { ...ownedActive },
+              completedTools: [...ownedCompleted],
             };
+
+            // Stash foreign tools into their respective session caches so they
+            // survive the switch. Completed tools for other sessions are merged.
+            const foreignCompleted = state.completedTools.filter(
+              (t) => t.sessionId !== undefined && t.sessionId !== state.currentSessionId
+            );
+            // Group foreign tools by sessionId
+            const foreignBySession = new Map<
+              string,
+              { active: Record<string, ToolExecution>; completed: ToolExecution[] }
+            >();
+            for (const [tid, tool] of Object.entries(foreignActive)) {
+              const sid = tool.sessionId ?? '';
+              let group = foreignBySession.get(sid);
+              if (!group) {
+                group = { active: {}, completed: [] };
+                foreignBySession.set(sid, group);
+              }
+              group.active[tid] = tool;
+            }
+            for (const tool of foreignCompleted) {
+              const sid = tool.sessionId ?? '';
+              let group = foreignBySession.get(sid);
+              if (!group) {
+                group = { active: {}, completed: [] };
+                foreignBySession.set(sid, group);
+              }
+              group.completed.push(tool);
+            }
+            for (const [sid, group] of foreignBySession) {
+              const existing = state.sessionCache[sid];
+              state.sessionCache[sid] = {
+                usage: existing?.usage ?? { ...initialUsage },
+                processedIds: existing?.processedIds ?? [],
+                activeTools: { ...(existing?.activeTools ?? {}), ...group.active },
+                completedTools: [...(existing?.completedTools ?? []), ...group.completed],
+              };
+            }
 
             const cacheKeys = Object.keys(state.sessionCache);
             if (cacheKeys.length > MAX_CACHED_SESSIONS) {
@@ -569,14 +632,21 @@ export const useToolStore = create<ToolState>()(
             state.processedMessageIds = new Set(cached.processedIds);
             state.activeTools = { ...cached.activeTools };
             state.completedTools = [...cached.completedTools];
+            logger.debug(
+              `switchSession: ${String(prevId)} → ${newSessionId} | cached ${String(prevToolCount)} tools, restored ${String(cached.completedTools.length)} from cache`
+            );
           } else if (isInitLoad) {
             state.sessionUsage = { ...initialUsage };
             state.processedMessageIds = new Set<string>();
+            logger.debug(`switchSession: INIT → ${newSessionId} | no cache (initial load)`);
           } else {
             state.sessionUsage = { ...initialUsage };
             state.processedMessageIds = new Set<string>();
             state.activeTools = {};
             state.completedTools = [];
+            logger.debug(
+              `switchSession: ${String(prevId)} → ${newSessionId} | cached ${String(prevToolCount)} tools, RESET (no cache)`
+            );
           }
 
           state.currentSessionId = newSessionId;
@@ -678,8 +748,12 @@ export const useToolStore = create<ToolState>()(
           output?: string | undefined;
           success: boolean;
           contentOffset?: number | undefined;
-        }[]
+        }[],
+        sessionId?: string
       ) => {
+        logger.debug(
+          `restoreToolsForMessage: msgId=${messageId}, toolCount=${String(tools.length)}, names=[${tools.map((t) => t.name).join(', ')}]`
+        );
         set((state) => {
           // Convert persisted tool data to ToolExecution format.
           // If a tool already exists (e.g., from localStorage rehydration), UPDATE it
@@ -700,6 +774,7 @@ export const useToolStore = create<ToolState>()(
               completedAt: 0, // Not available from persisted data
               success: tool.success,
               contentOffset: tool.contentOffset,
+              sessionId: sessionId ?? state.currentSessionId ?? undefined,
             };
 
             if (existingIdx >= 0) {
@@ -738,6 +813,9 @@ export const useToolStore = create<ToolState>()(
               completedTools: [...state.completedTools],
             };
           }
+          logger.debug(
+            `restoreToolsForMessage DONE: total completedTools=${String(state.completedTools.length)}, cached for session=${String(sid)}`
+          );
         });
       },
 

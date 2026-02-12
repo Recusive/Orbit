@@ -9,7 +9,7 @@
  * To change chat max-width or CSS variable names,
  * update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts - DO NOT hardcode here.
  */
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ChatContent } from './ChatContent';
 import { useLayoutStabilization } from './use-layout-stabilization';
@@ -68,7 +68,7 @@ export const ChatArea: FC = () => {
   const inputMode = useInputMode();
   const thinkingMode = useThinkingMode();
   const effortLevel = useEffortLevel();
-  const pendingPermissions = usePendingPermissions();
+  const allPendingPermissions = usePendingPermissions();
   const sessionUsage = useSessionUsage();
   const maxTokens = useMaxTokens();
   const {
@@ -119,6 +119,13 @@ export const ChatArea: FC = () => {
 
   // Only show queued message if it belongs to current session
   const queuedMessage = rawQueuedMessage?.sessionId === sessionId ? rawQueuedMessage : null;
+
+  // Only show permission requests for the active session — prevents permission
+  // modals from leaking across sessions when the user switches conversations.
+  const pendingPermissions = useMemo(
+    () => allPendingPermissions.filter((p) => p.sessionId === sessionId),
+    [allPendingPermissions, sessionId]
+  );
 
   // Handle feedback click - dispatches event to focus input
   const handleFeedback = useCallback((): void => {
