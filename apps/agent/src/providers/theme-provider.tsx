@@ -29,7 +29,7 @@ export interface ThemeProviderProps {
 export const ThemeProvider: FC<ThemeProviderProps> = ({
   children,
   defaultTheme = 'system',
-  defaultWindowMode = 'liquid-glass',
+  defaultWindowMode = 'solid',
   storageKey = 'orbit-agent-theme',
   windowModeStorageKey = 'orbit-agent-window-mode',
 }) => {
