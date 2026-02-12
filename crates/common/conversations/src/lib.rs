@@ -18,7 +18,7 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::io::{BufRead as _, BufReader, ErrorKind, Read as _, Seek as _, SeekFrom};
+use std::io::{self, BufRead as _, BufReader, ErrorKind, Read as _, Seek as _, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -70,6 +70,10 @@ pub struct Message {
     /// Token usage for this message (assistant messages only)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<TokenUsage>,
+    /// Parent message UUID for branch tracking (normalized to skip system/progress lines).
+    /// Used by the frontend's `getActiveChain()` to walk the active branch after rewind.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_uuid: Option<String>,
 }
 
 /// A tool use within a message
@@ -890,6 +894,7 @@ fn build_assistant_message(uuid: &str, value: &serde_json::Value, ts: u64) -> Me
         created_at: ts,
         tool_uses,
         usage,
+        parent_uuid: None,
     }
 }
 
@@ -907,25 +912,99 @@ fn resolve_title(title: String, first_user_text: Option<String>) -> String {
     }
 }
 
-/// Parse JSONL lines from a reader, collecting messages and metadata.
-fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
-    let mut raw_messages: Vec<Message> = Vec::new();
-    let mut seen_uuids: HashMap<String, usize> = HashMap::new();
-    let mut title = String::from("Untitled");
-    let mut first_user_text: Option<String> = None;
-    let mut first_timestamp: Option<u64> = None;
-    let mut last_timestamp: Option<u64> = None;
-    // Collect tool results from tool_result-only user messages so we can
-    // backfill `output` onto the matching ToolUse entries in assistant messages.
-    let mut tool_results: HashMap<String, ToolResultData> = HashMap::new();
+/// Build the set of active UUIDs by walking the `parentUuid` chain from the leaf.
+///
+/// The Claude SDK uses append-only JSONL with `parentUuid` branching. When a conversation
+/// is rewound, the old messages stay in the file and new messages are appended with
+/// `parentUuid` pointing to the fork point. To get the active branch, we must walk
+/// backwards from the leaf (last line with a UUID) through the `parentUuid` chain.
+///
+/// Returns `None` if no line has a `parentUuid` field (legacy/unbranched conversation).
+fn build_active_uuid_set(lines: &[String]) -> Option<HashSet<String>> {
+    // Phase 1: Lightweight parse to extract uuid and parentUuid from ALL line types
+    // (user, assistant, system, progress, file-history-snapshot, etc.)
+    let mut chain_links: Vec<(String, Option<String>)> = Vec::new();
+    let mut uuid_to_parent: HashMap<String, Option<String>> = HashMap::new();
+    let mut has_any_parent = false;
 
-    for (line_num, line_result) in reader.lines().enumerate() {
-        let Ok(line) = line_result else { continue };
+    for line in lines {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
 
+        // Only parse what we need: uuid and parentUuid fields
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) else {
+            continue;
+        };
+
+        let Some(uuid) = value.get("uuid").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+
+        let parent_uuid = value.get("parentUuid").and_then(|v| {
+            if v.is_null() {
+                None
+            } else {
+                v.as_str().map(str::to_owned)
+            }
+        });
+
+        if parent_uuid.is_some() {
+            has_any_parent = true;
+        }
+
+        let uuid_owned = uuid.to_owned();
+        let _ = uuid_to_parent.insert(uuid_owned.clone(), parent_uuid.clone());
+        chain_links.push((uuid_owned, parent_uuid));
+    }
+
+    // If no line has parentUuid, this is a legacy/unbranched conversation
+    if !has_any_parent {
+        return None;
+    }
+
+    // Phase 2: Walk chain from the leaf backwards to build active set
+    // The leaf is the last UUID we encountered in file order
+    let (leaf_uuid, _) = chain_links.last()?;
+
+    let mut active_uuids = HashSet::new();
+    let mut current = Some(leaf_uuid.clone());
+    let mut visited = HashSet::new();
+
+    while let Some(uuid) = current {
+        if !visited.insert(uuid.clone()) {
+            // Cycle detected — stop to prevent infinite loop
+            tracing::warn!("Cycle detected in parentUuid chain at {uuid}");
+            break;
+        }
+        let _ = active_uuids.insert(uuid.clone());
+
+        current = uuid_to_parent.get(&uuid).and_then(Clone::clone);
+    }
+
+    Some(active_uuids)
+}
+
+/// Check if a UUID is on the active branch (always true for unbranched conversations).
+fn is_active(uuid: &str, active_uuids: Option<&HashSet<String>>) -> bool {
+    active_uuids.is_none_or(|active| active.contains(uuid))
+}
+
+/// Parse JSONL lines from a reader, collecting messages and metadata.
+///
+/// Supports branched conversations (rewind): when `parentUuid` fields are present,
+/// only messages on the active branch are returned. Dead branches are filtered out.
+fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
+    let all_lines: Vec<String> = reader.lines().map_while(io::Result::ok).collect();
+    let active_uuids = build_active_uuid_set(&all_lines);
+    let mut ctx = ParseContext::new();
+
+    for (line_num, line) in all_lines.iter().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
         match serde_json::from_str::<JsonlLine>(trimmed) {
             Ok(JsonlLine::User {
                 uuid,
@@ -934,49 +1013,10 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
                 is_meta,
                 ..
             }) => {
-                // Skip SDK meta messages (e.g., slash command expansion text).
-                // These are internal protocol messages, not real user input.
-                if is_meta {
+                if !is_active(&uuid, active_uuids.as_ref()) || is_meta {
                     continue;
                 }
-                if payload.content.is_tool_result_only() {
-                    extract_tool_results(&payload.content, &mut tool_results);
-                    continue;
-                }
-
-                let ts = parse_iso_timestamp(&timestamp);
-                if first_timestamp.is_none() {
-                    first_timestamp = Some(ts);
-                }
-                last_timestamp = Some(ts);
-
-                let text = payload.content.to_text();
-
-                // Skip SDK-injected synthetic user messages that are not real user input:
-                // - Empty content (edge case from content blocks with no text fields)
-                // - "[Request interrupted by user]" — SDK interrupt marker written when
-                //   a query is stopped (including during rewind). The assistant message
-                //   already has `is_interrupted: true`; this user-side marker is redundant.
-                if text.is_empty() || text == "[Request interrupted by user]" {
-                    continue;
-                }
-
-                if first_user_text.is_none() {
-                    first_user_text = Some(text.clone());
-                }
-
-                let msg = Message {
-                    id: uuid.clone(),
-                    role: MessageRole::User,
-                    content: text,
-                    thinking: None,
-                    thinking_duration_ms: None,
-                    is_interrupted: None,
-                    created_at: ts,
-                    tool_uses: Vec::new(),
-                    usage: None,
-                };
-                dedup_insert(&mut raw_messages, &mut seen_uuids, uuid, msg);
+                ctx.process_user_line(uuid, &payload, &timestamp);
             },
             Ok(JsonlLine::Assistant {
                 uuid,
@@ -984,28 +1024,17 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
                 timestamp,
                 ..
             }) => {
-                let ts = timestamp
-                    .as_deref()
-                    .map_or_else(|| last_timestamp.unwrap_or(0), parse_iso_timestamp);
-
-                if first_timestamp.is_none() {
-                    first_timestamp = Some(ts);
+                if !is_active(&uuid, active_uuids.as_ref()) {
+                    continue;
                 }
-                last_timestamp = Some(ts);
-
-                let msg = build_assistant_message(&uuid, &value, ts);
-                dedup_insert(&mut raw_messages, &mut seen_uuids, uuid, msg);
+                ctx.process_assistant_line(uuid, &value, timestamp.as_deref());
             },
-            Ok(JsonlLine::Summary { summary, .. }) => {
-                title = summary;
-            },
-            Ok(JsonlLine::CustomTitle { title: t, .. }) => {
-                title = t;
-            },
+            Ok(JsonlLine::Summary { summary, .. }) => ctx.title = summary,
+            Ok(JsonlLine::CustomTitle { title: t, .. }) => ctx.title = t,
             Ok(JsonlLine::Unknown) => {},
             Err(e) => {
                 tracing::warn!(
-                    "Skipping unparseable JSONL line {} in {}: {}",
+                    "Skipping JSONL line {} in {}: {}",
                     line_num,
                     path.display(),
                     e
@@ -1014,16 +1043,95 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
         }
     }
 
-    // Backfill tool outputs onto assistant ToolUse entries.
-    backfill_tool_outputs(&mut raw_messages, tool_results);
+    ctx.finalize()
+}
 
-    let title = resolve_title(title, first_user_text);
+/// Accumulator for `parse_jsonl_lines` — extracted to keep the main loop under 100 lines.
+struct ParseContext {
+    raw_messages: Vec<Message>,
+    seen_uuids: HashMap<String, usize>,
+    title: String,
+    first_user_text: Option<String>,
+    first_timestamp: Option<u64>,
+    last_timestamp: Option<u64>,
+    tool_results: HashMap<String, ToolResultData>,
+    last_msg_uuid: Option<String>,
+}
 
-    ParsedJsonl {
-        raw_messages,
-        title,
-        first_timestamp,
-        last_timestamp,
+impl ParseContext {
+    fn new() -> Self {
+        Self {
+            raw_messages: Vec::new(),
+            seen_uuids: HashMap::new(),
+            title: String::from("Untitled"),
+            first_user_text: None,
+            first_timestamp: None,
+            last_timestamp: None,
+            tool_results: HashMap::new(),
+            last_msg_uuid: None,
+        }
+    }
+
+    fn track_timestamp(&mut self, ts: u64) {
+        if self.first_timestamp.is_none() {
+            self.first_timestamp = Some(ts);
+        }
+        self.last_timestamp = Some(ts);
+    }
+
+    fn process_user_line(&mut self, uuid: String, payload: &UserMessagePayload, timestamp: &str) {
+        if payload.content.is_tool_result_only() {
+            extract_tool_results(&payload.content, &mut self.tool_results);
+            return;
+        }
+        let ts = parse_iso_timestamp(timestamp);
+        self.track_timestamp(ts);
+        let text = payload.content.to_text();
+        if text.is_empty() || text == "[Request interrupted by user]" {
+            return;
+        }
+        if self.first_user_text.is_none() {
+            self.first_user_text = Some(text.clone());
+        }
+        let msg = Message {
+            id: uuid.clone(),
+            role: MessageRole::User,
+            content: text,
+            thinking: None,
+            thinking_duration_ms: None,
+            is_interrupted: None,
+            created_at: ts,
+            tool_uses: Vec::new(),
+            usage: None,
+            parent_uuid: self.last_msg_uuid.clone(),
+        };
+        self.last_msg_uuid = Some(uuid.clone());
+        dedup_insert(&mut self.raw_messages, &mut self.seen_uuids, uuid, msg);
+    }
+
+    fn process_assistant_line(
+        &mut self,
+        uuid: String,
+        value: &serde_json::Value,
+        timestamp: Option<&str>,
+    ) {
+        let ts = timestamp.map_or_else(|| self.last_timestamp.unwrap_or(0), parse_iso_timestamp);
+        self.track_timestamp(ts);
+        let mut msg = build_assistant_message(&uuid, value, ts);
+        msg.parent_uuid.clone_from(&self.last_msg_uuid);
+        self.last_msg_uuid = Some(uuid.clone());
+        dedup_insert(&mut self.raw_messages, &mut self.seen_uuids, uuid, msg);
+    }
+
+    fn finalize(mut self) -> ParsedJsonl {
+        backfill_tool_outputs(&mut self.raw_messages, self.tool_results);
+        let title = resolve_title(self.title, self.first_user_text);
+        ParsedJsonl {
+            raw_messages: self.raw_messages,
+            title,
+            first_timestamp: self.first_timestamp,
+            last_timestamp: self.last_timestamp,
+        }
     }
 }
 
@@ -1170,52 +1278,26 @@ fn parse_title_line(line: &str) -> Option<String> {
 }
 
 /// Merge consecutive assistant messages into single turns.
+///
+/// When two assistant JSONL lines appear consecutively (e.g., thinking+tool_use followed
+/// by text response), they belong to the same turn. This merges them into a single
+/// `Message`, combining content, tool uses, and metadata.
+///
+/// After merging, any `parent_uuid` references that pointed to a consumed (merged-away)
+/// message are remapped to the surviving message's UUID. Without this remap, the
+/// frontend's `getActiveChain()` walk breaks at merged boundaries.
 fn merge_consecutive_assistants(raw: Vec<Message>) -> Vec<Message> {
     let mut merged: Vec<Message> = Vec::with_capacity(raw.len());
+    // Track consumed UUID → surviving UUID so we can fix parent_uuid references.
+    let mut uuid_remap: HashMap<String, String> = HashMap::new();
 
     for msg in raw {
         if msg.role == MessageRole::Assistant {
             if let Some(last) = merged.last_mut() {
                 if last.role == MessageRole::Assistant {
-                    // Record the current text length BEFORE appending so we can
-                    // shift the incoming tool offsets by this amount.
-                    let base_len = u32::try_from(last.content.len()).unwrap_or(u32::MAX);
-                    let incoming_has_text = !msg.content.is_empty();
-
-                    if incoming_has_text {
-                        if last.content.is_empty() {
-                            last.content = msg.content;
-                        } else {
-                            last.content.push('\n');
-                            last.content.push_str(&msg.content);
-                        }
-                    }
-                    if last.thinking.is_none() {
-                        last.thinking = msg.thinking;
-                    }
-
-                    // Shift tool content_offsets by the existing text length
-                    // (+ 1 for the "\n" separator if we appended text).
-                    let shift = if base_len > 0 && incoming_has_text {
-                        base_len + 1
-                    } else {
-                        base_len
-                    };
-                    for mut tool in msg.tool_uses {
-                        tool.content_offset =
-                            Some(tool.content_offset.unwrap_or(0).saturating_add(shift));
-                        last.tool_uses.push(tool);
-                    }
-
-                    if msg.usage.is_some() {
-                        last.usage = msg.usage;
-                    }
-                    if msg.created_at > last.created_at {
-                        last.created_at = msg.created_at;
-                    }
-                    if msg.is_interrupted.is_some() {
-                        last.is_interrupted = msg.is_interrupted;
-                    }
+                    // This message will be absorbed — record the remap.
+                    let _ = uuid_remap.insert(msg.id.clone(), last.id.clone());
+                    absorb_assistant_message(last, msg);
                     continue;
                 }
             }
@@ -1223,7 +1305,67 @@ fn merge_consecutive_assistants(raw: Vec<Message>) -> Vec<Message> {
         merged.push(msg);
     }
 
+    // Fix parent_uuid references broken by merge. A message may point to a UUID
+    // that was consumed during merge — remap it to the surviving message's UUID.
+    remap_parent_uuids(&mut merged, &uuid_remap);
+
     merged
+}
+
+/// Absorb `incoming` assistant message into `target`, merging content, tools, and metadata.
+fn absorb_assistant_message(target: &mut Message, incoming: Message) {
+    // Record the current text length BEFORE appending so we can
+    // shift the incoming tool offsets by this amount.
+    let base_len = u32::try_from(target.content.len()).unwrap_or(u32::MAX);
+    let incoming_has_text = !incoming.content.is_empty();
+
+    if incoming_has_text {
+        if target.content.is_empty() {
+            target.content = incoming.content;
+        } else {
+            target.content.push('\n');
+            target.content.push_str(&incoming.content);
+        }
+    }
+    if target.thinking.is_none() {
+        target.thinking = incoming.thinking;
+    }
+
+    // Shift tool content_offsets by the existing text length
+    // (+ 1 for the "\n" separator if we appended text).
+    let shift = if base_len > 0 && incoming_has_text {
+        base_len + 1
+    } else {
+        base_len
+    };
+    for mut tool in incoming.tool_uses {
+        tool.content_offset = Some(tool.content_offset.unwrap_or(0).saturating_add(shift));
+        target.tool_uses.push(tool);
+    }
+
+    if incoming.usage.is_some() {
+        target.usage = incoming.usage;
+    }
+    if incoming.created_at > target.created_at {
+        target.created_at = incoming.created_at;
+    }
+    if incoming.is_interrupted.is_some() {
+        target.is_interrupted = incoming.is_interrupted;
+    }
+}
+
+/// Remap `parent_uuid` references that point to consumed (merged-away) UUIDs.
+fn remap_parent_uuids(messages: &mut [Message], uuid_remap: &HashMap<String, String>) {
+    if uuid_remap.is_empty() {
+        return;
+    }
+    for msg in messages {
+        if let Some(parent) = &msg.parent_uuid {
+            if let Some(surviving) = uuid_remap.get(parent) {
+                msg.parent_uuid = Some(surviving.clone());
+            }
+        }
+    }
 }
 
 /// Extract tool results from a `tool_result`-only user message into the collector map.
@@ -1575,6 +1717,7 @@ mod tests {
             created_at: current_timestamp(),
             tool_uses: Vec::new(),
             usage: None,
+            parent_uuid: None,
         };
 
         // Should succeed silently
@@ -2027,11 +2170,12 @@ mod tests {
         // 1. The command text with XML tags (isMeta absent or false)
         // 2. The expanded prompt with isMeta: true
         // Only the first should appear as a chat message.
+        // All lines have parentUuid (real SDK format) so chain filtering is active.
         let path = ws_dir.join("meta-session.jsonl");
         let lines = [
-            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"<command-name>/init</command-name>\n<command-message>init</command-message>"},"cwd":"/test","sessionId":"meta-session","timestamp":"2026-02-07T12:00:00.000Z"}"#,
-            r#"{"type":"user","uuid":"u2","parentUuid":"u1","isMeta":true,"message":{"role":"user","content":[{"type":"text","text":"Please analyze this codebase and create a CLAUDE.md file..."}]},"cwd":"/test","sessionId":"meta-session","timestamp":"2026-02-07T12:00:00.000Z"}"#,
-            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"I'll analyze the codebase."}]},"cwd":"/test","sessionId":"meta-session","timestamp":"2026-02-07T12:00:01.000Z"}"#,
+            r#"{"parentUuid":null,"type":"user","uuid":"u1","message":{"role":"user","content":"<command-name>/init</command-name>\n<command-message>init</command-message>"},"cwd":"/test","sessionId":"meta-session","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+            r#"{"parentUuid":"u1","type":"user","uuid":"u2","isMeta":true,"message":{"role":"user","content":[{"type":"text","text":"Please analyze this codebase and create a CLAUDE.md file..."}]},"cwd":"/test","sessionId":"meta-session","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+            r#"{"parentUuid":"u2","type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"I'll analyze the codebase."}]},"cwd":"/test","sessionId":"meta-session","timestamp":"2026-02-07T12:00:01.000Z"}"#,
         ];
         fs::write(&path, jsonl_content(&lines)).expect("write");
 
@@ -2188,5 +2332,198 @@ mod tests {
         assert_eq!(conv.messages[2].role, MessageRole::User);
         assert_eq!(conv.messages[3].content, "Done!");
         assert_eq!(conv.messages[3].role, MessageRole::Assistant);
+    }
+
+    // ============================================================================
+    // Active chain filtering (parentUuid branch resolution for rewind)
+    // ============================================================================
+
+    /// Assert a message matches expected id, content, role, and parent_uuid.
+    fn assert_msg(msg: &Message, id: &str, content: &str, role: MessageRole, parent: Option<&str>) {
+        assert_eq!(msg.id, id);
+        assert_eq!(msg.content, content);
+        assert_eq!(msg.role, role);
+        assert_eq!(msg.parent_uuid.as_deref(), parent);
+    }
+
+    #[test]
+    fn test_active_chain_after_rewind() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Branch 1 (original): u1→sys1→a1→sys2→u2→sys3→a2
+        // Branch 2 (rewind to a1): u3→sys4→a3
+        // Active chain: u1, a1, u3, a3 — dead branch (u2, a2) filtered out.
+        let path = ws_dir.join("branched-session.jsonl");
+        let lines = [
+            r#"{"type":"summary","summary":"Branched Chat","leafUuid":"a3"}"#,
+            r#"{"parentUuid":null,"type":"user","uuid":"u1","message":{"role":"user","content":"hello"},"cwd":"/test","sessionId":"branched-session","timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            r#"{"parentUuid":"u1","type":"system","uuid":"sys1","message":{},"cwd":"/test","sessionId":"branched-session","timestamp":"2026-01-11T18:00:00.500Z"}"#,
+            r#"{"parentUuid":"sys1","type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Hi there!"}]},"cwd":"/test","sessionId":"branched-session","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"parentUuid":"a1","type":"system","uuid":"sys2","message":{},"cwd":"/test","sessionId":"branched-session","timestamp":"2026-01-11T18:00:01.500Z"}"#,
+            r#"{"parentUuid":"sys2","type":"user","uuid":"u2","message":{"role":"user","content":"how are you"},"cwd":"/test","sessionId":"branched-session","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+            r#"{"parentUuid":"u2","type":"system","uuid":"sys3","message":{},"cwd":"/test","sessionId":"branched-session","timestamp":"2026-01-11T18:00:02.500Z"}"#,
+            r#"{"parentUuid":"sys3","type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"I'm doing well!"}]},"cwd":"/test","sessionId":"branched-session","timestamp":"2026-01-11T18:00:03.000Z"}"#,
+            r#"{"parentUuid":"a1","type":"user","uuid":"u3","message":{"role":"user","content":"actually, what's up"},"cwd":"/test","sessionId":"branched-session","timestamp":"2026-01-11T18:01:00.000Z"}"#,
+            r#"{"parentUuid":"u3","type":"system","uuid":"sys4","message":{},"cwd":"/test","sessionId":"branched-session","timestamp":"2026-01-11T18:01:00.500Z"}"#,
+            r#"{"parentUuid":"sys4","type":"assistant","uuid":"a3","message":{"role":"assistant","content":[{"type":"text","text":"Not much, just chilling!"}]},"cwd":"/test","sessionId":"branched-session","timestamp":"2026-01-11T18:01:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("branched-session", None)
+            .expect("load")
+            .expect("not found");
+
+        assert_eq!(conv.messages.len(), 4);
+        assert_msg(&conv.messages[0], "u1", "hello", MessageRole::User, None);
+        assert_msg(
+            &conv.messages[1],
+            "a1",
+            "Hi there!",
+            MessageRole::Assistant,
+            Some("u1"),
+        );
+        assert_msg(
+            &conv.messages[2],
+            "u3",
+            "actually, what's up",
+            MessageRole::User,
+            Some("a1"),
+        );
+        assert_msg(
+            &conv.messages[3],
+            "a3",
+            "Not much, just chilling!",
+            MessageRole::Assistant,
+            Some("u3"),
+        );
+    }
+
+    #[test]
+    fn test_unbranched_conversation_returns_all_messages() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Legacy conversation with no parentUuid fields — all messages should be returned
+        let path = ws_dir.join("unbranched-session.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"hello"},"cwd":"/test","sessionId":"unbranched-session","timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Hi!"}]},"cwd":"/test","sessionId":"unbranched-session","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"type":"user","uuid":"u2","message":{"role":"user","content":"goodbye"},"cwd":"/test","sessionId":"unbranched-session","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"Bye!"}]},"cwd":"/test","sessionId":"unbranched-session","timestamp":"2026-01-11T18:00:03.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("unbranched-session", None)
+            .expect("load")
+            .expect("not found");
+
+        // All 4 messages should be present (no filtering for legacy conversations)
+        assert_eq!(conv.messages.len(), 4);
+        assert_eq!(conv.messages[0].content, "hello");
+        assert_eq!(conv.messages[1].content, "Hi!");
+        assert_eq!(conv.messages[2].content, "goodbye");
+        assert_eq!(conv.messages[3].content, "Bye!");
+    }
+
+    #[test]
+    fn test_double_rewind_active_chain() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Simulate two rewinds:
+        //
+        // Original: u1 → a1 → u2 → a2
+        // Rewind 1 (to a1): u3 → a3  (u2, a2 dead)
+        // Rewind 2 (to a1): u4 → a4  (u3, a3 also dead)
+        //
+        // Active: u1, a1, u4, a4
+        let path = ws_dir.join("double-rewind.jsonl");
+        let lines = [
+            // Original branch
+            r#"{"parentUuid":null,"type":"user","uuid":"u1","message":{"role":"user","content":"msg 1"},"cwd":"/test","sessionId":"double-rewind","timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            r#"{"parentUuid":"u1","type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"response 1"}]},"cwd":"/test","sessionId":"double-rewind","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"parentUuid":"a1","type":"user","uuid":"u2","message":{"role":"user","content":"msg 2"},"cwd":"/test","sessionId":"double-rewind","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+            r#"{"parentUuid":"u2","type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"response 2"}]},"cwd":"/test","sessionId":"double-rewind","timestamp":"2026-01-11T18:00:03.000Z"}"#,
+            // Rewind 1: fork from a1
+            r#"{"parentUuid":"a1","type":"user","uuid":"u3","message":{"role":"user","content":"msg 3 (rewind 1)"},"cwd":"/test","sessionId":"double-rewind","timestamp":"2026-01-11T18:01:00.000Z"}"#,
+            r#"{"parentUuid":"u3","type":"assistant","uuid":"a3","message":{"role":"assistant","content":[{"type":"text","text":"response 3"}]},"cwd":"/test","sessionId":"double-rewind","timestamp":"2026-01-11T18:01:01.000Z"}"#,
+            // Rewind 2: fork from a1 again (abandoning rewind 1's branch too)
+            r#"{"parentUuid":"a1","type":"user","uuid":"u4","message":{"role":"user","content":"msg 4 (rewind 2)"},"cwd":"/test","sessionId":"double-rewind","timestamp":"2026-01-11T18:02:00.000Z"}"#,
+            r#"{"parentUuid":"u4","type":"assistant","uuid":"a4","message":{"role":"assistant","content":[{"type":"text","text":"response 4"}]},"cwd":"/test","sessionId":"double-rewind","timestamp":"2026-01-11T18:02:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("double-rewind", None)
+            .expect("load")
+            .expect("not found");
+
+        // Active: u1, a1, u4, a4 (both original tail and rewind 1 are dead)
+        assert_eq!(conv.messages.len(), 4);
+        assert_eq!(conv.messages[0].id, "u1");
+        assert_eq!(conv.messages[0].content, "msg 1");
+        assert_eq!(conv.messages[1].id, "a1");
+        assert_eq!(conv.messages[1].content, "response 1");
+        assert_eq!(conv.messages[2].id, "u4");
+        assert_eq!(conv.messages[2].content, "msg 4 (rewind 2)");
+        assert_eq!(conv.messages[3].id, "a4");
+        assert_eq!(conv.messages[3].content, "response 4");
+    }
+
+    #[test]
+    fn test_active_chain_with_tool_results_and_merge() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Branched conversation with tool results on active branch
+        // Tool results from the dead branch should be filtered out
+        let path = ws_dir.join("branched-tools.jsonl");
+        let lines = [
+            r#"{"parentUuid":null,"type":"user","uuid":"u1","message":{"role":"user","content":"run ls"},"cwd":"/test","sessionId":"branched-tools","timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            r#"{"parentUuid":"u1","type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Sure!"},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}}]},"cwd":"/test","sessionId":"branched-tools","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            // tool_result on active branch (parentUuid points to a1)
+            r#"{"parentUuid":"a1","type":"user","uuid":"tr1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"file1.txt"}]},"cwd":"/test","sessionId":"branched-tools","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+            r#"{"parentUuid":"tr1","type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"Found file1.txt"}]},"cwd":"/test","sessionId":"branched-tools","timestamp":"2026-01-11T18:00:03.000Z"}"#,
+            // Dead branch: user2 after a2 (will be pruned by rewind)
+            r#"{"parentUuid":"a2","type":"user","uuid":"u2","message":{"role":"user","content":"dead branch msg"},"cwd":"/test","sessionId":"branched-tools","timestamp":"2026-01-11T18:00:04.000Z"}"#,
+            r#"{"parentUuid":"u2","type":"assistant","uuid":"a3-dead","message":{"role":"assistant","content":[{"type":"text","text":"dead response"}]},"cwd":"/test","sessionId":"branched-tools","timestamp":"2026-01-11T18:00:05.000Z"}"#,
+            // Rewind: fork from a2
+            r#"{"parentUuid":"a2","type":"user","uuid":"u3","message":{"role":"user","content":"new after rewind"},"cwd":"/test","sessionId":"branched-tools","timestamp":"2026-01-11T18:01:00.000Z"}"#,
+            r#"{"parentUuid":"u3","type":"assistant","uuid":"a4","message":{"role":"assistant","content":[{"type":"text","text":"Fresh start!"}]},"cwd":"/test","sessionId":"branched-tools","timestamp":"2026-01-11T18:01:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("branched-tools", None)
+            .expect("load")
+            .expect("not found");
+
+        // Active: u1, a1+a2 (merged), u3, a4
+        // Tool result tr1 is consumed by backfill, dead branch (u2, a3-dead) gone
+        assert_eq!(conv.messages.len(), 4);
+        assert_eq!(conv.messages[0].id, "u1");
+        assert_eq!(conv.messages[0].content, "run ls");
+
+        // a1 and a2 merged (consecutive assistants)
+        assert_eq!(conv.messages[1].role, MessageRole::Assistant);
+        assert!(conv.messages[1].content.contains("Sure!"));
+        assert!(conv.messages[1].content.contains("Found file1.txt"));
+        assert_eq!(conv.messages[1].tool_uses.len(), 1);
+        assert_eq!(
+            conv.messages[1].tool_uses[0].output.as_deref(),
+            Some("file1.txt")
+        );
+
+        assert_eq!(conv.messages[2].id, "u3");
+        assert_eq!(conv.messages[2].content, "new after rewind");
+        assert_eq!(conv.messages[3].id, "a4");
+        assert_eq!(conv.messages[3].content, "Fresh start!");
     }
 }

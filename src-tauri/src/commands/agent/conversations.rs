@@ -41,6 +41,9 @@ pub struct MessageDto {
     /// Token usage for this message (assistant messages only)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<TokenUsageDto>,
+    /// Parent message UUID for branch tracking (normalized to skip system/progress lines)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_uuid: Option<String>,
 }
 
 /// Serializable tool use for frontend
@@ -135,6 +138,7 @@ impl From<Message> for MessageDto {
             created_at: msg.created_at,
             tool_uses: msg.tool_uses.into_iter().map(ToolUseDto::from).collect(),
             usage: msg.usage.map(TokenUsageDto::from),
+            parent_uuid: msg.parent_uuid,
         }
     }
 }
@@ -168,6 +172,7 @@ impl From<MessageDto> for Message {
             created_at: dto.created_at,
             tool_uses: dto.tool_uses.into_iter().map(ToolUse::from).collect(),
             usage: dto.usage.map(TokenUsage::from),
+            parent_uuid: dto.parent_uuid,
         }
     }
 }
@@ -293,7 +298,11 @@ pub fn conversation_list(
         .collect())
 }
 
-/// Load a conversation by session ID
+/// Load a conversation by session ID.
+///
+/// Reads the single JSONL file for this session. Each session's JSONL is
+/// self-contained (forkSessionAt pre-populates the new file with ancestor
+/// messages). Uses `parentUuid` chains to filter dead branches.
 #[tauri::command]
 pub fn conversation_load(
     session_id: String,

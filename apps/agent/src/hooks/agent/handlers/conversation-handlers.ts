@@ -93,6 +93,8 @@ export async function handleConversationLoad(
             ...(m.thinking ? { thinking: m.thinking } : {}),
             ...(m.toolUses && m.toolUses.length > 0 ? { toolUses: m.toolUses } : {}),
             ...(m.usage ? { usage: m.usage } : {}),
+            // parentUuid for active chain resolution (getActiveChain defense-in-depth)
+            ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
           })),
           // Authoritative session usage from SDK result event (via .usage.json sidecar)
           ...(conv.sessionUsage ? { session_usage: conv.sessionUsage } : {}),
@@ -189,17 +191,25 @@ export async function handleConversationRewind(
     const checkpointStore = useCheckpointStore.getState();
     const rewindCheckpoints = checkpointStore.getRewindCheckpoints(session_id, user_message_id);
 
-    // Step 2: Rewind files to the turn END checkpoint
+    // Step 2: Rewind files to the turn END checkpoint.
+    // File rewind is best-effort; the conversation rewind must always complete.
     if (rewindCheckpoints?.rewindFiles) {
       try {
         await agentRewindFiles(session_id, rewindCheckpoints.rewindFiles);
       } catch (rewindErr) {
-        logger.error('File rewind failed', rewindErr);
+        logger.warn('File rewind failed (continuing with conversation rewind)', {
+          error: rewindErr instanceof Error ? rewindErr.message : String(rewindErr),
+        });
       }
     }
 
     // Step 3: Load conversation from disk to get the SDK message ID
+    logger.warn('Rewind step 3: loading conversation from disk', { session_id });
     const conv = await conversationLoad(session_id);
+    logger.warn('Rewind step 3: conversation loaded', {
+      hasConv: conv !== null,
+      messageCount: conv?.messages.length ?? 0,
+    });
 
     // Find the target message — priority chain:
     //   1. Direct disk ID match (message_id found in JSONL by ID)
@@ -244,14 +254,25 @@ export async function handleConversationRewind(
         if (positionCandidate && contentMatches) {
           targetMessage = positionCandidate;
           sdkMessageId = targetMessage.id;
+          logger.warn('Rewind: Priority 2 — content-validated position match', {
+            sdkMessageId,
+            index: message_index,
+          });
         } else if (current_messages && current_messages.length > 0) {
           // Priority 3: Frontend messages fallback — disk is stale (rewind 2+)
           sdkMessageId = message_id;
           useFrontendMessages = true;
+          logger.warn('Rewind: Priority 3 — frontend messages fallback', {
+            sdkMessageId,
+            frontendMsgCount: current_messages.length,
+          });
         } else if (positionCandidate) {
           // Priority 4: Unvalidated position fallback — no frontend messages to validate
           targetMessage = positionCandidate;
           sdkMessageId = targetMessage.id;
+          logger.warn('Rewind: Priority 4 — unvalidated position fallback', {
+            sdkMessageId,
+          });
         }
       }
     } else if (current_messages && current_messages.length > 0) {
@@ -260,23 +281,41 @@ export async function handleConversationRewind(
       useFrontendMessages = true;
     }
 
-    // Step 4: Fork the session at the target message
+    // Step 4: Fork the session at the target message.
     //
-    // Only fork when the target was found in the current JSONL (first rewind).
-    // For rewind 2+, the target UUID isn't in the current JSONL — forkSessionAt
-    // would truncate 0 lines, destroy the session, and recreate it from the
-    // unchanged JSONL.
+    // Always fork when the target was found in the disk JSONL — this is Claude Code's
+    // approach. The SDK creates a new session with parentUuid branching that naturally
+    // handles dead branches. No timeouts needed: bridge calls are awaited directly.
     if (sdkMessageId && !useFrontendMessages) {
+      logger.warn('Rewind step 4: forking session at target', { session_id, sdkMessageId });
       try {
         await agentForkSessionAt(session_id, sdkMessageId);
         checkpointStore.setPendingConversationFork(session_id, sdkMessageId);
       } catch (forkErr) {
-        logger.error('Session fork failed', forkErr);
+        logger.warn('Session fork failed (continuing with rewind)', {
+          error: forkErr instanceof Error ? forkErr.message : String(forkErr),
+        });
       }
+    } else {
+      logger.warn('Rewind step 4: skipping fork', {
+        sdkMessageId,
+        useFrontendMessages,
+      });
     }
 
     // Step 5: Build the message list to display
     // Priority: disk messages (first rewind) > frontend messages (rewind 2+) > empty
+    logger.warn('Rewind step 5: building message list', {
+      hasConv: conv !== null,
+      hasTarget: targetMessage !== undefined,
+      useFrontendMessages,
+      path:
+        conv && targetMessage && !useFrontendMessages
+          ? 'disk'
+          : current_messages && current_messages.length > 0
+            ? 'frontend'
+            : 'empty',
+    });
     if (conv && targetMessage && !useFrontendMessages) {
       // Disk data available — use disk messages
       const messagesUpToRewind: typeof conv.messages = [];

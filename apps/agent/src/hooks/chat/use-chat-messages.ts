@@ -19,6 +19,8 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createChatActions } from './handlers/chat-actions';
 
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
+import type { MegaStressTestConfig } from '@/services/chat/rewind-mega-stress-test';
+import type { StressTestConfig } from '@/services/chat/rewind-stress-test';
 import type {
   EffortLevel,
   Model,
@@ -38,6 +40,24 @@ import {
   useIsAgentRunning,
 } from '@/stores/chat/chat-store';
 import { useUIStore } from '@/stores/ui/ui-store';
+
+// ────────────────────────────────────────────────────────────────────────────
+// Dev-mode debug interface (window.__orbit_debug)
+// ────────────────────────────────────────────────────────────────────────────
+
+declare global {
+  interface Window {
+    __orbit_debug?:
+      | {
+          runRewindStressTest: (config?: StressTestConfig) => Promise<unknown>;
+          runMegaStressTest: (config?: MegaStressTestConfig) => Promise<unknown>;
+          handleSend: (text: string) => void;
+          handleRewind: (messageId: string) => void;
+          handleStop: () => void;
+        }
+      | undefined;
+  }
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Return Type
@@ -371,6 +391,46 @@ export function useChatMessages(): UseChatMessagesReturn {
       }
     }
   }, [sessionId]);
+
+  // ── 7. Dev-mode debug interface ─────────────────────────────────────
+  // Exposes chatActions on window.__orbit_debug for DevTools console access.
+  // Used by the rewind stress test and manual debugging.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+
+    const actions = createChatActions({ postMessage });
+    window.__orbit_debug = {
+      handleSend: actions.handleSend,
+      handleRewind: actions.handleRewind,
+      handleStop: actions.handleStop,
+      runRewindStressTest: async (config?: StressTestConfig) => {
+        const { runRewindStressTest } = await import('@/services/chat/rewind-stress-test');
+        return runRewindStressTest(
+          {
+            handleSend: actions.handleSend,
+            handleRewind: actions.handleRewind,
+            handleStop: actions.handleStop,
+          },
+          config
+        );
+      },
+      runMegaStressTest: async (config?: MegaStressTestConfig) => {
+        const { runMegaStressTest } = await import('@/services/chat/rewind-mega-stress-test');
+        return runMegaStressTest(
+          {
+            handleSend: actions.handleSend,
+            handleRewind: actions.handleRewind,
+            handleStop: actions.handleStop,
+          },
+          config
+        );
+      },
+    };
+
+    return (): void => {
+      window.__orbit_debug = undefined;
+    };
+  }, [postMessage]);
 
   // ══════════════════════════════════════════════════════════════════════
   // Actions

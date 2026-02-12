@@ -329,18 +329,8 @@ class ChatMessageService {
       // Migrate external stores
       useToolStore.getState().remapSession(frontendSessionId, sdkSessionId);
       useCheckpointStore.getState().remapSession(frontendSessionId, sdkSessionId);
-
-      // Consume pending conversation fork (if this is a post-rewind remap)
-      const rewindMessageId = useCheckpointStore
-        .getState()
-        .consumePendingConversationFork(frontendSessionId);
-      if (rewindMessageId) {
-        logger.debug('Post-rewind session remap (agent-bridge handles JSONL cleanup)', {
-          originalSessionId: frontendSessionId,
-          newSessionId: sdkSessionId,
-          rewindMessageId,
-        });
-      }
+      // Consume pending conversation fork (clears checkpoint store state for this session)
+      useCheckpointStore.getState().consumePendingConversationFork(frontendSessionId);
 
       // Mark load pending to prevent redundant conversation:load
       useMessageBufferStore.getState().markLoadPending(sdkSessionId);
