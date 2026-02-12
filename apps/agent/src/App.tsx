@@ -326,7 +326,7 @@ const App: FC = () => {
                   aria-hidden="true"
                 />
                 <div
-                  className="absolute inset-0 bg-gradient-to-t from-gray-5/55 via-gray-5/25 to-gray-5/10 dark:from-gray-3/80 dark:via-gray-3/55 dark:to-gray-3/35"
+                  className="absolute inset-0 bg-linear-to-t from-gray-5/55 via-gray-5/25 to-gray-5/10 dark:from-gray-3/80 dark:via-gray-3/55 dark:to-gray-3/35"
                   aria-hidden="true"
                 />
               </>
