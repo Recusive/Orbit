@@ -136,7 +136,7 @@ export const EditorBreadcrumbs: FC<EditorBreadcrumbsProps> = ({
   }, [outline, activeOutlineIndex]);
 
   return (
-    <div className="flex items-center gap-0.5 px-3 py-1.5 bg-card overflow-x-auto scrollbar-hide">
+    <div className="flex items-center gap-0.5 px-3 py-1.5 bg-editor-bg overflow-x-auto scrollbar-hide">
       {/* Filename */}
       <BreadcrumbItem
         label={fileName}

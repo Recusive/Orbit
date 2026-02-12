@@ -200,15 +200,21 @@ const DiffStatsButton: FC = () => {
   );
 };
 
-export const ChatHeader: FC = () => {
+interface ChatHeaderProps {
+  /** Hide git branch selector and diff stats (e.g. in editor mode where source control is in the sidebar) */
+  readonly hideGitControls?: boolean;
+}
+
+export const ChatHeader: FC<ChatHeaderProps> = ({ hideGitControls }) => {
   const workspaceName = useWorkspaceName();
   const activeConversationTitle = useActiveConversationTitle();
   const vaultOpen = useVaultOpen();
   const reviewPanelOpen = useReviewPanelOpen();
   const activityTab = useActivityTab();
 
-  // Hide branch + diff when source control tab is visible in the activity panel
-  const showGitControls = !(reviewPanelOpen && activityTab === 'source');
+  // Hide branch + diff when source control tab is visible in the activity panel,
+  // or when explicitly disabled (editor mode)
+  const showGitControls = !hideGitControls && !(reviewPanelOpen && activityTab === 'source');
 
   return (
     <header

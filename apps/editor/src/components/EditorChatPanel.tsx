@@ -131,9 +131,9 @@ export const EditorChatPanel: FC = () => {
   } as const;
 
   return (
-    <div className="h-full w-full flex flex-col bg-chat-area border-l border-border/50">
+    <div className="h-full w-full flex flex-col bg-chat-area">
       {/* Chat Header */}
-      <ChatHeader />
+      <ChatHeader hideGitControls />
 
       {/* Chat Content */}
       <div ref={contentRef} className="flex-1 flex flex-col min-h-0 overflow-hidden">

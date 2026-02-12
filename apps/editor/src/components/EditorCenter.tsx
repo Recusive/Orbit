@@ -83,26 +83,18 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       tabIndex={isActive ? 0 : -1}
       className={cn(
         'group relative flex items-center h-full px-3 text-base cursor-pointer select-none shrink-0',
-        'border-r border-border/50',
+        'border-r border-gray-5',
         isActive
-          ? 'bg-card text-foreground'
-          : 'bg-chat-area text-muted-foreground hover:text-foreground'
+          ? 'bg-editor-bg text-foreground border-t-2 border-t-primary'
+          : 'bg-chat-area text-muted-foreground hover:text-foreground border-t-2 border-t-transparent'
       )}
       style={{ maxWidth: 180 }}
     >
-      {/* Top border accent for active tab */}
-      <div
-        className={cn(
-          'absolute top-0 inset-x-0 h-px transition-colors',
-          isActive ? 'bg-primary' : 'bg-transparent'
-        )}
-      />
-
       {/* Bottom border - hide for active tab (connects to content) */}
       <div
         className={cn(
           'absolute bottom-0 inset-x-0 h-px z-10',
-          isActive ? 'bg-card' : 'bg-border/50'
+          isActive ? 'bg-editor-bg' : 'bg-border/50'
         )}
       />
 
@@ -124,7 +116,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         <button
           onClick={handleCloseClick}
           className={cn(
-            'w-4 h-4 flex items-center justify-center rounded transition-all hover:bg-muted',
+            'w-4 h-4 flex items-center justify-center rounded transition-[background-color,opacity] hover:bg-accent',
             isActive ? 'opacity-70 hover:opacity-100' : 'opacity-0 group-hover:opacity-70'
           )}
           aria-label={`Close ${fileName}`}

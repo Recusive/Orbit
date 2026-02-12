@@ -101,7 +101,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         'group relative flex items-center h-full px-3 text-base cursor-pointer select-none shrink-0',
         'border-r border-gray-5',
         isActive
-          ? 'bg-card text-foreground border-t-2 border-t-primary'
+          ? 'bg-editor-bg text-foreground border-t-2 border-t-primary'
           : 'bg-chat-area text-muted-foreground hover:text-foreground border-t-2 border-t-transparent'
       )}
       style={{ maxWidth: 180 }}
@@ -110,7 +110,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       <div
         className={cn(
           'absolute bottom-0 inset-x-0 h-px z-10',
-          isActive ? 'bg-card' : 'bg-border/50'
+          isActive ? 'bg-editor-bg' : 'bg-border/50'
         )}
       />
 

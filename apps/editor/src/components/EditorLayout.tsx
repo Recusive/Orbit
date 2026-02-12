@@ -95,7 +95,7 @@ export const EditorLayout: FC = () => {
       <SidebarResizeHandle />
 
       {/* Main content area - Editor + Chat Panel */}
-      <ResizablePanelGroup direction="horizontal" className="flex-1 min-w-0">
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-w-0 bg-chat-area">
         {/* Editor Center - Tabs + CodeMirror + Terminal */}
         <ResizablePanel
           preferredSize={chatPanelOpen ? '65%' : '100%'}

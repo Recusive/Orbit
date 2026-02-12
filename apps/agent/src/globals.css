@@ -442,7 +442,7 @@ html.window-mode-solid.light {
   --card: var(--gray-2);
   --popover: var(--gray-2);
   --chat-area: var(--gray-2);
-  --editor-bg: var(--gray-2);
+  --editor-bg: var(--gray-1);
   --sidebar: var(--gray-2);
 }
 
@@ -453,7 +453,7 @@ html.window-mode-solid.dark {
   --card: var(--gray-2);
   --popover: var(--gray-2);
   --chat-area: var(--gray-2);
-  --editor-bg: var(--gray-2);
+  --editor-bg: var(--gray-1);
   --sidebar: var(--gray-2);
 }
 

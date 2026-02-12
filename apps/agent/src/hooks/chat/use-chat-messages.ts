@@ -334,6 +334,28 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
     };
   }, [sessionId, messageHandler]);
 
+  // Cross-instance user message sync (Agent ↔ Editor).
+  // Both views mount their own useChatMessages with separate useState. When a user message
+  // is sent from one view, only that view's state is updated. The other view receives
+  // backend events (agent:chunk, tool:start, etc.) but never the user message, so it
+  // renders the assistant response without the preceding user bubble.
+  // This listener picks up user messages broadcast by the sending instance.
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const detail = (e as CustomEvent<{ sessionId: string; message: ChatMessage }>).detail;
+      if (detail.sessionId !== sessionId) return;
+      setMessages((prev) => {
+        // Dedupe: the instance that sent the message already has it
+        if (prev.some((m) => m.id === detail.message.id)) return prev;
+        return [...prev, detail.message];
+      });
+    };
+    window.addEventListener('orbit:user-message', handler);
+    return (): void => {
+      window.removeEventListener('orbit:user-message', handler);
+    };
+  }, [sessionId, setMessages]);
+
   // Request conversation list when session is ready or workspace/worktree changes
   useEffect(() => {
     if (sessionId || workspacePath) {
@@ -452,6 +474,15 @@ export function useChatMessages(options: UseChatMessagesOptions = {}): UseChatMe
       };
       setMessages((prev: ChatMessage[]) => [...prev, userMessage]);
       setIsAgentRunning(true);
+
+      // Broadcast user message so other mounted instances (e.g., Editor ↔ Agent) stay in sync.
+      // Both views mount their own useChatMessages with separate useState, so a user message
+      // sent from one view is invisible to the other without this cross-instance sync.
+      window.dispatchEvent(
+        new CustomEvent('orbit:user-message', {
+          detail: { sessionId, message: userMessage },
+        })
+      );
 
       // Persist user message to backend with workspace/worktree context
       // This ensures auto-created conversations go to the correct location, not _global

@@ -11,7 +11,7 @@
  * - Inbox
  * - Start conversation button
  */
-import { FlaskConical, Settings } from 'lucide-react';
+import { FlaskConical, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
@@ -20,7 +20,7 @@ import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/files';
 import { SourceControlTab } from '@/components/git';
-import { SidebarToggleIcon, TabButton } from '@/components/layout/primary-sidebar';
+import { SidebarItem, SidebarToggleIcon, TabButton } from '@/components/layout/primary-sidebar';
 import { BeamAsciiPre } from '@/components/shared';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -41,52 +41,6 @@ const SettingsDialog: FC<SettingsDialogProps> = (props) => (
 );
 
 type EditorSidebarTab = 'explorer' | 'source';
-
-interface EditorSidebarItemProps {
-  readonly icon: typeof Settings;
-  readonly label: string;
-  readonly isCollapsed: boolean;
-  readonly shortcut?: readonly string[];
-  readonly onClick?: () => void;
-}
-
-const EditorSidebarItem: FC<EditorSidebarItemProps> = ({
-  icon: Icon,
-  label,
-  isCollapsed,
-  shortcut,
-  onClick,
-}) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <button
-        onClick={onClick}
-        className={cn(
-          'flex items-center w-full rounded-md transition-all duration-150',
-          'text-muted-foreground hover:text-foreground hover:bg-muted/60',
-          isCollapsed ? 'h-9 w-9 justify-center mx-auto' : 'h-8 px-2 gap-2'
-        )}
-      >
-        <Icon className={cn('shrink-0', isCollapsed ? 'h-5 w-5' : 'h-4 w-4')} />
-        {!isCollapsed && (
-          <>
-            <span className="text-sm truncate flex-1 text-left">{label}</span>
-            {shortcut ? (
-              <KbdGroup className="ml-auto">
-                {shortcut.map((key, idx) => (
-                  <Kbd key={`${key}-${String(idx)}`} className="text-xs">
-                    {key}
-                  </Kbd>
-                ))}
-              </KbdGroup>
-            ) : null}
-          </>
-        )}
-      </button>
-    </TooltipTrigger>
-    {isCollapsed ? <TooltipContent side="right">{label}</TooltipContent> : null}
-  </Tooltip>
-);
 
 interface EditorSidebarProps {
   readonly width: number;
@@ -205,8 +159,8 @@ export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
       {/* Tab Navigation - hidden when collapsed */}
       <div
         className={cn(
-          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-hidden transition-[height,opacity] duration-150 ease-in-out',
-          isCollapsed ? '' : 'border-b border-divider'
+          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-visible transition-opacity duration-150 ease-out',
+          isCollapsed ? '' : 'border-b border-gray-5'
         )}
         style={{
           height: isCollapsed ? 0 : SIDEBAR.tabNavHeight,
@@ -253,32 +207,28 @@ export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
 
       <hr
         className={cn(
-          'border-divider shrink-0 transition-all duration-150 ease-in-out',
-          isCollapsed ? 'my-0 opacity-0' : 'my-2 opacity-100'
+          'border-gray-5 border-t shrink-0',
+          isCollapsed ? 'mt-0 mb-0 opacity-0' : 'mt-2 mb-0 opacity-100'
         )}
       />
 
       {/* Utilities */}
-      <div
-        className={cn(
-          'flex flex-col shrink-0 transition-all duration-150 ease-in-out',
-          isCollapsed ? 'gap-0 py-1 items-center' : 'gap-1 py-1.5 px-1.5'
-        )}
-        style={isCollapsed ? { width: SIDEBAR.iconColumnWidth } : undefined}
-      >
-        <EditorSidebarItem
-          icon={Settings}
+      <div className="flex flex-col shrink-0 gap-1 py-1.5">
+        <SidebarItem
+          icon={Settings2}
           label="Settings"
-          isCollapsed={isCollapsed}
+          collapsed={isCollapsed}
+          equalSpacing={isCollapsed}
           shortcut={['⌘', ',']}
           onClick={() => {
             openSettings('agent');
           }}
         />
-        <EditorSidebarItem
+        <SidebarItem
           icon={FlaskConical}
           label="Feedback"
-          isCollapsed={isCollapsed}
+          collapsed={isCollapsed}
+          equalSpacing={isCollapsed}
           onClick={() => {
             openSettings('feedback');
           }}
