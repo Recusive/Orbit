@@ -17,10 +17,13 @@ import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { WelcomePage } from '@/components/welcome';
+import { startDemoConversation } from '@/hooks/agent/demo-conversation';
+import { MOCK_ROOT, getMockFileContent } from '@/hooks/agent/use-tauri-mock';
 import { useBrowser } from '@/hooks/browser/use-browser';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { TauriProvider } from '@/providers/tauri-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
+import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useOnboardingStore } from '@/stores/onboarding/onboarding-store';
 import { useHasWorkspace, useUIStore } from '@/stores/ui/ui-store';
 
@@ -30,6 +33,83 @@ import { useHasWorkspace, useUIStore } from '@/stores/ui/ui-store';
 
 const STYLE_DISPLAY_BLOCK: CSSProperties = { display: 'block' };
 const STYLE_DISPLAY_NONE: CSSProperties = { display: 'none' };
+
+// ============================================
+// Demo View Initialization
+// ============================================
+
+/**
+ * Apply demo-specific initial state based on the ?view= query parameter.
+ * Each view variant configures which panels and files are open on launch.
+ */
+/**
+ * Apply demo-specific initial state based on the ?view= query parameter.
+ * Each view variant configures which panels and files are open on launch.
+ *
+ * For 'hero' and 'demo' views, starts a scripted conversation playback.
+ * For 'showcase' and 'feature' views, configures static editor state.
+ *
+ * @returns cleanup function (for conversation playback cancellation)
+ */
+function applyDemoView(view: string): (() => void) | undefined {
+  const viewerStore = useFileViewerStore.getState();
+  const uiStore = useUIStore.getState();
+
+  // Set workspace so the full workspace UI renders (sidebar, file tree, etc.)
+  // MOCK_ROOT is '/demo' → workspaceName becomes 'demo'
+  uiStore.setWorkspace(MOCK_ROOT);
+
+  let cleanupFn: (() => void) | undefined;
+
+  switch (view) {
+    case 'hero': {
+      // Editor open with a React component file + scripted conversation
+      const path = `${MOCK_ROOT}/src/app.tsx`;
+      const content = getMockFileContent(path);
+      viewerStore.openFile(path, content);
+      viewerStore.setFileContent(path, content);
+      uiStore.openFileTab();
+      cleanupFn = startDemoConversation();
+      break;
+    }
+
+    case 'showcase': {
+      // Chat-only view with scripted conversation (no editor panel)
+      cleanupFn = startDemoConversation();
+      break;
+    }
+
+    case 'feature': {
+      // Editor tab with a utility file + scripted conversation in editor chat
+      const path = `${MOCK_ROOT}/src/utils.ts`;
+      const content = getMockFileContent(path);
+      viewerStore.openFile(path, content);
+      viewerStore.setFileContent(path, content);
+      uiStore.openFileTab();
+      uiStore.setActiveTab('editor');
+      cleanupFn = startDemoConversation();
+      break;
+    }
+
+    case 'demo': {
+      // Editor open with CSS file + scripted conversation
+      const path = `${MOCK_ROOT}/src/styles.css`;
+      const content = getMockFileContent(path);
+      viewerStore.openFile(path, content);
+      viewerStore.setFileContent(path, content);
+      uiStore.openFileTab();
+      cleanupFn = startDemoConversation();
+      break;
+    }
+
+    default: {
+      // No view specified — default chat view, no editor
+      break;
+    }
+  }
+
+  return cleanupFn;
+}
 
 // ============================================
 // Hooks
@@ -189,6 +269,24 @@ const App: FC = () => {
   const hasWorkspace = useHasWorkspace();
   const hasCompletedOnboarding = useOnboardingStore((state) => state.hasCompletedOnboarding);
 
+  // Skip onboarding in demo mode (marketing site iframe with ?demo=true)
+  const searchParams = new URLSearchParams(window.location.search);
+  const isDemo = searchParams.get('demo') === 'true';
+  const demoView = searchParams.get('view') ?? '';
+
+  // Apply demo-specific initial state based on the ?view= parameter
+  useEffect(() => {
+    if (!isDemo) return;
+    let cleanupConversation: (() => void) | undefined;
+    const timer = setTimeout(() => {
+      cleanupConversation = applyDemoView(demoView);
+    }, 800);
+    return (): void => {
+      clearTimeout(timer);
+      cleanupConversation?.();
+    };
+  }, [isDemo, demoView]);
+
   // Track which tabs have been visited for lazy mounting
   const mounted = useMountedTabs(activeTab);
 
@@ -204,8 +302,8 @@ const App: FC = () => {
     [acknowledge]
   );
 
-  // Show onboarding flow if user hasn't completed it yet
-  if (!hasCompletedOnboarding) {
+  // Show onboarding flow if user hasn't completed it yet (skip in demo mode)
+  if (!hasCompletedOnboarding && !isDemo) {
     return (
       <ThemeProvider>
         <OnboardingFlow />
@@ -219,7 +317,7 @@ const App: FC = () => {
         <TooltipProvider delayDuration={0}>
           <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground relative">
             {/* Full-window background image — only on welcome page */}
-            {!hasWorkspace ? (
+            {!hasWorkspace && !isDemo ? (
               <>
                 <div
                   className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -234,7 +332,7 @@ const App: FC = () => {
             ) : null}
 
             {/* Shared header with tabs — relative z-10 to sit above welcome bg */}
-            <HeaderBar transparent={!hasWorkspace} className="relative z-10" />
+            <HeaderBar transparent={!hasWorkspace && !isDemo} className="relative z-10" />
 
             {/* Mode content - show welcome page if no workspace, otherwise show active mode */}
             {/*
@@ -244,7 +342,7 @@ const App: FC = () => {
              * 2. Unnecessary memory usage for unvisited modes
              */}
             <div className="flex-1 min-h-0 overflow-hidden relative z-10">
-              {!hasWorkspace ? (
+              {!hasWorkspace && !isDemo ? (
                 <WelcomePage />
               ) : (
                 <>
@@ -298,7 +396,7 @@ const App: FC = () => {
             </div>
 
             {/* Status Bar — relative z-10 to sit above welcome bg */}
-            <StatusBar transparent={!hasWorkspace} className="relative z-10" />
+            <StatusBar transparent={!hasWorkspace && !isDemo} className="relative z-10" />
 
             {/* Crash notification dialog */}
             {hasCrash && crashLog ? (

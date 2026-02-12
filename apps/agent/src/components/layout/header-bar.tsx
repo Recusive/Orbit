@@ -64,6 +64,9 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
   const workspaceName = useWorkspaceName();
   const hasWorkspace = useHasWorkspace();
 
+  // Demo mode: bypass workspace/auth gates when embedded in marketing site iframe
+  const isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
+
   // Use useShallow to prevent re-renders when unrelated store state changes
   const {
     setActiveTab,
@@ -104,7 +107,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
     toggleBottomPanel();
   };
 
-  const searchText = workspaceName ?? 'Search...';
+  const searchText = workspaceName ?? (isDemo ? 'my-project' : 'Search...');
 
   return (
     <header
@@ -121,11 +124,18 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
       {/* Navigation arrows — hidden until handlers are implemented
        * (Code review: Opus cycle 3, issue #18) */}
       <div className="flex items-center gap-0.5">
-        {/* Spacer to maintain layout — buttons will go here when navigation is wired up */}
+        {/* In demo mode, render fake macOS traffic light dots (native Tauri controls don't exist in iframe) */}
+        {isDemo ? (
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-[7px]">
+            <div className="size-[11px] rounded-full bg-[#FF5F57]" />
+            <div className="size-[11px] rounded-full bg-[#FEBC2E]" />
+            <div className="size-[11px] rounded-full bg-[#28C840]" />
+          </div>
+        ) : null}
       </div>
 
-      {/* Center tabs - only show when workspace is open */}
-      {hasWorkspace ? (
+      {/* Center tabs - only show when workspace is open (or in demo mode) */}
+      {hasWorkspace || isDemo ? (
         <div className="flex items-center gap-0.5" role="tablist" aria-orientation="horizontal">
           <TabButton
             label="Agent"
@@ -154,7 +164,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
       )}
 
       {/* Right section: Search + Action buttons */}
-      {workspaceName ? (
+      {workspaceName || isDemo ? (
         <div className="flex items-center gap-0.5 pr-0.5">
           {/* Search button */}
           <button
