@@ -452,6 +452,18 @@ pub async fn agent_generate_agent_definition(
         .map_err(to_error)
 }
 
+/// Enhance a bug report using AI
+#[tauri::command]
+pub async fn agent_enhance_bug_report(
+    description: String,
+    message_content: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<String> {
+    state
+        .enhance_bug_report(&description, &message_content)
+        .map_err(to_error)
+}
+
 /// Generate a command definition from a natural language description
 #[tauri::command]
 pub async fn agent_generate_command_definition(

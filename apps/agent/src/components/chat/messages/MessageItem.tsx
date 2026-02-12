@@ -14,6 +14,7 @@ import { Streamdown } from 'streamdown';
 import { InterruptIndicator, ThinkingBox } from '../status';
 
 import { ToolWidgetRenderer } from './ToolWidgetRenderer';
+import { FeedbackDialog } from './feedback-dialog';
 import { MessageActions } from './message-actions';
 import { arePropsEqual, buildSegments, hasVisibleContent } from './message-utils';
 
@@ -147,6 +148,8 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   onOpenUrl,
   onFeedback,
 }) {
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+
   // Message is complete when streaming has finished
   // Note: displayedContent.length === content.length check removed - with backend batching,
   // both fields are always equal. Streaming state is the authoritative signal.
@@ -335,15 +338,25 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
 
           {/* Message actions - shown when complete */}
           {isComplete ? (
-            <MessageActions
-              rewindDisabled={isLastAssistantMessage}
-              onCopy={() => {
-                void navigator.clipboard.writeText(message.content);
-              }}
-              onRewind={() => {
-                onRewind(message.id);
-              }}
-            />
+            <>
+              <MessageActions
+                rewindDisabled={isLastAssistantMessage}
+                onCopy={() => {
+                  void navigator.clipboard.writeText(message.content);
+                }}
+                onDislike={() => {
+                  setFeedbackDialogOpen(true);
+                }}
+                onRewind={() => {
+                  onRewind(message.id);
+                }}
+              />
+              <FeedbackDialog
+                open={feedbackDialogOpen}
+                onOpenChange={setFeedbackDialogOpen}
+                messageContent={message.content}
+              />
+            </>
           ) : null}
 
           {/* Interrupt indicator - shown when message was interrupted or question rejected */}

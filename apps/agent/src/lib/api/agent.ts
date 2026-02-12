@@ -460,3 +460,10 @@ export async function generateCommandDefinition(
 ): Promise<SlashCommandDefinition> {
   return invoke<SlashCommandDefinition>('agent_generate_command_definition', { description });
 }
+
+export async function enhanceBugReport(
+  description: string,
+  messageContent: string
+): Promise<string> {
+  return invoke<string>('agent_enhance_bug_report', { description, messageContent });
+}

@@ -641,6 +641,19 @@ async function handleRequest(
       break;
     }
 
+    case 'enhance_bug_report': {
+      const result = await sessionManager.enhanceBugReport(
+        request.description,
+        request.messageContent
+      );
+      sendResponse({
+        type: 'string',
+        requestType: request.type,
+        value: JSON.stringify(result),
+      });
+      break;
+    }
+
     // Canvas Operations
     case 'canvas:create_session': {
       await canvasSessionManager.createSession(request.sessionId, request.config);

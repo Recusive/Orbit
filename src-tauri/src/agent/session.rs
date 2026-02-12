@@ -675,6 +675,22 @@ impl SessionManager {
             .ok_or_else(|| BridgeError::SidecarError("Generation returned null".to_owned()))
     }
 
+    /// Enhance a bug report using AI
+    pub fn enhance_bug_report(&self, description: &str, message_content: &str) -> Result<String> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::EnhanceBugReport {
+            description: description.to_owned(),
+            message_content: message_content.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_string(response)?.ok_or_else(|| {
+            BridgeError::SidecarError("Bug report enhancement returned null".to_owned())
+        })
+    }
+
     /// Generate a command definition from a natural language description
     pub fn generate_command_definition(&self, description: &str) -> Result<SlashCommandDefinition> {
         self.ensure_running()?;

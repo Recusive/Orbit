@@ -1,4 +1,3 @@
-import { open } from '@tauri-apps/plugin-shell';
 import { Check, Copy, Rewind, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useState } from 'react';
 
@@ -6,9 +5,6 @@ import type { FC, ReactNode } from 'react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-
-const BUG_REPORT_URL =
-  'https://github.com/Recusive/Orbit/issues/new?labels=bug&template=bug_report.md';
 
 interface MessageActionsProps {
   readonly rewindDisabled?: boolean;
@@ -83,7 +79,6 @@ export const MessageActions: FC<MessageActionsProps> = ({
           label="Dislike"
           onClick={() => {
             onDislike?.();
-            void open(BUG_REPORT_URL);
           }}
         >
           <ThumbsDown className="h-3.5 w-3.5" aria-hidden="true" />

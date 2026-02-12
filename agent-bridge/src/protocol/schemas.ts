@@ -451,6 +451,15 @@ export type GenerateCommandDefinitionRequest = z.infer<
   typeof GenerateCommandDefinitionRequestSchema
 >;
 
+export const EnhanceBugReportRequestSchema = z
+  .object({
+    type: z.literal('enhance_bug_report'),
+    description: z.string(),
+    messageContent: z.string(),
+  })
+  .strict();
+export type EnhanceBugReportRequest = z.infer<typeof EnhanceBugReportRequestSchema>;
+
 export const ShutdownRequestSchema = z
   .object({
     type: z.literal('shutdown'),
@@ -589,6 +598,7 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   ForkSessionAtRequestSchema,
   GenerateAgentDefinitionRequestSchema,
   GenerateCommandDefinitionRequestSchema,
+  EnhanceBugReportRequestSchema,
   ShutdownRequestSchema,
   CanvasCreateSessionRequestSchema,
   CanvasDeleteSessionRequestSchema,

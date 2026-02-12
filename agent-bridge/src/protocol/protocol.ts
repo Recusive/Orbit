@@ -337,6 +337,15 @@ export interface GenerateCommandDefinitionRequest {
 }
 
 /**
+ * Enhance a bug report using AI
+ */
+export interface EnhanceBugReportRequest {
+  type: 'enhance_bug_report';
+  description: string;
+  messageContent: string;
+}
+
+/**
  * Shutdown the bridge
  */
 export interface ShutdownRequest {
@@ -436,6 +445,7 @@ export type BridgeRequest =
   | ForkSessionAtRequest
   | GenerateAgentDefinitionRequest
   | GenerateCommandDefinitionRequest
+  | EnhanceBugReportRequest
   | ShutdownRequest
   | CanvasCreateSessionRequest
   | CanvasDeleteSessionRequest

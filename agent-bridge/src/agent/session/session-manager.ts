@@ -2223,6 +2223,82 @@ Return ONLY the JSON object with the command definition.`;
   }
 
   /**
+   * Enhance a bug report from a user's plain-language description using AI.
+   * Creates a structured GitHub issue with title and markdown body.
+   *
+   * Uses Haiku for speed/cost — this is a simple formatting task, not a complex reasoning one.
+   */
+  async enhanceBugReport(
+    description: string,
+    messageContent: string
+  ): Promise<{ title: string; body: string }> {
+    const prompt = `You are a bug report writer for an AI code editor called Orbit.
+Given a user's complaint and the AI message that prompted it, produce a structured GitHub issue.
+
+User's complaint:
+"${description}"
+
+AI message that the user disliked (truncated):
+"""
+${messageContent}
+"""
+
+Write a clear, actionable bug report even if the complaint is vague — always produce your best attempt.
+The title should be concise (under 80 characters).
+The body should be markdown with these sections: Description, Steps to Reproduce, Expected Behavior, Actual Behavior.
+
+You MUST respond with ONLY a valid JSON object and nothing else. No markdown code fences, no explanation.
+Example format:
+{"title":"Bug: something broke","body":"## Description\\n..."}`;
+
+    const agent = new OrbitAgent({
+      model: 'haiku',
+    });
+
+    await agent.startSession();
+    agent.queueMessage(prompt);
+
+    let resultText = '';
+
+    for await (const rawMessage of agent.receiveResponse()) {
+      const sdkMessage = rawMessage as Record<string, unknown>;
+      if (sdkMessage.type === 'result') {
+        if (typeof sdkMessage.result === 'string') {
+          resultText = sdkMessage.result;
+        }
+        break;
+      }
+    }
+
+    await agent.stopSession();
+
+    // Extract JSON from the response — handle markdown code fences and surrounding text
+    const jsonMatch = /\{[\s\S]*\}/.exec(resultText);
+    if (jsonMatch === null) {
+      throw new Error('Failed to enhance bug report - no JSON in response');
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonMatch[0]) as unknown;
+    } catch {
+      throw new Error('Failed to enhance bug report - invalid JSON in response');
+    }
+
+    const BugReportSchema = z.object({
+      title: z.string(),
+      body: z.string(),
+    });
+
+    const parseResult = BugReportSchema.safeParse(parsed);
+    if (!parseResult.success) {
+      throw new Error(`Enhanced bug report is invalid: ${formatZodError(parseResult.error)}`);
+    }
+
+    return parseResult.data;
+  }
+
+  /**
    * Get content loss metrics for monitoring.
    * These metrics track data loss due to SDK integration issues.
    * Non-zero values indicate bugs that should be investigated.

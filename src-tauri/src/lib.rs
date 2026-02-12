@@ -383,6 +383,7 @@ pub fn run() {
             agent_cmd::agent_fork_session_at,
             agent_cmd::agent_generate_agent_definition,
             agent_cmd::agent_generate_command_definition,
+            agent_cmd::agent_enhance_bug_report,
             // Canvas session commands
             canvas_cmd::canvas_create_session,
             canvas_cmd::canvas_delete_session,

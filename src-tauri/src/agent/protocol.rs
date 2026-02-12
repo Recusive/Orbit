@@ -448,6 +448,11 @@ pub enum BridgeRequest {
     GenerateCommandDefinition {
         description: String,
     },
+    EnhanceBugReport {
+        description: String,
+        #[serde(rename = "messageContent")]
+        message_content: String,
+    },
     // Canvas Operations
     #[serde(rename = "canvas:create_session")]
     CanvasCreateSession {

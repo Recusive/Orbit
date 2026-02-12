@@ -781,6 +781,7 @@ apps/Canvas-UI-Builder/src/
 </canvas_ui_builder>
 
 <feature_documentation location="docs/">
+<index file="docs/CLAUDE.md" rule="When adding, removing, or moving files in docs/, update docs/CLAUDE.md to keep the index in sync."/>
 <feature name="Embedded Browser" file="docs/architecture/EMBEDDED_BROWSER.md" description="Tauri multiwebview browser panel, WKWebView workarounds, idle timeout system"/>
 <feature name="CSP Security" file="docs/architecture/CSP-SECURITY.md" description="Content Security Policy config, why unsafe-eval is required for streamdown"/>
 <feature name="ProMotion 120fps" file="docs/architecture/PROMOTION-120FPS.md" description="120Hz rendering in WKWebView via CADisplayLink + WebKit _WKFeature private API"/>
