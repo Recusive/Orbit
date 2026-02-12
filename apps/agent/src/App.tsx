@@ -74,7 +74,8 @@ function applyDemoView(view: string): (() => void) | undefined {
     }
 
     case 'showcase': {
-      // Chat-only view with scripted conversation (no editor panel)
+      // Settings dialog open on accounts page showing Claude Code connected
+      uiStore.openSettings('account');
       cleanupFn = startDemoConversation();
       break;
     }

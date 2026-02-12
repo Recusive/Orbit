@@ -130,6 +130,22 @@ export const AccountSettings: FC = () => {
   // ── Fetch status on mount ────────────────────────────────────────────
   const fetchStatus = useCallback(async (): Promise<void> => {
     setIsChecking(true);
+
+    // In demo mode (marketing site iframe), skip Tauri invocations and show mock connected state
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('demo') === 'true') {
+      setKeychainStatus({
+        hasCredentials: true,
+        credentialType: 'oauth',
+        expiresAt: Date.now() + 4 * 60 * 60_000,
+        entryExists: true,
+        error: null,
+      });
+      setLastChecked(Date.now());
+      setIsChecking(false);
+      return;
+    }
+
     try {
       const [status, apiKeyResult] = await Promise.all([
         invoke<KeychainStatus>('check_claude_keychain'),
