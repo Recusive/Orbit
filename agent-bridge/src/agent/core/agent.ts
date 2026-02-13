@@ -631,7 +631,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       // Working directory
       cwd: this.cwd,
       // Load CLAUDE.md from project directory for project-specific instructions
-      settingSources: ['user', 'project'],
+      settingSources: ['user', 'project', 'local'],
     };
 
     // Only add thinking tokens if thinking mode is enabled and budget > 0

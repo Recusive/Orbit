@@ -3,6 +3,7 @@
 > **Last Updated:** February 12, 2026 (v2)
 > **Branch:** `refactor/chatstore-zustand-migration`
 > **Status:** Production — Zustand-based architecture with non-destructive rewind
+> **Claude Session:** `72d722f8-4c21-498c-a652-ef479218dde8` (non-destructive rewind implementation)
 
 ---
 

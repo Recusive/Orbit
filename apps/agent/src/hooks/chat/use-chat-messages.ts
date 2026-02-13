@@ -19,8 +19,9 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createChatActions } from './handlers/chat-actions';
 
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
-import type { MegaStressTestConfig } from '@/services/chat/rewind-mega-stress-test';
-import type { StressTestConfig } from '@/services/chat/rewind-stress-test';
+import type { MegaStressTestConfig } from '@/stress-tests/rewind-mega-stress-test';
+import type { StressTestConfig } from '@/stress-tests/rewind-stress-test';
+import type { SessionStressTestConfig } from '@/stress-tests/session-stress-test';
 import type {
   EffortLevel,
   Model,
@@ -51,6 +52,7 @@ declare global {
       | {
           runRewindStressTest: (config?: StressTestConfig) => Promise<unknown>;
           runMegaStressTest: (config?: MegaStressTestConfig) => Promise<unknown>;
+          runSessionStressTest: (config?: SessionStressTestConfig) => Promise<unknown>;
           handleSend: (text: string) => void;
           handleRewind: (messageId: string) => void;
           handleStop: () => void;
@@ -404,7 +406,7 @@ export function useChatMessages(): UseChatMessagesReturn {
       handleRewind: actions.handleRewind,
       handleStop: actions.handleStop,
       runRewindStressTest: async (config?: StressTestConfig) => {
-        const { runRewindStressTest } = await import('@/services/chat/rewind-stress-test');
+        const { runRewindStressTest } = await import('@/stress-tests/rewind-stress-test');
         return runRewindStressTest(
           {
             handleSend: actions.handleSend,
@@ -415,12 +417,23 @@ export function useChatMessages(): UseChatMessagesReturn {
         );
       },
       runMegaStressTest: async (config?: MegaStressTestConfig) => {
-        const { runMegaStressTest } = await import('@/services/chat/rewind-mega-stress-test');
+        const { runMegaStressTest } = await import('@/stress-tests/rewind-mega-stress-test');
         return runMegaStressTest(
           {
             handleSend: actions.handleSend,
             handleRewind: actions.handleRewind,
             handleStop: actions.handleStop,
+          },
+          config
+        );
+      },
+      runSessionStressTest: async (config?: SessionStressTestConfig) => {
+        const { runSessionStressTest } = await import('@/stress-tests/session-stress-test');
+        return runSessionStressTest(
+          {
+            handleSend: actions.handleSend,
+            handleStop: actions.handleStop,
+            postMessage,
           },
           config
         );
