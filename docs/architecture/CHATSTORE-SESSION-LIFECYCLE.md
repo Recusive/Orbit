@@ -1,8 +1,8 @@
 # ChatStore Session Lifecycle & Architecture
 
-> **Last Updated:** February 12, 2026
+> **Last Updated:** February 12, 2026 (v2)
 > **Branch:** `refactor/chatstore-zustand-migration`
-> **Status:** Production — Zustand-based architecture with unified rewind system
+> **Status:** Production — Zustand-based architecture with non-destructive rewind
 
 ---
 
@@ -45,12 +45,14 @@ This replaces the previous `message-handler.ts` + `message-state.ts` + `session-
 
 ### Two Separate Rewind Systems
 
-| System                  | Purpose                            | Mechanism                             | Status               |
-| ----------------------- | ---------------------------------- | ------------------------------------- | -------------------- |
-| **Conversation Rewind** | Rewind to earlier message in chat  | `forkSessionAt` + `parentUuid` chains | **DONE & WORKING**   |
-| **File Checkpointing**  | Restore file state before AI edits | SDK `rewindFiles(checkpointId)`       | **FIXED (Feb 2026)** |
+| System                  | Purpose                            | Mechanism                             | JSONL Behavior                      | Status               |
+| ----------------------- | ---------------------------------- | ------------------------------------- | ----------------------------------- | -------------------- |
+| **Conversation Rewind** | Rewind to earlier message in chat  | `forkSessionAt` + `parentUuid` chains | Non-destructive: old branches kept  | **DONE & WORKING**   |
+| **File Checkpointing**  | Restore file state before AI edits | SDK `rewindFiles(checkpointId)`       | N/A (operates on working directory) | **FIXED (Feb 2026)** |
 
 These are **independent systems**. Do NOT conflate them.
+
+**Non-destructive approach:** When rewinding, the original JSONL is preserved on disk (matching Claude Code). Old branches appear as separate sidebar entries and can be browsed. The `parentUuid` chain handles filtering dead branches at load time — no file deletion needed.
 
 ---
 
@@ -537,7 +539,7 @@ These exist because `useQueuedMessageHandler` still expects `React.Dispatch`-sty
 
 ### Overview
 
-Conversation rewind uses Claude Code's `forkSessionAt` approach for **all** rewinds (first and repeat):
+Conversation rewind uses Claude Code's `forkSessionAt` approach for **all** rewinds (first and repeat). This is a **non-destructive** system: original JSONL branch files are preserved on disk. The `parentUuid` chain handles filtering dead branches at load time — no file deletion needed.
 
 ```
 User clicks rewind button on message
@@ -549,23 +551,25 @@ chat-actions.ts handleRewind(messageId)                  (line 297-355)
   ↓
 conversation-handlers.ts handleConversationRewind()      (line 184-402)
   │
-  ├── Step 1: Find target message
+  ├── Step 1: Get checkpoints for the target user message
+  │     CheckpointStore.getRewindCheckpoints(session_id, userMessageId)
+  │
+  ├── Step 2: File rewind (if checkpoints available)
+  │     await agentRewindFiles(session_id, checkpointId)
+  │     Best-effort — failure doesn't block conversation rewind
+  │
+  ├── Step 3: Find target message in disk JSONL
   │     Priority chain:
   │     1. Direct SDK UUID match in JSONL
   │     2. Content-validated position match (role+content of disk vs frontend)
   │     3. Frontend messages fallback (stale disk on rewind 2+)
   │     4. Unvalidated position fallback (last resort)
   │
-  ├── Step 2: File rewind (if checkpoints available)
-  │     await agentRewindFiles(session_id, checkpointId)
-  │
-  ├── Step 3: Get rewind checkpoints from CheckpointStore
-  │     CheckpointStore.getRewindCheckpoints(session_id, userMessageId)
-  │
   ├── Step 4: Fork session at target message
   │     if (sdkMessageId && !useFrontendMessages):
   │       await agentForkSessionAt(session_id, sdkMessageId)
   │       CheckpointStore.setPendingConversationFork(session_id, sdkMessageId)
+  │     Bridge calls are awaited directly — no Promise.race timeouts
   │
   └── Step 5: Post conversation:rewound
         window.postMessage({ type: 'conversation:rewound', messages, new_session_id })
@@ -579,6 +583,17 @@ ChatMessageService.handleConversationRewound()           (line 985-1050)
   └── Restore tool executions for rewound messages
 ```
 
+### Non-Destructive JSONL Preservation
+
+When `forkSessionAt` runs in the agent-bridge:
+
+1. **Truncate** — Writes a truncated copy of the original JSONL (messages up to the fork point)
+2. **Copy** — Copies the truncated file to a new intermediate session ID
+3. **SDK Fork** — Creates a new SDK session with `forkSession: true` which reads the intermediate, creates a self-contained fork JSONL, and deletes the intermediate
+4. **Cleanup** — Only the intermediate JSONL is deleted. The **original** JSONL stays on disk
+
+This matches Claude Code's behavior: old branches remain browsable via the sidebar. The `parentUuid` chain in each JSONL + `build_active_uuid_set()` in Rust handles filtering dead branches when loading. Old branches coexist safely — they're historical data, not garbage.
+
 ### parentUuid Chain
 
 Every message has a `parentUuid` field linking to its predecessor. After rewind, the new user message's `parentUuid` points to the last surviving message. Dead branches are filtered by `getActiveChain()` which walks the `parentUuid` chain backwards from the last message.
@@ -589,6 +604,20 @@ On first rewind, direct UUID match always fails (frontend UUID ≠ SDK UUID). Po
 
 - **Content match** = fresh disk (first rewind) → proceed with `forkSessionAt`
 - **Content mismatch** = stale disk (rewind 2+) → use frontend messages, skip fork
+
+### Removed Workarounds (Historical)
+
+The following workarounds were removed as part of the unified non-destructive rewind system:
+
+| Removed Code                   | Location                                              | Why It Existed                                                   | Why It's Gone                                                          |
+| ------------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `forkedSessions` Set           | `conversation-handlers.ts`                            | Tracked sessions already forked to skip repeat forks             | Always fork now — non-destructive, no IPC blocking                     |
+| `isRepeatRewind` guard         | `conversation-handlers.ts`                            | Detected repeat rewinds to skip bridge calls                     | All rewinds go through same code path                                  |
+| `Promise.race` timeouts        | `conversation-handlers.ts`                            | Prevented IPC blocking from slow bridge calls                    | Bridge calls are `await`-ed directly; async file I/O prevents blocking |
+| `propagateForkedSession()`     | `conversation-handlers.ts`, `chat-message-service.ts` | Propagated forked status through session remap chain             | No forked session tracking needed                                      |
+| `.rewinds.json` sidecar        | `conversations/src/lib.rs`                            | `apply_self_rewinds()` filtered dead branches for repeat rewinds | `parentUuid` chain handles all branching natively                      |
+| `pendingJsonlDeletions` Map    | `session-manager.ts`                                  | Fallback cleanup when copy-then-delete failed in `forkSessionAt` | No more copy-then-delete — originals are preserved                     |
+| `conversationRecordSelfRewind` | `conversations.rs`, `lib/api`                         | Rust command to write `.rewinds.json` sidecar                    | Self-rewind system fully removed                                       |
 
 ---
 
@@ -751,16 +780,18 @@ ChatMessageService.handleSystemInit
          └─► ToolStore.switchSession(new)               if still active
 ```
 
-### Rewind Flow
+### Rewind Flow (Non-Destructive)
 
 ```
 conversation:rewind (postMessage from handleRewind)
          │
          ▼
 handleConversationRewind (conversation-handlers.ts)
+  ├── Get checkpoints from CheckpointStore
+  ├── await agentRewindFiles() — restore file state (best-effort)
   ├── Find target in JSONL (4-step priority chain)
-  ├── agentRewindFiles() — restore file state
-  ├── agentForkSessionAt() — create SDK branch
+  ├── await agentForkSessionAt() — create SDK branch (no timeouts)
+  │     └── Original JSONL preserved on disk (non-destructive)
   └── conversation:rewound (via window.postMessage)
          │
          ▼
@@ -946,15 +977,24 @@ Post-fork sessions MUST set `forkSession: true` in `createSession` options. With
 - `getRewindCheckpoints()` returns `undefined`
 - File rewind silently skips
 
-### 8. `startTransition` Works Outside React Components
+### 8. `forkSessionAt` Is Non-Destructive — Original JONLs Stay on Disk
+
+After a rewind, the original JSONL branch is **not deleted**. This is intentional — it matches Claude Code's approach. Consequences:
+
+- **Sidebar shows old branches:** Each rewind creates a new SDK session → new JSONL on disk → new sidebar entry. Users can browse old branches.
+- **Disk usage grows:** Each rewind adds a JSONL file. This is bounded by the fork chain mechanism (`.fork.json` sidecars) which links branches together.
+- **`build_active_uuid_set` handles filtering:** When loading a session, Rust walks the `parentUuid` chain to determine the active branch. Dead branches on disk are harmless — they're filtered at load time.
+- **Intermediate JONLs are cleaned up:** Only the temporary intermediate file (used between truncate and SDK fork) is deleted. The SDK fork process often deletes it first; our cleanup is a best-effort fallback.
+
+### 9. `startTransition` Works Outside React Components
 
 `ChatMessageService` imports `startTransition` from `react` and uses it in `handleConversationLoaded`. This works because Zustand v4+ uses `useSyncExternalStore` internally. Do NOT downgrade Zustand below v4 without verifying this still works.
 
-### 9. RAF Batchers Are Per-Session
+### 10. RAF Batchers Are Per-Session
 
 Rewinding session A cancels only A's batchers. Session B's streaming continues unaffected. This prevents cross-session interference in multi-session scenarios.
 
-### 10. Reconciliation `reconciled` Flag Prevents Stale Overwrites
+### 11. Reconciliation `reconciled` Flag Prevents Stale Overwrites
 
 `currentUserMessageId` has a `reconciled: boolean` field. `onUserMessageSent` sets it to `false`; first successful `reconcileUserMessageId` sets it to `true`. Subsequent reconciliation attempts are rejected. Epoch-based guards don't work because JS is single-threaded (get/set are atomic).
 
@@ -998,14 +1038,15 @@ Rewinding session A cancels only A's batchers. Session B's streaming continues u
 3. **Expected:** Session B loads correctly, session A continues in background
 4. **Verify:** `remapConversation` updates A's entry, doesn't hijack focus to A
 
-### Scenario 6: Single Rewind
+### Scenario 6: Single Rewind (Non-Destructive)
 
 1. Send 3 messages, let each complete
 2. Rewind to after message 1
 3. **Expected:** Messages 2-3 disappear, file state restores
 4. Send new message → agent responds
 5. Switch to another chat, switch back
-6. **Verify:** Only active branch visible (parentUuid chain)
+6. **Verify:** Active branch visible (parentUuid chain), old branch visible in sidebar as separate entry
+7. **Verify:** Clicking the old sidebar entry shows pre-rewind messages
 
 ### Scenario 7: Multi-Rewind (Stress Test)
 
@@ -1013,8 +1054,10 @@ Rewinding session A cancels only A's batchers. Session B's streaming continues u
 2. Rewind again to after msg 1 → send another new msg
 3. Rewind a third time → send another msg
 4. Switch away and back between each step
-5. **Expected:** Only newest branch visible each time
-6. **Verify:** No duplicate messages, no sidebar ghosts, file checkpoints work
+5. **Expected:** Only newest branch visible in active chat
+6. **Verify:** No duplicate messages, file checkpoints work
+7. **Verify:** Old branches persist as separate sidebar entries (non-destructive)
+8. **Verify:** No IPC blocking — each rewind completes without timeout
 
 ### Scenario 8: LRU Eviction
 
@@ -1112,14 +1155,14 @@ remapSession: (oldId: string, newId: string): void => {
 
 ### Supporting Files
 
-| File                                                           | Purpose                                                  |
-| -------------------------------------------------------------- | -------------------------------------------------------- |
-| `apps/agent/src/hooks/agent/handlers/conversation-handlers.ts` | Rewind flow (Steps 1-5), conversation CRUD               |
-| `apps/agent/src/stores/agent/checkpoint-store.ts`              | File checkpoints, message ID reconciliation              |
-| `apps/agent/src/stores/ui/ui-store.ts`                         | Sidebar list, optimistic preservation, remapConversation |
-| `apps/agent/src/stores/agent/tool-store.ts`                    | Tool execution, token tracking, session usage            |
-| `agent-bridge/src/agent/session/session-manager.ts`            | forkSessionAt, createSession, JSONL I/O                  |
-| `agent-bridge/src/agent/core/agent.ts`                         | shouldEnableReplay, \_createOptions                      |
+| File                                                           | Purpose                                                   |
+| -------------------------------------------------------------- | --------------------------------------------------------- |
+| `apps/agent/src/hooks/agent/handlers/conversation-handlers.ts` | Rewind flow (Steps 1-5), conversation CRUD                |
+| `apps/agent/src/stores/agent/checkpoint-store.ts`              | File checkpoints, message ID reconciliation               |
+| `apps/agent/src/stores/ui/ui-store.ts`                         | Sidebar list, optimistic preservation, remapConversation  |
+| `apps/agent/src/stores/agent/tool-store.ts`                    | Tool execution, token tracking, session usage             |
+| `agent-bridge/src/agent/session/session-manager.ts`            | forkSessionAt (non-destructive), createSession, JSONL I/O |
+| `agent-bridge/src/agent/core/agent.ts`                         | shouldEnableReplay, \_createOptions                       |
 
 ### Deleted Files (Historical)
 

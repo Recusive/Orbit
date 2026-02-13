@@ -812,14 +812,6 @@ export class SessionManager extends Disposable {
   private pendingDisplayNames = new Map<string, string>();
   private browserToolUnsubscribers = new Map<string, () => void>();
 
-  /**
-   * Tracks intermediate JSONL files created by forkSessionAt that need cleanup.
-   * Key: orbit session ID (frontend-facing), Value: { intermediateId, cwd }
-   * Cleaned up when system:init fires (we learn the final SDK session ID)
-   * or when deleteSession is called (user navigated away without sending).
-   */
-  private pendingJsonlDeletions = new Map<string, { intermediateId: string; cwd: string }>();
-
   // Track the current turn ID per session (our OWN stable ID, not SDK's uuid)
   // The SDK sends different UUIDs for each message (stream_event, assistant, etc.)
   // We generate our own stable turn ID when a turn starts and use it for ALL events
@@ -871,7 +863,6 @@ export class SessionManager extends Disposable {
     rekey(this.pendingDisplayNames);
     rekey(this.browserToolUnsubscribers);
     rekey(this.currentTurnId);
-    rekey(this.pendingJsonlDeletions);
 
     if (this.sessionInitFired.has(oldId)) {
       this.sessionInitFired.delete(oldId);
@@ -1138,20 +1129,6 @@ export class SessionManager extends Disposable {
                 isResumed: resumeState.isResumed,
                 isForked: resumeState.isForked,
               });
-
-              // Clean up any leftover intermediate JSONL from forkSessionAt.
-              // Normally, forkSessionAt handles all cleanup (prefilling the new
-              // session's JSONL and deleting intermediates/originals). This is a
-              // fallback for the rare case where prefill failed.
-              const pending = this.pendingJsonlDeletions.get(sessionId);
-              if (pending) {
-                // Delete intermediate JSONL if the SDK created its own (different ID)
-                if (pending.intermediateId !== sdkSessionId) {
-                  void deleteSessionJsonl(pending.intermediateId, pending.cwd);
-                }
-
-                this.pendingJsonlDeletions.delete(sessionId);
-              }
             }
             continue;
           }
@@ -1586,14 +1563,6 @@ export class SessionManager extends Disposable {
       this.activeSessions.delete(sessionId);
     }
 
-    // Clean up intermediate JSONL from forkSessionAt if the user navigated away
-    // without sending a message (system:init never fired to clean it up).
-    const pendingDeletion = this.pendingJsonlDeletions.get(sessionId);
-    if (pendingDeletion) {
-      void deleteSessionJsonl(pendingDeletion.intermediateId, pendingDeletion.cwd);
-      this.pendingJsonlDeletions.delete(sessionId);
-    }
-
     this.pendingTools.delete(sessionId);
     this.approvedToolNames.delete(sessionId);
     this.sessionResumeState.delete(sessionId);
@@ -1986,33 +1955,19 @@ export class SessionManager extends Disposable {
     const newAgent = this.activeSessions.get(sessionId);
     const finalSdkSessionId = newAgent?.getCurrentSessionId();
 
-    // Step 7: Make the new session's JSONL self-contained.
-    // Copy the truncated history (intermediate) to the new session's JSONL path.
-    // The SDK appends new messages to this pre-populated file, so conversationLoad()
-    // reads a single JSONL with the complete conversation — no fork chain needed.
-    if (finalSdkSessionId && finalSdkSessionId !== newSdkSessionId) {
-      const prefillResult = await copySessionJsonl(newSdkSessionId, finalSdkSessionId, savedCwd);
-      if (prefillResult.success) {
-        // Intermediate is redundant, original is a dead branch — clean both up
-        await deleteSessionJsonl(newSdkSessionId, savedCwd);
-        await deleteSessionJsonl(sdkSessionId, savedCwd);
-      } else {
-        // Prefill failed — fall back to intermediate cleanup in system:init.
-        // Original stays on disk. Frontend works (cached messages) but cold-start
-        // conversationLoad may return incomplete history.
-        logger.warn(
-          { error: prefillResult.error, finalSdkSessionId, intermediateId: newSdkSessionId },
-          'forkSessionAt: failed to prefill new session JSONL'
-        );
-        this.pendingJsonlDeletions.set(sessionId, {
-          intermediateId: newSdkSessionId,
-          cwd: savedCwd,
-        });
-      }
-    } else {
-      // Edge case: intermediate IS the final session — just clean up original
-      await deleteSessionJsonl(sdkSessionId, savedCwd);
-    }
+    // Step 7: Clean up the intermediate JSONL only.
+    //
+    // The SDK with forkSession: true already creates a self-contained JSONL for
+    // the new session (finalSdkSessionId). It reads the intermediate, forks into
+    // the new session, and typically deletes the intermediate itself.
+    //
+    // We do NOT delete the original (sdkSessionId) JSONL — matching Claude Code's
+    // approach of keeping all branches on disk. The parentUuid chain in each JSONL
+    // handles branch filtering when loading. Old branches stay as historical data
+    // and can be browsed via the sidebar.
+    //
+    // Only clean up the intermediate (our temporary copy) if the SDK didn't already.
+    await deleteSessionJsonl(newSdkSessionId, savedCwd);
 
     return finalSdkSessionId ?? newSdkSessionId;
   }
@@ -2342,11 +2297,6 @@ Example format:
       resolver({ decision: 'deny', always: false });
     }
     this.permissionResolvers.clear();
-
-    // On shutdown, clear pending deletions. In the rare fallback case where
-    // forkSessionAt couldn't prefill the new JSONL, the intermediate stays on
-    // disk — harmless phantom sidebar entry, no data loss.
-    this.pendingJsonlDeletions.clear();
 
     // Cancel all background consumers
     for (const [, consumer] of this.sessionConsumers.entries()) {
