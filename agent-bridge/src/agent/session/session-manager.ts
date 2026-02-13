@@ -1965,11 +1965,15 @@ export class SessionManager extends Disposable {
     // Do this BEFORE createSession so the session ID slot is free.
     await this.deleteSession(sessionId);
 
-    // Step 5: Create new session that resumes from the COPIED JSONL
+    // Step 5: Create new session that resumes from the COPIED JSONL.
+    // forkSession: true is CRITICAL — it tells _createOptions() to enable
+    // replay-user-messages, which is required for file checkpointing to work.
+    // Without it, the SDK won't emit user message UUIDs during replay, so no
+    // checkpoint events fire, and file rewind silently fails.
     await this.createSession(sessionId, {
       resumeSessionId: newSdkSessionId,
-      // NO resumeSessionAt - file is already truncated
-      // NO forkSession - we've done the "fork" by truncating and copying
+      forkSession: true,
+      // NO resumeSessionAt - file is already truncated by us
       cwd: savedCwd,
       thinkingEnabled: savedPrefs.thinkingEnabled,
       maxThinkingTokens: savedPrefs.maxThinkingTokens,

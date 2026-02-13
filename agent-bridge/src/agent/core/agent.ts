@@ -1022,17 +1022,15 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
 
     // Enable replay-user-messages for:
     // 1. NEW sessions: need checkpoint UUIDs for the rewind feature
-    // 2. FORKED sessions with resumeSessionAt: need conversation context replayed UP TO the fork point
-    //    (The SDK will only replay messages up to resumeSessionAt, so no double-message bug)
+    // 2. FORKED sessions: need checkpoint UUIDs emitted during replay.
+    //    Two fork flavors:
+    //    a) SDK fork: forkSession + resumeSessionAt → SDK stops replay at fork point
+    //    b) Manual fork (forkSessionAt): forkSession + NO resumeSessionAt → JSONL is
+    //       already truncated by us, so replaying all is safe (all messages have responses)
     //
     // Disable for:
     // - Plain resumed sessions (continue where left off): would replay ALL messages causing double-response
-    //
-    // Key insight: resumeSessionAt tells the SDK WHERE to stop replaying, making it safe to enable.
-    // Without resumeSessionAt, replay goes to the END of the session, then adds the new message.
-    const shouldEnableReplay =
-      this._resumeSessionId === undefined ||
-      (this._forkSession && this._resumeSessionAt !== undefined);
+    const shouldEnableReplay = this._resumeSessionId === undefined || this._forkSession;
 
     if (shouldEnableReplay) {
       options.extraArgs = {
@@ -1042,7 +1040,8 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       logger.warn(
         {
           isNewSession: !this._resumeSessionId,
-          isForkWithResumeAt: this._forkSession && !!this._resumeSessionAt,
+          isFork: this._forkSession,
+          hasResumeAt: !!this._resumeSessionAt,
         },
         'CHECKPOINT _createOptions — replay-user-messages ENABLED (checkpoint UUIDs will arrive)'
       );
@@ -1794,11 +1793,21 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Step 2: Build options for the rewind query - must resume the session
     // Important: Include the CLI path since bundled Bun environments need it
     // Also include env with the checkpointing flag
+    //
+    // CRITICAL: replay-user-messages is required for the resumed CLI process to
+    // emit messages in the stream. Without it, the CLI exits immediately
+    // (empty prompt + no replay = transport dies before rewindFiles() executes).
+    // permissionMode prevents the temporary process from blocking on prompts.
+    // This matches the SDK docs' official checkpointing pattern.
     const rewindOptions: Options = {
       enableFileCheckpointing: true,
+      permissionMode: 'acceptEdits' as const,
       resume: sdkSessionId,
       cwd: this.cwd,
       pathToClaudeCodeExecutable: this._findClaudeExecutable(),
+      extraArgs: {
+        'replay-user-messages': null,
+      },
       env: {
         ...process.env,
         CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING: '1',

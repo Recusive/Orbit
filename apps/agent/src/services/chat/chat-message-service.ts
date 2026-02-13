@@ -329,8 +329,9 @@ class ChatMessageService {
       // Migrate external stores
       useToolStore.getState().remapSession(frontendSessionId, sdkSessionId);
       useCheckpointStore.getState().remapSession(frontendSessionId, sdkSessionId);
-      // Consume pending conversation fork (clears checkpoint store state for this session)
-      useCheckpointStore.getState().consumePendingConversationFork(frontendSessionId);
+      // Consume pending conversation fork (clears checkpoint store state for this session).
+      // Must use sdkSessionId because remapSession() above moved the data from frontendSessionId.
+      useCheckpointStore.getState().consumePendingConversationFork(sdkSessionId);
 
       // Mark load pending to prevent redundant conversation:load
       useMessageBufferStore.getState().markLoadPending(sdkSessionId);

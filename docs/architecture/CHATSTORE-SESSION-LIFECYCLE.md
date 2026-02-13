@@ -1,8 +1,8 @@
-# ChatStore Session Lifecycle & Sidebar Synchronization
+# ChatStore Session Lifecycle & Architecture
 
 > **Last Updated:** February 12, 2026
-> **Branch:** `fix/feedback`
-> **Status:** Production fix — Three bugs resolved across UIStore, ChatStore, and ChatMessageService
+> **Branch:** `refactor/chatstore-zustand-migration`
+> **Status:** Production — Zustand-based architecture with unified rewind system
 
 ---
 
@@ -12,86 +12,116 @@
 2. [Architecture Overview](#architecture-overview)
 3. [The Dual-ID Problem](#the-dual-id-problem)
 4. [Session Lifecycle Timeline](#session-lifecycle-timeline)
-5. [Bug #1: Welcome Page Stuck on New Chat](#bug-1-welcome-page-stuck-on-new-chat)
-6. [Bug #2: Sidebar Entry Disappears During Streaming](#bug-2-sidebar-entry-disappears-during-streaming)
-7. [Bug #3: Stale Ghost Entry Appears at Top of Sidebar](#bug-3-stale-ghost-entry-appears-at-top-of-sidebar)
-8. [Files Modified](#files-modified)
-9. [Store Relationships & Data Flow](#store-relationships--data-flow)
-10. [Key Actions & Their Responsibilities](#key-actions--their-responsibilities)
-11. [Race Conditions & Timing Windows](#race-conditions--timing-windows)
-12. [Debugging Guide](#debugging-guide)
-13. [Gotchas & Footguns](#gotchas--footguns)
-14. [Test Scenarios](#test-scenarios)
+5. [ChatStore Deep Dive](#chatstore-deep-dive)
+6. [ChatMessageService Deep Dive](#chatmessageservice-deep-dive)
+7. [useChatMessages Hook](#usechatmessages-hook)
+8. [Rewind System](#rewind-system)
+9. [File Checkpointing](#file-checkpointing)
+10. [Sidebar Synchronization Bugs (Historical)](#sidebar-synchronization-bugs-historical)
+11. [Store Relationships & Data Flow](#store-relationships--data-flow)
+12. [Key Actions & Their Responsibilities](#key-actions--their-responsibilities)
+13. [Race Conditions & Timing Windows](#race-conditions--timing-windows)
+14. [Gotchas & Footguns](#gotchas--footguns)
+15. [Test Scenarios](#test-scenarios)
 
 ---
 
 ## Executive Summary
 
-Three interconnected bugs were caused by the interaction between **two stores** (ChatStore and UIStore) and the **session remap** flow where frontend-generated UUIDs are replaced by SDK-generated session IDs.
+The chat system uses a **three-layer architecture** that cleanly separates concerns:
 
-| Bug | Symptom                                   | Root Cause                                                           | Fix Location                  |
-| --- | ----------------------------------------- | -------------------------------------------------------------------- | ----------------------------- |
-| #1  | New chat message stuck on welcome page    | `setConversations` full array replacement wiped optimistic entries   | `ui-store.ts:347`             |
-| #2  | Sidebar entry disappears during streaming | `removeConversation(frontendId)` deleted entry without adding SDK ID | `chat-message-service.ts:354` |
-| #3  | Stale conversation appears at position 0  | Optimistic entries with `messageCount: 0` preserved forever          | `ui-store.ts:360`             |
+| Layer                  | File                                    | Responsibility                               |
+| ---------------------- | --------------------------------------- | -------------------------------------------- |
+| **ChatStore**          | `stores/chat/chat-store.ts`             | Session-keyed state (messages, running, LRU) |
+| **ChatMessageService** | `services/chat/chat-message-service.ts` | Event dispatch, RAF batching, store writes   |
+| **useChatMessages**    | `hooks/chat/use-chat-messages.ts`       | React integration, effects, compat wrappers  |
+
+This replaces the previous `message-handler.ts` + `message-state.ts` + `session-state.ts` architecture which used React `useState` and a 1629-line closure. The new architecture:
+
+- Writes backend events directly to Zustand (no `setState` callback chains)
+- Uses per-session RAF batchers for streaming (created lazily, destroyed on `agent:complete`)
+- Implements LRU eviction at 20 sessions to bound memory
+- Persists only `activeSessionId` to localStorage (not the full store)
+
+### Two Separate Rewind Systems
+
+| System                  | Purpose                            | Mechanism                             | Status               |
+| ----------------------- | ---------------------------------- | ------------------------------------- | -------------------- |
+| **Conversation Rewind** | Rewind to earlier message in chat  | `forkSessionAt` + `parentUuid` chains | **DONE & WORKING**   |
+| **File Checkpointing**  | Restore file state before AI edits | SDK `rewindFiles(checkpointId)`       | **FIXED (Feb 2026)** |
+
+These are **independent systems**. Do NOT conflate them.
 
 ---
 
 ## Architecture Overview
 
-### Two Sources of Truth
-
-The system has **two separate representations** of conversations:
+### Three Sources of Truth
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  ChatStore (Zustand)                                                  │
+│  ChatStore (Zustand — devtools + immer)                              │
 │  ┌────────────────────────────────────────────────────────────────┐  │
 │  │  sessions: Record<string, ChatSessionData>                     │  │
 │  │    - messages: ChatMessage[]                                   │  │
 │  │    - isAgentRunning: boolean                                   │  │
 │  │    - isStopPending: boolean                                    │  │
 │  │  activeSessionId: string | null  (persisted to localStorage)   │  │
-│  │  loadedSessions: Record<string, true>                          │  │
+│  │  lastCreatedSessionId: string | null                           │  │
+│  │  pendingMessage: PendingMessage | null                         │  │
 │  │  remappedOrbitIds: Record<string, true>                        │  │
+│  │  rewindEpoch: number                                           │  │
+│  │  conversationLoadEpoch: number                                 │  │
+│  │  loadedSessions: Record<string, boolean>                       │  │
+│  │  lruOrder: string[]                                            │  │
 │  └────────────────────────────────────────────────────────────────┘  │
 │  Purpose: In-memory message data, streaming state, active session    │
-│  File: apps/agent/src/stores/chat/chat-store.ts                      │
+│  File: apps/agent/src/stores/chat/chat-store.ts (503 lines)         │
 └──────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────┐
-│  UIStore (Zustand + persist)                                          │
+│  UIStore (Zustand + persist)                                         │
 │  ┌────────────────────────────────────────────────────────────────┐  │
 │  │  conversations: ConversationSummary[]                          │  │
-│  │    - sessionId: string                                         │  │
-│  │    - title: string                                             │  │
-│  │    - updatedAt: number                                         │  │
-│  │    - messageCount: number                                      │  │
-│  │    - workspacePath?: string                                    │  │
-│  │    - worktreePath?: string                                     │  │
+│  │    - sessionId, title, updatedAt, messageCount                 │  │
+│  │    - workspacePath?, worktreePath?                              │  │
 │  │  activeConversationId: string | null                           │  │
 │  │  activeConversationTitle: string | null                        │  │
 │  └────────────────────────────────────────────────────────────────┘  │
 │  Purpose: Sidebar display list, conversation metadata                │
-│  File: apps/agent/src/stores/ui/ui-store.ts                          │
+│  File: apps/agent/src/stores/ui/ui-store.ts                         │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│  CheckpointStore (Zustand — devtools + immer)                        │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  currentTurnStartCheckpoint: Record<sid, checkpointId>         │  │
+│  │  turnCheckpoints: Record<sid, Record<msgId, checkpoint>>       │  │
+│  │  currentUserMessageId: Record<sid, { messageId, reconciled }>  │  │
+│  │  pendingConversationFork: Record<sid, forkId>                  │  │
+│  │  rewindForkPoints: Record<sid, messageId>                      │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│  Purpose: File rewind checkpoints, message ID reconciliation         │
+│  File: apps/agent/src/stores/agent/checkpoint-store.ts               │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-**Critical insight:** These two stores are NOT automatically synchronized. ChatStore knows about session data (messages, running state). UIStore knows about the sidebar list (titles, message counts, ordering). When a session is created or remapped, BOTH stores must be updated in the correct order.
+**Critical insight:** These stores are NOT automatically synchronized. ChatStore knows about session data (messages, running state). UIStore knows about the sidebar list (titles, counts, ordering). CheckpointStore knows about rewind checkpoints. When a session is created or remapped, ALL stores must be updated in the correct order.
 
 ### The Orchestrator: ChatMessageService
 
-`ChatMessageService` is a **module-level singleton** (not a React component) that receives all backend events via a window listener and dispatches updates to both stores.
+`ChatMessageService` is a **module-level singleton** (not a React component) that receives all backend events and dispatches updates to all stores.
 
 ```
-File: apps/agent/src/services/chat/chat-message-service.ts
-
-Backend Events → ChatMessageService → ChatStore (session data)
-                                    → UIStore (sidebar list)
-                                    → ToolStore (token tracking)
-                                    → CheckpointStore (rewind data)
-                                    → FileStore (file tree per session)
+Backend Events → ChatMessageService → ChatStore        (session data)
+                                    → UIStore          (sidebar list)
+                                    → ToolStore        (token tracking)
+                                    → CheckpointStore  (rewind data)
+                                    → FileStore        (file tree per session)
+                                    → FileViewerStore  (file content cache)
 ```
+
+**File:** `apps/agent/src/services/chat/chat-message-service.ts` (1398 lines)
 
 ---
 
@@ -116,22 +146,23 @@ Timeline:
    → Sidebar entry must survive this transition
 ```
 
-The remap happens in `handleSystemInit` (chat-message-service.ts:306-366). It must update:
+The remap happens in `handleSystemInit` (chat-message-service.ts:303-371). It must update:
 
 | Store               | Action                                   | Line |
 | ------------------- | ---------------------------------------- | ---- |
-| ChatStore           | `remapSession(frontendId, sdkId)`        | 327  |
-| CreatedSessions set | `remapCreatedSession(frontendId, sdkId)` | 330  |
-| ToolStore           | `remapSession(frontendId, sdkId)`        | 333  |
-| CheckpointStore     | `remapSession(frontendId, sdkId)`        | 334  |
-| MessageBufferStore  | `markLoadPending(sdkId)`                 | 349  |
-| UIStore             | `remapConversation(frontendId, sdkId)`   | 354  |
+| ChatStore           | `remapSession(frontendId, sdkId)`        | 324  |
+| CreatedSessions set | `remapCreatedSession(frontendId, sdkId)` | 327  |
+| ToolStore           | `remapSession(frontendId, sdkId)`        | 330  |
+| CheckpointStore     | `remapSession(frontendId, sdkId)`        | 331  |
+| CheckpointStore     | `consumePendingConversationFork(sdkId)`  | 334  |
+| MessageBufferStore  | `markLoadPending(sdkId)`                 | 337  |
+| UIStore             | `remapConversation(frontendId, sdkId)`   | 342  |
+
+**Note on `consumePendingConversationFork`:** Must use `sdkSessionId` (not `frontendSessionId`) because `remapSession()` above already moved the data. This was a bug fixed in February 2026.
 
 ---
 
 ## Session Lifecycle Timeline
-
-This is the complete timeline for creating a new conversation and sending the first message.
 
 ### Phase 1: User Clicks "New Session"
 
@@ -142,23 +173,26 @@ useSidebarActions.handleStartConversation()
   ↓
 postMessage({ type: 'conversation:create', uuid, title: 'Untitled' })
   ↓
-Backend creates JSONL file, responds with conversation:created
+handleConversationCreate() (conversation-handlers.ts:18-37)
+  → Generates temp sessionId via crypto.randomUUID()
+  → Posts conversation:created back via window.postMessage
   ↓
-ChatMessageService.handleConversationCreated(message)
+ChatMessageService.handleConversationCreated(message)    (line 646-690)
   │
-  ├── ChatStore.getOrCreateSession(sid)           // Create session data
-  ├── ChatStore.setMessages(sid, [])               // Empty messages
-  ├── ChatStore.setActiveSession(sid)              // Set as active
-  ├── ChatStore.markSessionLoaded(sid)             // Prevent duplicate load
-  ├── ChatStore.bumpConversationLoadEpoch()         // Invalidate stale loads
-  ├── ChatStore.setState({ lastCreatedSessionId })  // For Effect 4
-  ├── UIStore.addConversation({                    // Add to sidebar
+  ├── FileStore.switchSession(sid)                        // Prepare file tree
+  ├── ChatStore.getOrCreateSession(sid)                   // Create session data
+  ├── ChatStore.setMessages(sid, [])                      // Empty messages
+  ├── ChatStore.setActiveSession(sid)                     // Set as active
+  ├── ChatStore.markSessionLoaded(sid)                    // Prevent duplicate load
+  ├── ChatStore.bumpConversationLoadEpoch()                // Invalidate stale loads
+  ├── ChatStore.setState({ lastCreatedSessionId })        // For Effect 4
+  ├── UIStore.addConversation({                           // Add to sidebar
   │     sessionId: sid,
-  │     title: 'Untitled',
-  │     updatedAt: Date.now(),
-  │     messageCount: 0,                           // ← Optimistic marker
+  │     title, updatedAt: Date.now(),
+  │     messageCount: 0,                                  // ← Optimistic marker
   │   })
-  └── UIStore.setActiveConversation(sid, title)    // Highlight in sidebar
+  ├── UIStore.setActiveConversation(sid, title)           // Highlight in sidebar
+  └── ToolStore.switchSession(sid)                        // Prepare token tracking
 ```
 
 **Key:** `messageCount: 0` marks this as an optimistic entry. It's in the sidebar before any JSONL with messages exists on disk.
@@ -166,28 +200,34 @@ ChatMessageService.handleConversationCreated(message)
 ### Phase 2: User Types and Sends Message
 
 ```
-User types "hello love" and presses Enter
+User types "hello" and presses Enter
   ↓
-chat-actions.ts createChatActions().handleSend(text)
+chat-actions.ts createChatActions().handleSend(text)     (line 54-217)
   │
   ├── Reads ChatStore.activeSessionId, sessions[sid], messages
-  ├── Checks conversationExists:
+  ├── If isAgentRunning → queue in QueuedMessageStore (line 82-91)
+  │
+  ├── Checks conversationExists:                          (line 100-102)
   │     session !== undefined (ChatStore — primary authority)
-  │     OR conversations.some(c => c.sessionId === sid) (UIStore — fallback)
+  │     OR conversations.some(c => c.sessionId === sid)   (UIStore — fallback)
   │
-  ├── If conversationExists AND messages.length === 0:
-  │     → "Direct path": updates title, builds message, sends message:send
-  │     → UIStore.updateConversationTitle(sid, "hello love")
-  │     → ChatStore.addMessage(sid, userMessage)
-  │     → ChatStore.setAgentRunning(sid, true)
-  │     → postMessage({ type: 'message:send', ... })
+  ├── If !conversationExists OR no sessionId:
+  │     → "Pending path": stores in pendingMessage, creates conversation
+  │     → ChatStore.setPendingMessage({ text })
+  │     → postMessage({ type: 'conversation:create', ... })
+  │     → Effect 4 in use-chat-messages.ts sends the message when
+  │       lastCreatedSessionId updates
   │
-  └── If !conversationExists:
-        → "Pending path": stores in pendingMessage, creates conversation
-        → ChatStore.setPendingMessage({ text })
-        → postMessage({ type: 'conversation:create', ... })
-        → Effect 4 in use-chat-messages.ts sends the message when
-          lastCreatedSessionId updates
+  └── If conversationExists:
+        → "Direct path"
+        ├── If first message (messages.length === 0):
+        │     Update title from "Untitled" to text
+        ├── Send thinking:set, model:set, effort:set
+        ├── Get parentUuid (forkPoint OR lastMessage.id)
+        ├── ChatStore.addMessage(sid, userMessage)
+        ├── ChatStore.setAgentRunning(sid, true)
+        ├── Persist via conversationAddMessage()
+        └── postMessage({ type: 'message:send', ... })
 ```
 
 ### Phase 3: System Init (Session Remap)
@@ -197,17 +237,19 @@ chat-actions.ts createChatActions().handleSend(text)
   ↓
 Backend fires system:init with sdk_session_id
   ↓
-ChatMessageService.handleSystemInit(message)
+ChatMessageService.handleSystemInit(message)             (line 303-371)
   │
-  ├── Determines frontendSessionId (message.session_id or activeSessionId)
-  ├── ChatStore.remapSession(frontendId, sdkId)       // Move session data
-  ├── remapCreatedSession(frontendId, sdkId)           // Track created sessions
-  ├── ToolStore.remapSession(frontendId, sdkId)        // Migrate token data
-  ├── CheckpointStore.remapSession(frontendId, sdkId)  // Migrate checkpoints
-  ├── MessageBufferStore.markLoadPending(sdkId)        // Prevent duplicate load
-  ├── UIStore.remapConversation(frontendId, sdkId)     // ← KEY FIX: swap sidebar ID
-  │     Swaps sessionId in-place, updates activeConversationId,
-  │     migrates sessionWorktreeMap entry
+  ├── Determines frontendSessionId:
+  │     Prefer message.session_id if ≠ sdkSessionId
+  │     Fallback: chatStore.activeSessionId
+  │
+  ├── ChatStore.remapSession(frontendId, sdkId)           // Atomic data move
+  ├── remapCreatedSession(frontendId, sdkId)               // Track created sessions
+  ├── ToolStore.remapSession(frontendId, sdkId)            // Token data
+  ├── CheckpointStore.remapSession(frontendId, sdkId)      // Checkpoint data
+  ├── CheckpointStore.consumePendingConversationFork(sdkId) // Clear fork state
+  ├── MessageBufferStore.markLoadPending(sdkId)            // Prevent duplicate load
+  ├── UIStore.remapConversation(frontendId, sdkId)         // Swap sidebar entry
   │
   └── if isStillActive:
         ToolStore.switchSession(sdkId)
@@ -218,252 +260,453 @@ ChatMessageService.handleSystemInit(message)
 ```
 Backend sends agent:chunk events (streaming)
   ↓
-ChatMessageService.handleAgentChunk()
-  → Appends content to ChatStore session messages
-  → Sidebar entry stays visible (remapped to SDK ID)
+ChatMessageService.handleAgentChunk()                    (line 378-410)
+  → RAF-batched: accumulates chunks per-session, flushes at animation frame
+  → Creates assistant message on first chunk (with parentUuid linkage)
 
-Backend sends agent:complete
+Backend sends agent:complete                             (line 424-571)
   ↓
 ChatMessageService.handleAgentComplete()
-  → Sets isAgentRunning = false
-  → Triggers conversation:list refresh
-  → UIStore.setConversations() merges backend list
-    → Remapped entry has SDK UUID → matches incoming, gets replaced
-    → Correct position in time-sorted list
+  ├── Flush all pending batchers (chunks, thinking, tools)
+  ├── Clean up batcher Map entries
+  ├── Finalize thinking duration
+  ├── Build completedMsg (isStreaming: false)
+  ├── Persist to backend via conversationAddMessage()
+  ├── Track usage in ToolStore
+  ├── Mark checkpoint complete: CheckpointStore.onMessageComplete()
+  ├── Clear isAgentRunning + isStopPending
+  └── Schedule coalesced sidebar refresh (requestIdleCallback)
 ```
 
-### Phase 5: Conversation List Refresh
+### Phase 5: Sidebar Refresh
 
 ```
-Effect 2 in use-chat-messages.ts fires on sessionId change
+scheduleSidebarRefresh() (line 89-116)
+  → Coalesced via requestIdleCallback (fires once even after multiple agent:complete)
   ↓
-postMessage({ type: 'conversation:list' })
+conversationList(workspacePath)
   ↓
-Backend scans JSONL files on disk, returns list
-  ↓
-ChatMessageService.handleConversationList()
-  ↓
-UIStore.setConversations(incomingList)
-  │
-  ├── Build incomingIds Set (all session IDs from backend)
-  ├── Filter optimistic entries from current state:
-  │     messageCount === 0
-  │     AND sessionId NOT in incomingIds
-  │     AND updatedAt within last 60 seconds (TTL guard)
-  ├── Merge: [...optimistic, ...incoming]
-  │
-  └── Result: optimistic entries prepended, backend entries follow
+UIStore.setConversations(backendList)
+  ├── Filter optimistic: messageCount===0 AND not in backend AND <60s old
+  ├── Merge: [...optimistic, ...backendList]
+  └── Result: sidebar reflects disk state + fresh optimistic entries
 ```
 
 ---
 
-## Bug #1: Welcome Page Stuck on New Chat
+## ChatStore Deep Dive
 
-### Symptom
+**File:** `apps/agent/src/stores/chat/chat-store.ts` (503 lines)
 
-User clicks "New Session" → types a message → hits Enter → UI stays on the welcome page (centered input) instead of transitioning to the chat view with the message visible. Backend chunks stream in the background but the UI shows the empty state.
-
-### Root Cause
-
-`ChatContent.tsx:48` determines the view:
+### Middleware Stack
 
 ```typescript
-const isEmptyState = messages.length === 0 && !isLoadingConversation;
+create<ChatStoreState>()(
+  devtools(        // Redux DevTools integration (development only)
+    immer(         // Immutable updates via mutable syntax
+      (set, get) => ({ ... })
+    ),
+    { name: 'chat-store' }
+  )
+);
 ```
 
-The `messages` array was empty because `handleSend` took the **wrong code path**. Here's why:
+### Design Decisions
 
-1. `handleConversationCreated` adds `{sessionId: frontendUUID, messageCount: 0}` to UIStore sidebar
-2. Effect 2 fires `conversation:list` because `sessionId` changed
-3. Backend response arrives → `setConversations` **replaced the entire array**
-4. The backend list doesn't include the new conversation (JSONL has 0 messages on disk yet)
-5. The optimistic sidebar entry is **wiped**
-6. When user sends message, `handleSend` checks `conversationExists`:
-   - ChatStore `session` was `undefined` (stale read or not yet created)
-   - UIStore `conversations.some()` returns `false` (entry was wiped)
-7. `handleSend` takes the "pending message" path → creates ANOTHER session
-8. The message ends up in the wrong session
+| Decision                                                | Why                                                                                |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `Record<string, ChatSessionData>` not Map               | Immer works with plain objects; Maps require custom serialization                  |
+| `remappedOrbitIds` as `Record<string, true>` not Set    | Immer's structural sharing doesn't work with Sets (every mutation creates new Set) |
+| Manual localStorage subscriber (not persist middleware) | Serializing entire sessions Record on every `agent:chunk` would be catastrophic    |
+| LRU eviction at 20 sessions                             | Bounds memory; active session pinned; evicted sessions reload on switch-back       |
 
-### Fix Applied
-
-**File: `apps/agent/src/stores/ui/ui-store.ts` (line 347-371)**
-
-Changed `setConversations` from full replacement to **merge with optimistic preservation**:
+### LRU Eviction System
 
 ```typescript
-setConversations: (conversations: ConversationSummary[]): void => {
-  set((state) => {
-    const OPTIMISTIC_TTL_MS = 60_000;
-    const now = Date.now();
-    const incomingIds = new Set(conversations.map((c) => c.sessionId));
-    const optimistic = state.conversations.filter(
-      (c) =>
-        c.messageCount === 0 &&
-        !incomingIds.has(c.sessionId) &&
-        now - c.updatedAt < OPTIMISTIC_TTL_MS
-    );
-    state.conversations = [...optimistic, ...conversations];
-  });
-},
+const MAX_IN_MEMORY_SESSIONS = 20;
+
+function evictIfNeeded(sessions, lruOrder, loadedSessions, activeSessionId):
+  while lruOrder.length > MAX_IN_MEMORY_SESSIONS:
+    candidate = lruOrder[0]  // Oldest access
+    if candidate === activeSessionId → skip (pinned)
+    if session.isAgentRunning → skip (active streaming)
+    session.messages = []    // Clear messages (keep session key)
+    delete loadedSessions[candidate]  // Will reload on switch-back
+    lruOrder.splice(0, 1)   // Remove from LRU
 ```
 
-**File: `apps/agent/src/hooks/chat/handlers/chat-actions.ts` (line 96-103)**
+**Key:** Eviction clears messages but keeps the session key in `sessions`. This preserves `isAgentRunning` state for background sessions. Clearing `loadedSessions` ensures `Effect 3` will fire a `conversation:load` when the user switches back.
 
-Changed `conversationExists` to use ChatStore as **primary authority**:
+### localStorage Subscriber
 
 ```typescript
-const conversationExists =
-  sessionId !== '' &&
-  (session !== undefined || conversations.some((c) => c.sessionId === sessionId));
+useChatStore.subscribe((state, prevState) => {
+  if (state.activeSessionId !== prevState.activeSessionId) {
+    localStorage.setItem(STORAGE_KEY, state.activeSessionId);
+  }
+});
 ```
 
-Before this fix, it only checked `conversations.some()` (UIStore), which was stale after the wipe.
+Only `activeSessionId` survives app restarts. Messages are reloaded from JSONL via `conversation:load`.
+
+### Selector Helpers
+
+Pre-built selectors prevent unnecessary re-renders:
+
+```typescript
+useActiveMessages(); // → ChatMessage[] (stable EMPTY_MESSAGES when no session)
+useActiveSession(); // → ChatSessionData | undefined
+useActiveSessionId(); // → string | null
+useIsAgentRunning(); // → boolean
+useIsStopPending(); // → boolean
+```
+
+### Key Actions
+
+| Action                              | What It Does                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------- |
+| `getOrCreateSession(id)`            | Creates session if missing, touches LRU, runs eviction                                        |
+| `setActiveSession(id)`              | Sets activeSessionId, ensures session exists, touches LRU                                     |
+| `remapSession(old, new)`            | Atomic move: sessions, activeSessionId (if match), loadedSessions, lruOrder, remappedOrbitIds |
+| `destroySession(id)`                | Deletes from sessions, loadedSessions, lruOrder; clears activeSessionId if match              |
+| `bumpRewindEpoch()`                 | Invalidates in-flight `conversation:loaded` after rewind                                      |
+| `bumpConversationLoadEpoch()`       | Invalidates stale `conversation:loaded` after new session creation                            |
+| `reconcileMessageId(sid, old, new)` | Swaps user message ID from frontend UUID to SDK checkpoint UUID                               |
 
 ---
 
-## Bug #2: Sidebar Entry Disappears During Streaming
+## ChatMessageService Deep Dive
 
-### Symptom
+**File:** `apps/agent/src/services/chat/chat-message-service.ts` (1398 lines)
 
-User sends message → sidebar shows the conversation → streaming starts → sidebar entry **vanishes** → streaming completes → entry **reappears**.
+### Per-Session RAF Batchers
 
-### Root Cause
+The service uses `requestAnimationFrame`-based batching to coalesce rapid events into single store updates per frame:
 
-In `handleSystemInit` (the session remap handler), the old code did:
-
-```typescript
-// OLD CODE (removed)
-useUIStore.getState().setActiveConversation(sdkSessionId, null);
-// ...
-useUIStore.getState().removeConversation(frontendSessionId);
+```
+agent:chunk events (10-50/second)
+       │
+       ▼
+  chunkBatcher[sessionId]    ← Created lazily on first chunk
+       │
+       ▼ (at next animation frame)
+  Accumulate chunks by messageId
+       │
+       ▼
+  Single ChatStore.updateMessage() call per messageId
 ```
 
-This **removed** the sidebar entry for the frontend UUID but never **added** one for the SDK UUID. The `setActiveConversation` only sets `activeConversationId` and `activeConversationTitle` — it does NOT add an entry to the `conversations[]` array. So:
+Three batcher types per session:
 
-1. `removeConversation('dd43566e...')` → entry gone from sidebar
-2. No `addConversation('18173e82...')` → no entry in sidebar
-3. Sidebar shows nothing for this session during entire streaming phase
-4. After `agent:complete` → `conversation:list` refreshes → backend now has JSONL → entry reappears
+| Batcher            | Events Batched                     | Store Action                               |
+| ------------------ | ---------------------------------- | ------------------------------------------ |
+| `chunkBatchers`    | `agent:chunk` text content         | `updateMessage()` / `addMessage()`         |
+| `thinkingBatchers` | `agent:thinking` extended thinking | `updateMessage()` with thinkingBlocks      |
+| `toolBatchers`     | `tool:start` / `tool:end`          | ToolStore (currently called synchronously) |
 
-### Fix Applied
+**Lifecycle:**
 
-**File: `apps/agent/src/stores/ui/ui-store.ts` (line 399-418)**
+- Created lazily on first event for a session
+- Flushed with `cancel(true)` on `agent:complete` (processes pending items)
+- Cancelled without flush on rewind (`cancel()` — discards stale chunks)
+- Deleted from Map after flush/cancel (recreated if session streams again)
 
-Added new `remapConversation` action that swaps the sessionId **in-place**:
+### Checkpoint Debouncing
 
 ```typescript
-remapConversation: (oldSessionId: string, newSessionId: string): void => {
-  set((state) => {
-    const conversation = state.conversations.find(
-      (c) => c.sessionId === oldSessionId
-    );
-    if (conversation) {
-      conversation.sessionId = newSessionId;
-      conversation.updatedAt = Date.now();
-    }
-    if (state.activeConversationId === oldSessionId) {
-      state.activeConversationId = newSessionId;
-    }
-    const worktreePath = state.sessionWorktreeMap.get(oldSessionId);
-    if (worktreePath !== undefined) {
-      state.sessionWorktreeMap.delete(oldSessionId);
-      state.sessionWorktreeMap.set(newSessionId, worktreePath);
-    }
+private batchedCheckpoint = createCheckpointBatcher((sessionId, checkpointId) => {
+  useCheckpointStore.getState().onCheckpointReceived(sessionId, checkpointId);
+}, 100);  // 100ms debounce window
+```
+
+Reduces ~30 checkpoint state updates per agent run to ~2-3. The last checkpoint in each debounce window wins.
+
+**Known risk:** For fast responses (queued messages), the debounced callback can fire AFTER `onMessageComplete`, misattributing `currentTurnStartCheckpoint`. This is a suspected cause of intermittent file checkpoint failures with queued messages.
+
+### Sidebar Refresh Coalescing
+
+```typescript
+let sidebarDirty = false;
+let sidebarIdleCallbackId: number | null = null;
+
+function scheduleSidebarRefresh(): void {
+  sidebarDirty = true;
+  if (sidebarIdleCallbackId !== null) return; // Already scheduled
+  sidebarIdleCallbackId = requestIdleCallback(() => {
+    if (!sidebarDirty) return;
+    sidebarDirty = false;
+    conversationList(workspacePath).then(setConversations);
   });
-},
-```
-
-**File: `apps/agent/src/services/chat/chat-message-service.ts` (line 351-362)**
-
-Replaced `removeConversation` + `setActiveConversation` with single `remapConversation`:
-
-```typescript
-// Remap the sidebar entry in-place: swap sessionId from frontendId → sdkId.
-useUIStore.getState().remapConversation(frontendSessionId, sdkSessionId);
-
-const isStillActive = useChatStore.getState().activeSessionId === sdkSessionId;
-if (isStillActive) {
-  useToolStore.getState().switchSession(sdkSessionId);
 }
 ```
 
-Note: `setActiveConversation(sdkSessionId, null)` was also removed because:
+Multiple `agent:complete` events (e.g., from parallel background sessions) only trigger one sidebar refresh.
 
-- `remapConversation` already updates `activeConversationId`
-- The `null` title parameter was **clearing** the title that was already correctly set by `updateConversationTitle`
+### Event Dispatch Table
+
+| Event                  | Handler                     | Stores Modified                                                    |
+| ---------------------- | --------------------------- | ------------------------------------------------------------------ |
+| `system:init`          | `handleSystemInit`          | ChatStore, ToolStore, CheckpointStore, UIStore, MessageBufferStore |
+| `agent:chunk`          | `handleAgentChunk`          | ChatStore (via RAF batcher)                                        |
+| `agent:thinking`       | `handleAgentThinking`       | ChatStore (via RAF batcher)                                        |
+| `agent:complete`       | `handleAgentComplete`       | ChatStore, ToolStore, CheckpointStore, UIStore (sidebar refresh)   |
+| `agent:error`          | `handleAgentError`          | ChatStore                                                          |
+| `agent:checkpoint`     | `handleAgentCheckpoint`     | CheckpointStore, ChatStore (reconcileMessageId)                    |
+| `conversation:created` | `handleConversationCreated` | ChatStore, UIStore, ToolStore, FileStore                           |
+| `conversation:list`    | `handleConversationList`    | UIStore                                                            |
+| `conversation:loaded`  | `handleConversationLoaded`  | ChatStore, UIStore, ToolStore, FileStore                           |
+| `conversation:rewound` | `handleConversationRewound` | ChatStore, ToolStore, FileStore, UIStore, CheckpointStore          |
+| `conversation:deleted` | `handleConversationDeleted` | ChatStore, ToolStore, FileStore                                    |
+| `tool:start`           | `handleToolStart`           | ToolStore, ChatStore                                               |
+| `tool:end`             | `handleToolEnd`             | ToolStore, FileStore                                               |
+| `permission:request`   | `handlePermissionRequest`   | ToolStore                                                          |
+
+### conversation:loaded Merge Logic
+
+The most complex handler — merges backend JSONL messages with in-memory cache:
+
+```
+conversation:loaded arrives
+  ↓
+1. Skip if session_id in remappedOrbitIds (stale remap)
+2. Snapshot cached messages BEFORE setTimeout(0)
+3. Capture rewindEpoch + bump conversationLoadEpoch
+4. setTimeout(0) → defer to avoid blocking
+5. Staleness guards:
+   - rewindEpoch changed → skip (rewind happened)
+   - conversationLoadEpoch changed → skip (new session created)
+6. Streaming guard:
+   - If target session isAgentRunning AND hasLiveMessages → skip merge
+     (cache is authoritative during streaming; disk has different IDs)
+7. Merge:
+   a. Both empty → empty
+   b. Only backend → backend
+   c. Only cache → cache
+   d. Both exist:
+      - Count user messages in each
+      - cachedUserCount ≤ backendUserCount → use backend + trailing
+      - cachedUserCount > backendUserCount → backend + live trailing
+8. Enrich with client-only fields (interruptReason) from cache
+9. Write to ChatStore, restore tools for active chain
+```
 
 ---
 
-## Bug #3: Stale Ghost Entry Appears at Top of Sidebar
+## useChatMessages Hook
 
-### Symptom
+**File:** `apps/agent/src/hooks/chat/use-chat-messages.ts` (452 lines)
 
-After Bug #1 fix, stale conversations from hours ago (e.g., "whats up ??" from 2h ago) would appear at **position 0** in the sidebar, above the current conversation and all time-sorted backend entries.
+This is a **thin reader hook** — it doesn't process events (that's ChatMessageService). It:
 
-### Root Cause
+1. Reads reactive state via ChatStore selectors
+2. Provides compatibility wrappers for legacy consumers
+3. Runs 7 effects
+4. Creates chat actions
 
-The optimistic preservation in `setConversations` had **no expiry**:
+### Effects
+
+| #   | Purpose                         | Dependencies                                     | What It Does                                                     |
+| --- | ------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------- |
+| 1   | Restore usage on mount          | `[]` (mount-only)                                | Loads persisted usage from JSONL for sessionId from localStorage |
+| 2   | Request conversation list       | `[sessionId, workspacePath, activeWorktreePath]` | Fires `conversation:list` on any change                          |
+| 3   | Load messages on session change | `[sessionId]`                                    | Fires `conversation:load` for unloaded sessions                  |
+| 4   | Send pending message            | `[lastCreatedSessionId, pendingMessage]`         | After `conversation:created`, sends the queued message           |
+| 5   | Cross-instance sync             | `[sessionId]`                                    | Listens for `orbit:user-message` CustomEvent (Agent ↔ Editor)    |
+| 6   | Sync ToolStore session          | `[sessionId]`                                    | Ensures token usage follows active session                       |
+| 7   | Dev debug interface             | `[postMessage]`                                  | Exposes `window.__orbit_debug` with stress test runners          |
+
+### Compat Wrappers
 
 ```typescript
-// OLD: preserved ALL entries with messageCount === 0 forever
-const optimistic = state.conversations.filter(
-  (c) => c.messageCount === 0 && !incomingIds.has(c.sessionId)
-);
-state.conversations = [...optimistic, ...conversations];
+const setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>> = useCallback((updater) => {
+  const store = useChatStore.getState();
+  const sid = store.activeSessionId;
+  const current = store.sessions[sid]?.messages ?? [];
+  const next = typeof updater === 'function' ? updater(current) : updater;
+  store.setMessages(sid, next);
+}, []);
 ```
 
-A conversation from a previous session (hours ago) could still have `messageCount: 0` if:
+These exist because `useQueuedMessageHandler` still expects `React.Dispatch`-style setters. They delegate to ChatStore internally.
 
-- It was created but never had a message persisted to disk
-- Its frontend UUID was remapped but the old entry wasn't properly cleaned up
-- The backend `conversation:list` uses the SDK UUID (which doesn't match the stale frontend UUID)
+---
 
-Since optimistic entries are **prepended** (`[...optimistic, ...conversations]`), they always appeared at position 0, before the time-sorted backend list.
+## Rewind System
 
-### Fix Applied
+**Status:** DONE AND WORKING. Validated by Mega Stress Test (18 steps, 4 consecutive rewinds, all pass).
 
-**File: `apps/agent/src/stores/ui/ui-store.ts` (line 356-368)**
+### Overview
 
-Added a 60-second TTL to the optimistic filter:
+Conversation rewind uses Claude Code's `forkSessionAt` approach for **all** rewinds (first and repeat):
+
+```
+User clicks rewind button on message
+  ↓
+chat-actions.ts handleRewind(messageId)                  (line 297-355)
+  ├── Find user message (if assistant clicked, walk back)
+  ├── Build truncatedMessages with IDs, roles, content, parentUuid
+  └── postMessage({ type: 'conversation:rewind', ..., current_messages })
+  ↓
+conversation-handlers.ts handleConversationRewind()      (line 184-402)
+  │
+  ├── Step 1: Find target message
+  │     Priority chain:
+  │     1. Direct SDK UUID match in JSONL
+  │     2. Content-validated position match (role+content of disk vs frontend)
+  │     3. Frontend messages fallback (stale disk on rewind 2+)
+  │     4. Unvalidated position fallback (last resort)
+  │
+  ├── Step 2: File rewind (if checkpoints available)
+  │     await agentRewindFiles(session_id, checkpointId)
+  │
+  ├── Step 3: Get rewind checkpoints from CheckpointStore
+  │     CheckpointStore.getRewindCheckpoints(session_id, userMessageId)
+  │
+  ├── Step 4: Fork session at target message
+  │     if (sdkMessageId && !useFrontendMessages):
+  │       await agentForkSessionAt(session_id, sdkMessageId)
+  │       CheckpointStore.setPendingConversationFork(session_id, sdkMessageId)
+  │
+  └── Step 5: Post conversation:rewound
+        window.postMessage({ type: 'conversation:rewound', messages, new_session_id })
+  ↓
+ChatMessageService.handleConversationRewound()           (line 985-1050)
+  ├── Cancel RAF batchers (discard pre-rewind chunks)
+  ├── Bump rewindEpoch (invalidate stale conversation:loaded)
+  ├── If new session → switch all stores to new_session_id
+  ├── Write rewound messages to ChatStore
+  ├── Set rewindForkPoint in CheckpointStore
+  └── Restore tool executions for rewound messages
+```
+
+### parentUuid Chain
+
+Every message has a `parentUuid` field linking to its predecessor. After rewind, the new user message's `parentUuid` points to the last surviving message. Dead branches are filtered by `getActiveChain()` which walks the `parentUuid` chain backwards from the last message.
+
+### Content-Validated Position Matching
+
+On first rewind, direct UUID match always fails (frontend UUID ≠ SDK UUID). Position-based matching validates by comparing content+role of the disk message vs the frontend message at the same position:
+
+- **Content match** = fresh disk (first rewind) → proceed with `forkSessionAt`
+- **Content mismatch** = stale disk (rewind 2+) → use frontend messages, skip fork
+
+---
+
+## File Checkpointing
+
+**Status:** FIXED (February 2026). Root cause: post-fork sessions missing `forkSession: true`.
+
+### How It Works
+
+1. **Enable:** `CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=1` (set in agent-bridge `index.ts`)
+2. **Track:** Each user message replay emits a checkpoint UUID via `--replay-user-messages` CLI flag
+3. **Store:** `CheckpointStore.onCheckpointReceived()` debounced at 100ms
+4. **Associate:** `CheckpointStore.onMessageComplete()` links checkpoint to the preceding user message
+5. **Rewind:** `agentRewindFiles(sessionId, checkpointId)` restores file state
+
+### The Root Cause Bug (Fixed)
+
+In `forkSessionAt` (session-manager.ts), the post-fork session was created with `resumeSessionId` but **without** `forkSession: true`:
+
+```typescript
+// BEFORE (broken):
+await this.createSession(sessionId, {
+  resumeSessionId: newSdkSessionId,
+  // forkSession missing → shouldEnableReplay = false → no checkpoints
+});
+
+// AFTER (fixed):
+await this.createSession(sessionId, {
+  resumeSessionId: newSdkSessionId,
+  forkSession: true, // ← CRITICAL: enables replay-user-messages
+});
+```
+
+Without `forkSession: true`, `_createOptions()` in agent.ts computed `shouldEnableReplay = false` → `--replay-user-messages` omitted from CLI → no checkpoint UUIDs emitted → `getRewindCheckpoints()` returned `undefined` → file rewind silently skipped.
+
+The fix also simplified `shouldEnableReplay`:
+
+```typescript
+// BEFORE: Only enabled for new sessions OR SDK forks with resumeAt
+const shouldEnableReplay =
+  this._resumeSessionId === undefined || (this._forkSession && this._resumeSessionAt !== undefined);
+
+// AFTER: Enabled for new sessions OR any fork
+const shouldEnableReplay = this._resumeSessionId === undefined || this._forkSession;
+```
+
+### Checkpoint Flow Diagram
+
+```
+User sends message (user message UUID = "abc-123")
+  ↓
+ChatStore.addMessage(sid, { id: "abc-123", ... })
+CheckpointStore.onUserMessageSent(sid, "abc-123")
+  → currentUserMessageId[sid] = { messageId: "abc-123", reconciled: false }
+  ↓
+agent-bridge replays messages → emits agent:checkpoint events
+  ↓
+ChatMessageService.handleAgentCheckpoint()
+  ├── batchedCheckpoint(sid, checkpointId)     // Debounced 100ms
+  │     → CheckpointStore.onCheckpointReceived(sid, checkpointId)
+  │       → currentTurnStartCheckpoint[sid] = checkpointId
+  │
+  └── CheckpointStore.reconcileUserMessageId(sid, checkpointId)
+        // Frontend UUID "abc-123" → SDK checkpoint UUID
+        // Sets reconciled: true (prevents stale overwrite)
+        → ChatStore.reconcileMessageId(sid, "abc-123", checkpointId)
+  ↓
+agent:complete arrives
+  ↓
+CheckpointStore.onMessageComplete(sid)
+  → turnCheckpoints[sid]["abc-123"] = {
+      rewindFiles: currentTurnStartCheckpoint[sid],
+      forkSession: currentTurnStartCheckpoint[sid]
+    }
+```
+
+### Key Constraint
+
+"Checkpoints are tied to the session that created them." After `forkSessionAt`, old session's checkpoint data may be inaccessible from the new session. The `forkSession: true` fix ensures new post-fork sessions emit their own checkpoints.
+
+---
+
+## Sidebar Synchronization Bugs (Historical)
+
+Three bugs were discovered and fixed in the `fix/feedback` branch. They are documented here for reference.
+
+### Bug #1: Welcome Page Stuck on New Chat
+
+**Symptom:** User clicks "New Session" → types message → UI stays on welcome page.
+
+**Root cause:** `setConversations` full-array replacement wiped optimistic sidebar entries. `handleSend` fell back to the pending message path, creating a second session.
+
+**Fix:** `setConversations` now preserves optimistic entries (`messageCount === 0`, not in incoming list, created within 60 seconds). `handleSend` uses ChatStore session as primary authority for `conversationExists`.
+
+### Bug #2: Sidebar Entry Disappears During Streaming
+
+**Symptom:** Sidebar entry vanishes after session remap, reappears after streaming.
+
+**Root cause:** `handleSystemInit` called `removeConversation(frontendId)` then `setActiveConversation(sdkId)` — but `setActiveConversation` only sets the pointer, doesn't add an array entry.
+
+**Fix:** New `remapConversation(oldId, newId)` action swaps `sessionId` in-place, atomically updates `activeConversationId`, and migrates `sessionWorktreeMap`.
+
+### Bug #3: Stale Ghost Entry at Top of Sidebar
+
+**Symptom:** Old conversations (hours old) appear at position 0 above time-sorted list.
+
+**Root cause:** Optimistic entries with `messageCount === 0` had no expiry. Stale entries from hours ago were perpetually prepended.
+
+**Fix:** 60-second TTL guard on optimistic entries in `setConversations`:
 
 ```typescript
 const OPTIMISTIC_TTL_MS = 60_000;
-const now = Date.now();
 const optimistic = state.conversations.filter(
   (c) =>
-    c.messageCount === 0 && !incomingIds.has(c.sessionId) && now - c.updatedAt < OPTIMISTIC_TTL_MS // ← TTL guard
+    c.messageCount === 0 && !incomingIds.has(c.sessionId) && now - c.updatedAt < OPTIMISTIC_TTL_MS
 );
+state.conversations = [...optimistic, ...conversations];
 ```
-
-This ensures:
-
-- Fresh optimistic entries (just created, SDK hasn't written JSONL yet) are preserved
-- Stale entries from minutes/hours ago are dropped during the next `conversation:list` merge
-- The `updatedAt` field from `handleConversationCreated` (set to `Date.now()`) provides the timestamp
-
----
-
-## Files Modified
-
-### Changed Files
-
-| File                                                   | Lines Changed         | What Changed                                                                             |
-| ------------------------------------------------------ | --------------------- | ---------------------------------------------------------------------------------------- |
-| `apps/agent/src/stores/ui/ui-store.ts`                 | 148, 347-371, 399-418 | Added `remapConversation` to interface + implementation; TTL guard in `setConversations` |
-| `apps/agent/src/services/chat/chat-message-service.ts` | 351-362               | Replaced `removeConversation` + `setActiveConversation` with `remapConversation`         |
-| `apps/agent/src/hooks/chat/handlers/chat-actions.ts`   | 96-103                | `conversationExists` uses ChatStore session as primary authority                         |
-
-### Key Files (Read-Only Reference)
-
-| File                                                                            | Purpose                  | Relevant Lines                                                                                                              |
-| ------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `apps/agent/src/stores/chat/chat-store.ts`                                      | Session data store       | `remapSession` (346-375), `setActiveSession`, `getOrCreateSession`                                                          |
-| `apps/agent/src/services/chat/chat-message-service.ts`                          | Event dispatcher         | `handleSystemInit` (306-366), `handleConversationCreated` (651-693), `handleConversationList` (695-707)                     |
-| `apps/agent/src/hooks/chat/use-chat-messages.ts`                                | React hook with effects  | Effect 2 (181-190): `conversation:list` trigger; Effect 3 (196-218): session load; Effect 4 (228-337): pending message send |
-| `apps/agent/src/components/layout/chat-area/ChatContent.tsx`                    | View rendering           | `isEmptyState` (line 48): `messages.length === 0 && !isLoadingConversation`                                                 |
-| `apps/agent/src/hooks/chat/handlers/chat-actions.ts`                            | Send/stop/rewind actions | `handleSend` (67-200+): two code paths (direct vs pending)                                                                  |
-| `apps/agent/src/components/layout/primary-sidebar/hooks/use-sidebar-actions.ts` | Sidebar handlers         | `handleStartConversation` (202-228), `handleLoadConversation` (230-271)                                                     |
-| `apps/agent/src/types/protocol/protocol.ts`                                     | Type definitions         | `StoredConversationSummarySchema` (126-135): sessionId, title, updatedAt, messageCount                                      |
 
 ---
 
@@ -475,15 +718,19 @@ This ensures:
 conversation:create (postMessage)
          │
          ▼
-conversation:created (backend response)
+conversation:created (via window.postMessage)
          │
          ▼
 ChatMessageService.handleConversationCreated
          │
+         ├─► FileStore.switchSession(sid)
          ├─► ChatStore.getOrCreateSession(sid)     sessions[sid] = { messages: [], ... }
          ├─► ChatStore.setActiveSession(sid)        activeSessionId = sid
+         ├─► ChatStore.markSessionLoaded(sid)       loadedSessions[sid] = true
+         ├─► ChatStore.bumpConversationLoadEpoch()  epoch++
          ├─► UIStore.addConversation(...)           conversations = [newEntry, ...rest]
-         └─► UIStore.setActiveConversation(sid)     activeConversationId = sid
+         ├─► UIStore.setActiveConversation(sid)     activeConversationId = sid
+         └─► ToolStore.switchSession(sid)
 ```
 
 ### Remap Flow
@@ -494,25 +741,36 @@ system:init (backend event, ~50-200ms after message:send)
          ▼
 ChatMessageService.handleSystemInit
          │
-         ├─► ChatStore.remapSession(old, new)       sessions[new] = sessions[old]; delete old
-         ├─► UIStore.remapConversation(old, new)     conversations[i].sessionId = new
-         ├─► ToolStore.remapSession(old, new)        token data migrated
-         └─► CheckpointStore.remapSession(old, new)  checkpoint data migrated
+         ├─► ChatStore.remapSession(old, new)          sessions[new] = sessions[old]; delete old
+         ├─► remapCreatedSession(old, new)              update created sessions tracker
+         ├─► ToolStore.remapSession(old, new)           token data migrated
+         ├─► CheckpointStore.remapSession(old, new)     checkpoint data migrated
+         ├─► CheckpointStore.consumePendingFork(new)    clear fork state (uses NEW id!)
+         ├─► MessageBufferStore.markLoadPending(new)    prevent duplicate load
+         ├─► UIStore.remapConversation(old, new)        conversations[i].sessionId = new
+         └─► ToolStore.switchSession(new)               if still active
 ```
 
-### Refresh Flow
+### Rewind Flow
 
 ```
-conversation:list (backend event, triggered by Effect 2 or agent:complete)
+conversation:rewind (postMessage from handleRewind)
          │
          ▼
-ChatMessageService.handleConversationList
+handleConversationRewind (conversation-handlers.ts)
+  ├── Find target in JSONL (4-step priority chain)
+  ├── agentRewindFiles() — restore file state
+  ├── agentForkSessionAt() — create SDK branch
+  └── conversation:rewound (via window.postMessage)
          │
-         └─► UIStore.setConversations(backendList)
-               │
-               ├── Filter optimistic: messageCount===0 AND not in backend AND <60s old
-               ├── Merge: [...optimistic, ...backendList]
-               └── Result: sidebar reflects disk state + fresh optimistic entries
+         ▼
+ChatMessageService.handleConversationRewound
+  ├── Cancel RAF batchers (discard stale chunks)
+  ├── ChatStore.bumpRewindEpoch()
+  ├── Switch stores to new session (if different)
+  ├── ChatStore.setMessages(targetId, rewoundMessages)
+  ├── CheckpointStore.setRewindForkPoint(targetId, lastMsg.id)
+  └── Restore tool executions
 ```
 
 ---
@@ -521,27 +779,32 @@ ChatMessageService.handleConversationList
 
 ### UIStore Actions (Conversation Management)
 
-| Action                                | What It Does                                                                         | When Used                                            |
-| ------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| `addConversation(summary)`            | Prepends to `conversations[]` with duplicate check                                   | `handleConversationCreated` — optimistic sidebar add |
-| `removeConversation(sid)`             | Filters out from array, clears active if match, cleans up worktree map + checkpoints | Manual delete, `handleConversationDeleted`           |
-| `remapConversation(oldId, newId)`     | Swaps sessionId in-place, updates activeConversationId, migrates worktree map        | `handleSystemInit` — session remap                   |
-| `setConversations(list)`              | Full merge with optimistic preservation (TTL-guarded)                                | `handleConversationList` — backend refresh           |
-| `updateConversationTitle(sid, title)` | Updates title in array + activeConversationTitle                                     | `handleSend` first message, rename dialog            |
-| `setActiveConversation(id, title)`    | Sets `activeConversationId` + `activeConversationTitle` only (does NOT add to array) | Navigation, session creation                         |
+| Action                            | What It Does                                                                     | When Used                                  |
+| --------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------ |
+| `addConversation(summary)`        | Prepends to `conversations[]` with duplicate check                               | `handleConversationCreated`                |
+| `removeConversation(sid)`         | Filters out from array, clears active if match, cleans up worktree + checkpoints | Manual delete, `handleConversationDeleted` |
+| `remapConversation(oldId, newId)` | Swaps sessionId in-place, updates activeConversationId, migrates worktree map    | `handleSystemInit` — session remap         |
+| `setConversations(list)`          | Full merge with optimistic preservation (60s TTL)                                | `handleConversationList` — backend refresh |
+| `updateConversationTitle(sid, t)` | Updates title in array + activeConversationTitle                                 | `handleSend` first message, rename dialog  |
+| `setActiveConversation(id, t)`    | Sets `activeConversationId` + title only (does NOT add to array)                 | Navigation, session creation               |
 
 ### ChatStore Actions (Session Data)
 
-| Action                          | What It Does                                                                          | When Used                             |
-| ------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------- |
-| `getOrCreateSession(sid)`       | Creates session entry if missing, returns it                                          | Conversation creation, chunk handling |
-| `setActiveSession(sid)`         | Sets `activeSessionId`, pins in LRU                                                   | Navigation, creation                  |
-| `remapSession(oldId, newId)`    | Moves session data atomically, updates active if match, migrates LRU + loadedSessions | `handleSystemInit`                    |
-| `setMessages(sid, msgs)`        | Replaces messages array for session                                                   | Conversation load, creation           |
-| `addMessage(sid, msg)`          | Appends message to session                                                            | `handleSend`, `handleAgentChunk`      |
-| `setAgentRunning(sid, running)` | Sets streaming state                                                                  | `handleSend`, `handleAgentComplete`   |
-| `markSessionLoaded(sid)`        | Prevents duplicate conversation:load                                                  | Effect 3, `handleConversationCreated` |
-| `isSessionLoaded(sid)`          | Check if session was already loaded                                                   | Effect 3 guard                        |
+| Action                          | What It Does                                                                | When Used                             |
+| ------------------------------- | --------------------------------------------------------------------------- | ------------------------------------- |
+| `getOrCreateSession(sid)`       | Creates session entry if missing, touches LRU, runs eviction                | Conversation creation, chunk handling |
+| `setActiveSession(sid)`         | Sets `activeSessionId`, ensures session exists, touches LRU                 | Navigation, creation                  |
+| `remapSession(oldId, newId)`    | Atomic move: sessions, activeSessionId (if match), loadedSessions, lruOrder | `handleSystemInit`                    |
+| `setMessages(sid, msgs)`        | Replaces messages array for session                                         | Conversation load, rewind             |
+| `addMessage(sid, msg)`          | Appends message to session                                                  | `handleSend`, chunk batcher           |
+| `updateMessage(sid, id, fn)`    | Functional update of specific message by ID                                 | Chunk append, thinking, complete      |
+| `reconcileMessageId(sid, o, n)` | Swaps user message ID from frontend UUID to SDK checkpoint UUID             | `handleAgentCheckpoint`               |
+| `setAgentRunning(sid, running)` | Sets streaming state                                                        | `handleSend`, `handleAgentComplete`   |
+| `setStopPending(sid, pending)`  | Blocks rewind while SDK flushes after Stop                                  | `handleStop`, `handleAgentComplete`   |
+| `destroySession(sid)`           | Full cleanup: sessions, loadedSessions, lruOrder, activeSessionId           | `handleConversationDeleted`           |
+| `bumpRewindEpoch()`             | Invalidates in-flight `conversation:loaded`                                 | Rewind                                |
+| `bumpConversationLoadEpoch()`   | Invalidates stale `conversation:loaded`                                     | New session creation                  |
+| `markSessionLoaded(sid)`        | Prevents duplicate `conversation:load` requests                             | Effect 3, `handleConversationCreated` |
 
 ---
 
@@ -550,136 +813,55 @@ ChatMessageService.handleConversationList
 ### Race 1: conversation:list vs Optimistic Entry
 
 ```
-Time ──────────────────────────────────────────────────►
-
-T0: handleConversationCreated
-    → addConversation({sid: "abc", messageCount: 0})
-
-T1: Effect 2 fires (sessionId changed)
-    → postMessage({ type: 'conversation:list' })
-
+T0: handleConversationCreated → addConversation({sid: "abc", messageCount: 0})
+T1: Effect 2 fires → postMessage({ type: 'conversation:list' })
 T2: Backend scans disk — "abc" JSONL has 0 messages or doesn't exist yet
+T3: conversation:list response → setConversations(backendList)
+    backendList doesn't include "abc"
 
-T3: conversation:list response arrives
-    → setConversations(backendList)  // backendList doesn't include "abc"
+    WITHOUT FIX: conversations = backendList  →  "abc" GONE
+    WITH FIX:    conversations = [abc_optimistic, ...backendList]  (TTL: 60s)
 
-    WITHOUT FIX: conversations = backendList  →  "abc" entry GONE
-    WITH FIX:    conversations = [abc_optimistic, ...backendList]
-
-T4: User sends message → handleSend checks conversationExists
-    WITHOUT FIX: false → wrong code path → duplicate session
-    WITH FIX:    true (ChatStore session exists OR UIStore has entry)
+T4: handleSend checks conversationExists
+    WITHOUT FIX: false → pending path → duplicate session
+    WITH FIX:    true (ChatStore session exists as primary authority)
 ```
 
 ### Race 2: Session Remap vs Sidebar Display
 
 ```
-Time ──────────────────────────────────────────────────►
-
-T0: handleConversationCreated({sid: "frontend-uuid"})
-    → Sidebar shows "frontend-uuid" entry
-
-T1: User sends message, title updated to "hello love"
-
+T0: handleConversationCreated({sid: "frontend-uuid"})  →  Sidebar shows entry
+T1: User sends message, title updated
 T2: system:init arrives (sdk_session_id: "sdk-uuid")
-    → handleSystemInit fires
 
-    WITHOUT FIX:
-      removeConversation("frontend-uuid")  →  Sidebar entry GONE
-      setActiveConversation("sdk-uuid", null)  →  Only sets pointer, no array entry
-      → Sidebar empty during entire streaming phase
+    WITHOUT FIX: removeConversation("frontend-uuid") → sidebar empty during streaming
+    WITH FIX:    remapConversation("frontend-uuid", "sdk-uuid") → entry stays visible
 
-    WITH FIX:
-      remapConversation("frontend-uuid", "sdk-uuid")
-      → Entry stays visible, sessionId swapped in-place
-      → activeConversationId updated atomically
-
-T3-T99: Streaming (agent:chunk events)
-    WITHOUT FIX: No sidebar entry visible
-    WITH FIX:    Entry visible with correct title
-
-T100: agent:complete → conversation:list refreshes
-    → Backend list includes "sdk-uuid" (JSONL now on disk)
-    → setConversations replaces optimistic with backend version
+T3-T99: Streaming (sidebar entry visible throughout)
+T100: agent:complete → sidebar refresh replaces optimistic with backend entry
 ```
 
-### Race 3: Stale Optimistic Entry Resurrection
+### Race 3: conversation:loaded vs New Session Creation
 
 ```
-Time ──────────────────────────────────────────────────►
-
-T0 (2 hours ago): Session "old-uuid" created, messageCount: 0
-T1 (2 hours ago): Remapped to "old-sdk-uuid", but old entry not cleaned up
-T2 (2 hours ago): setConversations → old entry preserved (messageCount: 0, not in incoming)
-
-... 2 hours pass ...
-
-T3 (now): New conversation:list arrives
-    WITHOUT TTL: "old-uuid" still has messageCount: 0, not in incoming
-                 → preserved and PREPENDED at position 0
-    WITH TTL:    updatedAt is 2 hours old, exceeds 60s TTL
-                 → DROPPED from optimistic list
+T0: App starts, restores sessionId from localStorage
+T1: Effect 3 fires conversation:load for old session
+T2: User clicks "+" and sends message → handleConversationCreated bumps epoch
+T3: conversation:loaded arrives for old session
+    Guard: newLoadEpoch !== currentStore.conversationLoadEpoch → SKIP
+    Without guard: stale response hijacks activeSessionId
 ```
 
----
-
-## Debugging Guide
-
-### How to Identify Which Bug is Occurring
-
-| Symptom                                 | Bug # | What to Check                                                                                                         |
-| --------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------- |
-| Welcome page won't transition to chat   | #1    | `messages.length` in ChatStore for active session. If 0, check `handleSend` code path (pending vs direct).            |
-| Sidebar entry vanishes during streaming | #2    | Check if `remapConversation` is being called. Look for `removeConversation` calls that should be `remapConversation`. |
-| Wrong conversation at top of sidebar    | #3    | Check `updatedAt` of the stale entry. If old, TTL should catch it. If recent, might be a different issue.             |
-| Duplicate sidebar entries               | All   | Check if both frontend UUID and SDK UUID entries exist. `remapConversation` should prevent this.                      |
-
-### Console Log Markers
-
-Key log lines to look for in DevTools:
+### Race 4: Checkpoint Debounce vs Message Complete
 
 ```
-[ChatMessageService] handleConversationCreated { sid: "..." }
-  → Sidebar entry added
+T0: agent:checkpoint arrives  → batchedCheckpoint queued (100ms debounce)
+T1: agent:complete arrives     → CheckpointStore.onMessageComplete(sid)
+    onMessageComplete reads currentTurnStartCheckpoint — may be STALE
+T2: Debounced callback fires   → updates currentTurnStartCheckpoint (TOO LATE)
 
-[ChatMessageService] Remapped created session { oldId: "...", newId: "..." }
-  → Session remap happened
-
-[ChatStore] remapSession { oldId: "...", newId: "..." }
-  → ChatStore data migrated
-
-[UIStore] setConversations { incoming: N, optimistic: M }
-  → Conversation list refreshed (add logging if needed)
-```
-
-### Adding Diagnostic Logging
-
-If bugs recur, add temporary logging to `setConversations`:
-
-```typescript
-setConversations: (conversations: ConversationSummary[]): void => {
-  set((state) => {
-    const OPTIMISTIC_TTL_MS = 60_000;
-    const now = Date.now();
-    const incomingIds = new Set(conversations.map((c) => c.sessionId));
-    const optimistic = state.conversations.filter(
-      (c) =>
-        c.messageCount === 0 &&
-        !incomingIds.has(c.sessionId) &&
-        now - c.updatedAt < OPTIMISTIC_TTL_MS
-    );
-    // DIAGNOSTIC: uncomment to trace merge behavior
-    // logger.warn('setConversations merge', {
-    //   incoming: conversations.length,
-    //   optimistic: optimistic.length,
-    //   optimisticIds: optimistic.map(c => c.sessionId.slice(0, 8)),
-    //   droppedStale: state.conversations.filter(
-    //     c => c.messageCount === 0 && !incomingIds.has(c.sessionId) && now - c.updatedAt >= OPTIMISTIC_TTL_MS
-    //   ).length,
-    // });
-    state.conversations = [...optimistic, ...conversations];
-  });
-},
+Impact: Intermittent file checkpoint misattribution with queued messages
+Status: Known issue, separate from the forkSession fix
 ```
 
 ---
@@ -699,17 +881,39 @@ uiStore.remapConversation(old, new)   // for remap
 
 ### 2. Optimistic Entries Are Identified by `messageCount === 0`
 
-Any conversation with `messageCount: 0` is treated as optimistic by `setConversations`. If you create entries with `messageCount: 0` for other purposes, they'll be subject to the optimistic preservation logic.
+Any conversation with `messageCount: 0` is treated as optimistic by `setConversations`. Creating entries with `messageCount: 0` for other purposes will subject them to optimistic preservation logic.
 
-### 3. Optimistic Entries Are Prepended (Position 0)
+### 3. `consumePendingConversationFork` Must Use SDK ID
+
+After `remapSession(frontendId, sdkId)`, the data lives under `sdkId`. Calling `consumePendingConversationFork(frontendId)` finds nothing:
 
 ```typescript
-state.conversations = [...optimistic, ...conversations];
+// ❌ Wrong: data already moved by remapSession
+useCheckpointStore.getState().consumePendingConversationFork(frontendSessionId);
+
+// ✅ Correct: use the remapped ID
+useCheckpointStore.getState().consumePendingConversationFork(sdkSessionId);
 ```
 
-This means optimistic entries always appear ABOVE the time-sorted backend list. This is intentional (new conversation should be at top) but can look wrong for stale entries — hence the TTL guard.
+### 4. Immer Nested Property Mutation — Silently Dropped
 
-### 4. `removeConversation` Clears Checkpoints
+In `create()(immer((set, get) => ...))`, mutating a nested property on an existing object can be silently dropped:
+
+```typescript
+// ❌ May not produce new state reference
+set((state) => {
+  state.obj.prop = newValue; // Silent no-op
+});
+
+// ✅ Replace entire object
+set((state) => {
+  state.obj = { ...state.obj, prop: newValue };
+});
+```
+
+The `get()` call immediately after `set()` may appear correct (reading the draft) but the committed state is unchanged. Only detectable via `useChatStore.subscribe()` monitoring.
+
+### 5. `removeConversation` Clears Checkpoints
 
 ```typescript
 removeConversation: (sessionId: string): void => {
@@ -718,12 +922,11 @@ removeConversation: (sessionId: string): void => {
 };
 ```
 
-This is correct for user-initiated deletes but was WRONG for remap (Bug #2). `remapConversation` does NOT clear checkpoints — they're handled separately by `CheckpointStore.remapSession`.
+Correct for user-initiated deletes but WRONG for remap. `remapConversation` does NOT clear checkpoints — they're handled by `CheckpointStore.remapSession`.
 
-### 5. Effect 2 Triggers on `sessionId` Change
+### 6. Effect 2 Triggers on `sessionId` Change
 
 ```typescript
-// use-chat-messages.ts:181-190
 useEffect(() => {
   if (sessionId || workspacePath) {
     postMessage({ type: 'conversation:list', ... });
@@ -731,35 +934,29 @@ useEffect(() => {
 }, [sessionId, workspacePath, activeWorktreePath, postMessage]);
 ```
 
-When `remapSession` changes `activeSessionId` in ChatStore, this effect fires a new `conversation:list`. The response arrives asynchronously and calls `setConversations`. If the remap isn't complete when the response arrives, the optimistic preservation logic handles it.
+When `remapSession` changes `activeSessionId` in ChatStore, this effect fires a new `conversation:list`. If the remap isn't complete when the response arrives, the optimistic preservation logic handles it.
 
-### 6. ChatStore `session` vs UIStore `conversations`
+### 7. `forkSession: true` Is Critical for File Checkpointing
 
-```typescript
-// ChatStore: session data (messages, running state)
-const session = chatStore.sessions[sessionId]; // Can be undefined
+Post-fork sessions MUST set `forkSession: true` in `createSession` options. Without it:
 
-// UIStore: sidebar list (titles, message counts)
-const exists = conversations.some((c) => c.sessionId === sid); // Can be stale
-```
+- `shouldEnableReplay` = false
+- `--replay-user-messages` not added to CLI args
+- No checkpoint UUIDs emitted during replay
+- `getRewindCheckpoints()` returns `undefined`
+- File rewind silently skips
 
-`handleSend` uses ChatStore as **primary authority** because:
+### 8. `startTransition` Works Outside React Components
 
-- ChatStore is updated synchronously by `handleConversationCreated`
-- UIStore can be wiped by `setConversations` (conversation:list response)
-- ChatStore's `sessions` Record is never replaced wholesale
+`ChatMessageService` imports `startTransition` from `react` and uses it in `handleConversationLoaded`. This works because Zustand v4+ uses `useSyncExternalStore` internally. Do NOT downgrade Zustand below v4 without verifying this still works.
 
-### 7. Immer Mutation in `remapConversation`
+### 9. RAF Batchers Are Per-Session
 
-```typescript
-const conversation = state.conversations.find((c) => c.sessionId === oldSessionId);
-if (conversation) {
-  conversation.sessionId = newSessionId; // Direct mutation OK inside immer set()
-  conversation.updatedAt = Date.now();
-}
-```
+Rewinding session A cancels only A's batchers. Session B's streaming continues unaffected. This prevents cross-session interference in multi-session scenarios.
 
-This works because we're inside `set((state) => {...})` with immer. The `find()` returns a draft proxy, and mutations are tracked. However, remember the general gotcha: mutating NESTED properties on objects in Maps or top-level state can be silently dropped. Always replace entire objects when in doubt.
+### 10. Reconciliation `reconciled` Flag Prevents Stale Overwrites
+
+`currentUserMessageId` has a `reconciled: boolean` field. `onUserMessageSent` sets it to `false`; first successful `reconcileUserMessageId` sets it to `true`. Subsequent reconciliation attempts are rejected. Epoch-based guards don't work because JS is single-threaded (get/set are atomic).
 
 ---
 
@@ -799,14 +996,64 @@ This works because we're inside `set((state) => {...})` with immer. The `find()`
 1. Create session A and send message
 2. Before streaming completes, click a different session B
 3. **Expected:** Session B loads correctly, session A continues in background
-4. **Verify:** `remapConversation` updates the entry for A, doesn't hijack focus to A
+4. **Verify:** `remapConversation` updates A's entry, doesn't hijack focus to A
+
+### Scenario 6: Single Rewind
+
+1. Send 3 messages, let each complete
+2. Rewind to after message 1
+3. **Expected:** Messages 2-3 disappear, file state restores
+4. Send new message → agent responds
+5. Switch to another chat, switch back
+6. **Verify:** Only active branch visible (parentUuid chain)
+
+### Scenario 7: Multi-Rewind (Stress Test)
+
+1. Send 3 messages → rewind to after msg 1 → send new msg
+2. Rewind again to after msg 1 → send another new msg
+3. Rewind a third time → send another msg
+4. Switch away and back between each step
+5. **Expected:** Only newest branch visible each time
+6. **Verify:** No duplicate messages, no sidebar ghosts, file checkpoints work
+
+### Scenario 8: LRU Eviction
+
+1. Open 25+ different conversations (switch between them)
+2. Switch back to the first conversation
+3. **Expected:** Messages reload from backend (evicted from memory)
+4. **Verify:** Tool widgets and usage data restored correctly
 
 ---
 
-## Appendix: ConversationSummary Schema
+## Appendix: Key Type Definitions
+
+### ChatSessionData
 
 ```typescript
-// apps/agent/src/types/protocol/protocol.ts:126-135
+// apps/agent/src/stores/chat/chat-store.ts:57-61
+export interface ChatSessionData {
+  messages: ChatMessage[];
+  isAgentRunning: boolean;
+  isStopPending: boolean;
+}
+```
+
+### PendingMessage
+
+```typescript
+// apps/agent/src/stores/chat/chat-store.ts:50-55
+export interface PendingMessage {
+  text: string;
+  contextFiles?: string[] | undefined;
+  images?: ImageAttachment[] | undefined;
+  elements?: ReactElementContext[] | undefined;
+}
+```
+
+### ConversationSummary (Sidebar)
+
+```typescript
+// apps/agent/src/types/protocol/protocol.ts
 export const StoredConversationSummarySchema = z
   .object({
     sessionId: z.string(),
@@ -819,10 +1066,10 @@ export const StoredConversationSummarySchema = z
   .strict();
 ```
 
-## Appendix: ChatStore Session Remap (Atomic)
+### ChatStore remapSession (Atomic)
 
 ```typescript
-// apps/agent/src/stores/chat/chat-store.ts:346-375
+// apps/agent/src/stores/chat/chat-store.ts:350-378
 remapSession: (oldId: string, newId: string): void => {
   set((draft) => {
     // Move session data from old key to new key
@@ -849,3 +1096,35 @@ remapSession: (oldId: string, newId: string): void => {
   });
 },
 ```
+
+---
+
+## Files Reference
+
+### Core Files
+
+| File                                                   | Lines | Purpose                                                       |
+| ------------------------------------------------------ | ----- | ------------------------------------------------------------- |
+| `apps/agent/src/stores/chat/chat-store.ts`             | 503   | Zustand store: session-keyed state, LRU, selectors            |
+| `apps/agent/src/services/chat/chat-message-service.ts` | 1398  | Singleton event dispatcher, RAF batchers, checkpoint debounce |
+| `apps/agent/src/hooks/chat/use-chat-messages.ts`       | 452   | Thin reader hook, 7 effects, compat wrappers                  |
+| `apps/agent/src/hooks/chat/handlers/chat-actions.ts`   | 553   | handleSend, handleStop, handleRewind, permissions             |
+
+### Supporting Files
+
+| File                                                           | Purpose                                                  |
+| -------------------------------------------------------------- | -------------------------------------------------------- |
+| `apps/agent/src/hooks/agent/handlers/conversation-handlers.ts` | Rewind flow (Steps 1-5), conversation CRUD               |
+| `apps/agent/src/stores/agent/checkpoint-store.ts`              | File checkpoints, message ID reconciliation              |
+| `apps/agent/src/stores/ui/ui-store.ts`                         | Sidebar list, optimistic preservation, remapConversation |
+| `apps/agent/src/stores/agent/tool-store.ts`                    | Tool execution, token tracking, session usage            |
+| `agent-bridge/src/agent/session/session-manager.ts`            | forkSessionAt, createSession, JSONL I/O                  |
+| `agent-bridge/src/agent/core/agent.ts`                         | shouldEnableReplay, \_createOptions                      |
+
+### Deleted Files (Historical)
+
+| File                                           | Replaced By        |
+| ---------------------------------------------- | ------------------ |
+| `apps/agent/src/hooks/chat/message-handler.ts` | ChatMessageService |
+| `apps/agent/src/hooks/chat/message-state.ts`   | ChatStore          |
+| `apps/agent/src/hooks/chat/session-state.ts`   | ChatStore          |
