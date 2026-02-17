@@ -747,6 +747,63 @@ html.dark [data-streamdown='code-block-container'] {
   color: var(--foreground);
 }
 
+/* ── Insight Block ─────────────────────────────────
+   Styled aside for Claude Code's explanatory output style.
+   Replaces the raw `★ Insight ───` / `───` border pattern
+   with a warm callout card. Rendered by rehype-insight-blocks.ts.
+   ──────────────────────────────────────────────────── */
+.insight-block {
+  margin: 0.75rem 0;
+  padding: 0.5rem 0.75rem 0.625rem;
+  border-left: 2px solid var(--accent-7);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--accent-a2);
+}
+
+.insight-block .insight-header {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.25rem;
+}
+
+.insight-block .insight-star {
+  font-size: 0.625rem;
+  line-height: 1;
+  color: var(--accent-9);
+}
+
+.insight-block .insight-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-11);
+}
+
+.insight-block .insight-body {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+/* Inline code inside insight inherits chat-markdown code styling */
+.insight-block .insight-body code {
+  position: relative;
+  padding: 0.125rem 0.25rem;
+  border-radius: var(--radius-md);
+  background-color: var(--muted);
+  font-family: 'Geist Mono Variable', 'Geist Mono', ui-monospace, Menlo, monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+/* Paragraph spacing inside multi-paragraph insight blocks */
+.insight-block .insight-body p:not(:first-child) {
+  margin-top: 0.5rem;
+}
+
 /* Horizontal rules */
 .chat-markdown hr {
   margin-top: 1rem;

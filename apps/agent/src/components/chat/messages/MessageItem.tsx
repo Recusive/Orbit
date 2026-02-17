@@ -23,6 +23,7 @@ import type { FC } from 'react';
 
 import { ErrorBoundary } from '@/components/shared';
 import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
+import { rehypeInsightBlocks } from '@/lib/rehype-insight-blocks';
 import { cn, CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
 /** Max collapsed height for user message bubbles (px). Content taller than this gets a "Show more" toggle. */
@@ -36,9 +37,12 @@ const LINK_SAFETY_DISABLED = { enabled: false } as const;
 // This is critical for Streamdown performance as it compares plugin arrays by reference.
 const REMARK_PLUGINS = [remarkGfm];
 
-// Rehype configuration: wraps text in <span class="flow-token"> for per-word
-// blur-in animation during streaming. These spans are visually inert when the
-// message is complete — the CSS animation only applies via [data-streaming="true"].
+// Rehype configuration:
+// 1. rehypeInsightBlocks: detects `★ Insight ───` / `───` border patterns and
+//    restructures them into styled <aside class="insight-block"> elements.
+//    Must run BEFORE rehypeFlowTokens so the DOM is finalized before tokenization.
+// 2. rehypeFlowTokens: wraps text in <span class="flow-token"> for per-word
+//    blur-in animation during streaming. Inert when data-streaming="false".
 //
 // IMPORTANT: We use ONE pipeline for both streaming and completed messages.
 // Previously, we switched from streaming→static (empty) plugins when isStreaming
@@ -46,7 +50,7 @@ const REMARK_PLUGINS = [remarkGfm];
 // in one frame), creating a visible flash/glitch at the end of streaming.
 // Keeping the spans avoids the restructuring. The extra DOM weight is negligible
 // since the virtualizer limits to ~15 messages in the DOM.
-const REHYPE_PLUGINS = [rehypeFlowTokens];
+const REHYPE_PLUGINS = [rehypeInsightBlocks, rehypeFlowTokens];
 
 // Streamdown plugins for diagram and code rendering - defined outside component for reference stability.
 // The `code` plugin provides Shiki syntax highlighting with github-light/dark themes.

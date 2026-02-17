@@ -53,7 +53,7 @@ export const BranchSelector: React.FC<BranchSelectorProps> = ({
           <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
         ) : null}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
+      <DropdownMenuContent align="start" className="max-h-64 max-w-80 overflow-y-auto">
         {branches.map((branch) => (
           <DropdownMenuItem
             key={branch.name}
@@ -62,15 +62,15 @@ export const BranchSelector: React.FC<BranchSelectorProps> = ({
                 onCheckout(branch.name);
               }
             }}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 min-w-0"
           >
             <GitBranch className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
             <span className="truncate">{branch.name}</span>
-            <span className="flex items-center gap-1.5 ml-auto shrink-0">
+            <span className="flex items-center gap-1.5 ml-auto min-w-0 shrink">
               {branch.upstream ? (
-                <span className="text-xs text-muted-foreground">→ {branch.upstream}</span>
+                <span className="text-xs text-muted-foreground truncate">→ {branch.upstream}</span>
               ) : null}
-              {branch.isCurrent ? <Check className="h-3.5 w-3.5 text-green-500" /> : null}
+              {branch.isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-green-500" /> : null}
             </span>
           </DropdownMenuItem>
         ))}
