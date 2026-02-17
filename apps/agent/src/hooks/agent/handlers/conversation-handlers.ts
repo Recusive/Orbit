@@ -94,6 +94,8 @@ export async function handleConversationLoad(
             ...(m.thinkingDurationMs !== undefined
               ? { thinkingDurationMs: m.thinkingDurationMs }
               : {}),
+            ...(m.isInterrupted === true ? { isInterrupted: true } : {}),
+            ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
             ...(m.toolUses && m.toolUses.length > 0 ? { toolUses: m.toolUses } : {}),
             ...(m.usage ? { usage: m.usage } : {}),
             // parentUuid for active chain resolution (getActiveChain defense-in-depth)

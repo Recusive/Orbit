@@ -190,6 +190,7 @@ const _CHAT_MESSAGE_KEYS_CHECK: Record<keyof ChatMessage, true> = {
   displayedContent: true,
   isStreaming: true,
   isInterrupted: true,
+  turnDurationMs: true,
   thinking: true,
   thinkingDurationMs: true,
   thinkingBlocks: true,
@@ -229,6 +230,7 @@ export function arePropsEqual(prev: MessageItemProps, next: MessageItemProps): b
   if (pm.displayedContent !== nm.displayedContent) return false;
   if (pm.isStreaming !== nm.isStreaming) return false;
   if (pm.isInterrupted !== nm.isInterrupted) return false;
+  if (pm.turnDurationMs !== nm.turnDurationMs) return false;
   if (pm.thinking !== nm.thinking) return false;
   if (pm.thinkingDurationMs !== nm.thinkingDurationMs) return false;
   if (pm.isThinkingActive !== nm.isThinkingActive) return false;

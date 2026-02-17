@@ -62,6 +62,10 @@ pub struct Message {
     /// Whether this message was interrupted by the user
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_interrupted: Option<bool>,
+    /// Wall-clock duration of the entire turn in milliseconds (from SDK `turn_duration` event).
+    /// Includes thinking + content generation + tool execution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_duration_ms: Option<u64>,
     /// Timestamp when the message was created (Unix epoch milliseconds)
     pub created_at: u64,
     /// Tool uses in this message
@@ -187,7 +191,16 @@ enum JsonlLine {
     /// Claude Code stores explicit titles as a separate line type.
     #[serde(rename = "custom-title")]
     CustomTitle { title: String },
-    /// Catch-all for system, file-history-snapshot, tool_result, etc.
+    /// System events (turn_duration, stop_hook_summary, etc.)
+    #[serde(rename = "system")]
+    System {
+        #[serde(default)]
+        subtype: Option<String>,
+        /// Turn duration in milliseconds (only on subtype == "turn_duration")
+        #[serde(default, rename = "durationMs")]
+        duration_ms: Option<u64>,
+    },
+    /// Catch-all for file-history-snapshot, tool_result, progress, etc.
     #[serde(other)]
     Unknown,
 }
@@ -985,6 +998,7 @@ fn build_assistant_message(uuid: &str, value: &serde_json::Value, ts: u64) -> Me
         thinking,
         thinking_duration_ms: None,
         is_interrupted: is_interrupted.then_some(true),
+        turn_duration_ms: None,
         created_at: ts,
         tool_uses,
         usage,
@@ -1125,6 +1139,17 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
             },
             Ok(JsonlLine::Summary { summary, .. }) => ctx.title = summary,
             Ok(JsonlLine::CustomTitle { title: t, .. }) => ctx.title = t,
+            Ok(JsonlLine::System {
+                subtype,
+                duration_ms,
+                ..
+            }) => {
+                if subtype.as_deref() == Some("turn_duration") {
+                    if let Some(ms) = duration_ms {
+                        ctx.apply_turn_duration(ms);
+                    }
+                }
+            },
             Ok(JsonlLine::Unknown) => {},
             Err(e) => {
                 tracing::warn!(
@@ -1173,6 +1198,15 @@ impl ParseContext {
         self.last_timestamp = Some(ts);
     }
 
+    /// Apply a `turn_duration` value from a system line to the most recent assistant message.
+    fn apply_turn_duration(&mut self, ms: u64) {
+        if let Some(last) = self.raw_messages.last_mut() {
+            if last.role == MessageRole::Assistant {
+                last.turn_duration_ms = Some(ms);
+            }
+        }
+    }
+
     fn process_user_line(&mut self, uuid: String, payload: &UserMessagePayload, timestamp: &str) {
         if payload.content.is_tool_result_only() {
             extract_tool_results(&payload.content, &mut self.tool_results);
@@ -1181,7 +1215,18 @@ impl ParseContext {
         let ts = parse_iso_timestamp(timestamp);
         self.track_timestamp(ts);
         let text = payload.content.to_text();
-        if text.is_empty() || text == "[Request interrupted by user]" {
+        // SDK writes these markers when the user interrupts (Stop button).
+        // Mark the preceding assistant message as interrupted so the UI
+        // can show the "Response interrupted" indicator after session reload.
+        if text.starts_with("[Request interrupted by user") {
+            if let Some(last) = self.raw_messages.last_mut() {
+                if last.role == MessageRole::Assistant {
+                    last.is_interrupted = Some(true);
+                }
+            }
+            return;
+        }
+        if text.is_empty() {
             return;
         }
         if self.first_user_text.is_none() {
@@ -1194,6 +1239,7 @@ impl ParseContext {
             thinking: None,
             thinking_duration_ms: None,
             is_interrupted: None,
+            turn_duration_ms: None,
             created_at: ts,
             tool_uses: Vec::new(),
             usage: None,
@@ -1408,9 +1454,10 @@ fn merge_consecutive_assistants(raw: Vec<Message>) -> Vec<Message> {
 
 /// Absorb `incoming` assistant message into `target`, merging content, tools, and metadata.
 fn absorb_assistant_message(target: &mut Message, incoming: Message) {
-    // Record the current text length BEFORE appending so we can
-    // shift the incoming tool offsets by this amount.
-    let base_len = u32::try_from(target.content.len()).unwrap_or(u32::MAX);
+    // Record the current text length in UTF-16 code units BEFORE appending
+    // so we can shift the incoming tool offsets by this amount.
+    // Must use UTF-16 (not UTF-8 bytes) to match JavaScript string indexing.
+    let base_len = u32::try_from(target.content.encode_utf16().count()).unwrap_or(u32::MAX);
     let incoming_has_text = !incoming.content.is_empty();
 
     if incoming_has_text {
@@ -1445,6 +1492,9 @@ fn absorb_assistant_message(target: &mut Message, incoming: Message) {
     }
     if incoming.is_interrupted.is_some() {
         target.is_interrupted = incoming.is_interrupted;
+    }
+    if incoming.turn_duration_ms.is_some() {
+        target.turn_duration_ms = incoming.turn_duration_ms;
     }
 }
 
@@ -1538,8 +1588,10 @@ fn extract_assistant_content(value: &serde_json::Value) -> (String, Option<Strin
     let mut text_parts: Vec<String> = Vec::new();
     let mut thinking: Option<String> = None;
     let mut tool_uses: Vec<ToolUse> = Vec::new();
-    // Running byte length of all text parts joined so far (including "\n" separators).
-    let mut text_byte_len: u32 = 0;
+    // Running UTF-16 code unit count of all text parts joined so far.
+    // Must use UTF-16 (not UTF-8 bytes) because the frontend uses JavaScript
+    // string.slice() which indexes by UTF-16 code units.
+    let mut text_utf16_len: u32 = 0;
 
     let content = value.get("content");
 
@@ -1549,10 +1601,11 @@ fn extract_assistant_content(value: &serde_json::Value) -> (String, Option<Strin
                 Some("text") => {
                     if let Some(text) = block.get("text").and_then(serde_json::Value::as_str) {
                         if !text_parts.is_empty() {
-                            // Account for the "\n" join separator
-                            text_byte_len += 1;
+                            // Account for the "\n" join separator (1 UTF-16 code unit)
+                            text_utf16_len += 1;
                         }
-                        text_byte_len += u32::try_from(text.len()).unwrap_or(u32::MAX);
+                        text_utf16_len +=
+                            u32::try_from(text.encode_utf16().count()).unwrap_or(u32::MAX);
                         text_parts.push(text.to_owned());
                     }
                 },
@@ -1583,7 +1636,7 @@ fn extract_assistant_content(value: &serde_json::Value) -> (String, Option<Strin
                         input,
                         output: None,
                         success: true,
-                        content_offset: Some(text_byte_len),
+                        content_offset: Some(text_utf16_len),
                     });
                 },
                 _ => {},
@@ -1888,6 +1941,7 @@ mod tests {
             thinking: None,
             thinking_duration_ms: None,
             is_interrupted: None,
+            turn_duration_ms: None,
             created_at: current_timestamp(),
             tool_uses: Vec::new(),
             usage: None,
@@ -1923,6 +1977,7 @@ mod tests {
             thinking: Some("Deep thought".to_owned()),
             thinking_duration_ms: Some(1234),
             is_interrupted: None,
+            turn_duration_ms: None,
             created_at: current_timestamp(),
             tool_uses: Vec::new(),
             usage: None,
@@ -2385,13 +2440,87 @@ mod tests {
         assert_eq!(assistant.content, "First.\nSecond.\nThird.");
         assert_eq!(assistant.tool_uses.len(), 2);
 
-        // t1 appears after "First." (6 bytes)
+        // t1 appears after "First." (6 UTF-16 code units)
         assert_eq!(assistant.tool_uses[0].id, "t1");
         assert_eq!(assistant.tool_uses[0].content_offset, Some(6));
 
-        // t2 appears after "First.\nSecond." (6 + 1 + 7 = 14 bytes)
+        // t2 appears after "First.\nSecond." (6 + 1 + 7 = 14 UTF-16 code units)
         assert_eq!(assistant.tool_uses[1].id, "t2");
         assert_eq!(assistant.tool_uses[1].content_offset, Some(14));
+    }
+
+    /// Verify content_offset uses UTF-16 code units, not UTF-8 bytes.
+    /// JavaScript's string.slice() indexes by UTF-16 code units, so offsets
+    /// must match that encoding. Multi-byte UTF-8 characters (em dashes,
+    /// smart quotes, emojis) would produce wrong offsets if counted as bytes.
+    #[test]
+    fn test_content_offset_uses_utf16_not_bytes() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Text contains an em dash (U+2014): 3 bytes UTF-8, 1 UTF-16 code unit
+        // "Hello — world" = 13 UTF-16 code units, but 15 UTF-8 bytes
+        let path = ws_dir.join("utf16-offset-session.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"test"},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Hello — world."},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}},{"type":"text","text":"After tool."}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("utf16-offset-session", None)
+            .expect("load")
+            .expect("not found");
+
+        let assistant = &conv.messages[1];
+        assert_eq!(assistant.content, "Hello \u{2014} world.\nAfter tool.");
+        assert_eq!(assistant.tool_uses.len(), 1);
+
+        // "Hello — world." = 14 UTF-16 code units (not 16 UTF-8 bytes)
+        // If this were byte-counted, it would be 16 and JS slice(0, 16) would
+        // cut 2 chars into "After tool.", splitting text incorrectly.
+        assert_eq!(assistant.tool_uses[0].content_offset, Some(14));
+    }
+
+    /// Verify content_offset is correct after absorb_assistant_message merges
+    /// consecutive JSONL lines containing multi-byte characters.
+    #[test]
+    fn test_content_offset_utf16_across_merged_lines() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Simulate SDK output: separate JSONL lines for text and tool_use
+        // Text contains em dashes (3 bytes each, 1 UTF-16 code unit each)
+        let path = ws_dir.join("utf16-merge-session.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"test"},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            // First assistant line: text with em dash "path — when"
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"streaming path — done."}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+            // Second assistant line: tool_use (gets merged)
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Grep","input":{"pattern":"test"}}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:03.000Z"}"#,
+            // Third assistant line: more text (gets merged)
+            r#"{"type":"assistant","uuid":"a3","message":{"role":"assistant","content":[{"type":"text","text":"After grep."}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:04.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("utf16-merge-session", None)
+            .expect("load")
+            .expect("not found");
+
+        // Should merge into 1 user + 1 assistant
+        assert_eq!(conv.messages.len(), 2);
+        let assistant = &conv.messages[1];
+        assert_eq!(
+            assistant.content,
+            "streaming path \u{2014} done.\nAfter grep."
+        );
+
+        // "streaming path — done." = 22 UTF-16 code units
+        // (not 24 UTF-8 bytes — the em dash is 3 bytes but 1 code unit)
+        assert_eq!(assistant.tool_uses[0].content_offset, Some(22));
     }
 
     #[test]
@@ -2722,6 +2851,81 @@ mod tests {
         assert_eq!(conv.messages[2].role, MessageRole::User);
         assert_eq!(conv.messages[3].content, "Done!");
         assert_eq!(conv.messages[3].role, MessageRole::Assistant);
+    }
+
+    #[test]
+    fn test_interrupt_detected_from_sdk_marker_without_stop_reason() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // In streaming input mode, stop_reason is null for ALL assistant messages.
+        // The only reliable interrupt signal is the SDK's synthetic user message
+        // "[Request interrupted by user]" or "[Request interrupted by user for tool use]".
+        let path = ws_dir.join("interrupt-null-sr.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"hello"},"cwd":"/test","sessionId":"s","timestamp":"2026-02-17T12:00:00.000Z"}"#,
+            // stop_reason is null — same as normal completion in streaming mode
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Let me search..."}],"stop_reason":null},"cwd":"/test","sessionId":"s","timestamp":"2026-02-17T12:00:01.000Z"}"#,
+            // SDK interrupt marker for tool use — should mark a1 as interrupted
+            r#"{"type":"user","uuid":"u-int","message":{"role":"user","content":"[Request interrupted by user for tool use]"},"cwd":"/test","sessionId":"s","timestamp":"2026-02-17T12:00:02.000Z"}"#,
+            r#"{"type":"user","uuid":"u2","message":{"role":"user","content":"go on"},"cwd":"/test","sessionId":"s","timestamp":"2026-02-17T12:00:03.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"Done!"}],"stop_reason":null},"cwd":"/test","sessionId":"s","timestamp":"2026-02-17T12:00:04.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("interrupt-null-sr", None)
+            .expect("load")
+            .expect("not found");
+
+        assert_eq!(conv.messages.len(), 4); // u1, a1, u2, a2
+        assert_eq!(conv.messages[1].content, "Let me search...");
+        assert_eq!(
+            conv.messages[1].is_interrupted,
+            Some(true),
+            "Interrupt should be detected from SDK marker even with stop_reason:null"
+        );
+        // The non-interrupted assistant should NOT be marked
+        assert_eq!(conv.messages[3].content, "Done!");
+        assert_eq!(
+            conv.messages[3].is_interrupted, None,
+            "Non-interrupted assistant should not be marked"
+        );
+    }
+
+    #[test]
+    fn test_turn_duration_from_system_line() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let path = ws_dir.join("turn-dur.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"hello"},"cwd":"/test","sessionId":"s","timestamp":"2026-02-17T12:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Hi!"}],"stop_reason":null},"cwd":"/test","sessionId":"s","timestamp":"2026-02-17T12:00:01.000Z"}"#,
+            // turn_duration system line — should be applied to a1
+            r#"{"type":"system","subtype":"turn_duration","durationMs":82261,"uuid":"s1","timestamp":"2026-02-17T12:00:03.000Z"}"#,
+            r#"{"type":"user","uuid":"u2","message":{"role":"user","content":"thanks"},"cwd":"/test","sessionId":"s","timestamp":"2026-02-17T12:00:04.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"Welcome!"}],"stop_reason":null},"cwd":"/test","sessionId":"s","timestamp":"2026-02-17T12:00:05.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("turn-dur", None)
+            .expect("load")
+            .expect("not found");
+
+        assert_eq!(conv.messages.len(), 4); // u1, a1, u2, a2
+        assert_eq!(
+            conv.messages[1].turn_duration_ms,
+            Some(82261),
+            "turn_duration_ms should be set from system line"
+        );
+        assert_eq!(
+            conv.messages[3].turn_duration_ms, None,
+            "Second assistant should have no turn_duration_ms (no system line for it)"
+        );
     }
 
     // ============================================================================

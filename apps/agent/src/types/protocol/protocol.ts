@@ -1459,6 +1459,7 @@ const PersistedMessageSchema = z
     thinking: z.string().optional(),
     thinkingDurationMs: z.number().optional(),
     isInterrupted: z.boolean().optional(),
+    turnDurationMs: z.number().optional(),
     // Support both old 'timestamp' and new 'createdAt' field names
     createdAt: z.number().optional(),
     timestamp: z.number().optional(),
@@ -1480,6 +1481,7 @@ const PersistedMessageSchema = z
     thinking: msg.thinking,
     thinkingDurationMs: msg.thinkingDurationMs,
     isInterrupted: msg.isInterrupted,
+    turnDurationMs: msg.turnDurationMs,
     // Prefer createdAt, fall back to timestamp, default to 0
     createdAt: msg.createdAt ?? msg.timestamp ?? 0,
     toolUses: msg.toolUses ?? [],

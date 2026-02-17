@@ -36,6 +36,8 @@ export interface ChatMessage {
   displayedContent: string;
   isStreaming?: boolean | undefined;
   isInterrupted?: boolean | undefined;
+  /** Wall-clock duration of the entire assistant turn in milliseconds (from SDK). */
+  turnDurationMs?: number | undefined;
   /**
    * Flat thinking string for persistence compatibility.
    * During live streaming, prefer `thinkingBlocks` for per-phase rendering.

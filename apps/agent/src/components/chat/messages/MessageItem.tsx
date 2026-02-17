@@ -325,6 +325,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
             <>
               <MessageActions
                 rewindDisabled={isLastAssistantMessage}
+                turnDurationMs={message.turnDurationMs}
                 onCopy={() => {
                   void navigator.clipboard.writeText(message.content);
                 }}

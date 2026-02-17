@@ -820,6 +820,7 @@ class ChatMessageService {
               ...(m.thinkingDurationMs !== undefined
                 ? { thinkingDurationMs: m.thinkingDurationMs }
                 : {}),
+              ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
             };
             if (m.isInterrupted === true) {
               const hasRejectedQuestion = m.toolUses.some(
@@ -1091,7 +1092,7 @@ class ChatMessageService {
       recordBrowserActivityFromAI();
     }
 
-    // Calculate contentOffset from store + pending chunks
+    // Look up current message state (needed for thinking finalization + message creation below)
     const store = useChatStore.getState();
     const session = store.sessions[sid];
     const messages = session?.messages ?? [];
@@ -1101,14 +1102,16 @@ class ChatMessageService {
         ? lastMsg
         : messages.find((m) => m.id === message.message_id);
 
-    const displayedLength = currentMsg?.content.length ?? 0;
-    const pendingLength = this.pendingChunkLengths.get(message.message_id) ?? 0;
-    const maxKnownLength = displayedLength + pendingLength;
-
+    // Use the bridge's content_offset directly — it represents the total text
+    // streamed before this tool, calculated after flushing buffered text.
+    // Do NOT clamp with Math.min(offset, maxKnownLength): that permanently
+    // corrupts the stored offset when the frontend hasn't received all flushed
+    // text yet (small IPC delivery window). string.slice() with an offset beyond
+    // content length safely returns the available text, and once the message
+    // completes the offset falls within range.
     const contentOffset =
-      message.content_offset !== undefined
-        ? Math.min(message.content_offset, maxKnownLength)
-        : maxKnownLength;
+      message.content_offset ??
+      (currentMsg?.content.length ?? 0) + (this.pendingChunkLengths.get(message.message_id) ?? 0);
 
     // Call startTool synchronously for immediate widget rendering
     useToolStore

@@ -1425,6 +1425,11 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       throw new Error('No active query. Call startSession() first.');
     }
 
+    // Capture the query reference so we can detect if startSession() replaced it
+    // during a post-interrupt restart. Without this guard, the cleanup at the end
+    // of the for-await loop would null out the NEW query set by startSession().
+    const queryRef = this.currentQuery;
+
     // Track tool use blocks to match with their results
     const toolUseMap = new Map<string, { name: string; input: Record<string, unknown> }>();
 
@@ -1434,7 +1439,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Yield messages as they arrive
     // In streaming mode, the query continues running and processing messages from the queue
     try {
-      for await (const message of this.currentQuery) {
+      for await (const message of queryRef) {
         messageCount++;
 
         // Debug: Log every message from SDK with details
@@ -1552,8 +1557,17 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
 
     // Query completed (session ended)
     logger.info({ messageCount }, 'Query session completed');
-    this.sessionActive = false;
-    this.currentQuery = null;
+
+    // Only clean up if the query hasn't been replaced by a restart.
+    // During post-interrupt restart, stopSession() → startSession() replaces
+    // currentQuery before this old generator finishes draining. Without this
+    // guard, we'd null out the NEW query and break interrupt().
+    if (this.currentQuery === queryRef) {
+      this.sessionActive = false;
+      this.currentQuery = null;
+    } else {
+      logger.info('Skipping cleanup — query was replaced by a restart');
+    }
   }
 
   async stopSession(): Promise<void> {

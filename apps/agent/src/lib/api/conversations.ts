@@ -16,6 +16,10 @@ export interface ConversationMessageDto {
   content: string;
   thinking?: string;
   thinkingDurationMs?: number;
+  /** Whether this assistant message was interrupted by the user (Stop button). */
+  isInterrupted?: boolean;
+  /** Wall-clock duration of the entire assistant turn in milliseconds. */
+  turnDurationMs?: number;
   createdAt: number;
   toolUses?: ToolUseDto[];
   usage?: TokenUsageDto;
