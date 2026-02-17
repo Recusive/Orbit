@@ -321,7 +321,15 @@ class ChatMessageService {
         ? message.session_id
         : chatStore.activeSessionId;
 
+    // LEGACY REMAP PATH: Since SDK v0.2.44, new sessions pass `options.sessionId`
+    // in agent-bridge's _createOptions(), so the SDK uses Orbit's UUID directly and
+    // this entire block is skipped (IDs match). This remap cascade is still required for:
+    //   1. Forks/rewinds — SDK generates a new UUID for the forked JSONL
+    //   2. Sessions created before the custom sessionId feature was added
     if (sdkSessionId && frontendSessionId && sdkSessionId !== frontendSessionId) {
+      logger.info(
+        `system:init — session IDs differ (frontend=${frontendSessionId}, sdk=${sdkSessionId}), remapping`
+      );
       // Remap session in ChatStore (atomically moves data, updates activeSessionId if active)
       useChatStore.getState().remapSession(frontendSessionId, sdkSessionId);
 
@@ -350,6 +358,9 @@ class ChatMessageService {
       if (isStillActive) {
         useToolStore.getState().switchSession(sdkSessionId);
       }
+    } else if (sdkSessionId && frontendSessionId && sdkSessionId === frontendSessionId) {
+      // Session IDs match — custom sessionId was used, no remap needed
+      logger.info('system:init — session IDs match, skipping remap (custom sessionId)');
     } else if (
       !chatStore.activeSessionId ||
       (chatStore.sessions[chatStore.activeSessionId]?.messages.length ?? 0) === 0

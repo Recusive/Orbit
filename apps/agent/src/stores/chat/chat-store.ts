@@ -95,6 +95,7 @@ export interface ChatStoreState {
   reconcileMessageId: (id: string, oldId: string, newId: string) => void;
   setAgentRunning: (id: string, running: boolean) => void;
   setStopPending: (id: string, pending: boolean) => void;
+  /** @legacy Still needed for forks and pre-custom-sessionId sessions. New sessions skip remap. */
   remapSession: (oldId: string, newId: string) => void;
   destroySession: (id: string) => void;
   bumpRewindEpoch: () => number;

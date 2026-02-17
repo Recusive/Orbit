@@ -920,6 +920,14 @@ export class SessionManager extends Disposable {
    * Called when system:init fires and we learn the SDK session ID.
    * After this, both the agent-bridge and the frontend use the SDK ID
    * as the single source of truth — no aliases or translation needed.
+   *
+   * LEGACY PATH: Since SDK v0.2.44, new sessions pass `options.sessionId`
+   * (see agent.ts `_createOptions`), so the SDK uses Orbit's UUID directly
+   * and this method is never called for new sessions.
+   *
+   * Still required for:
+   * - Forks/rewinds: SDK generates a new UUID for the forked JSONL
+   * - Sessions created before the custom sessionId feature was added
    */
   private rekeySession(oldId: string, newId: string): void {
     const rekey = <V>(map: Map<string, V>): void => {
@@ -1190,10 +1198,17 @@ export class SessionManager extends Disposable {
 
               // Re-key all Maps from temp ID to SDK ID.
               // After this, both the agent-bridge and frontend use one ID.
+              // For new sessions with custom sessionId (SDK v0.2.44+), IDs already
+              // match so this branch is skipped. Still fires for forks and legacy sessions.
               if (sdkSessionId !== sessionId) {
                 this.rekeySession(sessionId, sdkSessionId);
                 agent.effectiveSessionId = sdkSessionId;
                 sessionId = sdkSessionId; // All subsequent emissions use SDK ID
+              } else {
+                logger.info(
+                  { sessionId },
+                  'Session ID matches SDK ID — no rekeying needed (custom sessionId)'
+                );
               }
 
               const resumeState = this.sessionResumeState.get(sessionId) ?? {

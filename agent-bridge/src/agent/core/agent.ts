@@ -1007,6 +1007,18 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Enable streaming partial messages for real-time text streaming
     options.includePartialMessages = true;
 
+    // For NEW sessions: tell the SDK to use Orbit's session ID instead of auto-generating one.
+    // This eliminates the frontend→SDK UUID remapping that happens on system:init.
+    // Only for new sessions — forks and resumes must NOT set this (would collide with
+    // existing JONLs on disk or conflict with the resume option).
+    if (!this._resumeSessionId && this._effectiveSessionId) {
+      options.sessionId = this._effectiveSessionId;
+      logger.info(
+        { sessionId: this._effectiveSessionId },
+        'Custom sessionId set — SDK will use Orbit session ID (no remap needed)'
+      );
+    }
+
     // Session resume/fork options
     // With resumeSessionAt + forkSession=true, SDK resumes at that specific message
     // and creates a new branch - Claude only sees context UP TO that message

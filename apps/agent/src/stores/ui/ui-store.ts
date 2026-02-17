@@ -145,6 +145,7 @@ interface UIActions {
   setConversations: (conversations: ConversationSummary[]) => void;
   addConversation: (conversation: ConversationSummary) => void;
   removeConversation: (sessionId: string) => void;
+  /** @legacy Still needed for forks and pre-custom-sessionId sessions. New sessions skip remap. */
   remapConversation: (oldSessionId: string, newSessionId: string) => void;
   updateConversationTitle: (sessionId: string, title: string) => void;
   setEditingConversationId: (id: string | null) => void;

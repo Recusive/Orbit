@@ -242,6 +242,9 @@ export interface CheckpointState {
    * Remap checkpoints from old session ID to new session ID.
    * Called during session ID remapping when the frontend temp ID is replaced with SDK ID.
    *
+   * @legacy Still needed for forks and pre-custom-sessionId sessions. New sessions
+   * pass `options.sessionId` to the SDK so IDs match and this is never called.
+   *
    * This updates:
    * - In-flight state (currentUserMessageId, pendingMessageForTurnEnd, currentTurnStartCheckpoint)
    * - Session-keyed records (turnStartCheckpoints, turnEndCheckpoints, etc.)

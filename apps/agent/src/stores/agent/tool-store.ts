@@ -310,6 +310,7 @@ export interface ToolState {
   ) => void;
   resetUsage: () => void;
   switchSession: (newSessionId: string) => void;
+  /** @legacy Still needed for forks and pre-custom-sessionId sessions. New sessions skip remap. */
   remapSession: (oldSessionId: string, newSessionId: string) => void;
   restoreSessionUsage: (sessionId: string, usage: UsageData, processedIds?: string[]) => void;
 
