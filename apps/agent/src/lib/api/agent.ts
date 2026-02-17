@@ -121,7 +121,12 @@ export interface CheckpointEvent {
 
 export interface AuthErrorEvent {
   sessionId: string;
-  category: 'TOKEN_EXPIRED' | 'REFRESH_FAILED' | 'NO_CREDENTIALS' | 'INVALID_TOKEN';
+  category:
+    | 'TOKEN_EXPIRED'
+    | 'REFRESH_FAILED'
+    | 'NO_CREDENTIALS'
+    | 'INVALID_TOKEN'
+    | 'AUTH_RECOVERED'; // [oauth-401-recovery] added AUTH_RECOVERED
   message: string;
   recoverable: boolean;
 }

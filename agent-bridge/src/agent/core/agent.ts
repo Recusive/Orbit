@@ -374,8 +374,26 @@ export class OrbitAgent {
   // Auto-refresh timer cleanup function
   private _autoRefreshCleanup?: () => void;
 
+  // [oauth-401-recovery] Flag: set after a 401 + successful token refresh. Cleared by restartSession().
+  // Revert: remove this property and all methods/usages referencing _needsSessionRestart.
+  private _needsSessionRestart = false;
+
   /** Callback for auth failures detected during auto-refresh or credential re-validation */
   private _onAuthFailure?: (message: string) => void;
+
+  // [oauth-401-recovery] Getter + marker for session restart flag.
+  /** Check if session needs restart after auth recovery. */
+  needsSessionRestart(): boolean {
+    return this._needsSessionRestart;
+  }
+
+  /**
+   * Mark that the session needs restart (public for async race fallback in session-manager).
+   * Called when the consumer catch block detects an auth error and explicitly awaits refresh.
+   */
+  markNeedsSessionRestart(): void {
+    this._needsSessionRestart = true;
+  }
 
   constructor(config: OrbitAgentConfig = {}) {
     this.permissionManager = new PermissionManager(
@@ -947,9 +965,12 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             void ClaudeCredentials.refreshIfNeeded()
               .then((result) => {
                 if (result.refreshed) {
+                  // [oauth-401-recovery] Set restart flag after successful refresh.
+                  // Revert: remove the _needsSessionRestart line and restore original log message.
                   logger.info(
-                    'Auto-refreshed credentials after CLI auth error — suppressing error'
+                    'Auto-refreshed credentials after CLI auth error — suppressing error, marking restart needed'
                   );
+                  this._needsSessionRestart = true;
                 } else {
                   // Refresh failed — NOW surface both the stderr error and auth failure
                   this._onStderrError?.(categorized);
@@ -1203,6 +1224,34 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     }
     // No refresh was needed — credentials still valid (API key or unexpired token)
     return true;
+  }
+
+  // [oauth-401-recovery] Restart method — revert: remove this entire method.
+  /**
+   * Restart the SDK session with fresh credentials after a 401 recovery.
+   * Stops the current query and starts a new one that resumes the session.
+   * The new query reads the refreshed OAuth token from the Keychain.
+   */
+  async restartSession(): Promise<void> {
+    const resumeId = this._currentSessionId;
+    if (!resumeId) {
+      throw new Error('Cannot restart session: no current session ID');
+    }
+
+    logger.info({ resumeId }, 'Restarting session with fresh credentials');
+
+    await this.stopSession();
+
+    // Configure for plain resume (no fork, no replay).
+    // shouldEnableReplay evaluates to !resumeSessionId || forkSession = false.
+    // This means replay-user-messages is disabled — no slow message replay,
+    // and no checkpoint events (acceptable since we're not rewinding).
+    this._resumeSessionId = resumeId;
+    this._resumeSessionAt = undefined;
+    this._forkSession = false;
+    this._needsSessionRestart = false;
+
+    await this.startSession();
   }
 
   /**

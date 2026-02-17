@@ -561,19 +561,23 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
           })
       );
 
-      // Auth error events (OAuth token expiry, refresh failure)
+      // [oauth-401-recovery] Updated toast handler — revert: restore original block from git.
+      // Auth error events (OAuth token expiry, refresh failure, auth recovery)
       listenerPromises.push(
         onAgentAuthError((event) => {
           logger.warn('Auth error received', {
             category: event.category,
             recoverable: event.recoverable,
           });
+
+          // Show "Copy command" for recoverable errors that need manual re-auth,
+          // but NOT for AUTH_RECOVERED (token was already refreshed automatically)
+          const showCopyCommand = event.recoverable && event.category !== 'AUTH_RECOVERED';
+
           toast.error('Authentication Error', {
-            description: event.recoverable
-              ? 'Your session token has expired. Run "claude login" in your terminal to re-authenticate.'
-              : event.message,
+            description: event.message,
             duration: 10_000,
-            action: event.recoverable
+            action: showCopyCommand
               ? {
                   label: 'Copy command',
                   onClick: (): void => {

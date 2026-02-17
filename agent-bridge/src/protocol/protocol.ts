@@ -680,7 +680,12 @@ export interface CanvasErrorEvent {
 export interface AuthErrorEvent {
   type: 'auth_error';
   sessionId: string;
-  category: 'TOKEN_EXPIRED' | 'REFRESH_FAILED' | 'NO_CREDENTIALS' | 'INVALID_TOKEN';
+  category:
+    | 'TOKEN_EXPIRED'
+    | 'REFRESH_FAILED'
+    | 'NO_CREDENTIALS'
+    | 'INVALID_TOKEN'
+    | 'AUTH_RECOVERED'; // [oauth-401-recovery] added AUTH_RECOVERED
   message: string;
   /** Whether the user can retry (e.g., re-login) vs unrecoverable */
   recoverable: boolean;

@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { formatZodError } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
+import { ClaudeCredentials } from '../../common/auth/credentials.js'; // [oauth-401-recovery] import — revert: remove this line
 import { TextEventBatcher } from '../../common/batching/index.js';
 import { Disposable, Emitter } from '../../common/events/events.js';
 import { createLogger } from '../../common/logging/logger.js';
@@ -838,7 +839,12 @@ export class SessionManager extends Disposable {
   private readonly _onAuthError = this._register(
     new Emitter<{
       sessionId: string;
-      category: 'TOKEN_EXPIRED' | 'REFRESH_FAILED' | 'NO_CREDENTIALS' | 'INVALID_TOKEN';
+      category:
+        | 'TOKEN_EXPIRED'
+        | 'REFRESH_FAILED'
+        | 'NO_CREDENTIALS'
+        | 'INVALID_TOKEN'
+        | 'AUTH_RECOVERED';
       message: string;
       recoverable: boolean;
     }>()
@@ -1641,8 +1647,35 @@ export class SessionManager extends Disposable {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : 'no stack';
-        logger.error({ sessionId, error: errorMessage }, 'Background consumer error');
-        this._onError.fire({ message: `[SDK Error] ${errorMessage}`, stack: errorStack });
+        // [oauth-401-recovery] Auth-aware catch block.
+        // Revert: remove from here to the closing brace of `if (agent.needsSessionRestart())`,
+        // and restore the original two lines:
+        //   logger.error({ sessionId, error: errorMessage }, 'Background consumer error');
+        //   this._onError.fire({ message: `[SDK Error] ${errorMessage}`, stack: errorStack });
+        const isAuthError = /401|unauthorized|authentication|token.*expired/i.test(errorMessage);
+
+        // Guard against async race: stderr handler's refreshIfNeeded() is fire-and-forget.
+        // If the consumer catches the error before the refresh resolves, the flag won't be
+        // set yet. For auth errors, explicitly await a refresh attempt here.
+        if (isAuthError && !agent.needsSessionRestart()) {
+          const refreshResult = await ClaudeCredentials.refreshIfNeeded();
+          if (refreshResult.refreshed) {
+            agent.markNeedsSessionRestart();
+          }
+        }
+
+        if (agent.needsSessionRestart()) {
+          logger.info({ sessionId }, 'Auth recovered — session will restart on next message');
+          this._onAuthError.fire({
+            sessionId,
+            category: 'AUTH_RECOVERED',
+            message: 'Session credentials refreshed. Please resend your message.',
+            recoverable: true,
+          });
+        } else {
+          logger.error({ sessionId, error: errorMessage }, 'Background consumer error');
+          this._onError.fire({ message: `[SDK Error] ${errorMessage}`, stack: errorStack });
+        }
       }
     })();
   }
@@ -1746,6 +1779,35 @@ export class SessionManager extends Disposable {
         recoverable: true,
       });
       return;
+    }
+
+    // [oauth-401-recovery] Layer 3: Restart session after 401 recovery.
+    // Revert: remove this entire if-block (down to the closing brace before "Track turn start time").
+    if (agent.needsSessionRestart()) {
+      logger.info({ sessionId }, 'Restarting session after auth recovery');
+
+      // Cancel old background consumer (its query is dead)
+      const consumer = this.sessionConsumers.get(sessionId);
+      if (consumer) consumer.cancel();
+
+      // Allow re-initialization for new query
+      this.sessionInitFired.delete(sessionId);
+
+      try {
+        await agent.restartSession();
+        this._startBackgroundConsumer(sessionId, agent);
+        logger.info({ sessionId }, 'Session restarted with fresh credentials');
+      } catch (restartErr) {
+        const errMsg = restartErr instanceof Error ? restartErr.message : String(restartErr);
+        logger.error({ sessionId, error: errMsg }, 'Session restart failed');
+        this._onAuthError.fire({
+          sessionId,
+          category: 'REFRESH_FAILED',
+          message: `Session restart failed: ${errMsg}. Please start a new chat.`,
+          recoverable: false,
+        });
+        return; // Don't queue message to dead session
+      }
     }
 
     // Track turn start time
