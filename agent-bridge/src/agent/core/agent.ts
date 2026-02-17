@@ -317,6 +317,7 @@ export class OrbitAgent {
   private cwd: string;
   private _thinkingMode: boolean;
   private _thinkingBudget: number; // 0=off, 4096=think, 10240=hard, 32768=ultra
+  private _effortLevel?: 'low' | 'medium' | 'high' | 'max';
   private _planMode: boolean;
   private _acceptMode: boolean;
   private _critiqueMode: boolean;
@@ -652,17 +653,29 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       settingSources: ['user', 'project', 'local'],
     };
 
-    // Only add thinking tokens if thinking mode is enabled and budget > 0
-    if (this._thinkingMode && this._thinkingBudget > 0) {
-      options.maxThinkingTokens = this._thinkingBudget;
-      // Map budget to mode name for logging
+    // Configure thinking based on model type
+    const isAdaptive = this.model === 'claude-opus-4-6';
+    if (isAdaptive) {
+      // Opus 4.6+: adaptive thinking (model decides depth), effort controls intensity
+      options.thinking = { type: 'adaptive' };
+      if (this._effortLevel) {
+        options.effort = this._effortLevel;
+      }
+      logger.info(
+        { thinking: 'adaptive', effort: this._effortLevel ?? 'default' },
+        'Adaptive thinking ENABLED (Opus 4.6)'
+      );
+    } else if (this._thinkingMode && this._thinkingBudget > 0) {
+      // Older models: fixed thinking budget
+      options.thinking = { type: 'enabled', budgetTokens: this._thinkingBudget };
       const modeName =
         this._thinkingBudget <= 4096 ? 'think' : this._thinkingBudget <= 10240 ? 'hard' : 'ultra';
       logger.info(
         { thinkingMode: modeName, thinkingBudget: this._thinkingBudget },
-        'Extended thinking ENABLED'
+        'Extended thinking ENABLED (fixed budget)'
       );
     } else {
+      options.thinking = { type: 'disabled' };
       logger.info({ thinkingMode: 'off' }, 'Extended thinking DISABLED');
     }
 
@@ -1614,51 +1627,32 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
    * Set effort level for adaptive thinking (Opus 4.6).
    * Maps effort levels to thinking token budgets via setMaxThinkingTokens.
    */
-  async setEffortLevel(effort: 'low' | 'medium' | 'high' | 'max'): Promise<void> {
+  setEffortLevel(effort: 'low' | 'medium' | 'high' | 'max'): void {
+    this._effortLevel = effort;
+
+    // Also set budget as fallback for non-adaptive models
     const budgetMap: Record<string, number> = {
       low: 1024,
       medium: 4096,
       high: 10240,
       max: 32768,
     };
-
-    const budget = budgetMap[effort] ?? 4096;
     this._thinkingMode = true;
-    this._thinkingBudget = budget;
+    this._thinkingBudget = budgetMap[effort] ?? 4096;
 
-    if (this.currentQuery) {
-      const currentQuery = this.currentQuery;
-
-      await withRetry(async () => currentQuery.setMaxThinkingTokens(budget), {
-        ...RetryPresets.quick,
-        operationName: 'setEffortLevel',
-      });
-
-      logger.info({ effort, budget }, 'Effort level updated mid-session');
-    }
+    logger.info({ effort }, 'Effort level set — applies on next query');
   }
 
-  async setThinkingMode(enabled: boolean, maxTokens?: number): Promise<void> {
+  setThinkingMode(enabled: boolean, maxTokens?: number): void {
     this._thinkingMode = enabled;
     if (maxTokens !== undefined) {
       this._thinkingBudget = maxTokens;
     }
 
-    // Update running query if exists - this is the key fix!
-    // Without this, thinking mode changes wouldn't take effect mid-session
-    if (this.currentQuery) {
-      const budget = enabled && this._thinkingBudget > 0 ? this._thinkingBudget : null;
-      const currentQuery = this.currentQuery;
-
-      await withRetry(async () => currentQuery.setMaxThinkingTokens(budget), {
-        ...RetryPresets.quick,
-        operationName: 'setMaxThinkingTokens',
-      });
-
-      const modeName =
-        budget === null ? 'off' : budget <= 4096 ? 'think' : budget <= 10240 ? 'hard' : 'ultra';
-      logger.info({ thinkingMode: modeName, budget }, 'Thinking mode updated mid-session');
-    }
+    const budget = enabled && this._thinkingBudget > 0 ? this._thinkingBudget : 0;
+    const modeName =
+      budget === 0 ? 'off' : budget <= 4096 ? 'think' : budget <= 10240 ? 'hard' : 'ultra';
+    logger.info({ thinkingMode: modeName, budget }, 'Thinking mode set — applies on next query');
   }
 
   getThinkingMode(): boolean {

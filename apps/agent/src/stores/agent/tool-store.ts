@@ -389,7 +389,7 @@ export const useToolStore = create<ToolState>()(
     immer((set, get) => ({
       inputMode: 'default',
       thinkingMode: 'off',
-      effortLevel: 'high',
+      effortLevel: 'max',
       model: 'sonnet',
       activeTools: {},
       completedTools: [],

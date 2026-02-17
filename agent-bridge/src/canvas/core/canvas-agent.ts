@@ -535,7 +535,7 @@ export class CanvasAgent {
 
     // Enable thinking if configured
     if (this._thinkingMode) {
-      options.maxThinkingTokens = CanvasAgent.THINKING_BUDGET;
+      options.thinking = { type: 'enabled', budgetTokens: CanvasAgent.THINKING_BUDGET };
       logger.info({ thinkingBudget: CanvasAgent.THINKING_BUDGET }, 'Extended thinking ENABLED');
     }
 
@@ -653,6 +653,7 @@ export class CanvasAgent {
         break;
       }
 
+      case 'tool_use_summary':
       case 'system':
       case 'stream_event':
       case 'tool_progress':

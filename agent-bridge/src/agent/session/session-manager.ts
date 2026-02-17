@@ -1845,16 +1845,11 @@ export class SessionManager extends Disposable {
   /**
    * Set thinking mode for a session
    */
-  async setThinkingMode(sessionId: string, enabled: boolean, maxTokens?: number): Promise<void> {
+  setThinkingMode(sessionId: string, enabled: boolean, maxTokens?: number): void {
     const agent = this.activeSessions.get(sessionId);
-    if (!agent) {
-      const prefs = this.modePreferences.get(sessionId) ?? {};
-      prefs.thinkingEnabled = enabled;
-      prefs.maxThinkingTokens = maxTokens;
-      this.modePreferences.set(sessionId, prefs);
-      return;
+    if (agent) {
+      agent.setThinkingMode(enabled, maxTokens);
     }
-    await agent.setThinkingMode(enabled, maxTokens);
     const prefs = this.modePreferences.get(sessionId) ?? {};
     prefs.thinkingEnabled = enabled;
     prefs.maxThinkingTokens = maxTokens;
@@ -1864,29 +1859,24 @@ export class SessionManager extends Disposable {
   /**
    * Set effort level for a session (adaptive thinking for Opus 4.6)
    */
-  async setEffortLevel(
-    sessionId: string,
-    effort: 'low' | 'medium' | 'high' | 'max'
-  ): Promise<void> {
+  setEffortLevel(sessionId: string, effort: 'low' | 'medium' | 'high' | 'max'): void {
     const agent = this.activeSessions.get(sessionId);
-    if (!agent) {
-      // Store as thinking preference so session creation picks it up.
-      // Without this, the first effort:set is lost (fires before session exists)
-      // and the session creates with default budget instead of the user's choice.
-      const budgetMap: Record<string, number> = {
-        low: 1024,
-        medium: 4096,
-        high: 10240,
-        max: 32768,
-      };
-      const prefs = this.modePreferences.get(sessionId) ?? {};
-      prefs.thinkingEnabled = true;
-      prefs.maxThinkingTokens = budgetMap[effort] ?? 4096;
-      this.modePreferences.set(sessionId, prefs);
-      logger.debug({ sessionId, effort }, 'Stored effort preference for session creation');
-      return;
+    if (agent) {
+      agent.setEffortLevel(effort);
     }
-    await agent.setEffortLevel(effort);
+    // Store as thinking preference so session creation picks it up.
+    // Without this, the first effort:set is lost (fires before session exists)
+    // and the session creates with default budget instead of the user's choice.
+    const budgetMap: Record<string, number> = {
+      low: 1024,
+      medium: 4096,
+      high: 10240,
+      max: 32768,
+    };
+    const prefs = this.modePreferences.get(sessionId) ?? {};
+    prefs.thinkingEnabled = true;
+    prefs.maxThinkingTokens = budgetMap[effort] ?? 4096;
+    this.modePreferences.set(sessionId, prefs);
   }
 
   /**

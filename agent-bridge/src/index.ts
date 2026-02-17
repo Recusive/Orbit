@@ -436,13 +436,13 @@ async function handleRequest(
     }
 
     case 'set_thinking_mode': {
-      await sessionManager.setThinkingMode(request.sessionId, request.enabled, request.maxTokens);
+      sessionManager.setThinkingMode(request.sessionId, request.enabled, request.maxTokens);
       sendResponse({ type: 'success', requestType: request.type });
       break;
     }
 
     case 'set_effort_level': {
-      await sessionManager.setEffortLevel(request.sessionId, request.effort);
+      sessionManager.setEffortLevel(request.sessionId, request.effort);
       sendResponse({ type: 'success', requestType: request.type });
       break;
     }
