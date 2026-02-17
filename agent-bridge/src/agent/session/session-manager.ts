@@ -1156,9 +1156,10 @@ export class SessionManager extends Disposable {
           { name: string; input: Record<string, unknown>; pendingMessages: AgentMessage[] }
         >();
 
-        // Track whether text was streamed for this turn (via stream_event)
-        // If not streamed, we need to emit text from the assistant message
+        // Track whether text/thinking was streamed for this turn (via stream_event)
+        // If not streamed, we need to emit from the assistant message
         let textWasStreamed = false;
+        let thinkingWasStreamed = false;
 
         let messageIndex = 0;
         for await (const rawMessage of agent.receiveResponse()) {
@@ -1332,6 +1333,7 @@ export class SessionManager extends Disposable {
             ) {
               const thinkingDelta = event.delta.thinking;
               if (thinkingDelta !== undefined) {
+                thinkingWasStreamed = true;
                 this._onAgentMessage.fire({
                   sessionId,
                   message: { type: 'thinking', content: thinkingDelta, messageId: streamMessageId },
@@ -1392,14 +1394,16 @@ export class SessionManager extends Disposable {
                 continue;
               }
               if (block.type === 'thinking') {
-                this._onAgentMessage.fire({
-                  sessionId,
-                  message: {
-                    type: 'thinking',
-                    content: block.thinking ?? '',
-                    messageId: currentMessageId,
-                  },
-                });
+                if (!thinkingWasStreamed) {
+                  this._onAgentMessage.fire({
+                    sessionId,
+                    message: {
+                      type: 'thinking',
+                      content: block.thinking ?? '',
+                      messageId: currentMessageId,
+                    },
+                  });
+                }
                 continue;
               }
               // block.type === 'tool_use'
@@ -1626,6 +1630,7 @@ export class SessionManager extends Disposable {
 
             // Reset for next turn - the next turn will get a new message ID from the SDK
             textWasStreamed = false;
+            thinkingWasStreamed = false;
             this.currentTurnId.delete(sessionId);
           }
 
