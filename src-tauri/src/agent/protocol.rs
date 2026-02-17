@@ -103,8 +103,8 @@ pub struct SessionConfig {
 #[serde(rename_all = "lowercase")]
 pub enum Model {
     Haiku,
-    Sonnet,
-    Opus,
+    #[serde(rename = "claude-sonnet-4-6")]
+    ClaudeSonnet46,
     #[serde(rename = "claude-opus-4-6")]
     ClaudeOpus46,
 }
@@ -683,9 +683,9 @@ impl BridgeResponse {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AgentModel {
-    Sonnet,
-    Opus,
     Haiku,
+    #[serde(rename = "claude-sonnet-4-6")]
+    ClaudeSonnet46,
     #[serde(rename = "claude-opus-4-6")]
     ClaudeOpus46,
     Inherit,

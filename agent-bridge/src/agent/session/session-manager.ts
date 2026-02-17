@@ -48,7 +48,7 @@ const GeneratedAgentSchema = z
       .optional()
       .describe('Optional list of specific tool names this agent should use'),
     model: z
-      .enum(['sonnet', 'opus', 'haiku', 'claude-opus-4-6', 'inherit'])
+      .enum(['claude-sonnet-4-6', 'claude-opus-4-6', 'haiku', 'inherit'])
       .optional()
       .describe('Model to use (default: inherit from parent)'),
   })
@@ -76,7 +76,7 @@ const GeneratedCommandSchema = z
       .optional()
       .describe('Optional hint for command arguments (e.g., "[file] [options]")'),
     model: z
-      .enum(['sonnet', 'opus', 'haiku'])
+      .enum(['claude-sonnet-4-6', 'claude-opus-4-6', 'haiku'])
       .optional()
       .describe('Optional model to use for this command'),
   })
@@ -183,7 +183,7 @@ export interface SessionConfig {
   planEnabled?: boolean;
   acceptEnabled?: boolean;
   critiqueEnabled?: boolean;
-  model?: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
+  model?: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
   sessionMode?: 'chat' | 'agent';
   /** SDK session ID to resume from (for session continuity, rewind forks, etc.) */
   resumeSessionId?: string;
@@ -870,7 +870,7 @@ export class SessionManager extends Disposable {
       planEnabled?: boolean;
       acceptEnabled?: boolean;
       critiqueEnabled?: boolean;
-      model?: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
+      model?: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
     }
   >();
   private pendingTools = new Map<
@@ -1929,7 +1929,7 @@ export class SessionManager extends Disposable {
    */
   async setModel(
     sessionId: string,
-    model: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6'
+    model: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6'
   ): Promise<void> {
     const agent = this.activeSessions.get(sessionId);
     if (!agent) {
@@ -2271,14 +2271,14 @@ Create a well-structured agent with:
 2. A clear description of when to use this agent
 3. A detailed system prompt that explains the agent's purpose, capabilities, and how it should behave
 4. Optionally specify which tools the agent should use (if not specified, it inherits all tools)
-5. Optionally specify a model (sonnet for balanced, opus for complex tasks, haiku for fast simple tasks)
+5. Optionally specify a model (claude-sonnet-4-6 for balanced, claude-opus-4-6 for complex tasks, haiku for fast simple tasks)
 
 Return ONLY the JSON object with the agent definition.`;
 
     // Create temporary agent with structured output
     const agent = new OrbitAgent({
       outputFormat,
-      model: 'sonnet',
+      model: 'claude-sonnet-4-6',
     });
 
     await agent.startSession();
@@ -2338,14 +2338,14 @@ Create a well-structured command with:
 2. A clear description of what the command does
 3. A detailed prompt content that tells the AI exactly what to do when the command is invoked
 4. Optionally specify argument hints if the command accepts parameters
-5. Optionally specify a model (sonnet for balanced, opus for complex tasks, haiku for fast simple tasks)
+5. Optionally specify a model (claude-sonnet-4-6 for balanced, claude-opus-4-6 for complex tasks, haiku for fast simple tasks)
 
 Return ONLY the JSON object with the command definition.`;
 
     // Create temporary agent with structured output
     const agent = new OrbitAgent({
       outputFormat,
-      model: 'sonnet',
+      model: 'claude-sonnet-4-6',
     });
 
     await agent.startSession();

@@ -26,7 +26,7 @@ export interface SlashCommandDefinition {
   content: string; // The actual prompt content
   allowedTools?: string[];
   argumentHint?: string;
-  model?: 'sonnet' | 'opus' | 'haiku' | 'claude-opus-4-6';
+  model?: 'claude-sonnet-4-6' | 'claude-opus-4-6' | 'haiku' | 'inherit';
   scope: CommandScope;
   readonly?: boolean;
 }
@@ -233,10 +233,10 @@ function parseCommandFile(
   }
 
   // Validate model
-  let model: 'sonnet' | 'opus' | 'haiku' | 'claude-opus-4-6' | undefined;
+  let model: 'claude-sonnet-4-6' | 'claude-opus-4-6' | 'haiku' | 'inherit' | undefined;
   const modelValue = metadata.get('model');
   if (modelValue !== undefined) {
-    const validModels = ['sonnet', 'opus', 'haiku', 'claude-opus-4-6'];
+    const validModels = ['claude-sonnet-4-6', 'claude-opus-4-6', 'haiku', 'inherit'];
     if (validModels.includes(modelValue)) {
       model = modelValue as typeof model;
     }

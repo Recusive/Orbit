@@ -654,10 +654,10 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     };
 
     // Configure thinking based on model type
-    const isAdaptive = this.model === 'claude-opus-4-6';
+    const isAdaptive = this.model === 'claude-opus-4-6' || this.model === 'claude-sonnet-4-6';
     if (isAdaptive) {
-      // DO NOT set options.thinking for Opus 4.6.
-      // The CLI natively uses adaptive thinking for this model.
+      // DO NOT set options.thinking for adaptive models (Opus 4.6, Sonnet 4.6).
+      // The CLI natively uses adaptive thinking for these models.
       // Explicitly setting it causes the SDK to pass --max-thinking-tokens 32000,
       // which suppresses StreamEvent messages (text_delta, thinking_delta).
       // By omitting it, the CLI handles thinking internally while still emitting
@@ -667,7 +667,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       }
       logger.info(
         { thinking: 'adaptive (CLI-managed)', effort: this._effortLevel ?? 'default' },
-        'Adaptive thinking delegated to CLI for streaming compatibility (Opus 4.6)'
+        'Adaptive thinking delegated to CLI for streaming compatibility'
       );
     } else {
       // All other models: default to extended thinking at ultra (32768 tokens).
@@ -1326,7 +1326,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
 
     logger.info(
       {
-        model: this.model ?? 'sonnet',
+        model: this.model ?? 'claude-sonnet-4-6',
         thinkingMode: thinkingModeName,
         thinkingBudget: this._thinkingBudget,
         thinkingEnabled: this._thinkingMode,
@@ -1781,7 +1781,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
   }
 
   getModel(): string {
-    return this.model ?? 'sonnet';
+    return this.model ?? 'claude-sonnet-4-6';
   }
 
   /**

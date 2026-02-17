@@ -106,7 +106,7 @@ export interface SetEffortLevelRequest {
 export interface SetModelRequest {
   type: 'set_model';
   sessionId: string;
-  model: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
+  model: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
 }
 
 /**

@@ -49,7 +49,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   getActiveDots,
   getEffortInfo,
 }) {
-  const isOpus46 = model === 'claude-opus-4-6';
+  const isAdaptiveModel = model === 'claude-opus-4-6' || model === 'claude-sonnet-4-6';
   const containerRef = useRef<HTMLDivElement>(null);
   const width = useContainerWidth(containerRef);
 
@@ -138,7 +138,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
           // Expanded mode: all buttons inline
           <>
             {/* Thinking Mode / Effort Level Button — conditional on model */}
-            {isOpus46 ? (
+            {isAdaptiveModel ? (
               <EffortLevelButton
                 effortLevel={effortLevel}
                 effortHoverOpen={effortHoverOpen}

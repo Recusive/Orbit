@@ -182,12 +182,12 @@ pub async fn agent_set_model(
 ) -> Result<()> {
     let model = match model.as_str() {
         "haiku" => Model::Haiku,
-        "sonnet" => Model::Sonnet,
-        "opus" => Model::Opus,
+        "claude-sonnet-4-6" => Model::ClaudeSonnet46,
         "claude-opus-4-6" => Model::ClaudeOpus46,
         _ => {
             return Err(
-                "Invalid model: must be 'haiku', 'sonnet', 'opus', or 'claude-opus-4-6'".to_owned(),
+                "Invalid model: must be 'haiku', 'claude-sonnet-4-6', or 'claude-opus-4-6'"
+                    .to_owned(),
             )
         },
     };

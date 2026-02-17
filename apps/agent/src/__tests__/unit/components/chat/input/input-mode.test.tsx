@@ -46,7 +46,7 @@ function TestWrapper({ children }: { readonly children: ReactNode }): ReactNode 
 function createDefaultProps(overrides: Partial<InputControlsProps> = {}): InputControlsProps {
   return {
     inputMode: 'default',
-    model: 'sonnet',
+    model: 'claude-sonnet-4-6',
     thinkingMode: 'off',
     effortLevel: 'high',
     isAgentRunning: false,

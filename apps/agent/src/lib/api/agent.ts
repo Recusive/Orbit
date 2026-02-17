@@ -12,7 +12,7 @@ import { invoke, listen } from './core';
 
 export interface SessionConfig {
   cwd?: string;
-  model?: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
+  model?: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
   thinkingEnabled?: boolean;
   maxThinkingTokens?: number;
   acceptEnabled?: boolean;
@@ -131,7 +131,7 @@ export interface AuthErrorEvent {
   recoverable: boolean;
 }
 
-export type AgentModel = 'sonnet' | 'opus' | 'haiku' | 'claude-opus-4-6' | 'inherit';
+export type AgentModel = 'claude-sonnet-4-6' | 'claude-opus-4-6' | 'haiku' | 'inherit';
 
 export interface SubagentDefinition {
   name: string;
@@ -150,7 +150,7 @@ export interface SlashCommandDefinition {
   content: string;
   allowedTools?: string[];
   argumentHint?: string;
-  model?: 'sonnet' | 'opus' | 'haiku' | 'claude-opus-4-6';
+  model?: 'claude-sonnet-4-6' | 'claude-opus-4-6' | 'haiku';
   scope: CommandScope;
   readonly?: boolean;
 }
@@ -245,7 +245,7 @@ export async function agentGetThinkingMode(sessionId: string): Promise<boolean> 
 
 export async function agentSetModel(
   sessionId: string,
-  model: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6'
+  model: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6'
 ): Promise<void> {
   return invoke('agent_set_model', { sessionId, model });
 }

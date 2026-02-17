@@ -65,8 +65,8 @@ describe('tool-store', () => {
       expect(useToolStore.getState().thinkingMode).toBe('ultra');
     });
 
-    it('should start with sonnet model', () => {
-      expect(useToolStore.getState().model).toBe('sonnet');
+    it('should start with claude-sonnet-4-6 model', () => {
+      expect(useToolStore.getState().model).toBe('claude-sonnet-4-6');
     });
 
     it('should start with empty active tools', () => {
@@ -143,11 +143,11 @@ describe('tool-store', () => {
       setModel('haiku');
       expect(useToolStore.getState().model).toBe('haiku');
 
-      setModel('opus');
-      expect(useToolStore.getState().model).toBe('opus');
+      setModel('claude-opus-4-6');
+      expect(useToolStore.getState().model).toBe('claude-opus-4-6');
 
-      setModel('sonnet');
-      expect(useToolStore.getState().model).toBe('sonnet');
+      setModel('claude-sonnet-4-6');
+      expect(useToolStore.getState().model).toBe('claude-sonnet-4-6');
     });
   });
 
@@ -484,7 +484,7 @@ describe('tool-store', () => {
       setModel('haiku');
       expect(getMaxTokens()).toBe(200000);
 
-      setModel('opus');
+      setModel('claude-opus-4-6');
       expect(getMaxTokens()).toBe(200000);
     });
   });
@@ -605,7 +605,7 @@ describe('tool-store', () => {
       // Set up various state
       setInputMode('accept');
       setThinkingMode('ultra');
-      setModel('opus');
+      setModel('claude-opus-4-6');
       switchSession('session-1');
       startTool('tool-1', 'msg-1', 'bash', createMockToolInput());
       addUsage('msg-1', { input_tokens: 100, output_tokens: 50 });
@@ -617,7 +617,7 @@ describe('tool-store', () => {
       const state = useToolStore.getState();
       expect(state.inputMode).toBe('default');
       expect(state.thinkingMode).toBe('ultra');
-      expect(state.model).toBe('sonnet');
+      expect(state.model).toBe('claude-sonnet-4-6');
       expect(state.activeTools).toEqual({});
       expect(state.completedTools).toEqual([]);
       expect(state.pendingPermissions).toEqual([]);

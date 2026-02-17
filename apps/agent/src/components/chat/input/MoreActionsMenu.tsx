@@ -32,7 +32,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
   effortLevel,
   getEffortInfo,
 }) {
-  const isOpus46 = model === 'claude-opus-4-6';
+  const isAdaptiveModel = model === 'claude-opus-4-6' || model === 'claude-sonnet-4-6';
   const thinkingInfo = getThinkingInfo();
   const effortInfo = getEffortInfo();
 
@@ -61,7 +61,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        {isOpus46 ? (
+        {isAdaptiveModel ? (
           <DropdownMenuItem onClick={cycleEffortLevel}>
             <svg width="16" height="16" viewBox="0 0 16 16" className="mr-2" aria-hidden="true">
               <line

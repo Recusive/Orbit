@@ -126,7 +126,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
   const [description, setDescription] = useState('');
   const [prompt, setPrompt] = useState('');
   const [tools, setTools] = useState<string[]>([]);
-  const [model, setModel] = useState<'sonnet' | 'opus' | 'haiku' | 'claude-opus-4-6' | 'inherit'>(
+  const [model, setModel] = useState<'claude-sonnet-4-6' | 'claude-opus-4-6' | 'haiku' | 'inherit'>(
     'inherit'
   );
 
@@ -322,8 +322,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
                     <SelectContent className="z-70">
                       <SelectItem value="inherit">Inherit from parent</SelectItem>
                       <SelectItem value="haiku">Haiku 4.5 (fast)</SelectItem>
-                      <SelectItem value="sonnet">Sonnet 4.5 (balanced)</SelectItem>
-                      <SelectItem value="opus">Opus 4.5</SelectItem>
+                      <SelectItem value="claude-sonnet-4-6">Sonnet 4.6 (balanced)</SelectItem>
                       <SelectItem value="claude-opus-4-6">Opus 4.6 (best)</SelectItem>
                     </SelectContent>
                   </Select>

@@ -43,7 +43,7 @@ function TestWrapper({ children }: { readonly children: ReactNode }): ReactNode 
  */
 function createMenuProps(overrides: Partial<MoreActionsMenuProps> = {}): MoreActionsMenuProps {
   return {
-    model: 'sonnet',
+    model: 'claude-sonnet-4-6',
     cycleThinkingMode: vi.fn(),
     thinkingMode: 'off',
     getThinkingInfo: () => ({ level: 'Off', tokens: '0' }),
@@ -92,9 +92,9 @@ describe('MoreActionsMenu', () => {
       const trigger = screen.getByRole('button', { name: 'More actions' });
       await user.click(trigger);
 
-      // Menu items should now be visible
+      // Default model (claude-sonnet-4-6) is adaptive, so shows Effort
       await waitFor(() => {
-        expect(screen.getByRole('menuitem', { name: /Thinking/i })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: /Effort/i })).toBeInTheDocument();
       });
     });
 
@@ -102,7 +102,8 @@ describe('MoreActionsMenu', () => {
       const cycleThinkingMode = vi.fn();
       const user = userEvent.setup();
 
-      render(<MoreActionsMenu {...createMenuProps({ cycleThinkingMode })} />, {
+      // Haiku is the only non-adaptive model that shows "Thinking"
+      render(<MoreActionsMenu {...createMenuProps({ model: 'haiku', cycleThinkingMode })} />, {
         wrapper: TestWrapper,
       });
 
@@ -156,7 +157,10 @@ describe('MoreActionsMenu', () => {
       const user = userEvent.setup();
       render(
         <MoreActionsMenu
-          {...createMenuProps({ getThinkingInfo: () => ({ level: 'Low', tokens: '1K' }) })}
+          {...createMenuProps({
+            model: 'haiku',
+            getThinkingInfo: () => ({ level: 'Low', tokens: '1K' }),
+          })}
         />,
         { wrapper: TestWrapper }
       );
@@ -171,7 +175,7 @@ describe('MoreActionsMenu', () => {
 
     it('should show primary color on thinking icon when mode is active', async () => {
       const user = userEvent.setup();
-      render(<MoreActionsMenu {...createMenuProps({ thinkingMode: 'think' })} />, {
+      render(<MoreActionsMenu {...createMenuProps({ model: 'haiku', thinkingMode: 'think' })} />, {
         wrapper: TestWrapper,
       });
 
@@ -187,7 +191,7 @@ describe('MoreActionsMenu', () => {
 
     it('should not show primary color when thinking is off', async () => {
       const user = userEvent.setup();
-      render(<MoreActionsMenu {...createMenuProps({ thinkingMode: 'off' })} />, {
+      render(<MoreActionsMenu {...createMenuProps({ model: 'haiku', thinkingMode: 'off' })} />, {
         wrapper: TestWrapper,
       });
 
@@ -250,14 +254,15 @@ describe('MoreActionsMenu', () => {
 // =============================================================================
 
 describe('MoreActionsMenu Edge Cases', () => {
-  it('should work with all thinking modes', async () => {
+  it('should work with all thinking modes (haiku)', async () => {
     const user = userEvent.setup();
 
-    // Test each thinking mode
+    // Haiku is the only non-adaptive model that shows extended thinking
     for (const mode of ['off', 'think', 'hard', 'ultra'] as const) {
-      const { unmount } = render(<MoreActionsMenu {...createMenuProps({ thinkingMode: mode })} />, {
-        wrapper: TestWrapper,
-      });
+      const { unmount } = render(
+        <MoreActionsMenu {...createMenuProps({ model: 'haiku', thinkingMode: mode })} />,
+        { wrapper: TestWrapper }
+      );
 
       const trigger = screen.getByRole('button', { name: 'More actions' });
       await user.click(trigger);
