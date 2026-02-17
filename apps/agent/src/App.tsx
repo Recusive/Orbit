@@ -362,7 +362,7 @@ const App: FC = () => {
                   aria-hidden="true"
                 />
                 <div
-                  className="absolute inset-0 bg-linear-to-t from-transparent via-transparent to-transparent dark:from-gray-3/80 dark:via-gray-3/55 dark:to-gray-3/35"
+                  className="absolute inset-0 hidden dark:block bg-linear-to-t from-gray-3/80 via-gray-3/55 to-gray-3/35"
                   aria-hidden="true"
                 />
               </>
