@@ -656,27 +656,29 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Configure thinking based on model type
     const isAdaptive = this.model === 'claude-opus-4-6';
     if (isAdaptive) {
-      // Opus 4.6+: adaptive thinking (model decides depth), effort controls intensity
-      options.thinking = { type: 'adaptive' };
+      // DO NOT set options.thinking for Opus 4.6.
+      // The CLI natively uses adaptive thinking for this model.
+      // Explicitly setting it causes the SDK to pass --max-thinking-tokens 32000,
+      // which suppresses StreamEvent messages (text_delta, thinking_delta).
+      // By omitting it, the CLI handles thinking internally while still emitting
+      // stream events for real-time text and thinking output.
       if (this._effortLevel) {
         options.effort = this._effortLevel;
       }
       logger.info(
-        { thinking: 'adaptive', effort: this._effortLevel ?? 'default' },
-        'Adaptive thinking ENABLED (Opus 4.6)'
-      );
-    } else if (this._thinkingMode && this._thinkingBudget > 0) {
-      // Older models: fixed thinking budget
-      options.thinking = { type: 'enabled', budgetTokens: this._thinkingBudget };
-      const modeName =
-        this._thinkingBudget <= 4096 ? 'think' : this._thinkingBudget <= 10240 ? 'hard' : 'ultra';
-      logger.info(
-        { thinkingMode: modeName, thinkingBudget: this._thinkingBudget },
-        'Extended thinking ENABLED (fixed budget)'
+        { thinking: 'adaptive (CLI-managed)', effort: this._effortLevel ?? 'default' },
+        'Adaptive thinking delegated to CLI for streaming compatibility (Opus 4.6)'
       );
     } else {
-      options.thinking = { type: 'disabled' };
-      logger.info({ thinkingMode: 'off' }, 'Extended thinking DISABLED');
+      // All other models: default to extended thinking at ultra (32768 tokens).
+      // If user explicitly configured a budget, use that; otherwise default to ultra.
+      const budget = this._thinkingBudget > 0 ? this._thinkingBudget : 32768;
+      options.thinking = { type: 'enabled', budgetTokens: budget };
+      const modeName = budget <= 4096 ? 'think' : budget <= 10240 ? 'hard' : 'ultra';
+      logger.info(
+        { thinkingMode: modeName, thinkingBudget: budget },
+        'Extended thinking ENABLED (fixed budget)'
+      );
     }
 
     // Permission handling based on session mode

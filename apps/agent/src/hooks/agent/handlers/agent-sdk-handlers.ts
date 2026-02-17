@@ -18,6 +18,7 @@ import {
   agentSetAcceptMode,
 } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
+import { THINKING_MODE_BUDGET } from '@/stores/agent/tool-store';
 
 export async function handleMessageSend(
   message: Extract<WebviewMessage, { type: 'message:send' }>
@@ -116,14 +117,7 @@ export async function handleThinkingSet(
 ): Promise<void> {
   try {
     const enabled = message.mode !== 'off';
-    const maxTokens =
-      message.mode === 'think'
-        ? 4096
-        : message.mode === 'hard'
-          ? 10240
-          : message.mode === 'ultra'
-            ? 32768
-            : undefined;
+    const maxTokens = THINKING_MODE_BUDGET[message.mode];
     await agentSetThinkingMode(message.session_id, enabled, maxTokens);
   } catch (err: unknown) {
     logger.error('Set thinking mode error', err);

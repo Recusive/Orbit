@@ -65,6 +65,17 @@ const MAX_CACHED_SESSIONS = 10;
 export const ADAPTIVE_THINKING_DEFAULT_BUDGET = 32768;
 
 /**
+ * Thinking mode → token budget mapping for non-adaptive models.
+ * Used at session creation and in thinking:set IPC handler.
+ */
+export const THINKING_MODE_BUDGET: Record<ThinkingMode, number | undefined> = {
+  off: undefined,
+  think: 4096,
+  hard: 10240,
+  ultra: 32768,
+};
+
+/**
  * Opus 4.6 uses adaptive thinking (effort-based), not extended thinking (toggle-based).
  * For adaptive models, thinking is always enabled via a budget — the effort level
  * controls the budget size. The thinking toggle UI is hidden and `thinking:set`
@@ -389,7 +400,7 @@ export const useToolStore = create<ToolState>()(
   persist(
     immer((set, get) => ({
       inputMode: 'default',
-      thinkingMode: 'off',
+      thinkingMode: 'ultra',
       effortLevel: 'max',
       model: 'sonnet',
       activeTools: {},
@@ -840,7 +851,7 @@ export const useToolStore = create<ToolState>()(
       reset: () => {
         set((state) => {
           state.inputMode = 'default';
-          state.thinkingMode = 'off';
+          state.thinkingMode = 'ultra';
           state.effortLevel = 'high';
           state.model = 'sonnet';
           state.activeTools = {};
