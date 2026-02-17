@@ -66,6 +66,8 @@ export function formatToolResult(
     case 'WebFetch':
     case 'WebSearch':
       return formatWebTool(resultContent);
+    case 'Skill':
+      return formatSkill(toolInput, resultContent);
     default:
       return formatGeneric(resultContent);
   }
@@ -229,6 +231,23 @@ function formatError(resultContent: unknown): string {
 
   const displayLines = lines.slice(0, MAX_LINES).join('\n');
   return `${displayLines}\n... (${String(lines.length - MAX_LINES)} more lines)`;
+}
+
+/**
+ * Format Skill tool output - show skill name with loaded status
+ */
+function formatSkill(toolInput: Record<string, unknown>, resultContent: unknown): string {
+  const skillName = typeof toolInput.skill === 'string' ? toolInput.skill : '';
+  if (resultContent === null || resultContent === undefined) {
+    return skillName ? `Loaded skill: ${skillName}` : 'Skill loaded';
+  }
+
+  const contentStr = contentToString(resultContent);
+  // SDK typically returns "Successfully loaded skill" — pass through
+  if (contentStr.toLowerCase().includes('loaded')) {
+    return contentStr;
+  }
+  return skillName ? `Loaded skill: ${skillName}` : contentStr;
 }
 
 /**

@@ -702,7 +702,8 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
                 const toolInput = preToolInput.tool_input as Record<string, unknown>;
 
                 // Auto-approve TodoWrite - it just updates UI, no file modifications
-                if (toolName === 'TodoWrite') {
+                // Auto-approve Skill - it loads a prompt template, no side effects
+                if (toolName === 'TodoWrite' || toolName === 'Skill') {
                   return Promise.resolve({
                     hookSpecificOutput: {
                       hookEventName: 'PreToolUse' as const,

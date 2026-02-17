@@ -13,6 +13,7 @@ import {
   GrepToolWidget,
   PlanToolWidget,
   ReadToolWidget,
+  SkillToolWidget,
   TaskToolWidget,
   TodoToolWidget,
   WebFetchToolWidget,
@@ -217,6 +218,15 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
         />
       );
     }
+
+    case 'skill':
+      return (
+        <SkillToolWidget
+          skillName={getStringInput(tool, 'skill', '') || getStringInput(tool, 'args', '')}
+          isRunning={statusProps.isRunning}
+          success={statusProps.success}
+        />
+      );
 
     case 'exitplanmode':
       // ExitPlanMode is handled by the permission modal in ChatInput
