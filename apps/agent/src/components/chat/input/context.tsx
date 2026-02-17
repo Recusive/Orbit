@@ -129,13 +129,12 @@ export const ContextTrigger: FC<ContextTriggerProps> = ({ children, className })
     <HoverCardTrigger asChild>
       <button
         className={cn(
-          'h-7 flex items-center gap-1.5 px-2 rounded hover:bg-accent transition-colors text-xs',
+          'h-7 flex items-center px-1.5 rounded hover:bg-accent transition-colors',
           className
         )}
         title="Context usage"
       >
         <ProgressPie percentage={percentage} />
-        <span className="text-muted-foreground">{percentage}%</span>
       </button>
     </HoverCardTrigger>
   );

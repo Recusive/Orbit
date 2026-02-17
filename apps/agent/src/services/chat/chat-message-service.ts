@@ -717,8 +717,14 @@ class ChatMessageService {
   ): void {
     const chatStore = useChatStore.getState();
 
-    // Skip stale responses for remapped Orbit session IDs
-    if (message.session_id in chatStore.remappedOrbitIds) {
+    // Skip stale responses for remapped Orbit session IDs — but allow if the
+    // user explicitly navigated to this session (e.g., clicking a parent session
+    // in the sidebar after a rewind). The activeSessionId check ensures we only
+    // block truly stale in-flight responses, not intentional sidebar clicks.
+    if (
+      message.session_id in chatStore.remappedOrbitIds &&
+      chatStore.activeSessionId !== message.session_id
+    ) {
       return;
     }
 

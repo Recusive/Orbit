@@ -715,6 +715,69 @@ async function deleteSessionJsonl(sdkSessionId: string, cwd: string): Promise<vo
 }
 
 /**
+ * Hard-link file backups from a source session to a new (forked) session.
+ *
+ * This matches Claude Code's `BUR` function: when a session is forked (rewind),
+ * file backup files are hard-linked (not copied) from the parent session's
+ * file-history directory to the child's. This allows the child session to access
+ * ALL parent checkpoints without duplicating disk space.
+ *
+ * If hard-linking fails (e.g., cross-device), falls back to a file copy.
+ * Non-fatal: if the source directory doesn't exist, this is a no-op.
+ */
+async function hardLinkFileBackups(
+  sourceSessionId: string,
+  targetSessionId: string
+): Promise<void> {
+  const fileHistoryBase = path.join(os.homedir(), '.claude', 'file-history');
+  const sourceDir = path.join(fileHistoryBase, sourceSessionId);
+  const targetDir = path.join(fileHistoryBase, targetSessionId);
+
+  if (!fs.existsSync(sourceDir)) {
+    logger.debug(
+      { sourceSessionId, targetSessionId },
+      'No file-history for source session (no backups to link)'
+    );
+    return;
+  }
+
+  // Ensure target directory exists
+  await fs.promises.mkdir(targetDir, { recursive: true });
+
+  const entries = await fs.promises.readdir(sourceDir);
+
+  for (const entry of entries) {
+    const sourcePath = path.join(sourceDir, entry);
+    const targetPath = path.join(targetDir, entry);
+
+    // Skip if target already exists (e.g., from a previous fork)
+    if (fs.existsSync(targetPath)) {
+      continue;
+    }
+
+    try {
+      // Hard-link shares the same inode — no disk space wasted
+      await fs.promises.link(sourcePath, targetPath);
+    } catch {
+      // Fallback to copy if hard-link fails (cross-device, permissions, etc.)
+      try {
+        await fs.promises.copyFile(sourcePath, targetPath);
+      } catch (copyErr) {
+        logger.debug(
+          { entry, error: copyErr instanceof Error ? copyErr.message : String(copyErr) },
+          'Failed to copy file backup (non-fatal)'
+        );
+      }
+    }
+  }
+
+  logger.warn(
+    { sourceSessionId, targetSessionId, fileCount: entries.length },
+    'Hard-linked file backups from source to forked session'
+  );
+}
+
+/**
  * Session Manager - orchestrates Claude Agent SDK sessions
  */
 export class SessionManager extends Disposable {
@@ -805,7 +868,15 @@ export class SessionManager extends Disposable {
     Map<string, { toolName: string; toolId: string; toolInput: Record<string, unknown> }>
   >();
   private approvedToolNames = new Map<string, Set<string>>();
-  private sessionResumeState = new Map<string, { isResumed: boolean; isForked: boolean }>();
+  private sessionResumeState = new Map<
+    string,
+    {
+      isResumed: boolean;
+      isForked: boolean;
+      intermediateSessionId?: string;
+      sourceSessionId?: string;
+    }
+  >();
   /** Tracks turn start times per session for performance logging */
   private turnStartTimes = new Map<string, number>();
   private sessionInitFired = new Set<string>();
@@ -1129,6 +1200,47 @@ export class SessionManager extends Disposable {
                 isResumed: resumeState.isResumed,
                 isForked: resumeState.isForked,
               });
+
+              // Post-fork cleanup: runs only when this session was created by forkSessionAt.
+              if (resumeState.isForked) {
+                // (a) Delete the intermediate JSONL — no longer needed after fork replay.
+                // The CLI has already read it and created a self-contained JSONL for
+                // the new session. Leaving it would create a phantom sidebar entry.
+                if (resumeState.intermediateSessionId) {
+                  const intermediateId = resumeState.intermediateSessionId;
+                  void deleteSessionJsonl(intermediateId, agent.workingDirectory).catch(
+                    (err: unknown) => {
+                      logger.warn(
+                        {
+                          intermediateId,
+                          error: err instanceof Error ? err.message : String(err),
+                        },
+                        'Failed to delete intermediate JSONL (non-fatal)'
+                      );
+                    }
+                  );
+                }
+
+                // (b) Hard-link file backups from the source (parent) session to the
+                // new (child) session. This matches Claude Code's BUR function: the
+                // child session can access all parent file checkpoints via shared inodes.
+                // Without this, rewindFiles fails with "No file checkpoint found" after
+                // 2+ forks because checkpoints are session-scoped.
+                if (resumeState.sourceSessionId) {
+                  void hardLinkFileBackups(resumeState.sourceSessionId, sdkSessionId).catch(
+                    (err: unknown) => {
+                      logger.warn(
+                        {
+                          sourceSessionId: resumeState.sourceSessionId,
+                          targetSessionId: sdkSessionId,
+                          error: err instanceof Error ? err.message : String(err),
+                        },
+                        'Failed to hard-link file backups (non-fatal)'
+                      );
+                    }
+                  );
+                }
+              }
             }
             continue;
           }
@@ -1955,19 +2067,28 @@ export class SessionManager extends Disposable {
     const newAgent = this.activeSessions.get(sessionId);
     const finalSdkSessionId = newAgent?.getCurrentSessionId();
 
-    // Step 7: Clean up the intermediate JSONL only.
+    // Step 7: Schedule intermediate JSONL cleanup.
     //
-    // The SDK with forkSession: true already creates a self-contained JSONL for
-    // the new session (finalSdkSessionId). It reads the intermediate, forks into
-    // the new session, and typically deletes the intermediate itself.
+    // CRITICAL: Do NOT delete the intermediate here. createSession() returns
+    // immediately while the CLI subprocess runs in the background (via
+    // _startBackgroundConsumer). The CLI reads the intermediate JSONL for
+    // the fork replay. Deleting it here races with that read and causes the
+    // CLI to crash with exit code 1.
+    //
+    // Instead, store the intermediate UUID in sessionResumeState. The background
+    // consumer's system:init handler will delete it after the fork replay completes
+    // (the CLI has read the intermediate and created a self-contained JSONL).
+    // This prevents phantom sidebar entries from intermediate files.
     //
     // We do NOT delete the original (sdkSessionId) JSONL — matching Claude Code's
-    // approach of keeping all branches on disk. The parentUuid chain in each JSONL
-    // handles branch filtering when loading. Old branches stay as historical data
-    // and can be browsed via the sidebar.
-    //
-    // Only clean up the intermediate (our temporary copy) if the SDK didn't already.
-    await deleteSessionJsonl(newSdkSessionId, savedCwd);
+    // approach of keeping all branches on disk. The parentUuid chain handles
+    // branch filtering at load time.
+    this.sessionResumeState.set(sessionId, {
+      isResumed: true,
+      isForked: true,
+      intermediateSessionId: newSdkSessionId,
+      sourceSessionId: sdkSessionId, // Original session whose file backups to hard-link
+    });
 
     return finalSdkSessionId ?? newSdkSessionId;
   }

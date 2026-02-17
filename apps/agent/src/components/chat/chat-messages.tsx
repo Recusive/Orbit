@@ -525,7 +525,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         {/* Progress indicator - shows while agent is running */}
         {isLoading ? (
           <div className="flex items-center gap-2 px-3 py-2">
-            <ThinkingDots size={20} duration={1.2} />
+            <ThinkingDots size={13} speed={1.2} />
             <HyperText
               key={loadingMessage}
               className="font-mono text-sm text-muted-foreground"

@@ -144,12 +144,14 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           session_id: sessionId,
           model: toolState.model,
         });
-        postMessage({
-          type: 'effort:set',
-          uuid: crypto.randomUUID(),
-          session_id: sessionId,
-          effort: toolState.effortLevel,
-        });
+        if (isAdaptiveThinkingModel(toolState.model)) {
+          postMessage({
+            type: 'effort:set',
+            uuid: crypto.randomUUID(),
+            session_id: sessionId,
+            effort: toolState.effortLevel,
+          });
+        }
 
         // Get parentUuid for Claude Code-style rewind (linked list of messages)
         const checkpointStore = useCheckpointStore.getState();
@@ -340,6 +342,15 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           content: m.content,
           parentUuid: m.parentUuid ?? null,
         }));
+
+        // Find the first user message AFTER the rewind point to prefill in the input box.
+        // This lets the user quickly edit and resend the message that was removed.
+        const nextUserMessage = messages.slice(messageIndex + 1).find((m) => m.role === 'user');
+        if (nextUserMessage) {
+          window.dispatchEvent(
+            new CustomEvent('prefillChatInput', { detail: { text: nextUserMessage.content } })
+          );
+        }
 
         postMessage({
           type: 'conversation:rewind',

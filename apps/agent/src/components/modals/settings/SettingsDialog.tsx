@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 // Loading fallback for lazy-loaded pages
 const PageLoader: FC = () => (
   <div className="flex items-center justify-center h-full">
-    <ThinkingDots size={24} />
+    <ThinkingDots size={15} />
   </div>
 );
 

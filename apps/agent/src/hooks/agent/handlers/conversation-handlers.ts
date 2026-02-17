@@ -91,6 +91,9 @@ export async function handleConversationLoad(
             createdAt: m.createdAt,
             // Include all optional fields for backwards compatibility and usage tracking
             ...(m.thinking ? { thinking: m.thinking } : {}),
+            ...(m.thinkingDurationMs !== undefined
+              ? { thinkingDurationMs: m.thinkingDurationMs }
+              : {}),
             ...(m.toolUses && m.toolUses.length > 0 ? { toolUses: m.toolUses } : {}),
             ...(m.usage ? { usage: m.usage } : {}),
             // parentUuid for active chain resolution (getActiveChain defense-in-depth)
@@ -193,9 +196,19 @@ export async function handleConversationRewind(
 
     // Step 2: Rewind files to the turn END checkpoint.
     // File rewind is best-effort; the conversation rewind must always complete.
+    // Safety timeout: if the bridge hangs (e.g., SDK retry loop on same query),
+    // give up after 10s so conversation rewind (Steps 3-5) can proceed.
     if (rewindCheckpoints?.rewindFiles) {
       try {
-        await agentRewindFiles(session_id, rewindCheckpoints.rewindFiles);
+        const FILE_REWIND_TIMEOUT_MS = 10_000;
+        await Promise.race([
+          agentRewindFiles(session_id, rewindCheckpoints.rewindFiles),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => {
+              reject(new Error('File rewind timed out'));
+            }, FILE_REWIND_TIMEOUT_MS);
+          }),
+        ]);
       } catch (rewindErr) {
         logger.warn('File rewind failed (continuing with conversation rewind)', {
           error: rewindErr instanceof Error ? rewindErr.message : String(rewindErr),

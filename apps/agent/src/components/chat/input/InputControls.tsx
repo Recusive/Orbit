@@ -224,7 +224,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                     : 'Send message'
               }
               className={cn(
-                'h-7 w-7 flex items-center justify-center rounded-full',
+                'ml-1.5 h-7 w-7 flex items-center justify-center rounded-full',
                 'transition-[background-color,color,transform,box-shadow] duration-200 ease-out',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
                 isAgentRunning && isInputEmpty

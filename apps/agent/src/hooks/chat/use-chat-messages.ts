@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createChatActions } from './handlers/chat-actions';
 
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
+import type { ReviewFixesStressTestConfig } from '@/stress-tests/review-fixes-stress-test';
 import type { MegaStressTestConfig } from '@/stress-tests/rewind-mega-stress-test';
 import type { StressTestConfig } from '@/stress-tests/rewind-stress-test';
 import type { SessionStressTestConfig } from '@/stress-tests/session-stress-test';
@@ -53,6 +54,7 @@ declare global {
           runRewindStressTest: (config?: StressTestConfig) => Promise<unknown>;
           runMegaStressTest: (config?: MegaStressTestConfig) => Promise<unknown>;
           runSessionStressTest: (config?: SessionStressTestConfig) => Promise<unknown>;
+          runReviewFixesStressTest: (config?: ReviewFixesStressTestConfig) => Promise<unknown>;
           handleSend: (text: string) => void;
           handleRewind: (messageId: string) => void;
           handleStop: () => void;
@@ -433,6 +435,21 @@ export function useChatMessages(): UseChatMessagesReturn {
           {
             handleSend: actions.handleSend,
             handleStop: actions.handleStop,
+            postMessage,
+          },
+          config
+        );
+      },
+      runReviewFixesStressTest: async (config?: ReviewFixesStressTestConfig) => {
+        const { runReviewFixesStressTest } =
+          await import('@/stress-tests/review-fixes-stress-test');
+        return runReviewFixesStressTest(
+          {
+            handleSend: actions.handleSend,
+            handleStop: actions.handleStop,
+            handleEffortLevelChange: actions.handleEffortLevelChange,
+            handleModelChange: actions.handleModelChange,
+            handleThinkingModeChange: actions.handleThinkingModeChange,
             postMessage,
           },
           config

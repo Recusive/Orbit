@@ -323,7 +323,7 @@ export const ChatArea: FC = () => {
       {/* Conversation transition loader - centered dots while content swaps */}
       {isTransitioning ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-          <ThinkingDots size={28} duration={1.2} />
+          <ThinkingDots size={18} speed={1.2} />
         </div>
       ) : null}
 

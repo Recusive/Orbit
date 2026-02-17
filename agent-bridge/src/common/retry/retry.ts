@@ -85,6 +85,8 @@ const NON_RETRYABLE_ERROR_PATTERNS = [
   // Validation errors
   'validation',
   'invalid',
+  // SDK file checkpoint errors — deterministic, retrying hangs the query
+  'no file checkpoint found',
 ];
 
 /**

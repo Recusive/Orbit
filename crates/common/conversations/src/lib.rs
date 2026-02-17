@@ -120,6 +120,41 @@ pub struct TokenUsage {
 }
 
 // ============================================
+// Per-message metadata sidecar (`.metadata.json`)
+// ============================================
+
+/// Per-message metadata that the SDK doesn't persist to JSONL.
+///
+/// Currently stores `thinking_duration_ms` (computed client-side during streaming).
+/// Designed for future per-message fields that originate from the frontend.
+///
+/// # ID Mismatch & Fingerprint Matching
+///
+/// The frontend writes metadata keyed by the agent-bridge's turn ID (a `randomUUID()`
+/// generated per turn for stable event grouping). The SDK JSONL uses its own UUIDs
+/// for each line. These are deliberately different ID namespaces.
+///
+/// To bridge this gap, we store a `thinking_prefix` — the first 64 chars of thinking
+/// text — as a fingerprint. During load, if a direct ID match fails for an assistant
+/// message with thinking, we fall back to matching by this prefix.
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct MessageMetadata {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    thinking_duration_ms: Option<u64>,
+    /// First 64 characters of thinking text, used as a fingerprint for matching
+    /// when the frontend message ID differs from the SDK JSONL UUID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    thinking_prefix: Option<String>,
+}
+
+/// Top-level structure of the `.metadata.json` sidecar file.
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct SessionMetadata {
+    #[serde(default)]
+    messages: HashMap<String, MessageMetadata>,
+}
+
+// ============================================
 // JSONL Line Types (internal parsing)
 // ============================================
 
@@ -593,7 +628,38 @@ impl ConversationManager {
         let parsed = parse_jsonl_lines(reader, &path);
 
         // Merge consecutive assistant messages into single turns.
-        let messages = merge_consecutive_assistants(parsed.raw_messages);
+        let mut messages = merge_consecutive_assistants(parsed.raw_messages);
+
+        // Merge per-message metadata from sidecar (e.g., thinking_duration_ms).
+        //
+        // The sidecar is keyed by the frontend's message ID (agent-bridge turn ID),
+        // which differs from the SDK JSONL UUID. We try direct ID match first, then
+        // fall back to matching by thinking content prefix fingerprint.
+        let metadata = read_message_metadata(&path);
+        if !metadata.is_empty() {
+            for msg in &mut messages {
+                if msg.thinking_duration_ms.is_some() {
+                    continue;
+                }
+                // Try direct ID match first
+                if let Some(meta) = metadata.get(&msg.id) {
+                    msg.thinking_duration_ms = meta.thinking_duration_ms;
+                    continue;
+                }
+                // Fallback: match by thinking content prefix fingerprint
+                if let Some(thinking) = &msg.thinking {
+                    let msg_prefix = truncate_to_char_boundary(thinking, 64);
+                    for meta in metadata.values() {
+                        if let Some(stored_prefix) = &meta.thinking_prefix {
+                            if !stored_prefix.is_empty() && stored_prefix == msg_prefix {
+                                msg.thinking_duration_ms = meta.thinking_duration_ms;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         let now = current_timestamp();
         let created_at = parsed.first_timestamp.unwrap_or(now);
@@ -676,14 +742,37 @@ impl ConversationManager {
         ))
     }
 
-    /// No-op. The Claude Agent SDK handles JSONL persistence.
+    /// Persist per-message metadata that the SDK doesn't write to JSONL.
+    ///
+    /// The Claude Agent SDK handles JSONL persistence for message content.
+    /// This method writes supplementary metadata (e.g., `thinking_duration_ms`)
+    /// to a `.metadata.json` sidecar file alongside the JSONL.
     pub fn add_message(
         &self,
-        _session_id: &str,
-        _message: Message,
-        _workspace_path: Option<&str>,
+        session_id: &str,
+        message: &Message,
+        workspace_path: Option<&str>,
         _worktree_path: Option<&str>,
     ) -> Result<()> {
+        // Only write sidecar if there's metadata worth persisting
+        if message.thinking_duration_ms.is_some() {
+            let jsonl_path = self.conversation_path(session_id, workspace_path);
+            // Store a thinking content prefix as a fingerprint for matching.
+            // The frontend message ID (bridge turn ID) differs from the SDK JSONL
+            // UUID, so we need content-based fallback matching during load.
+            let thinking_prefix = message
+                .thinking
+                .as_ref()
+                .map(|t| truncate_to_char_boundary(t, 64).to_owned());
+            write_message_metadata(
+                &jsonl_path,
+                &message.id,
+                MessageMetadata {
+                    thinking_duration_ms: message.thinking_duration_ms,
+                    thinking_prefix,
+                },
+            )?;
+        }
         Ok(())
     }
 
@@ -791,6 +880,11 @@ impl ConversationManager {
                     Error::Io(e)
                 }
             })?;
+
+            // Clean up sidecar files (best-effort, ignore errors)
+            drop(fs::remove_file(path.with_extension("metadata.json")));
+            drop(fs::remove_file(path.with_extension("usage.json")));
+
             tracing::debug!("Deleted conversation {}", session_id);
         }
 
@@ -1551,6 +1645,60 @@ fn read_session_usage(jsonl_path: &Path) -> Option<TokenUsage> {
     })
 }
 
+/// Read per-message metadata from a `.metadata.json` sidecar file.
+///
+/// Returns a map from message ID → metadata. The frontend writes this file
+/// via `conversation_add_message` for data the SDK doesn't persist to JSONL
+/// (e.g., `thinking_duration_ms` which is computed client-side during streaming).
+///
+/// `jsonl_path` is the path to the `.jsonl` file; we swap the extension.
+fn read_message_metadata(jsonl_path: &Path) -> HashMap<String, MessageMetadata> {
+    let meta_path = jsonl_path.with_extension("metadata.json");
+    let Ok(data) = fs::read_to_string(&meta_path) else {
+        return HashMap::new();
+    };
+    let Ok(session_meta) = serde_json::from_str::<SessionMetadata>(&data) else {
+        return HashMap::new();
+    };
+    session_meta.messages
+}
+
+/// Write per-message metadata to a `.metadata.json` sidecar file.
+///
+/// Reads the existing sidecar (if any), merges the new entry, and writes back.
+/// Uses atomic write (write to temp file, then rename) to prevent corruption.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be written.
+fn write_message_metadata(
+    jsonl_path: &Path,
+    message_id: &str,
+    metadata: MessageMetadata,
+) -> Result<()> {
+    let meta_path = jsonl_path.with_extension("metadata.json");
+
+    // Read existing sidecar or start fresh
+    let mut session_meta = fs::read_to_string(&meta_path)
+        .ok()
+        .and_then(|data| serde_json::from_str::<SessionMetadata>(&data).ok())
+        .unwrap_or_default();
+
+    // Insert/update the entry for this message
+    let _ = session_meta
+        .messages
+        .insert(message_id.to_owned(), metadata);
+
+    // Atomic write: temp file → rename
+    let tmp_path = meta_path.with_extension("metadata.json.tmp");
+    let serialized = serde_json::to_string_pretty(&session_meta)
+        .map_err(|e| Error::Config(format!("Failed to serialize metadata: {e}")))?;
+    fs::write(&tmp_path, serialized).map_err(Error::Io)?;
+    fs::rename(&tmp_path, &meta_path).map_err(Error::Io)?;
+
+    Ok(())
+}
+
 /// Parse an ISO-8601 timestamp to epoch milliseconds.
 fn parse_iso_timestamp(s: &str) -> u64 {
     chrono::DateTime::parse_from_rfc3339(s).map_or_else(
@@ -1659,6 +1807,11 @@ fn floor_char_boundary(s: &str, index: usize) -> usize {
     i
 }
 
+/// Truncate a string to at most `max_len` bytes at a valid char boundary.
+fn truncate_to_char_boundary(s: &str, max_len: usize) -> &str {
+    &s[..floor_char_boundary(s, max_len)]
+}
+
 // ============================================
 // Tests
 // ============================================
@@ -1704,7 +1857,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_message_is_noop() {
+    fn test_add_message_no_thinking_no_sidecar() {
         let (manager, _temp) = create_test_manager();
 
         let msg = Message {
@@ -1720,10 +1873,178 @@ mod tests {
             parent_uuid: None,
         };
 
-        // Should succeed silently
+        // No thinking_duration_ms → no sidecar written
         manager
-            .add_message("session-1", msg, None, None)
-            .expect("add_message should be a no-op");
+            .add_message("session-1", &msg, None, None)
+            .expect("add_message should succeed");
+
+        let meta_path = manager
+            .conversation_path("session-1", None)
+            .with_extension("metadata.json");
+        assert!(
+            !meta_path.exists(),
+            "No sidecar when no metadata to persist"
+        );
+    }
+
+    #[test]
+    fn test_add_message_writes_thinking_duration_sidecar() {
+        let (manager, _temp) = create_test_manager();
+
+        // Ensure the workspace dir exists (normally created by SDK)
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let msg = Message {
+            id: "a1".to_owned(),
+            role: MessageRole::Assistant,
+            content: "Response".to_owned(),
+            thinking: Some("Deep thought".to_owned()),
+            thinking_duration_ms: Some(1234),
+            is_interrupted: None,
+            created_at: current_timestamp(),
+            tool_uses: Vec::new(),
+            usage: None,
+            parent_uuid: None,
+        };
+
+        manager
+            .add_message("session-1", &msg, None, None)
+            .expect("add_message should write sidecar");
+
+        // Verify sidecar exists and contains the correct data
+        let meta_path = manager
+            .conversation_path("session-1", None)
+            .with_extension("metadata.json");
+        assert!(meta_path.exists(), "Sidecar should be created");
+
+        let data = fs::read_to_string(&meta_path).expect("read sidecar");
+        let session_meta: SessionMetadata = serde_json::from_str(&data).expect("parse sidecar");
+        let meta = session_meta.messages.get("a1").expect("message entry");
+        assert_eq!(meta.thinking_duration_ms, Some(1234));
+        assert_eq!(
+            meta.thinking_prefix.as_deref(),
+            Some("Deep thought"),
+            "thinking_prefix should be stored for fingerprint matching"
+        );
+    }
+
+    #[test]
+    fn test_load_merges_thinking_duration_from_sidecar() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Write a JSONL with an assistant message (no thinking duration in JSONL)
+        let path = ws_dir.join("session-1.jsonl");
+        let lines = [
+            r#"{"type":"summary","summary":"Test","leafUuid":""}"#,
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"Hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"thinking","thinking":"Deep thought"},{"type":"text","text":"Hi!"}]},"timestamp":"2026-01-11T18:00:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
+
+        // Write the metadata sidecar with thinking_duration_ms (direct ID match case)
+        let meta_path = path.with_extension("metadata.json");
+        let meta = SessionMetadata {
+            messages: {
+                let mut m = HashMap::new();
+                let _ = m.insert(
+                    "a1".to_owned(),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(5678),
+                        thinking_prefix: Some("Deep thought".to_owned()),
+                    },
+                );
+                m
+            },
+        };
+        fs::write(&meta_path, serde_json::to_string(&meta).expect("serialize"))
+            .expect("write sidecar");
+
+        // Load and verify the merge
+        let conv = manager
+            .load_from_workspace("session-1", None)
+            .expect("load")
+            .expect("conversation exists");
+
+        let assistant_msg = conv
+            .messages
+            .iter()
+            .find(|m| m.role == MessageRole::Assistant)
+            .expect("assistant message");
+
+        assert_eq!(
+            assistant_msg.thinking_duration_ms,
+            Some(5678),
+            "thinking_duration_ms should be merged from sidecar"
+        );
+        assert_eq!(
+            assistant_msg.thinking.as_deref(),
+            Some("Deep thought"),
+            "thinking text should come from JSONL"
+        );
+    }
+
+    #[test]
+    fn test_load_merges_thinking_duration_via_fingerprint() {
+        // This test validates the fingerprint-based fallback matching.
+        // The sidecar uses a DIFFERENT message ID than the JSONL (simulating
+        // the real-world mismatch between bridge turn IDs and SDK UUIDs),
+        // but matching succeeds via the thinking content prefix.
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // JSONL uses SDK UUID "sdk-uuid-abc" for the assistant message
+        let path = ws_dir.join("session-fp.jsonl");
+        let lines = [
+            r#"{"type":"summary","summary":"Fingerprint Test","leafUuid":""}"#,
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"Hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"sdk-uuid-abc","message":{"role":"assistant","content":[{"type":"thinking","thinking":"Analyzing the request carefully"},{"type":"text","text":"Hi!"}]},"timestamp":"2026-01-11T18:00:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
+
+        // Sidecar uses frontend turn ID "bridge-turn-xyz" (different from SDK UUID)
+        let meta_path = path.with_extension("metadata.json");
+        let meta = SessionMetadata {
+            messages: {
+                let mut m = HashMap::new();
+                let _ = m.insert(
+                    "bridge-turn-xyz".to_owned(),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(3456),
+                        thinking_prefix: Some("Analyzing the request carefully".to_owned()),
+                    },
+                );
+                m
+            },
+        };
+        fs::write(&meta_path, serde_json::to_string(&meta).expect("serialize"))
+            .expect("write sidecar");
+
+        // Load — direct ID match fails (sdk-uuid-abc ≠ bridge-turn-xyz),
+        // but fingerprint match succeeds via thinking prefix
+        let conv = manager
+            .load_from_workspace("session-fp", None)
+            .expect("load")
+            .expect("conversation exists");
+
+        let assistant_msg = conv
+            .messages
+            .iter()
+            .find(|m| m.role == MessageRole::Assistant)
+            .expect("assistant message");
+
+        assert_eq!(
+            assistant_msg.thinking_duration_ms,
+            Some(3456),
+            "thinking_duration_ms should be merged via fingerprint fallback"
+        );
+        assert_eq!(
+            assistant_msg.thinking.as_deref(),
+            Some("Analyzing the request carefully"),
+        );
     }
 
     #[test]

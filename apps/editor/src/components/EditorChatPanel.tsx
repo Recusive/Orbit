@@ -14,52 +14,26 @@
 import { useCallback, useRef } from 'react';
 
 import type { ChatMessage } from '@/components/chat/messages';
-import type { PermissionRequest } from '@/stores/agent/tool-store';
 import type { FC } from 'react';
 
 import { ChatHeader, ChatMessages, ChatInput, useQueuedMessageHandler } from '@/components/chat';
-import { PermissionModal } from '@/components/modals';
 import { useChatMessages } from '@/hooks/chat/use-chat-messages';
 import { cn } from '@/lib/utils/utils';
 import {
   usePendingPermissions,
   useInputMode,
   useThinkingMode,
+  useEffortLevel,
   useSessionUsage,
   useMaxTokens,
 } from '@/stores/agent/tool-store';
 import { useIsLoadingConversation } from '@/stores/ui/ui-store';
 
-// Permission bar for tool approvals
-interface PermissionBarProps {
-  readonly permissions: PermissionRequest[];
-  readonly onApprove: (requestId: string) => void;
-  readonly onDeny: (requestId: string) => void;
-}
-
-const PermissionBar: FC<PermissionBarProps> = ({ permissions, onApprove, onDeny }) => {
-  if (permissions.length === 0) return null;
-
-  return (
-    <div className="px-4 shrink-0">
-      <div className="mx-auto max-w-2xl">
-        {permissions.map((request) => (
-          <PermissionModal
-            key={request.requestId}
-            request={request}
-            onApprove={onApprove}
-            onDeny={onDeny}
-          />
-        ))}
-      </div>
-    </div>
-  );
-};
-
 export const EditorChatPanel: FC = () => {
   const isLoadingConversation = useIsLoadingConversation();
   const inputMode = useInputMode();
   const thinkingMode = useThinkingMode();
+  const effortLevel = useEffortLevel();
   const pendingPermissions = usePendingPermissions();
   const sessionUsage = useSessionUsage();
   const maxTokens = useMaxTokens();
@@ -117,11 +91,14 @@ export const EditorChatPanel: FC = () => {
   const inputProps = {
     inputMode,
     thinkingMode,
-    effortLevel: 'high' as const,
+    effortLevel,
     isAgentRunning,
     usage: sessionUsage,
     maxTokens,
     hasPermissionPending: pendingPermissions.length > 0,
+    permissions: pendingPermissions,
+    onPermissionApprove: handlePermissionApprove,
+    onPermissionDeny: handlePermissionDeny,
     onSend: handleSend,
     onStop: handleStop,
     onModeChange: handleModeChange,
@@ -144,11 +121,6 @@ export const EditorChatPanel: FC = () => {
               <p className="text-base font-medium">How can I help?</p>
               <p className="text-sm mt-1">Ask me about your code or request changes</p>
             </div>
-            <PermissionBar
-              permissions={pendingPermissions}
-              onApprove={handlePermissionApprove}
-              onDeny={handlePermissionDeny}
-            />
             <ChatInput {...inputProps} />
           </div>
         ) : (
@@ -164,11 +136,6 @@ export const EditorChatPanel: FC = () => {
               onOpenUrl={handleOpenUrl}
               onCancelQueue={cancelQueue}
               onFeedback={handleFeedback}
-            />
-            <PermissionBar
-              permissions={pendingPermissions}
-              onApprove={handlePermissionApprove}
-              onDeny={handlePermissionDeny}
             />
             <div className={cn('shrink-0', pendingPermissions.length > 0 ? 'pt-0' : 'pt-2')}>
               <ChatInput {...inputProps} />

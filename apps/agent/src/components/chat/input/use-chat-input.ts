@@ -75,6 +75,30 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     };
   }, []);
 
+  // Listen for prefill event from rewind — populates input with the removed message
+  useEffect(() => {
+    const handlePrefill = (e: Event): void => {
+      const text = (e as CustomEvent<{ text: string }>).detail.text;
+      if (!text || !inputRef.current) return;
+      inputRef.current.textContent = text;
+      setInputText(text);
+      // Move cursor to end
+      const range = document.createRange();
+      const sel = window.getSelection();
+      if (sel) {
+        range.selectNodeContents(inputRef.current);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      inputRef.current.focus();
+    };
+    window.addEventListener('prefillChatInput', handlePrefill);
+    return () => {
+      window.removeEventListener('prefillChatInput', handlePrefill);
+    };
+  }, []);
+
   // Reset stopping guard when agent stops running
   useEffect(() => {
     if (!isAgentRunning) {

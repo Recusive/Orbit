@@ -197,9 +197,17 @@ export const AskUserQuestionModal: FC<AskUserQuestionModalProps> = ({
     };
   }, [handleDismiss]);
 
-  // Guard: if no valid questions, fall back to simple approve
+  // Guard: if no valid questions, fall back to simple approve.
+  // Moved to useEffect to avoid side effects during render (React Strict Mode safety).
+  const fallbackFired = useRef(false);
+  useEffect(() => {
+    if ((totalQuestions === 0 || !currentQuestion) && !fallbackFired.current) {
+      fallbackFired.current = true;
+      onApprove(request.requestId);
+    }
+  }, [totalQuestions, currentQuestion, onApprove, request.requestId]);
+
   if (totalQuestions === 0 || !currentQuestion) {
-    onApprove(request.requestId);
     return null;
   }
 

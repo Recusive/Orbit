@@ -1376,7 +1376,10 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         if (message.type === 'system' && (message as { subtype?: string }).subtype === 'init') {
           const initMessage = message as { session_id?: string };
           if (initMessage.session_id) {
-            const isForkedSession = this._forkSession && this._resumeSessionAt !== undefined;
+            // Detect fork session: either SDK fork (with resumeSessionAt) or
+            // manual forkSessionAt (forkSession=true but NO resumeSessionAt,
+            // because we pre-truncate the JSONL ourselves).
+            const isForkedSession = this._forkSession;
             logger.warn(
               {
                 previousSessionId: this._currentSessionId ?? 'none',
@@ -1392,12 +1395,15 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             // CRITICAL: After a fork completes, clear the fork options so subsequent
             // messages continue the forked session instead of re-forking.
             // Update _resumeSessionId to the new forked session ID.
+            // This handles BOTH fork flavors:
+            //   a) SDK fork: forkSession + resumeSessionAt
+            //   b) Manual fork (forkSessionAt): forkSession only (JSONL pre-truncated)
             if (isForkedSession) {
               logger.info(
                 {
                   oldResumeId: this._resumeSessionId,
                   newSessionId: initMessage.session_id,
-                  clearedForkPoint: this._resumeSessionAt,
+                  clearedForkPoint: this._resumeSessionAt ?? 'none (manual forkSessionAt)',
                 },
                 'Fork completed - clearing fork options for subsequent messages'
               );
@@ -1781,6 +1787,10 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           'REWIND rewindFiles Step 1 — interrupt error (continuing anyway)'
         );
       }
+      // Clear the reference so stopSession() (called by deleteSession → forkSessionAt)
+      // won't attempt to re-interrupt this already-interrupted query. Re-interrupting a
+      // dead CLI subprocess can hang forever since withRetry has no per-attempt timeout.
+      this.currentQuery = null;
     } else {
       logger.warn({ checkpointId }, 'REWIND rewindFiles Step 1 — no current query to interrupt');
     }

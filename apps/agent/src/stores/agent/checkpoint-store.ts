@@ -633,27 +633,57 @@ export const useCheckpointStore = create<CheckpointState>()(
           };
         }
 
-        // Migrate session-keyed records (move data from old key to new key)
+        // MIGRATE historical checkpoint records from old session to new session.
+        //
+        // Checkpoint UUIDs from the original session ARE valid in the forked session
+        // because forkSessionAt: (1) copies the JSONL (with file-history-snapshot entries),
+        // (2) hardLinkFileBackups copies backup files to the new session's directory,
+        // (3) replay-user-messages (enabled by forkSession: true) rebuilds the SDK's
+        //     checkpoint index from those JSONL entries.
+        //
+        // Without migration, getRewindCheckpoints returns undefined for pre-fork
+        // messages, and file rewind is silently skipped even though the SDK has
+        // all the data it needs.
+        //
+        // IMPORTANT: Use whole-object replacement to avoid Immer nested mutation bug.
+        // See memory note: "Immer nested property mutation silently dropped".
         if (state.turnStartCheckpoints[oldSessionId] !== undefined) {
-          state.turnStartCheckpoints[newSessionId] = state.turnStartCheckpoints[oldSessionId];
+          state.turnStartCheckpoints[newSessionId] = {
+            ...state.turnStartCheckpoints[newSessionId],
+            ...state.turnStartCheckpoints[oldSessionId],
+          };
           Reflect.deleteProperty(state.turnStartCheckpoints, oldSessionId);
         }
         if (state.turnEndCheckpoints[oldSessionId] !== undefined) {
-          state.turnEndCheckpoints[newSessionId] = state.turnEndCheckpoints[oldSessionId];
+          state.turnEndCheckpoints[newSessionId] = {
+            ...state.turnEndCheckpoints[newSessionId],
+            ...state.turnEndCheckpoints[oldSessionId],
+          };
           Reflect.deleteProperty(state.turnEndCheckpoints, oldSessionId);
         }
         if (state.checkpointOrder[oldSessionId] !== undefined) {
-          state.checkpointOrder[newSessionId] = state.checkpointOrder[oldSessionId];
+          const merged = [
+            ...(state.checkpointOrder[newSessionId] ?? []),
+            ...state.checkpointOrder[oldSessionId],
+          ];
+          // Deduplicate while preserving order (replay may re-emit same checkpoint IDs)
+          state.checkpointOrder[newSessionId] = [...new Set(merged)];
           Reflect.deleteProperty(state.checkpointOrder, oldSessionId);
         }
         if (state.latestCheckpoints[oldSessionId] !== undefined) {
-          state.latestCheckpoints[newSessionId] = state.latestCheckpoints[oldSessionId];
+          // Only overwrite if new session doesn't already have a more recent checkpoint
+          state.latestCheckpoints[newSessionId] ??= state.latestCheckpoints[oldSessionId];
           Reflect.deleteProperty(state.latestCheckpoints, oldSessionId);
         }
+
+        // Migrate in-flight queue (messages that completed but haven't received
+        // their turnEnd checkpoint yet — these are from the CURRENT turn, not historical)
         if (state.pendingMessagesQueue[oldSessionId] !== undefined) {
           state.pendingMessagesQueue[newSessionId] = state.pendingMessagesQueue[oldSessionId];
           Reflect.deleteProperty(state.pendingMessagesQueue, oldSessionId);
         }
+
+        // Migrate fork-related state (needed for fork recording and next-message parentUuid)
         if (state.rewindForkPoints[oldSessionId] !== undefined) {
           state.rewindForkPoints[newSessionId] = state.rewindForkPoints[oldSessionId];
           Reflect.deleteProperty(state.rewindForkPoints, oldSessionId);

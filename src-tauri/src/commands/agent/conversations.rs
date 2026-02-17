@@ -344,7 +344,7 @@ pub fn conversation_add_message(
 ) -> Result<()> {
     manager.add_message(
         &session_id,
-        Message::from(message),
+        &Message::from(message),
         workspace_path.as_deref(),
         worktree_path.as_deref(),
     )
