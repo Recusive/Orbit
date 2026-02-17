@@ -61,8 +61,8 @@ describe('tool-store', () => {
       expect(useToolStore.getState().inputMode).toBe('default');
     });
 
-    it('should start with thinking mode off', () => {
-      expect(useToolStore.getState().thinkingMode).toBe('off');
+    it('should start with thinking mode ultra', () => {
+      expect(useToolStore.getState().thinkingMode).toBe('ultra');
     });
 
     it('should start with sonnet model', () => {
@@ -616,7 +616,7 @@ describe('tool-store', () => {
 
       const state = useToolStore.getState();
       expect(state.inputMode).toBe('default');
-      expect(state.thinkingMode).toBe('off');
+      expect(state.thinkingMode).toBe('ultra');
       expect(state.model).toBe('sonnet');
       expect(state.activeTools).toEqual({});
       expect(state.completedTools).toEqual([]);
