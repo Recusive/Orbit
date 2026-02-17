@@ -155,6 +155,16 @@ export interface SlashCommandDefinition {
   readonly?: boolean;
 }
 
+export type SkillSource = 'project' | 'user';
+
+export interface SkillDefinition {
+  name: string;
+  description: string;
+  source: SkillSource;
+  triggers?: string[];
+  filePath?: string;
+}
+
 export interface ForkSessionOptions {
   keepAlive?: boolean;
   checkpointPrompt?: string;
@@ -400,6 +410,14 @@ export async function updateAgent(
 
 export async function deleteAgent(workspacePath: string, name: string): Promise<void> {
   return invoke('agent_delete_agent', { workspacePath, name });
+}
+
+// ============================================
+// Skill Definition Operations
+// ============================================
+
+export async function listSkills(workspacePath: string): Promise<SkillDefinition[]> {
+  return invoke<SkillDefinition[]>('agent_list_skills', { workspacePath });
 }
 
 // ============================================

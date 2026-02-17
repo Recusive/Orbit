@@ -397,6 +397,32 @@ export const DeleteCommandRequestSchema = z
   .strict();
 export type DeleteCommandRequest = z.infer<typeof DeleteCommandRequestSchema>;
 
+// ============================================================================
+// Skill Schemas
+// ============================================================================
+
+export const SkillSourceSchema = z.enum(['project', 'user']);
+export type SkillSource = z.infer<typeof SkillSourceSchema>;
+
+export const SkillDefinitionSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string(),
+    source: SkillSourceSchema,
+    triggers: z.array(z.string()).optional(),
+    filePath: z.string().optional(),
+  })
+  .strict();
+export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>;
+
+export const ListSkillsRequestSchema = z
+  .object({
+    type: z.literal('list_skills'),
+    workspacePath: z.string(),
+  })
+  .strict();
+export type ListSkillsRequest = z.infer<typeof ListSkillsRequestSchema>;
+
 export const ForkSessionOptionsSchema = z
   .object({
     keepAlive: z.boolean().optional(),
@@ -593,6 +619,7 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   CreateCommandRequestSchema,
   UpdateCommandRequestSchema,
   DeleteCommandRequestSchema,
+  ListSkillsRequestSchema,
   ForkSessionRequestSchema,
   RewindFilesRequestSchema,
   ForkSessionAtRequestSchema,

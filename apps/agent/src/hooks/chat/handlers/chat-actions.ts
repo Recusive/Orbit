@@ -30,7 +30,8 @@ interface ChatActionsReturn {
     text: string,
     contextFiles?: string[],
     images?: ImageAttachment[],
-    elements?: ReactElementContext[]
+    elements?: ReactElementContext[],
+    skills?: string[]
   ) => void;
   handleStop: () => void;
   handleRewind: (messageId: string) => void;
@@ -55,7 +56,8 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     text: string,
     contextFiles?: string[],
     images?: ImageAttachment[],
-    elements?: ReactElementContext[]
+    elements?: ReactElementContext[],
+    skills?: string[]
   ): void => {
     if (!text) return;
 
@@ -86,6 +88,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
             ...(contextFiles ? { contextFiles } : {}),
             ...(images ? { images } : {}),
             ...(elements ? { elements } : {}),
+            ...(skills ? { skills } : {}),
           });
           return;
         }
@@ -105,7 +108,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         // we need to create a conversation first via the backend
         if (!sessionId || (messages.length === 0 && !conversationExists)) {
           // Store pending message — will be sent after conversation:created
-          chatStore.setPendingMessage({ text, contextFiles, images, elements });
+          chatStore.setPendingMessage({ text, contextFiles, images, elements, skills });
           postMessage({
             type: 'conversation:create',
             uuid: crypto.randomUUID(),

@@ -9,6 +9,7 @@ export interface QueuedMessage {
   contextFiles?: string[] | undefined;
   images?: ImageAttachment[] | undefined;
   elements?: ReactElementContext[] | undefined;
+  skills?: string[] | undefined;
   queuedAt: number;
   sessionId: string; // Track which session this message belongs to
 }

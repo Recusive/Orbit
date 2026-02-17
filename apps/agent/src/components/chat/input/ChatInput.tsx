@@ -52,6 +52,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     attachedContext,
     slashCommands,
     isInputEmpty,
+    slashGhostText,
     // Refs
     inputRef,
     imageInputRef,
@@ -184,22 +185,39 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
               <ContextChips items={attachedContext} onRemove={handleRemoveContext} />
             ) : null}
 
-            {/* Input Area */}
-            <div
-              ref={inputRef}
-              className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden wrap-break-word"
-              style={{
-                minHeight: INPUT_SIZES.textareaMinHeight,
-                maxHeight: INPUT_SIZES.textareaMaxHeight,
-              }}
-              contentEditable
-              suppressContentEditableWarning
-              data-placeholder="Plan, @ for context, / for commands"
-              data-empty={isInputEmpty}
-              onInput={handleInputChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-            />
+            {/* Input Area — relative wrapper for ghost text overlay */}
+            <div className="relative">
+              <div
+                ref={inputRef}
+                className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden wrap-break-word"
+                style={{
+                  minHeight: INPUT_SIZES.textareaMinHeight,
+                  maxHeight: INPUT_SIZES.textareaMaxHeight,
+                }}
+                contentEditable
+                suppressContentEditableWarning
+                data-placeholder="Plan, @ for context, / for commands"
+                data-empty={isInputEmpty}
+                onInput={handleInputChange}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+              />
+
+              {/* Ghost autocomplete text — mirrors input position, typed portion is invisible */}
+              {slashGhostText.length > 0 ? (
+                <div
+                  aria-hidden
+                  className="absolute top-0 left-0 p-2 text-base pointer-events-none whitespace-pre-wrap break-words"
+                  style={{
+                    minHeight: INPUT_SIZES.textareaMinHeight,
+                    maxHeight: INPUT_SIZES.textareaMaxHeight,
+                  }}
+                >
+                  <span className="invisible">{inputRef.current?.textContent ?? ''}</span>
+                  <span className="text-muted-foreground/40">{slashGhostText}</span>
+                </div>
+              ) : null}
+            </div>
 
             {/* Mention Popover */}
             <MentionPopover

@@ -209,6 +209,8 @@ export function useBrowser(): void {
         case 'commands:deleted':
         case 'commands:error':
         case 'commands:generated':
+        case 'skills:list:response':
+        case 'skills:error':
           break;
       }
     },

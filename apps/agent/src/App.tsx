@@ -163,6 +163,19 @@ const MODE_LABELS: Record<HeaderTab, string> = {
   editor: 'Editor',
 } as const;
 
+/**
+ * Staggered entrance animation timing for crash fallback children.
+ * Uses smooth easing (0.16, 1, 0.3, 1) matching POPOVER_ANIMATION.enterEasing.
+ * Each child delays 60ms for a subtle stagger reveal effect.
+ */
+const CRASH_ENTER: CSSProperties = {
+  animationDuration: '400ms',
+  animationTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+};
+const CRASH_ENTER_1: CSSProperties = { ...CRASH_ENTER, animationDelay: '60ms' };
+const CRASH_ENTER_2: CSSProperties = { ...CRASH_ENTER, animationDelay: '120ms' };
+const CRASH_ENTER_3: CSSProperties = { ...CRASH_ENTER, animationDelay: '180ms' };
+
 interface ModeErrorFallbackProps {
   readonly mode: HeaderTab;
   readonly error?: Error;
@@ -173,7 +186,7 @@ interface ModeErrorFallbackProps {
 /**
  * Fallback UI shown when a mode (Agent/Canvas/Editor) crashes.
  * Isolates crashes to individual modes so the app remains usable.
- * Provides both "Try Again" (reset error boundary) and "Reload App" options.
+ * Uses staggered entrance animation following orbit animation guidelines.
  */
 const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error, onReset }) => {
   const handleReload = (): void => {
@@ -183,36 +196,56 @@ const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error, onReset })
   return (
     <div className="h-full w-full flex items-center justify-center bg-chat-area">
       <div
-        className="flex flex-col items-center gap-4 max-w-sm text-center px-8 py-7 rounded-2xl"
+        className="flex flex-col items-center gap-6 max-w-[400px] w-full text-center px-5 py-5 rounded-2xl"
         style={{
-          backgroundColor: 'var(--gray-1)',
-          boxShadow: '0 0 0 3px color-mix(in oklch, var(--destructive) 20%, transparent)',
+          backgroundColor: 'var(--gray-2)',
+          border: '1px solid var(--gray-5)',
         }}
       >
-        {/* Icon */}
-        <div
-          className="h-10 w-10 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: 'color-mix(in oklch, var(--destructive) 12%, transparent)' }}
-          aria-hidden="true"
-        >
-          <AlertTriangle className="h-[18px] w-[18px] text-destructive" />
+        {/* Icon with ambient radial glow */}
+        <div className="relative animate-in fade-in-0 zoom-in-[0.96]" style={CRASH_ENTER}>
+          <div
+            className="absolute -inset-4 rounded-3xl"
+            style={{
+              background:
+                'radial-gradient(circle, color-mix(in oklch, var(--destructive) 12%, transparent), transparent 70%)',
+            }}
+            aria-hidden="true"
+          />
+          <div
+            className="relative h-12 w-12 rounded-2xl flex items-center justify-center"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--destructive) 10%, transparent)',
+              boxShadow: 'inset 0 0 0 1px color-mix(in oklch, var(--destructive) 15%, transparent)',
+            }}
+            aria-hidden="true"
+          >
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+          </div>
         </div>
 
-        {/* Copy */}
-        <div className="space-y-1">
-          <h2 className="text-[15px] font-semibold text-foreground" style={{ textWrap: 'balance' }}>
+        {/* Heading + description */}
+        <div
+          className="space-y-1.5 animate-in fade-in-0 slide-in-from-bottom-1"
+          style={CRASH_ENTER_1}
+        >
+          <h2
+            className="text-base font-semibold text-foreground tracking-tight"
+            style={{ textWrap: 'balance' }}
+          >
             {MODE_LABELS[mode]} Crashed
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-[13px] text-muted-foreground/80 leading-relaxed">
             Something went wrong. Try again or reload the app.
           </p>
         </div>
 
-        {/* Error detail */}
+        {/* Error detail — red diagnostic box */}
         {error ? (
           <div
-            className="w-full rounded-lg px-3 py-2"
+            className="w-full rounded-xl px-3.5 py-2.5 animate-in fade-in-0 slide-in-from-bottom-1"
             style={{
+              ...CRASH_ENTER_2,
               backgroundColor: 'color-mix(in oklch, var(--destructive) 8%, transparent)',
               boxShadow: 'inset 0 0 0 1px color-mix(in oklch, var(--destructive) 15%, transparent)',
             }}
@@ -224,14 +257,17 @@ const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error, onReset })
         ) : null}
 
         {/* Actions */}
-        <div className="flex gap-2">
+        <div
+          className="flex gap-2.5 self-end animate-in fade-in-0 slide-in-from-bottom-1"
+          style={CRASH_ENTER_3}
+        >
           {onReset ? (
             <Button variant="outline" size="sm" onClick={onReset}>
-              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+              <RotateCcw className="!size-3 mr-1" />
               Try Again
             </Button>
           ) : null}
-          <Button variant="ghost" size="sm" onClick={handleReload}>
+          <Button variant="secondary" size="sm" onClick={handleReload}>
             Reload App
           </Button>
         </div>

@@ -4,6 +4,7 @@ import type { ContextItem } from '@/types/agent/context';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files/file-icon';
+import { IconSkills } from '@/components/layout/primary-sidebar/components/IconSkills';
 import { cn } from '@/lib/utils';
 
 interface ContextChipsProps {
@@ -47,11 +48,21 @@ interface ContextChipProps {
 
 const ContextChip: FC<ContextChipProps> = ({ item, onRemove }) => {
   const isImage = item.type === 'image';
+  const isSkill = item.type === 'skill';
 
   return (
-    <div className="group flex items-center gap-1.5 pl-2 pr-1 py-1 text-xs bg-gray-4 hover:bg-gray-5 rounded-md border border-gray-7 transition-colors shrink-0 max-w-[180px]">
-      {/* Image thumbnail or file icon */}
-      {isImage && item.previewUrl ? (
+    <div
+      className={cn(
+        'group flex items-center gap-1.5 pl-2 pr-1 py-1 text-xs rounded-md border transition-colors shrink-0 max-w-[180px]',
+        isSkill
+          ? 'bg-primary/10 hover:bg-primary/15 border-primary/30'
+          : 'bg-gray-4 hover:bg-gray-5 border-gray-7'
+      )}
+    >
+      {/* Icon: skill / image / file */}
+      {isSkill ? (
+        <IconSkills className="h-3.5 w-3.5 shrink-0 text-primary" />
+      ) : isImage && item.previewUrl ? (
         <img
           src={item.previewUrl}
           alt={item.name}
@@ -61,8 +72,8 @@ const ContextChip: FC<ContextChipProps> = ({ item, onRemove }) => {
         <FileIcon fileName={item.name} className="h-3.5 w-3.5" monochrome={false} />
       )}
 
-      {/* File name */}
-      <span className="truncate text-foreground/80">{item.name}</span>
+      {/* Display name — skills prefixed with / */}
+      <span className="truncate text-foreground/80">{isSkill ? `/${item.name}` : item.name}</span>
 
       {/* Remove button - slides in on hover */}
       <button

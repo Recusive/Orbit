@@ -21,7 +21,6 @@ import { arePropsEqual, buildSegments, hasVisibleContent } from './message-utils
 import type { MessageItemProps } from './types';
 import type { FC } from 'react';
 
-import { FileIcon } from '@/components/files';
 import { ErrorBoundary } from '@/components/shared';
 import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
 import { cn, CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
@@ -93,6 +92,30 @@ const UserMessageBubble: FC<{ readonly content: string; readonly animate: boolea
       setIsExpanded((prev) => !prev);
     }, []);
 
+    // Render leading /slash-command and @file tokens as inline code tags for visual distinction.
+    // Matches tokens like "/commit", "@utils.ts @hooks/" at the start of content.
+    // Both prefixes can coexist: "/review-pr @file.ts explain this"
+    const renderedContent = useMemo(() => {
+      const match = /^((?:(?:\/[\w-]+|@[\w./-]+)(?:\s+|$))+)/.exec(content);
+      if (match === null) return content;
+
+      const rest = content.slice(match[0].length);
+      const tokens = match[0].trim().split(/\s+/);
+
+      return (
+        <>
+          {tokens.map((token, i) => (
+            <span key={i}>
+              <code className="rounded bg-gray-6 px-1.5 py-0.5 font-mono text-sm">
+                {token}
+              </code>{' '}
+            </span>
+          ))}
+          {rest}
+        </>
+      );
+    }, [content]);
+
     const isCollapsed = isOverflowing && !isExpanded;
 
     return (
@@ -115,7 +138,7 @@ const UserMessageBubble: FC<{ readonly content: string; readonly animate: boolea
                 : undefined
             }
           >
-            {content}
+            {renderedContent}
           </p>
 
           {/* Gradient fade overlay when collapsed */}
@@ -200,11 +223,6 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
     [message.role, animatedContent, tools]
   );
 
-  // Check for attachments
-  const hasFiles = (message.attachedFiles?.length ?? 0) > 0;
-  const hasImages = (message.attachedImages?.length ?? 0) > 0;
-  const hasAttachments = hasFiles || hasImages;
-
   // Don't render empty assistant message bubbles
   if (!hasVisibleContent(message, segments, isComplete)) {
     return null;
@@ -225,40 +243,6 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
         /* User message — right-aligned bubble with collapsible long content */
         <div className="flex flex-col items-end gap-1">
           <UserMessageBubble content={message.displayedContent} animate={animate} />
-
-          {/* Attached context — right-aligned alongside the bubble */}
-          {hasAttachments ? (
-            <div className="chat-attached-context flex flex-wrap justify-end gap-1.5">
-              {message.attachedFiles?.map((filePath) => {
-                const fileName = filePath.split('/').pop() ?? filePath;
-                return (
-                  <div
-                    key={filePath}
-                    className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-gray-4 rounded-md hover:bg-accent transition-colors cursor-pointer"
-                    title={filePath}
-                  >
-                    <FileIcon fileName={fileName} className="h-3.5 w-3.5" monochrome={false} />
-                    <span className="text-sm text-foreground/70">{fileName}</span>
-                  </div>
-                );
-              })}
-
-              {message.attachedImages?.map((image, index) => (
-                <div
-                  key={`${image.name}-${String(index)}`}
-                  className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-gray-4 rounded-md hover:bg-accent transition-colors cursor-pointer"
-                  title={image.name}
-                >
-                  <img
-                    src={image.previewUrl}
-                    alt={image.name}
-                    className="h-4 w-4 object-cover rounded-md"
-                  />
-                  <span className="text-sm text-foreground/70">{image.name}</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
         </div>
       ) : (
         /* Assistant message - no bubble, content flows naturally */

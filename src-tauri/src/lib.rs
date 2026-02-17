@@ -371,6 +371,8 @@ pub fn run() {
             agent_cmd::agent_create_agent,
             agent_cmd::agent_update_agent,
             agent_cmd::agent_delete_agent,
+            // Skill definition commands
+            agent_cmd::agent_list_skills,
             // Command definition commands
             agent_cmd::agent_list_commands,
             agent_cmd::agent_get_command,

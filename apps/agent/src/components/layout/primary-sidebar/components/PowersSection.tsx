@@ -4,7 +4,7 @@
  * Mirrors the worktree expand/collapse pattern:
  * icon + label header with chevron, vertical tree line, indented children.
  */
-import { Slash } from 'lucide-react';
+import { Slash, Users } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import { IconMcp } from './IconMcp';
@@ -34,13 +34,15 @@ const POWER_ITEMS: readonly PowerChildItem[] = [
   { icon: IconSkills, label: 'Skills' },
   { icon: IconMcp, label: 'MCP' },
   { icon: SlashIcon, label: 'Slash Commands' },
+  { icon: Users, label: 'Sub Agents' },
 ];
 
 interface PowersSectionProps {
   readonly collapsed: boolean;
+  readonly onSkillsClick?: () => void;
 }
 
-export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
+export const PowersSection: FC<PowersSectionProps> = ({ collapsed, onSkillsClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleToggle = useCallback((): void => {
@@ -59,7 +61,7 @@ export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
         <button
           className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
           aria-label="Powers"
-          title="Powers — Coming soon"
+          title="Powers"
         >
           <IconPowers className={cn('shrink-0', iconSizeClass)} />
         </button>
@@ -93,17 +95,6 @@ export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
         >
           Powers
         </span>
-
-        {/* Badge */}
-        <span
-          className="ml-auto mr-2 shrink-0 inline-flex items-center h-4 rounded px-1.5 text-[10px] font-medium select-none"
-          style={{
-            color: 'var(--gray-11)',
-            backgroundColor: 'var(--gray-a4)',
-          }}
-        >
-          Coming soon
-        </span>
       </button>
 
       {/* Expandable child items — kept mounted, toggled via CSS */}
@@ -121,6 +112,7 @@ export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
                 <button
                   className="flex items-center gap-2 h-7 w-full rounded-lg pl-[7px] pr-3 overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 transition-[background-color] duration-100 text-sidebar-foreground hover:text-foreground"
                   title={item.label}
+                  onClick={item.label === 'Skills' ? onSkillsClick : undefined}
                 >
                   <item.icon className="h-3.5 w-3.5 shrink-0" />
                   <span className="text-sm overflow-hidden flex-1 text-left truncate">

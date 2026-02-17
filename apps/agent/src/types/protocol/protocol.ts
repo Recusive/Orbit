@@ -745,6 +745,27 @@ export const BrowserToolResponseSchema = z
 // SUBAGENTS (Webview → Extension)
 // ═══════════════════════════════════════════════════════════════
 
+// Skill definition
+export const SkillDefinitionSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string(),
+    source: z.enum(['project', 'user']),
+    triggers: z.array(z.string()).optional(),
+    filePath: z.string().optional(),
+  })
+  .strict();
+
+export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>;
+
+// List all skills
+export const SkillsListSchema = z
+  .object({
+    type: z.literal('skills:list'),
+    uuid: UUIDSchema,
+  })
+  .strict();
+
 // Subagent definition
 export const SubagentDefinitionSchema = z
   .object({
@@ -947,6 +968,8 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   BrowserShowSchema,
   BrowserHideSchema,
   BrowserToolResponseSchema,
+  // Skills
+  SkillsListSchema,
   // Subagents
   SubagentsListSchema,
   SubagentCreateSchema,
@@ -1719,6 +1742,30 @@ export const SubagentErrorSchema = z
   .strict();
 
 // ═══════════════════════════════════════════════════════════════
+// SKILLS (Extension → Webview)
+// ═══════════════════════════════════════════════════════════════
+
+// Response with list of all skills
+export const SkillsListResponseSchema = z
+  .object({
+    type: z.literal('skills:list:response'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    skills: z.array(SkillDefinitionSchema),
+  })
+  .strict();
+
+// Skill operation error
+export const SkillsErrorSchema = z
+  .object({
+    type: z.literal('skills:error'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    error: z.string(),
+  })
+  .strict();
+
+// ═══════════════════════════════════════════════════════════════
 // SLASH COMMANDS (Extension → Webview)
 // ═══════════════════════════════════════════════════════════════
 
@@ -1859,6 +1906,9 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   BrowserOpenSchema,
   BrowserCloseSchema,
   BrowserToolRequestSchema,
+  // Skills
+  SkillsListResponseSchema,
+  SkillsErrorSchema,
   // Subagents
   SubagentsListResponseSchema,
   SubagentCreatedSchema,

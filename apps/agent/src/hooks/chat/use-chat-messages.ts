@@ -83,7 +83,8 @@ interface UseChatMessagesReturn {
     text: string,
     contextFiles?: string[],
     images?: ImageAttachment[],
-    elements?: ReactElementContext[]
+    elements?: ReactElementContext[],
+    skills?: string[]
   ) => void;
   handleStop: () => void;
   handleRewind: (messageId: string) => void;

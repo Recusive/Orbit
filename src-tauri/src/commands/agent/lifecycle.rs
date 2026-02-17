@@ -19,7 +19,7 @@ use tauri::{AppHandle, Emitter as _, State};
 
 use crate::agent::{
     AttachmentContentBlock, CommandScope, ForkSessionOptions, ForkSessionResult, McpToolResponse,
-    Model, PermissionDecision, PermissionResponse, SessionConfig, SessionManager,
+    Model, PermissionDecision, PermissionResponse, SessionConfig, SessionManager, SkillDefinition,
     SlashCommandDefinition, SubagentDefinition,
 };
 
@@ -311,6 +311,19 @@ pub async fn agent_delete_agent(
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
     state.delete_agent(&workspace_path, &name).map_err(to_error)
+}
+
+// ============================================================================
+// Skill Definition Commands
+// ============================================================================
+
+/// List all skills in workspace and user directories
+#[tauri::command]
+pub async fn agent_list_skills(
+    workspace_path: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<Vec<SkillDefinition>> {
+    state.list_skills(&workspace_path).map_err(to_error)
 }
 
 // ============================================================================

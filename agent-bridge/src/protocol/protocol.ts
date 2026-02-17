@@ -8,6 +8,7 @@ import type {
   CommandScope,
   SlashCommandDefinition,
 } from '../agent/definitions/command-definitions.js';
+import type { SkillDefinition } from '../agent/definitions/skill-definitions.js';
 import type {
   AgentMessage,
   PermissionRequest,
@@ -274,6 +275,18 @@ export interface DeleteCommandRequest {
   scope: CommandScope;
 }
 
+// ============================================================================
+// Skill Definition Requests
+// ============================================================================
+
+/**
+ * List all skills in workspace and user directories
+ */
+export interface ListSkillsRequest {
+  type: 'list_skills';
+  workspacePath: string;
+}
+
 /**
  * Fork a session (create a checkpoint/branch)
  */
@@ -440,6 +453,7 @@ export type BridgeRequest =
   | CreateCommandRequest
   | UpdateCommandRequest
   | DeleteCommandRequest
+  | ListSkillsRequest
   | ForkSessionRequest
   | RewindFilesRequest
   | ForkSessionAtRequest
@@ -521,6 +535,15 @@ export interface AgentResponse {
 }
 
 /**
+ * Skill list response
+ */
+export interface SkillListResponse {
+  type: 'skill_list';
+  requestType: string;
+  skills: SkillDefinition[];
+}
+
+/**
  * Command list response
  */
 export interface CommandListResponse {
@@ -558,6 +581,7 @@ export type BridgeCommandResponse =
   | NumberResponse
   | AgentListResponse
   | AgentResponse
+  | SkillListResponse
   | CommandListResponse
   | CommandResponse
   | ForkSessionResponse;

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 
 import type { FC } from 'react';
 
+import { IconSkills } from '@/components/layout/primary-sidebar/components/IconSkills';
 import { Command, CommandEmpty, CommandGroup, CommandList } from '@/components/ui/command';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,8 @@ export interface SlashCommand {
   name: string;
   description: string;
   icon?: string;
+  /** Distinguishes skills from regular slash commands */
+  kind?: 'command' | 'skill';
 }
 
 // UI-only commands that are handled client-side (not from backend)
@@ -50,12 +53,12 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
     ...UI_COMMANDS.filter((ui) => !commands.some((c) => c.name === ui.name)),
   ];
 
-  // Filter commands based on query
-  const filteredCommands = allCommands.filter(
-    (cmd) =>
-      cmd.name.toLowerCase().includes(query.toLowerCase()) ||
-      cmd.description.toLowerCase().includes(query.toLowerCase())
-  );
+  // Filter items based on query — "skills" shows all skills unfiltered
+  const filteredCommands = filterItems(allCommands, query);
+
+  // Split into commands and skills for grouped display
+  const commandItems = filteredCommands.filter((cmd) => cmd.kind !== 'skill');
+  const skillItems = filteredCommands.filter((cmd) => cmd.kind === 'skill');
 
   const handleSelect = (command: SlashCommand): void => {
     onSelect(command);
@@ -64,6 +67,9 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
 
   // Cast the anchor ref to Measurable (HTMLElement has getBoundingClientRect)
   const measurableRef = anchorRef as React.RefObject<Measurable>;
+
+  // Running index counter so keyboard navigation works across both groups
+  let runningIndex = 0;
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -84,21 +90,47 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
           <CommandList className="scroll-py-2 pb-1.5">
             {filteredCommands.length === 0 ? <CommandEmpty>No commands found.</CommandEmpty> : null}
 
-            <CommandGroup
-              heading="Commands"
-              className="**:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/60"
-            >
-              {filteredCommands.map((cmd, idx) => (
-                <CommandItem
-                  key={cmd.name}
-                  command={cmd}
-                  isSelected={selectedIndex === idx}
-                  isFirst={idx === 0}
-                  isLast={idx === filteredCommands.length - 1}
-                  onSelect={handleSelect}
-                />
-              ))}
-            </CommandGroup>
+            {commandItems.length > 0 ? (
+              <CommandGroup
+                heading="Commands"
+                className="**:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/60"
+              >
+                {commandItems.map((cmd) => {
+                  const idx = runningIndex++;
+                  return (
+                    <CommandItem
+                      key={`cmd-${cmd.name}`}
+                      command={cmd}
+                      isSelected={selectedIndex === idx}
+                      isFirst={idx === 0}
+                      isLast={idx === filteredCommands.length - 1}
+                      onSelect={handleSelect}
+                    />
+                  );
+                })}
+              </CommandGroup>
+            ) : null}
+
+            {skillItems.length > 0 ? (
+              <CommandGroup
+                heading="Skills"
+                className="**:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/60"
+              >
+                {skillItems.map((cmd) => {
+                  const idx = runningIndex++;
+                  return (
+                    <CommandItem
+                      key={`skill-${cmd.name}`}
+                      command={cmd}
+                      isSelected={selectedIndex === idx}
+                      isFirst={idx === 0}
+                      isLast={idx === filteredCommands.length - 1}
+                      onSelect={handleSelect}
+                    />
+                  );
+                })}
+              </CommandGroup>
+            ) : null}
           </CommandList>
         </Command>
       </PopoverContent>
@@ -112,15 +144,21 @@ const mergeCommands = (commands: SlashCommand[]): SlashCommand[] => [
   ...UI_COMMANDS.filter((ui) => !commands.some((c) => c.name === ui.name)),
 ];
 
-// Export helper to get filtered commands count
-export const getFilteredCommandsCount = (query: string, commands: SlashCommand[] = []): number => {
-  const allCommands = mergeCommands(commands);
+// Shared filter logic — "skills" shows all skills unfiltered
+const filterItems = (allCommands: SlashCommand[], query: string): SlashCommand[] => {
+  const lq = query.toLowerCase();
+  const isSkillsQuery = lq === 'skills';
   return allCommands.filter(
     (cmd) =>
-      cmd.name.toLowerCase().includes(query.toLowerCase()) ||
-      cmd.description.toLowerCase().includes(query.toLowerCase())
-  ).length;
+      (isSkillsQuery && cmd.kind === 'skill') ||
+      cmd.name.toLowerCase().includes(lq) ||
+      cmd.description.toLowerCase().includes(lq)
+  );
 };
+
+// Export helper to get filtered commands count
+export const getFilteredCommandsCount = (query: string, commands: SlashCommand[] = []): number =>
+  filterItems(mergeCommands(commands), query).length;
 
 // Export helper to get command at index
 export const getCommandAtIndex = (
@@ -128,12 +166,7 @@ export const getCommandAtIndex = (
   index: number,
   commands: SlashCommand[] = []
 ): SlashCommand | null => {
-  const allCommands = mergeCommands(commands);
-  const filtered = allCommands.filter(
-    (cmd) =>
-      cmd.name.toLowerCase().includes(query.toLowerCase()) ||
-      cmd.description.toLowerCase().includes(query.toLowerCase())
-  );
+  const filtered = filterItems(mergeCommands(commands), query);
   return filtered[index] ?? null;
 };
 
@@ -179,7 +212,11 @@ const CommandItem: FC<CommandItemProps> = ({ command, isSelected, isFirst, isLas
           : 'rounded-md hover:bg-accent active:scale-[0.99]'
       )}
     >
-      <span className="text-muted-foreground/70 font-mono text-base">/</span>
+      {command.kind === 'skill' ? (
+        <IconSkills className="size-4 shrink-0 text-muted-foreground/70" />
+      ) : (
+        <span className="text-muted-foreground/70 font-mono text-base">/</span>
+      )}
       <div className="flex flex-col min-w-0 flex-1">
         <span className="text-base font-medium">{command.name}</span>
         <span className="truncate text-sm text-muted-foreground/60">{command.description}</span>

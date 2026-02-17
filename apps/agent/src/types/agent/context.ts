@@ -5,7 +5,7 @@ import { z } from 'zod';
  */
 
 // Supported context types
-export const ContextTypeSchema = z.enum(['file', 'folder', 'url', 'code', 'image']);
+export const ContextTypeSchema = z.enum(['file', 'folder', 'url', 'code', 'image', 'skill']);
 export type ContextType = z.infer<typeof ContextTypeSchema>;
 
 // Context item attached to a message

@@ -48,6 +48,7 @@ import {
   listCommands,
   updateCommand,
 } from './agent/definitions/command-definitions.js';
+import { listSkills } from './agent/definitions/skill-definitions.js';
 import { SessionManager } from './agent/session/session-manager.js';
 import {
   cleanupOldSessions,
@@ -539,6 +540,13 @@ async function handleRequest(
     case 'delete_agent': {
       deleteAgent(request.workspacePath, request.name);
       sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
+    // Skill Definition Operations
+    case 'list_skills': {
+      const skills = listSkills(request.workspacePath);
+      sendResponse({ type: 'skill_list', requestType: request.type, skills });
       break;
     }
 

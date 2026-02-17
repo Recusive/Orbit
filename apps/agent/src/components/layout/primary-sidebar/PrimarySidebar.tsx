@@ -20,6 +20,7 @@ import { useSidebarActions } from './hooks/use-sidebar-actions';
 
 import type { PrimarySidebarProps, SidebarTab } from './types';
 import type { SettingsDialogProps } from '@/components/modals/settings';
+import type { SkillsDialogProps } from '@/components/modals/skills';
 import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/files';
@@ -66,6 +67,17 @@ const SettingsDialog: FC<SettingsDialogProps> = (props) => (
   </Suspense>
 );
 
+const LazySkillsDialog = lazy(() =>
+  import('@/components/modals/skills/SkillsDialog').then((m) => ({
+    default: m.SkillsDialog,
+  }))
+);
+const SkillsDialog: FC<SkillsDialogProps> = (props) => (
+  <Suspense fallback={null}>
+    <LazySkillsDialog {...props} />
+  </Suspense>
+);
+
 export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   // Use useShallow to prevent re-renders when unrelated store state changes
   const {
@@ -99,6 +111,7 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   const createWorktreeDialogOpen = useCreateWorktreeDialogOpen();
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
+  const [skillsDialogOpen, setSkillsDialogOpen] = useState(false);
 
   const {
     deleteDialogOpen,
@@ -292,7 +305,12 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
               useUIStore.getState().toggleVault();
             }}
           />
-          <PowersSection collapsed={isCollapsed} />
+          <PowersSection
+            collapsed={isCollapsed}
+            onSkillsClick={() => {
+              setSkillsDialogOpen(true);
+            }}
+          />
         </div>
       ) : null}
 
@@ -413,6 +431,9 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
           void handleRemoveWorktree(deleteBranch);
         }}
       />
+
+      {/* Skills Dialog */}
+      <SkillsDialog open={skillsDialogOpen} onOpenChange={setSkillsDialogOpen} />
     </aside>
   );
 };

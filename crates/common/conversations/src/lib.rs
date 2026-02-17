@@ -1763,24 +1763,45 @@ fn strip_file_context_prefix(s: &str) -> String {
 
 /// Strip SDK command XML tags from user messages.
 ///
-/// When the Claude SDK handles slash commands from `.claude/commands/` natively,
-/// it stores the user message with XML wrapping:
+/// The Claude SDK stores slash commands / skills with XML tags. Two formats exist:
+///
+/// **Legacy format** (`.claude/commands/` without user args):
 ///   `<command-name>/init</command-name>\n<command-message>init</command-message>`
 ///
-/// For display, we extract just the command name (e.g., `/init`).
+/// **Current format** (skills and commands with user args):
+///   `<command-message>web-animation-design</command-message>\n<command-name>/web-animation-design</command-name>\n<command-args>load this</command-args>`
+///
+/// For display we reconstruct: `/web-animation-design load this`.
 fn strip_sdk_command_xml(s: &str) -> String {
-    const TAG_OPEN: &str = "<command-name>";
-    const TAG_CLOSE: &str = "</command-name>";
+    const NAME_OPEN: &str = "<command-name>";
+    const NAME_CLOSE: &str = "</command-name>";
+    const ARGS_OPEN: &str = "<command-args>";
+    const ARGS_CLOSE: &str = "</command-args>";
 
-    if let Some(start) = s.find(TAG_OPEN) {
-        if let Some(end) = s.find(TAG_CLOSE) {
-            let name_start = start + TAG_OPEN.len();
-            if name_start < end {
-                return s[name_start..end].to_owned();
-            }
+    // Extract <command-name> — present in both formats
+    let name = extract_xml_tag(s, NAME_OPEN, NAME_CLOSE);
+    let name = match name {
+        Some(n) if !n.is_empty() => n,
+        _ => return s.to_owned(), // No command-name tag → pass through
+    };
+
+    // Extract <command-args> — user text AFTER the slash command (current format)
+    if let Some(args) = extract_xml_tag(s, ARGS_OPEN, ARGS_CLOSE) {
+        let args = args.trim();
+        if !args.is_empty() {
+            return format!("{name} {args}");
         }
     }
-    s.to_owned()
+
+    name.to_owned()
+}
+
+/// Extract text between an XML open/close tag pair. Returns `None` if tags are missing.
+fn extract_xml_tag<'a>(s: &'a str, open: &str, close: &str) -> Option<&'a str> {
+    let start = s.find(open)?;
+    let end = s.find(close)?;
+    let content_start = start + open.len();
+    (content_start < end).then(|| &s[content_start..end])
 }
 
 /// Clean user message text for display by applying all stripping passes.
@@ -2479,6 +2500,54 @@ mod tests {
 
         // Should extract command name from XML, not show raw tags
         assert_eq!(conv.messages[0].content, "/init");
+    }
+
+    #[test]
+    fn test_strip_sdk_command_xml_preserves_command_args() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Real SDK format for skill invocations (v2.1.44+):
+        // <command-message> = bare name, <command-name> = /name, <command-args> = user text
+        // The user typed "/web-animation-design load this"
+        let path = ws_dir.join("cmd-with-args.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"<command-message>web-animation-design</command-message>\n<command-name>/web-animation-design</command-name>\n<command-args>load this</command-args>"},"cwd":"/test","sessionId":"cmd-with-args","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Loading skill..."}]},"cwd":"/test","sessionId":"cmd-with-args","timestamp":"2026-02-07T12:00:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("cmd-with-args", None)
+            .expect("load")
+            .expect("not found");
+
+        // Should preserve both command name AND user's args text
+        assert_eq!(conv.messages[0].content, "/web-animation-design load this");
+    }
+
+    #[test]
+    fn test_strip_sdk_command_xml_no_args() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Skill invocation with no extra user text (just "/skill-name")
+        let path = ws_dir.join("cmd-no-args.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"<command-message>web-animation-design</command-message>\n<command-name>/web-animation-design</command-name>"},"cwd":"/test","sessionId":"cmd-no-args","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Loading skill..."}]},"cwd":"/test","sessionId":"cmd-no-args","timestamp":"2026-02-07T12:00:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("cmd-no-args", None)
+            .expect("load")
+            .expect("not found");
+
+        // No args → just the command name
+        assert_eq!(conv.messages[0].content, "/web-animation-design");
     }
 
     #[test]

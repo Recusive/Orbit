@@ -52,6 +52,7 @@ export interface PendingMessage {
   contextFiles?: string[] | undefined;
   images?: ImageAttachment[] | undefined;
   elements?: ReactElementContext[] | undefined;
+  skills?: string[] | undefined;
 }
 
 export interface ChatSessionData {

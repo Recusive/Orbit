@@ -608,6 +608,7 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'commands:delete':
     case 'subagents:generate':
     case 'commands:generate':
+    case 'skills:list':
       break;
   }
 }

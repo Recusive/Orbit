@@ -16,5 +16,8 @@ export * from './quick-open';
 // Settings
 export * from './settings';
 
+// Skills
+export * from './skills';
+
 // Worktree / Git
 export * from './worktree';
