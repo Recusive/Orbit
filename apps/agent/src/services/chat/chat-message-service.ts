@@ -25,7 +25,7 @@ import type { ExtensionMessage } from '@/types/protocol';
 import { getActiveChain } from '@/components/chat/messages/message-utils';
 import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-handlers';
 import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
-import { conversationAddMessage, conversationList } from '@/lib/api';
+import { conversationAddMessage, conversationList, conversationLoad } from '@/lib/api';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { toConversationSummaries } from '@/lib/mappers';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
@@ -210,6 +210,9 @@ class ChatMessageService {
         break;
       case 'agent:checkpoint':
         this.handleAgentCheckpoint(message);
+        break;
+      case 'agent:compact_complete':
+        this.handleCompactComplete(message);
         break;
       case 'conversation:created':
         this.handleConversationCreated(message);
@@ -649,6 +652,61 @@ class ChatMessageService {
 
     if (oldFrontendId) {
       useChatStore.getState().reconcileMessageId(checkpointSessionId, oldFrontendId, checkpoint_id);
+    }
+  }
+
+  private handleCompactComplete(
+    message: Extract<ExtensionMessage, { type: 'agent:compact_complete' }>
+  ): void {
+    const { session_id } = message;
+    logger.info(`Context compaction completed (bridge event) for session ${session_id}`);
+    useChatStore.getState().markCompacted();
+
+    // The SDK rewrites the JSONL asynchronously after compact_boundary fires.
+    // Delay the reload to let the SDK finish writing the compacted file.
+    // Without this, conversationLoad() reads the stale pre-compaction JSONL.
+    setTimeout(() => {
+      void this.reloadConversationFromDisk(session_id);
+    }, 1500);
+  }
+
+  /** Read compacted JSONL from disk and replace in-memory messages. */
+  private async reloadConversationFromDisk(sessionId: string): Promise<void> {
+    try {
+      const conv = await conversationLoad(sessionId);
+      if (!conv) {
+        logger.warn(`Compact reload: no conversation found for ${sessionId}`);
+        return;
+      }
+
+      // Build ChatMessage[] from the disk data
+      const chainableMessages = conv.messages.map((m) => ({
+        id: m.id,
+        parentUuid: m.parentUuid ?? undefined,
+      }));
+      const activeChainIds = new Set(getActiveChain(chainableMessages).map((m) => m.id));
+
+      const newMessages: ChatMessage[] = conv.messages
+        .filter((m) => activeChainIds.has(m.id))
+        .map((m) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          displayedContent: m.content,
+          thinking: m.thinking ?? undefined,
+          thinkingDurationMs: m.thinkingDurationMs ?? undefined,
+          turnDurationMs: m.turnDurationMs ?? undefined,
+          isInterrupted: m.isInterrupted ?? undefined,
+          parentUuid: m.parentUuid ?? undefined,
+        }));
+
+      // Replace messages in store — full swap, no merge
+      useChatStore.getState().setMessages(sessionId, newMessages);
+      logger.info(
+        `Compact reload: replaced ${String(newMessages.length)} messages for ${sessionId}`
+      );
+    } catch (err) {
+      logger.warn(`Compact reload failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

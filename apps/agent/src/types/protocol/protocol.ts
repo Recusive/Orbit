@@ -1101,6 +1101,14 @@ export const AgentCheckpointSchema = z
   })
   .strict();
 
+// Compact complete event (SDK compact_boundary signal)
+export const AgentCompactCompleteSchema = z
+  .object({
+    type: z.literal('agent:compact_complete'),
+    session_id: z.string(),
+  })
+  .strict();
+
 // Tool events (matches SDK pattern)
 export const ToolStartSchema = z
   .object({
@@ -1858,6 +1866,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   AgentPlanModeSchema,
   AgentAcceptModeSchema,
   AgentCheckpointSchema,
+  AgentCompactCompleteSchema,
   // Tools
   ToolStartSchema,
   ToolEndSchema,
@@ -2003,6 +2012,7 @@ export type AgentError = z.infer<typeof AgentErrorSchema>;
 export type AgentPlanMode = z.infer<typeof AgentPlanModeSchema>;
 export type AgentAcceptMode = z.infer<typeof AgentAcceptModeSchema>;
 export type AgentCheckpoint = z.infer<typeof AgentCheckpointSchema>;
+export type AgentCompactComplete = z.infer<typeof AgentCompactCompleteSchema>;
 export type ToolStart = z.infer<typeof ToolStartSchema>;
 export type ToolEnd = z.infer<typeof ToolEndSchema>;
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;

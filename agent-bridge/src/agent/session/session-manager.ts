@@ -829,6 +829,10 @@ export class SessionManager extends Disposable {
   );
   readonly onCheckpoint = this._onCheckpoint.event;
 
+  // Compact complete event - fired when SDK emits compact_boundary system message
+  private readonly _onCompactComplete = this._register(new Emitter<{ sessionId: string }>());
+  readonly onCompactComplete = this._onCompactComplete.event;
+
   // Browser tool request event - forwarded to frontend for execution
   private readonly _onBrowserToolRequest = this._register(
     new Emitter<{ sessionId: string; request: McpToolRequest }>()
@@ -1263,6 +1267,15 @@ export class SessionManager extends Disposable {
                   );
                 }
               }
+            }
+
+            // Handle compact_boundary — SDK signal that compaction completed
+            if (sdkMessage.subtype === 'compact_boundary') {
+              logger.info(
+                { sessionId },
+                'Context compaction completed (compact_boundary received)'
+              );
+              this._onCompactComplete.fire({ sessionId });
             }
             continue;
           }

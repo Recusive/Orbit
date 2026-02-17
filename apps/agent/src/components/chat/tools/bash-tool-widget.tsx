@@ -1,11 +1,12 @@
 import { CheckCircle2, ChevronRight, Loader2, Terminal, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   getShiki,
   TOOL_EXPAND_TRANSITION,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolInlinePreview,
   useIsDarkMode,
 } from './shared';
 
@@ -21,6 +22,16 @@ interface BashToolWidgetProps {
   readonly success?: boolean | undefined;
 }
 
+/** Build a one-line preview for the collapsed header: `$ cmd → lastOutputLine` */
+function buildBashPreview(command: string, output: string | undefined): string {
+  const cmd = command.length > 50 ? command.slice(0, 50) + '\u2026' : command;
+  if (!output) return `$ ${cmd}`;
+  const lines = output.split('\n');
+  const lastLine = lines.filter((l) => l.trim().length > 0).pop() ?? '';
+  const truncated = lastLine.length > 40 ? lastLine.slice(0, 40) + '\u2026' : lastLine;
+  return truncated ? `$ ${cmd} \u2192 ${truncated}` : `$ ${cmd}`;
+}
+
 export const BashToolWidget: FC<BashToolWidgetProps> = ({
   command,
   description,
@@ -31,19 +42,10 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   const isDarkMode = useIsDarkMode();
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
-  // Start expanded if running, collapsed if already completed (restored from persistence)
-  const [isExpanded, setIsExpanded] = useState(isRunning);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(false);
   const [highlightedCommand, setHighlightedCommand] = useState<string>('');
   const [highlightedOutput, setHighlightedOutput] = useState<string>('');
-  const wasRunningRef = useRef(isRunning);
-
-  // Auto-collapse when tool finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   // Syntax highlight the command (responds to theme changes via MutationObserver)
   useEffect(() => {
@@ -120,6 +122,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   const displayOutput = isExpanded ? output : outputLines.slice(0, maxCollapsedLines).join('\n');
 
   const statusLabel = isRunning ? 'Running Bash' : 'Bash';
+  const previewText = buildBashPreview(command, output);
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -131,12 +134,13 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Bash output' : 'Expand Bash output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
           'cursor-pointer w-full text-left rounded-lg',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon + tool name + spinner */}
+        <div className="flex items-center gap-2 shrink-0">
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
@@ -164,14 +168,22 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
           {isRunning ? (
             <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
           ) : null}
-
-          <ChevronRight
-            className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
-              isExpanded && 'rotate-90'
-            )}
-          />
         </div>
+
+        {/* Center: inline preview strip (collapsed only) */}
+        {!isExpanded && success === undefined ? (
+          <ToolInlinePreview text={previewText} />
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        {/* Right: chevron */}
+        <ChevronRight
+          className={cn(
+            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            isExpanded && 'rotate-90'
+          )}
+        />
       </button>
 
       {/* Tree-style expanded content */}

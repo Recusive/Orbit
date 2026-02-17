@@ -1,9 +1,9 @@
 import { CheckCircle2, ChevronRight, Globe, Loader2, Search, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { z } from 'zod';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE, ToolInlinePreview } from './shared';
 
 import type { FC } from 'react';
 
@@ -97,23 +97,22 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
   success,
   onOpenUrl,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(isRunning);
-  const wasRunningRef = useRef(isRunning);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(false);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
-
-  // Auto-collapse when tool finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   const results = parseSearchResults(output);
   const resultCount = results.length;
 
   const statusLabel = isRunning ? 'Searching the web' : 'Web Search';
+
+  // Inline preview: query + result count
+  const truncatedQuery = query.length > 50 ? query.slice(0, 50) + '\u2026' : query;
+  const previewText =
+    resultCount > 0
+      ? `"${truncatedQuery}" \u2192 ${String(resultCount)} ${resultCount === 1 ? 'result' : 'results'}`
+      : `"${truncatedQuery}"`;
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -125,12 +124,13 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Web Search output' : 'Expand Web Search output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
           'cursor-pointer w-full text-left rounded-lg',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon + tool name + count + spinner */}
+        <div className="flex items-center gap-2 shrink-0">
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
@@ -164,14 +164,22 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
           {isRunning ? (
             <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
           ) : null}
-
-          <ChevronRight
-            className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
-              isExpanded && 'rotate-90'
-            )}
-          />
         </div>
+
+        {/* Center: inline preview strip (collapsed only) */}
+        {!isExpanded && success === undefined ? (
+          <ToolInlinePreview text={previewText} />
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        {/* Right: chevron */}
+        <ChevronRight
+          className={cn(
+            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            isExpanded && 'rotate-90'
+          )}
+        />
       </button>
 
       {/* Tree-style expanded content */}

@@ -220,6 +220,15 @@ function main(): void {
     });
   });
 
+  // Emit compact complete event when SDK compact_boundary is received
+  sessionManager.onCompactComplete((data) => {
+    logger.info({ sessionId: data.sessionId }, 'Compact complete — sending event to Rust/frontend');
+    sendEvent({
+      type: 'compact_complete',
+      sessionId: data.sessionId,
+    });
+  });
+
   // Browser tool request events (from MCP server)
   sessionManager.onBrowserToolRequest((data) => {
     sendEvent({

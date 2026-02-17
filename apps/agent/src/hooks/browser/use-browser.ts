@@ -211,6 +211,7 @@ export function useBrowser(): void {
         case 'commands:generated':
         case 'skills:list:response':
         case 'skills:error':
+        case 'agent:compact_complete':
           break;
       }
     },

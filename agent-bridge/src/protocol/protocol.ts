@@ -658,6 +658,15 @@ export interface CheckpointEvent {
   checkpointId: string;
 }
 
+/**
+ * Compact complete event - emitted when the SDK fires compact_boundary,
+ * signaling that context compaction has finished.
+ */
+export interface CompactCompleteEvent {
+  type: 'compact_complete';
+  sessionId: string;
+}
+
 // ============================================================================
 // Canvas Event Types
 // ============================================================================
@@ -727,6 +736,7 @@ export type BridgeEvent =
   | ErrorEvent
   | ReadyEvent
   | CheckpointEvent
+  | CompactCompleteEvent
   | CanvasMessageEvent
   | CanvasToolRequestEvent
   | CanvasErrorEvent

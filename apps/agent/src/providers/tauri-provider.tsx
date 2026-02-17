@@ -26,6 +26,7 @@ import type { FC, ReactNode } from 'react';
 import {
   onAgentAuthError,
   onAgentCheckpoint,
+  onAgentCompactComplete,
   onAgentError,
   onAgentMessage,
   onAgentAcceptModeChanged,
@@ -548,6 +549,25 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             uuid: crypto.randomUUID(),
             session_id: event.sessionId,
             checkpoint_id: event.checkpointId,
+          });
+        })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
+          })
+      );
+
+      // Compact complete events (reload conversation after /compact)
+      listenerPromises.push(
+        onAgentCompactComplete((event) => {
+          postWindowMessage({
+            type: 'agent:compact_complete',
+            session_id: event.session_id,
           });
         })
           .then((unlisten) => {

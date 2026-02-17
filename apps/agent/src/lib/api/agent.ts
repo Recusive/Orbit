@@ -319,6 +319,16 @@ export async function onAgentCheckpoint(
   return listen<CheckpointEvent>('agent:checkpoint', callback);
 }
 
+export interface CompactCompleteEvent {
+  session_id: string;
+}
+
+export async function onAgentCompactComplete(
+  callback: (event: CompactCompleteEvent) => void
+): Promise<() => void> {
+  return listen<CompactCompleteEvent>('agent:compact_complete', callback);
+}
+
 export async function onAgentReady(callback: () => void): Promise<() => void> {
   return listen<undefined>('agent:ready', () => {
     callback();

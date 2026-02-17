@@ -81,6 +81,8 @@ export interface ChatStoreState {
   conversationLoadEpoch: number;
   /** Tracks sessions loaded from backend to prevent duplicate conversation:load requests */
   loadedSessions: Record<string, boolean>;
+  /** Message ID of the /compact user message currently being processed (null when idle) */
+  compactingMessageId: string | null;
   /** LRU access order for eviction (most recently accessed at end) */
   lruOrder: LruTracker;
 
@@ -104,6 +106,8 @@ export interface ChatStoreState {
   markSessionLoaded: (id: string) => void;
   clearSessionLoaded: (id: string) => void;
   isSessionLoaded: (id: string) => boolean;
+  markCompacting: (messageId: string) => void;
+  markCompacted: () => void;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -199,6 +203,7 @@ export const useChatStore = create<ChatStoreState>()(
       lastCreatedSessionId: null,
       pendingMessage: null,
       remappedOrbitIds: {},
+      compactingMessageId: null,
       rewindEpoch: 0,
       conversationLoadEpoch: 0,
       loadedSessions: {},
@@ -436,6 +441,18 @@ export const useChatStore = create<ChatStoreState>()(
 
       isSessionLoaded: (id: string): boolean => {
         return get().loadedSessions[id] === true;
+      },
+
+      markCompacting: (messageId: string): void => {
+        set((draft) => {
+          draft.compactingMessageId = messageId;
+        });
+      },
+
+      markCompacted: (): void => {
+        set((draft) => {
+          draft.compactingMessageId = null;
+        });
       },
     })),
     { name: 'chat-store' }

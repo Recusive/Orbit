@@ -601,6 +601,10 @@ pub enum BridgeEvent {
         #[serde(rename = "checkpointId")]
         checkpoint_id: String,
     },
+    CompactComplete {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+    },
     // Canvas Events
     #[serde(rename = "canvas:message")]
     CanvasMessage {

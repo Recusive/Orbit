@@ -1,3 +1,4 @@
+export { CompactIndicator } from './compact-indicator';
 export { ThinkingBox } from './thinking-box';
 export { ProgressUpdates } from './progress-updates';
 export { ProgressStep } from './progress-step';

@@ -1,11 +1,12 @@
 import { CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import {
   DiffStat,
   TOOL_EXPAND_TRANSITION,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolInlinePreview,
   useHighlightedTokens,
   useIsDarkMode,
 } from './shared';
@@ -31,22 +32,14 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   success,
   onOpenFile,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(isRunning);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showAllLines, setShowAllLines] = useState(false);
-  const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
   const isDarkMode = useIsDarkMode();
   const oldTokens = useHighlightedTokens(oldString, filePath, isDarkMode);
   const newTokens = useHighlightedTokens(newString, filePath, isDarkMode);
-
-  // Auto-collapse when tool finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   const fileName = filePath.split('/').pop() ?? filePath;
   const oldLines = oldString.split('\n');
@@ -60,6 +53,11 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   const displayNewLines = showAllLines ? newLines : newLines.slice(0, maxPreviewLines);
   const hasMore =
     !showAllLines && (oldLines.length > maxPreviewLines || newLines.length > maxPreviewLines);
+
+  // Inline preview: show first line of new content
+  const firstNewLine = newLines[0] ?? '';
+  const previewText =
+    firstNewLine.length > 60 ? firstNewLine.slice(0, 60) + '\u2026' : firstNewLine;
 
   const handleFileClick = (e: React.MouseEvent): void => {
     e.preventDefault();
@@ -79,12 +77,13 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
         }
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
           'cursor-pointer w-full text-left rounded-lg',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon, filename, badges, spinner, diff */}
+        <div className="flex items-center gap-2 shrink-0 min-w-0">
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
@@ -130,14 +129,22 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
           {!isRunning && !isFailed ? (
             <DiffStat additions={additions} deletions={deletions} />
           ) : null}
-
-          <ChevronRight
-            className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
-              isExpanded && 'rotate-90'
-            )}
-          />
         </div>
+
+        {/* Center: inline preview strip (collapsed only) */}
+        {!isExpanded && success === undefined ? (
+          <ToolInlinePreview text={previewText} />
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        {/* Right: chevron */}
+        <ChevronRight
+          className={cn(
+            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            isExpanded && 'rotate-90'
+          )}
+        />
       </button>
 
       {/* Tree-style expanded content */}

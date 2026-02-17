@@ -19,6 +19,7 @@ import {
 } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { THINKING_MODE_BUDGET } from '@/stores/agent/tool-store';
+import { useChatStore } from '@/stores/chat/chat-store';
 
 export async function handleMessageSend(
   message: Extract<WebviewMessage, { type: 'message:send' }>
@@ -30,6 +31,11 @@ export async function handleMessageSend(
     // Track this user message ID for checkpoint association
     // The checkpoint that arrives will be stored against this user message ID
     useCheckpointStore.getState().onUserMessageSent(message.session_id, message.uuid);
+
+    // Mark message as compacting when /compact is sent (cleared by compact_complete event)
+    if (message.content.trim() === '/compact') {
+      useChatStore.getState().markCompacting(message.uuid);
+    }
 
     // Convert context images to attachments if present
     const attachments: AttachmentContentBlock[] = [];

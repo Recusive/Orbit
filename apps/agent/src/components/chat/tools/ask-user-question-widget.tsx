@@ -12,9 +12,9 @@
  */
 import { CheckCircle2, ChevronRight, MessageCircleQuestion, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE, ToolInlinePreview } from './shared';
 
 import type { FC } from 'react';
 
@@ -84,20 +84,12 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
   success,
   output,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(isRunning);
-  const wasRunningRef = useRef(isRunning);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(false);
   const shouldReduceMotion = useReducedMotion();
 
   const isFailed = success === false;
   const isComplete = !isRunning && success !== undefined;
-
-  // Auto-collapse when tool finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   const questionTexts = extractQuestions(questions);
   const answerMap = resolveAnswers(injectedAnswers, output);
@@ -113,6 +105,11 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
 
   const statusLabel = isRunning ? 'Asking question' : 'Asked question';
 
+  // Inline preview: first question text
+  const firstQuestion = pairs[0]?.question ?? '';
+  const previewText =
+    firstQuestion.length > 60 ? firstQuestion.slice(0, 60) + '\u2026' : firstQuestion;
+
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Collapsible header */}
@@ -123,12 +120,13 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse question details' : 'Expand question details'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
           'cursor-pointer w-full text-left rounded-lg',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon + tool name */}
+        <div className="flex items-center gap-2 shrink-0">
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
@@ -145,19 +143,22 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
           </div>
 
           <span className={cn('text-xs font-medium truncate', 'text-gray-11')}>{statusLabel}</span>
-
-          {/* Preview: first question text in collapsed state */}
-          {!isExpanded && pairs[0] !== undefined ? (
-            <span className="text-xs text-gray-9 truncate">{pairs[0].question}</span>
-          ) : null}
-
-          <ChevronRight
-            className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
-              isExpanded && 'rotate-90'
-            )}
-          />
         </div>
+
+        {/* Center: inline preview strip (collapsed only) */}
+        {!isExpanded && success === undefined ? (
+          <ToolInlinePreview text={previewText} />
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        {/* Right: chevron */}
+        <ChevronRight
+          className={cn(
+            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            isExpanded && 'rotate-90'
+          )}
+        />
       </button>
 
       {/* Expandable content */}

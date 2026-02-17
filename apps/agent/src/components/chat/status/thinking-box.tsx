@@ -1,8 +1,9 @@
 import { ChevronRight, CircleCheck } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from '../tools/shared';
+import { ToolInlinePreview } from '../tools/shared/tool-inline-preview';
 
 import type { FC, ReactNode } from 'react';
 
@@ -68,19 +69,9 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
   defaultExpanded = false,
   isStreaming = false,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded || isStreaming);
-  const wasStreamingRef = useRef(false);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const shouldReduceMotion = useReducedMotion();
-
-  // Auto-expand when streaming starts, auto-collapse when streaming ends
-  useEffect(() => {
-    if (isStreaming && !wasStreamingRef.current) {
-      setIsExpanded(true);
-    } else if (!isStreaming && wasStreamingRef.current) {
-      setIsExpanded(false);
-    }
-    wasStreamingRef.current = isStreaming;
-  }, [isStreaming]);
 
   const durationText = formatDuration(thinkingDurationMs);
 
@@ -92,6 +83,15 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
     [thinking, isStreaming]
   );
 
+  // Inline preview: first meaningful line of thinking text
+  const previewText =
+    thinking
+      .split('\n')
+      .find((l) => l.trim().length > 0)
+      ?.trim() ?? '';
+  const truncatedPreview =
+    previewText.length > 60 ? previewText.slice(0, 60) + '\u2026' : previewText;
+
   return (
     <div className="min-w-0">
       {/* Header — flat inline row */}
@@ -100,13 +100,14 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
           setIsExpanded(!isExpanded);
         }}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
           'cursor-pointer w-full text-left rounded-lg'
         )}
         aria-expanded={isExpanded}
         aria-label={`Thought for ${durationText}, ${isExpanded ? 'expanded' : 'collapsed'}`}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon + label + duration */}
+        <div className="flex items-center gap-2 shrink-0">
           <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-violet-500/8">
             <svg
               aria-hidden="true"
@@ -138,14 +139,22 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
           {!isStreaming && thinkingDurationMs > 0 ? (
             <span className="text-xs text-muted-foreground/50">for {durationText}</span>
           ) : null}
-
-          <ChevronRight
-            className={cn(
-              'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
-              isExpanded && 'rotate-90'
-            )}
-          />
         </div>
+
+        {/* Center: inline preview strip (collapsed only) */}
+        {!isExpanded && isStreaming ? (
+          <ToolInlinePreview text={truncatedPreview} />
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        {/* Right: chevron */}
+        <ChevronRight
+          className={cn(
+            'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
+            isExpanded && 'rotate-90'
+          )}
+        />
       </button>
 
       {/* Tree-style expanded content */}

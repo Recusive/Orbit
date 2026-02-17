@@ -7,12 +7,13 @@ import {
   XCircle,
 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   DiffStat,
   TOOL_EXPAND_TRANSITION,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolInlinePreview,
   useHighlightedTokens,
   useIsDarkMode,
 } from './shared';
@@ -36,21 +37,13 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   success,
   onOpenFile,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(isRunning);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showAllLines, setShowAllLines] = useState(false);
-  const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
   const isDarkMode = useIsDarkMode();
   const highlightedTokens = useHighlightedTokens(content, filePath, isDarkMode);
-
-  // Auto-collapse when tool finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   // Reset showAllLines when collapsed to avoid stale state on re-expand
   useEffect(() => {
@@ -65,6 +58,10 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   const maxPreviewLines = 8;
   const displayLines = showAllLines ? lines : lines.slice(0, maxPreviewLines);
   const hasMore = !showAllLines && lines.length > maxPreviewLines;
+
+  // Inline preview: show first line of content
+  const firstLine = lines[0] ?? '';
+  const previewText = firstLine.length > 60 ? firstLine.slice(0, 60) + '\u2026' : firstLine;
 
   const handleFileClick = (e: React.MouseEvent): void => {
     e.preventDefault();
@@ -86,13 +83,13 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
         }
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
           'cursor-pointer w-full text-left rounded-lg',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        {/* Grouped content — icon, filename, diff, chevron all together */}
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon, filename, badges, spinner, diff */}
+        <div className="flex items-center gap-2 shrink-0 min-w-0">
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
@@ -136,14 +133,22 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
           ) : null}
 
           {!isRunning && !isFailed ? <DiffStat additions={lineCount} deletions={0} /> : null}
-
-          <ChevronRight
-            className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
-              isExpanded && 'rotate-90'
-            )}
-          />
         </div>
+
+        {/* Center: inline preview strip (collapsed only) */}
+        {!isExpanded && success === undefined ? (
+          <ToolInlinePreview text={previewText} />
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        {/* Right: chevron */}
+        <ChevronRight
+          className={cn(
+            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            isExpanded && 'rotate-90'
+          )}
+        />
       </button>
 
       {/* Tree-style expanded content */}

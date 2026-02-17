@@ -11,7 +11,7 @@ import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'r
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
-import { InterruptIndicator, ThinkingBox } from '../status';
+import { CompactIndicator, InterruptIndicator, ThinkingBox } from '../status';
 
 import { ToolWidgetRenderer } from './ToolWidgetRenderer';
 import { FeedbackDialog } from './feedback-dialog';
@@ -240,10 +240,14 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
     >
       {/* Message block */}
       {message.role === 'user' ? (
-        /* User message — right-aligned bubble with collapsible long content */
-        <div className="flex flex-col items-end gap-1">
-          <UserMessageBubble content={message.displayedContent} animate={animate} />
-        </div>
+        /* User message — right-aligned bubble, or compact divider for /compact */
+        message.displayedContent.trim() === '/compact' ? (
+          <CompactIndicator messageId={message.id} />
+        ) : (
+          <div className="flex flex-col items-end gap-1">
+            <UserMessageBubble content={message.displayedContent} animate={animate} />
+          </div>
+        )
       ) : (
         /* Assistant message - no bubble, content flows naturally */
         <div

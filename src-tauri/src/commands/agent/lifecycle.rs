@@ -578,6 +578,16 @@ fn emit_checkpoint(app: &AppHandle, session_id: &str, checkpoint_id: &str) {
     ));
 }
 
+/// Emit compact complete event
+fn emit_compact_complete(app: &AppHandle, session_id: &str) {
+    drop(app.emit(
+        "agent:compact_complete",
+        serde_json::json!({
+            "session_id": session_id,
+        }),
+    ));
+}
+
 /// Emit canvas message event
 fn emit_canvas_message(app: &AppHandle, session_id: &str, message: &SDKMessage) {
     drop(app.emit(
@@ -672,6 +682,9 @@ pub fn setup_event_callbacks(app: &AppHandle, session_manager: &Arc<SessionManag
             session_id,
             checkpoint_id,
         } => emit_checkpoint(&app_handle, &session_id, &checkpoint_id),
+        BridgeEvent::CompactComplete { session_id } => {
+            emit_compact_complete(&app_handle, &session_id);
+        },
         BridgeEvent::CanvasMessage {
             session_id,
             message,

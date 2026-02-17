@@ -1511,6 +1511,43 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           }
         }
 
+        // Filter out SDK slash-command artifacts that shouldn't reach the frontend:
+        // - User messages with <local-command-stdout> (hook output from /compact)
+        // - Assistant messages with "No response requested." (SDK placeholder for commands)
+        if (message.type === 'assistant') {
+          const contentArray = getMessageContentArray(message);
+          if (contentArray !== null && contentArray.length > 0) {
+            const firstBlock = contentArray[0] as { type?: string; text?: string } | undefined;
+            if (
+              contentArray.length === 1 &&
+              firstBlock?.type === 'text' &&
+              firstBlock.text?.trim() === 'No response requested.'
+            ) {
+              logger.debug('Filtered SDK "No response requested." placeholder message');
+              continue;
+            }
+          }
+        }
+
+        if (message.type === 'user') {
+          const contentArray = getMessageContentArray(message);
+          if (contentArray !== null) {
+            const hasOnlyInternalContent = contentArray.every((block: unknown) => {
+              if (typeof block === 'object' && block !== null && 'type' in block) {
+                const typed = block as { type: string; text?: string };
+                if (typed.type === 'text' && typeof typed.text === 'string') {
+                  return typed.text.trim().startsWith('<local-command-stdout>');
+                }
+              }
+              return false;
+            });
+            if (hasOnlyInternalContent && contentArray.length > 0) {
+              logger.debug('Filtered SDK internal <local-command-stdout> user message');
+              continue;
+            }
+          }
+        }
+
         // Format tool results in user messages
         if (message.type === 'user') {
           const contentArray = getMessageContentArray(message);

@@ -404,6 +404,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         case 'commands:generated':
         case 'skills:list:response':
         case 'skills:error':
+        case 'agent:compact_complete':
           break;
       }
     },
