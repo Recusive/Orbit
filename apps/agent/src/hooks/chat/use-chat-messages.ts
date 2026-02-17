@@ -23,6 +23,7 @@ import type { ReviewFixesStressTestConfig } from '@/stress-tests/review-fixes-st
 import type { MegaStressTestConfig } from '@/stress-tests/rewind-mega-stress-test';
 import type { StressTestConfig } from '@/stress-tests/rewind-stress-test';
 import type { SessionStressTestConfig } from '@/stress-tests/session-stress-test';
+import type { VerifiedReviewCycle1StressTestConfig } from '@/stress-tests/verified-review-cycle1-stress-test';
 import type {
   EffortLevel,
   Model,
@@ -55,6 +56,9 @@ declare global {
           runMegaStressTest: (config?: MegaStressTestConfig) => Promise<unknown>;
           runSessionStressTest: (config?: SessionStressTestConfig) => Promise<unknown>;
           runReviewFixesStressTest: (config?: ReviewFixesStressTestConfig) => Promise<unknown>;
+          runVerifiedReviewCycle1StressTest: (
+            config?: VerifiedReviewCycle1StressTestConfig
+          ) => Promise<unknown>;
           handleSend: (text: string) => void;
           handleRewind: (messageId: string) => void;
           handleStop: () => void;
@@ -451,6 +455,17 @@ export function useChatMessages(): UseChatMessagesReturn {
             handleModelChange: actions.handleModelChange,
             handleThinkingModeChange: actions.handleThinkingModeChange,
             postMessage,
+          },
+          config
+        );
+      },
+      runVerifiedReviewCycle1StressTest: async (config?: VerifiedReviewCycle1StressTestConfig) => {
+        const { runVerifiedReviewCycle1StressTest } =
+          await import('@/stress-tests/verified-review-cycle1-stress-test');
+        return runVerifiedReviewCycle1StressTest(
+          {
+            handleSend: actions.handleSend,
+            handleStop: actions.handleStop,
           },
           config
         );

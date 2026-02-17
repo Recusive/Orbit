@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // timing. Upgrading may break the workaround silently. Test thoroughly before
 // bumping. (Code review: Opus cycle 1, issue #8)
 import { useStickToBottom } from 'use-stick-to-bottom';
+import { useShallow } from 'zustand/shallow';
 
 import { MessageItem } from './messages';
 import { QueuedMessageBubble } from './queued-message';
@@ -34,12 +35,7 @@ import type { FC } from 'react';
 import { HyperText } from '@/components/ui/hyper-text';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
-import {
-  deduplicateAndSortTools,
-  useActiveTools,
-  useCompletedTools,
-  useRunningTool,
-} from '@/stores/agent/tool-store';
+import { deduplicateAndSortTools, useRunningTool, useToolStore } from '@/stores/agent/tool-store';
 
 const logger = createLogger('ChatMessages');
 
@@ -287,18 +283,24 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // (Uses dedicated selector for better encapsulation - code review cycle 2, issue #1)
   const runningTool = useRunningTool();
 
-  // Subscribe to activeTools and completedTools via selectors to compute
-  // tools-per-message directly in the render. This bypasses the store's
-  // internal get() which can return stale state in the persist(immer(...))
-  // middleware stack — causing tool widgets to not appear until completion.
-  const activeTools = useActiveTools();
-  const completedTools = useCompletedTools();
+  // Subscribe to activeTools and completedTools via a single combined selector
+  // with useShallow. This bypasses the store's internal get() which can return
+  // stale state in the persist(immer(...)) middleware stack — causing tool widgets
+  // to not appear until completion. The useShallow wrapper uses shallow equality
+  // comparison, preventing re-renders from unrelated store mutations (e.g., persist
+  // rehydration) and coalescing the two subscriptions into one.
+  // (Code review: verified-cycle-1-opus, issue #1)
+  const { activeTools, completedTools } = useToolStore(
+    useShallow((state) => ({
+      activeTools: state.activeTools,
+      completedTools: state.completedTools,
+    }))
+  );
 
   // Memoize tools-per-message: build a Map<messageId, ToolExecution[]> once per
   // activeTools/completedTools change, then O(1) lookup per message render.
   // Without this, deduplicateAndSortTools() runs O(messages x tools) per cycle.
-  // (Code review: Opus cycle 1, issue #1)
-  // TODO(code-review/cycle-1#28): Consider shallow equality selector to avoid rebuilding on every tool status change during streaming
+  // (Code review: Opus cycle 1, issue #1; useShallow applied in verified-cycle-1-opus #1)
   const toolsByMessageId = useMemo(() => {
     const activeByMsg = new Map<string, ToolExecution[]>();
     const completedByMsg = new Map<string, ToolExecution[]>();
