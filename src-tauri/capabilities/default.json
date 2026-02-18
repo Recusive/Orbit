@@ -39,6 +39,9 @@
     "shell:allow-stdin-write",
     "shell:allow-kill",
 
-    "liquid-glass:default"
+    "liquid-glass:default",
+
+    "updater:default",
+    "process:allow-restart"
   ]
 }

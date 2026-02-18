@@ -20,6 +20,7 @@ import { WelcomePage } from '@/components/welcome';
 import { startDemoConversation } from '@/hooks/agent/demo-conversation';
 import { MOCK_ROOT, getMockFileContent } from '@/hooks/agent/use-tauri-mock';
 import { useBrowser } from '@/hooks/browser/use-browser';
+import { useAutoUpdate } from '@/hooks/core/use-auto-update';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { TauriProvider } from '@/providers/tauri-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
@@ -299,6 +300,7 @@ const EditorMode: FC = () => {
 
 const App: FC = () => {
   useBrowser(); // Handle browser messages from Tauri backend
+  useAutoUpdate(); // Check for app updates on mount + periodic interval
   const { hasCrash, crashLog, dismiss, acknowledge } = useCrashCheck();
   const [crashDialogOpen, setCrashDialogOpen] = useState(true);
 

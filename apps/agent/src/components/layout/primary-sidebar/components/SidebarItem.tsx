@@ -17,6 +17,8 @@ export const SidebarItem: FC<SidebarItemProps> = ({
   equalSpacing,
   shortcut,
   badge,
+  badgeVariant = 'default',
+  className,
   onClick,
 }) => {
   const iconSizeClass = small ? 'h-3 w-3' : large ? 'h-4.5 w-4.5' : 'h-4 w-4';
@@ -30,7 +32,8 @@ export const SidebarItem: FC<SidebarItemProps> = ({
         <button
           className={cn(
             "relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 before:absolute before:content-[''] before:inset-[-8px]",
-            active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'
+            active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground',
+            className
           )}
           aria-label={badge ? `${label} (${badge})` : label}
           title={badge ? `${label} — ${badge}` : label}
@@ -46,7 +49,8 @@ export const SidebarItem: FC<SidebarItemProps> = ({
     <button
       className={cn(
         'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98] transition-[background-color,transform] duration-100',
-        active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'
+        active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground',
+        className
       )}
       title={collapsed ? label : undefined}
       onClick={onClick}
@@ -72,10 +76,11 @@ export const SidebarItem: FC<SidebarItemProps> = ({
       {badge && !collapsed ? (
         <span
           className="ml-auto mr-2 shrink-0 inline-flex items-center h-4 rounded px-1.5 text-[10px] font-medium select-none"
-          style={{
-            color: 'var(--gray-11)',
-            backgroundColor: 'var(--gray-a4)',
-          }}
+          style={
+            badgeVariant === 'primary'
+              ? { color: 'var(--primary-foreground)', backgroundColor: 'var(--primary)' }
+              : { color: 'var(--gray-11)', backgroundColor: 'var(--gray-a4)' }
+          }
         >
           {badge}
         </span>

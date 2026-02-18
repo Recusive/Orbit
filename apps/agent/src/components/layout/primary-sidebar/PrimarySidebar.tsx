@@ -7,7 +7,7 @@
  */
 import { IconCirclePlus } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconCirclePlus';
 import { IconSearchlinesSparkle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSearchlinesSparkle';
-import { FlaskConical, FolderOpen, Search, Settings2 } from 'lucide-react';
+import { Download, FlaskConical, FolderOpen, Search, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
@@ -44,6 +44,7 @@ import {
   useActiveWorktreePath,
   useCreateWorktreeDialogOpen,
 } from '@/stores/ui/ui-store';
+import { useUpdateStore } from '@/stores/ui/update-store';
 
 /** Evaluated once at module load — the OS preference is static for the session lifetime.
  * Guarded for non-DOM contexts (tests / SSR). (Code review: Codex cycle 1, issue #3) */
@@ -109,6 +110,9 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   const worktrees = useWorktrees();
   const activeWorktreePath = useActiveWorktreePath();
   const createWorktreeDialogOpen = useCreateWorktreeDialogOpen();
+
+  const updateStatus = useUpdateStore((s) => s.status);
+  const updateDismissed = useUpdateStore((s) => s.toastDismissed);
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
   const [skillsDialogOpen, setSkillsDialogOpen] = useState(false);
@@ -372,6 +376,26 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
 
       {/* Utilities — pinned to bottom, spacing stays constant so buttons don't shift on collapse */}
       <div className="flex flex-col shrink-0 gap-1 py-1.5">
+        {/* Update indicator — visible after user dismisses the update toast */}
+        {(updateStatus === 'available' || updateStatus === 'ready') && updateDismissed ? (
+          <SidebarItem
+            icon={Download}
+            label={updateStatus === 'ready' ? 'Restart to update' : 'Update available'}
+            collapsed={isCollapsed}
+            equalSpacing={isCollapsed}
+            badge={updateStatus === 'ready' ? 'Restart' : 'Update'}
+            badgeVariant="primary"
+            className="border border-dashed border-gray-6"
+            onClick={() => {
+              const store = useUpdateStore.getState();
+              if (store.status === 'ready') {
+                void store.relaunch();
+              } else {
+                void store.downloadAndInstall();
+              }
+            }}
+          />
+        ) : null}
         <SidebarItem
           icon={Settings2}
           label="Settings"

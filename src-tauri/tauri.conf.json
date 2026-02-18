@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Orbit",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "identifier": "com.recursive.orbit",
   "build": {
     "frontendDist": "../dist",
@@ -37,7 +37,7 @@
         "default-src": "'self'",
         "script-src": "'self' 'unsafe-eval' https://streamdown.ai http://localhost:5176 http://localhost:5199",
         "style-src": "'self' 'unsafe-inline' https://streamdown.ai http://localhost:*",
-        "connect-src": "'self' https://api.anthropic.com ipc://localhost https://streamdown.ai http://localhost:* ws://localhost:*",
+        "connect-src": "'self' https://api.anthropic.com ipc://localhost https://streamdown.ai http://localhost:* ws://localhost:* https://github.com https://*.githubusercontent.com",
         "img-src": "'self' data: blob:",
         "font-src": "'self' data: https://streamdown.ai",
         "worker-src": "'self' blob:",
@@ -58,12 +58,22 @@
     "longDescription": "Orbit is a modern code editor built with Tauri, React, and Rust, featuring an AI coding assistant.",
     "macOS": {
       "entitlements": "Entitlements.plist",
-      "minimumSystemVersion": "10.15",
+      "minimumSystemVersion": "15.0",
       "signingIdentity": "Developer ID Application: Pranit sharma (QSAMZF2NJ7)",
       "files": {
         "Resources/Assets.car": "resources/Assets.car"
       }
     }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE3ODVEMDY5QUVENzM4ODkKUldTSk9OZXVhZENGRnpZMEIyVE9NZXhqbUZWM3VzN05aUjVuSGY0dmNBSGhtajAvMjQ3bEN2WGQK",
+      "endpoints": [
+        "https://github.com/Recusive/Orbit-Release/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
 }

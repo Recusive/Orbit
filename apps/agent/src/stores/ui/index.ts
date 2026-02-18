@@ -46,3 +46,5 @@ export {
 } from './welcome-animation-store';
 
 export type { WelcomeAnimationId, WelcomeAnimationInfo } from './welcome-animation-store';
+
+export { useUpdateStore } from './update-store';

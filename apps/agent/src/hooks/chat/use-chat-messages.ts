@@ -23,6 +23,7 @@ import type { ReviewFixesStressTestConfig } from '@/stress-tests/review-fixes-st
 import type { MegaStressTestConfig } from '@/stress-tests/rewind-mega-stress-test';
 import type { StressTestConfig } from '@/stress-tests/rewind-stress-test';
 import type { SessionStressTestConfig } from '@/stress-tests/session-stress-test';
+import type { UpdateSimulationConfig } from '@/stress-tests/update-simulation';
 import type { VerifiedReviewCycle1StressTestConfig } from '@/stress-tests/verified-review-cycle1-stress-test';
 import type {
   EffortLevel,
@@ -52,16 +53,18 @@ declare global {
   interface Window {
     __orbit_debug?:
       | {
-          runRewindStressTest: (config?: StressTestConfig) => Promise<unknown>;
-          runMegaStressTest: (config?: MegaStressTestConfig) => Promise<unknown>;
-          runSessionStressTest: (config?: SessionStressTestConfig) => Promise<unknown>;
-          runReviewFixesStressTest: (config?: ReviewFixesStressTestConfig) => Promise<unknown>;
-          runVerifiedReviewCycle1StressTest: (
+          runRewindStressTest?: (config?: StressTestConfig) => Promise<unknown>;
+          runMegaStressTest?: (config?: MegaStressTestConfig) => Promise<unknown>;
+          runSessionStressTest?: (config?: SessionStressTestConfig) => Promise<unknown>;
+          runReviewFixesStressTest?: (config?: ReviewFixesStressTestConfig) => Promise<unknown>;
+          runVerifiedReviewCycle1StressTest?: (
             config?: VerifiedReviewCycle1StressTestConfig
           ) => Promise<unknown>;
-          handleSend: (text: string) => void;
-          handleRewind: (messageId: string) => void;
-          handleStop: () => void;
+          simulateUpdate?: (config?: UpdateSimulationConfig) => Promise<void>;
+          simulateUpdateQuickCycle?: () => Promise<void>;
+          handleSend?: (text: string) => void;
+          handleRewind?: (messageId: string) => void;
+          handleStop?: () => void;
         }
       | undefined;
   }
@@ -408,7 +411,9 @@ export function useChatMessages(): UseChatMessagesReturn {
     if (!import.meta.env.DEV) return;
 
     const actions = createChatActions({ postMessage });
+    const existingDebug = window.__orbit_debug ?? {};
     window.__orbit_debug = {
+      ...existingDebug,
       handleSend: actions.handleSend,
       handleRewind: actions.handleRewind,
       handleStop: actions.handleStop,
@@ -470,6 +475,14 @@ export function useChatMessages(): UseChatMessagesReturn {
           },
           config
         );
+      },
+      simulateUpdate: async (config?: UpdateSimulationConfig) => {
+        const { simulateUpdate } = await import('@/stress-tests/update-simulation');
+        return simulateUpdate(config);
+      },
+      simulateUpdateQuickCycle: async () => {
+        const { simulateUpdateQuickCycle } = await import('@/stress-tests/update-simulation');
+        return simulateUpdateQuickCycle();
       },
     };
 

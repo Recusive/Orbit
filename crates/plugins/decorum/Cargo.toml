@@ -1,6 +1,6 @@
 [package]
 name = "orbit-plugin-decorum"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 description = "macOS ProMotion 120Hz support for Tauri apps"
 license = "MIT"

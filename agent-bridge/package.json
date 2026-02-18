@@ -1,6 +1,6 @@
 {
   "name": "agent-bridge",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "Claude Agent SDK bridge for Orbit",
   "type": "module",
   "main": "dist/index.js",

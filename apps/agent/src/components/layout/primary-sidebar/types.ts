@@ -20,6 +20,8 @@ export interface SidebarItemProps {
   readonly equalSpacing?: boolean;
   readonly shortcut?: string[];
   readonly badge?: string;
+  readonly badgeVariant?: 'default' | 'primary';
+  readonly className?: string;
   readonly onClick?: () => void;
 }
 

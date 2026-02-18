@@ -67,6 +67,8 @@ whoami = "2.1"
 # Local fork with fix for decoration-less windows (original crashes)
 orbit-plugin-decorum = { path = "../crates/plugins/decorum" }
 tauri-plugin-window-state = "2"
+tauri-plugin-updater = { workspace = true }
+tauri-plugin-process = { workspace = true }
 
 # Error tracking
 sentry = { workspace = true }

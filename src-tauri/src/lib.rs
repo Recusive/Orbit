@@ -287,6 +287,8 @@ pub fn run() {
         .plugin(tauri_plugin_liquid_glass::init())
         .plugin(orbit_plugin_decorum::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         // Setup event callbacks for agent and configure window
         .setup(move |app| {
             agent_cmd::setup_event_callbacks(app.handle(), &session_manager);
