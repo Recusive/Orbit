@@ -1934,6 +1934,10 @@ export class SessionManager extends Disposable {
     // Store as thinking preference so session creation picks it up.
     // Without this, the first effort:set is lost (fires before session exists)
     // and the session creates with default budget instead of the user's choice.
+    // NOTE: Only update thinkingEnabled/maxThinkingTokens if thinking is currently
+    // enabled (or was previously enabled in prefs). Without this guard, effort:set
+    // unconditionally forces thinkingEnabled=true, overriding the user's "thinking off"
+    // setting for non-adaptive models like Haiku.
     const budgetMap: Record<string, number> = {
       low: 1024,
       medium: 4096,
@@ -1941,8 +1945,10 @@ export class SessionManager extends Disposable {
       max: 32768,
     };
     const prefs = this.modePreferences.get(sessionId) ?? {};
-    prefs.thinkingEnabled = true;
-    prefs.maxThinkingTokens = budgetMap[effort] ?? 4096;
+    if (prefs.thinkingEnabled !== false) {
+      prefs.thinkingEnabled = true;
+      prefs.maxThinkingTokens = budgetMap[effort] ?? 4096;
+    }
     this.modePreferences.set(sessionId, prefs);
   }
 

@@ -1132,7 +1132,9 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
                 timestamp,
                 ..
             }) => {
-                if !is_active(&uuid, active_uuids.as_ref()) {
+                let active = is_active(&uuid, active_uuids.as_ref());
+                ctx.last_assistant_active = active;
+                if !active {
                     continue;
                 }
                 ctx.process_assistant_line(uuid, &value, timestamp.as_deref());
@@ -1145,8 +1147,13 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
                 ..
             }) => {
                 if subtype.as_deref() == Some("turn_duration") {
-                    if let Some(ms) = duration_ms {
-                        ctx.apply_turn_duration(ms);
+                    // Only apply turn_duration if the most recent assistant was on
+                    // the active branch. Dead-branch durations must not overwrite
+                    // the active assistant's value.
+                    if ctx.last_assistant_active {
+                        if let Some(ms) = duration_ms {
+                            ctx.apply_turn_duration(ms);
+                        }
                     }
                 }
             },
@@ -1175,6 +1182,9 @@ struct ParseContext {
     last_timestamp: Option<u64>,
     tool_results: HashMap<String, ToolResultData>,
     last_msg_uuid: Option<String>,
+    /// Tracks whether the most recently encountered assistant line was on the active branch.
+    /// Used to skip `turn_duration` system lines that follow dead-branch assistants.
+    last_assistant_active: bool,
 }
 
 impl ParseContext {
@@ -1188,6 +1198,7 @@ impl ParseContext {
             last_timestamp: None,
             tool_results: HashMap::new(),
             last_msg_uuid: None,
+            last_assistant_active: false,
         }
     }
 

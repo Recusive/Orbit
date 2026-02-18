@@ -199,22 +199,27 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     let text = inputText.trim();
     if (!text) return;
 
-    // Prepend skill invocation if a skill chip is attached
-    const skillItems = attachedContext.filter((item) => item.type === 'skill');
-    if (skillItems.length > 0) {
-      const skillPrefix = skillItems.map((s) => `/${s.name}`).join(' ');
-      text = `${skillPrefix} ${text}`;
-    }
-
-    // Prepend @filename tokens for attached files/folders so they persist in JSONL content.
+    // Append @filename tokens for attached files/folders so they persist in JSONL content.
     // The file paths are still sent as attachments for the SDK, but the @tokens ensure
     // the user sees them after switching chats (JSONL content survives, attachedFiles doesn't).
+    // NOTE: File tokens are appended (not prepended) so they don't interfere with
+    // skill prefix `/command` at the start of the message — agent-bridge checks
+    // message.startsWith('/') for slash expansion (agent.ts:1306).
     const fileItems = attachedContext.filter(
       (item) => item.type === 'file' || item.type === 'folder'
     );
     if (fileItems.length > 0) {
-      const filePrefix = fileItems.map((item) => `@${item.name}`).join(' ');
-      text = `${filePrefix} ${text}`;
+      const fileSuffix = fileItems.map((item) => `@${item.name}`).join(' ');
+      text = `${text} ${fileSuffix}`;
+    }
+
+    // Prepend skill invocation if a skill chip is attached.
+    // This must be the LAST prefix operation so `/skillName` stays at position 0,
+    // ensuring agent-bridge's `message.startsWith('/')` check succeeds.
+    const skillItems = attachedContext.filter((item) => item.type === 'skill');
+    if (skillItems.length > 0) {
+      const skillPrefix = skillItems.map((s) => `/${s.name}`).join(' ');
+      text = `${skillPrefix} ${text}`;
     }
 
     // Clear input immediately

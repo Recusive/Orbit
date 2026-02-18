@@ -670,9 +670,9 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         { thinking: 'adaptive (CLI-managed)', effort: this._effortLevel ?? 'default' },
         'Adaptive thinking delegated to CLI for streaming compatibility'
       );
-    } else {
-      // All other models: default to extended thinking at ultra (32768 tokens).
-      // If user explicitly configured a budget, use that; otherwise default to ultra.
+    } else if (this._thinkingMode) {
+      // Non-adaptive models with thinking enabled: use explicit extended thinking.
+      // If user explicitly configured a budget, use that; otherwise default to ultra (32768).
       const budget = this._thinkingBudget > 0 ? this._thinkingBudget : 32768;
       options.thinking = { type: 'enabled', budgetTokens: budget };
       const modeName = budget <= 4096 ? 'think' : budget <= 10240 ? 'hard' : 'ultra';
@@ -680,6 +680,10 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         { thinkingMode: modeName, thinkingBudget: budget },
         'Extended thinking ENABLED (fixed budget)'
       );
+    } else {
+      // Non-adaptive models with thinking OFF: omit options.thinking entirely
+      // so the SDK uses its default (no thinking).
+      logger.info('Extended thinking DISABLED for non-adaptive model');
     }
 
     // Permission handling based on session mode
@@ -1692,23 +1696,42 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
   /**
    * Set effort level for adaptive thinking (Opus 4.6).
    * Maps effort levels to thinking token budgets via setMaxThinkingTokens.
+   *
+   * IMPORTANT: This does NOT mutate the active SDK query. The Claude Code SDK does not
+   * expose runtime setters for effort/thinking on an in-flight query. Changes are stored
+   * internally and take effect when `_createOptions()` is called for the next query.
+   * The frontend sends `effort:set` before each message (chat-actions.ts), so the
+   * timing works out — but mid-turn changes have no effect until the next user message.
    */
   setEffortLevel(effort: 'low' | 'medium' | 'high' | 'max'): void {
     this._effortLevel = effort;
 
-    // Also set budget as fallback for non-adaptive models
+    // Also set budget as fallback for non-adaptive models.
+    // Only update _thinkingMode/_thinkingBudget if thinking is not explicitly disabled.
+    // Without this guard, effort:set unconditionally forces _thinkingMode=true,
+    // which overrides the user's "thinking off" setting for non-adaptive models.
     const budgetMap: Record<string, number> = {
       low: 1024,
       medium: 4096,
       high: 10240,
       max: 32768,
     };
-    this._thinkingMode = true;
-    this._thinkingBudget = budgetMap[effort] ?? 4096;
+    if (this._thinkingMode) {
+      this._thinkingBudget = budgetMap[effort] ?? 4096;
+    }
 
     logger.info({ effort }, 'Effort level set — applies on next query');
   }
 
+  /**
+   * Enable or disable extended thinking for non-adaptive models.
+   *
+   * IMPORTANT: This does NOT mutate the active SDK query. The Claude Code SDK does not
+   * expose runtime setters for thinking on an in-flight query. Changes are stored
+   * internally and take effect when `_createOptions()` is called for the next query.
+   * The frontend sends `thinking:set` before each message (chat-actions.ts), so the
+   * timing works out — but mid-turn changes have no effect until the next user message.
+   */
   setThinkingMode(enabled: boolean, maxTokens?: number): void {
     this._thinkingMode = enabled;
     if (maxTokens !== undefined) {

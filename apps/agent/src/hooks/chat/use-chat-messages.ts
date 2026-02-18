@@ -288,12 +288,14 @@ export function useChatMessages(): UseChatMessagesReturn {
       session_id: lastCreatedSessionId,
       model: toolState.model,
     });
-    postMessage({
-      type: 'effort:set',
-      uuid: crypto.randomUUID(),
-      session_id: lastCreatedSessionId,
-      effort: toolState.effortLevel,
-    });
+    if (isAdaptiveThinkingModel(toolState.model)) {
+      postMessage({
+        type: 'effort:set',
+        uuid: crypto.randomUUID(),
+        session_id: lastCreatedSessionId,
+        effort: toolState.effortLevel,
+      });
+    }
 
     // Update title
     useUIStore.getState().updateConversationTitle(lastCreatedSessionId, text);
