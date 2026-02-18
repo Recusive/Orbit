@@ -403,16 +403,34 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     onStop();
   }, [onStop]);
 
+  // Global ESC handler — stops the agent from anywhere on screen,
+  // not just when the input box is focused. Without this, ESC only works
+  // via the React onKeyDown on the contentEditable div.
+  useEffect(() => {
+    if (!isAgentRunning) return;
+
+    const handleGlobalEscape = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return;
+      // Only plain ESC — not Cmd+Esc, Ctrl+Esc, etc.
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      // If a popover is open, ESC should close it (handled by popover's own listener)
+      if (popover.slashOpen || popover.mentionOpen) return;
+
+      e.preventDefault();
+      handleStop();
+    };
+
+    window.addEventListener('keydown', handleGlobalEscape);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalEscape);
+    };
+  }, [isAgentRunning, popover.slashOpen, popover.mentionOpen, handleStop]);
+
   // Keyboard handler
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent): void => {
-      // Escape stops the agent when running (highest priority)
-      // Note: MentionPopover handles its own keyboard events via global listener
-      if (e.key === 'Escape' && isAgentRunning && !popover.slashOpen && !popover.mentionOpen) {
-        e.preventDefault();
-        handleStop();
-        return;
-      }
+      // ESC stop is handled by the global window listener (useEffect above)
+      // so it works regardless of which element has focus.
 
       // Handle slash command popover
       if (popover.slashOpen) {
@@ -448,7 +466,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         handleSend();
       }
     },
-    [isAgentRunning, handleStop, popover, slashCommands, handleSlashSelect, handleSend]
+    [popover, slashCommands, handleSlashSelect, handleSend]
   );
 
   // Paste handler

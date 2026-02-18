@@ -110,8 +110,9 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   // The active AskUserQuestion request (only one at a time — the first)
   const activeAskQuestion = askUserQuestions[0];
 
-  // Global keyboard shortcuts for regular permission modals
-  // Handled here to avoid conflicts when multiple permissions are pending.
+  // Global keyboard shortcuts for regular permission modals.
+  // Uses capture phase so Enter fires here BEFORE React's onKeyDown on
+  // the input (which would otherwise send a message).
   // AskUserQuestion handles its own keyboard shortcuts internally.
   useEffect(() => {
     if (regularPermissions.length === 0 || !onPermissionApprove || !onPermissionDeny) {
@@ -119,23 +120,26 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     }
 
     const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.metaKey || e.ctrlKey) {
-        const firstPermission = regularPermissions[0];
-        if (firstPermission === undefined) return;
+      const firstPermission = regularPermissions[0];
+      if (firstPermission === undefined) return;
 
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          onPermissionApprove(firstPermission.requestId);
-        } else if (e.key === 'Backspace') {
-          e.preventDefault();
-          onPermissionDeny(firstPermission.requestId);
-        }
+      // Plain Enter approves the first permission
+      if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        onPermissionApprove(firstPermission.requestId);
+      }
+      // Cmd+Backspace denies
+      else if (e.key === 'Backspace' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        onPermissionDeny(firstPermission.requestId);
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [regularPermissions, onPermissionApprove, onPermissionDeny]);
 
@@ -170,7 +174,6 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
                     request={request}
                     onApprove={onPermissionApprove}
                     onDeny={onPermissionDeny}
-                    isFirst={index === 0}
                     isLast={index === regularPermissions.length - 1}
                   />
                 ))}

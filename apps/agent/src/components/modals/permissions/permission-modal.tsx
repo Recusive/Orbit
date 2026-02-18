@@ -1,5 +1,5 @@
 import { File, Globe, Loader2, Terminal } from 'lucide-react';
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 
 import type { PermissionRequest } from '@/stores/agent/tool-store';
 import type { FC } from 'react';
@@ -10,14 +10,12 @@ interface PermissionModalProps {
   readonly request: PermissionRequest;
   readonly onApprove: (requestId: string, always?: boolean) => void;
   readonly onDeny: (requestId: string) => void;
-  /** Whether this is the first permission in the list (controls keyboard shortcuts) */
-  readonly isFirst?: boolean;
   /** Whether this is the last permission in the list (controls bottom separator) */
   readonly isLast?: boolean;
 }
 
-// Note: Keyboard shortcuts (Cmd+Enter, Cmd+Backspace) are handled by the parent
-// ChatInput component to avoid conflicts when multiple permissions are pending.
+// Note: Keyboard shortcuts (Enter to approve, Cmd+Backspace to deny) are handled
+// by the parent ChatInput component to avoid conflicts when multiple permissions are pending.
 
 // Get confirmation action label
 function getConfirmLabel(toolName: string): string {
@@ -50,35 +48,14 @@ export const PermissionModal: FC<PermissionModalProps> = ({
   request,
   onApprove,
   onDeny,
-  isFirst = false,
   isLast = true,
 }) => {
   const confirmLabel = getConfirmLabel(request.toolName);
   const isBash = request.toolName.toLowerCase() === 'bash';
   const isBrowser = isBrowserTool(request.toolName);
 
-  // Keyboard shortcuts - only the first permission modal handles global shortcuts
-  // to prevent multiple permissions being approved/denied by a single keypress
-  useEffect(() => {
-    if (!isFirst) return;
-
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.metaKey || e.ctrlKey) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          onApprove(request.requestId);
-        } else if (e.key === 'Backspace') {
-          e.preventDefault();
-          onDeny(request.requestId);
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isFirst, request.requestId, onApprove, onDeny]);
+  // Keyboard shortcuts (Enter to approve, Cmd+Backspace to deny) are handled
+  // globally by ChatInput to avoid conflicts when multiple permissions are pending.
 
   const handleApprove = useCallback(() => {
     onApprove(request.requestId);
@@ -117,13 +94,13 @@ export const PermissionModal: FC<PermissionModalProps> = ({
             onClick={handleDeny}
             className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-gray-4 hover:bg-gray-5 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            Reject <span className="text-muted-foreground/50 ml-1">⌘⌫</span>
+            Reject <span className="text-muted-foreground/50 ml-1">ESC</span>
           </button>
           <button
             onClick={handleApprove}
             className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            Accept <span className="text-primary-foreground/60 ml-1">⌘⏎</span>
+            Accept <span className="text-primary-foreground/60 ml-1">⏎</span>
           </button>
         </div>
       </div>

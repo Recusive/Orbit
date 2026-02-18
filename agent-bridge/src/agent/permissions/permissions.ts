@@ -171,17 +171,26 @@ export class PermissionManager {
           } catch (error) {
             // If permission request fails, deny to avoid silent auto-approval
             const errorMessage = error instanceof Error ? error.message : String(error);
+            const wasAborted = options.signal.aborted;
             logger.error(
-              { toolName, error: errorMessage, signalAborted: options.signal.aborted },
+              { toolName, error: errorMessage, signalAborted: wasAborted },
               `[ERROR] Permission request failed for ${toolName} - DENYING`
             );
+            // When the signal was aborted (user pressed ESC / query interrupted),
+            // set interrupt: true so the SDK stops the current turn cleanly.
+            // With interrupt: false, the SDK would try to continue the conversation
+            // (sending tool_result back to Claude) while query.interrupt() simultaneously
+            // kills the CLI subprocess — this race produces duplicate tool_use IDs
+            // and causes "tool_use ids must be unique" API errors.
             return {
               behavior: 'deny',
-              message: localize(
-                'orbit.permissionFailed',
-                'Permission request failed. Please try again.'
-              ),
-              interrupt: false,
+              message: wasAborted
+                ? localize('orbit.permissionAborted', 'User interrupted')
+                : localize(
+                    'orbit.permissionFailed',
+                    'Permission request failed. Please try again.'
+                  ),
+              interrupt: wasAborted,
             };
           }
         }
@@ -193,8 +202,9 @@ export class PermissionManager {
         };
       } catch (error) {
         // Catch-all: if ANYTHING goes wrong in the callback, deny to avoid silent auto-approval
+        const wasAborted = options.signal.aborted;
         logger.error(
-          { error },
+          { error, signalAborted: wasAborted },
           'CRITICAL: Permission callback crashed - DENYING to prevent silent approval'
         );
         return {
@@ -203,7 +213,7 @@ export class PermissionManager {
             'orbit.permissionSystemError',
             'Permission system error. Please try again.'
           ),
-          interrupt: false,
+          interrupt: wasAborted,
         };
       }
     };

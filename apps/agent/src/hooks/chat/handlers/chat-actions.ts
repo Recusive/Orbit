@@ -227,6 +227,27 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     const session = sessionId ? chatStore.sessions[sessionId] : undefined;
     if (!sessionId || !(session?.isAgentRunning ?? false)) return;
 
+    // If there are pending permission requests, deny them BEFORE interrupting.
+    // Without this, agent:stop fires query.interrupt() which aborts the permission
+    // callback via signal — the PermissionManager returns { deny, interrupt: false }
+    // which races with the CLI subprocess SIGINT, causing duplicate tool_use IDs
+    // and "tool_use ids must be unique" API errors.
+    // Sending proper deny responses first ensures the SDK processes the denial
+    // cleanly before the interrupt arrives.
+    const pendingPermissions = useToolStore.getState().pendingPermissions;
+    if (pendingPermissions.length > 0) {
+      for (const permission of pendingPermissions) {
+        postMessage({
+          type: 'permission:response',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+          request_id: permission.requestId,
+          decision: 'deny',
+        });
+      }
+      useToolStore.getState().clearPermissions();
+    }
+
     Sentry.startSpan(
       {
         op: 'ui.action',
@@ -244,9 +265,6 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         useChatStore.getState().setAgentRunning(sessionId, false);
         // Block rewind until SDK confirms stop (agent:complete/agent:error clears this)
         useChatStore.getState().setStopPending(sessionId, true);
-
-        // Clear any pending permission requests
-        useToolStore.getState().clearPermissions();
 
         const { workspacePath, activeWorktreePath } = useUIStore.getState();
 
