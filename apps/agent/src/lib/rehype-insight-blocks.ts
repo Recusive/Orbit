@@ -95,6 +95,40 @@ function hasOnlyInsightCloser(p: HastElement): boolean {
   return meaningful.length === 1 && first !== undefined && isInsightCloser(first);
 }
 
+/** Recursively check if any descendant of an element contains a closer <code>. */
+function containsCloser(node: HastNode): boolean {
+  if (isInsightCloser(node)) return true;
+  if (isElementNode(node)) {
+    return node.children.some(containsCloser);
+  }
+  return false;
+}
+
+/**
+ * Recursively strip the closer <code> from a tree, returning a new tree without it.
+ * Also removes trailing whitespace text nodes left behind after removal.
+ */
+function stripCloser(node: HastElement): HastElement {
+  const newChildren: HastNode[] = [];
+  for (const child of node.children) {
+    if (isInsightCloser(child)) continue;
+    if (isElementNode(child) && containsCloser(child)) {
+      newChildren.push(stripCloser(child));
+    } else {
+      newChildren.push(child);
+    }
+  }
+
+  // Trim trailing whitespace-only text nodes left after removal
+  let end = newChildren.length;
+  for (; end > 0; end--) {
+    const n = newChildren[end - 1];
+    if (n === undefined || !isTextNode(n) || n.value.trim() !== '') break;
+  }
+
+  return { ...node, children: newChildren.slice(0, end) };
+}
+
 /** Strip leading/trailing whitespace-only text nodes from an array. */
 function trimEdgeWhitespace(nodes: HastNode[]): HastNode[] {
   let start = 0;
@@ -220,23 +254,42 @@ function processTree(node: HastRoot | HastElement): void {
     }
 
     // ── Case 2: Opener in its own <p>, content spans multiple siblings ──
+    // The closer may be in a standalone <p>, or embedded inside any descendant
+    // (e.g., inside the last <li> of a <ul> when the model uses bullet lists).
     if (isElementNode(child) && child.tagName === 'p' && hasOnlyInsightOpener(child)) {
       let closerIdx = -1;
+      let closerEmbedded = false;
       for (let j = i + 1; j < node.children.length; j++) {
         const sibling = node.children[j];
-        if (
-          sibling !== undefined &&
-          isElementNode(sibling) &&
-          sibling.tagName === 'p' &&
-          hasOnlyInsightCloser(sibling)
-        ) {
+        if (sibling === undefined || !isElementNode(sibling)) continue;
+
+        // Standalone closer in its own <p>
+        if (sibling.tagName === 'p' && hasOnlyInsightCloser(sibling)) {
           closerIdx = j;
+          break;
+        }
+        // Closer embedded inside another element (ul, blockquote, etc.)
+        if (containsCloser(sibling)) {
+          closerIdx = j;
+          closerEmbedded = true;
           break;
         }
       }
 
       if (closerIdx !== -1) {
-        const contentElements = node.children.slice(i + 1, closerIdx);
+        let contentElements: HastNode[];
+        if (closerEmbedded) {
+          // Include all siblings between opener and the element containing the closer,
+          // but strip the closer <code> from that last element.
+          contentElements = node.children.slice(i + 1, closerIdx);
+          const lastElement = node.children[closerIdx];
+          if (lastElement !== undefined && isElementNode(lastElement)) {
+            contentElements.push(stripCloser(lastElement));
+          }
+        } else {
+          // Standalone closer in its own <p> — exclude it entirely
+          contentElements = node.children.slice(i + 1, closerIdx);
+        }
         const insightBlock = buildInsightBlock(contentElements);
         newChildren.push(insightBlock);
         i = closerIdx + 1;
