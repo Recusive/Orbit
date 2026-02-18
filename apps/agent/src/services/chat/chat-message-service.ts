@@ -1167,9 +1167,11 @@ class ChatMessageService {
     // text yet (small IPC delivery window). string.slice() with an offset beyond
     // content length safely returns the available text, and once the message
     // completes the offset falls within range.
-    const contentOffset =
+    const contentOffset = Math.max(
+      0,
       message.content_offset ??
-      (currentMsg?.content.length ?? 0) + (this.pendingChunkLengths.get(message.message_id) ?? 0);
+        (currentMsg?.content.length ?? 0) + (this.pendingChunkLengths.get(message.message_id) ?? 0)
+    );
 
     // Call startTool synchronously for immediate widget rendering
     useToolStore

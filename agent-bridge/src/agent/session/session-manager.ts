@@ -1523,7 +1523,7 @@ export class SessionManager extends Disposable {
               );
             }
 
-            // Tool results
+            // Tool results and command expansion output
             const content = sdkMessage.message?.content;
             if (!Array.isArray(content)) continue;
 
@@ -1573,6 +1573,35 @@ export class SessionManager extends Disposable {
                   toolUseMap.delete(toolUseId);
                 }
               }
+
+              // Surface SDK command expansion errors (e.g. bash pattern failures in
+              // .claude/commands/*.md templates) so they appear inline in chat.
+              const typed = block as { type?: string; text?: string };
+              if (typed.type === 'text' && typeof typed.text === 'string') {
+                const text = typed.text.trim();
+                if (text.startsWith('<local-command-stderr>')) {
+                  const errorText = text.replace(/<\/?local-command-stderr>/g, '').trim();
+                  if (errorText) {
+                    // Ensure a turn ID exists so the frontend can render the error
+                    if (!this.currentTurnId.has(sessionId)) {
+                      this.currentTurnId.set(sessionId, randomUUID());
+                    }
+                    const errorMsgId = this.currentTurnId.get(sessionId);
+                    logger.warn(
+                      { sessionId, errorLength: errorText.length },
+                      'Command expansion error — surfacing to frontend'
+                    );
+                    this._onAgentMessage.fire({
+                      sessionId,
+                      message: {
+                        type: 'error',
+                        content: errorText,
+                        messageId: errorMsgId,
+                      },
+                    });
+                  }
+                }
+              }
             }
           } else {
             // sdkMessage.type === 'result'
@@ -1589,7 +1618,12 @@ export class SessionManager extends Disposable {
             // drain, but no new SDK messages are expected until the next turn begins.
             await this.textBatcher.drainSession(sessionId);
 
-            // Get the final message ID for this turn before resetting
+            // Get the final message ID for this turn before resetting.
+            // For command-only turns (no streaming/assistant), generate a fallback
+            // so the frontend can still render the result event.
+            if (!this.currentTurnId.has(sessionId)) {
+              this.currentTurnId.set(sessionId, randomUUID());
+            }
             const turnMessageId = this.currentTurnId.get(sessionId);
 
             // Clear accumulated length tracking for this message (reset for next turn)

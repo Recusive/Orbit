@@ -21,11 +21,7 @@ export interface SlashCommand {
 }
 
 // UI-only commands that are handled client-side (not from backend)
-const UI_COMMANDS: SlashCommand[] = [
-  { name: 'new', description: 'Start a new conversation' },
-  { name: 'model', description: 'Change the AI model' },
-  { name: 'settings', description: 'Open settings' },
-];
+const UI_COMMANDS: SlashCommand[] = [];
 
 interface SlashCommandPopoverProps {
   readonly open: boolean;
@@ -56,10 +52,6 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
   // Filter items based on query — "skills" shows all skills unfiltered
   const filteredCommands = filterItems(allCommands, query);
 
-  // Split into commands and skills for grouped display
-  const commandItems = filteredCommands.filter((cmd) => cmd.kind !== 'skill');
-  const skillItems = filteredCommands.filter((cmd) => cmd.kind === 'skill');
-
   const handleSelect = (command: SlashCommand): void => {
     onSelect(command);
     onOpenChange(false);
@@ -68,8 +60,12 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
   // Cast the anchor ref to Measurable (HTMLElement has getBoundingClientRect)
   const measurableRef = anchorRef as React.RefObject<Measurable>;
 
-  // Running index counter so keyboard navigation works across both groups
-  let runningIndex = 0;
+  // Pre-compute indexed arrays in render order (commands first, then skills)
+  // so keyboard navigation indices match the visual order without a mutable counter.
+  const commandItems = filteredCommands.filter((cmd) => cmd.kind !== 'skill');
+  const skillItems = filteredCommands.filter((cmd) => cmd.kind === 'skill');
+  const indexedCommandItems = commandItems.map((cmd, i) => ({ cmd, idx: i }));
+  const indexedSkillItems = skillItems.map((cmd, i) => ({ cmd, idx: commandItems.length + i }));
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -90,45 +86,39 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
           <CommandList className="scroll-py-2 pb-1.5">
             {filteredCommands.length === 0 ? <CommandEmpty>No commands found.</CommandEmpty> : null}
 
-            {commandItems.length > 0 ? (
+            {indexedCommandItems.length > 0 ? (
               <CommandGroup
                 heading="Commands"
                 className="**:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/60"
               >
-                {commandItems.map((cmd) => {
-                  const idx = runningIndex++;
-                  return (
-                    <CommandItem
-                      key={`cmd-${cmd.name}`}
-                      command={cmd}
-                      isSelected={selectedIndex === idx}
-                      isFirst={idx === 0}
-                      isLast={idx === filteredCommands.length - 1}
-                      onSelect={handleSelect}
-                    />
-                  );
-                })}
+                {indexedCommandItems.map(({ cmd, idx }) => (
+                  <CommandItem
+                    key={`cmd-${cmd.name}`}
+                    command={cmd}
+                    isSelected={selectedIndex === idx}
+                    isFirst={idx === 0}
+                    isLast={idx === filteredCommands.length - 1}
+                    onSelect={handleSelect}
+                  />
+                ))}
               </CommandGroup>
             ) : null}
 
-            {skillItems.length > 0 ? (
+            {indexedSkillItems.length > 0 ? (
               <CommandGroup
                 heading="Skills"
                 className="**:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-wide **:[[cmdk-group-heading]]:text-muted-foreground/60"
               >
-                {skillItems.map((cmd) => {
-                  const idx = runningIndex++;
-                  return (
-                    <CommandItem
-                      key={`skill-${cmd.name}`}
-                      command={cmd}
-                      isSelected={selectedIndex === idx}
-                      isFirst={idx === 0}
-                      isLast={idx === filteredCommands.length - 1}
-                      onSelect={handleSelect}
-                    />
-                  );
-                })}
+                {indexedSkillItems.map(({ cmd, idx }) => (
+                  <CommandItem
+                    key={`skill-${cmd.name}`}
+                    command={cmd}
+                    isSelected={selectedIndex === idx}
+                    isFirst={idx === 0}
+                    isLast={idx === filteredCommands.length - 1}
+                    onSelect={handleSelect}
+                  />
+                ))}
               </CommandGroup>
             ) : null}
           </CommandList>

@@ -1218,6 +1218,7 @@ impl ParseContext {
         // SDK writes these markers when the user interrupts (Stop button).
         // Mark the preceding assistant message as interrupted so the UI
         // can show the "Response interrupted" indicator after session reload.
+        // Deliberately omits closing "]" to match both "...user]" and "...user for tool use]"
         if text.starts_with("[Request interrupted by user") {
             if let Some(last) = self.raw_messages.last_mut() {
                 if last.role == MessageRole::Assistant {

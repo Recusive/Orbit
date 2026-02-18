@@ -8,12 +8,6 @@ import * as path from 'node:path';
 
 import { createLogger } from '../../common/logging/logger.js';
 
-import { REVIEW_BRANCH_PROMPT } from './prompts/review-branch.js';
-import { REVIEW_COMMIT_PROMPT } from './prompts/review-commit.js';
-import { REVIEW_PR_PROMPT } from './prompts/review-pr.js';
-import { REVIEW_STAGED_PROMPT } from './prompts/review-staged.js';
-import { REVIEW_UNCOMMITTED_PROMPT } from './prompts/review-uncommitted.js';
-
 const logger = createLogger('CommandDefinitions');
 
 // Command scope: where the command comes from
@@ -42,105 +36,12 @@ const BUILTIN_COMMANDS: SlashCommandDefinition[] = [
     scope: 'builtin',
     readonly: true,
   },
-  {
-    name: 'clear',
-    description: 'Clear conversation and start fresh',
-    content: '/clear',
-    scope: 'builtin',
-    readonly: true,
-  },
-  {
-    name: 'help',
-    description: 'Show available commands and help',
-    content: '/help',
-    scope: 'builtin',
-    readonly: true,
-  },
 ];
 
 /**
  * Default commands shipped with Orbit (read-only)
  */
-const DEFAULT_COMMANDS: SlashCommandDefinition[] = [
-  // ============================================================================
-  // Review Commands - Used by Review agents in Canvas
-  // ============================================================================
-  {
-    name: 'review-uncommitted',
-    description: 'Review all uncommitted changes in the working directory',
-    content: REVIEW_UNCOMMITTED_PROMPT,
-    allowedTools: ['Read', 'Grep', 'Glob', 'Bash'],
-    scope: 'default',
-    readonly: true,
-  },
-  {
-    name: 'review-staged',
-    description: 'Review staged changes only (git diff --cached)',
-    content: REVIEW_STAGED_PROMPT,
-    allowedTools: ['Read', 'Grep', 'Glob', 'Bash'],
-    scope: 'default',
-    readonly: true,
-  },
-  {
-    name: 'review-branch',
-    description: 'Review all changes on the current branch vs main',
-    argumentHint: '[base-branch]',
-    content: REVIEW_BRANCH_PROMPT,
-    allowedTools: ['Read', 'Grep', 'Glob', 'Bash'],
-    scope: 'default',
-    readonly: true,
-  },
-  {
-    name: 'review-pr',
-    description: 'Review a GitHub Pull Request (uses current branch PR if no number specified)',
-    argumentHint: '[pr-number]',
-    content: REVIEW_PR_PROMPT,
-    allowedTools: ['Read', 'Grep', 'Glob', 'Bash'],
-    scope: 'default',
-    readonly: true,
-  },
-  {
-    name: 'review-commit',
-    description: 'Review a specific commit or commit range',
-    argumentHint: '<sha|sha1..sha2>',
-    content: REVIEW_COMMIT_PROMPT,
-    allowedTools: ['Read', 'Grep', 'Glob', 'Bash'],
-    scope: 'default',
-    readonly: true,
-  },
-  {
-    name: 'fix-tests',
-    description: 'Find and fix failing tests',
-    content: `Find and fix failing tests in the codebase.
-
-1. Run the test suite to identify failures
-2. Analyze the error messages
-3. Fix the underlying issues
-4. Re-run tests to verify fixes
-
-Be thorough and ensure all tests pass.`,
-    allowedTools: ['Read', 'Edit', 'Bash', 'Grep', 'Glob'],
-    scope: 'default',
-    readonly: true,
-  },
-  {
-    name: 'document',
-    description: 'Generate documentation for code',
-    content: `Generate comprehensive documentation for the specified code.
-
-Include:
-- Function/class descriptions
-- Parameter documentation
-- Return value documentation
-- Usage examples where appropriate
-
-Follow the project's existing documentation style.`,
-    argumentHint: '[file-or-function]',
-    allowedTools: ['Read', 'Edit', 'Grep', 'Glob'],
-    scope: 'default',
-    readonly: true,
-  },
-];
+const DEFAULT_COMMANDS: SlashCommandDefinition[] = [];
 
 /**
  * Get the commands directory path for a workspace (project scope)

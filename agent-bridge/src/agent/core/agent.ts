@@ -662,6 +662,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       // which suppresses StreamEvent messages (text_delta, thinking_delta).
       // By omitting it, the CLI handles thinking internally while still emitting
       // stream events for real-time text and thinking output.
+      // Validated against @anthropic-ai/claude-code@1.0.x (CLI v2.1.39).
       if (this._effortLevel) {
         options.effort = this._effortLevel;
       }
