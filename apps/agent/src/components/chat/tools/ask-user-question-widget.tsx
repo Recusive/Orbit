@@ -14,7 +14,7 @@ import { CheckCircle2, ChevronRight, MessageCircleQuestion, XCircle } from 'luci
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE, ToolInlinePreview } from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
@@ -105,11 +105,6 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
 
   const statusLabel = isRunning ? 'Asking question' : 'Asked question';
 
-  // Inline preview: first question text
-  const firstQuestion = pairs[0]?.question ?? '';
-  const previewText =
-    firstQuestion.length > 60 ? firstQuestion.slice(0, 60) + '\u2026' : firstQuestion;
-
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Collapsible header */}
@@ -145,12 +140,7 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
           <span className={cn('text-xs font-medium truncate', 'text-gray-11')}>{statusLabel}</span>
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && success === undefined ? (
-          <ToolInlinePreview text={previewText} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight

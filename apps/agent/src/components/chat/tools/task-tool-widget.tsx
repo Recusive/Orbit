@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 import { z } from 'zod';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE, ToolInlinePreview } from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
@@ -66,7 +66,6 @@ function truncatePrompt(prompt: string, maxLength = 200): string {
 }
 
 export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
-  description,
   prompt,
   subagentType,
   model,
@@ -81,9 +80,6 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
 
   const formattedType = formatSubagentType(subagentType);
   const statusLabel = isRunning ? 'Running Task' : 'Task';
-
-  // Inline preview: agent type + description
-  const previewText = `${formattedType}: ${description}`;
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -131,12 +127,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
           ) : null}
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && success === undefined ? (
-          <ToolInlinePreview text={previewText} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight

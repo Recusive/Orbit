@@ -13,7 +13,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE, ToolInlinePreview } from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC, ReactNode } from 'react';
 
@@ -165,11 +165,6 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
   const stepLabel = getStepLabel(actionName, toolInput, isRunning);
   const stepIcon = getStepIcon(actionName);
 
-  // Inline preview: action description
-  const previewText = stepLabel.linkText
-    ? `${stepLabel.text}${stepLabel.linkText}`
-    : stepLabel.text;
-
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Collapsed header — "Browser" */}
@@ -216,12 +211,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
           ) : null}
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && success === undefined ? (
-          <ToolInlinePreview text={previewText} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight

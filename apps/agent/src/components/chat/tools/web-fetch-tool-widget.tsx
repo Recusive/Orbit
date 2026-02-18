@@ -2,7 +2,7 @@ import { CheckCircle2, ChevronRight, ExternalLink, Globe, Loader2, XCircle } fro
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE, ToolInlinePreview } from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
@@ -40,9 +40,6 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
 
   const hostname = getHostname(url);
   const statusLabel = isRunning ? 'Fetching URL' : 'Web Fetch';
-
-  // Inline preview: hostname + fetch status
-  const previewText = output ? `${hostname} \u2192 fetched` : hostname;
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -90,12 +87,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
           ) : null}
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && success === undefined ? (
-          <ToolInlinePreview text={previewText} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight

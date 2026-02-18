@@ -3,7 +3,6 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useMemo, useState } from 'react';
 
 import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from '../tools/shared';
-import { ToolInlinePreview } from '../tools/shared/tool-inline-preview';
 
 import type { FC, ReactNode } from 'react';
 
@@ -83,15 +82,6 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
     [thinking, isStreaming]
   );
 
-  // Inline preview: first meaningful line of thinking text
-  const previewText =
-    thinking
-      .split('\n')
-      .find((l) => l.trim().length > 0)
-      ?.trim() ?? '';
-  const truncatedPreview =
-    previewText.length > 60 ? previewText.slice(0, 60) + '\u2026' : previewText;
-
   return (
     <div className="min-w-0">
       {/* Header — flat inline row */}
@@ -141,12 +131,7 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
           ) : null}
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && isStreaming ? (
-          <ToolInlinePreview text={truncatedPreview} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight

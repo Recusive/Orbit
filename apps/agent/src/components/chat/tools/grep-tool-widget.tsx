@@ -2,7 +2,7 @@ import { CheckCircle2, ChevronRight, File, Loader2, Search, XCircle } from 'luci
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE, ToolInlinePreview } from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
@@ -113,13 +113,6 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
 
   const statusLabel = isRunning ? 'Searching content' : 'Grep';
 
-  // Inline preview: pattern + result count
-  const truncatedPattern = pattern.length > 40 ? pattern.slice(0, 40) + '\u2026' : pattern;
-  const previewText =
-    matchCount > 0
-      ? `/${truncatedPattern}/ \u2192 ${String(matchCount)} ${matchCount === 1 ? 'match' : 'matches'}`
-      : `/${truncatedPattern}/`;
-
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
@@ -173,12 +166,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
           ) : null}
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && success === undefined ? (
-          <ToolInlinePreview text={previewText} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight

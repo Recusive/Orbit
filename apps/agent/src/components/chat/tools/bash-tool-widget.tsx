@@ -6,7 +6,6 @@ import {
   getShiki,
   TOOL_EXPAND_TRANSITION,
   TOOL_EXPAND_TRANSITION_NONE,
-  ToolInlinePreview,
   useIsDarkMode,
 } from './shared';
 
@@ -20,16 +19,6 @@ interface BashToolWidgetProps {
   readonly output?: string | undefined;
   readonly isRunning?: boolean;
   readonly success?: boolean | undefined;
-}
-
-/** Build a one-line preview for the collapsed header: `$ cmd → lastOutputLine` */
-function buildBashPreview(command: string, output: string | undefined): string {
-  const cmd = command.length > 50 ? command.slice(0, 50) + '\u2026' : command;
-  if (!output) return `$ ${cmd}`;
-  const lines = output.split('\n');
-  const lastLine = lines.filter((l) => l.trim().length > 0).pop() ?? '';
-  const truncated = lastLine.length > 40 ? lastLine.slice(0, 40) + '\u2026' : lastLine;
-  return truncated ? `$ ${cmd} \u2192 ${truncated}` : `$ ${cmd}`;
 }
 
 export const BashToolWidget: FC<BashToolWidgetProps> = ({
@@ -122,7 +111,6 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   const displayOutput = isExpanded ? output : outputLines.slice(0, maxCollapsedLines).join('\n');
 
   const statusLabel = isRunning ? 'Running Bash' : 'Bash';
-  const previewText = buildBashPreview(command, output);
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -170,12 +158,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
           ) : null}
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && success === undefined ? (
-          <ToolInlinePreview text={previewText} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight

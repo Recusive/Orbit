@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 import { z } from 'zod';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE, ToolInlinePreview } from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
@@ -107,13 +107,6 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
 
   const statusLabel = isRunning ? 'Searching the web' : 'Web Search';
 
-  // Inline preview: query + result count
-  const truncatedQuery = query.length > 50 ? query.slice(0, 50) + '\u2026' : query;
-  const previewText =
-    resultCount > 0
-      ? `"${truncatedQuery}" \u2192 ${String(resultCount)} ${resultCount === 1 ? 'result' : 'results'}`
-      : `"${truncatedQuery}"`;
-
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
@@ -166,12 +159,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
           ) : null}
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && success === undefined ? (
-          <ToolInlinePreview text={previewText} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight

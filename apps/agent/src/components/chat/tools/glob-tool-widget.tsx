@@ -2,7 +2,7 @@ import { CheckCircle2, ChevronRight, File, Folder, Loader2, Search, XCircle } fr
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE, ToolInlinePreview } from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
@@ -49,12 +49,6 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
   const fileCount = files.length;
 
   const statusLabel = isRunning ? 'Searching files' : 'Glob';
-
-  // Inline preview: pattern + result count
-  const previewText =
-    fileCount > 0
-      ? `${pattern} \u2192 ${String(fileCount)} ${fileCount === 1 ? 'file' : 'files'}`
-      : pattern;
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -108,12 +102,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
           ) : null}
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && success === undefined ? (
-          <ToolInlinePreview text={previewText} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight

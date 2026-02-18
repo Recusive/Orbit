@@ -2,7 +2,7 @@ import { CheckCircle2, ChevronRight, Circle, ListTodo, Loader2, XCircle } from '
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE, ToolInlinePreview } from './shared';
+import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC, ReactElement } from 'react';
 
@@ -117,13 +117,6 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
 
   const statusLabel = isRunning ? 'Updating tasks' : 'Todo';
 
-  // Inline preview: first todo item content
-  const firstTodo = todos[0]?.content ?? '';
-  const previewText =
-    totalCount > 0
-      ? `${String(completedCount)}/${String(totalCount)} \u2014 ${firstTodo.length > 40 ? firstTodo.slice(0, 40) + '\u2026' : firstTodo}`
-      : '';
-
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
@@ -188,12 +181,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
           ) : null}
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && success === undefined ? (
-          <ToolInlinePreview text={previewText} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight

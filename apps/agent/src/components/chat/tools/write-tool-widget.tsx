@@ -13,7 +13,6 @@ import {
   DiffStat,
   TOOL_EXPAND_TRANSITION,
   TOOL_EXPAND_TRANSITION_NONE,
-  ToolInlinePreview,
   useHighlightedTokens,
   useIsDarkMode,
 } from './shared';
@@ -58,10 +57,6 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   const maxPreviewLines = 8;
   const displayLines = showAllLines ? lines : lines.slice(0, maxPreviewLines);
   const hasMore = !showAllLines && lines.length > maxPreviewLines;
-
-  // Inline preview: show first line of content
-  const firstLine = lines[0] ?? '';
-  const previewText = firstLine.length > 60 ? firstLine.slice(0, 60) + '\u2026' : firstLine;
 
   const handleFileClick = (e: React.MouseEvent): void => {
     e.preventDefault();
@@ -135,12 +130,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
           {!isRunning && !isFailed ? <DiffStat additions={lineCount} deletions={0} /> : null}
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && success === undefined ? (
-          <ToolInlinePreview text={previewText} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight

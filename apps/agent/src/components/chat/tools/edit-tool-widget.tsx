@@ -6,7 +6,6 @@ import {
   DiffStat,
   TOOL_EXPAND_TRANSITION,
   TOOL_EXPAND_TRANSITION_NONE,
-  ToolInlinePreview,
   useHighlightedTokens,
   useIsDarkMode,
 } from './shared';
@@ -53,11 +52,6 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   const displayNewLines = showAllLines ? newLines : newLines.slice(0, maxPreviewLines);
   const hasMore =
     !showAllLines && (oldLines.length > maxPreviewLines || newLines.length > maxPreviewLines);
-
-  // Inline preview: show first line of new content
-  const firstNewLine = newLines[0] ?? '';
-  const previewText =
-    firstNewLine.length > 60 ? firstNewLine.slice(0, 60) + '\u2026' : firstNewLine;
 
   const handleFileClick = (e: React.MouseEvent): void => {
     e.preventDefault();
@@ -131,12 +125,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
           ) : null}
         </div>
 
-        {/* Center: inline preview strip (collapsed only) */}
-        {!isExpanded && success === undefined ? (
-          <ToolInlinePreview text={previewText} />
-        ) : (
-          <div className="flex-1" />
-        )}
+        <div className="flex-1" />
 
         {/* Right: chevron */}
         <ChevronRight
