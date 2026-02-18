@@ -369,3 +369,79 @@ The `tauri-apps/tauri-action` may have failed to generate it. Check the build-ta
 ### App says "no update available" but version is outdated
 
 The version in `tauri.conf.json` must be lower than the version in `latest.json`. Verify both. The comparison is semver-based.
+
+---
+
+## Current Status & Next Steps
+
+**Status:** Implementation complete, not yet tested end-to-end. All code is on the `fix/prod` branch.
+
+### What's Done
+
+- All auto-update code (store, hook, toast, sidebar button, simulation)
+- Tauri updater + process plugins wired in (Rust + frontend)
+- CI workflow (`tauri-build.yml`) configured for macOS ARM64 only
+- Public release repo (`Recusive/Orbit-Release`) created with README + branding
+- Signing keys generated and stored as GitHub Secrets (all 10 secrets configured)
+- Version unified to `0.0.1` across all manifests
+- `AUTO-UPDATE.md` documentation (this file)
+
+### What's Next
+
+The pipeline has never been run. To test it end-to-end:
+
+#### Step 1: Merge to main
+
+Review all changes on `fix/prod`, then merge into `main` when ready:
+
+```bash
+git checkout main
+git merge fix/prod
+git push origin main
+```
+
+#### Step 2: First release (v0.0.1)
+
+Tag and push to trigger the CI pipeline for the first time:
+
+```bash
+git tag v0.0.1
+git push origin v0.0.1
+```
+
+This creates the baseline release. The app built from this version will be the one that later checks for updates. Watch the GitHub Actions tab for the 4-job pipeline to complete (~15 min). Verify that `Recusive/Orbit-Release` has a release with `.dmg`, `.app.tar.gz`, `latest.json`, and `.sig` files.
+
+#### Step 3: Install the v0.0.1 build
+
+Download the `.dmg` from Orbit-Release and install it on your machine. This is the "old" version that will later detect the update.
+
+#### Step 4: Ship a test update (v0.0.2)
+
+Bump the version, push, and let CI build the new release:
+
+```bash
+./scripts/bump-version.sh 0.0.2
+git push && git push --tags
+```
+
+#### Step 5: Verify the update flow
+
+Open the installed v0.0.1 app. Within a few seconds (or up to 4 hours for the periodic check), it should:
+
+1. Fetch `latest.json` from Orbit-Release
+2. See that `0.0.2 > 0.0.1`
+3. Show the update toast with "Orbit v0.0.2 available"
+4. Clicking "Update now" downloads and installs
+5. "Restart now" relaunches on v0.0.2
+
+If the toast doesn't appear, check the DevTools console for `[UpdateStore]` and `[AutoUpdate]` log messages.
+
+#### Step 6: Clean up the test version (optional)
+
+If v0.0.2 was just a test, you can delete the release from Orbit-Release and continue development. The next real release can be any version > 0.0.1.
+
+### Known Risks
+
+- **First CI run may fail** — The Xcode 26.2 path in `xcode-select` assumes the GitHub runner has it installed. If it fails, check [runner-images](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-arm64-Readme.md) for available Xcode versions and update the workflow.
+- **Apple notarization** — First-time notarization can take longer (up to 30 min). Subsequent runs are faster (~5 min).
+- **`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`** — Set to a single space because GitHub rejects empty secret values. If the key was generated without a password, this should work. If signing fails, try regenerating the key with an explicit password.
