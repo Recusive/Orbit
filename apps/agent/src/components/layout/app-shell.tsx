@@ -2,7 +2,7 @@
  * AppShell — Dia-style base layer root layout
  *
  * Renders the dark base layer with a flex-row layout:
- * [Sidebar (variable width)] [ResizeHandle] [ContentCard (flex: 1)]
+ * [Sidebar (variable width)] [ResizeHandle] [ContentCard (flex: 1)] [ActionsBar?]
  *
  * The base layer is draggable (data-tauri-drag-region) so the user
  * can drag the window from the exposed dark margins around the card.
@@ -24,9 +24,17 @@ interface AppShellProps {
   readonly resizeHandle: ReactNode;
   readonly children: ReactNode;
   readonly sidebarWidth: number;
+  /** Optional right-side actions bar rendered on the base layer */
+  readonly actionsBar?: ReactNode;
 }
 
-export const AppShell: FC<AppShellProps> = ({ sidebar, resizeHandle, children, sidebarWidth }) => {
+export const AppShell: FC<AppShellProps> = ({
+  sidebar,
+  resizeHandle,
+  children,
+  sidebarWidth,
+  actionsBar,
+}) => {
   // The sidebar wrapper always maintains at least minUsable width so content
   // never compresses. When sidebarWidth drops below that (during collapse
   // animation), a negative margin-left slides the entire wrapper off the left
@@ -57,6 +65,9 @@ export const AppShell: FC<AppShellProps> = ({ sidebar, resizeHandle, children, s
 
       {/* Content card fills remaining space */}
       {children}
+
+      {/* Actions bar — right edge, on the base layer */}
+      {actionsBar}
     </div>
   );
 };

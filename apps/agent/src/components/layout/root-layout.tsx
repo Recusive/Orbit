@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
-import { ActionsBar } from './actions-bar';
 import { ChatArea } from './chat-area';
 
 import type { ExtensionMessage } from '@/types/protocol';
@@ -21,7 +20,6 @@ import { useUIStore } from '@/stores/ui/ui-store';
  */
 export const RootLayout: FC = () => {
   // Granular data selectors — only re-render when THESE specific values change
-  const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const goToLineDialogOpen = useUIStore((s) => s.goToLineDialogOpen);
   const chatAreaDetached = useUIStore((s) => s.chatAreaDetached);
 
@@ -151,10 +149,6 @@ export const RootLayout: FC = () => {
       {/* Chat Area - Main chat interface with Activity panel */}
       {/* Hidden when detached (e.g., canvas expanded view uses its own ChatArea) */}
       {!chatAreaDetached ? <ChatArea /> : null}
-
-      {/* Actions Bar - Activity Panel tab switcher */}
-      {/* Also hidden when ChatArea is detached to prevent orphaned controls */}
-      {rightSidebarOpen && !chatAreaDetached ? <ActionsBar /> : null}
 
       {/* Quick Open Dialog */}
       <QuickOpen open={quickOpenVisible} onOpenChange={setQuickOpenVisible} />

@@ -28,9 +28,19 @@ function getPanelConstraints(target: 'review' | 'bottom'): { min: number; max: n
 interface ResizeHandleProps {
   readonly direction: 'horizontal' | 'vertical';
   readonly target: 'review' | 'bottom';
+  /** When true, hides the persistent separator line — handle is invisible until hovered */
+  readonly borderless?: boolean;
+  /** Called on every rAF frame during drag with the clamped value — use for direct DOM updates.
+   *  When provided, Zustand store is only updated on mouseup (not every frame). */
+  readonly onDrag?: (value: number) => void;
 }
 
-export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
+export const ResizeHandle: FC<ResizeHandleProps> = ({
+  direction,
+  target,
+  borderless = false,
+  onDrag,
+}) => {
   // Use useShallow to prevent re-renders when unrelated store state changes
   const { setReviewPanelWidth, setBottomPanelHeight, reviewPanelWidth, bottomPanelHeight } =
     useUIStore(
@@ -42,21 +52,37 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
       }))
     );
   const startValueRef = useRef(0);
+  const dragValueRef = useRef(0);
+  const rafRef = useRef(0);
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
   const handleMouseDown = (e: React.MouseEvent): void => {
     e.preventDefault();
     const startPos = direction === 'vertical' ? e.clientX : e.clientY;
-    startValueRef.current = target === 'review' ? reviewPanelWidth : bottomPanelHeight;
+    const currentValue = target === 'review' ? reviewPanelWidth : bottomPanelHeight;
+    startValueRef.current = currentValue;
+    dragValueRef.current = currentValue;
+    const constraints = getPanelConstraints(target);
+    const setValue = target === 'review' ? setReviewPanelWidth : setBottomPanelHeight;
 
     const handleMouseMove = (moveEvent: MouseEvent): void => {
-      if (target === 'review') {
-        const delta = startPos - moveEvent.clientX;
-        setReviewPanelWidth(startValueRef.current + delta);
+      const delta = startPos - (direction === 'vertical' ? moveEvent.clientX : moveEvent.clientY);
+      const clamped = Math.max(
+        constraints.min,
+        Math.min(constraints.max, startValueRef.current + delta)
+      );
+      dragValueRef.current = clamped;
+
+      if (onDrag) {
+        // Batch DOM updates via rAF — skip React entirely during drag
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(() => {
+          onDrag(clamped);
+        });
       } else {
-        const delta = startPos - moveEvent.clientY;
-        setBottomPanelHeight(startValueRef.current + delta);
+        // Fallback: update store directly (original behavior)
+        setValue(clamped);
       }
     };
 
@@ -65,6 +91,9 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
       document.removeEventListener('mouseup', handleMouseUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      cancelAnimationFrame(rafRef.current);
+      // Commit final value to store (single render on mouseup)
+      setValue(dragValueRef.current);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -159,24 +188,26 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({ direction, target }) => {
         setIsHovered(false);
       }}
     >
-      {/* Persistent separator line */}
+      {/* Persistent separator line — hidden in borderless mode */}
+      {!borderless ? (
+        <div
+          className="bg-border transition-colors duration-100"
+          style={
+            isVertical
+              ? { width: RESIZE_HANDLE.width, height: '100%' }
+              : { height: RESIZE_HANDLE.width, width: '100%' }
+          }
+        />
+      ) : null}
+      {/* Hover indicator line — uses CSS group-hover for reliable hit-testing */}
       <div
-        className="bg-border transition-colors duration-100"
+        className={cn(
+          'absolute bg-primary transition-opacity duration-100 opacity-0 group-hover:opacity-100',
+          isFocused && 'opacity-100'
+        )}
         style={
-          isVertical
-            ? { width: RESIZE_HANDLE.width, height: '100%' }
-            : { height: RESIZE_HANDLE.width, width: '100%' }
+          isVertical ? { width: handleSize, height: '100%' } : { height: handleSize, width: '100%' }
         }
-      />
-      {/* Hover indicator line */}
-      <div
-        className="absolute bg-primary transition-opacity duration-100"
-        style={{
-          opacity: isHovered ? 1 : 0,
-          ...(isVertical
-            ? { width: handleSize, height: '100%' }
-            : { height: handleSize, width: '100%' }),
-        }}
       />
     </div>
   );

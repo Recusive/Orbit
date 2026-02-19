@@ -1,21 +1,25 @@
 import { CanvasApp } from '@canvas/CanvasApp';
 import { EditorApp } from '@editor/EditorApp';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { HeaderTab } from '@/stores/ui/ui-store';
 import type { CSSProperties, FC } from 'react';
 
 import welcomeBg from '@/assets/welcome-bg.png';
+import { ActionsBar } from '@/components/layout/actions-bar';
+import { ActivityCard } from '@/components/layout/activity-card';
 import { AppShell } from '@/components/layout/app-shell';
 import { ContentCard } from '@/components/layout/content-card';
 import { ContentTopBar } from '@/components/layout/content-top-bar';
 import { PrimarySidebar } from '@/components/layout/primary-sidebar';
+import { ResizeHandle } from '@/components/layout/resize-handle';
 import { RootLayout } from '@/components/layout/root-layout';
 import { SidebarResizeHandle } from '@/components/layout/sidebar-resize-handle';
 import { StatusBar } from '@/components/layout/status-bar';
 import { CrashNotification } from '@/components/modals';
 import { OnboardingFlow } from '@/components/onboarding';
+import { ActivityPanel } from '@/components/panels';
 import { ErrorBoundary } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
@@ -28,7 +32,7 @@ import { useAutoUpdate } from '@/hooks/core/use-auto-update';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { useFullscreen } from '@/hooks/ui/use-fullscreen';
 import { useTrafficLights } from '@/hooks/ui/use-traffic-lights';
-import { SIDEBAR } from '@/lib/utils/constants';
+import { CONTENT_CARD, SIDEBAR } from '@/lib/utils/constants';
 import { TauriProvider } from '@/providers/tauri-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
@@ -41,6 +45,15 @@ import { useHasWorkspace, useLeftSidebarWidth, useUIStore } from '@/stores/ui/ui
 
 const STYLE_DISPLAY_BLOCK: CSSProperties = { display: 'block' };
 const STYLE_DISPLAY_NONE: CSSProperties = { display: 'none' };
+
+/** Evaluated once — reduced-motion preference is static for session lifetime */
+const PREFERS_REDUCED_MOTION =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Activity panel slide transition — margin reclaims space, transform moves it off-screen */
+const ACTIVITY_TRANSITION: string | undefined = PREFERS_REDUCED_MOTION
+  ? undefined
+  : `margin-right ${CONTENT_CARD.transition}, transform ${CONTENT_CARD.transition}`;
 
 // ============================================
 // Demo View Initialization
@@ -315,6 +328,9 @@ const App: FC = () => {
   // Sidebar state — now global (shared across all modes)
   const leftSidebarWidth = useLeftSidebarWidth();
   const sidebarOpen = leftSidebarWidth > SIDEBAR.collapsed;
+  const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
+  const reviewPanelOpen = useUIStore((s) => s.reviewPanelOpen);
+  const reviewPanelWidth = useUIStore((s) => s.reviewPanelWidth);
 
   // Dia-style layout hooks
   useTrafficLights(sidebarOpen);
@@ -362,6 +378,34 @@ const App: FC = () => {
     };
   }, [toggleLeftSidebar]);
 
+  // Activity panel slide wrapper — mirrors the sidebar's margin-slide pattern.
+  // When closed, marginRight = -width slides the entire panel off the right edge
+  // as one rigid body. Content inside never compresses.
+  const isWelcome = !hasWorkspace && !isDemo;
+  const activityOpen = reviewPanelOpen && !isWelcome;
+  const activityWrapperStyle = useMemo(
+    (): CSSProperties => ({
+      width: reviewPanelWidth,
+      marginRight: activityOpen ? 0 : -reviewPanelWidth,
+      transform: activityOpen ? 'translateX(0)' : 'translateX(100%)',
+      flexShrink: 0,
+      overflow: 'hidden',
+      transition: ACTIVITY_TRANSITION,
+    }),
+    [activityOpen, reviewPanelWidth]
+  );
+
+  // Direct DOM ref for the activity wrapper — bypasses React during drag resize.
+  // ResizeHandle calls onDrag → sets style.width directly at 60fps, no re-renders.
+  // Store commit happens once on mouseup.
+  const activityWrapperRef = useRef<HTMLDivElement>(null);
+  const handleActivityDrag = useCallback((width: number): void => {
+    const el = activityWrapperRef.current;
+    if (el) {
+      el.style.width = `${String(width)}px`;
+    }
+  }, []);
+
   // Show onboarding flow if user hasn't completed it yet (skip in demo mode)
   if (!hasCompletedOnboarding && !isDemo) {
     return (
@@ -371,8 +415,6 @@ const App: FC = () => {
     );
   }
 
-  const isWelcome = !hasWorkspace && !isDemo;
-
   return (
     <ThemeProvider>
       <TauriProvider>
@@ -381,8 +423,14 @@ const App: FC = () => {
             sidebar={<PrimarySidebar />}
             resizeHandle={<SidebarResizeHandle />}
             sidebarWidth={leftSidebarWidth}
+            actionsBar={rightSidebarOpen && !isWelcome ? <ActionsBar /> : undefined}
           >
-            <ContentCard sidebarOpen={sidebarOpen} isFullscreen={isFullscreen}>
+            {/* Main content card — takes remaining space */}
+            <ContentCard
+              sidebarOpen={sidebarOpen}
+              actionsBarOpen={activityOpen || rightSidebarOpen ? !isWelcome : false}
+              isFullscreen={isFullscreen}
+            >
               {/* Welcome background image — inside the card */}
               {isWelcome ? (
                 <>
@@ -484,6 +532,21 @@ const App: FC = () => {
               {/* Toast notifications — offset accounts for card margin */}
               <Toaster position="bottom-right" offset={46} />
             </ContentCard>
+
+            {/* Activity panel — slides in/out via negative marginRight (sidebar pattern) */}
+            <div ref={activityWrapperRef} style={activityWrapperStyle}>
+              <div className="h-full flex">
+                <ResizeHandle
+                  direction="vertical"
+                  target="review"
+                  borderless
+                  onDrag={handleActivityDrag}
+                />
+                <ActivityCard actionsBarOpen={rightSidebarOpen} isFullscreen={isFullscreen}>
+                  <ActivityPanel canRenderTerminal canManageBrowser />
+                </ActivityCard>
+              </div>
+            </div>
           </AppShell>
         </TooltipProvider>
       </TauriProvider>
