@@ -1,10 +1,10 @@
 //! Orbit's window enhancement plugin for macOS.
 //!
-//! Provides `ProMotion` 120Hz rendering support via `CADisplayLink` and
-//! `WebKit` 60fps cap removal via the `_WKFeature` private API (with
-//! fullscreen-aware toggling for notch `MacBook` compatibility).
-//! Traffic light positioning is handled natively by Tauri's
-//! `trafficLightPosition` config — no custom delegate needed.
+//! Provides:
+//! - `ProMotion` 120Hz rendering support via `CADisplayLink` and
+//!   `WebKit` 60fps cap removal via the `_WKFeature` private API
+//! - Runtime traffic light (close/minimize/zoom) repositioning
+//! - Child window z-ordering fix
 
 use tauri::plugin::{Builder, TauriPlugin};
 #[cfg(target_os = "macos")]
@@ -13,6 +13,8 @@ use tauri::{Runtime, WebviewWindow};
 
 #[cfg(target_os = "macos")]
 mod promotion;
+#[cfg(target_os = "macos")]
+mod traffic_lights;
 #[cfg(target_os = "macos")]
 mod window_order;
 
@@ -36,6 +38,18 @@ pub trait WebviewWindowExt {
     /// Returns an error if the operation cannot be dispatched to the main thread.
     #[cfg(target_os = "macos")]
     fn enable_promotion(&self) -> Result<(), Error>;
+
+    /// Show or hide macOS traffic light buttons (close/minimize/zoom).
+    ///
+    /// Uses `setHidden:` on each `standardWindowButton`, matching Electron's
+    /// `win.setWindowButtonVisibility()`. Positioning is handled by wry's
+    /// `drawRect:` via `trafficLightPosition` in `tauri.conf.json`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be dispatched to the main thread.
+    #[cfg(target_os = "macos")]
+    fn set_traffic_lights_visible(&self, visible: bool, x: f64, y: f64) -> Result<(), Error>;
 }
 
 impl WebviewWindowExt for WebviewWindow {
@@ -48,6 +62,18 @@ impl WebviewWindowExt for WebviewWindow {
             self.run_on_main_thread(move || {
                 promotion::enable_promotion();
                 promotion::unlock_webview_framerate();
+            })?;
+        }
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    fn set_traffic_lights_visible(&self, visible: bool, x: f64, y: f64) -> Result<(), Error> {
+        if is_main_thread() {
+            traffic_lights::set_traffic_lights_visible(visible, x, y);
+        } else {
+            self.run_on_main_thread(move || {
+                traffic_lights::set_traffic_lights_visible(visible, x, y);
             })?;
         }
         Ok(())

@@ -128,11 +128,7 @@ function flattenTree(
 // File Explorer Component
 // ═══════════════════════════════════════════════════════════════
 
-interface FileExplorerProps {
-  readonly collapsed?: boolean;
-}
-
-export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
+export const FileExplorer: FC = () => {
   const {
     rootPath,
     rootChildren,
@@ -235,10 +231,6 @@ export const FileExplorer: FC<FileExplorerProps> = ({ collapsed = false }) => {
       logger.error('Failed to open folder', err instanceof Error ? err : new Error(String(err)));
     }
   }, [setRootPath, refresh]);
-
-  if (collapsed) {
-    return null;
-  }
 
   // Get virtual items once per render
   const virtualItems = rowVirtualizer.getVirtualItems();

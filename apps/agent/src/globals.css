@@ -126,6 +126,9 @@
   --color-terminal-bg: var(--terminal-bg);
   --color-terminal-fg: var(--terminal-fg);
   --color-terminal-cursor: var(--terminal-cursor);
+
+  /* Content card (Dia-style floating layout) */
+  --color-base-layer: var(--base-layer);
 }
 
 :root {
@@ -275,6 +278,12 @@
   --gradient-warning-glow: 0 0 8px rgba(245, 158, 11, 0.3);
   --gradient-success-glow: 0 0 8px rgba(16, 185, 129, 0.3);
 
+  /* Content card (Dia-style floating layout) */
+  --base-layer: var(--gray-4);
+  --content-card-radius: 10px;
+  --content-card-margin: 4px;
+  --content-card-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 2px 12px -4px rgba(0, 0, 0, 0.08);
+
   /* Beam ASCII reveal animation — leading edge and glow colors */
   --beam-hot: #c04020;           /* Saturated warm coral for light bg */
   --beam-glow-rgb: 192, 64, 32; /* Same as hot, in RGB for rgba() */
@@ -422,6 +431,10 @@ html.dark {
   /* Tooltip colors (elevated surface on dark theme) */
   --tooltip-bg: var(--gray-5);
   --tooltip-text: var(--gray-12);
+
+  /* Content card (Dia-style floating layout) — subtle white ring on dark */
+  --base-layer: var(--gray-1);
+  --content-card-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 2px 12px -4px rgba(0, 0, 0, 0.3);
 
   /* Beam ASCII reveal animation — white-hot on dark bg */
   --beam-hot: #ffffff;
@@ -886,6 +899,7 @@ html.dark [data-streamdown='code-block-container'] {
 .prose td[align='right'] {
   text-align: right;
 }
+
 
 @layer base {
   *,

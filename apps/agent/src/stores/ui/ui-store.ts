@@ -465,14 +465,13 @@ export const useUIStore = create<UIStore>()(
 
     setLeftSidebarWidth: (width: number): void => {
       set((state) => {
-        // Clamp to valid range: either collapsed or minUsable-max
-        if (width <= SIDEBAR.collapsed) {
+        // Clamp to valid range: either collapsed (0) or minUsable-max.
+        // Any width below minUsable snaps to collapsed — there's no usable
+        // sidebar state between 0 and minUsable.
+        if (width < PANEL_SIZES.sidebar.minUsable) {
           state.leftSidebarWidth = SIDEBAR.collapsed;
         } else {
-          const clampedWidth = Math.max(
-            PANEL_SIZES.sidebar.minUsable,
-            Math.min(PANEL_SIZES.sidebar.max, width)
-          );
+          const clampedWidth = Math.min(PANEL_SIZES.sidebar.max, width);
           state.leftSidebarWidth = clampedWidth;
           // Remember this width for when user toggles via button
           state.lastExpandedSidebarWidth = clampedWidth;
@@ -692,14 +691,13 @@ export const useUIStore = create<UIStore>()(
 
     setCanvasRightSidebarWidth: (width: number): void => {
       set((state) => {
-        // Clamp to valid range: either collapsed or minUsable-max
-        if (width <= SIDEBAR.collapsed) {
+        // Clamp to valid range: either collapsed (0) or minUsable-max.
+        // Any width below minUsable snaps to collapsed — there's no usable
+        // sidebar state between 0 and minUsable.
+        if (width < PANEL_SIZES.sidebar.minUsable) {
           state.canvasRightSidebarWidth = SIDEBAR.collapsed;
         } else {
-          const clampedWidth = Math.max(
-            PANEL_SIZES.sidebar.minUsable,
-            Math.min(PANEL_SIZES.sidebar.max, width)
-          );
+          const clampedWidth = Math.min(PANEL_SIZES.sidebar.max, width);
           state.canvasRightSidebarWidth = clampedWidth;
           // Remember this width for when user toggles via button
           state.lastExpandedCanvasRightSidebarWidth = clampedWidth;

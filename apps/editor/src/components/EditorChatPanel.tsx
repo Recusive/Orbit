@@ -16,7 +16,7 @@ import { useCallback, useRef } from 'react';
 import type { ChatMessage } from '@/components/chat/messages';
 import type { FC } from 'react';
 
-import { ChatHeader, ChatMessages, ChatInput, useQueuedMessageHandler } from '@/components/chat';
+import { ChatMessages, ChatInput, useQueuedMessageHandler } from '@/components/chat';
 import { useChatMessages } from '@/hooks/chat/use-chat-messages';
 import { cn } from '@/lib/utils/utils';
 import {
@@ -110,7 +110,6 @@ export const EditorChatPanel: FC = () => {
   return (
     <div className="h-full w-full flex flex-col bg-chat-area">
       {/* Chat Header */}
-      <ChatHeader hideGitControls />
 
       {/* Chat Content */}
       <div ref={contentRef} className="flex-1 flex flex-col min-h-0 overflow-hidden">

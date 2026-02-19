@@ -16,18 +16,13 @@ export const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       onClick={onClick}
       title={label}
     >
-      {/* Tab background - Orbit style */}
+      {/* Tab background */}
       <div
         className={cn(
-          'absolute inset-x-0 top-1.5 bottom-0 rounded-t-md transition-[background-color] duration-100',
-          active ? 'bg-gray-4' : 'hover:bg-gray-4'
+          'absolute inset-x-0 top-1.5 bottom-0 rounded-md transition-[background-color] duration-100',
+          active ? 'bg-gray-2 dark:bg-gray-4' : 'hover:bg-gray-2 dark:hover:bg-gray-4'
         )}
       />
-      {/* Active indicator */}
-      {/* Active indicator - offset to sit on parent's bottom border */}
-      {active ? (
-        <div className="absolute inset-x-0 h-[2px] bg-primary" style={{ bottom: -1.5 }} />
-      ) : null}
       <span className="relative text-base font-medium truncate">{label}</span>
     </button>
   );

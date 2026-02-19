@@ -196,7 +196,7 @@ export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
       >
         {activeTab === 'explorer' ? (
           <div className="h-full overflow-y-auto">
-            <FileExplorer collapsed={isCollapsed} />
+            <FileExplorer />
           </div>
         ) : (
           <div className="h-full overflow-y-auto">
@@ -217,8 +217,6 @@ export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
         <SidebarItem
           icon={Settings2}
           label="Settings"
-          collapsed={isCollapsed}
-          equalSpacing={isCollapsed}
           shortcut={['⌘', ',']}
           onClick={() => {
             openSettings('agent');
@@ -227,8 +225,6 @@ export const EditorSidebar: FC<EditorSidebarProps> = ({ width }) => {
         <SidebarItem
           icon={FlaskConical}
           label="Feedback"
-          collapsed={isCollapsed}
-          equalSpacing={isCollapsed}
           onClick={() => {
             openSettings('feedback');
           }}

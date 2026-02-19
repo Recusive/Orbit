@@ -18,7 +18,7 @@ import { SidebarToggleIcon } from './components/SidebarToggleIcon';
 import { TabButton } from './components/TabButton';
 import { useSidebarActions } from './hooks/use-sidebar-actions';
 
-import type { PrimarySidebarProps, SidebarTab } from './types';
+import type { SidebarTab } from './types';
 import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { SkillsDialogProps } from '@/components/modals/skills';
 import type { FC } from 'react';
@@ -29,13 +29,11 @@ import {
   CreateWorktreeDialog,
   DeleteWorktreeDialog,
 } from '@/components/modals';
-import { BeamAsciiPre } from '@/components/shared';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn, getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
+import { getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
 import {
   useUIStore,
-  useIsLeftSidebarCollapsed,
   useWorkspaceName,
   useWorkspacePath,
   useWorkspaceConversations,
@@ -45,16 +43,6 @@ import {
   useCreateWorktreeDialogOpen,
 } from '@/stores/ui/ui-store';
 import { useUpdateStore } from '@/stores/ui/update-store';
-
-/** Evaluated once at module load — the OS preference is static for the session lifetime.
- * Guarded for non-DOM contexts (tests / SSR). (Code review: Codex cycle 1, issue #3) */
-const PREFERS_REDUCED_MOTION =
-  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/** Width transition CSS for the sidebar, gated on reduced-motion preference. */
-const SIDEBAR_WIDTH_TRANSITION = PREFERS_REDUCED_MOTION
-  ? 'none'
-  : 'width 200ms cubic-bezier(0.165, 0.84, 0.44, 1)';
 
 // Lazy load heavy components
 const LazySettingsDialog = lazy(() =>
@@ -79,7 +67,7 @@ const SkillsDialog: FC<SkillsDialogProps> = (props) => (
   </Suspense>
 );
 
-export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
+export const PrimarySidebar: FC = () => {
   // Use useShallow to prevent re-renders when unrelated store state changes
   const {
     toggleLeftSidebar,
@@ -102,7 +90,6 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       setEditingConversationId: s.setEditingConversationId,
     }))
   );
-  const isCollapsed = useIsLeftSidebarCollapsed();
   const workspaceName = useWorkspaceName();
   const workspacePath = useWorkspacePath();
   const conversations = useWorkspaceConversations();
@@ -144,93 +131,42 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
   return (
     <aside
       data-sidebar="primary"
-      className="h-full flex flex-col bg-card overflow-hidden border-r border-gray-5"
-      style={{
-        width,
-        transition: SIDEBAR_WIDTH_TRANSITION,
-        contain: 'layout style',
-      }}
+      className="h-full flex flex-col overflow-hidden"
+      style={{ contain: 'layout style' }}
     >
-      {/* Header */}
-      <div className="flex shrink-0" style={{ height: HEIGHTS.headerBar }}>
-        {isCollapsed ? (
-          /* Collapsed: just the icon centered */
-          <div
-            className="flex items-center justify-center shrink-0 h-full"
-            style={{ width: SIDEBAR.iconColumnWidth }}
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={toggleLeftSidebar}
-                  aria-label="Expand sidebar"
-                  className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
-                >
-                  <SidebarToggleIcon expanded={false} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="flex items-center gap-2">
-                <span>Expand sidebar</span>
-                <KbdGroup>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">{getCommandKey()}</Kbd>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">/</Kbd>
-                </KbdGroup>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        ) : (
-          /* Expanded: text on left, button on right */
-          <div className="flex items-center justify-between w-full px-3">
-            <div className="flex items-center gap-1.5">
-              <BeamAsciiPre
-                ariaLabel="Orbit Agent"
-                className="text-[3.5px] leading-[1.1]"
-                duration={1400}
-                beamSize={20}
-                text={` ██████╗ ██████╗ ██████╗ ██╗████████╗     █████╗  ██████╗ ███████╗███╗  ██╗████████╗
-██╔═══██╗██╔══██╗██╔══██╗██║╚══██╔══╝    ██╔══██╗██╔════╝ ██╔════╝████╗ ██║╚══██╔══╝
-██║   ██║██████╔╝██████╔╝██║   ██║       ███████║██║  ███╗█████╗  ██╔██╗██║   ██║
-██║   ██║██╔══██╗██╔══██╗██║   ██║       ██╔══██║██║   ██║██╔══╝  ██║╚████║   ██║
-╚██████╔╝██║  ██║██████╔╝██║   ██║       ██║  ██║╚██████╔╝███████╗██║ ╚███║   ██║
- ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝       ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚══╝   ╚═╝`}
-              />
-            </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={toggleLeftSidebar}
-                  aria-label="Collapse sidebar"
-                  className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
-                >
-                  <SidebarToggleIcon expanded={true} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="flex items-center gap-2">
-                <span>Collapse sidebar</span>
-                <KbdGroup>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">{getCommandKey()}</Kbd>
-                  <Kbd className="bg-white/15 text-inherit border-white/20">/</Kbd>
-                </KbdGroup>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        )}
+      {/* Header — always expanded; at width 0 the sidebar is fully clipped by AppShell */}
+      <div
+        className="flex items-center justify-end shrink-0 w-full px-3"
+        style={{ height: HEIGHTS.headerBar, marginTop: 5, marginBottom: 5 }}
+      >
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={toggleLeftSidebar}
+              aria-label="Collapse sidebar"
+              className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-2 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
+            >
+              <SidebarToggleIcon expanded={true} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="flex items-center gap-2">
+            <span>Collapse sidebar</span>
+            <KbdGroup>
+              <Kbd className="bg-white/15 text-inherit border-white/20">{getCommandKey()}</Kbd>
+              <Kbd className="bg-white/15 text-inherit border-white/20">/</Kbd>
+            </KbdGroup>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
-      {/* Search Bar - hidden when collapsed */}
+      {/* Search Bar */}
       <div
-        className={cn(
-          'shrink-0 mx-1.5 overflow-hidden transition-opacity duration-150 ease-out',
-          isCollapsed ? 'py-0' : ''
-        )}
-        style={{
-          height: isCollapsed ? 0 : SIDEBAR.searchBarHeight,
-          opacity: isCollapsed ? 0 : 1,
-        }}
+        className="shrink-0 mx-1.5 overflow-hidden"
+        style={{ height: SIDEBAR.searchBarHeight, marginBottom: 5 }}
       >
         <button
           onClick={handleOpenQuickSearch}
-          className="flex items-center h-8 rounded-lg text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-4 hover:bg-gray-5 border border-gray-7 transition-[background-color] duration-100"
+          className="flex items-center h-8 rounded-lg text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-7 hover:bg-gray-8 dark:bg-gray-4 dark:hover:bg-gray-5 transition-[background-color] duration-100"
           title="Search files (⌘P)"
         >
           {/* Fixed-width icon column - never moves */}
@@ -250,16 +186,10 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         </button>
       </div>
 
-      {/* Tab Navigation - hidden when collapsed */}
+      {/* Tab Navigation */}
       <div
-        className={cn(
-          'flex items-center shrink-0 px-1.5 gap-0.5 overflow-visible transition-opacity duration-150 ease-out',
-          isCollapsed ? '' : 'border-b border-gray-5'
-        )}
-        style={{
-          height: isCollapsed ? 0 : SIDEBAR.tabNavHeight,
-          opacity: isCollapsed ? 0 : 1,
-        }}
+        className="flex items-center shrink-0 px-1.5 gap-0.5 overflow-visible"
+        style={{ height: SIDEBAR.tabNavHeight }}
       >
         <TabButton
           label="Sessions"
@@ -277,40 +207,25 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         />
       </div>
 
-      {/* Main Actions (only show for conversations tab) - slides up when collapsed */}
+      {/* Main Actions (only show for conversations tab) */}
       {activeTab === 'conversations' ? (
-        <div
-          className={cn(
-            'flex flex-col border-b border-gray-5 shrink-0',
-            isCollapsed ? 'gap-0 pt-0 pb-1.5' : 'gap-1 py-1.5'
-          )}
-        >
+        <div className="flex flex-col shrink-0 gap-1 py-1.5">
           <SidebarItem
             icon={IconCirclePlus}
             label="New Session"
-            collapsed={isCollapsed}
-            equalSpacing={isCollapsed}
             large
             onClick={handleStartConversation}
           />
-          <SidebarItem
-            icon={FolderOpen}
-            label="Projects"
-            collapsed={isCollapsed}
-            equalSpacing={isCollapsed}
-          />
+          <SidebarItem icon={FolderOpen} label="Projects" />
           <SidebarItem
             icon={IconSearchlinesSparkle}
             label="Vault"
             badge="Coming soon"
-            collapsed={isCollapsed}
-            equalSpacing={isCollapsed}
             onClick={() => {
               useUIStore.getState().toggleVault();
             }}
           />
           <PowersSection
-            collapsed={isCollapsed}
             onSkillsClick={() => {
               setSkillsDialogOpen(true);
             }}
@@ -319,70 +234,46 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
       ) : null}
 
       {/* Tab Content */}
-      <div
-        className={cn(
-          'flex-1 overflow-x-hidden',
-          isCollapsed ? 'overflow-y-hidden' : 'overflow-y-auto'
-        )}
-      >
+      <div className="flex-1 overflow-x-hidden overflow-y-auto">
         {activeTab === 'conversations' ? (
-          /* Conversations Tab Content */
-          <div
-            className={cn(
-              'transition-opacity duration-150',
-              isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-            )}
-          >
-            <ConversationList
-              conversations={conversations}
-              worktrees={worktrees}
-              workspaceName={workspaceName}
-              activeConversationId={activeConversationId}
-              activeWorktreePath={activeWorktreePath}
-              editingConversationId={editingConversationId}
-              collapsed={isCollapsed}
-              onLoadConversation={handleLoadConversation}
-              onStartEditConversation={setEditingConversationId}
-              onRenameConversation={(sessionId, newTitle) => {
-                void handleRenameConversation(sessionId, newTitle);
-              }}
-              onCancelEditConversation={() => {
-                setEditingConversationId(null);
-              }}
-              onDeleteConversation={handleOpenDeleteDialog}
-              onDuplicateConversation={handleDuplicateConversation}
-              onToggleWorktree={toggleWorktreeExpanded}
-              onSelectWorktree={(path) => {
-                useUIStore.getState().setActiveWorktree(path);
-              }}
-              onRemoveWorktree={handleOpenDeleteWorktreeDialog}
-              onOpenCreateWorktree={handleOpenCreateWorktree}
-            />
-          </div>
+          <ConversationList
+            conversations={conversations}
+            worktrees={worktrees}
+            workspaceName={workspaceName}
+            activeConversationId={activeConversationId}
+            activeWorktreePath={activeWorktreePath}
+            editingConversationId={editingConversationId}
+            onLoadConversation={handleLoadConversation}
+            onStartEditConversation={setEditingConversationId}
+            onRenameConversation={(sessionId, newTitle) => {
+              void handleRenameConversation(sessionId, newTitle);
+            }}
+            onCancelEditConversation={() => {
+              setEditingConversationId(null);
+            }}
+            onDeleteConversation={handleOpenDeleteDialog}
+            onDuplicateConversation={handleDuplicateConversation}
+            onToggleWorktree={toggleWorktreeExpanded}
+            onSelectWorktree={(path) => {
+              useUIStore.getState().setActiveWorktree(path);
+            }}
+            onRemoveWorktree={handleOpenDeleteWorktreeDialog}
+            onOpenCreateWorktree={handleOpenCreateWorktree}
+          />
         ) : (
-          /* Explorer Tab Content */
-          <div
-            className={cn(
-              'h-full transition-opacity duration-150',
-              isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-            )}
-          >
-            <FileExplorer collapsed={isCollapsed} />
-          </div>
+          <FileExplorer />
         )}
       </div>
 
       <hr className="border-gray-5 border-t shrink-0 mt-2 mb-0" />
 
-      {/* Utilities — pinned to bottom, spacing stays constant so buttons don't shift on collapse */}
+      {/* Utilities — pinned to bottom */}
       <div className="flex flex-col shrink-0 gap-1 py-1.5">
         {/* Update indicator — visible after user dismisses the update toast */}
         {(updateStatus === 'available' || updateStatus === 'ready') && updateDismissed ? (
           <SidebarItem
             icon={Download}
             label={updateStatus === 'ready' ? 'Restart to update' : 'Update available'}
-            collapsed={isCollapsed}
-            equalSpacing={isCollapsed}
             badge={updateStatus === 'ready' ? 'Restart' : 'Update'}
             badgeVariant="primary"
             className="border border-dashed border-gray-6"
@@ -399,8 +290,6 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         <SidebarItem
           icon={Settings2}
           label="Settings"
-          collapsed={isCollapsed}
-          equalSpacing={isCollapsed}
           shortcut={['⌘', ',']}
           onClick={() => {
             openSettings('agent');
@@ -409,8 +298,6 @@ export const PrimarySidebar: FC<PrimarySidebarProps> = ({ width }) => {
         <SidebarItem
           icon={FlaskConical}
           label="Feedback"
-          collapsed={isCollapsed}
-          equalSpacing={isCollapsed}
           onClick={() => {
             openSettings('feedback');
           }}

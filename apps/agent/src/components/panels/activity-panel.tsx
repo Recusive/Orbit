@@ -101,8 +101,8 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         'group relative flex items-center h-full px-3 text-base cursor-pointer select-none shrink-0',
         'border-r border-gray-5',
         isActive
-          ? 'bg-editor-bg text-foreground border-t-2 border-t-primary'
-          : 'bg-chat-area text-muted-foreground hover:text-foreground border-t-2 border-t-transparent'
+          ? 'bg-editor-bg text-foreground'
+          : 'bg-chat-area text-muted-foreground hover:text-foreground'
       )}
       style={{ maxWidth: 180 }}
     >

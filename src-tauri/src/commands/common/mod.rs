@@ -10,4 +10,5 @@ pub mod providers;
 pub mod search;
 pub mod settings;
 pub mod terminal;
+pub mod window;
 pub mod workspace;

@@ -11,6 +11,22 @@ import type { FC, KeyboardEvent } from 'react';
 import { cn, PANEL_SIZES, RESIZE_HANDLE, SIDEBAR } from '@/lib/utils';
 import { useIsLeftSidebarCollapsed, useUIStore } from '@/stores/ui/ui-store';
 
+/**
+ * Apply sidebar width to a wrapper element that uses the margin-left slide pattern.
+ * Above minUsable: real width grows, marginLeft stays 0.
+ * Below minUsable: width stays fixed at minUsable, marginLeft slides it off-screen.
+ */
+function applySidebarWidth(el: HTMLElement, width: number): void {
+  const minWidth = PANEL_SIZES.sidebar.minUsable;
+  if (width < minWidth) {
+    el.style.width = `${String(minWidth)}px`;
+    el.style.marginLeft = `${String(width - minWidth)}px`;
+  } else {
+    el.style.width = `${String(width)}px`;
+    el.style.marginLeft = '0px';
+  }
+}
+
 /** Keyboard resize step in pixels */
 const KEYBOARD_STEP = 10;
 const KEYBOARD_STEP_LARGE = 50;
@@ -18,17 +34,18 @@ const KEYBOARD_STEP_LARGE = 50;
 /**
  * SidebarResizeHandle - A smooth resize handle for the left sidebar
  *
+ * Layout: Zero-width flex container with absolutely positioned 8px hit area.
+ * The outer div occupies 0px in flex flow. An inner absolute-positioned div
+ * extends 4px on each side (centered on the sidebar/card boundary) to create
+ * the interactive region without negative margins or padding hacks.
+ *
  * Key features:
  * - Updates DOM directly during drag for smooth, lag-free resizing
  * - Only syncs to React state on mouseup (prevents re-render jank)
  * - Enforces min 240px, max 400px when expanded
- * - Snap-to-collapse: drag below snapThreshold to collapse to 40px
- * - Disabled when sidebar is collapsed (40px)
- * - Wide hit area (8px) for easy targeting, thin visual line (1px)
- * - Orange highlight persists during drag
- *
- * This approach avoids the lag that occurs when updating React state
- * on every mousemove event.
+ * - Snap-to-collapse: drag below snapThreshold to collapse to 0px
+ * - Wide hit area (8px) for easy targeting, thin visual line (3px)
+ * - Accent highlight on hover/drag/focus
  */
 export const SidebarResizeHandle: FC = () => {
   // Use useShallow to prevent re-renders when unrelated store state changes
@@ -84,12 +101,13 @@ export const SidebarResizeHandle: FC = () => {
 
     e.preventDefault();
 
-    // Find the sidebar element first - if not found, bail out before setting any state
-    // Find the sibling sidebar element. Both Agent ("primary") and Editor ("editor-primary")
-    // use this handle; query for either attribute on the previous sibling.
+    // Find the sidebar wrapper element first - if not found, bail out before setting any state.
+    // In AppShell layout, the sidebar is wrapped in a width-controlling div
+    // (data-sidebar="primary-wrapper"). Fall back to the sidebar element itself
+    // for Editor mode (data-sidebar="editor-primary").
     const sidebarElement =
-      (e.currentTarget as HTMLElement).parentElement?.querySelector<HTMLElement>(
-        '[data-sidebar="primary"], [data-sidebar="editor-primary"]'
+      document.querySelector<HTMLElement>(
+        '[data-sidebar="primary-wrapper"], [data-sidebar="editor-primary"]'
       ) ?? null;
     if (!sidebarElement) return;
 
@@ -105,9 +123,6 @@ export const SidebarResizeHandle: FC = () => {
     const originalTransition = sidebarElement.style.transition;
     sidebarElement.style.transition = 'none';
 
-    // Track if we're in snap zone to update React state only on threshold crossing
-    let wasInSnapZone = false;
-
     const handleMouseMove = (moveEvent: MouseEvent): void => {
       // Calculate delta (positive = dragging right = wider)
       const delta = moveEvent.clientX - startX;
@@ -116,26 +131,17 @@ export const SidebarResizeHandle: FC = () => {
       // Clamp max, but allow going below minUsable for snap behavior
       newWidth = Math.min(PANEL_SIZES.sidebar.max, newWidth);
 
-      const isInSnapZone = newWidth < PANEL_SIZES.sidebar.snapThreshold;
-
-      // Update React state only when crossing the snap threshold (not every frame)
-      if (isInSnapZone !== wasInSnapZone) {
-        wasInSnapZone = isInSnapZone;
-        // This updates isCollapsed which controls sidebar content visibility
-        setLeftSidebarWidth(isInSnapZone ? SIDEBAR.collapsed : PANEL_SIZES.sidebar.minUsable);
-      }
-
-      // Snap behavior: if below threshold, show collapsed width
-      if (isInSnapZone) {
-        sidebarElement.style.width = `${String(SIDEBAR.collapsed)}px`;
+      // Snap behavior: if below threshold, slide to collapsed
+      if (newWidth < PANEL_SIZES.sidebar.snapThreshold) {
+        applySidebarWidth(sidebarElement, SIDEBAR.collapsed);
         currentWidthRef.current = SIDEBAR.collapsed;
       } else if (newWidth < PANEL_SIZES.sidebar.minUsable) {
-        // Between threshold and minUsable: show minUsable (visual feedback)
-        sidebarElement.style.width = `${String(PANEL_SIZES.sidebar.minUsable)}px`;
+        // Between threshold and minUsable: show minUsable (visual resistance)
+        applySidebarWidth(sidebarElement, PANEL_SIZES.sidebar.minUsable);
         currentWidthRef.current = newWidth; // Keep actual value for snap decision
       } else {
         // Normal range: show actual width
-        sidebarElement.style.width = `${String(newWidth)}px`;
+        applySidebarWidth(sidebarElement, newWidth);
         currentWidthRef.current = newWidth;
       }
     };
@@ -192,36 +198,39 @@ export const SidebarResizeHandle: FC = () => {
       aria-valuemax={PANEL_SIZES.sidebar.max}
       aria-label="Resize sidebar. Use left/right arrow keys to adjust."
       tabIndex={isCollapsed ? -1 : 0}
-      className={cn(
-        'group relative shrink-0 h-full',
-        'focus:outline-none focus-visible:z-10',
-        // Only show resize cursor when expanded
-        isCollapsed ? 'cursor-default' : 'cursor-col-resize'
-      )}
-      onMouseDown={handleMouseDown}
-      onKeyDown={handleKeyDown}
-      onFocus={() => {
-        setIsFocused(true);
-      }}
-      onBlur={() => {
-        setIsFocused(false);
-      }}
-      // Wider hit area via padding, visual line matches RESIZE_HANDLE.width
-      style={{ width: RESIZE_HANDLE.width, padding: '0 4px', margin: '0 -4px' }}
+      className="relative shrink-0 h-full focus:outline-none focus-visible:z-10"
+      style={{ width: 0 }}
     >
-      {/* No persistent line — sidebar owns the border-r to avoid stacking */}
-      {/* Hover/Active indicator line - only show when expanded (can resize) */}
-      {!isCollapsed && (
-        <div
-          className={cn(
-            'absolute inset-y-0 left-1/2 -translate-x-1/2 bg-primary transition-opacity duration-100',
-            // Use group-hover for reliable hit area detection (outer div is 8px wide)
-            isDragging || isFocused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-          )}
-          // Always use hoverWidth (3px) since line is only visible on hover/drag/focus
-          style={{ width: RESIZE_HANDLE.hoverWidth }}
-        />
-      )}
+      {/* Hit area — absolutely positioned, centered on the sidebar/card boundary */}
+      <div
+        className={cn(
+          'group absolute inset-y-0 z-10',
+          isCollapsed ? 'cursor-default' : 'cursor-col-resize'
+        )}
+        style={{
+          width: RESIZE_HANDLE.hitArea,
+          left: -(RESIZE_HANDLE.hitArea / 2),
+        }}
+        onMouseDown={handleMouseDown}
+        onKeyDown={handleKeyDown}
+        onFocus={() => {
+          setIsFocused(true);
+        }}
+        onBlur={() => {
+          setIsFocused(false);
+        }}
+      >
+        {/* Hover/Active indicator line — only visible when expanded */}
+        {!isCollapsed && (
+          <div
+            className={cn(
+              'absolute inset-y-0 left-1/2 -translate-x-1/2 bg-primary transition-opacity duration-100',
+              isDragging || isFocused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            )}
+            style={{ width: RESIZE_HANDLE.hoverWidth }}
+          />
+        )}
+      </div>
     </div>
   );
 };

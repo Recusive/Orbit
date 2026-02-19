@@ -31,3 +31,6 @@ export { useMentionSearch } from './use-mention-search';
 export type { UseMentionSearchOptions, UseMentionSearchReturn } from './use-mention-search';
 
 export { useContainerWidth } from './use-container-width';
+
+export { useTrafficLights } from './use-traffic-lights';
+export { useFullscreen } from './use-fullscreen';

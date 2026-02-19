@@ -42,7 +42,7 @@
  * Sidebar width constants
  */
 export const SIDEBAR = {
-  collapsed: 35,
+  collapsed: 0,
   expanded: 256,
   iconColumnWidth: 35,
   itemPadding: 12, // 6px mx-1.5 each side
@@ -66,7 +66,7 @@ export const HEIGHTS = {
 export const PANEL_SIZES = {
   sidebar: {
     default: 256,
-    min: 35,
+    min: 0,
     minUsable: 240, // Minimum width when expanded (can't drag smaller than this)
     max: 400,
     snapThreshold: 180, // Below this, sidebar snaps to collapsed
@@ -145,8 +145,25 @@ export const INPUT_SIZES = {
  * Resize handle dimensions
  */
 export const RESIZE_HANDLE = {
+  /** Persistent separator line width (generic resize handles) */
   width: 1,
-  hoverWidth: 1,
+  /** Accent indicator line width on hover/drag/focus */
+  hoverWidth: 3,
+  /** Full interactive hit area width (sidebar resize handle) */
+  hitArea: 8,
+} as const;
+
+/**
+ * Content card layout (Dia-style floating card)
+ *
+ * The app uses a dark base layer with a floating rounded content card.
+ * When the sidebar is open, the card has no left margin (touches sidebar).
+ * When closed, uniform margins on all sides.
+ */
+export const CONTENT_CARD = {
+  borderRadius: 10,
+  margin: 10,
+  transition: '200ms cubic-bezier(0.165, 0.84, 0.44, 1)',
 } as const;
 
 // ============================================

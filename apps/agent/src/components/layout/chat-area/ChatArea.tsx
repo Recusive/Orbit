@@ -19,7 +19,7 @@ import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { AllotmentHandle } from 'allotment';
 import type { FC, JSX } from 'react';
 
-import { ChatHeader, useQueuedMessageHandler } from '@/components/chat';
+import { useQueuedMessageHandler } from '@/components/chat';
 import { ActivityPanel } from '@/components/panels';
 import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
@@ -291,10 +291,7 @@ export const ChatArea: FC = () => {
         preferredSize={reviewPanelOpen ? CHAT_PANEL.WITH_ACTIVITY_WIDTH : '100%'}
         minSize={CHAT_PANEL.MIN_WIDTH}
       >
-        <div className="flex flex-col h-full min-w-0">
-          <ChatHeader />
-          {chatContent}
-        </div>
+        <div className="flex flex-col h-full min-w-0">{chatContent}</div>
       </ResizablePanel>
 
       {/* Activity Panel (split view) - uses delayed visible for animation timing */}

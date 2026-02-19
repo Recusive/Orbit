@@ -29,7 +29,7 @@ use commands::canvas::PreviewServerState;
 use commands::common::{
     credentials, dev_monitor, diagnostics, files, git, lsp, providers,
     search::{self, FileIndexState},
-    settings, terminal, workspace,
+    settings, terminal, window, workspace,
 };
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
@@ -580,6 +580,8 @@ pub fn run() {
             browser::browser_detect,
             browser::browser_get_pid,
             browser::browser_clear,
+            // Window management commands
+            window::set_traffic_lights_visible,
         ])
         .run(tauri::generate_context!());
 

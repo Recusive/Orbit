@@ -6,18 +6,14 @@ import type { FC } from 'react';
 
 export type SidebarTab = 'conversations' | 'explorer';
 
-export interface PrimarySidebarProps {
-  readonly width: number;
-}
+export type PrimarySidebarProps = Record<string, never>;
 
 export interface SidebarItemProps {
   readonly icon: FC<{ className?: string }>;
   readonly label: string;
-  readonly collapsed: boolean;
   readonly active?: boolean;
   readonly small?: boolean;
   readonly large?: boolean;
-  readonly equalSpacing?: boolean;
   readonly shortcut?: string[];
   readonly badge?: string;
   readonly badgeVariant?: 'default' | 'primary';
@@ -28,7 +24,6 @@ export interface SidebarItemProps {
 export interface ConversationItemProps {
   readonly conversation: ConversationSummary;
   readonly active?: boolean;
-  readonly collapsed?: boolean;
   readonly isEditing?: boolean;
   readonly onClick?: () => void;
   readonly onDoubleClick?: () => void;
@@ -41,7 +36,6 @@ export interface ConversationItemProps {
 export interface WorkspaceItemProps {
   readonly name: string;
   readonly active?: boolean;
-  readonly collapsed?: boolean;
   readonly expanded?: boolean;
   readonly onToggle?: () => void;
 }

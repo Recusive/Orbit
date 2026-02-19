@@ -7,8 +7,12 @@ import type { HeaderTab } from '@/stores/ui/ui-store';
 import type { CSSProperties, FC } from 'react';
 
 import welcomeBg from '@/assets/welcome-bg.png';
-import { HeaderBar } from '@/components/layout/header-bar';
+import { AppShell } from '@/components/layout/app-shell';
+import { ContentCard } from '@/components/layout/content-card';
+import { ContentTopBar } from '@/components/layout/content-top-bar';
+import { PrimarySidebar } from '@/components/layout/primary-sidebar';
 import { RootLayout } from '@/components/layout/root-layout';
+import { SidebarResizeHandle } from '@/components/layout/sidebar-resize-handle';
 import { StatusBar } from '@/components/layout/status-bar';
 import { CrashNotification } from '@/components/modals';
 import { OnboardingFlow } from '@/components/onboarding';
@@ -22,11 +26,14 @@ import { MOCK_ROOT, getMockFileContent } from '@/hooks/agent/use-tauri-mock';
 import { useBrowser } from '@/hooks/browser/use-browser';
 import { useAutoUpdate } from '@/hooks/core/use-auto-update';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
+import { useFullscreen } from '@/hooks/ui/use-fullscreen';
+import { useTrafficLights } from '@/hooks/ui/use-traffic-lights';
+import { SIDEBAR } from '@/lib/utils/constants';
 import { TauriProvider } from '@/providers/tauri-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useOnboardingStore } from '@/stores/onboarding/onboarding-store';
-import { useHasWorkspace, useUIStore } from '@/stores/ui/ui-store';
+import { useHasWorkspace, useLeftSidebarWidth, useUIStore } from '@/stores/ui/ui-store';
 
 // ============================================
 // Style Constants (avoid new object refs on each render)
@@ -39,10 +46,6 @@ const STYLE_DISPLAY_NONE: CSSProperties = { display: 'none' };
 // Demo View Initialization
 // ============================================
 
-/**
- * Apply demo-specific initial state based on the ?view= query parameter.
- * Each view variant configures which panels and files are open on launch.
- */
 /**
  * Apply demo-specific initial state based on the ?view= query parameter.
  * Each view variant configures which panels and files are open on launch.
@@ -278,7 +281,8 @@ const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error, onReset })
 };
 
 /**
- * Agent mode - the main chat interface with sidebar and activity panel
+ * Agent mode - the main chat interface with activity panel
+ * (Sidebar is now in AppShell, not here)
  */
 const AgentMode: FC = () => {
   return <RootLayout />;
@@ -307,6 +311,14 @@ const App: FC = () => {
   const activeTab = useUIStore((state) => state.activeTab);
   const hasWorkspace = useHasWorkspace();
   const hasCompletedOnboarding = useOnboardingStore((state) => state.hasCompletedOnboarding);
+
+  // Sidebar state — now global (shared across all modes)
+  const leftSidebarWidth = useLeftSidebarWidth();
+  const sidebarOpen = leftSidebarWidth > SIDEBAR.collapsed;
+
+  // Dia-style layout hooks
+  useTrafficLights(sidebarOpen);
+  const isFullscreen = useFullscreen();
 
   // Skip onboarding in demo mode (marketing site iframe with ?demo=true)
   const searchParams = new URLSearchParams(window.location.search);
@@ -341,6 +353,15 @@ const App: FC = () => {
     [acknowledge]
   );
 
+  // Listen for sidebar toggle keyboard shortcut (global — all modes)
+  const toggleLeftSidebar = useUIStore((s) => s.toggleLeftSidebar);
+  useEffect(() => {
+    window.addEventListener('toggleLeftSidebar', toggleLeftSidebar);
+    return (): void => {
+      window.removeEventListener('toggleLeftSidebar', toggleLeftSidebar);
+    };
+  }, [toggleLeftSidebar]);
+
   // Show onboarding flow if user hasn't completed it yet (skip in demo mode)
   if (!hasCompletedOnboarding && !isDemo) {
     return (
@@ -350,106 +371,120 @@ const App: FC = () => {
     );
   }
 
+  const isWelcome = !hasWorkspace && !isDemo;
+
   return (
     <ThemeProvider>
       <TauriProvider>
         <TooltipProvider delayDuration={0}>
-          <div className="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground relative">
-            {/* Full-window background image — only on welcome page */}
-            {!hasWorkspace && !isDemo ? (
-              <>
-                <div
-                  className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-                  style={{ backgroundImage: `url(${welcomeBg})` }}
-                  aria-hidden="true"
-                />
-                <div
-                  className="absolute inset-0 hidden dark:block bg-linear-to-t from-gray-3/80 via-gray-3/55 to-gray-3/35"
-                  aria-hidden="true"
-                />
-              </>
-            ) : null}
-
-            {/* Shared header with tabs — relative z-10 to sit above welcome bg */}
-            <HeaderBar transparent={!hasWorkspace && !isDemo} className="relative z-10" />
-
-            {/* Mode content - show welcome page if no workspace, otherwise show active mode */}
-            {/*
-             * LAZY MOUNT PATTERN: Modes are only mounted when first visited, then kept
-             * alive via CSS display toggling. This prevents:
-             * 1. Layout flashes when switching tabs (no remounting)
-             * 2. Unnecessary memory usage for unvisited modes
-             */}
-            <div className="flex-1 min-h-0 overflow-hidden relative z-10">
-              {!hasWorkspace && !isDemo ? (
-                <WelcomePage />
-              ) : (
+          <AppShell
+            sidebar={<PrimarySidebar />}
+            resizeHandle={<SidebarResizeHandle />}
+            sidebarWidth={leftSidebarWidth}
+          >
+            <ContentCard sidebarOpen={sidebarOpen} isFullscreen={isFullscreen}>
+              {/* Welcome background image — inside the card */}
+              {isWelcome ? (
                 <>
-                  {/* Agent mode - mounted on first visit, kept alive */}
-                  {mounted.agent ? (
-                    <div
-                      className="h-full w-full"
-                      style={activeTab === 'agent' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
-                    >
-                      <ErrorBoundary
-                        fallback={(error, reset) => (
-                          <ModeErrorFallback mode="agent" error={error} onReset={reset} />
-                        )}
-                      >
-                        <AgentMode />
-                      </ErrorBoundary>
-                    </div>
-                  ) : null}
-                  {/* Canvas mode - mounted on first visit, kept alive */}
-                  {mounted.canvas ? (
-                    <div
-                      className="h-full w-full"
-                      style={activeTab === 'canvas' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
-                    >
-                      <ErrorBoundary
-                        fallback={(error, reset) => (
-                          <ModeErrorFallback mode="canvas" error={error} onReset={reset} />
-                        )}
-                      >
-                        <CanvasMode />
-                      </ErrorBoundary>
-                    </div>
-                  ) : null}
-                  {/* Editor mode - mounted on first visit, kept alive */}
-                  {mounted.editor ? (
-                    <div
-                      className="h-full w-full"
-                      style={activeTab === 'editor' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
-                    >
-                      <ErrorBoundary
-                        fallback={(error, reset) => (
-                          <ModeErrorFallback mode="editor" error={error} onReset={reset} />
-                        )}
-                      >
-                        <EditorMode />
-                      </ErrorBoundary>
-                    </div>
-                  ) : null}
+                  <div
+                    className="absolute inset-0 bg-cover bg-center bg-no-repeat rounded-[inherit]"
+                    style={{ backgroundImage: `url(${welcomeBg})` }}
+                    aria-hidden="true"
+                  />
+                  <div
+                    className="absolute inset-0 hidden dark:block bg-linear-to-t from-gray-3/80 via-gray-3/55 to-gray-3/35 rounded-[inherit]"
+                    aria-hidden="true"
+                  />
                 </>
-              )}
-            </div>
+              ) : null}
 
-            {/* Status Bar — relative z-10 to sit above welcome bg */}
-            <StatusBar transparent={!hasWorkspace && !isDemo} className="relative z-10" />
-
-            {/* Crash notification dialog */}
-            {hasCrash && crashLog ? (
-              <CrashNotification
-                open={crashDialogOpen}
-                onOpenChange={handleOpenChange}
-                crashLog={crashLog}
-                onDismiss={dismiss}
+              {/* ContentTopBar replaces HeaderBar — inside the card */}
+              <ContentTopBar
+                sidebarOpen={sidebarOpen}
+                transparent={isWelcome}
+                className="relative z-10"
               />
-            ) : null}
 
-            {/* Toast notifications */}
-            <Toaster position="bottom-right" offset={40} />
-          </div>
+              {/* Mode content — wrapped in relative container so gradient overlays scroll area */}
+              <div className="flex-1 min-h-0 overflow-hidden relative z-0">
+                {/* Gradient fade below header — blends card color into content */}
+                {!isWelcome ? (
+                  <div
+                    className="absolute inset-x-0 top-0 h-8 z-10 pointer-events-none"
+                    style={{ background: 'linear-gradient(to bottom, var(--card), transparent)' }}
+                    aria-hidden="true"
+                  />
+                ) : null}
+                {isWelcome ? (
+                  <WelcomePage />
+                ) : (
+                  <>
+                    {/* Agent mode - mounted on first visit, kept alive */}
+                    {mounted.agent ? (
+                      <div
+                        className="h-full w-full"
+                        style={activeTab === 'agent' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
+                      >
+                        <ErrorBoundary
+                          fallback={(error, reset) => (
+                            <ModeErrorFallback mode="agent" error={error} onReset={reset} />
+                          )}
+                        >
+                          <AgentMode />
+                        </ErrorBoundary>
+                      </div>
+                    ) : null}
+                    {/* Canvas mode - mounted on first visit, kept alive */}
+                    {mounted.canvas ? (
+                      <div
+                        className="h-full w-full"
+                        style={activeTab === 'canvas' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
+                      >
+                        <ErrorBoundary
+                          fallback={(error, reset) => (
+                            <ModeErrorFallback mode="canvas" error={error} onReset={reset} />
+                          )}
+                        >
+                          <CanvasMode />
+                        </ErrorBoundary>
+                      </div>
+                    ) : null}
+                    {/* Editor mode - mounted on first visit, kept alive */}
+                    {mounted.editor ? (
+                      <div
+                        className="h-full w-full"
+                        style={activeTab === 'editor' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
+                      >
+                        <ErrorBoundary
+                          fallback={(error, reset) => (
+                            <ModeErrorFallback mode="editor" error={error} onReset={reset} />
+                          )}
+                        >
+                          <EditorMode />
+                        </ErrorBoundary>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+
+              {/* Status Bar — inside the card */}
+              <StatusBar transparent={isWelcome} className="relative z-10" />
+
+              {/* Crash notification dialog */}
+              {hasCrash && crashLog ? (
+                <CrashNotification
+                  open={crashDialogOpen}
+                  onOpenChange={handleOpenChange}
+                  crashLog={crashLog}
+                  onDismiss={dismiss}
+                />
+              ) : null}
+
+              {/* Toast notifications — offset accounts for card margin */}
+              <Toaster position="bottom-right" offset={46} />
+            </ContentCard>
+          </AppShell>
         </TooltipProvider>
       </TauriProvider>
     </ThemeProvider>

@@ -466,22 +466,27 @@ describe('ui-store', () => {
       it('should clamp width to valid range', () => {
         const { setLeftSidebarWidth } = useUIStore.getState();
 
-        // Too small (but above collapsed) - should clamp to minUsable
+        // Below minUsable — snaps to collapsed (no usable state between 0 and minUsable)
         setLeftSidebarWidth(100);
-        expect(useUIStore.getState().leftSidebarWidth).toBe(PANEL_SIZES.sidebar.minUsable);
+        expect(useUIStore.getState().leftSidebarWidth).toBe(SIDEBAR.collapsed);
 
-        // Too large - should clamp to max
+        // Too large — should clamp to max
         setLeftSidebarWidth(1000);
         expect(useUIStore.getState().leftSidebarWidth).toBe(PANEL_SIZES.sidebar.max);
       });
 
-      it('should snap to collapsed when width is at or below collapsed', () => {
+      it('should snap to collapsed when width is below minUsable', () => {
         const { setLeftSidebarWidth } = useUIStore.getState();
 
         setLeftSidebarWidth(SIDEBAR.collapsed);
         expect(useUIStore.getState().leftSidebarWidth).toBe(SIDEBAR.collapsed);
 
+        // Any width below minUsable snaps to collapsed (0) —
+        // there's no usable sidebar state between 0 and minUsable
         setLeftSidebarWidth(30);
+        expect(useUIStore.getState().leftSidebarWidth).toBe(SIDEBAR.collapsed);
+
+        setLeftSidebarWidth(PANEL_SIZES.sidebar.minUsable - 1);
         expect(useUIStore.getState().leftSidebarWidth).toBe(SIDEBAR.collapsed);
       });
 

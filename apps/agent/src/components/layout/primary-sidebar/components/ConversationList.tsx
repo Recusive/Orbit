@@ -24,7 +24,6 @@ interface ConversationListProps {
   readonly activeConversationId: string | null;
   readonly activeWorktreePath: string | null;
   readonly editingConversationId: string | null;
-  readonly collapsed: boolean;
   readonly onLoadConversation: (sessionId: string) => void;
   readonly onStartEditConversation: (sessionId: string) => void;
   readonly onRenameConversation: (sessionId: string, newTitle: string) => void;
@@ -45,7 +44,6 @@ export const ConversationList: FC<ConversationListProps> = ({
   activeConversationId,
   activeWorktreePath,
   editingConversationId,
-  collapsed,
   onLoadConversation,
   onStartEditConversation,
   onRenameConversation,
@@ -140,7 +138,6 @@ export const ConversationList: FC<ConversationListProps> = ({
               key={conv.sessionId}
               conversation={conv}
               active={conv.sessionId === activeConversationId}
-              collapsed={collapsed}
               isEditing={editingConversationId === conv.sessionId}
               onClick={() => {
                 onLoadConversation(conv.sessionId);
@@ -175,7 +172,7 @@ export const ConversationList: FC<ConversationListProps> = ({
           <TooltipTrigger asChild>
             <button
               aria-label="Create worktree"
-              className="relative h-5 w-5 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-90 transition-[background-color,transform] duration-100 text-muted-foreground hover:text-foreground shrink-0 before:absolute before:content-[''] before:inset-[-10px]"
+              className="relative h-5 w-5 flex items-center justify-center rounded-md hover:bg-gray-2 dark:hover:bg-gray-4 active:scale-90 transition-[background-color,transform] duration-100 text-muted-foreground hover:text-foreground shrink-0 before:absolute before:content-[''] before:inset-[-10px]"
               onClick={onOpenCreateWorktree}
             >
               <Plus className="h-3 w-3" />
@@ -195,7 +192,6 @@ export const ConversationList: FC<ConversationListProps> = ({
                 <WorktreeItem
                   worktreeState={wt}
                   active={wt.worktree.path === activeWorktreePath}
-                  collapsed={collapsed}
                   onToggle={() => {
                     onToggleWorktree(wt.worktree.path);
                   }}
@@ -222,7 +218,6 @@ export const ConversationList: FC<ConversationListProps> = ({
             <WorkspaceItem
               name={workspaceName}
               active
-              collapsed={collapsed}
               expanded={true}
               onToggle={() => {
                 // No-op for single workspace

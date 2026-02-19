@@ -5,9 +5,8 @@
  *
  * The SidebarItem component:
  * - Renders an icon and label in a button
- * - Has two visual variants: full button (default) and compact square (equalSpacing)
- * - Handles collapsed state with animated width/opacity transitions
  * - Supports active state styling and keyboard shortcuts display
+ * - Supports badge display with default and primary variants
  *
  * @see SidebarItem.tsx - Component implementation
  * @see types.ts - SidebarItemProps interface
@@ -41,7 +40,6 @@ function createDefaultProps(overrides: Partial<SidebarItemProps> = {}): SidebarI
   return {
     icon: MockIcon,
     label: 'Test Label',
-    collapsed: false,
     ...overrides,
   };
 }
@@ -97,41 +95,12 @@ describe('SidebarItem', () => {
 
       expect(onClick).toHaveBeenCalledTimes(3);
     });
-  });
 
-  // =============================================================================
-  // Unit Tests: Collapsed State
-  // =============================================================================
-
-  describe('collapsed state', () => {
-    it('should have hidden label classes when collapsed=true', () => {
-      render(<SidebarItem {...createDefaultProps({ collapsed: true })} />);
-
-      const label = screen.getByText('Test Label');
-      expect(label).toHaveClass('w-0');
-      expect(label).toHaveClass('opacity-0');
-    });
-
-    it('should have visible label classes when collapsed=false', () => {
-      render(<SidebarItem {...createDefaultProps({ collapsed: false })} />);
+    it('should always show label text', () => {
+      render(<SidebarItem {...createDefaultProps()} />);
 
       const label = screen.getByText('Test Label');
       expect(label).toHaveClass('w-auto');
-      expect(label).toHaveClass('opacity-100');
-    });
-
-    it('should have title attribute when collapsed for tooltip', () => {
-      render(<SidebarItem {...createDefaultProps({ collapsed: true })} />);
-
-      const button = getButton();
-      expect(button).toHaveAttribute('title', 'Test Label');
-    });
-
-    it('should not have title attribute when expanded', () => {
-      render(<SidebarItem {...createDefaultProps({ collapsed: false })} />);
-
-      const button = getButton();
-      expect(button).not.toHaveAttribute('title');
     });
   });
 
@@ -197,22 +166,15 @@ describe('SidebarItem', () => {
   // =============================================================================
 
   describe('keyboard shortcuts', () => {
-    it('should render keyboard shortcuts when provided and not collapsed', () => {
-      render(<SidebarItem {...createDefaultProps({ shortcut: ['⌘', ','], collapsed: false })} />);
+    it('should render keyboard shortcuts when provided', () => {
+      render(<SidebarItem {...createDefaultProps({ shortcut: ['⌘', ','] })} />);
 
       expect(screen.getByText('⌘')).toBeInTheDocument();
       expect(screen.getByText(',')).toBeInTheDocument();
     });
 
-    it('should not render keyboard shortcuts when collapsed', () => {
-      render(<SidebarItem {...createDefaultProps({ shortcut: ['⌘', ','], collapsed: true })} />);
-
-      expect(screen.queryByText('⌘')).not.toBeInTheDocument();
-      expect(screen.queryByText(',')).not.toBeInTheDocument();
-    });
-
     it('should not render keyboard shortcuts when not provided', () => {
-      render(<SidebarItem {...createDefaultProps({ collapsed: false })} />);
+      render(<SidebarItem {...createDefaultProps()} />);
 
       // The KbdGroup should not be present
       const button = getButton();
@@ -221,68 +183,21 @@ describe('SidebarItem', () => {
   });
 
   // =============================================================================
-  // Unit Tests: Equal Spacing Variant (Collapsed Square Button)
+  // Unit Tests: Badge
   // =============================================================================
 
-  describe('equalSpacing variant', () => {
-    it('should render compact square button when equalSpacing=true', () => {
-      render(<SidebarItem {...createDefaultProps({ equalSpacing: true })} />);
+  describe('badge', () => {
+    it('should render badge when provided', () => {
+      render(<SidebarItem {...createDefaultProps({ badge: 'New' })} />);
 
-      const button = getButton();
-      // The compact variant has different classes
-      expect(button).toHaveClass('h-7');
-      expect(button).toHaveClass('w-7');
-      expect(button).toHaveClass('rounded-md');
+      expect(screen.getByText('New')).toBeInTheDocument();
     });
 
-    it('should render full button when equalSpacing=false', () => {
-      render(<SidebarItem {...createDefaultProps({ equalSpacing: false })} />);
+    it('should not render badge when not provided', () => {
+      render(<SidebarItem {...createDefaultProps()} />);
 
-      const button = getButton();
-      // The full variant has h-8 and rounded-lg
-      expect(button).toHaveClass('h-8');
-      expect(button).toHaveClass('rounded-lg');
-    });
-
-    it('should have title attribute in equalSpacing variant', () => {
-      render(<SidebarItem {...createDefaultProps({ equalSpacing: true })} />);
-
-      const button = getButton();
-      expect(button).toHaveAttribute('title', 'Test Label');
-    });
-
-    it('should call onClick in equalSpacing variant', async () => {
-      const onClick = vi.fn();
-      const user = userEvent.setup();
-
-      render(<SidebarItem {...createDefaultProps({ equalSpacing: true, onClick })} />);
-
-      await user.click(getButton());
-
-      expect(onClick).toHaveBeenCalledTimes(1);
-    });
-
-    it('should have active styling in equalSpacing variant when active=true', () => {
-      render(<SidebarItem {...createDefaultProps({ equalSpacing: true, active: true })} />);
-
-      const button = getButton();
-      expect(button).toHaveClass('text-foreground');
-    });
-
-    it('should have sidebar text styling in equalSpacing variant when active=false', () => {
-      render(<SidebarItem {...createDefaultProps({ equalSpacing: true, active: false })} />);
-
-      const button = getButton();
-      expect(button).toHaveClass('text-sidebar-foreground');
-    });
-
-    it('should not render label text in equalSpacing variant', () => {
-      render(<SidebarItem {...createDefaultProps({ equalSpacing: true })} />);
-
-      // Label should not be visible (only icon and title attribute)
-      const button = getButton();
-      // The label text should not be a direct child in the compact variant
-      expect(button.querySelector('span')).not.toBeInTheDocument();
+      // No badge element should exist
+      expect(screen.queryByText('New')).not.toBeInTheDocument();
     });
   });
 
@@ -292,11 +207,9 @@ describe('SidebarItem', () => {
 
   describe('edge cases: no onClick handler', () => {
     it('should render without error when onClick is not provided', () => {
-      // Create props without onClick (omitted, not undefined)
       const propsWithoutOnClick: SidebarItemProps = {
         icon: MockIcon,
         label: 'Test Label',
-        collapsed: false,
       };
 
       // Should not throw
@@ -308,11 +221,9 @@ describe('SidebarItem', () => {
     it('should not crash when clicked without onClick handler', async () => {
       const user = userEvent.setup();
 
-      // Create props without onClick (omitted, not undefined)
       const propsWithoutOnClick: SidebarItemProps = {
         icon: MockIcon,
         label: 'Test Label',
-        collapsed: false,
       };
 
       render(<SidebarItem {...propsWithoutOnClick} />);

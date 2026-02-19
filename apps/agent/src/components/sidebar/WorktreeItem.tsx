@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn, getCollapseTransition, SIDEBAR } from '@/lib/utils';
+import { cn, SIDEBAR } from '@/lib/utils';
 
 // Hoisted RegExp for path splitting (avoids recreation on each render)
 const PATH_SEPARATOR_RE = /[/\\]/;
@@ -25,7 +25,6 @@ const PATH_SEPARATOR_RE = /[/\\]/;
 interface WorktreeItemProps {
   readonly worktreeState: WorktreeUIState;
   readonly active?: boolean;
-  readonly collapsed?: boolean;
   /** Called when clicking the chevron to expand/collapse conversations */
   readonly onToggle?: () => void;
   /** Called when clicking the worktree row to switch to this workspace */
@@ -36,7 +35,6 @@ interface WorktreeItemProps {
 export const WorktreeItem: FC<WorktreeItemProps> = ({
   worktreeState,
   active = false,
-  collapsed = false,
   onToggle,
   onSelect,
   onRemove,
@@ -126,12 +124,8 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
 
         {/* Workspace name */}
         <span
-          className={cn(
-            'text-base whitespace-nowrap overflow-hidden text-left flex-1',
-            collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
-          )}
+          className="text-base whitespace-nowrap overflow-hidden text-left flex-1 w-auto"
           style={{
-            transition: getCollapseTransition(collapsed),
             maskImage: 'linear-gradient(to right, black 80%, transparent 95%)',
             WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 95%)',
           }}
@@ -140,21 +134,19 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         </span>
 
         {/* Branch badge */}
-        {!collapsed && (
-          <div
-            className={cn(
-              'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium mr-1 shrink-0 transition-colors duration-200',
-              worktree.isMain ? 'bg-primary/12 text-primary' : 'bg-gray-4 text-gray-11'
-            )}
-          >
-            <GitBranch className="h-3 w-3" />
-            <span className="max-w-[60px] truncate">{branchName}</span>
-          </div>
-        )}
+        <div
+          className={cn(
+            'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium mr-1 shrink-0 transition-colors duration-200',
+            worktree.isMain ? 'bg-primary/12 text-primary' : 'bg-gray-4 text-gray-11'
+          )}
+        >
+          <GitBranch className="h-3 w-3" />
+          <span className="max-w-[60px] truncate">{branchName}</span>
+        </div>
       </div>
 
       {/* More options dropdown - appears on hover */}
-      {!collapsed && !worktree.isMain && (
+      {!worktree.isMain && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -184,7 +176,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
       )}
 
       {/* Locked indicator */}
-      {worktree.locked !== null && !collapsed && (
+      {worktree.locked !== null && (
         <div
           className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-amber-500 font-medium uppercase tracking-wide"
           title={`Locked: ${worktree.locked}`}

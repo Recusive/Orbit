@@ -8,7 +8,7 @@ import type { ConversationItemProps } from '../types';
 import type { FC } from 'react';
 
 import { ConversationContextMenu, ConversationDropdownMenu } from '@/components/sidebar';
-import { cn, getCollapseTransition } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 /**
  * Format a timestamp into a compact relative time string.
@@ -40,7 +40,6 @@ const TITLE_HOVER_MASK = 'linear-gradient(to right, black 85%, transparent 98%)'
 export const ConversationItem: FC<ConversationItemProps> = ({
   conversation,
   active = false,
-  collapsed = false,
   isEditing = false,
   onClick,
   onDoubleClick,
@@ -116,7 +115,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
   };
 
   // Render inline edit input
-  if (isEditing && !collapsed) {
+  if (isEditing) {
     return (
       <form
         className="relative mx-1.5 ml-2"
@@ -154,9 +153,9 @@ export const ConversationItem: FC<ConversationItemProps> = ({
     >
       <button
         className={cn(
-          'flex items-center h-7 w-full rounded-lg pl-[7px] overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 transition-[background-color,padding] duration-100',
+          'flex items-center h-7 w-full rounded-lg pl-[7px] overflow-hidden hover:bg-gray-2 dark:hover:bg-gray-4 transition-[background-color,padding] duration-100',
           isHovered ? 'pr-7' : 'pr-9',
-          active ? 'bg-gray-4 dark:bg-gray-4 text-foreground' : 'text-gray-11 hover:text-gray-12'
+          active ? 'bg-gray-2 dark:bg-gray-4 text-foreground' : 'text-gray-11 hover:text-gray-12'
         )}
         title={conversation.title}
         onClick={onClick}
@@ -169,52 +168,45 @@ export const ConversationItem: FC<ConversationItemProps> = ({
         <span
           className={cn(
             'text-base overflow-hidden flex-1 text-left',
-            collapsed ? 'w-0 opacity-0 whitespace-nowrap' : '',
-            // When not hovered: truncate with ellipsis
-            // When hovered: allow full text with gradient mask
-            !collapsed && !isHovered && 'truncate',
-            !collapsed && isHovered && 'whitespace-nowrap'
+            !isHovered && 'truncate',
+            isHovered && 'whitespace-nowrap'
           )}
-          style={{
-            transition: getCollapseTransition(collapsed),
-            // Only apply gradient mask when hovered
-            ...(isHovered && !collapsed
+          style={
+            isHovered
               ? {
                   maskImage: TITLE_HOVER_MASK,
                   WebkitMaskImage: TITLE_HOVER_MASK,
                 }
-              : {}),
-          }}
+              : undefined
+          }
         >
           {conversation.title}
         </span>
       </button>
       {/* Right area: timestamp when not hovering/menu closed, dropdown menu when hovering or open */}
-      {!collapsed ? (
-        <>
-          {/* Relative timestamp - visible when NOT hovering AND menu is closed.
-              No opacity transition: instant swap feels snappier on fast pointer sweeps. */}
-          <span
-            className={cn(
-              'absolute right-1.5 top-1/2 -translate-y-1/2',
-              'text-[11px] text-muted-foreground/60 tabular-nums',
-              showTimestamp ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            )}
-          >
-            {formatRelativeTime(conversation.updatedAt)}
-          </span>
-          {/* More options dropdown - appears on hover or when menu is open */}
-          <div className="absolute right-0.5 top-1/2 -translate-y-1/2">
-            <ConversationDropdownMenu
-              visible={isHovered || isMenuOpen}
-              onRename={handleMenuRename}
-              onDelete={handleMenuDelete}
-              onDuplicate={handleMenuDuplicate}
-              onOpenChange={setIsMenuOpen}
-            />
-          </div>
-        </>
-      ) : null}
+      <>
+        {/* Relative timestamp - visible when NOT hovering AND menu is closed.
+            No opacity transition: instant swap feels snappier on fast pointer sweeps. */}
+        <span
+          className={cn(
+            'absolute right-1.5 top-1/2 -translate-y-1/2',
+            'text-[11px] text-muted-foreground/60 tabular-nums',
+            showTimestamp ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          )}
+        >
+          {formatRelativeTime(conversation.updatedAt)}
+        </span>
+        {/* More options dropdown - appears on hover or when menu is open */}
+        <div className="absolute right-0.5 top-1/2 -translate-y-1/2">
+          <ConversationDropdownMenu
+            visible={isHovered || isMenuOpen}
+            onRename={handleMenuRename}
+            onDelete={handleMenuDelete}
+            onDuplicate={handleMenuDuplicate}
+            onOpenChange={setIsMenuOpen}
+          />
+        </div>
+      </>
     </div>
   );
 

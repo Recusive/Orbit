@@ -14,7 +14,6 @@ export * from './tools';
 export * from './queued-message';
 
 // Top-level chat components
-export { ChatHeader } from './chat-header';
 export { ChatMessages } from './chat-messages';
 export { FilesEditedList } from './files-edited-list';
 export { ToolCallBlock } from './tool-call-block';
