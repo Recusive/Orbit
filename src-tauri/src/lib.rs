@@ -517,6 +517,7 @@ pub fn run() {
             settings::get_ssh_hosts,
             settings::remove_ssh_host,
             settings::clear_ssh_hosts,
+            settings::pick_directory,
             // Diagnostics commands
             diagnostics::check_previous_crash,
             diagnostics::clear_crash_log,

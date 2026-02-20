@@ -26,6 +26,7 @@ import { SidebarToggleIcon } from './components/SidebarToggleIcon';
 import { useSidebarActions } from './hooks/use-sidebar-actions';
 
 import type { SidebarTab } from './types';
+import type { ProjectsDialogProps } from '@/components/modals/projects';
 import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { SkillsDialogProps } from '@/components/modals/skills';
 import type { FC } from 'react';
@@ -62,6 +63,17 @@ const LazySettingsDialog = lazy(() =>
 const SettingsDialog: FC<SettingsDialogProps> = (props) => (
   <Suspense fallback={null}>
     <LazySettingsDialog {...props} />
+  </Suspense>
+);
+
+const LazyProjectsDialog = lazy(() =>
+  import('@/components/modals/projects/ProjectsDialog').then((m) => ({
+    default: m.ProjectsDialog,
+  }))
+);
+const ProjectsDialog: FC<ProjectsDialogProps> = (props) => (
+  <Suspense fallback={null}>
+    <LazyProjectsDialog {...props} />
   </Suspense>
 );
 
@@ -111,6 +123,7 @@ export const PrimarySidebar: FC = () => {
   const updateDismissed = useUpdateStore((s) => s.toastDismissed);
 
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
+  const [projectsDialogOpen, setProjectsDialogOpen] = useState(false);
   const [skillsDialogOpen, setSkillsDialogOpen] = useState(false);
 
   const {
@@ -254,7 +267,13 @@ export const PrimarySidebar: FC = () => {
             large
             onClick={handleStartConversation}
           />
-          <SidebarItem icon={FolderOpen} label="Projects" />
+          <SidebarItem
+            icon={FolderOpen}
+            label="Projects"
+            onClick={() => {
+              setProjectsDialogOpen(true);
+            }}
+          />
           <SidebarItem
             icon={IconSearchlinesSparkle}
             label="Vault"
@@ -401,6 +420,9 @@ export const PrimarySidebar: FC = () => {
           void handleRemoveWorktree(deleteBranch);
         }}
       />
+
+      {/* Projects Dialog */}
+      <ProjectsDialog open={projectsDialogOpen} onOpenChange={setProjectsDialogOpen} />
 
       {/* Skills Dialog */}
       <SkillsDialog open={skillsDialogOpen} onOpenChange={setSkillsDialogOpen} />

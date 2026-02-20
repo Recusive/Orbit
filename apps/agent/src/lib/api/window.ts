@@ -35,6 +35,17 @@ export async function openFileDialog(
     logger.warn('Mock: openFileDialog');
     return null;
   }
+
+  // On macOS 26+, NSOpenPanel crashes when NSGlassEffectView is active in the
+  // window. The JS dialog plugin likely uses sheet presentation which hosts the
+  // panel inside the parent window's view hierarchy — right where glass lives.
+  // Route directory picks through a Rust command that uses raw NSOpenPanel with
+  // runModal (standalone modal, no parent window interaction) and temporarily
+  // hides glass effects before showing the panel.
+  if (options?.directory === true) {
+    return invoke<string | null>('pick_directory');
+  }
+
   const { open } = await import('@tauri-apps/plugin-dialog');
   return open(options);
 }

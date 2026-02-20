@@ -22,6 +22,14 @@ use objc2_foundation::NSString;
 /// Guard against duplicate initialization.
 static INITIALIZED: AtomicBool = AtomicBool::new(false);
 
+/// When true, observer callbacks (`on_resign_key`, `on_become_key`) are no-ops.
+///
+/// Set by [`suspend`]/[`resume`] around native dialog presentation. Without
+/// this, `toggle_glass` fires when the main window resigns/becomes key during
+/// `NSOpenPanel` — modifying the window's view tree and background color while
+/// a dialog transition is in flight, which crashes on macOS 26+.
+static SUSPENDED: AtomicBool = AtomicBool::new(false);
+
 /// App-level effective theme, set by the frontend via Tauri command.
 ///
 /// 0 = not yet set (fall back to system appearance),
@@ -62,7 +70,11 @@ unsafe fn set_glass_hidden_recursive(view: *mut AnyObject, glass_class: &AnyClas
     }
 }
 
-/// Toggle glass views in ALL app windows and swap window background color.
+/// Toggle glass views in Orbit windows and swap window background color.
+///
+/// Skips `NSPanel` subclasses (`NSOpenPanel`, `NSSavePanel`, etc.) because
+/// on macOS 26+ those system panels contain their own `NSGlassEffectView`
+/// instances. Modifying them hides the panel's UI and makes it unresponsive.
 ///
 /// # Safety
 ///
@@ -143,9 +155,24 @@ unsafe fn toggle_glass(hidden: bool) {
         msg_send![ns_color_class, clearColor]
     };
 
+    // Skip NSPanel subclasses (NSOpenPanel, NSSavePanel, print panels, etc.)
+    // On macOS 26+, these system panels have their own NSGlassEffectView
+    // instances. If we hide those or change the panel's backgroundColor,
+    // the panel becomes invisible/unresponsive and the app appears to hang.
+    let ns_panel_class = AnyClass::get(c"NSPanel");
+
     let win_count: usize = msg_send![windows, count];
     for i in 0..win_count {
         let window: *mut AnyObject = msg_send![windows, objectAtIndex: i];
+
+        // Never modify system panels — their glass is not ours to touch.
+        if let Some(panel_class) = ns_panel_class {
+            let is_panel: bool = msg_send![window, isKindOfClass: panel_class];
+            if is_panel {
+                continue;
+            }
+        }
+
         let content_view: *mut AnyObject = msg_send![window, contentView];
         if content_view.is_null() {
             continue;
@@ -200,31 +227,67 @@ unsafe fn has_glass_view(view: *mut AnyObject, glass_class: &AnyClass) -> bool {
 // ObjC notification callbacks
 // =========================================================================
 
+/// Check whether the notification's originating window is an `NSPanel`.
+///
+/// `NSOpenPanel`, `NSSavePanel`, print/font/color panels all inherit from
+/// `NSPanel`. We must ignore their key-status changes — otherwise
+/// `toggle_glass` fires during panel presentation and corrupts the panel
+/// rendering on macOS 26+ (where system panels have their own glass views).
+///
+/// # Safety
+///
+/// Must be called on the main thread with a valid notification pointer.
+unsafe fn notification_is_from_panel(notification: *mut AnyObject) -> bool {
+    if notification.is_null() {
+        return false;
+    }
+    let window: *mut AnyObject = msg_send![notification, object];
+    if window.is_null() {
+        return false;
+    }
+    let Some(panel_class) = AnyClass::get(c"NSPanel") else {
+        return false;
+    };
+    msg_send![window, isKindOfClass: panel_class]
+}
+
 /// Window resigned key → hide glass, set opaque background.
+///
+/// Ignores notifications originating from `NSPanel` subclasses
+/// (`NSOpenPanel`, `NSSavePanel`, etc.) to avoid corrupting their UI.
 ///
 /// # Safety
 ///
 /// Called by the Objective-C runtime via `NSNotificationCenter`.
 #[allow(clippy::missing_const_for_fn)]
-unsafe extern "C" fn on_resign_key(
-    _this: *mut AnyObject,
-    _cmd: Sel,
-    _notification: *mut AnyObject,
-) {
+unsafe extern "C" fn on_resign_key(_this: *mut AnyObject, _cmd: Sel, notification: *mut AnyObject) {
+    if SUSPENDED.load(Ordering::Relaxed) {
+        return;
+    }
+    if notification_is_from_panel(notification) {
+        return;
+    }
     toggle_glass(true);
 }
 
 /// Window became key → show glass, set transparent background.
 ///
+/// Ignores notifications originating from `NSPanel` subclasses
+/// (`NSOpenPanel`, `NSSavePanel`, etc.) to avoid corrupting their UI.
+///
+/// Also skipped when [`SUSPENDED`] is set (during native dialog presentation).
+///
 /// # Safety
 ///
 /// Called by the Objective-C runtime via `NSNotificationCenter`.
 #[allow(clippy::missing_const_for_fn)]
-unsafe extern "C" fn on_become_key(
-    _this: *mut AnyObject,
-    _cmd: Sel,
-    _notification: *mut AnyObject,
-) {
+unsafe extern "C" fn on_become_key(_this: *mut AnyObject, _cmd: Sel, notification: *mut AnyObject) {
+    if SUSPENDED.load(Ordering::Relaxed) {
+        return;
+    }
+    if notification_is_from_panel(notification) {
+        return;
+    }
     toggle_glass(false);
 }
 
@@ -330,4 +393,19 @@ pub(crate) fn suppress_glass_defocus_dimming() {
 /// chosen theme rather than the system appearance.
 pub(crate) fn set_effective_theme(is_dark: bool) {
     EFFECTIVE_THEME.store(if is_dark { 2 } else { 1 }, Ordering::Relaxed);
+}
+
+/// Suspend glass defocus observers — callbacks become no-ops.
+///
+/// Used by [`crate::WebviewWindowExt::pick_folder_native`] around native
+/// dialog presentation. Without suspension, `toggle_glass` fires when the
+/// main window resigns/becomes key during the dialog, modifying the view tree
+/// mid-transition — which crashes on macOS 26+.
+pub(crate) fn suspend() {
+    SUSPENDED.store(true, Ordering::Relaxed);
+}
+
+/// Resume glass defocus observers after dialog closes.
+pub(crate) fn resume() {
+    SUSPENDED.store(false, Ordering::Relaxed);
 }
