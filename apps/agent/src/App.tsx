@@ -1,8 +1,9 @@
 import { CanvasApp } from '@canvas/CanvasApp';
 import { EditorApp } from '@editor/EditorApp';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { HeaderTab } from '@/stores/ui/ui-store';
 import type { CSSProperties, FC } from 'react';
 
@@ -17,6 +18,7 @@ import { ResizeHandle } from '@/components/layout/resize-handle';
 import { RootLayout } from '@/components/layout/root-layout';
 import { SidebarResizeHandle } from '@/components/layout/sidebar-resize-handle';
 import { StatusBar } from '@/components/layout/status-bar';
+import { TerminalCard } from '@/components/layout/terminal-card';
 import { CrashNotification } from '@/components/modals';
 import { OnboardingFlow } from '@/components/onboarding';
 import { ActivityPanel } from '@/components/panels';
@@ -32,12 +34,20 @@ import { useAutoUpdate } from '@/hooks/core/use-auto-update';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { useFullscreen } from '@/hooks/ui/use-fullscreen';
 import { useTrafficLights } from '@/hooks/ui/use-traffic-lights';
-import { CONTENT_CARD, SIDEBAR } from '@/lib/utils/constants';
+import { CONTENT_CARD, HEIGHTS, SIDEBAR } from '@/lib/utils/constants';
 import { TauriProvider } from '@/providers/tauri-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useOnboardingStore } from '@/stores/onboarding/onboarding-store';
-import { useHasWorkspace, useLeftSidebarWidth, useUIStore } from '@/stores/ui/ui-store';
+import {
+  useHasWorkspace,
+  useLeftSidebarWidth,
+  useBottomPanelOpen,
+  useBottomPanelHeight,
+  useTerminalCollapsed,
+  useTerminalPosition,
+  useUIStore,
+} from '@/stores/ui/ui-store';
 
 // ============================================
 // Style Constants (avoid new object refs on each render)
@@ -54,6 +64,21 @@ const PREFERS_REDUCED_MOTION =
 const ACTIVITY_TRANSITION: string | undefined = PREFERS_REDUCED_MOTION
   ? undefined
   : `margin-right ${CONTENT_CARD.transition}, transform ${CONTENT_CARD.transition}`;
+
+/** Terminal panel slide transition — height for collapse, margin/transform for hide */
+const TERMINAL_TRANSITION: string | undefined = PREFERS_REDUCED_MOTION
+  ? undefined
+  : `height ${CONTENT_CARD.transition}, margin-bottom ${CONTENT_CARD.transition}, transform ${CONTENT_CARD.transition}`;
+
+// Lazy load TerminalPanel for 'both' mode — heavy xterm.js dependency
+const LazyTerminalPanel = lazy(() =>
+  import('@/components/terminal/terminal-panel').then((m) => ({ default: m.TerminalPanel }))
+);
+const TerminalPanelBoth: FC<TerminalPanelProps> = (props) => (
+  <Suspense fallback={null}>
+    <LazyTerminalPanel {...props} />
+  </Suspense>
+);
 
 // ============================================
 // Demo View Initialization
@@ -389,11 +414,127 @@ const App: FC = () => {
       marginRight: activityOpen ? 0 : -reviewPanelWidth,
       transform: activityOpen ? 'translateX(0)' : 'translateX(100%)',
       flexShrink: 0,
-      overflow: 'hidden',
+      // No overflow:hidden here — it was blocking CSS height transitions on the
+      // terminal card inside (WebKit doesn't repaint children's transitions inside
+      // an overflow:hidden + transform container). The main content wrapper's
+      // overflow-hidden clips the slide animation instead.
       transition: ACTIVITY_TRANSITION,
     }),
     [activityOpen, reviewPanelWidth]
   );
+
+  // Terminal panel state — terminal is its own card in all 3 positions.
+  // Three separate wrappers, one per position. Only the active position is
+  // populated with TerminalPanel (xterm can only attach to one container).
+  const bottomPanelOpen = useBottomPanelOpen();
+  const bottomPanelHeight = useBottomPanelHeight();
+  const terminalCollapsed = useTerminalCollapsed();
+  const terminalPosition = useTerminalPosition();
+
+  // Compute which terminal position is visually open (open OR collapsed — both show the wrapper)
+  const terminalChatOpen = bottomPanelOpen && terminalPosition === 'chat' && !isWelcome;
+  const terminalActivityOpen = bottomPanelOpen && terminalPosition === 'activity' && !isWelcome;
+  const terminalBothOpen = bottomPanelOpen && terminalPosition === 'both' && !isWelcome;
+
+  // Collapsed height = header + gap handle + TerminalCard bottom margin
+  // so the full header is visible without being clipped by overflow: hidden
+  const terminalCollapsedHeight = HEIGHTS.headerBar + CONTENT_CARD.gap + CONTENT_CARD.margin;
+
+  // Shared margin-slide style factory for terminal wrappers.
+  // Three visual states: open (full height), collapsed (header only), hidden (off-screen).
+  const makeTerminalStyle = useCallback(
+    (open: boolean): CSSProperties => {
+      // Use collapsed height regardless of open/closed — prevents the height from
+      // jumping to full bottomPanelHeight when hiding from collapsed state (Cmd+J).
+      const effectiveHeight = terminalCollapsed ? terminalCollapsedHeight : bottomPanelHeight;
+      return {
+        height: effectiveHeight,
+        marginBottom: open ? 0 : -effectiveHeight,
+        transform: open ? 'translateY(0)' : 'translateY(100%)',
+        flexShrink: 0,
+        overflow: 'hidden',
+        transition: TERMINAL_TRANSITION,
+      };
+    },
+    [bottomPanelHeight, terminalCollapsed, terminalCollapsedHeight]
+  );
+
+  const terminalChatStyle = useMemo(
+    () => makeTerminalStyle(terminalChatOpen),
+    [makeTerminalStyle, terminalChatOpen]
+  );
+  const terminalActivityStyle = useMemo(
+    () => makeTerminalStyle(terminalActivityOpen),
+    [makeTerminalStyle, terminalActivityOpen]
+  );
+  const terminalBothStyle = useMemo(
+    () => makeTerminalStyle(terminalBothOpen),
+    [makeTerminalStyle, terminalBothOpen]
+  );
+
+  // Direct DOM refs for each terminal wrapper — bypasses React during drag resize.
+  // ResizeHandle calls onDrag at 60fps; ref.style.height is set directly (no re-renders).
+  const terminalChatRef = useRef<HTMLDivElement>(null);
+  const terminalActivityRef = useRef<HTMLDivElement>(null);
+  const terminalBothRef = useRef<HTMLDivElement>(null);
+
+  // Single drag handler — reads current terminalPosition from store at invocation time
+  // to update the correct wrapper. Safe because position only changes on user click, not mid-drag.
+  // Value is already clamped by ResizeHandle (via getMax), so no additional clamping needed here.
+  // Adds .drag-active CSS class to disable transitions during drag (instant response).
+  // The class uses !important to override React-managed inline transition — avoids the
+  // reconciliation bug where React skips re-applying unchanged transition values.
+  const handleTerminalDrag = useCallback((height: number): void => {
+    const pos = useUIStore.getState().terminalPosition;
+    const el =
+      pos === 'chat'
+        ? terminalChatRef.current
+        : pos === 'activity'
+          ? terminalActivityRef.current
+          : terminalBothRef.current;
+    if (el) {
+      el.classList.add('drag-active');
+      el.style.height = `${String(height)}px`;
+    }
+  }, []);
+
+  // Remove .drag-active class after drag ends, restoring CSS transitions for
+  // collapse/expand animations. React's inline transition style takes effect again.
+  const handleTerminalDragEnd = useCallback((): void => {
+    const pos = useUIStore.getState().terminalPosition;
+    const el =
+      pos === 'chat'
+        ? terminalChatRef.current
+        : pos === 'activity'
+          ? terminalActivityRef.current
+          : terminalBothRef.current;
+    if (el) {
+      el.classList.remove('drag-active');
+    }
+  }, []);
+
+  // Dynamic max constraint for terminal resize — called once at drag start.
+  // For 'chat'/'activity', subtracts the sibling card's top margin (10px) so the
+  // terminal never overflows the flex column. Bottom margin is 0 (handle provides gap).
+  // For 'both', the cards row (flex-1, min-h-0) has no margins, so terminal takes full height.
+  const getTerminalMax = useCallback((): number => {
+    const pos = useUIStore.getState().terminalPosition;
+    const ref =
+      pos === 'chat' ? terminalChatRef : pos === 'activity' ? terminalActivityRef : terminalBothRef;
+    const el = ref.current;
+    if (!el?.parentElement) return Infinity;
+
+    const parentHeight = el.parentElement.clientHeight;
+
+    // 'both' mode: terminal shares main flex-col with the cards row.
+    // Cards row is flex-1 min-h-0 with no margins → terminal can take full height.
+    if (pos === 'both') return parentHeight;
+
+    // 'chat'/'activity': terminal shares a flex-col with ContentCard/ActivityCard.
+    // Card top margin (10px) is irreducible in flexbox — occupies space even when
+    // the card's content area shrinks to 0. Bottom margin is 0 (handle provides gap).
+    return parentHeight - CONTENT_CARD.margin;
+  }, []);
 
   // Direct DOM ref for the activity wrapper — bypasses React during drag resize.
   // ResizeHandle calls onDrag → sets style.width directly at 60fps, no re-renders.
@@ -425,126 +566,237 @@ const App: FC = () => {
             sidebarWidth={leftSidebarWidth}
             actionsBar={rightSidebarOpen && !isWelcome ? <ActionsBar /> : undefined}
           >
-            {/* Main content card — takes remaining space */}
-            <ContentCard
-              sidebarOpen={sidebarOpen}
-              actionsBarOpen={activityOpen || rightSidebarOpen ? !isWelcome : false}
-              isFullscreen={isFullscreen}
-            >
-              {/* Welcome background image — inside the card */}
-              {isWelcome ? (
-                <>
-                  <div
-                    className="absolute inset-0 bg-cover bg-center bg-no-repeat rounded-[inherit]"
-                    style={{ backgroundImage: `url(${welcomeBg})` }}
-                    aria-hidden="true"
-                  />
-                  <div
-                    className="absolute inset-0 hidden dark:block bg-linear-to-t from-gray-3/80 via-gray-3/55 to-gray-3/35 rounded-[inherit]"
-                    aria-hidden="true"
-                  />
-                </>
-              ) : null}
+            {/* Main content wrapper — flex column for cards row + full-width terminal.
+                overflow-hidden clips the activity panel's slide animation (previously
+                on the activity wrapper, but that blocked terminal height transitions). */}
+            <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+              {/* Cards row — content column + activity column side by side */}
+              <div className="flex-1 flex min-h-0">
+                {/* ── Content column ── */}
+                {/* flex-col: ContentCard on top, terminal below when position='chat' */}
+                <div className="flex-1 flex flex-col min-w-0 min-h-0">
+                  {/* Main content card — takes remaining vertical space */}
+                  <ContentCard
+                    sidebarOpen={sidebarOpen}
+                    actionsBarOpen={activityOpen || rightSidebarOpen ? !isWelcome : false}
+                    isFullscreen={isFullscreen}
+                    terminalBelow={terminalChatOpen || terminalBothOpen}
+                  >
+                    {/* Welcome background image — inside the card */}
+                    {isWelcome ? (
+                      <>
+                        <div
+                          className="absolute inset-0 bg-cover bg-center bg-no-repeat rounded-[inherit]"
+                          style={{ backgroundImage: `url(${welcomeBg})` }}
+                          aria-hidden="true"
+                        />
+                        <div
+                          className="absolute inset-0 hidden dark:block bg-linear-to-t from-gray-3/80 via-gray-3/55 to-gray-3/35 rounded-[inherit]"
+                          aria-hidden="true"
+                        />
+                      </>
+                    ) : null}
 
-              {/* ContentTopBar replaces HeaderBar — inside the card */}
-              <ContentTopBar
-                sidebarOpen={sidebarOpen}
-                transparent={isWelcome}
-                className="relative z-10"
-              />
+                    {/* ContentTopBar replaces HeaderBar — inside the card */}
+                    <ContentTopBar
+                      sidebarOpen={sidebarOpen}
+                      transparent={isWelcome}
+                      className="relative z-10"
+                    />
 
-              {/* Mode content — wrapped in relative container so gradient overlays scroll area */}
-              <div className="flex-1 min-h-0 overflow-hidden relative z-0">
-                {/* Gradient fade below header — blends card color into content */}
-                {!isWelcome ? (
-                  <div
-                    className="absolute inset-x-0 top-0 h-8 z-10 pointer-events-none"
-                    style={{ background: 'linear-gradient(to bottom, var(--card), transparent)' }}
-                    aria-hidden="true"
-                  />
-                ) : null}
-                {isWelcome ? (
-                  <WelcomePage />
-                ) : (
-                  <>
-                    {/* Agent mode - mounted on first visit, kept alive */}
-                    {mounted.agent ? (
-                      <div
-                        className="h-full w-full"
-                        style={activeTab === 'agent' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
-                      >
-                        <ErrorBoundary
-                          fallback={(error, reset) => (
-                            <ModeErrorFallback mode="agent" error={error} onReset={reset} />
-                          )}
-                        >
-                          <AgentMode />
-                        </ErrorBoundary>
-                      </div>
+                    {/* Mode content — wrapped in relative container so gradient overlays scroll area */}
+                    <div className="flex-1 min-h-0 overflow-hidden relative z-0">
+                      {/* Gradient fade below header — blends card color into content */}
+                      {!isWelcome ? (
+                        <div
+                          className="absolute inset-x-0 top-0 h-8 z-10 pointer-events-none"
+                          style={{
+                            background: 'linear-gradient(to bottom, var(--card), transparent)',
+                          }}
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                      {isWelcome ? (
+                        <WelcomePage />
+                      ) : (
+                        <>
+                          {/* Agent mode - mounted on first visit, kept alive */}
+                          {mounted.agent ? (
+                            <div
+                              className="h-full w-full"
+                              style={
+                                activeTab === 'agent' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE
+                              }
+                            >
+                              <ErrorBoundary
+                                fallback={(error, reset) => (
+                                  <ModeErrorFallback mode="agent" error={error} onReset={reset} />
+                                )}
+                              >
+                                <AgentMode />
+                              </ErrorBoundary>
+                            </div>
+                          ) : null}
+                          {/* Canvas mode - mounted on first visit, kept alive */}
+                          {mounted.canvas ? (
+                            <div
+                              className="h-full w-full"
+                              style={
+                                activeTab === 'canvas' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE
+                              }
+                            >
+                              <ErrorBoundary
+                                fallback={(error, reset) => (
+                                  <ModeErrorFallback mode="canvas" error={error} onReset={reset} />
+                                )}
+                              >
+                                <CanvasMode />
+                              </ErrorBoundary>
+                            </div>
+                          ) : null}
+                          {/* Editor mode - mounted on first visit, kept alive */}
+                          {mounted.editor ? (
+                            <div
+                              className="h-full w-full"
+                              style={
+                                activeTab === 'editor' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE
+                              }
+                            >
+                              <ErrorBoundary
+                                fallback={(error, reset) => (
+                                  <ModeErrorFallback mode="editor" error={error} onReset={reset} />
+                                )}
+                              >
+                                <EditorMode />
+                              </ErrorBoundary>
+                            </div>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Status Bar — inside the card */}
+                    <StatusBar transparent={isWelcome} className="relative z-10" />
+
+                    {/* Crash notification dialog */}
+                    {hasCrash && crashLog ? (
+                      <CrashNotification
+                        open={crashDialogOpen}
+                        onOpenChange={handleOpenChange}
+                        crashLog={crashLog}
+                        onDismiss={dismiss}
+                      />
                     ) : null}
-                    {/* Canvas mode - mounted on first visit, kept alive */}
-                    {mounted.canvas ? (
-                      <div
-                        className="h-full w-full"
-                        style={activeTab === 'canvas' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
+
+                    {/* Toast notifications — offset accounts for card margin */}
+                    <Toaster position="bottom-right" offset={46} />
+                  </ContentCard>
+
+                  {/* Terminal in 'chat' position — below ContentCard in same column */}
+                  <div ref={terminalChatRef} style={terminalChatStyle}>
+                    <div className="h-full flex flex-col">
+                      <ResizeHandle
+                        direction="horizontal"
+                        target="bottom"
+                        borderless
+                        size={CONTENT_CARD.gap}
+                        onDrag={handleTerminalDrag}
+                        getMax={getTerminalMax}
+                        onDragEnd={handleTerminalDragEnd}
+                      />
+                      <TerminalCard
+                        position="chat"
+                        sidebarOpen={sidebarOpen}
+                        actionsBarOpen={activityOpen || rightSidebarOpen ? !isWelcome : false}
+                        isFullscreen={isFullscreen}
                       >
-                        <ErrorBoundary
-                          fallback={(error, reset) => (
-                            <ModeErrorFallback mode="canvas" error={error} onReset={reset} />
-                          )}
-                        >
-                          <CanvasMode />
-                        </ErrorBoundary>
-                      </div>
-                    ) : null}
-                    {/* Editor mode - mounted on first visit, kept alive */}
-                    {mounted.editor ? (
-                      <div
-                        className="h-full w-full"
-                        style={activeTab === 'editor' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE}
+                        {terminalPosition === 'chat' ? (
+                          <TerminalPanelBoth variant="full-width" collapsed={terminalCollapsed} />
+                        ) : null}
+                      </TerminalCard>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Activity column ── */}
+                {/* Slides in/out via negative marginRight (sidebar pattern). */}
+                {/* flex-row: ResizeHandle spans full height, column content beside it. */}
+                <div ref={activityWrapperRef} style={activityWrapperStyle}>
+                  <div className="h-full flex">
+                    {/* Vertical resize handle — spans full activity column height (card + terminal) */}
+                    <ResizeHandle
+                      direction="vertical"
+                      target="review"
+                      borderless
+                      size={CONTENT_CARD.gap}
+                      onDrag={handleActivityDrag}
+                    />
+
+                    {/* Activity card + terminal stacked vertically */}
+                    <div className="flex-1 flex flex-col min-w-0 min-h-0">
+                      <ActivityCard
+                        actionsBarOpen={rightSidebarOpen}
+                        isFullscreen={isFullscreen}
+                        terminalBelow={terminalActivityOpen || terminalBothOpen}
                       >
-                        <ErrorBoundary
-                          fallback={(error, reset) => (
-                            <ModeErrorFallback mode="editor" error={error} onReset={reset} />
-                          )}
-                        >
-                          <EditorMode />
-                        </ErrorBoundary>
+                        <ActivityPanel canManageBrowser />
+                      </ActivityCard>
+
+                      {/* Terminal in 'activity' position — below ActivityCard in same column */}
+                      <div ref={terminalActivityRef} style={terminalActivityStyle}>
+                        <div className="h-full flex flex-col">
+                          <ResizeHandle
+                            direction="horizontal"
+                            target="bottom"
+                            borderless
+                            size={CONTENT_CARD.gap}
+                            onDrag={handleTerminalDrag}
+                            getMax={getTerminalMax}
+                            onDragEnd={handleTerminalDragEnd}
+                          />
+                          <TerminalCard
+                            position="activity"
+                            sidebarOpen={false}
+                            actionsBarOpen={rightSidebarOpen}
+                            isFullscreen={isFullscreen}
+                          >
+                            {terminalPosition === 'activity' ? (
+                              <TerminalPanelBoth
+                                variant="full-width"
+                                collapsed={terminalCollapsed}
+                              />
+                            ) : null}
+                          </TerminalCard>
+                        </div>
                       </div>
-                    ) : null}
-                  </>
-                )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Status Bar — inside the card */}
-              <StatusBar transparent={isWelcome} className="relative z-10" />
-
-              {/* Crash notification dialog */}
-              {hasCrash && crashLog ? (
-                <CrashNotification
-                  open={crashDialogOpen}
-                  onOpenChange={handleOpenChange}
-                  crashLog={crashLog}
-                  onDismiss={dismiss}
-                />
-              ) : null}
-
-              {/* Toast notifications — offset accounts for card margin */}
-              <Toaster position="bottom-right" offset={46} />
-            </ContentCard>
-
-            {/* Activity panel — slides in/out via negative marginRight (sidebar pattern) */}
-            <div ref={activityWrapperRef} style={activityWrapperStyle}>
-              <div className="h-full flex">
-                <ResizeHandle
-                  direction="vertical"
-                  target="review"
-                  borderless
-                  onDrag={handleActivityDrag}
-                />
-                <ActivityCard actionsBarOpen={rightSidebarOpen} isFullscreen={isFullscreen}>
-                  <ActivityPanel canRenderTerminal canManageBrowser />
-                </ActivityCard>
+              {/* Terminal in 'both' position — full width below the cards row */}
+              <div ref={terminalBothRef} style={terminalBothStyle}>
+                <div className="h-full flex flex-col">
+                  <ResizeHandle
+                    direction="horizontal"
+                    target="bottom"
+                    borderless
+                    size={CONTENT_CARD.gap}
+                    onDrag={handleTerminalDrag}
+                    getMax={getTerminalMax}
+                    onDragEnd={handleTerminalDragEnd}
+                  />
+                  <TerminalCard
+                    position="both"
+                    sidebarOpen={sidebarOpen}
+                    actionsBarOpen={rightSidebarOpen}
+                    isFullscreen={isFullscreen}
+                  >
+                    {terminalPosition === 'both' ? (
+                      <TerminalPanelBoth variant="full-width" collapsed={terminalCollapsed} />
+                    ) : null}
+                  </TerminalCard>
+                </div>
               </div>
             </div>
           </AppShell>

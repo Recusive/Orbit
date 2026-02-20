@@ -73,14 +73,14 @@ export const RootLayout: FC = () => {
     setQuickOpenVisible(true);
   }, []);
 
-  // Smart terminal toggle: if activity panel is closed, open terminal in full-width mode
-  // PERF: Reads reviewPanelOpen/bottomPanelOpen from getState() instead of subscribing.
-  // These values are only needed at callback-invocation time, not for rendering.
+  // Smart terminal toggle: if activity panel is closed and terminal is fully hidden,
+  // open terminal in chat mode. Otherwise just toggle collapsed/expanded.
+  // PERF: Reads state from getState() — only needed at callback-invocation time.
   const handleToggleTerminal = useCallback((): void => {
     const { reviewPanelOpen, bottomPanelOpen } = useUIStore.getState();
     if (!reviewPanelOpen && !bottomPanelOpen) {
-      // Activity panel is closed and terminal is closed - open in full-width mode
-      setTerminalPosition('both');
+      // Activity panel is closed and terminal is fully hidden - open in chat mode
+      setTerminalPosition('chat');
     }
     toggleBottomPanel();
   }, [setTerminalPosition, toggleBottomPanel]);

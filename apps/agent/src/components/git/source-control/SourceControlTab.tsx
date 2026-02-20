@@ -122,7 +122,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header with Branch Dropdown */}
       <div
-        className="flex items-center justify-between px-4 border-b border-gray-5 shrink-0"
+        className="flex items-center justify-between px-4 shrink-0"
         style={{ height: HEADER_HEIGHT }} // Extracted constant
       >
         <BranchSelector
@@ -176,12 +176,21 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           />
         ) : null}
 
-        {/* Commit Message */}
+        {/* Commit Message + Actions */}
         <CommitForm
           value={commitMessage}
           onChange={setCommitMessage}
           onCommit={handleCommit}
           error={commitError}
+        />
+        <GitActions
+          onCommit={handleCommit}
+          isCommitting={isCommitting}
+          canCommit={canCommit}
+          onPull={handlePull}
+          isPulling={isPulling}
+          onPush={handlePush}
+          isPushing={isPushing}
         />
 
         {/* Changes List */}
@@ -198,17 +207,6 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           onRequestDiscard={handleRequestDiscard}
         />
       </div>
-
-      {/* Footer with Commit/Push/Pull */}
-      <GitActions
-        onCommit={handleCommit}
-        isCommitting={isCommitting}
-        canCommit={canCommit}
-        onPull={handlePull}
-        isPulling={isPulling}
-        onPush={handlePush}
-        isPushing={isPushing}
-      />
     </div>
   );
 };

@@ -79,7 +79,7 @@ export const PANEL_SIZES = {
   terminal: {
     default: 200,
     min: 100,
-    max: 1990,
+    max: 9999,
   },
   rightSidebar: {
     default: 150,
@@ -163,6 +163,8 @@ export const RESIZE_HANDLE = {
 export const CONTENT_CARD = {
   borderRadius: 10,
   margin: 10,
+  /** Inter-card gap — resize handles occupy this space instead of card margins */
+  gap: 4,
   transition: '200ms cubic-bezier(0.165, 0.84, 0.44, 1)',
 } as const;
 

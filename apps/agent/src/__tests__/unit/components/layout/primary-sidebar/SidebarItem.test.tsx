@@ -313,7 +313,7 @@ describe('SidebarItem', () => {
       render(<SidebarItem {...createDefaultProps()} />);
 
       const button = getButton();
-      expect(button).toHaveClass('hover:bg-gray-3');
+      expect(button).toHaveClass('hover:bg-gray-2');
     });
   });
 

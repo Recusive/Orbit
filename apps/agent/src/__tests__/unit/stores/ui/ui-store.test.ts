@@ -563,14 +563,23 @@ describe('ui-store', () => {
 
   describe('bottom panel', () => {
     describe('toggleBottomPanel', () => {
-      it('should toggle bottom panel open state', () => {
+      it('should open panel and toggle collapsed state', () => {
         const { toggleBottomPanel } = useUIStore.getState();
 
+        // First toggle: closed → open (expanded)
         toggleBottomPanel();
         expect(useUIStore.getState().bottomPanelOpen).toBe(true);
+        expect(useUIStore.getState().terminalCollapsed).toBe(false);
 
+        // Second toggle: open expanded → open collapsed (header-only)
         toggleBottomPanel();
-        expect(useUIStore.getState().bottomPanelOpen).toBe(false);
+        expect(useUIStore.getState().bottomPanelOpen).toBe(true);
+        expect(useUIStore.getState().terminalCollapsed).toBe(true);
+
+        // Third toggle: open collapsed → open expanded
+        toggleBottomPanel();
+        expect(useUIStore.getState().bottomPanelOpen).toBe(true);
+        expect(useUIStore.getState().terminalCollapsed).toBe(false);
       });
     });
 
@@ -583,7 +592,7 @@ describe('ui-store', () => {
         expect(useUIStore.getState().bottomPanelHeight).toBe(PANEL_SIZES.terminal.min);
 
         // Too large
-        setBottomPanelHeight(3000);
+        setBottomPanelHeight(99999);
         expect(useUIStore.getState().bottomPanelHeight).toBe(PANEL_SIZES.terminal.max);
 
         // Valid
@@ -635,13 +644,16 @@ describe('ui-store', () => {
     });
 
     describe('cycleTerminalPosition', () => {
-      it('should cycle between activity and both', () => {
+      it('should cycle through activity → both → chat → activity', () => {
         const { cycleTerminalPosition } = useUIStore.getState();
 
         expect(useUIStore.getState().terminalPosition).toBe('activity');
 
         cycleTerminalPosition();
         expect(useUIStore.getState().terminalPosition).toBe('both');
+
+        cycleTerminalPosition();
+        expect(useUIStore.getState().terminalPosition).toBe('chat');
 
         cycleTerminalPosition();
         expect(useUIStore.getState().terminalPosition).toBe('activity');
@@ -654,6 +666,54 @@ describe('ui-store', () => {
 
         expect(useUIStore.getState().bottomPanelOpen).toBe(true);
       });
+    });
+  });
+
+  // ============================================================================
+  // Terminal Auto-Switch
+  // ============================================================================
+
+  describe('terminal auto-switch on activity close', () => {
+    it('should switch terminal from activity to chat when activity panel closes', () => {
+      const { toggleReviewPanel, setTerminalPosition, toggleBottomPanel } = useUIStore.getState();
+
+      // Open activity panel and terminal in activity position
+      toggleReviewPanel(); // open
+      setTerminalPosition('activity');
+      toggleBottomPanel(); // open terminal
+
+      expect(useUIStore.getState().terminalPosition).toBe('activity');
+
+      // Close activity panel — terminal should auto-switch to chat
+      toggleReviewPanel();
+
+      expect(useUIStore.getState().terminalPosition).toBe('chat');
+    });
+
+    it('should not auto-switch when terminal is in both position', () => {
+      const { toggleReviewPanel, setTerminalPosition, toggleBottomPanel } = useUIStore.getState();
+
+      toggleReviewPanel(); // open
+      setTerminalPosition('both');
+      toggleBottomPanel(); // open terminal
+
+      // Close activity panel — terminal stays in 'both'
+      toggleReviewPanel();
+
+      expect(useUIStore.getState().terminalPosition).toBe('both');
+    });
+
+    it('should not auto-switch when terminal is closed', () => {
+      const { toggleReviewPanel, setTerminalPosition } = useUIStore.getState();
+
+      toggleReviewPanel(); // open
+      setTerminalPosition('activity');
+      // bottomPanelOpen is false (default)
+
+      // Close activity panel — no switch since terminal is closed
+      toggleReviewPanel();
+
+      expect(useUIStore.getState().terminalPosition).toBe('activity');
     });
   });
 
@@ -911,10 +971,10 @@ describe('ui-store', () => {
         toggleReviewPanel();
       }
 
-      // After even number of toggles, should be back to initial state
+      // After 10 toggles: sidebar and review flip back, terminal stays open
       const state = useUIStore.getState();
       expect(state.leftSidebarWidth).toBe(SIDEBAR.expanded); // Back to expanded
-      expect(state.bottomPanelOpen).toBe(false); // Back to closed
+      expect(state.bottomPanelOpen).toBe(true); // Opens on first toggle, stays open
       expect(state.reviewPanelOpen).toBe(false); // Back to closed
     });
 

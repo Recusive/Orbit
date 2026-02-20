@@ -25,7 +25,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({ value, onChange, onCommi
   );
 
   return (
-    <div className="p-3 border-b border-gray-5">
+    <div className="px-3 pt-3 pb-0">
       <textarea
         value={value}
         onChange={(e) => {

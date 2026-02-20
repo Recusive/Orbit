@@ -144,7 +144,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   }, [regularPermissions, onPermissionApprove, onPermissionDeny]);
 
   return (
-    <div className="flex justify-center p-4 pt-0 shrink-0 relative">
+    <div className="flex justify-center px-4 pb-1 shrink-0 relative">
       <div
         className={getInputBoxClasses()}
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}

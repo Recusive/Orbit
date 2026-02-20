@@ -29,9 +29,8 @@ import {
   CreateWorktreeDialog,
   DeleteWorktreeDialog,
 } from '@/components/modals';
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { getCommandKey, HEIGHTS, SIDEBAR } from '@/lib/utils';
+import { Kbd } from '@/components/ui/kbd';
+import { HEIGHTS, SIDEBAR } from '@/lib/utils';
 import {
   useUIStore,
   useWorkspaceName,
@@ -134,29 +133,18 @@ export const PrimarySidebar: FC = () => {
       className="h-full flex flex-col overflow-hidden"
       style={{ contain: 'layout style' }}
     >
-      {/* Header — always expanded; at width 0 the sidebar is fully clipped by AppShell */}
+      {/* Header — collapse button next to macOS traffic lights (x:11 + ~54px for 3 buttons) */}
       <div
-        className="flex items-center justify-end shrink-0 w-full px-3"
+        className="flex items-center shrink-0 w-full pl-[76px] pr-3"
         style={{ height: HEIGHTS.headerBar, marginTop: 5, marginBottom: 5 }}
       >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={toggleLeftSidebar}
-              aria-label="Collapse sidebar"
-              className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-2 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
-            >
-              <SidebarToggleIcon expanded={true} />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="flex items-center gap-2">
-            <span>Collapse sidebar</span>
-            <KbdGroup>
-              <Kbd className="bg-white/15 text-inherit border-white/20">{getCommandKey()}</Kbd>
-              <Kbd className="bg-white/15 text-inherit border-white/20">/</Kbd>
-            </KbdGroup>
-          </TooltipContent>
-        </Tooltip>
+        <button
+          onClick={toggleLeftSidebar}
+          aria-label="Collapse sidebar"
+          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-2 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
+        >
+          <SidebarToggleIcon expanded={true} />
+        </button>
       </div>
 
       {/* Search Bar */}
@@ -166,7 +154,7 @@ export const PrimarySidebar: FC = () => {
       >
         <button
           onClick={handleOpenQuickSearch}
-          className="flex items-center h-8 rounded-lg text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-7 hover:bg-gray-8 dark:bg-gray-4 dark:hover:bg-gray-5 transition-[background-color] duration-100"
+          className="flex items-center h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-7 hover:bg-gray-8 dark:bg-gray-4 dark:hover:bg-gray-5 transition-[background-color] duration-100"
           title="Search files (⌘P)"
         >
           {/* Fixed-width icon column - never moves */}
@@ -265,7 +253,7 @@ export const PrimarySidebar: FC = () => {
         )}
       </div>
 
-      <hr className="border-gray-5 border-t shrink-0 mt-2 mb-0" />
+      <hr className="border-gray-6 dark:border-gray-3 border-t shrink-0 mt-2 mb-0" />
 
       {/* Utilities — pinned to bottom */}
       <div className="flex flex-col shrink-0 gap-1 py-1.5">

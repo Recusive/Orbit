@@ -528,7 +528,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const getInputBoxClasses = useCallback((): string => {
     const base = cn(
       'w-full p-1 bg-gray-3 border transition-[border-color,box-shadow] duration-200',
-      'rounded-2xl',
+      'rounded-[14px]',
       'shadow-none'
     );
     switch (inputMode) {
@@ -537,7 +537,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
       case 'accept':
         return `${base} border-2 border-dotted border-mode-accept/40`;
       case 'default':
-        return `${base} border-gray-6`;
+        return `${base} border-gray-5`;
     }
   }, [inputMode]);
 

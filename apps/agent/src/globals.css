@@ -901,6 +901,12 @@ html.dark [data-streamdown='code-block-container'] {
 }
 
 
+/** Disable CSS transitions during resize drag — applied via classList, removed on mouseup.
+ *  Uses !important to override React-managed inline transition styles. */
+.drag-active {
+  transition: none !important;
+}
+
 @layer base {
   *,
   *::before,

@@ -171,7 +171,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[320px] p-0 rounded-lg border border-gray-5 shadow-lg"
+        className="w-[320px] p-0 rounded-[12px] border border-gray-5 shadow-lg"
         side="top"
         align="start"
         sideOffset={8}
@@ -182,7 +182,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
           e.preventDefault();
         }}
       >
-        <Command shouldFilter={false} className="rounded-lg bg-transparent">
+        <Command shouldFilter={false} className="rounded-[12px] bg-transparent">
           <CommandList className="scroll-py-2 max-h-[300px] pb-1.5">
             {/* Loading state */}
             {isLoading && results.length === 0 ? (

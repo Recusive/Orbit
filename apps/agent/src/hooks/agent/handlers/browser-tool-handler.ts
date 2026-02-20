@@ -464,7 +464,7 @@ export async function executeBrowserTool(
         await browserClose();
         useBrowserStore.getState().reset();
         useBrowserLifecycleStore.getState().reset();
-        useUIStore.getState().setActivityTab('files');
+        useUIStore.getState().setActivityTab('source');
         resetBrowserApiCache();
         return { success: true };
       }

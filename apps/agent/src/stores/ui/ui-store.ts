@@ -67,10 +67,10 @@ const WorktreeUIStateArraySchema = z.array(WorktreeUIStateSchema);
 export type ConversationSummary = StoredConversationSummary;
 
 // Terminal position options
-export type TerminalPosition = 'activity' | 'both';
+export type TerminalPosition = 'activity' | 'chat' | 'both';
 
 // Activity panel tabs
-export type ActivityTab = 'file' | 'files' | 'source' | 'browser';
+export type ActivityTab = 'file' | 'source' | 'browser';
 
 // Bottom panel tabs
 export type BottomPanelTab = 'terminal' | 'problems';
@@ -110,6 +110,7 @@ interface UIState {
   bottomPanelHeight: number;
   bottomPanelTab: BottomPanelTab;
   terminalPosition: TerminalPosition;
+  terminalCollapsed: boolean;
   // Activity Panel Tab
   activityTab: ActivityTab;
   // Header Tab (main app view)
@@ -157,6 +158,7 @@ interface UIActions {
   toggleReviewPanel: () => void;
   toggleRightSidebar: () => void;
   toggleBottomPanel: () => void;
+  toggleTerminalCollapsed: () => void;
   setReviewPanelWidth: (width: number) => void;
   setBottomPanelHeight: (height: number) => void;
   setTerminalPosition: (position: TerminalPosition) => void;
@@ -279,6 +281,7 @@ export const useUIStore = create<UIStore>()(
     bottomPanelHeight: DEFAULT_UI_STATE.bottomPanelHeight,
     bottomPanelTab: 'terminal' as BottomPanelTab,
     terminalPosition: 'activity' as TerminalPosition,
+    terminalCollapsed: false,
     activityTab: 'file' as ActivityTab,
     activeTab: 'agent' as HeaderTab,
     goToLineDialogOpen: false,
@@ -493,7 +496,21 @@ export const useUIStore = create<UIStore>()(
 
     toggleBottomPanel: (): void => {
       set((state) => {
-        state.bottomPanelOpen = !state.bottomPanelOpen;
+        if (!state.bottomPanelOpen) {
+          // Closed → open fully
+          state.bottomPanelOpen = true;
+          state.terminalCollapsed = false;
+        } else {
+          // Open → toggle between expanded and collapsed (header-only).
+          // The header bar always stays visible; Cmd+J never fully hides.
+          state.terminalCollapsed = !state.terminalCollapsed;
+        }
+      });
+    },
+
+    toggleTerminalCollapsed: (): void => {
+      set((state) => {
+        state.terminalCollapsed = !state.terminalCollapsed;
       });
     },
 
@@ -523,7 +540,10 @@ export const useUIStore = create<UIStore>()(
 
     cycleTerminalPosition: (): void => {
       set((state) => {
-        state.terminalPosition = state.terminalPosition === 'activity' ? 'both' : 'activity';
+        const order: TerminalPosition[] = ['activity', 'both', 'chat'];
+        const idx = order.indexOf(state.terminalPosition);
+        const next = order[(idx + 1) % order.length];
+        if (next !== undefined) state.terminalPosition = next;
         // Ensure terminal is open when cycling positions
         state.bottomPanelOpen = true;
       });
@@ -792,6 +812,10 @@ export const useWorkspaceConversations = (): ConversationSummary[] => {
 
 export const useTerminalPosition = (): TerminalPosition => {
   return useUIStore((state) => state.terminalPosition);
+};
+
+export const useTerminalCollapsed = (): boolean => {
+  return useUIStore((state) => state.terminalCollapsed);
 };
 
 export const useActivityTab = (): ActivityTab => {

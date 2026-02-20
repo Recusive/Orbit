@@ -9,6 +9,7 @@
  * - Sidebar open:  0 left (card touches sidebar)
  * - Actions bar open: 0 right (card touches actions bar)
  * - Both closed: 6px on all sides (card floats centered)
+ * - Terminal below: bottom margin shrinks to 4px (matching inter-card gap)
  * - Fullscreen: 0 on all sides, 0 border-radius
  */
 import { useMemo } from 'react';
@@ -25,6 +26,8 @@ interface ContentCardProps {
   readonly sidebarOpen: boolean;
   readonly actionsBarOpen: boolean;
   readonly isFullscreen: boolean;
+  /** When true, bottom margin shrinks to 4px to match the inter-card gap (terminal below). */
+  readonly terminalBelow?: boolean;
   readonly children: ReactNode;
 }
 
@@ -32,6 +35,7 @@ export const ContentCard: FC<ContentCardProps> = ({
   sidebarOpen,
   actionsBarOpen,
   isFullscreen,
+  terminalBelow = false,
   children,
 }) => {
   const style = useMemo((): CSSProperties => {
@@ -51,7 +55,8 @@ export const ContentCard: FC<ContentCardProps> = ({
 
     const top = m;
     const right = actionsBarOpen ? 0 : m;
-    const bottom = m;
+    // When terminal is below, bottom margin is 0 — the resize handle provides the gap.
+    const bottom = terminalBelow ? 0 : m;
     const left = sidebarOpen ? 0 : m;
 
     return {
@@ -63,7 +68,7 @@ export const ContentCard: FC<ContentCardProps> = ({
         ? undefined
         : `margin ${CONTENT_CARD.transition}, border-radius ${CONTENT_CARD.transition}`,
     };
-  }, [sidebarOpen, actionsBarOpen, isFullscreen]);
+  }, [sidebarOpen, actionsBarOpen, isFullscreen, terminalBelow]);
 
   return (
     <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative" style={style}>

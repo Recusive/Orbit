@@ -5,10 +5,16 @@
  * Uses immer with enableMapSet() for Map/Set support.
  */
 
-import type { FileChange, FileChangeStatus, FileChangeType } from '@/stores/file/file-store';
+import type { FileChange, FileChangeType } from '@/stores/file/file-store';
 import type { FileNode } from '@/types/protocol';
 
-import { flattenFileTree, getChangedFiles, useFileStore } from '@/stores/file/file-store';
+import { flattenFileTree, useFileStore } from '@/stores/file/file-store';
+
+/** Local test helper — reads all changed files sorted by timestamp descending */
+function getChangedFiles(): FileChange[] {
+  const { filesById } = useFileStore.getState();
+  return Object.values(filesById).sort((a, b) => b.timestamp - a.timestamp);
+}
 
 // Mock Date.now for consistent IDs
 let mockTime = 1704067200000;
@@ -48,7 +54,6 @@ function resetStore(): void {
     state.filesById = {};
     state.pathToId = {};
     state.selectedFile = null;
-    state.filterStatus = 'all';
     // Clear file tree state
     state.rootPath = null;
     state.treeNodes = {};
@@ -77,10 +82,6 @@ describe('file-store', () => {
 
     it('should start with null selected file', () => {
       expect(useFileStore.getState().selectedFile).toBeNull();
-    });
-
-    it('should start with "all" filter status', () => {
-      expect(useFileStore.getState().filterStatus).toBe('all');
     });
 
     it('should start with null root path', () => {
@@ -312,7 +313,7 @@ describe('file-store', () => {
   });
 
   // ============================================================================
-  // File Changes: selectFile/setFilterStatus
+  // File Changes: selectFile
   // ============================================================================
 
   describe('selectFile', () => {
@@ -331,19 +332,6 @@ describe('file-store', () => {
       selectFile(null);
 
       expect(useFileStore.getState().selectedFile).toBeNull();
-    });
-  });
-
-  describe('setFilterStatus', () => {
-    it('should set filter status', () => {
-      const { setFilterStatus } = useFileStore.getState();
-
-      const statuses: (FileChangeStatus | 'all')[] = ['all', 'pending', 'accepted', 'rejected'];
-
-      statuses.forEach((status) => {
-        setFilterStatus(status);
-        expect(useFileStore.getState().filterStatus).toBe(status);
-      });
     });
   });
 
@@ -984,41 +972,6 @@ describe('file-store', () => {
 
       // Reset mock for other tests
       vi.spyOn(Math, 'random').mockReturnValue(0.123456789);
-    });
-  });
-
-  // ============================================================================
-  // getChangedFiles Non-Memoization (Intentional Behavior)
-  // ============================================================================
-
-  describe('getChangedFiles non-memoization', () => {
-    it('should return new array reference on each call (intentional)', () => {
-      const { addFileChange } = useFileStore.getState();
-
-      addFileChange(createFileChange('/src/app.ts'));
-
-      const files1 = getChangedFiles();
-      const files2 = getChangedFiles();
-
-      // Different references (not memoized - intentional for non-hook usage)
-      expect(files1).not.toBe(files2);
-
-      // But same content
-      expect(files1).toEqual(files2);
-    });
-
-    it('should reflect mutations between calls', () => {
-      const { addFileChange, acceptFile } = useFileStore.getState();
-
-      addFileChange(createFileChange('/src/app.ts'));
-
-      const filesBefore = getChangedFiles();
-      expect(filesBefore[0]?.status).toBe('pending');
-
-      acceptFile('/src/app.ts');
-
-      const filesAfter = getChangedFiles();
-      expect(filesAfter[0]?.status).toBe('accepted');
     });
   });
 });

@@ -82,7 +82,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
                 'bg-card',
-                'border border-gray-5 rounded-lg overflow-hidden flex flex-col',
+                'border border-gray-5 rounded-[14px] overflow-hidden flex flex-col',
                 'shadow-lg duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
                 'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',

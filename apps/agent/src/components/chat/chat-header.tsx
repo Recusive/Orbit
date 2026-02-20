@@ -154,7 +154,7 @@ const DiffStatsButton: FC = () => {
       : `${String(fileCount)} file${fileCount !== 1 ? 's' : ''} changed on branch`;
 
   const handleClick = (): void => {
-    setActivityTab('files');
+    setActivityTab('source');
   };
 
   return (

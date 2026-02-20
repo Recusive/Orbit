@@ -3,7 +3,7 @@
  * To change sidebar widths, snap thresholds, or handle dimensions,
  * update SIDEBAR, PANEL_SIZES, and RESIZE_HANDLE in constants.ts.
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import type { FC, KeyboardEvent } from 'react';
@@ -44,8 +44,7 @@ const KEYBOARD_STEP_LARGE = 50;
  * - Only syncs to React state on mouseup (prevents re-render jank)
  * - Enforces min 240px, max 400px when expanded
  * - Snap-to-collapse: drag below snapThreshold to collapse to 0px
- * - Wide hit area (8px) for easy targeting, thin visual line (3px)
- * - Accent highlight on hover/drag/focus
+ * - Wide hit area (8px) for easy targeting
  */
 export const SidebarResizeHandle: FC = () => {
   // Use useShallow to prevent re-renders when unrelated store state changes
@@ -56,10 +55,6 @@ export const SidebarResizeHandle: FC = () => {
     }))
   );
   const isCollapsed = useIsLeftSidebarCollapsed();
-
-  // Track dragging state for visual feedback (needs React state for re-render)
-  const [isDragging, setIsDragging] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
 
   // Track the current width during drag (not in React state to avoid re-renders)
   const currentWidthRef = useRef(leftSidebarWidth);
@@ -113,7 +108,6 @@ export const SidebarResizeHandle: FC = () => {
 
     // Now safe to set dragging state since we have a valid element
     isDraggingRef.current = true;
-    setIsDragging(true);
     currentWidthRef.current = leftSidebarWidth;
 
     const startX = e.clientX;
@@ -150,7 +144,6 @@ export const SidebarResizeHandle: FC = () => {
       if (!isDraggingRef.current) return; // Already cleaned up
 
       isDraggingRef.current = false;
-      setIsDragging(false);
 
       // Remove event listeners
       document.removeEventListener('mousemove', handleMouseMove);
@@ -204,7 +197,7 @@ export const SidebarResizeHandle: FC = () => {
       {/* Hit area — absolutely positioned, centered on the sidebar/card boundary */}
       <div
         className={cn(
-          'group absolute inset-y-0 z-10',
+          'absolute inset-y-0 z-10',
           isCollapsed ? 'cursor-default' : 'cursor-col-resize'
         )}
         style={{
@@ -213,24 +206,7 @@ export const SidebarResizeHandle: FC = () => {
         }}
         onMouseDown={handleMouseDown}
         onKeyDown={handleKeyDown}
-        onFocus={() => {
-          setIsFocused(true);
-        }}
-        onBlur={() => {
-          setIsFocused(false);
-        }}
-      >
-        {/* Hover/Active indicator line — only visible when expanded */}
-        {!isCollapsed && (
-          <div
-            className={cn(
-              'absolute inset-y-0 left-1/2 -translate-x-1/2 bg-primary transition-opacity duration-100',
-              isDragging || isFocused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-            )}
-            style={{ width: RESIZE_HANDLE.hoverWidth }}
-          />
-        )}
-      </div>
+      />
     </div>
   );
 };
