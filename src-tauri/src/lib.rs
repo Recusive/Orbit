@@ -29,7 +29,7 @@ use commands::canvas::PreviewServerState;
 use commands::common::{
     credentials, dev_monitor, diagnostics, files, git, lsp, providers,
     search::{self, FileIndexState},
-    settings, terminal, window, workspace,
+    settings, sf_symbols, terminal, window, workspace,
 };
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
@@ -297,25 +297,14 @@ pub fn run() {
             {
                 use orbit_plugin_decorum::WebviewWindowExt as _;
                 use tauri::Manager as _;
-                use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 
                 if let Some(window) = app.get_webview_window("main") {
                     // Enable ProMotion 120Hz on supported displays.
                     drop(window.enable_promotion());
 
-                    // Apply heavy frosted vibrancy (iOS 7 style).
-                    // FullScreenUI has the heaviest gaussian blur of all NSVisualEffectMaterials,
-                    // creating a deeply frosted diffusion instead of a straight see-through look.
-                    // CSS surfaces at 70%/55% opacity mask any material tinting — only the
-                    // blur effect shows through the transparent portion.
-                    if let Err(e) = apply_vibrancy(
-                        &window,
-                        NSVisualEffectMaterial::FullScreenUI,
-                        None,
-                        None,
-                    ) {
-                        log::warn!("Failed to apply frosted vibrancy: {e}");
-                    }
+                    // Liquid Glass effect is managed by the frontend (theme-provider.tsx)
+                    // via tauri-plugin-liquid-glass JS API. This allows dynamic tint
+                    // adjustment when the user switches between light/dark themes.
 
                     // Fix macOS child window z-ordering: when the main window gains
                     // focus, the browser child window can appear behind the parent.
@@ -582,6 +571,8 @@ pub fn run() {
             browser::browser_clear,
             // Window management commands
             window::set_traffic_lights_visible,
+            // SF Symbol rendering
+            sf_symbols::get_sf_symbol,
         ])
         .run(tauri::generate_context!());
 

@@ -46,7 +46,7 @@ const ContextMenuSubContent = React.forwardRef<
   <ContextMenuPrimitive.SubContent
     ref={ref}
     className={cn(
-      'z-50 min-w-[8rem] overflow-hidden rounded-md border border-gray-6 bg-popover glass-float p-1 text-popover-foreground shadow-lg',
+      'z-50 min-w-[8rem] overflow-hidden rounded-md border border-gray-6 bg-popover p-1 text-popover-foreground shadow-lg',
       // Transform origin from Radix - scales from where it connects to parent menu
       'origin-[--radix-context-menu-content-transform-origin]',
       // Enter animation: subtle scale + fade + directional slide
@@ -76,7 +76,7 @@ const ContextMenuContent = React.forwardRef<
     <ContextMenuPrimitive.Content
       ref={ref}
       className={cn(
-        'z-50 min-w-[8rem] overflow-hidden rounded-md border border-gray-6 bg-popover glass-float p-1 text-popover-foreground shadow-md',
+        'z-50 min-w-[8rem] overflow-hidden rounded-md border border-gray-6 bg-popover p-1 text-popover-foreground shadow-md',
         // Transform origin from Radix - scales from cursor position
         'origin-[--radix-context-menu-content-transform-origin]',
         // Enter animation: subtle scale + fade + directional slide

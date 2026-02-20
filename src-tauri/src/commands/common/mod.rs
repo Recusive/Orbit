@@ -9,6 +9,7 @@ pub mod lsp;
 pub mod providers;
 pub mod search;
 pub mod settings;
+pub mod sf_symbols;
 pub mod terminal;
 pub mod window;
 pub mod workspace;

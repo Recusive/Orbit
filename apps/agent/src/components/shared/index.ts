@@ -7,4 +7,6 @@ export type { ErrorBoundaryResetFn } from './ErrorBoundary';
 
 export { BeamAsciiPre } from './BeamAsciiPre';
 export { ScrambleAsciiPre } from './ScrambleAsciiPre';
+export { SFSymbol } from './sf-symbol';
+export type { SFSymbolWeight } from './sf-symbol';
 export { StatusAnnouncer } from './StatusAnnouncer';

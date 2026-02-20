@@ -7,7 +7,15 @@
  */
 import { IconCirclePlus } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconCirclePlus';
 import { IconSearchlinesSparkle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSearchlinesSparkle';
-import { Download, FlaskConical, FolderOpen, Search, Settings2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Download,
+  FlaskConical,
+  FolderOpen,
+  Search,
+  Settings2,
+} from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
@@ -29,6 +37,7 @@ import {
   CreateWorktreeDialog,
   DeleteWorktreeDialog,
 } from '@/components/modals';
+import { SFSymbol } from '@/components/shared';
 import { Kbd } from '@/components/ui/kbd';
 import { HEIGHTS, SIDEBAR } from '@/lib/utils';
 import {
@@ -135,7 +144,7 @@ export const PrimarySidebar: FC = () => {
     >
       {/* Header — collapse button next to macOS traffic lights (x:11 + ~54px for 3 buttons) */}
       <div
-        className="flex items-center shrink-0 w-full pl-[76px] pr-3"
+        className="flex items-center shrink-0 w-full pl-[82px] pr-3"
         style={{ height: HEIGHTS.headerBar, marginTop: 5, marginBottom: 5 }}
       >
         <button
@@ -143,8 +152,38 @@ export const PrimarySidebar: FC = () => {
           aria-label="Collapse sidebar"
           className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-2 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
         >
-          <SidebarToggleIcon expanded={true} />
+          <SFSymbol
+            name="sidebar.left"
+            size={18}
+            weight="medium"
+            fallback={<SidebarToggleIcon expanded={true} />}
+          />
         </button>
+        {/* Back / Forward navigation */}
+        <div className="flex items-center gap-0.5 ml-auto">
+          <button
+            aria-label="Go back"
+            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-2 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+          >
+            <SFSymbol
+              name="arrow.left"
+              size={13}
+              weight="semibold"
+              fallback={<ArrowLeft className="h-3.5 w-3.5" />}
+            />
+          </button>
+          <button
+            aria-label="Go forward"
+            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-2 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+          >
+            <SFSymbol
+              name="arrow.right"
+              size={13}
+              weight="semibold"
+              fallback={<ArrowRight className="h-3.5 w-3.5" />}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -199,7 +238,14 @@ export const PrimarySidebar: FC = () => {
       {activeTab === 'conversations' ? (
         <div className="flex flex-col shrink-0 gap-1 py-1.5">
           <SidebarItem
-            icon={IconCirclePlus}
+            icon={() => (
+              <SFSymbol
+                name="square.and.pencil"
+                size={18}
+                weight="medium"
+                fallback={<IconCirclePlus className="h-4 w-4" />}
+              />
+            )}
             label="New Session"
             large
             onClick={handleStartConversation}
@@ -276,7 +322,14 @@ export const PrimarySidebar: FC = () => {
           />
         ) : null}
         <SidebarItem
-          icon={Settings2}
+          icon={() => (
+            <SFSymbol
+              name="gear"
+              size={18}
+              weight="medium"
+              fallback={<Settings2 className="h-4 w-4" />}
+            />
+          )}
           label="Settings"
           shortcut={['⌘', ',']}
           onClick={() => {
@@ -284,7 +337,14 @@ export const PrimarySidebar: FC = () => {
           }}
         />
         <SidebarItem
-          icon={FlaskConical}
+          icon={() => (
+            <SFSymbol
+              name="exclamationmark.bubble"
+              size={18}
+              weight="medium"
+              fallback={<FlaskConical className="h-4 w-4" />}
+            />
+          )}
           label="Feedback"
           onClick={() => {
             openSettings('feedback');

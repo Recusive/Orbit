@@ -1,5 +1,6 @@
 import { createLogger } from '@orbit/common/lib';
 import { createContext, useContext, useEffect, useState } from 'react';
+import { GlassMaterialVariant, setLiquidGlassEffect } from 'tauri-plugin-liquid-glass-api';
 
 import type { FC, ReactNode } from 'react';
 
@@ -95,6 +96,18 @@ export const ThemeProvider: FC<ThemeProviderProps> = ({
     root.classList.remove('window-mode-liquid-glass', 'window-mode-solid');
     root.classList.add(`window-mode-${windowMode}`);
   }, [windowMode]);
+
+  // Sync liquid glass effect with the current theme.
+  useEffect(() => {
+    if (windowMode === 'solid') {
+      void setLiquidGlassEffect({ enabled: false });
+      return;
+    }
+    void setLiquidGlassEffect({
+      variant: GlassMaterialVariant.Sidebar,
+      tintColor: effectiveTheme === 'light' ? '#DDCFC9cc' : '#16110Fcc',
+    });
+  }, [effectiveTheme, windowMode]);
 
   const setTheme = (newTheme: Theme): void => {
     logger.debug('Theme changed', { theme: newTheme });

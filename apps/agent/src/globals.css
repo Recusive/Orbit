@@ -443,7 +443,7 @@ html.dark {
 
 /* ============================================
    SOLID MODE OVERRIDES
-   Restores opaque surfaces (no transparency)
+   Fully opaque surfaces (no transparency anywhere)
    Uses Radix scale steps for consistent theming
    ============================================ */
 
@@ -468,6 +468,51 @@ html.window-mode-solid.dark {
   --chat-area: var(--gray-2);
   --editor-bg: var(--gray-1);
   --sidebar: var(--gray-2);
+}
+
+/* ============================================
+   LIQUID GLASS MODE OVERRIDES
+   Glass effect scoped to the sidebar ONLY.
+   Main app surfaces (content, dialogs, menus)
+   stay opaque for readability.
+   ============================================ */
+
+/* Light mode - Liquid Glass (sidebar-only glass) */
+html.window-mode-liquid-glass:root,
+html.window-mode-liquid-glass.light {
+  /* Main surfaces — opaque (same values as solid mode) */
+  --surface: var(--gray-2);
+  --background: var(--gray-2);
+  --card: var(--gray-2);
+  --popover: var(--gray-2);
+  --chat-area: var(--gray-2);
+  --editor-bg: var(--gray-1);
+  --sidebar: var(--gray-2);
+}
+
+/* Dark mode - Liquid Glass (sidebar-only glass) */
+html.window-mode-liquid-glass.dark {
+  /* Main surfaces — opaque (same values as solid mode) */
+  --surface: var(--gray-2);
+  --background: var(--gray-3);
+  --card: var(--gray-2);
+  --popover: var(--gray-2);
+  --chat-area: var(--gray-2);
+  --editor-bg: var(--gray-1);
+  --sidebar: var(--gray-2);
+}
+
+/* Base layer becomes transparent so tauri-plugin-liquid-glass
+   (GlassMaterialVariant::Sidebar) shows through the sidebar area.
+   ContentCard provides its own opaque background (var(--background)). */
+html.window-mode-liquid-glass [data-tauri-drag-region] {
+  background-color: transparent;
+}
+
+/* Sidebar — fully transparent so native vibrancy shows through.
+   No CSS blur or backdrop-filter needed; the OS handles it. */
+html.window-mode-liquid-glass [data-sidebar="primary"] {
+  background: transparent;
 }
 
 /* ── Streamdown code blocks ──────────────────────────────

@@ -8,6 +8,7 @@ import { SETTINGS_PAGE_COMPONENTS, SlashCommandsSettings, SubagentsSettings } fr
 import type { SettingsDialogProps, SettingsSection } from './types';
 import type { FC, ReactNode } from 'react';
 
+import { SFSymbol } from '@/components/shared';
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { cn } from '@/lib/utils';
@@ -97,7 +98,13 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               {/* Title bar */}
               <div className="flex items-center justify-between px-4 py-2.5 bg-transparent">
                 <div className="flex items-center gap-2 font-medium text-base">
-                  <Settings2 className="h-4 w-4 shrink-0 text-gray-9" />
+                  <SFSymbol
+                    name="gear"
+                    size={18}
+                    weight="medium"
+                    className="shrink-0 text-gray-9"
+                    fallback={<Settings2 className="h-4 w-4" />}
+                  />
                   <span className="text-gray-9">Settings</span>
                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-8" />
                   <span>{activeItem.icon}</span>

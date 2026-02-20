@@ -1,4 +1,4 @@
-//! Window management commands (traffic light visibility and positioning).
+//! Window management commands (traffic lights, glass state).
 
 /// Show or hide the macOS traffic light buttons (close/minimize/zoom).
 ///

@@ -9,13 +9,23 @@
  */
 import { IconSquareGridCircle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSquareGridCircle';
 import { createLogger } from '@orbit/common/lib';
-import { Check, ChevronDown, GitBranch, Loader2, Terminal } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  GitBranch,
+  Loader2,
+  PanelLeft,
+  PanelRight,
+  SquarePen,
+  Terminal,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
 
+import { SFSymbol } from '@/components/shared';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -217,6 +227,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
     setTerminalPosition,
     rightSidebarOpen,
     bottomPanelOpen,
+    terminalCollapsed,
   } = useUIStore(
     useShallow((s) => ({
       toggleLeftSidebar: s.toggleLeftSidebar,
@@ -226,16 +237,17 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
       setTerminalPosition: s.setTerminalPosition,
       rightSidebarOpen: s.rightSidebarOpen,
       bottomPanelOpen: s.bottomPanelOpen,
+      terminalCollapsed: s.terminalCollapsed,
     }))
   );
 
   const handleToggleTerminal = (): void => {
-    if (!bottomPanelOpen) {
-      if (reviewPanelOpen) {
-        setTerminalPosition('activity');
-      } else {
-        setTerminalPosition('both');
-      }
+    // Always pick a visible position — if the activity panel is closed,
+    // the 'activity' slot is off-screen so force 'chat'.
+    if (!reviewPanelOpen) {
+      setTerminalPosition('chat');
+    } else if (!bottomPanelOpen) {
+      setTerminalPosition('activity');
     }
     toggleBottomPanel();
   };
@@ -251,7 +263,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
       style={{ height: HEIGHTS.headerBar }}
     >
       {/* Left section: [button] | project name | chat name */}
-      <div className="flex items-center gap-1 pl-2 min-w-0">
+      <div className="flex items-center gap-1.5 pl-2 min-w-0">
         {/* In demo mode, render fake macOS traffic light dots */}
         {isDemo ? (
           <div className="flex items-center gap-[7px] mr-3">
@@ -261,35 +273,50 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
           </div>
         ) : null}
 
-        {/* Sidebar expand button — only visible when sidebar is closed */}
+        {/* Sidebar expand + New session — only visible when sidebar is closed */}
         {!sidebarOpen && !isDemo ? (
-          <button
-            data-tauri-drag-region={false}
-            onClick={toggleLeftSidebar}
-            aria-label="Show sidebar"
-            className={cn(
-              'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
-              'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
-              'transition-[color,background-color,transform] duration-150',
-              'text-sidebar-foreground hover:text-foreground'
-            )}
-          >
-            <svg
-              aria-hidden="true"
-              width="14"
-              height="14"
-              viewBox="1 1 22 22"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              data-tauri-drag-region={false}
+              onClick={toggleLeftSidebar}
+              aria-label="Show sidebar"
+              className={cn(
+                'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
+                'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                'transition-[color,background-color,transform] duration-150',
+                'text-sidebar-foreground hover:text-foreground'
+              )}
             >
-              <path
-                d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
-                fill="currentColor"
+              <SFSymbol
+                name="sidebar.left"
+                size={18}
+                weight="medium"
+                fallback={<PanelLeft className="h-4 w-4" />}
               />
-              <rect x="7" y="7" width="3" height="10" rx="1" fill="currentColor" />
-            </svg>
-          </button>
+            </button>
+            <div className="w-px h-3.5 bg-gray-6 shrink-0" />
+            <button
+              data-tauri-drag-region={false}
+              aria-label="New session"
+              className={cn(
+                'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
+                'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                'transition-[color,background-color,transform] duration-150',
+                'text-sidebar-foreground hover:text-foreground'
+              )}
+            >
+              <SFSymbol
+                name="square.and.pencil"
+                size={18}
+                weight="medium"
+                fallback={<SquarePen className="h-4 w-4" />}
+              />
+            </button>
+          </div>
         ) : null}
+
+        {/* Separator between icons and heading */}
+        {!sidebarOpen && !isDemo ? <div className="w-px h-3.5 bg-gray-6 shrink-0" /> : null}
 
         {/* Project name */}
         {workspaceName ? (
@@ -343,29 +370,12 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
               reviewPanelOpen ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'
             )}
           >
-            <div className="rotate-180">
-              <svg
-                aria-hidden="true"
-                width="16"
-                height="16"
-                viewBox="1 1 22 22"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
-                  fill="currentColor"
-                />
-                <rect
-                  x="7"
-                  y="7"
-                  width={reviewPanelOpen ? 5 : 2}
-                  height="10"
-                  rx="1"
-                  fill="currentColor"
-                />
-              </svg>
-            </div>
+            <SFSymbol
+              name="sidebar.squares.right"
+              size={18}
+              weight="medium"
+              fallback={<PanelRight className="h-4 w-4" />}
+            />
           </button>
 
           {/* Terminal Toggle */}
@@ -377,10 +387,17 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
               'h-6 w-6 flex items-center justify-center rounded-md',
               'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
               'transition-[color,background-color,transform] duration-150',
-              bottomPanelOpen ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'
+              bottomPanelOpen && !terminalCollapsed
+                ? 'text-foreground'
+                : 'text-sidebar-foreground hover:text-foreground'
             )}
           >
-            <Terminal className="h-3.5 w-3.5" />
+            <SFSymbol
+              name="apple.terminal"
+              size={18}
+              weight="medium"
+              fallback={<Terminal className="h-4 w-4" />}
+            />
           </button>
 
           {/* Actions Bar Toggle */}
@@ -395,7 +412,12 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
               rightSidebarOpen ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'
             )}
           >
-            <IconSquareGridCircle className="h-4 w-4" />
+            <SFSymbol
+              name="switch.2"
+              size={18}
+              weight="medium"
+              fallback={<IconSquareGridCircle className="h-4 w-4" />}
+            />
           </button>
         </div>
       ) : (
