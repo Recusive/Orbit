@@ -61,6 +61,13 @@ if (typeof __DEV__ !== 'undefined' && __DEV__) {
   (window as unknown as { Sentry: typeof Sentry }).Sentry = Sentry;
 }
 
+// Suppress native WebKit context menu (Reload, Inspect, Autofill).
+// Production desktop apps should not expose browser-level controls.
+// Individual components that need custom context menus can stopPropagation.
+document.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+});
+
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
