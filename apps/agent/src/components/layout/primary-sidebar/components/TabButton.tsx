@@ -20,7 +20,7 @@ export const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       <div
         className={cn(
           'absolute inset-x-0 top-1.5 bottom-0 rounded-md transition-[background-color] duration-100',
-          active ? 'bg-gray-5 dark:bg-gray-4' : 'hover:bg-gray-5 dark:hover:bg-gray-4'
+          active ? 'bg-gray-5 dark:bg-gray-4' : 'hover:bg-gray-3 dark:hover:bg-gray-4'
         )}
       />
       <span className="relative text-base font-medium truncate">{label}</span>

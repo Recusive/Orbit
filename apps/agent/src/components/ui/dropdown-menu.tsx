@@ -77,7 +77,7 @@ const DropdownMenuContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-32 overflow-y-auto overflow-x-hidden rounded-lg border border-gray-5 bg-popover p-1 text-popover-foreground shadow-md',
+        'z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-32 overflow-y-auto overflow-x-hidden rounded-xl border border-gray-5 bg-popover p-1 text-popover-foreground shadow-md',
         // Transform origin from Radix - scales from where it connects to trigger
         'origin-[--radix-dropdown-menu-content-transform-origin]',
         // Enter animation: subtle scale + fade + directional slide

@@ -10,6 +10,8 @@
 import { IconSquareGridCircle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSquareGridCircle';
 import { createLogger } from '@orbit/common/lib';
 import {
+  ArrowLeft,
+  ArrowRight,
   Check,
   ChevronDown,
   GitBranch,
@@ -108,7 +110,7 @@ const HeaderBranchSelector: FC = () => {
     <DropdownMenu onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger
         disabled={isCheckingOut || branches.length === 0}
-        className="flex items-center gap-1.5 text-sm min-w-0 hover:bg-accent rounded-md px-2 py-1 active:scale-[0.98] transition-[background-color,transform] duration-150 disabled:opacity-40"
+        className="flex items-center gap-1.5 text-sm min-w-0 hover:bg-accent rounded-full px-2 py-1 active:scale-[0.98] transition-[background-color,transform] duration-150 disabled:opacity-40"
       >
         {isCheckingOut ? (
           <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground/70" />
@@ -174,7 +176,7 @@ const DiffStatsButton: FC = () => {
           data-tauri-drag-region={false}
           onClick={handleClick}
           className={cn(
-            'flex items-center h-6 rounded-md overflow-hidden',
+            'flex items-center h-6 rounded-full overflow-hidden',
             'text-[11px] font-medium tabular-nums',
             'transition-[background-color,color] duration-150'
           )}
@@ -273,9 +275,10 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
           </div>
         ) : null}
 
-        {/* Sidebar expand + New session — only visible when sidebar is closed */}
+        {/* Navigation + sidebar controls — only visible when sidebar is closed */}
         {!sidebarOpen && !isDemo ? (
           <div className="flex items-center gap-1 shrink-0">
+            {/* Sidebar toggle */}
             <button
               data-tauri-drag-region={false}
               onClick={toggleLeftSidebar}
@@ -295,6 +298,32 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
               />
             </button>
             <div className="w-px h-3.5 bg-gray-6 shrink-0" />
+            {/* Back / Forward arrows — matches sidebar style */}
+            <button
+              data-tauri-drag-region={false}
+              aria-label="Go back"
+              className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-5 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+            >
+              <SFSymbol
+                name="arrow.left"
+                size={13}
+                weight="semibold"
+                fallback={<ArrowLeft className="h-3.5 w-3.5" />}
+              />
+            </button>
+            <button
+              data-tauri-drag-region={false}
+              aria-label="Go forward"
+              className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-5 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+            >
+              <SFSymbol
+                name="arrow.right"
+                size={13}
+                weight="semibold"
+                fallback={<ArrowRight className="h-3.5 w-3.5" />}
+              />
+            </button>
+            {/* New session */}
             <button
               data-tauri-drag-region={false}
               aria-label="New session"
@@ -331,10 +360,10 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
         {/* Separator + Chat name */}
         {conversationTitle ? (
           <>
-            <span className="text-base text-muted-foreground/50 shrink-0">/</span>
+            <div className="w-px h-3.5 bg-gray-6 shrink-0" />
             <span
               data-tauri-drag-region={false}
-              className="text-base opacity-70 cursor-pointer hover:opacity-100 transition-opacity truncate"
+              className="text-base text-gray-12 cursor-pointer hover:text-foreground transition-colors truncate"
             >
               {conversationTitle}
             </span>

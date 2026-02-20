@@ -4,14 +4,23 @@
  * NOTE: Icon column width comes from @/lib/utils/constants.
  * To change actions bar width, update SIDEBAR.iconColumnWidth in constants.ts.
  */
-import { CircleAlert, FileCode, GitBranch, Globe } from 'lucide-react';
+import {
+  CircleAlert,
+  Code,
+  FileCode,
+  GitBranch,
+  Globe,
+  MessageSquare,
+  Palette,
+} from 'lucide-react';
 
-import type { ActivityTab } from '@/stores/ui/ui-store';
-import type { FC } from 'react';
+import type { ActivityTab, HeaderTab } from '@/stores/ui/ui-store';
+import type { FC, ReactNode } from 'react';
 
+import { SFSymbol } from '@/components/shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, SIDEBAR } from '@/lib/utils';
-import { useActivityTab, useUIStore } from '@/stores/ui/ui-store';
+import { useActiveTab, useActivityTab, useUIStore } from '@/stores/ui/ui-store';
 
 interface ActionButtonProps {
   readonly icon: FC<{ className?: string }>;
@@ -50,6 +59,42 @@ const ActionButton: FC<ActionButtonProps> = ({ icon: Icon, label, isActive, onCl
         </div>
       ) : null}
     </button>
+  );
+};
+
+interface ModeButtonProps {
+  readonly id: HeaderTab;
+  readonly label: string;
+  readonly sfSymbol: string;
+  readonly fallback: ReactNode;
+}
+
+const ModeButton: FC<ModeButtonProps> = ({ id, label, sfSymbol, fallback }) => {
+  const activeMode = useActiveTab();
+  const setMode = useUIStore((s) => s.setActiveTab);
+  const isActive = activeMode === id;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={() => {
+            setMode(id);
+          }}
+          aria-label={`Switch to ${label}`}
+          aria-pressed={isActive}
+          className={cn(
+            'flex items-center justify-center w-full h-10 transition-colors',
+            isActive ? 'text-foreground' : 'text-muted-foreground/50 hover:text-foreground'
+          )}
+        >
+          <SFSymbol name={sfSymbol} size={18} weight="medium" fallback={fallback} />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="left" sideOffset={8}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
@@ -96,6 +141,28 @@ export const ActionsBar: FC = () => {
           onClick={() => {
             handleTabClick('browser');
           }}
+        />
+      </div>
+
+      {/* Mode switcher — pinned to bottom, above disclaimer */}
+      <div className="shrink-0 flex flex-col items-center py-1 gap-1">
+        <ModeButton
+          id="canvas"
+          label="Canvas"
+          sfSymbol="paintpalette"
+          fallback={<Palette className="h-5 w-5" />}
+        />
+        <ModeButton
+          id="editor"
+          label="Editor"
+          sfSymbol="chevron.left.forwardslash.chevron.right"
+          fallback={<Code className="h-5 w-5" />}
+        />
+        <ModeButton
+          id="agent"
+          label="Agent"
+          sfSymbol="command"
+          fallback={<MessageSquare className="h-5 w-5" />}
         />
       </div>
 

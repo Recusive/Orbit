@@ -153,9 +153,9 @@ export const ConversationItem: FC<ConversationItemProps> = ({
     >
       <button
         className={cn(
-          'flex items-center h-7 w-full rounded-lg pl-[7px] overflow-hidden hover:bg-gray-5 dark:hover:bg-gray-4 transition-[background-color,padding] duration-100',
+          'flex items-center h-7 w-full rounded-lg pl-[7px] overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 transition-[background-color,padding] duration-100',
           isHovered ? 'pr-7' : 'pr-9',
-          active ? 'bg-gray-5 dark:bg-gray-4 text-foreground' : 'text-gray-11 hover:text-gray-12'
+          active ? 'bg-gray-3 dark:bg-gray-4 text-foreground' : 'text-gray-11 hover:text-gray-12'
         )}
         title={conversation.title}
         onClick={onClick}

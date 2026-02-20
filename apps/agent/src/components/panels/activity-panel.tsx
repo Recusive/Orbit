@@ -75,7 +75,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         'border-r border-gray-5',
         isActive
           ? 'bg-editor-bg text-foreground'
-          : 'bg-chat-area text-muted-foreground hover:text-foreground'
+          : 'bg-gray-4 dark:bg-gray-1 text-muted-foreground hover:text-foreground'
       )}
       style={{ maxWidth: 180 }}
     >
@@ -249,7 +249,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
 
   return (
     <div
-      className="flex shrink-0 bg-chat-area relative"
+      className="flex shrink-0 bg-gray-4 dark:bg-gray-1 relative"
       style={{ height: ACTIVITY_PANEL.TABS_HEADER_HEIGHT }}
       onMouseEnter={() => {
         setIsHovered(true);
@@ -314,7 +314,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       </div>
 
       {/* Editor actions - VS Code style */}
-      <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-chat-area">
+      <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-gray-4 dark:bg-gray-1">
         <button
           onClick={() => {
             if (activeTabPath) onToggleSearch(activeTabPath);

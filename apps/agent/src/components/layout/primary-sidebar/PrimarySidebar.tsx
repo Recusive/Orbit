@@ -23,7 +23,6 @@ import { ConversationList } from './components/ConversationList';
 import { PowersSection } from './components/PowersSection';
 import { SidebarItem } from './components/SidebarItem';
 import { SidebarToggleIcon } from './components/SidebarToggleIcon';
-import { TabButton } from './components/TabButton';
 import { useSidebarActions } from './hooks/use-sidebar-actions';
 
 import type { SidebarTab } from './types';
@@ -39,6 +38,8 @@ import {
 } from '@/components/modals';
 import { SFSymbol } from '@/components/shared';
 import { Kbd } from '@/components/ui/kbd';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { HEIGHTS, SIDEBAR } from '@/lib/utils';
 import {
   useUIStore,
@@ -150,7 +151,7 @@ export const PrimarySidebar: FC = () => {
         <button
           onClick={toggleLeftSidebar}
           aria-label="Collapse sidebar"
-          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-5 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
+          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
         >
           <SFSymbol
             name="sidebar.left"
@@ -163,7 +164,7 @@ export const PrimarySidebar: FC = () => {
         <div className="flex items-center gap-0.5 ml-auto">
           <button
             aria-label="Go back"
-            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-5 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
           >
             <SFSymbol
               name="arrow.left"
@@ -174,7 +175,7 @@ export const PrimarySidebar: FC = () => {
           </button>
           <button
             aria-label="Go forward"
-            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-5 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
           >
             <SFSymbol
               name="arrow.right"
@@ -193,7 +194,7 @@ export const PrimarySidebar: FC = () => {
       >
         <button
           onClick={handleOpenQuickSearch}
-          className="flex items-center h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-5 hover:bg-gray-6 dark:bg-gray-4 dark:hover:bg-gray-5 transition-[background-color] duration-100"
+          className="flex items-center h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-6 hover:bg-gray-7 dark:bg-gray-4 dark:hover:bg-gray-5 transition-[background-color] duration-100"
           title="Search files (⌘P)"
         >
           {/* Fixed-width icon column - never moves */}
@@ -213,25 +214,28 @@ export const PrimarySidebar: FC = () => {
         </button>
       </div>
 
-      {/* Tab Navigation */}
-      <div
-        className="flex items-center shrink-0 px-1.5 gap-0.5 overflow-visible"
-        style={{ height: SIDEBAR.tabNavHeight }}
-      >
-        <TabButton
-          label="Sessions"
-          active={activeTab === 'conversations'}
-          onClick={() => {
-            setActiveTab('conversations');
-          }}
-        />
-        <TabButton
-          label="Explorer"
-          active={activeTab === 'explorer'}
-          onClick={() => {
-            setActiveTab('explorer');
-          }}
-        />
+      {/* Tab heading + toggle */}
+      <div className="flex items-center justify-between px-3 py-1 shrink-0">
+        <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
+          {activeTab === 'conversations' ? 'Sessions' : 'Explorer'}
+        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              <Switch
+                checked={activeTab === 'explorer'}
+                onCheckedChange={(checked) => {
+                  setActiveTab(checked ? 'explorer' : 'conversations');
+                }}
+                aria-label="Toggle Sessions / Explorer"
+                className="h-3.5 w-7 !rounded-md data-[state=checked]:bg-primary data-[state=unchecked]:bg-gray-6 [&>span]:!h-2.5 [&>span]:!w-2.5 [&>span]:!rounded-sm [&>span]:data-[state=checked]:!translate-x-3.5"
+              />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {activeTab === 'conversations' ? 'Switch to Explorer' : 'Switch to Sessions'}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Main Actions (only show for conversations tab) */}
