@@ -24,7 +24,7 @@ export interface WelcomePageProps {
 /** Action button config to eliminate repetition */
 /** Solid Radix scale colors so welcome page is unaffected by liquid glass */
 const ACTION_BUTTON_CLASS = cn(
-  'group relative flex flex-col items-start gap-3 p-4 rounded-lg cursor-pointer',
+  'group relative flex flex-col items-start gap-3 p-4 rounded-[12px] cursor-pointer',
   'bg-gray-2 dark:bg-gray-3',
   'border border-gray-4 dark:border-gray-5',
   'transition-[background-color,transform,border-color] duration-200 ease',
@@ -149,7 +149,7 @@ export const WelcomePage: FC<WelcomePageProps> = ({ className }) => {
 
       {/* Recent Projects — frosted glass card */}
       {projects.length > 0 ? (
-        <div className="w-full max-w-[420px] rounded-lg bg-gray-2 dark:bg-gray-3 border border-gray-4 dark:border-gray-5 p-3">
+        <div className="w-full max-w-[420px] rounded-[12px] bg-gray-2 dark:bg-gray-3 border border-gray-4 dark:border-gray-5 p-3">
           {/* Section header */}
           <div className="flex items-center justify-between px-2 mb-2">
             <span className="text-[10px] font-semibold tracking-widest text-gray-9 dark:text-gray-10 uppercase">

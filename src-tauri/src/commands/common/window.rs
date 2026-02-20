@@ -1,4 +1,13 @@
-//! Window management commands (traffic lights, glass state).
+//! Window management commands (traffic lights, glass theme).
+
+/// Tell the native glass defocus layer which theme Orbit is using.
+///
+/// This ensures the opaque fallback color shown on window defocus matches
+/// the app's chosen theme, not the macOS system appearance.
+#[tauri::command]
+pub fn set_glass_theme(is_dark: bool) {
+    orbit_plugin_decorum::set_glass_effective_theme(is_dark);
+}
 
 /// Show or hide the macOS traffic light buttons (close/minimize/zoom).
 ///

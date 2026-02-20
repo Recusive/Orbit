@@ -504,8 +504,11 @@ html.window-mode-liquid-glass.dark {
 
 /* Base layer becomes transparent so tauri-plugin-liquid-glass
    (GlassMaterialVariant::Sidebar) shows through the sidebar area.
-   ContentCard provides its own opaque background (var(--background)). */
-html.window-mode-liquid-glass [data-tauri-drag-region] {
+   ContentCard provides its own opaque background (var(--background)).
+   Scoped to .bg-base-layer (AppShell root) — NOT [data-tauri-drag-region]
+   because that also matches the ContentTopBar header and makes it
+   transparent/washed-out in liquid glass mode. */
+html.window-mode-liquid-glass .bg-base-layer {
   background-color: transparent;
 }
 

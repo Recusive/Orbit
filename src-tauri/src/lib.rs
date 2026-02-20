@@ -571,6 +571,7 @@ pub fn run() {
             browser::browser_clear,
             // Window management commands
             window::set_traffic_lights_visible,
+            window::set_glass_theme,
             // SF Symbol rendering
             sf_symbols::get_sf_symbol,
         ])

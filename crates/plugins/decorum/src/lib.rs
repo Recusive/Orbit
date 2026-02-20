@@ -12,6 +12,8 @@ use tauri::Error;
 use tauri::{Runtime, WebviewWindow};
 
 #[cfg(target_os = "macos")]
+mod glass_defocus;
+#[cfg(target_os = "macos")]
 mod promotion;
 #[cfg(target_os = "macos")]
 mod traffic_lights;
@@ -80,6 +82,26 @@ impl WebviewWindowExt for WebviewWindow {
     }
 }
 
+/// Tell the glass defocus system which theme Orbit is using.
+///
+/// Without this, the defocus fallback color follows the **system** appearance
+/// (via `NSApp.effectiveAppearance`), which is wrong when the user picks a
+/// different theme for Orbit than the system default.
+///
+/// Called from a Tauri command whenever `effectiveTheme` changes in the
+/// frontend `ThemeProvider`.
+///
+/// On non-macOS platforms or macOS < 26 (no glass), this is a no-op.
+// Cannot be const: calls non-const store on macOS; Clippy only sees empty body on Linux.
+#[allow(clippy::missing_const_for_fn)]
+pub fn set_glass_effective_theme(is_dark: bool) {
+    #[cfg(target_os = "macos")]
+    glass_defocus::set_effective_theme(is_dark);
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = is_dark;
+}
+
 /// Re-order all child windows of the main window to the front.
 ///
 /// This fixes macOS child window z-ordering: when the parent window gains
@@ -113,7 +135,13 @@ pub fn order_child_windows_front() {
 /// ```
 #[must_use]
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
-    Builder::new("decorum").build()
+    Builder::new("decorum")
+        .setup(|_app, _api| {
+            #[cfg(target_os = "macos")]
+            glass_defocus::suppress_glass_defocus_dimming();
+            Ok(())
+        })
+        .build()
 }
 
 /// Check if we're on the main thread using `NSThread.isMainThread`.

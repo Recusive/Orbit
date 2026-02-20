@@ -24,7 +24,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
   return (
     <button
       className={cn(
-        'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-gray-2 dark:hover:bg-gray-4 active:scale-[0.98] transition-[background-color,transform] duration-100',
+        'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-gray-5 dark:hover:bg-gray-4 active:scale-[0.98] transition-[background-color,transform] duration-100',
         active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground',
         className
       )}

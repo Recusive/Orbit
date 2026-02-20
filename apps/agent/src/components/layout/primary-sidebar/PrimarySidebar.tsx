@@ -150,7 +150,7 @@ export const PrimarySidebar: FC = () => {
         <button
           onClick={toggleLeftSidebar}
           aria-label="Collapse sidebar"
-          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-2 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
+          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-5 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
         >
           <SFSymbol
             name="sidebar.left"
@@ -163,7 +163,7 @@ export const PrimarySidebar: FC = () => {
         <div className="flex items-center gap-0.5 ml-auto">
           <button
             aria-label="Go back"
-            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-2 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-5 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
           >
             <SFSymbol
               name="arrow.left"
@@ -174,7 +174,7 @@ export const PrimarySidebar: FC = () => {
           </button>
           <button
             aria-label="Go forward"
-            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-2 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-5 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
           >
             <SFSymbol
               name="arrow.right"
@@ -193,7 +193,7 @@ export const PrimarySidebar: FC = () => {
       >
         <button
           onClick={handleOpenQuickSearch}
-          className="flex items-center h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-7 hover:bg-gray-8 dark:bg-gray-4 dark:hover:bg-gray-5 transition-[background-color] duration-100"
+          className="flex items-center h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-5 hover:bg-gray-6 dark:bg-gray-4 dark:hover:bg-gray-5 transition-[background-color] duration-100"
           title="Search files (⌘P)"
         >
           {/* Fixed-width icon column - never moves */}

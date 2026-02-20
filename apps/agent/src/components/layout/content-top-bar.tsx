@@ -347,7 +347,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
 
       {/* Right section: Git controls + Panel toggles */}
       {hasWorkspace || isDemo ? (
-        <div className="flex items-center gap-0.5 pr-1">
+        <div className="flex items-center pr-1" style={{ gap: '0.3rem' }}>
           {/* Git controls */}
           <div className="flex items-center gap-2 mr-1" data-tauri-drag-region={false}>
             {/* Branch selector — hidden when source control panel is open */}

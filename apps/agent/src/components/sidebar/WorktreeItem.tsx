@@ -86,9 +86,9 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         role="group"
         tabIndex={0}
         className={cn(
-          'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-100 hover:bg-gray-3 dark:hover:bg-gray-4 cursor-default',
+          'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-100 hover:bg-gray-5 dark:hover:bg-gray-4 cursor-default',
           active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground',
-          isExpanded && !active && 'bg-gray-4'
+          isExpanded && !active && 'bg-gray-5'
         )}
         onClick={handleRowClick}
         onKeyDown={(e) => {
