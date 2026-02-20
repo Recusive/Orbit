@@ -175,7 +175,7 @@ export const ConversationList: FC<ConversationListProps> = ({
               className="relative h-5 w-5 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-90 transition-[background-color,transform] duration-100 text-muted-foreground hover:text-foreground shrink-0 before:absolute before:content-[''] before:inset-[-10px]"
               onClick={onOpenCreateWorktree}
             >
-              <Plus className="h-3 w-3" />
+              <Plus className="h-3.5 w-3.5" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="right">

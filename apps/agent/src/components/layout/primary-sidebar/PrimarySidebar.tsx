@@ -271,8 +271,14 @@ export const PrimarySidebar: FC = () => {
         </div>
       ) : null}
 
-      {/* Tab Content */}
-      <div className="flex-1 overflow-x-hidden overflow-y-auto">
+      {/* Tab Content — mask fades content at bottom edge */}
+      <div
+        className="flex-1 overflow-x-hidden overflow-y-auto"
+        style={{
+          maskImage: 'linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)',
+        }}
+      >
         {activeTab === 'conversations' ? (
           <ConversationList
             conversations={conversations}
@@ -303,8 +309,6 @@ export const PrimarySidebar: FC = () => {
         )}
       </div>
 
-      <hr className="border-gray-6 dark:border-gray-3 border-t shrink-0 mt-2 mb-0" />
-
       {/* Utilities — pinned to bottom */}
       <div className="flex flex-col shrink-0 gap-1 py-1.5">
         {/* Update indicator — visible after user dismisses the update toast */}
@@ -325,35 +329,38 @@ export const PrimarySidebar: FC = () => {
             }}
           />
         ) : null}
-        <SidebarItem
-          icon={() => (
+        {/* Settings | Feedback — inline row */}
+        <div className="flex items-center h-8 mx-1.5 gap-1.5 overflow-hidden">
+          <button
+            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-lg px-2 hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
+            onClick={() => {
+              openSettings('agent');
+            }}
+          >
             <SFSymbol
               name="gear"
               size={18}
               weight="medium"
               fallback={<Settings2 className="h-4 w-4" />}
             />
-          )}
-          label="Settings"
-          shortcut={['⌘', ',']}
-          onClick={() => {
-            openSettings('agent');
-          }}
-        />
-        <SidebarItem
-          icon={() => (
+            <span className="text-base whitespace-nowrap">Settings</span>
+          </button>
+          <div className="w-px h-3.5 bg-gray-6 shrink-0" />
+          <button
+            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-lg px-2 hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
+            onClick={() => {
+              openSettings('feedback');
+            }}
+          >
             <SFSymbol
               name="exclamationmark.bubble"
               size={18}
               weight="medium"
               fallback={<FlaskConical className="h-4 w-4" />}
             />
-          )}
-          label="Feedback"
-          onClick={() => {
-            openSettings('feedback');
-          }}
-        />
+            <span className="text-base whitespace-nowrap">Feedback</span>
+          </button>
+        </div>
       </div>
 
       {/* Settings Dialog */}
