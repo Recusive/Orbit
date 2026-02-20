@@ -7,16 +7,20 @@
  */
 import { IconCirclePlus } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconCirclePlus';
 import { IconSearchlinesSparkle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSearchlinesSparkle';
+import { createLogger } from '@orbit/common/lib';
 import {
   ArrowLeft,
   ArrowRight,
+  ChevronRight,
   Download,
   FlaskConical,
   FolderOpen,
+  GitBranch,
   Search,
   Settings2,
+  Terminal,
 } from 'lucide-react';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useCallback, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import { ConversationList } from './components/ConversationList';
@@ -37,11 +41,17 @@ import {
   CreateWorktreeDialog,
   DeleteWorktreeDialog,
 } from '@/components/modals';
+import { CloneRepositoryDialog } from '@/components/modals/git';
+import { SSHConnectionDialog } from '@/components/modals/ssh';
 import { SFSymbol } from '@/components/shared';
 import { Kbd } from '@/components/ui/kbd';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { HEIGHTS, SIDEBAR } from '@/lib/utils';
+import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
+import { addRecentProject, conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
+import { toConversationSummaries } from '@/lib/mappers';
+import { cn, HEIGHTS, SIDEBAR } from '@/lib/utils';
+import { useFileStore } from '@/stores/file/file-store';
 import {
   useUIStore,
   useWorkspaceName,
@@ -87,6 +97,8 @@ const SkillsDialog: FC<SkillsDialogProps> = (props) => (
     <LazySkillsDialog {...props} />
   </Suspense>
 );
+
+const logger = createLogger('PrimarySidebar');
 
 export const PrimarySidebar: FC = () => {
   // Use useShallow to prevent re-renders when unrelated store state changes
@@ -150,6 +162,55 @@ export const PrimarySidebar: FC = () => {
     activeWorktreePath,
   });
 
+  // Welcome mode — no workspace open
+  const isWelcome = !workspacePath;
+  const setRootPath = useFileStore((s) => s.setRootPath);
+  const { projects } = useRecentProjects();
+  const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+  const [sshDialogOpen, setSshDialogOpen] = useState(false);
+
+  const openProject = useCallback(
+    async (path: string): Promise<void> => {
+      try {
+        await initializeWorkspace(path);
+        await addRecentProject(path);
+        useUIStore.getState().setWorkspace(path);
+        setRootPath(path);
+        const convos = await conversationList(path);
+        useUIStore.getState().setConversations(toConversationSummaries(convos));
+      } catch (err) {
+        logger.error('Failed to open project', err);
+      }
+    },
+    [setRootPath]
+  );
+
+  const handleOpenProject = useCallback(async (): Promise<void> => {
+    try {
+      const selected = await openFileDialog({
+        title: 'Open Project',
+        directory: true,
+        multiple: false,
+      });
+      if (selected !== null && typeof selected === 'string') {
+        await openProject(selected);
+      }
+    } catch (err) {
+      logger.error('Failed to open project', err);
+    }
+  }, [openProject]);
+
+  const handleRecentProjectClick = useCallback(
+    (path: string) => {
+      return (): void => {
+        openProject(path).catch((err: unknown) => {
+          logger.error('Failed to open recent project', err);
+        });
+      };
+    },
+    [openProject]
+  );
+
   return (
     <aside
       data-sidebar="primary"
@@ -200,59 +261,86 @@ export const PrimarySidebar: FC = () => {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div
-        className="shrink-0 mx-1.5 overflow-hidden"
-        style={{ height: SIDEBAR.searchBarHeight, marginBottom: 5 }}
-      >
-        <button
-          onClick={handleOpenQuickSearch}
-          className="flex items-center h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-6 hover:bg-gray-7 dark:bg-gray-4 dark:hover:bg-gray-5 transition-[background-color] duration-100"
-          title="Search files (⌘P)"
+      {/* Search Bar (workspace mode only) */}
+      {!isWelcome ? (
+        <div
+          className="shrink-0 mx-1.5 overflow-hidden"
+          style={{ height: SIDEBAR.searchBarHeight, marginBottom: 5 }}
         >
-          {/* Fixed-width icon column - never moves */}
-          <div
-            className="flex items-center justify-center shrink-0"
-            style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
+          <button
+            onClick={handleOpenQuickSearch}
+            className="flex items-center h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-6 hover:bg-gray-7 dark:bg-gray-4 dark:hover:bg-gray-5 transition-[background-color] duration-100"
+            title="Search files (⌘P)"
           >
-            <Search className="h-4 w-4 shrink-0" />
-          </div>
-          {/* Text that slides in */}
-          <span className="text-xs whitespace-nowrap overflow-hidden w-auto opacity-100">
-            Search files...
-          </span>
-          <Kbd className="ml-auto mr-2 h-[18px] !text-[12px] px-1.5 bg-gray-5 text-inherit border-gray-6">
-            <span className="text-[14px] leading-none">⌘</span> P
-          </Kbd>
-        </button>
-      </div>
-
-      {/* Tab heading + toggle */}
-      <div className="flex items-center justify-between px-3 py-1 shrink-0">
-        <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
-          {activeTab === 'conversations' ? 'Sessions' : 'Explorer'}
-        </span>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <Switch
-                checked={activeTab === 'explorer'}
-                onCheckedChange={(checked) => {
-                  setActiveTab(checked ? 'explorer' : 'conversations');
-                }}
-                aria-label="Toggle Sessions / Explorer"
-                className="h-3.5 w-7 !rounded-md data-[state=checked]:bg-primary data-[state=unchecked]:bg-gray-6 [&>span]:!h-2.5 [&>span]:!w-2.5 [&>span]:!rounded-sm [&>span]:data-[state=checked]:!translate-x-3.5"
-              />
+            {/* Fixed-width icon column - never moves */}
+            <div
+              className="flex items-center justify-center shrink-0"
+              style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
+            >
+              <Search className="h-4 w-4 shrink-0" />
             </div>
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            {activeTab === 'conversations' ? 'Switch to Explorer' : 'Switch to Sessions'}
-          </TooltipContent>
-        </Tooltip>
-      </div>
+            {/* Text that slides in */}
+            <span className="text-xs whitespace-nowrap overflow-hidden w-auto opacity-100">
+              Search files...
+            </span>
+            <Kbd className="ml-auto mr-2 h-[18px] !text-[12px] px-1.5 bg-gray-5 text-inherit border-gray-6">
+              <span className="text-[14px] leading-none">⌘</span> P
+            </Kbd>
+          </button>
+        </div>
+      ) : null}
 
-      {/* Main Actions (only show for conversations tab) */}
-      {activeTab === 'conversations' ? (
+      {/* Tab heading + toggle (workspace mode only) */}
+      {!isWelcome ? (
+        <div className="flex items-center justify-between px-3 py-1 shrink-0">
+          <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
+            {activeTab === 'conversations' ? 'Sessions' : 'Explorer'}
+          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <Switch
+                  checked={activeTab === 'explorer'}
+                  onCheckedChange={(checked) => {
+                    setActiveTab(checked ? 'explorer' : 'conversations');
+                  }}
+                  aria-label="Toggle Sessions / Explorer"
+                  className="h-3.5 w-7 !rounded-md data-[state=checked]:bg-primary data-[state=unchecked]:bg-gray-6 [&>span]:!h-2.5 [&>span]:!w-2.5 [&>span]:!rounded-sm [&>span]:data-[state=checked]:!translate-x-3.5"
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {activeTab === 'conversations' ? 'Switch to Explorer' : 'Switch to Sessions'}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      ) : null}
+
+      {/* Main Actions */}
+      {isWelcome ? (
+        <div className="flex flex-col shrink-0 gap-1 py-1.5">
+          <SidebarItem
+            icon={FolderOpen}
+            label="Open Project"
+            large
+            onClick={() => void handleOpenProject()}
+          />
+          <SidebarItem
+            icon={GitBranch}
+            label="Clone Repository"
+            onClick={() => {
+              setCloneDialogOpen(true);
+            }}
+          />
+          <SidebarItem
+            icon={Terminal}
+            label="SSH"
+            onClick={() => {
+              setSshDialogOpen(true);
+            }}
+          />
+        </div>
+      ) : activeTab === 'conversations' ? (
         <div className="flex flex-col shrink-0 gap-1 py-1.5">
           <SidebarItem
             icon={() => (
@@ -298,7 +386,55 @@ export const PrimarySidebar: FC = () => {
           WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)',
         }}
       >
-        {activeTab === 'conversations' ? (
+        {isWelcome ? (
+          <>
+            {/* Recent Projects heading */}
+            <div className="flex items-center px-3 py-1 shrink-0">
+              <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight">
+                Recent
+              </span>
+            </div>
+            {/* Recent project rows */}
+            <div className="flex flex-col gap-0.5 px-1.5">
+              {projects.map((project) => (
+                <button
+                  key={project.path}
+                  type="button"
+                  onClick={handleRecentProjectClick(project.path)}
+                  className={cn(
+                    'group flex items-center gap-2.5 px-2 py-2 rounded-lg',
+                    'transition-[background-color] duration-100',
+                    'hover:bg-gray-3 dark:hover:bg-gray-4',
+                    'text-left outline-none'
+                  )}
+                >
+                  <div className="flex items-center justify-center w-6 h-6 rounded-md bg-gray-3 dark:bg-gray-5 shrink-0">
+                    <FolderOpen
+                      className="h-3.5 w-3.5 text-gray-9 dark:text-gray-10"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-sm font-medium text-foreground truncate">
+                      {project.name}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground truncate">
+                      {project.parentPath}
+                    </span>
+                  </div>
+                  <ChevronRight
+                    className={cn(
+                      'h-3 w-3 text-transparent shrink-0',
+                      'transition-[color] duration-100',
+                      'group-hover:text-gray-8 dark:group-hover:text-gray-9'
+                    )}
+                    aria-hidden="true"
+                  />
+                </button>
+              ))}
+            </div>
+          </>
+        ) : activeTab === 'conversations' ? (
           <ConversationList
             conversations={conversations}
             worktrees={worktrees}
@@ -426,6 +562,12 @@ export const PrimarySidebar: FC = () => {
 
       {/* Skills Dialog */}
       <SkillsDialog open={skillsDialogOpen} onOpenChange={setSkillsDialogOpen} />
+
+      {/* Clone Repository Dialog (welcome mode) */}
+      <CloneRepositoryDialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen} />
+
+      {/* SSH Connection Dialog (welcome mode) */}
+      <SSHConnectionDialog open={sshDialogOpen} onOpenChange={setSshDialogOpen} />
     </aside>
   );
 };
