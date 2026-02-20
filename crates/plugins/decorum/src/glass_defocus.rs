@@ -227,6 +227,18 @@ unsafe fn has_glass_view(view: *mut AnyObject, glass_class: &AnyClass) -> bool {
 // ObjC notification callbacks
 // =========================================================================
 
+/// Extract the `NSWindow` from a notification's `object` property.
+///
+/// # Safety
+///
+/// Must be called on the main thread with a valid notification pointer.
+unsafe fn notification_window(notification: *mut AnyObject) -> *mut AnyObject {
+    if notification.is_null() {
+        return std::ptr::null_mut();
+    }
+    msg_send![notification, object]
+}
+
 /// Check whether the notification's originating window is an `NSPanel`.
 ///
 /// `NSOpenPanel`, `NSSavePanel`, print/font/color panels all inherit from
@@ -238,10 +250,7 @@ unsafe fn has_glass_view(view: *mut AnyObject, glass_class: &AnyClass) -> bool {
 ///
 /// Must be called on the main thread with a valid notification pointer.
 unsafe fn notification_is_from_panel(notification: *mut AnyObject) -> bool {
-    if notification.is_null() {
-        return false;
-    }
-    let window: *mut AnyObject = msg_send![notification, object];
+    let window = notification_window(notification);
     if window.is_null() {
         return false;
     }
@@ -249,6 +258,32 @@ unsafe fn notification_is_from_panel(notification: *mut AnyObject) -> bool {
         return false;
     };
     msg_send![window, isKindOfClass: panel_class]
+}
+
+/// Check whether the notification's originating window contains glass views.
+///
+/// Used by [`on_become_key`] to avoid restoring glass when a non-glass child
+/// window (e.g., the embedded browser) becomes key. Without this check, the
+/// browser child window's `becomeKey` notification would re-show glass on the
+/// main window while it's still defocused — causing macOS to apply its
+/// compositor-level defocus tint.
+///
+/// # Safety
+///
+/// Must be called on the main thread with a valid notification pointer.
+unsafe fn notification_window_has_glass(notification: *mut AnyObject) -> bool {
+    let window = notification_window(notification);
+    if window.is_null() {
+        return false;
+    }
+    let Some(glass_class) = AnyClass::get(c"NSGlassEffectView") else {
+        return false;
+    };
+    let content_view: *mut AnyObject = msg_send![window, contentView];
+    if content_view.is_null() {
+        return false;
+    }
+    has_glass_view(content_view, glass_class)
 }
 
 /// Window resigned key → hide glass, set opaque background.
@@ -275,6 +310,11 @@ unsafe extern "C" fn on_resign_key(_this: *mut AnyObject, _cmd: Sel, notificatio
 /// Ignores notifications originating from `NSPanel` subclasses
 /// (`NSOpenPanel`, `NSSavePanel`, etc.) to avoid corrupting their UI.
 ///
+/// Also ignores notifications from windows without glass views (e.g., the
+/// embedded browser child window). When such a window becomes key, the main
+/// window's glass must stay hidden — otherwise macOS applies its
+/// compositor-level defocus tint to the still-defocused main window.
+///
 /// Also skipped when [`SUSPENDED`] is set (during native dialog presentation).
 ///
 /// # Safety
@@ -286,6 +326,13 @@ unsafe extern "C" fn on_become_key(_this: *mut AnyObject, _cmd: Sel, notificatio
         return;
     }
     if notification_is_from_panel(notification) {
+        return;
+    }
+    // Only restore glass if the window that became key actually has glass.
+    // When a child window (embedded browser) becomes key, the main window is
+    // still defocused — re-showing its glass would cause the macOS compositor
+    // to apply its defocus tint instead of our opaque fallback color.
+    if !notification_window_has_glass(notification) {
         return;
     }
     toggle_glass(false);

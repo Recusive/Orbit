@@ -169,6 +169,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
   tools,
   isLastAssistantMessage,
+  isAgentRunning,
   animate,
   onRewind,
   onOpenFile,
@@ -328,8 +329,8 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
             })}
           </div>
 
-          {/* Message actions - shown when complete */}
-          {isComplete ? (
+          {/* Message actions - shown when turn is fully complete (not just this message) */}
+          {isComplete && !isAgentRunning ? (
             <>
               <MessageActions
                 rewindDisabled={isLastAssistantMessage}

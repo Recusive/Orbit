@@ -107,10 +107,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
   }, [isSelectingElement, onSelectElement, onCancelSelectElement]);
 
   return (
-    <div
-      className="flex items-center gap-1 px-2 border-b border-gray-5 bg-chat-area shrink-0"
-      style={{ height: 35 }}
-    >
+    <div className="flex items-center gap-1 px-2 bg-chat-area shrink-0" style={{ height: 35 }}>
       {/* Navigation buttons - enabled when canGoBack/canGoForward is null (unknown) or true */}
       <button
         onClick={onBack}

@@ -3,7 +3,7 @@ import { EMPTY_STATE_PADDING_BOTTOM } from './constants';
 import type { ChatContentProps } from './types';
 import type { FC } from 'react';
 
-import { ChatInput, ChatMessages } from '@/components/chat';
+import { ChatInput, ChatMessages, TodoBar } from '@/components/chat';
 import { StatusAnnouncer } from '@/components/shared';
 import { VaultPage } from '@/features/vault';
 import { useVaultOpen } from '@/stores/ui/ui-store';
@@ -104,6 +104,7 @@ export const ChatContent: FC<ChatContentProps> = ({
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
           />
+          <TodoBar />
           <ChatInput {...inputProps} />
         </div>
       )}

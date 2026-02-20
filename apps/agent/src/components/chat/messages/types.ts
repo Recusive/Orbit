@@ -80,6 +80,8 @@ export interface MessageItemProps {
   readonly message: ChatMessage;
   readonly tools: ToolExecution[];
   readonly isLastAssistantMessage: boolean;
+  /** Whether the agent is still running (entire turn not yet complete) */
+  readonly isAgentRunning: boolean;
   /** Whether to animate this message sliding in (for newly sent messages) */
   readonly animate?: boolean | undefined;
   readonly onRewind: (messageId: string) => void;

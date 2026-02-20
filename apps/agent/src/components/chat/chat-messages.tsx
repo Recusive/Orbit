@@ -506,6 +506,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                   message={msg}
                   tools={tools}
                   isLastAssistantMessage={isLastAssistant}
+                  isAgentRunning={isAgentRunning}
                   animate={shouldAnimate}
                   onRewind={onRewind}
                   onOpenFile={onOpenFile}
