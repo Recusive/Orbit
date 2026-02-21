@@ -670,11 +670,11 @@ describe('ui-store', () => {
   });
 
   // ============================================================================
-  // Terminal Auto-Switch
+  // Terminal Position Independence
   // ============================================================================
 
-  describe('terminal auto-switch on activity close', () => {
-    it('should switch terminal from activity to chat when activity panel closes', () => {
+  describe('terminal position is independent of activity panel', () => {
+    it('should preserve terminal position when activity panel closes', () => {
       const { toggleReviewPanel, setTerminalPosition, toggleBottomPanel } = useUIStore.getState();
 
       // Open activity panel and terminal in activity position
@@ -684,13 +684,13 @@ describe('ui-store', () => {
 
       expect(useUIStore.getState().terminalPosition).toBe('activity');
 
-      // Close activity panel — terminal should auto-switch to chat
+      // Close activity panel — terminal position is unchanged
       toggleReviewPanel();
 
-      expect(useUIStore.getState().terminalPosition).toBe('chat');
+      expect(useUIStore.getState().terminalPosition).toBe('activity');
     });
 
-    it('should not auto-switch when terminal is in both position', () => {
+    it('should preserve both position when activity panel closes', () => {
       const { toggleReviewPanel, setTerminalPosition, toggleBottomPanel } = useUIStore.getState();
 
       toggleReviewPanel(); // open
@@ -703,17 +703,16 @@ describe('ui-store', () => {
       expect(useUIStore.getState().terminalPosition).toBe('both');
     });
 
-    it('should not auto-switch when terminal is closed', () => {
-      const { toggleReviewPanel, setTerminalPosition } = useUIStore.getState();
+    it('should preserve chat position when activity panel closes', () => {
+      const { toggleReviewPanel, setTerminalPosition, toggleBottomPanel } = useUIStore.getState();
 
       toggleReviewPanel(); // open
-      setTerminalPosition('activity');
-      // bottomPanelOpen is false (default)
+      setTerminalPosition('chat');
+      toggleBottomPanel(); // open terminal
 
-      // Close activity panel — no switch since terminal is closed
-      toggleReviewPanel();
+      toggleReviewPanel(); // close
 
-      expect(useUIStore.getState().terminalPosition).toBe('activity');
+      expect(useUIStore.getState().terminalPosition).toBe('chat');
     });
   });
 
