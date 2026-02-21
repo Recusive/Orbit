@@ -101,14 +101,23 @@ pub fn clear_ssh_hosts(manager: State<'_, SettingsManager>) -> Result<()> {
 /// Returns the selected directory path, or `None` if the user cancelled.
 #[tauri::command]
 pub async fn pick_directory(app: tauri::AppHandle) -> Result<Option<String>> {
-    use orbit_plugin_decorum::WebviewWindowExt as _;
-    use tauri::Manager as _;
+    #[cfg(target_os = "macos")]
+    {
+        use orbit_plugin_decorum::WebviewWindowExt as _;
+        use tauri::Manager as _;
 
-    let window = app
-        .get_webview_window("main")
-        .ok_or_else(|| orbit_core::Error::Other("No main window found".into()))?;
+        let window = app
+            .get_webview_window("main")
+            .ok_or_else(|| orbit_core::Error::Other("No main window found".into()))?;
 
-    window
-        .pick_folder_native()
-        .map_err(|e| orbit_core::Error::Other(e.to_string()))
+        window
+            .pick_folder_native()
+            .map_err(|e| orbit_core::Error::Other(e.to_string()))
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Ok(None)
+    }
 }
