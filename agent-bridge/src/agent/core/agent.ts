@@ -1907,12 +1907,12 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       );
       try {
         await this.currentQuery.interrupt();
-        // Give the SDK a moment to finalize the session and flush checkpoint data
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        logger.warn(
-          { checkpointId },
-          'REWIND rewindFiles Step 1 — interrupt complete, waited 500ms'
-        );
+        // Brief delay for SDK to flush checkpoint data to disk after interrupt.
+        // interrupt() awaits the SDK response, but file-history writes are async.
+        // 100ms is sufficient for local FS; the resumed query in Step 2 will
+        // re-read checkpoint state regardless.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        logger.warn({ checkpointId }, 'REWIND rewindFiles Step 1 — interrupt complete');
       } catch (interruptErr) {
         const errMsg = interruptErr instanceof Error ? interruptErr.message : String(interruptErr);
         logger.warn(

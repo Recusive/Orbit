@@ -152,7 +152,7 @@ export const ContextContent: FC<ContextContentProps> = ({ children, className })
       side="top"
       align="end"
       className={cn(
-        'w-56 p-0 rounded-[12px] glass-popover bg-transparent border-0 shadow-none',
+        'w-56 p-0 rounded-[12px] bg-sidebar border border-border/50 shadow-md',
         className
       )}
     >

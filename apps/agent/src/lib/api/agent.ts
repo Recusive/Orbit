@@ -320,7 +320,7 @@ export async function onAgentCheckpoint(
 }
 
 export interface CompactCompleteEvent {
-  session_id: string;
+  sessionId: string;
 }
 
 export async function onAgentCompactComplete(

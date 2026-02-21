@@ -281,16 +281,13 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       tabIndex={-1}
       onKeyDown={handlePopoverKeyDown}
       className={cn(
-        'fixed glass-popover rounded-[10px] overflow-hidden z-50 outline-none',
+        'fixed bg-sidebar border border-border/50 rounded-[10px] overflow-hidden z-50 outline-none shadow-md',
         position.side === 'top' ? 'origin-bottom-left' : 'origin-top-left',
-        // Enter: scale + slide (no fade — opacity:0 hides backdrop-filter blur)
         !isAnimatingOut &&
           cn(
             'animate-in zoom-in-[0.97]',
             position.side === 'top' ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1'
           ),
-        // Exit: no animation (fade breaks glass blur, scale too subtle)
-        // The 100ms unmount timeout handles removal
         isAnimatingOut && 'opacity-0'
       )}
       style={{
@@ -315,7 +312,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
               {group.label}
             </div>
             {group.comingSoon === true ? (
-              <div className="mx-1.5 mt-0.5 mb-2 flex items-center gap-2 rounded-md bg-lg-control px-2.5 py-2">
+              <div className="mx-1.5 mt-0.5 mb-2 flex items-center gap-2 rounded-md bg-lg-sidebar-hover px-2.5 py-2">
                 <Info className="h-3.5 w-3.5 shrink-0 text-lg-text-secondary" />
                 <span className="text-xs text-lg-text-secondary">Coming Soon</span>
               </div>
@@ -331,8 +328,8 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                     TRANSITION_CLASSES.item,
                     'mt-0.5 first:mt-0 group',
                     selectedModel === model.id
-                      ? 'backdrop-blur-[20px] text-white rounded-md [background:rgba(0,122,255,0.85)]'
-                      : 'rounded-md hover:bg-lg-control-hover active:scale-[0.98]'
+                      ? 'bg-lg-sidebar-selected text-foreground rounded-md'
+                      : 'rounded-md hover:bg-lg-sidebar-hover active:scale-[0.98]'
                   )}
                 >
                   <div className="flex items-center gap-2">
@@ -353,7 +350,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                       </span>
                     ) : null}
                     {selectedModel === model.id ? (
-                      <Check className="h-3.5 w-3.5 text-white" />
+                      <Check className="h-3.5 w-3.5 text-foreground" />
                     ) : null}
                   </div>
                 </button>

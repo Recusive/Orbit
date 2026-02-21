@@ -14,6 +14,9 @@ import { useUIStore, useWorkspaceName, useActiveTab, useHasWorkspace } from '@/s
 // Re-export for backwards compatibility
 export type { HeaderTab } from '@/stores/ui/ui-store';
 
+// Parsed once at module load — query params don't change during the app's lifetime.
+const IS_DEMO = new URLSearchParams(window.location.search).get('demo') === 'true';
+
 export interface HeaderBarProps {
   className?: string;
   /** When true, renders with a transparent background (used on welcome page) */
@@ -66,7 +69,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
   const hasWorkspace = useHasWorkspace();
 
   // Demo mode: bypass workspace/auth gates when embedded in marketing site iframe
-  const isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
+  const isDemo = IS_DEMO;
 
   // Use useShallow to prevent re-renders when unrelated store state changes
   const {

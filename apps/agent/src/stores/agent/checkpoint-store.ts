@@ -537,14 +537,15 @@ export const useCheckpointStore = create<CheckpointState>()(
     },
 
     consumeRewindForkPoint: (sessionId): string | null => {
-      const forkPoint = get().rewindForkPoints[sessionId];
-      if (forkPoint) {
-        set((draft) => {
+      let consumed: string | null = null;
+      set((draft) => {
+        const forkPoint = draft.rewindForkPoints[sessionId];
+        if (forkPoint) {
+          consumed = forkPoint;
           Reflect.deleteProperty(draft.rewindForkPoints, sessionId);
-        });
-        return forkPoint;
-      }
-      return null;
+        }
+      });
+      return consumed;
     },
 
     hasRewindForkPoint: (sessionId): boolean => {
@@ -568,14 +569,15 @@ export const useCheckpointStore = create<CheckpointState>()(
     },
 
     consumePendingConversationFork: (originalSessionId): string | null => {
-      const rewindMessageId = get().pendingConversationForks[originalSessionId];
-      if (rewindMessageId) {
-        set((draft) => {
+      let consumed: string | null = null;
+      set((draft) => {
+        const rewindMessageId = draft.pendingConversationForks[originalSessionId];
+        if (rewindMessageId) {
+          consumed = rewindMessageId;
           Reflect.deleteProperty(draft.pendingConversationForks, originalSessionId);
-        });
-        return rewindMessageId;
-      }
-      return null;
+        }
+      });
+      return consumed;
     },
 
     hasPendingConversationFork: (originalSessionId): boolean => {

@@ -564,7 +564,7 @@ html.window-mode-liquid-glass.dark .bg-base-layer::before {
     linear-gradient(0deg, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.85)),
     #CCCCCC;
   background-blend-mode: normal, normal, color-burn;
-  opacity: 0.67;
+  opacity: 0.45;
 }
 
 /* Sidebar — transparent so the base layer tint shows through */

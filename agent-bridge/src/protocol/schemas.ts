@@ -73,11 +73,17 @@ export const SessionConfigSchema = z
     maxThinkingTokens: z.number().optional(),
     planEnabled: z.boolean().optional(),
     acceptEnabled: z.boolean().optional(),
+    critiqueEnabled: z.boolean().optional(),
     model: ModelSchema.optional(),
+    sessionMode: z.enum(['chat', 'agent']).optional(),
     // Resume an existing SDK session (for session continuity after app restart).
     // NOTE: This is NOT used for rewind scenarios. Rewind creates a fresh session
     // and prepends truncated context to the first message instead.
     resumeSessionId: z.string().optional(),
+    // Specific message UUID to resume at (for forking at a point in conversation).
+    resumeSessionAt: z.string().optional(),
+    // Whether to fork the session (create new branch) vs continue original.
+    forkSession: z.boolean().optional(),
   })
   .strict();
 export type SessionConfig = z.infer<typeof SessionConfigSchema>;

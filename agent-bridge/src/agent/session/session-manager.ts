@@ -859,7 +859,7 @@ export class SessionManager extends Disposable {
   private activeSessions = new Map<string, OrbitAgent>();
   private sessionConsumers = new Map<
     string,
-    { cancel: () => void; state: { cancelled: boolean; pendingRewindCheckpointId?: string } }
+    { cancel: () => void; state: { cancelled: boolean } }
   >();
   private permissionResolvers = new Map<string, PermissionResolver>();
   private modePreferences = new Map<
@@ -1144,7 +1144,7 @@ export class SessionManager extends Disposable {
    */
   private _startBackgroundConsumer(initialSessionId: string, agent: OrbitAgent): void {
     let sessionId = initialSessionId;
-    const state: { cancelled: boolean; pendingRewindCheckpointId?: string } = { cancelled: false };
+    const state: { cancelled: boolean } = { cancelled: false };
 
     const cancel = (): void => {
       state.cancelled = true;
@@ -1680,36 +1680,6 @@ export class SessionManager extends Disposable {
             thinkingWasStreamed = false;
             this.currentTurnId.delete(sessionId);
           }
-
-          // Check for pending rewind after processing each message
-          // This must be called from INSIDE the for-await loop on the SAME Query object
-          if (state.pendingRewindCheckpointId) {
-            const checkpointId = state.pendingRewindCheckpointId;
-            state.pendingRewindCheckpointId = undefined;
-
-            logger.warn(
-              {
-                sessionId,
-                checkpointId,
-                sdkSessionId: agent.getCurrentSessionId() ?? 'none',
-              },
-              'REWIND executing pending rewind INSIDE message loop'
-            );
-            try {
-              await agent.rewindFilesInLoop(checkpointId);
-              logger.warn(
-                { sessionId, checkpointId },
-                'REWIND pending rewind COMPLETE — breaking out of message loop'
-              );
-            } catch (rewindErr) {
-              const errMsg = rewindErr instanceof Error ? rewindErr.message : String(rewindErr);
-              logger.error(
-                { sessionId, checkpointId, error: errMsg },
-                'REWIND pending rewind FAILED inside message loop'
-              );
-            }
-            break; // Exit loop after rewind as per SDK pattern
-          }
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1845,7 +1815,9 @@ export class SessionManager extends Disposable {
         message: 'No valid credentials available. Please re-authenticate with "claude login".',
         recoverable: true,
       });
-      return;
+      throw new Error(
+        'No valid credentials available. Please re-authenticate with "claude login".'
+      );
     }
 
     // [oauth-401-recovery] Layer 3: Restart session after 401 recovery.

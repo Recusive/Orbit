@@ -611,6 +611,7 @@ class ChatMessageService {
     // (NOT "end_turn" — that's the raw Anthropic API stop_reason, not the SDK subtype)
     //
     // Clear isAgentRunning immediately in all cases.
+    this.forceCompleteOrphanedTools(sid);
     this.cancelAgentRunningTimer(sid);
     this.turnHadTools.set(sid, false);
     useChatStore.getState().setAgentRunning(sid, false);
@@ -629,6 +630,7 @@ class ChatMessageService {
     this.pendingChunkLengths.delete(message.message_id);
 
     // Errors are always terminal — clear immediately, cancel any delayed clear
+    this.forceCompleteOrphanedTools(sid);
     this.cancelAgentRunningTimer(sid);
     this.turnHadTools.delete(sid);
     useChatStore.getState().setAgentRunning(sid, false);
@@ -700,11 +702,26 @@ class ChatMessageService {
     useChatStore.getState().markCompacted();
 
     // The SDK rewrites the JSONL asynchronously after compact_boundary fires.
-    // Delay the reload to let the SDK finish writing the compacted file.
-    // Without this, conversationLoad() reads the stale pre-compaction JSONL.
-    setTimeout(() => {
-      void this.reloadConversationFromDisk(session_id);
-    }, 1500);
+    // Retry with backoff to handle slow machines where the SDK hasn't finished writing.
+    void this.reloadConversationWithRetry(session_id);
+  }
+
+  /** Reload compacted conversation with retry and backoff. */
+  private async reloadConversationWithRetry(sessionId: string): Promise<void> {
+    const delays = [500, 1000, 2000];
+    for (let attempt = 0; attempt < delays.length; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+      try {
+        await this.reloadConversationFromDisk(sessionId);
+        return; // Success — stop retrying
+      } catch {
+        if (attempt < delays.length - 1) {
+          logger.warn(`Compact reload attempt ${String(attempt + 1)} failed, retrying...`);
+        } else {
+          logger.warn(`Compact reload failed after ${String(delays.length)} attempts`);
+        }
+      }
+    }
   }
 
   /** Read compacted JSONL from disk and replace in-memory messages. */
@@ -1340,6 +1357,40 @@ class ChatMessageService {
   private handleFileContent(message: Extract<ExtensionMessage, { type: 'file:content' }>): void {
     const language = getLanguageFromPath(message.path);
     useFileViewerStore.getState().setFileContent(message.path, message.content, language);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Tool Cleanup
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Safety net: force-complete any tools still in `activeTools` for the given session.
+   *
+   * Normally the SDK guarantees tool:end before agent:complete within a single
+   * session's `for await` loop. But in concurrent multi-session scenarios (stress
+   * tests, interruptions, error races) a tool:end event can be lost in transit
+   * across the async bridge → Rust → Tauri event → postMessage pipeline.
+   *
+   * Called from handleAgentComplete and handleAgentError so no tools stay orphaned.
+   */
+  private forceCompleteOrphanedTools(sessionId: string): void {
+    const toolStore = useToolStore.getState();
+    const orphanIds: string[] = [];
+
+    for (const [id, tool] of Object.entries(toolStore.activeTools)) {
+      if (tool.sessionId === sessionId) {
+        orphanIds.push(id);
+      }
+    }
+
+    if (orphanIds.length > 0) {
+      logger.warn(
+        `Force-completing ${String(orphanIds.length)} orphaned tool(s) for session ${sessionId}`
+      );
+      for (const id of orphanIds) {
+        toolStore.completeTool(id, undefined, true);
+      }
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════

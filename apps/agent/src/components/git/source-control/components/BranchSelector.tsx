@@ -37,7 +37,7 @@ export const BranchSelector: React.FC<BranchSelectorProps> = ({
     <DropdownMenu>
       <DropdownMenuTrigger
         disabled={isCheckingOut || branches.length === 0}
-        className="flex items-center gap-1.5 text-sm min-w-0 hover:bg-lg-control-hover rounded-md px-2 py-1 -ml-2 active:scale-[0.98] transition-[background-color,transform] duration-150 disabled:opacity-40"
+        className="flex items-center gap-1.5 text-sm min-w-0 hover:bg-lg-control-hover rounded-full px-2.5 py-1 active:scale-[0.98] transition-[background-color,transform] duration-150 disabled:opacity-40"
       >
         {isCheckingOut ? (
           <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground/70" />

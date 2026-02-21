@@ -357,12 +357,27 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           }
         }
 
-        const truncatedMessages = messages.slice(0, messageIndex + 1).map((m) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          parentUuid: m.parentUuid ?? null,
-        }));
+        // Include tool data so rewind 2+ can restore tool widgets
+        const toolState = useToolStore.getState();
+        const truncatedMessages = messages.slice(0, messageIndex + 1).map((m) => {
+          const tools = toolState.completedTools
+            .filter((t) => t.messageId === m.id)
+            .map((t) => ({
+              id: t.id,
+              name: t.toolName,
+              input: t.toolInput,
+              success: t.success ?? false,
+              ...(typeof t.toolOutput === 'string' ? { output: t.toolOutput } : {}),
+              ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
+            }));
+          return {
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            parentUuid: m.parentUuid ?? null,
+            ...(tools.length > 0 ? { toolUses: tools } : {}),
+          };
+        });
 
         // Find the first user message AFTER the rewind point to prefill in the input box.
         // This lets the user quickly edit and resend the message that was removed.

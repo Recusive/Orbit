@@ -270,7 +270,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
             {message.thinkingBlocks !== undefined && message.thinkingBlocks.length > 0 ? (
               message.thinkingBlocks.map((block, i) => (
                 <ThinkingBox
-                  key={i}
+                  key={`thinking-${String(i)}-${String(block.durationMs)}`}
                   thinking={block.content}
                   thinkingDurationMs={block.durationMs}
                   isStreaming={

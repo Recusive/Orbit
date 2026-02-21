@@ -20,7 +20,7 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 
-import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
+import type { WebviewMessage } from '@/types/protocol';
 import type { FC, ReactNode } from 'react';
 
 import {
@@ -97,16 +97,12 @@ function postWindowMessage(data: Record<string, unknown>): void {
 // React Context
 // ============================================================================
 
-type MessageHandler = (message: ExtensionMessage) => void;
-
 interface TauriContextValue {
   /** Whether connected to Tauri backend */
   isConnected: boolean;
   /** Whether in mock mode (browser dev) */
   isMockMode: boolean;
-  /** Subscribe to messages - returns unsubscribe function */
-  subscribe: (handler: MessageHandler) => () => void;
-  /** Post a message to the backend */
+  /** Post a message to the backend (schema validation only — actual sends go through use-tauri.ts) */
   postMessage: (message: WebviewMessage) => void;
 }
 
@@ -260,9 +256,6 @@ interface TauriProviderProps {
 export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
   const [isConnected] = useState(() => isTauriEnvironment());
   const [isMockMode] = useState(() => !isTauriEnvironment());
-
-  // Message handler registry
-  const handlersRef = useRef<Set<MessageHandler>>(new Set());
 
   // Track if listeners have been initialized (persists across renders)
   const initializedRef = useRef(false);
@@ -570,7 +563,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
         onAgentCompactComplete((event) => {
           postWindowMessage({
             type: 'agent:compact_complete',
-            session_id: event.session_id,
+            session_id: event.sessionId,
           });
         })
           .then((unlisten) => {
@@ -778,15 +771,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
     };
   }, []);
 
-  // Subscribe function for hooks to register handlers
-  const subscribe = useCallback((handler: MessageHandler): (() => void) => {
-    handlersRef.current.add(handler);
-    return () => {
-      handlersRef.current.delete(handler);
-    };
-  }, []);
-
-  // Post message to backend
+  // Post message to backend (schema validation only — actual sends go through use-tauri.ts)
   const postMessage = useCallback(
     (message: WebviewMessage): void => {
       const result = WebviewMessageSchema.safeParse(message);
@@ -808,10 +793,9 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
     (): TauriContextValue => ({
       isConnected,
       isMockMode,
-      subscribe,
       postMessage,
     }),
-    [isConnected, isMockMode, subscribe, postMessage]
+    [isConnected, isMockMode, postMessage]
   );
 
   return <TauriContext.Provider value={value}>{children}</TauriContext.Provider>;
@@ -827,16 +811,4 @@ export function useTauriContext(): TauriContextValue {
     throw new Error('useTauriContext must be used within a TauriProvider');
   }
   return context;
-}
-
-/**
- * Hook to subscribe to Tauri messages
- * This is a convenience hook that handles subscription lifecycle
- */
-export function useTauriMessages(handler: MessageHandler): void {
-  const { subscribe } = useTauriContext();
-
-  useEffect(() => {
-    return subscribe(handler);
-  }, [subscribe, handler]);
 }

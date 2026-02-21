@@ -111,10 +111,17 @@ impl WebviewWindowExt for WebviewWindow {
         // macOS 26+.
         glass_defocus::suspend();
 
-        self.run_on_main_thread(move || {
+        let dispatch_result = self.run_on_main_thread(move || {
             let result = unsafe { native_dialog::pick_folder() };
             let _ = tx.send(result);
-        })?;
+        });
+
+        // Resume observers BEFORE propagating errors — otherwise SUSPENDED
+        // stays true permanently if run_on_main_thread fails.
+        if let Err(e) = dispatch_result {
+            glass_defocus::resume();
+            return Err(e);
+        }
 
         // Block the calling thread (Tokio worker) until the main thread
         // closure completes. runModal inside pick_folder() runs a nested

@@ -583,7 +583,7 @@ fn emit_compact_complete(app: &AppHandle, session_id: &str) {
     drop(app.emit(
         "agent:compact_complete",
         serde_json::json!({
-            "session_id": session_id,
+            "sessionId": session_id,
         }),
     ));
 }

@@ -35,7 +35,7 @@ export const CommitForm: React.FC<CommitFormProps> = ({ value, onChange, onCommi
         placeholder="Commit message (Ctrl+Enter to commit)..."
         rows={COMMIT_TEXTAREA_ROWS} // Extracted constant
         className="
-          w-full px-2.5 py-2 rounded-lg text-sm
+          w-full px-2.5 py-2 rounded-xl text-sm
           bg-background border-3 border-transparent
           ring-1 ring-lg-separator
           placeholder:text-lg-text-secondary

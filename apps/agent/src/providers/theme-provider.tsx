@@ -110,7 +110,7 @@ export const ThemeProvider: FC<ThemeProviderProps> = ({
     }
     void setLiquidGlassEffect({
       variant: GlassMaterialVariant.Sidebar,
-      tintColor: effectiveTheme === 'light' ? '#F5F5F5cc' : '#18181880',
+      tintColor: effectiveTheme === 'light' ? '#F5F5F560' : '#18181860',
     });
   }, [effectiveTheme, windowMode]);
 

@@ -682,6 +682,21 @@ export const useToolStore = create<ToolState>()(
           if (state.currentSessionId === oldSessionId) {
             state.currentSessionId = newSessionId;
           }
+
+          // Migrate sessionId on live tool entries so switchSession's ownership
+          // filter doesn't discard them as "foreign" after the remap.
+          // Without this, rewind followed by system:init causes tools to vanish:
+          // tools have sessionId=oldId, switchSession filters for sessionId=newId → empty.
+          for (const tool of state.completedTools) {
+            if (tool.sessionId === oldSessionId) {
+              tool.sessionId = newSessionId;
+            }
+          }
+          for (const tool of Object.values(state.activeTools)) {
+            if (tool.sessionId === oldSessionId) {
+              tool.sessionId = newSessionId;
+            }
+          }
         });
       },
 

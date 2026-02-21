@@ -316,6 +316,18 @@ export const RewindConversationSchema = z
           role: z.enum(['user', 'assistant']),
           content: z.string(),
           parentUuid: z.string().nullish(),
+          toolUses: z
+            .array(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+                input: z.record(z.string(), z.unknown()),
+                output: z.string().optional(),
+                success: z.boolean(),
+                contentOffset: z.number().optional(),
+              })
+            )
+            .optional(),
         })
       )
       .optional(),

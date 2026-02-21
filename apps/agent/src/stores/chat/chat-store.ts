@@ -157,6 +157,11 @@ function evictIfNeeded(
   loadedSessions: Record<string, boolean>,
   activeSessionId: string | null
 ): void {
+  // Guard: track how many candidates we've skipped without evicting.
+  // If we cycle through all candidates without evicting any, all are
+  // protected — break to avoid an infinite loop.
+  let skipped = 0;
+
   while (lruOrder.length > MAX_IN_MEMORY_SESSIONS) {
     const candidate = lruOrder[0];
     if (candidate === undefined) break;
@@ -166,6 +171,8 @@ function evictIfNeeded(
       // Move pinned session to end so we try the next candidate
       lruOrder.splice(0, 1);
       lruOrder.push(candidate);
+      skipped++;
+      if (skipped >= lruOrder.length) break;
       continue;
     }
 
@@ -174,6 +181,8 @@ function evictIfNeeded(
     if (session?.isAgentRunning) {
       lruOrder.splice(0, 1);
       lruOrder.push(candidate);
+      skipped++;
+      if (skipped >= lruOrder.length) break;
       continue;
     }
 
@@ -185,6 +194,7 @@ function evictIfNeeded(
     Reflect.deleteProperty(loadedSessions, candidate);
     // Remove from LRU (it stays in sessions Record with empty messages)
     lruOrder.splice(0, 1);
+    skipped = 0;
 
     logger.debug('Evicted session from memory', { sessionId: candidate });
   }
