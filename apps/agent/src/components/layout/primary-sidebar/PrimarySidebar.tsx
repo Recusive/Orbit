@@ -27,6 +27,7 @@ import { ConversationList } from './components/ConversationList';
 import { PowersSection } from './components/PowersSection';
 import { SidebarItem } from './components/SidebarItem';
 import { SidebarToggleIcon } from './components/SidebarToggleIcon';
+import { TriStateSwitch } from './components/tri-state-switch';
 import { useSidebarActions } from './hooks/use-sidebar-actions';
 
 import type { EditorSidebarTab, SidebarTab } from './types';
@@ -298,26 +299,33 @@ export const PrimarySidebar: FC = () => {
       {/* Tab heading + toggle (workspace mode only) */}
       {!isWelcome ? (
         isEditorMode ? (
-          /* Editor mode: Explorer / Source Control toggle — matches agent mode pattern */
+          /* Editor mode: Explorer / Source Control / Sessions toggle */
           <div className="flex items-center justify-between px-3 py-1 shrink-0">
             <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
-              {editorTab === 'explorer' ? 'Explorer' : 'Source Control'}
+              {editorTab === 'explorer'
+                ? 'Explorer'
+                : editorTab === 'source'
+                  ? 'Source Control'
+                  : 'Sessions'}
             </span>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div>
-                  <Switch
-                    checked={editorTab === 'source'}
-                    onCheckedChange={(checked) => {
-                      setEditorTab(checked ? 'source' : 'explorer');
+                  <TriStateSwitch
+                    value={editorTab === 'explorer' ? 0 : editorTab === 'source' ? 1 : 2}
+                    onChange={(v) => {
+                      setEditorTab(v === 0 ? 'explorer' : v === 1 ? 'source' : 'sessions');
                     }}
-                    aria-label="Toggle Explorer / Source Control"
-                    className="h-3.5 w-7 !rounded-md data-[state=checked]:bg-primary data-[state=unchecked]:bg-gray-6 [&>span]:!h-2.5 [&>span]:!w-2.5 [&>span]:!rounded-sm [&>span]:data-[state=checked]:!translate-x-3.5"
+                    aria-label="Toggle Explorer / Source Control / Sessions"
                   />
                 </div>
               </TooltipTrigger>
               <TooltipContent side="right">
-                {editorTab === 'explorer' ? 'Switch to Source Control' : 'Switch to Explorer'}
+                {editorTab === 'explorer'
+                  ? 'Switch to Source Control'
+                  : editorTab === 'source'
+                    ? 'Switch to Sessions'
+                    : 'Switch to Explorer'}
               </TooltipContent>
             </Tooltip>
           </div>
@@ -372,7 +380,8 @@ export const PrimarySidebar: FC = () => {
             }}
           />
         </div>
-      ) : !isEditorMode && activeTab === 'conversations' ? (
+      ) : (!isEditorMode && activeTab === 'conversations') ||
+        (isEditorMode && editorTab === 'sessions') ? (
         <div className="flex flex-col shrink-0 gap-1 py-1.5">
           <SidebarItem
             icon={() => (
@@ -467,11 +476,36 @@ export const PrimarySidebar: FC = () => {
             </div>
           </>
         ) : isEditorMode ? (
-          /* Editor mode: Explorer or Source Control */
+          /* Editor mode: Explorer, Source Control, or Sessions */
           editorTab === 'explorer' ? (
             <FileExplorer />
-          ) : (
+          ) : editorTab === 'source' ? (
             <SourceControlTab />
+          ) : (
+            <ConversationList
+              conversations={conversations}
+              worktrees={worktrees}
+              workspaceName={workspaceName}
+              activeConversationId={activeConversationId}
+              activeWorktreePath={activeWorktreePath}
+              editingConversationId={editingConversationId}
+              onLoadConversation={handleLoadConversation}
+              onStartEditConversation={setEditingConversationId}
+              onRenameConversation={(sessionId, newTitle) => {
+                void handleRenameConversation(sessionId, newTitle);
+              }}
+              onCancelEditConversation={() => {
+                setEditingConversationId(null);
+              }}
+              onDeleteConversation={handleOpenDeleteDialog}
+              onDuplicateConversation={handleDuplicateConversation}
+              onToggleWorktree={toggleWorktreeExpanded}
+              onSelectWorktree={(path) => {
+                useUIStore.getState().setActiveWorktree(path);
+              }}
+              onRemoveWorktree={handleOpenDeleteWorktreeDialog}
+              onOpenCreateWorktree={handleOpenCreateWorktree}
+            />
           )
         ) : activeTab === 'conversations' ? (
           <ConversationList

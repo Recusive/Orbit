@@ -6,7 +6,7 @@ import type { FC } from 'react';
 
 export type SidebarTab = 'conversations' | 'explorer';
 
-export type EditorSidebarTab = 'explorer' | 'source';
+export type EditorSidebarTab = 'explorer' | 'source' | 'sessions';
 
 export type PrimarySidebarProps = Record<string, never>;
 

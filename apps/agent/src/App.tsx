@@ -408,8 +408,9 @@ const App: FC = () => {
   // When closed, marginRight = -width slides the entire panel off the right edge
   // as one rigid body. Content inside never compresses.
   const isWelcome = !hasWorkspace && !isDemo;
-  // reviewPanelOpen drives the activity card for all modes — ContentTopBar's toggle works everywhere
-  const activityOpen = reviewPanelOpen && !isWelcome;
+  // reviewPanelOpen drives the activity card for agent/canvas modes.
+  // Editor mode always shows the activity column — it hosts EditorChatPanel.
+  const activityOpen = (reviewPanelOpen || activeTab === 'editor') && !isWelcome;
   const activityWrapperStyle = useMemo(
     (): CSSProperties => ({
       width: reviewPanelWidth,

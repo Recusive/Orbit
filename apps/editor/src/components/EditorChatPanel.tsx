@@ -10,11 +10,10 @@ import { useCallback, useRef } from 'react';
 import type { ChatMessage } from '@/components/chat/messages';
 import type { FC } from 'react';
 
-import { ChatMessages, ChatInput, useQueuedMessageHandler } from '@/components/chat';
+import { ChatMessages, ChatInput, TodoBar, useQueuedMessageHandler } from '@/components/chat';
 import { ContentTopBar } from '@/components/layout/content-top-bar';
 import { useChatMessages } from '@/hooks/chat/use-chat-messages';
 import { SIDEBAR } from '@/lib/utils/constants';
-import { cn } from '@/lib/utils/utils';
 import {
   usePendingPermissions,
   useInputMode,
@@ -141,9 +140,8 @@ export const EditorChatPanel: FC = () => {
               onCancelQueue={cancelQueue}
               onFeedback={handleFeedback}
             />
-            <div className={cn('shrink-0', pendingPermissions.length > 0 ? 'pt-0' : 'pt-2')}>
-              <ChatInput {...inputProps} />
-            </div>
+            <TodoBar />
+            <ChatInput {...inputProps} />
           </div>
         )}
       </div>
