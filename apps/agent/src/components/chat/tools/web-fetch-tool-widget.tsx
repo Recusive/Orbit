@@ -141,7 +141,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
                       }}
                       className="flex items-center gap-1 group focus:outline-none"
                     >
-                      <code className="bg-lg-control text-foreground rounded-md px-2 py-1 font-mono text-sm group-hover:bg-lg-control transition-colors truncate max-w-full">
+                      <code className="bg-lg-control text-foreground rounded-lg px-2 py-1 font-mono text-sm group-hover:bg-lg-control transition-colors truncate max-w-full">
                         {hostname}
                       </code>
                       <ExternalLink className="h-2.5 w-2.5 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -166,7 +166,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
                         <span>Fetching and processing content...</span>
                       </div>
                     ) : output ? (
-                      <div className="bg-lg-control rounded-md p-2 font-mono text-sm leading-relaxed text-foreground overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
+                      <div className="bg-lg-control rounded-lg p-2 font-mono text-sm leading-relaxed text-foreground overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
                         <pre className="whitespace-pre-wrap wrap-break-word m-0">{output}</pre>
                       </div>
                     ) : (

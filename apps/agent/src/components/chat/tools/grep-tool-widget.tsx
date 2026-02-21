@@ -213,7 +213,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                     <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
                       pattern
                     </div>
-                    <code className="block bg-lg-control rounded-md px-2 py-1 font-mono text-sm text-foreground break-all">
+                    <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground break-all">
                       {pattern}
                     </code>
                     {path ? (
@@ -253,7 +253,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                         <span>Searching for matches...</span>
                       </div>
                     ) : matches.length > 0 ? (
-                      <div className="relative max-h-[200px] overflow-y-auto overflow-x-hidden bg-lg-control rounded-md p-2">
+                      <div className="relative max-h-[200px] overflow-y-auto overflow-x-hidden bg-lg-control rounded-lg p-2">
                         {isContentMode
                           ? Object.entries(groupedMatches).map(
                               ([filePath, fileMatches], index, arr) => (

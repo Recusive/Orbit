@@ -149,7 +149,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                     <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
                       pattern
                     </div>
-                    <code className="block bg-lg-control rounded-md px-2 py-1 font-mono text-sm text-foreground">
+                    <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground">
                       {pattern}
                     </code>
                     {path ? (
@@ -171,7 +171,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                         <span>Searching for files...</span>
                       </div>
                     ) : files.length > 0 ? (
-                      <div className="space-y-0.5 max-h-[200px] overflow-y-auto overflow-x-hidden bg-lg-control rounded-md p-2">
+                      <div className="space-y-0.5 max-h-[200px] overflow-y-auto overflow-x-hidden bg-lg-control rounded-lg p-2">
                         {files.map((file, index) => (
                           <button
                             key={`${file}-${String(index)}`}

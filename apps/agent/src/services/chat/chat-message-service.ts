@@ -129,18 +129,10 @@ class ChatMessageService {
   private pendingChunkLengths = new Map<string, number>();
   private thinkingStartTimes = new Map<string, number>();
 
-  // Multi-turn tool flow tracking:
-  // When a turn uses tools, agent:complete is an intermediate signal (more turns coming).
-  // We delay clearing isAgentRunning so the loader dots persist between turns.
-  // The final turn (text-only, no tools) clears isAgentRunning immediately.
+  // Track whether the current turn used tools (for re-asserting isAgentRunning on tool:start)
   private turnHadTools = new Map<string, boolean>();
+  // Safety timers for edge-case cleanup (interrupted sessions, errors)
   private agentRunningTimers = new Map<string, ReturnType<typeof setTimeout>>();
-
-  /** Safety timeout after a tool-using turn completes.
-   *  Kept short (3s) to avoid visible delay on the final turn when tools and text
-   *  appear in the same response. Between turns, if the API call takes >3s the
-   *  dots briefly disappear — acceptable tradeoff vs a 30s delay on completion. */
-  private static readonly AGENT_RUNNING_SAFETY_TIMEOUT_MS = 3_000;
 
   // Checkpoint batching — debounces rapid checkpoint events (100ms window)
   // Reduces ~30 checkpoint state updates per agent run to ~2-3
@@ -609,41 +601,20 @@ class ChatMessageService {
     // Mark checkpoint completion (associates checkpoint with the user message)
     useCheckpointStore.getState().onMessageComplete(sid);
 
-    // Decide whether to clear isAgentRunning immediately or delay it.
+    // The SDK sends exactly ONE result message per sendMessage() call — always at
+    // the very end, after all tool-use turns complete internally. So agent:complete
+    // is ALWAYS the final event; there are no "intermediate" agent:complete events.
     //
-    // The bridge forwards SDK stop_reason as result_subtype:
-    //   "end_turn"  → model finished naturally (FINAL turn)
-    //   "tool_use"  → model wants to use tools (INTERMEDIATE, more turns coming)
-    //   undefined   → unknown, fall back to turnHadTools heuristic
+    // result_subtype is the SDK's SDKResultMessage.subtype:
+    //   "success"                              → normal completion
+    //   "error_max_turns" / "error_during_execution" / etc. → error completion
+    // (NOT "end_turn" — that's the raw Anthropic API stop_reason, not the SDK subtype)
     //
-    // For intermediate turns, we delay clearing isAgentRunning so the loader dots
-    // persist between turns. The next turn's thinking/chunk/tool events cancel the
-    // timer. For the final turn, we clear immediately.
-    const resultSubtype = message.result_subtype;
-    const hadTools = this.turnHadTools.get(sid) ?? false;
-    this.turnHadTools.set(sid, false); // Reset for next turn
-
-    // Determine if this is a final turn:
-    // 1. result_subtype === 'end_turn' is the authoritative signal
-    // 2. Fallback: no tools this turn → likely final (text-only response)
-    const isFinalTurn = resultSubtype === 'end_turn' || (resultSubtype === undefined && !hadTools);
-
-    if (isFinalTurn) {
-      // Final turn — clear immediately
-      this.cancelAgentRunningTimer(sid);
-      useChatStore.getState().setAgentRunning(sid, false);
-      useChatStore.getState().setStopPending(sid, false);
-    } else {
-      // Intermediate turn — delay clearing with a safety timeout.
-      // The next turn's thinking/chunk/tool events will cancel this timer.
-      this.cancelAgentRunningTimer(sid);
-      const timer = setTimeout(() => {
-        this.agentRunningTimers.delete(sid);
-        useChatStore.getState().setAgentRunning(sid, false);
-        useChatStore.getState().setStopPending(sid, false);
-      }, ChatMessageService.AGENT_RUNNING_SAFETY_TIMEOUT_MS);
-      this.agentRunningTimers.set(sid, timer);
-    }
+    // Clear isAgentRunning immediately in all cases.
+    this.cancelAgentRunningTimer(sid);
+    this.turnHadTools.set(sid, false);
+    useChatStore.getState().setAgentRunning(sid, false);
+    useChatStore.getState().setStopPending(sid, false);
 
     // Schedule coalesced sidebar refresh
     scheduleSidebarRefresh();

@@ -27,14 +27,15 @@ const SlashIcon: FC<{ className?: string }> = ({ className }) => (
 interface PowerChildItem {
   readonly icon: FC<{ className?: string }>;
   readonly label: string;
+  readonly comingSoon?: boolean;
 }
 
 const POWER_ITEMS: readonly PowerChildItem[] = [
-  { icon: IconPlugins, label: 'Plugins' },
+  { icon: IconPlugins, label: 'Plugins', comingSoon: true },
   { icon: IconSkills, label: 'Skills' },
-  { icon: IconMcp, label: 'MCP' },
-  { icon: SlashIcon, label: 'Slash Commands' },
-  { icon: Users, label: 'Sub Agents' },
+  { icon: IconMcp, label: 'MCP', comingSoon: true },
+  { icon: SlashIcon, label: 'Slash Commands', comingSoon: true },
+  { icon: Users, label: 'Sub Agents', comingSoon: true },
 ];
 
 interface PowersSectionProps {
@@ -86,7 +87,12 @@ export const PowersSection: FC<PowersSectionProps> = ({ onSkillsClick }) => {
             {POWER_ITEMS.map((item) => (
               <div key={item.label} className="relative group mx-1.5 ml-2">
                 <button
-                  className="flex items-center gap-2 h-7 w-full rounded-lg pl-[7px] pr-3 overflow-hidden hover:bg-lg-sidebar-hover transition-[background-color] duration-100 text-sidebar-foreground hover:text-foreground"
+                  className={cn(
+                    'flex items-center gap-2 h-7 w-full rounded-lg pl-[7px] pr-3 overflow-hidden transition-[background-color] duration-100',
+                    item.comingSoon === true
+                      ? 'text-sidebar-foreground/40 cursor-default'
+                      : 'hover:bg-lg-sidebar-hover text-sidebar-foreground hover:text-foreground'
+                  )}
                   title={item.label}
                   onClick={item.label === 'Skills' ? onSkillsClick : undefined}
                 >
@@ -94,6 +100,11 @@ export const PowersSection: FC<PowersSectionProps> = ({ onSkillsClick }) => {
                   <span className="text-sm overflow-hidden flex-1 text-left truncate">
                     {item.label}
                   </span>
+                  {item.comingSoon === true && (
+                    <span className="text-[10px] leading-none px-1.5 py-0.5 rounded-full bg-foreground/5 text-muted-foreground/50 shrink-0">
+                      Soon
+                    </span>
+                  )}
                 </button>
               </div>
             ))}

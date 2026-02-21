@@ -206,7 +206,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                     <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
                       query
                     </div>
-                    <code className="block bg-lg-control rounded-md px-2 py-1 font-mono text-sm text-foreground">
+                    <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground">
                       {query}
                     </code>
                   </div>
@@ -220,7 +220,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                         <span>Searching for results...</span>
                       </div>
                     ) : results.length > 0 ? (
-                      <div className="relative max-h-[200px] overflow-y-auto bg-lg-control rounded-md p-2">
+                      <div className="relative max-h-[200px] overflow-y-auto bg-lg-control rounded-lg p-2">
                         {results.map((result, index) => (
                           <button
                             key={`${result.url}-${String(index)}`}
