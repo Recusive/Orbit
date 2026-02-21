@@ -289,7 +289,7 @@ export const PrimarySidebar: FC = () => {
             <span className="text-base whitespace-nowrap overflow-hidden text-ellipsis w-auto opacity-100">
               {workspaceName}
             </span>
-            <Kbd className="ml-auto mr-2 h-[18px] !text-[12px] px-1.5 bg-lg-control text-inherit border-lg-separator">
+            <Kbd className="ml-auto mr-2 h-[18px] text-[12px]! px-1.5 bg-lg-control text-inherit border-lg-separator">
               <span className="text-[14px] leading-none">⌘</span> P
             </Kbd>
           </button>
@@ -344,7 +344,7 @@ export const PrimarySidebar: FC = () => {
                       setActiveTab(checked ? 'explorer' : 'conversations');
                     }}
                     aria-label="Toggle Sessions / Explorer"
-                    className="h-4 w-8 !rounded-[6px] [&>span]:!h-3 [&>span]:!w-3 [&>span]:!rounded-[4px] [&>span]:data-[state=checked]:!translate-x-4"
+                    className="h-4 w-8 rounded-[6px]! [&>span]:h-3! [&>span]:w-3! [&>span]:rounded-[4px]! [&>span]:data-[state=checked]:translate-x-4!"
                   />
                 </div>
               </TooltipTrigger>

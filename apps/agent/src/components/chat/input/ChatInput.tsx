@@ -210,7 +210,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
               {slashGhostText.length > 0 ? (
                 <div
                   aria-hidden
-                  className="absolute top-0 left-0 p-2 text-base pointer-events-none whitespace-pre-wrap break-words"
+                  className="absolute top-0 left-0 p-2 text-base pointer-events-none whitespace-pre-wrap wrap-break-word"
                   style={{
                     minHeight: INPUT_SIZES.textareaMinHeight,
                     maxHeight: INPUT_SIZES.textareaMaxHeight,
