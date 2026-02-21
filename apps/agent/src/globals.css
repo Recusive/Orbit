@@ -546,18 +546,18 @@ html.window-mode-liquid-glass .bg-base-layer::before {
 }
 
 /* Dark mode: no CSS blur (corner artifact). Native NSGlassEffectView
-   provides the blur; ::before dark tint darkens it for sidebar contrast. */
+   provides the blur. Tint applied directly on the root element. */
 html.window-mode-liquid-glass.dark .bg-base-layer {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+  background-color: rgba(18, 18, 18, 0.62);
 }
 
-/* Dark tint over the opaque --chat-area base to darken the sidebar. */
 html.window-mode-liquid-glass.dark .bg-base-layer::before {
-  background: rgba(15, 15, 18, 0.20);
+  background: rgba(0, 0, 0, 0.01);
 }
 
-/* Sidebar — transparent so the base layer frost shows through */
+/* Sidebar — transparent so the base layer tint shows through */
 html.window-mode-liquid-glass [data-sidebar="primary"] {
   background: transparent;
 }
