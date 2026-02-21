@@ -1,9 +1,9 @@
-name: Release
+name: Release (Legacy)
 
+# DEPRECATED: This workflow is from the old orbit-agent setup.
+# The real release pipeline is tauri-build.yml (builds .dmg with Tauri).
+# Disabled — kept for reference only.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -34,35 +34,7 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      # Run all checks
       - run: bun run typecheck
       - run: bun run lint
-      - run: bun test --if-present
+      - run: bun run test
       - run: bun run build
-
-      - name: Get version
-        id: version
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create release archive
-        run: |
-          cd dist
-          zip -r ../orbit-agent-ui-${{ steps.version.outputs.version }}.zip .
-          tar -czvf ../orbit-agent-ui-${{ steps.version.outputs.version }}.tar.gz .
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Release v${{ steps.version.outputs.version }}
-          draft: false
-          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          generate_release_notes: true
-          files: |
-            orbit-agent-ui-${{ steps.version.outputs.version }}.zip
-            orbit-agent-ui-${{ steps.version.outputs.version }}.tar.gz
