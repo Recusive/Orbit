@@ -62,6 +62,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
 
   return (
     <div
+      data-tauri-drag-region={false}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
       role="tab"
@@ -242,6 +243,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
 
   return (
     <div
+      data-tauri-drag-region
       className="flex shrink-0 bg-gray-4 dark:bg-gray-1 relative"
       style={{ height: ACTIVITY_PANEL.TABS_HEADER_HEIGHT }}
       onMouseEnter={() => {
@@ -255,8 +257,9 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       <div className="absolute bottom-0 left-0 right-0 h-px bg-border/50" />
 
       {/* Scrollable tabs container */}
-      <div className="relative flex-1 min-w-0">
+      <div data-tauri-drag-region className="relative flex-1 min-w-0">
         <div
+          data-tauri-drag-region
           ref={scrollContainerRef}
           className="flex items-center h-full overflow-x-auto scrollbar-hide"
           onWheel={handleWheel}
@@ -307,7 +310,10 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       </div>
 
       {/* Editor actions */}
-      <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-gray-4 dark:bg-gray-1">
+      <div
+        data-tauri-drag-region={false}
+        className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-gray-4 dark:bg-gray-1"
+      >
         <button
           onClick={() => {
             if (activeTabPath) onToggleSearch(activeTabPath);
