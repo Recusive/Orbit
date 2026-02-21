@@ -42,19 +42,25 @@ const Toaster: FC<ToasterProps> = (props) => {
       theme={isDark ? 'dark' : 'light'}
       className="toaster group"
       toastOptions={{
+        style: {
+          backdropFilter: 'blur(40px) saturate(1.5)',
+          WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
+          background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.80)',
+          border: isDark ? '0.5px solid rgba(255,255,255,0.10)' : '0.5px solid rgba(0,0,0,0.08)',
+          boxShadow: isDark
+            ? 'inset 0 0.5px 0 0 rgba(255,255,255,0.12), 0 1px 3px rgba(0,0,0,0.18)'
+            : 'inset 0 0.5px 0 0 rgba(255,255,255,0.06), 0 1px 3px rgba(0,0,0,0.08)',
+          borderRadius: '14px',
+        },
         classNames: {
-          toast:
-            'group toast group-[.toaster]:bg-gray-2 group-[.toaster]:text-gray-12 group-[.toaster]:border group-[.toaster]:border-gray-5 group-[.toaster]:shadow-lg group-[.toaster]:rounded-lg dark:group-[.toaster]:bg-gray-3',
-          description: 'group-[.toast]:text-gray-10',
-          actionButton: 'group-[.toast]:bg-gray-12 group-[.toast]:text-gray-1',
-          cancelButton: 'group-[.toast]:bg-gray-4 group-[.toast]:text-gray-11',
-          error:
-            'group-[.toaster]:border-destructive/40 group-[.toaster]:text-destructive [&_[data-icon]>svg]:text-destructive',
-          success:
-            'group-[.toaster]:border-success/40 group-[.toaster]:text-success [&_[data-icon]>svg]:text-success',
-          info: 'group-[.toaster]:border-info/40 group-[.toaster]:text-info [&_[data-icon]>svg]:text-info',
-          warning:
-            'group-[.toaster]:border-warning/40 group-[.toaster]:text-warning [&_[data-icon]>svg]:text-warning',
+          toast: 'group toast group-[.toaster]:text-foreground',
+          description: 'group-[.toast]:text-lg-text-secondary',
+          actionButton: 'group-[.toast]:bg-lg-default-bg group-[.toast]:text-lg-default-text',
+          cancelButton: 'group-[.toast]:bg-lg-control group-[.toast]:text-lg-text-secondary',
+          error: 'group-[.toaster]:text-destructive [&_[data-icon]>svg]:text-destructive',
+          success: 'group-[.toaster]:text-success [&_[data-icon]>svg]:text-success',
+          info: 'group-[.toaster]:text-info [&_[data-icon]>svg]:text-info',
+          warning: 'group-[.toaster]:text-warning [&_[data-icon]>svg]:text-warning',
         },
       }}
       {...props}

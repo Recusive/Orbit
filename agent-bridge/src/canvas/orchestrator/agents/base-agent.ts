@@ -333,7 +333,7 @@ export abstract class BaseAgent {
 
     // Enable thinking if configured
     if (this.config.thinkingEnabled) {
-      options.maxThinkingTokens = this.config.maxThinkingTokens;
+      options.thinking = { type: 'enabled', budgetTokens: this.config.maxThinkingTokens };
     }
 
     // Configure tools
@@ -436,6 +436,7 @@ export abstract class BaseAgent {
         break;
       }
 
+      case 'tool_use_summary':
       case 'system':
       case 'stream_event':
       case 'tool_progress':

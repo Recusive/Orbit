@@ -15,7 +15,6 @@ import {
   ReadToolWidget,
   SkillToolWidget,
   TaskToolWidget,
-  TodoToolWidget,
   WebFetchToolWidget,
   WebSearchToolWidget,
   WriteToolWidget,
@@ -150,16 +149,10 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
         />
       );
 
-    case 'todowrite': {
-      const todosInput = tool.toolInput['todos'];
-      return (
-        <TodoToolWidget
-          todos={Array.isArray(todosInput) ? todosInput : undefined}
-          isRunning={statusProps.isRunning}
-          success={statusProps.success}
-        />
-      );
-    }
+    case 'todowrite':
+      // Todos are rendered in the persistent TodoBar above the input box.
+      // No inline widget needed — prevents repetitive todo snapshots in the stream.
+      return null;
 
     case 'websearch':
       return (

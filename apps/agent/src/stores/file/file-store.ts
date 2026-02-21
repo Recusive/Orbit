@@ -104,7 +104,6 @@ export interface FileState {
   /** Index for O(1) path lookup: file path → file ID */
   pathToId: Record<string, string>;
   selectedFile: string | null;
-  filterStatus: FileChangeStatus | 'all';
 
   // File tree explorer (new)
   rootPath: string | null;
@@ -129,7 +128,6 @@ export interface FileState {
   rejectAllFiles: () => void;
   removeFile: (path: string) => void;
   clearFiles: (status?: FileChangeStatus) => void;
-  setFilterStatus: (status: FileChangeStatus | 'all') => void;
   /** O(1) lookup by path */
   getFileByPath: (path: string) => FileChange | undefined;
   /** O(1) lookup by id */
@@ -171,7 +169,6 @@ export const useFileStore = create<FileState>()(
     filesById: createDict<FileChange>(),
     pathToId: createDict<string>(),
     selectedFile: null,
-    filterStatus: 'all',
 
     // File tree explorer (new)
     rootPath: null,
@@ -386,12 +383,6 @@ export const useFileStore = create<FileState>()(
           const remaining = Object.values(state.filesById)[0];
           state.selectedFile = remaining?.path ?? null;
         }
-      });
-    },
-
-    setFilterStatus: (status: FileChangeStatus | 'all') => {
-      set((state) => {
-        state.filterStatus = status;
       });
     },
 
@@ -643,67 +634,6 @@ export const useFileStore = create<FileState>()(
 // ═══════════════════════════════════════════════════════════════
 // Derived Selectors for File Changes
 // ═══════════════════════════════════════════════════════════════
-
-/**
- * React hook that returns all changed files sorted by timestamp (most recent first).
- *
- * Uses `useMemo` to prevent recomputation on every render. The memoization
- * key is `filesById`, so the sorted array is only recomputed when files change.
- *
- * **BREAKING CHANGE**: Previously, files were returned in insertion order.
- * Now they are sorted by timestamp descending (most recent first).
- *
- * @example
- * const changedFiles = useChangedFiles();
- * // Returns FileChange[] sorted by timestamp descending
- */
-export function useChangedFiles(): FileChange[] {
-  const filesById = useFileStore((state) => state.filesById);
-
-  return useMemo(
-    () => Object.values(filesById).sort((a, b) => b.timestamp - a.timestamp),
-    [filesById]
-  );
-}
-
-/**
- * Non-hook version for use outside React components (tests, callbacks, event handlers).
- *
- * **WARNING**: This function does NOT memoize. Each call creates a new sorted array.
- * If calling multiple times in the same execution context, cache the result:
- *
- * @example
- * // In an event handler or callback:
- * const files = getChangedFiles();
- * files.forEach(file => processFile(file));
- *
- * // DON'T do this (creates array twice):
- * if (getChangedFiles().length > 0) {
- *   getChangedFiles().forEach(...);  // Wasteful - computes twice
- * }
- *
- * **BREAKING CHANGE**: Previously, files were returned in insertion order.
- * Now they are sorted by timestamp descending (most recent first).
- */
-export function getChangedFiles(): FileChange[] {
-  const { filesById } = useFileStore.getState();
-  return Object.values(filesById).sort((a, b) => b.timestamp - a.timestamp);
-}
-
-/**
- * Efficient hook for getting just the count of changed files.
- *
- * More efficient than `useChangedFiles().length` because it doesn't
- * compute or sort the full array—just counts the keys.
- *
- * @example
- * const count = useChangedFilesCount();
- * // Use for badges, empty state checks, etc.
- */
-export function useChangedFilesCount(): number {
-  const filesById = useFileStore((state) => state.filesById);
-  return Object.keys(filesById).length;
-}
 
 /**
  * Session diff stats - total additions and deletions across all changed files.

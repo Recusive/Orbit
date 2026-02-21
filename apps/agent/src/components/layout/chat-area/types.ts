@@ -43,7 +43,8 @@ export interface ChatContentProps {
     text: string,
     contextFiles?: string[],
     images?: ImageAttachment[],
-    elements?: ReactElementContext[]
+    elements?: ReactElementContext[],
+    skills?: string[]
   ) => void;
   readonly onStop: () => void;
   readonly onRewind: (messageId: string) => void;

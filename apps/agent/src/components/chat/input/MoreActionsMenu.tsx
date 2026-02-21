@@ -32,7 +32,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
   effortLevel,
   getEffortInfo,
 }) {
-  const isOpus46 = model === 'claude-opus-4-6';
+  const isAdaptiveModel = model === 'claude-opus-4-6' || model === 'claude-sonnet-4-6';
   const thinkingInfo = getThinkingInfo();
   const effortInfo = getEffortInfo();
 
@@ -52,7 +52,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
             'h-7 w-7 flex items-center justify-center rounded-lg',
             'bg-transparent text-muted-foreground/70',
             TRANSITION_CLASSES.button,
-            'hover:bg-gray-4 hover:text-foreground hover:scale-[1.08]',
+            'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
             'active:scale-95',
             'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
           )}
@@ -61,7 +61,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        {isOpus46 ? (
+        {isAdaptiveModel ? (
           <DropdownMenuItem onClick={cycleEffortLevel}>
             <svg width="16" height="16" viewBox="0 0 16 16" className="mr-2" aria-hidden="true">
               <line
@@ -69,7 +69,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
                 y1="8"
                 x2="16"
                 y2="8"
-                stroke="var(--gray-8)"
+                stroke="var(--muted-foreground)"
                 strokeWidth="0.5"
                 opacity="0.3"
               />
@@ -91,7 +91,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
           <DropdownMenuItem onClick={cycleThinkingMode}>
             <IconImagine
               size={16}
-              className={cn('mr-2', thinkingMode !== 'off' && 'text-primary')}
+              className={cn('mr-2', thinkingMode !== 'off' && 'text-foreground')}
             />
             <span className="flex-1">Thinking</span>
             <span className="text-xs text-muted-foreground">{thinkingInfo.level}</span>

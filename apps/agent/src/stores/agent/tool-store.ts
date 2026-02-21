@@ -57,7 +57,7 @@ const TRIM_BUFFER = 50;
 const MAX_CACHED_SESSIONS = 10;
 
 /**
- * Default thinking budget for adaptive thinking models (Opus 4.6).
+ * Default thinking budget for adaptive thinking models (Opus 4.6, Sonnet 4.6).
  * Used at session creation to ensure thinking works on the first message,
  * before effort:set can update it. Subsequent effort:set calls adjust
  * the budget mid-session.
@@ -65,12 +65,25 @@ const MAX_CACHED_SESSIONS = 10;
 export const ADAPTIVE_THINKING_DEFAULT_BUDGET = 32768;
 
 /**
- * Opus 4.6 uses adaptive thinking (effort-based), not extended thinking (toggle-based).
+ * Thinking mode → token budget mapping for non-adaptive models.
+ * Used at session creation and in thinking:set IPC handler.
+ */
+export const THINKING_MODE_BUDGET: Record<ThinkingMode, number | undefined> = {
+  off: undefined,
+  think: 4096,
+  hard: 10240,
+  ultra: 32768,
+};
+
+/**
+ * Opus 4.6 and Sonnet 4.6 use adaptive thinking (effort-based), not extended thinking (toggle-based).
  * For adaptive models, thinking is always enabled via a budget — the effort level
  * controls the budget size. The thinking toggle UI is hidden and `thinking:set`
  * messages are skipped to prevent racing with effort:set.
+ * Only Haiku 4.5 still uses extended thinking (off/think/hard/ultra).
  */
-export const isAdaptiveThinkingModel = (model: Model): boolean => model === 'claude-opus-4-6';
+export const isAdaptiveThinkingModel = (model: Model): boolean =>
+  model === 'claude-opus-4-6' || model === 'claude-sonnet-4-6';
 
 /**
  * Maximum size for toolInput values to persist (in characters).
@@ -193,11 +206,10 @@ export interface UsageData {
   totalCostUsd: number;
 }
 
-// Context window sizes by model (Claude 3.5 models all have 200k context)
+// Context window sizes by model
 const MODEL_CONTEXT_WINDOWS: Record<Model, number> = {
   haiku: 200000,
-  sonnet: 200000,
-  opus: 200000,
+  'claude-sonnet-4-6': 200000,
   'claude-opus-4-6': 200000,
 };
 
@@ -310,6 +322,7 @@ export interface ToolState {
   ) => void;
   resetUsage: () => void;
   switchSession: (newSessionId: string) => void;
+  /** @legacy Still needed for forks and pre-custom-sessionId sessions. New sessions skip remap. */
   remapSession: (oldSessionId: string, newSessionId: string) => void;
   restoreSessionUsage: (sessionId: string, usage: UsageData, processedIds?: string[]) => void;
 
@@ -388,9 +401,9 @@ export const useToolStore = create<ToolState>()(
   persist(
     immer((set, get) => ({
       inputMode: 'default',
-      thinkingMode: 'off',
-      effortLevel: 'high',
-      model: 'sonnet',
+      thinkingMode: 'ultra',
+      effortLevel: 'max',
+      model: 'claude-sonnet-4-6',
       activeTools: {},
       completedTools: [],
       pendingPermissions: [],
@@ -669,6 +682,21 @@ export const useToolStore = create<ToolState>()(
           if (state.currentSessionId === oldSessionId) {
             state.currentSessionId = newSessionId;
           }
+
+          // Migrate sessionId on live tool entries so switchSession's ownership
+          // filter doesn't discard them as "foreign" after the remap.
+          // Without this, rewind followed by system:init causes tools to vanish:
+          // tools have sessionId=oldId, switchSession filters for sessionId=newId → empty.
+          for (const tool of state.completedTools) {
+            if (tool.sessionId === oldSessionId) {
+              tool.sessionId = newSessionId;
+            }
+          }
+          for (const tool of Object.values(state.activeTools)) {
+            if (tool.sessionId === oldSessionId) {
+              tool.sessionId = newSessionId;
+            }
+          }
         });
       },
 
@@ -839,9 +867,9 @@ export const useToolStore = create<ToolState>()(
       reset: () => {
         set((state) => {
           state.inputMode = 'default';
-          state.thinkingMode = 'off';
-          state.effortLevel = 'high';
-          state.model = 'sonnet';
+          state.thinkingMode = 'ultra';
+          state.effortLevel = 'max';
+          state.model = 'claude-sonnet-4-6';
           state.activeTools = {};
           state.completedTools = [];
           state.pendingPermissions = [];

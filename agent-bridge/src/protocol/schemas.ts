@@ -55,10 +55,9 @@ export const AttachmentTypeSchema = z.enum(['document', 'image', 'text']);
 export type AttachmentType = z.infer<typeof AttachmentTypeSchema>;
 
 export const SubagentModelSchema = z.enum([
-  'sonnet',
-  'opus',
-  'haiku',
+  'claude-sonnet-4-6',
   'claude-opus-4-6',
+  'haiku',
   'inherit',
 ]);
 export type SubagentModel = z.infer<typeof SubagentModelSchema>;
@@ -74,11 +73,17 @@ export const SessionConfigSchema = z
     maxThinkingTokens: z.number().optional(),
     planEnabled: z.boolean().optional(),
     acceptEnabled: z.boolean().optional(),
+    critiqueEnabled: z.boolean().optional(),
     model: ModelSchema.optional(),
+    sessionMode: z.enum(['chat', 'agent']).optional(),
     // Resume an existing SDK session (for session continuity after app restart).
     // NOTE: This is NOT used for rewind scenarios. Rewind creates a fresh session
     // and prepends truncated context to the first message instead.
     resumeSessionId: z.string().optional(),
+    // Specific message UUID to resume at (for forking at a point in conversation).
+    resumeSessionAt: z.string().optional(),
+    // Whether to fork the session (create new branch) vs continue original.
+    forkSession: z.boolean().optional(),
   })
   .strict();
 export type SessionConfig = z.infer<typeof SessionConfigSchema>;
@@ -397,6 +402,32 @@ export const DeleteCommandRequestSchema = z
   .strict();
 export type DeleteCommandRequest = z.infer<typeof DeleteCommandRequestSchema>;
 
+// ============================================================================
+// Skill Schemas
+// ============================================================================
+
+export const SkillSourceSchema = z.enum(['project', 'user']);
+export type SkillSource = z.infer<typeof SkillSourceSchema>;
+
+export const SkillDefinitionSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string(),
+    source: SkillSourceSchema,
+    triggers: z.array(z.string()).optional(),
+    filePath: z.string().optional(),
+  })
+  .strict();
+export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>;
+
+export const ListSkillsRequestSchema = z
+  .object({
+    type: z.literal('list_skills'),
+    workspacePath: z.string(),
+  })
+  .strict();
+export type ListSkillsRequest = z.infer<typeof ListSkillsRequestSchema>;
+
 export const ForkSessionOptionsSchema = z
   .object({
     keepAlive: z.boolean().optional(),
@@ -593,6 +624,7 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   CreateCommandRequestSchema,
   UpdateCommandRequestSchema,
   DeleteCommandRequestSchema,
+  ListSkillsRequestSchema,
   ForkSessionRequestSchema,
   RewindFilesRequestSchema,
   ForkSessionAtRequestSchema,

@@ -39,7 +39,8 @@ export interface ChatInputProps {
     text: string,
     contextFiles?: string[],
     images?: ImageAttachment[],
-    elements?: ReactElementContext[]
+    elements?: ReactElementContext[],
+    skills?: string[]
   ) => void;
   readonly onStop: () => void;
   readonly onModeChange: (mode: InputMode) => void;
@@ -73,6 +74,9 @@ export interface PopoverNavigationState {
   setSlashQuery: (query: string) => void;
   slashSelectedIndex: number;
   setSlashSelectedIndex: React.Dispatch<React.SetStateAction<number>>;
+  /** Character index in inputText where the current "/" token starts */
+  slashStartIndex: number;
+  setSlashStartIndex: (index: number) => void;
   // Thinking hover
   thinkingHoverOpen: boolean;
   setThinkingHoverOpen: (open: boolean) => void;
@@ -102,6 +106,8 @@ export interface UseChatInputReturn {
   attachedContext: ContextItem[];
   slashCommands: SlashCommand[];
   isInputEmpty: boolean;
+  /** Untyped suffix of the top matching slash command (e.g., "mit" when typing "/com" → "commit") */
+  slashGhostText: string;
   // Refs
   inputRef: React.RefObject<HTMLDivElement | null>;
   imageInputRef: React.RefObject<HTMLInputElement | null>;
@@ -134,6 +140,8 @@ export interface UseChatInputReturn {
 export interface SlashCommand {
   name: string;
   description: string;
+  /** Distinguishes skills from regular slash commands in the popover */
+  kind?: 'command' | 'skill';
 }
 
 export interface InputControlsProps {

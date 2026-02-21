@@ -44,7 +44,7 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
   if (compact) {
     return (
       <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-accent text-xs">
-        <Code2 className="h-3 w-3 text-primary" />
+        <Code2 className="h-3 w-3 text-foreground/70" />
         <span className="font-medium">{element.componentName}</span>
         <button onClick={onRemove} className="ml-0.5 hover:text-destructive transition-colors">
           <X className="h-3 w-3" />
@@ -62,7 +62,7 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
         }}
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-accent/50 transition-colors text-left"
       >
-        <Code2 className="h-4 w-4 text-primary shrink-0" />
+        <Code2 className="h-4 w-4 text-foreground/70 shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm">{element.componentName}</span>
@@ -90,7 +90,7 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
           {/* File path */}
           <div className="pt-2">
             <span className="text-xs text-muted-foreground">File:</span>
-            <div className="font-mono text-xs bg-gray-4 px-2 py-1 rounded mt-1 truncate">
+            <div className="font-mono text-xs bg-lg-control px-2 py-1 rounded mt-1 truncate">
               {element.filePath}:{element.lineNumber}
             </div>
           </div>
@@ -99,7 +99,7 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
           {Object.keys(element.props).length > 0 ? (
             <div>
               <span className="text-xs text-muted-foreground">Props:</span>
-              <div className="font-mono text-xs bg-gray-4 px-2 py-1 rounded mt-1">
+              <div className="font-mono text-xs bg-lg-control px-2 py-1 rounded mt-1">
                 {formatProps(element.props)}
               </div>
             </div>
@@ -109,7 +109,7 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
           {element.componentStack.length > 0 ? (
             <div>
               <span className="text-xs text-muted-foreground">Component Stack:</span>
-              <div className="font-mono text-xs bg-gray-4 px-2 py-1 rounded mt-1 max-h-20 overflow-y-auto">
+              <div className="font-mono text-xs bg-lg-control px-2 py-1 rounded mt-1 max-h-20 overflow-y-auto">
                 {element.componentStack.map((name, i) => (
                   <div key={i} className={cn(i > 0 && 'text-muted-foreground')}>
                     {i > 0 ? '└ ' : ''}
@@ -123,7 +123,7 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
           {/* Selector */}
           <div>
             <span className="text-xs text-muted-foreground">Selector:</span>
-            <div className="font-mono text-xs bg-gray-4 px-2 py-1 rounded mt-1 truncate">
+            <div className="font-mono text-xs bg-lg-control px-2 py-1 rounded mt-1 truncate">
               {element.selector}
             </div>
           </div>
@@ -143,7 +143,7 @@ export const ElementContextList: FC<ElementContextListProps> = ({ elements, onRe
   if (elements.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-1.5 px-3 py-2 border-b border-border bg-gray-3">
+    <div className="flex flex-wrap gap-1.5 px-3 py-2 border-b border-border bg-lg-control">
       {elements.map((element, index) => (
         <ElementContextChip
           key={`${element.displayName}-${String(index)}`}

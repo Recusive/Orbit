@@ -10,9 +10,14 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
+import type { SkillDefinition } from '@/lib/api';
 import type { SlashCommandDefinition } from '@/types/protocol';
 
-import { listCommands as fetchCommandsFromBackend, getWorkspacePath } from '@/lib/api';
+import {
+  listCommands as fetchCommandsFromBackend,
+  listSkills as fetchSkillsFromBackend,
+  getWorkspacePath,
+} from '@/lib/api';
 
 const logger = createLogger('CommandsStore');
 
@@ -49,11 +54,17 @@ export interface CommandsState {
   /** List of available slash commands */
   commands: SlashCommandDefinition[];
 
+  /** List of available skills (from .claude/skills/) */
+  skills: SkillDefinition[];
+
   /** Whether commands are currently being fetched */
   isLoading: boolean;
 
   /** Whether commands have been successfully fetched at least once */
   hasFetched: boolean;
+
+  /** Whether skills have been successfully fetched at least once */
+  hasSkillsFetched: boolean;
 
   /** Error message if fetch failed */
   error: string | null;
@@ -63,6 +74,9 @@ export interface CommandsState {
 
   /** Fetch commands from backend (no-op if already fetched successfully, allows retry after error) */
   fetchCommands: () => Promise<void>;
+
+  /** Fetch skills from backend (no-op if already fetched successfully) */
+  fetchSkills: () => Promise<void>;
 
   /** Force refresh commands (ignores cache) */
   refreshCommands: () => Promise<void>;
@@ -87,8 +101,10 @@ export interface CommandsState {
 export const useCommandsStore = create<CommandsState>()(
   immer((set, get) => ({
     commands: [],
+    skills: [],
     isLoading: false,
     hasFetched: false,
+    hasSkillsFetched: false,
     error: null,
     lastFetchAttempt: null,
 
@@ -171,6 +187,31 @@ export const useCommandsStore = create<CommandsState>()(
       }
     },
 
+    fetchSkills: async () => {
+      const state = get();
+
+      // Skip if already fetched successfully
+      if (state.hasSkillsFetched) {
+        return;
+      }
+
+      try {
+        const workspacePath = await getWorkspacePathSafe();
+        const skills = await fetchSkillsFromBackend(workspacePath);
+
+        logger.info(`Skills fetched successfully (${String(skills.length)} skills)`);
+
+        set((draft) => {
+          draft.skills = skills;
+          draft.hasSkillsFetched = true;
+        });
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch skills';
+        logger.warn(`Failed to fetch skills: ${errorMessage}`);
+        // Skills are non-critical — don't block on failure
+      }
+    },
+
     addCommand: (command: SlashCommandDefinition) => {
       set((draft) => {
         draft.commands.push(command);
@@ -224,24 +265,32 @@ export const useCommandsError = (): string | null => useCommandsStore((state) =>
 export interface SlashCommand {
   name: string;
   description: string;
+  /** Distinguishes skills from regular slash commands in the popover */
+  kind?: 'command' | 'skill';
 }
 
 /**
- * Get simplified commands for chat input.
+ * Get simplified commands for chat input, including skills.
  *
- * Selects the raw commands array (referentially stable from Zustand store) then
- * transforms with useMemo to avoid creating new objects on every render. The
- * useMemo dependency on `commands` ensures re-computation only when the store
- * array actually changes.
+ * Selects both commands and skills arrays (referentially stable from Zustand store)
+ * then merges with useMemo. Skills appear after commands with `kind: 'skill'`.
  */
 export const useSlashCommands = (): SlashCommand[] => {
   const commands = useCommandsStore((state) => state.commands);
+  const skills = useCommandsStore((state) => state.skills);
   return useMemo(
-    () =>
-      commands.map((cmd) => ({
+    () => [
+      ...commands.map((cmd) => ({
         name: cmd.name,
         description: cmd.description ?? '',
+        kind: 'command' as const,
       })),
-    [commands]
+      ...skills.map((skill) => ({
+        name: skill.name,
+        description: skill.description,
+        kind: 'skill' as const,
+      })),
+    ],
+    [commands, skills]
   );
 };

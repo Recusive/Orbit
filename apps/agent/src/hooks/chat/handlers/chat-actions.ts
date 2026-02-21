@@ -30,7 +30,8 @@ interface ChatActionsReturn {
     text: string,
     contextFiles?: string[],
     images?: ImageAttachment[],
-    elements?: ReactElementContext[]
+    elements?: ReactElementContext[],
+    skills?: string[]
   ) => void;
   handleStop: () => void;
   handleRewind: (messageId: string) => void;
@@ -55,7 +56,8 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     text: string,
     contextFiles?: string[],
     images?: ImageAttachment[],
-    elements?: ReactElementContext[]
+    elements?: ReactElementContext[],
+    skills?: string[]
   ): void => {
     if (!text) return;
 
@@ -86,6 +88,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
             ...(contextFiles ? { contextFiles } : {}),
             ...(images ? { images } : {}),
             ...(elements ? { elements } : {}),
+            ...(skills ? { skills } : {}),
           });
           return;
         }
@@ -105,7 +108,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         // we need to create a conversation first via the backend
         if (!sessionId || (messages.length === 0 && !conversationExists)) {
           // Store pending message — will be sent after conversation:created
-          chatStore.setPendingMessage({ text, contextFiles, images, elements });
+          chatStore.setPendingMessage({ text, contextFiles, images, elements, skills });
           postMessage({
             type: 'conversation:create',
             uuid: crypto.randomUUID(),
@@ -224,6 +227,27 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     const session = sessionId ? chatStore.sessions[sessionId] : undefined;
     if (!sessionId || !(session?.isAgentRunning ?? false)) return;
 
+    // If there are pending permission requests, deny them BEFORE interrupting.
+    // Without this, agent:stop fires query.interrupt() which aborts the permission
+    // callback via signal — the PermissionManager returns { deny, interrupt: false }
+    // which races with the CLI subprocess SIGINT, causing duplicate tool_use IDs
+    // and "tool_use ids must be unique" API errors.
+    // Sending proper deny responses first ensures the SDK processes the denial
+    // cleanly before the interrupt arrives.
+    const pendingPermissions = useToolStore.getState().pendingPermissions;
+    if (pendingPermissions.length > 0) {
+      for (const permission of pendingPermissions) {
+        postMessage({
+          type: 'permission:response',
+          uuid: crypto.randomUUID(),
+          session_id: sessionId,
+          request_id: permission.requestId,
+          decision: 'deny',
+        });
+      }
+      useToolStore.getState().clearPermissions();
+    }
+
     Sentry.startSpan(
       {
         op: 'ui.action',
@@ -241,9 +265,6 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         useChatStore.getState().setAgentRunning(sessionId, false);
         // Block rewind until SDK confirms stop (agent:complete/agent:error clears this)
         useChatStore.getState().setStopPending(sessionId, true);
-
-        // Clear any pending permission requests
-        useToolStore.getState().clearPermissions();
 
         const { workspacePath, activeWorktreePath } = useUIStore.getState();
 
@@ -336,12 +357,27 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           }
         }
 
-        const truncatedMessages = messages.slice(0, messageIndex + 1).map((m) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          parentUuid: m.parentUuid ?? null,
-        }));
+        // Include tool data so rewind 2+ can restore tool widgets
+        const toolState = useToolStore.getState();
+        const truncatedMessages = messages.slice(0, messageIndex + 1).map((m) => {
+          const tools = toolState.completedTools
+            .filter((t) => t.messageId === m.id)
+            .map((t) => ({
+              id: t.id,
+              name: t.toolName,
+              input: t.toolInput,
+              success: t.success ?? false,
+              ...(typeof t.toolOutput === 'string' ? { output: t.toolOutput } : {}),
+              ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
+            }));
+          return {
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            parentUuid: m.parentUuid ?? null,
+            ...(tools.length > 0 ? { toolUses: tools } : {}),
+          };
+        });
 
         // Find the first user message AFTER the rewind point to prefill in the input box.
         // This lets the user quickly edit and resend the message that was removed.

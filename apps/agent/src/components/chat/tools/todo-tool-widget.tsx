@@ -1,6 +1,6 @@
 import { CheckCircle2, ChevronRight, Circle, ListTodo, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
@@ -67,7 +67,7 @@ function ProgressPie({ percentage }: { readonly percentage: number }): ReactElem
         fill="none"
         stroke="currentColor"
         strokeWidth={strokeWidth}
-        className="text-gray-9"
+        className="text-muted-foreground"
       />
       <circle
         cx={size / 2}
@@ -91,10 +91,10 @@ function StatusIcon({ status }: { readonly status: TodoItem['status'] }): ReactE
     case 'completed':
       return <CheckCircle2 className="h-3 w-3 text-success shrink-0" />;
     case 'in_progress':
-      return <Loader2 className="h-3 w-3 text-primary animate-spin shrink-0" />;
+      return <Loader2 className="h-3 w-3 text-foreground/60 animate-spin shrink-0" />;
     case 'pending':
     default:
-      return <Circle className="h-3 w-3 text-gray-9 shrink-0" />;
+      return <Circle className="h-3 w-3 text-muted-foreground shrink-0" />;
   }
 }
 
@@ -103,18 +103,10 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
   isRunning = false,
   success,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(isRunning);
-  const wasRunningRef = useRef(isRunning);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(false);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
-
-  // Auto-collapse when tool finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   const todos = parseTodos(rawTodos);
   const completedCount = todos.filter((t) => t.status === 'completed').length;
@@ -135,22 +127,23 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Todo output' : 'Expand Todo output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon + tool name + count + spinner + progress */}
+        <div className="flex items-center gap-2 shrink-0">
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-primary/15'
+              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
             )}
           >
             <ListTodo
               className={cn(
                 'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-primary/80',
+                isFailed ? 'text-destructive/60' : 'text-foreground/60',
                 isRunning && 'animate-pulse'
               )}
             />
@@ -159,21 +152,21 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >
             {statusLabel}
           </span>
 
           {!isRunning && !isFailed && totalCount > 0 ? (
-            <span className="text-xs text-gray-9">
+            <span className="text-xs text-muted-foreground">
               ({String(completedCount)}/{String(totalCount)}
               {inProgressCount > 0 ? `, ${String(inProgressCount)} active` : ''})
             </span>
           ) : null}
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
 
           {!isExpanded && totalCount > 0 ? (
@@ -181,7 +174,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
               <ProgressPie
                 percentage={totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0}
               />
-              <span className="text-xs text-gray-9">
+              <span className="text-xs text-muted-foreground">
                 {Math.round((completedCount / totalCount) * 100)}%
               </span>
             </div>
@@ -189,9 +182,10 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
+            aria-hidden="true"
           />
         </div>
       </button>
@@ -213,16 +207,16 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                   <div
                     className={cn(
                       'w-[2px] rounded-full h-full',
-                      success === undefined && 'bg-primary/40'
+                      success === undefined && 'bg-foreground/20'
                     )}
                     style={
                       success !== undefined
                         ? {
                             background: isFailed
-                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)'
+                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)'
                               : allCompleted
-                                ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
-                                : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #eab308 50%, transparent) 100%)',
+                                ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
+                                : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #eab308 50%, transparent) 100%)',
                           }
                         : undefined
                     }
@@ -230,10 +224,10 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-lg-separator bg-card overflow-hidden">
                   <div className="px-3 py-2">
                     {isRunning && todos.length === 0 ? (
-                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
+                      <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Updating task list...</span>
                       </div>
@@ -244,15 +238,15 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                             key={`${todo.content}-${String(index)}`}
                             className={cn(
                               'flex items-center gap-2 text-sm py-1 px-1.5 -mx-1.5 rounded transition-colors',
-                              todo.status === 'in_progress' && 'bg-primary/5',
+                              todo.status === 'in_progress' && 'bg-foreground/5',
                               todo.status === 'completed' && 'opacity-50'
                             )}
                           >
                             <StatusIcon status={todo.status} />
                             <span
                               className={cn(
-                                'text-gray-12 flex-1 leading-relaxed',
-                                todo.status === 'completed' && 'line-through text-gray-11'
+                                'text-foreground flex-1 leading-relaxed',
+                                todo.status === 'completed' && 'line-through text-lg-text-secondary'
                               )}
                             >
                               {todo.status === 'in_progress' ? todo.activeForm : todo.content}
@@ -261,14 +255,14 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                         ))}
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-9 italic">No tasks</div>
+                      <div className="text-sm text-muted-foreground italic">No tasks</div>
                     )}
 
                     {/* Progress bar */}
                     {totalCount > 0 ? (
-                      <div className="mt-2 pt-2 border-t border-gray-5">
+                      <div className="mt-2 pt-2 border-t border-lg-separator">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1 bg-gray-4 rounded-full overflow-hidden">
+                          <div className="flex-1 h-1 bg-lg-control rounded-full overflow-hidden">
                             <div
                               className="h-full bg-success transition-transform duration-300 origin-left rounded-full"
                               style={{
@@ -276,7 +270,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                               }}
                             />
                           </div>
-                          <span className="text-xs text-gray-9 font-medium">
+                          <span className="text-xs text-muted-foreground font-medium">
                             {Math.round((completedCount / totalCount) * 100)}%
                           </span>
                         </div>
@@ -292,21 +286,21 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
                   <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-red-500/15">
                     <XCircle className="h-3 w-3 text-red-500/80" />
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">Failed</span>
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">Failed</span>
                 </div>
               ) : allCompleted && !isRunning ? (
                 <div className="flex flex-row items-center px-2.5 py-1">
                   <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-green-500/15">
                     <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">Completed</span>
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">Completed</span>
                 </div>
               ) : (
                 <div className="flex flex-row items-center px-2.5 py-1">
                   <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-yellow-500/15">
                     <Circle className="h-3 w-3 text-yellow-500/80" />
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">Running</span>
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">Running</span>
                 </div>
               )}
             </div>

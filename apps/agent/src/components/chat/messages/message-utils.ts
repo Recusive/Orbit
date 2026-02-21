@@ -190,6 +190,7 @@ const _CHAT_MESSAGE_KEYS_CHECK: Record<keyof ChatMessage, true> = {
   displayedContent: true,
   isStreaming: true,
   isInterrupted: true,
+  turnDurationMs: true,
   thinking: true,
   thinkingDurationMs: true,
   thinkingBlocks: true,
@@ -229,6 +230,7 @@ export function arePropsEqual(prev: MessageItemProps, next: MessageItemProps): b
   if (pm.displayedContent !== nm.displayedContent) return false;
   if (pm.isStreaming !== nm.isStreaming) return false;
   if (pm.isInterrupted !== nm.isInterrupted) return false;
+  if (pm.turnDurationMs !== nm.turnDurationMs) return false;
   if (pm.thinking !== nm.thinking) return false;
   if (pm.thinkingDurationMs !== nm.thinkingDurationMs) return false;
   if (pm.isThinkingActive !== nm.isThinkingActive) return false;
@@ -243,6 +245,8 @@ export function arePropsEqual(prev: MessageItemProps, next: MessageItemProps): b
 
   // Compare other props
   if (prev.isLastAssistantMessage !== next.isLastAssistantMessage) return false;
+  if (prev.isLastInAssistantGroup !== next.isLastInAssistantGroup) return false;
+  if (prev.isAgentRunning !== next.isAgentRunning) return false;
   if (prev.animate !== next.animate) return false;
   if (prev.onRewind !== next.onRewind) return false;
   if (prev.onOpenFile !== next.onOpenFile) return false;
@@ -277,8 +281,18 @@ export function hasVisibleContent(
   // User messages must have non-empty content to render. Empty user messages can appear
   // from SDK protocol artifacts (e.g., interrupt markers stripped by backend, or edge
   // cases where content blocks yield no text). Without this check, an empty <p> tag
-  // renders inside a bg-gray-4 bubble, creating a visible empty rectangle.
-  if (message.role === 'user') return message.content.trim().length > 0;
+  // renders inside a bg-lg-control bubble, creating a visible empty rectangle.
+  // Also filter out SDK internal messages (e.g., <local-command-stdout> from /compact).
+  if (message.role === 'user') {
+    const trimmed = message.content.trim();
+    if (trimmed.length === 0) return false;
+    if (trimmed.startsWith('<local-command-stdout>')) return false;
+    return true;
+  }
+
+  // Filter out SDK placeholder responses to slash commands (e.g., "No response requested."
+  // from /compact). These are protocol artifacts, not real assistant content.
+  if (message.content.trim() === 'No response requested.') return false;
 
   const hasThinking =
     (message.thinkingBlocks !== undefined && message.thinkingBlocks.length > 0) ||

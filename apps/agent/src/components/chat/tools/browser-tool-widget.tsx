@@ -11,7 +11,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
@@ -156,18 +156,10 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
   success,
   onOpenUrl,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(isRunning);
-  const wasRunningRef = useRef(isRunning);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(false);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
-
-  // Auto-collapse when tool finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   const actionName = extractActionName(toolName);
   const stepLabel = getStepLabel(actionName, toolInput, isRunning);
@@ -183,22 +175,23 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Browser output' : 'Expand Browser output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon + tool name + spinner */}
+        <div className="flex items-center gap-2 shrink-0">
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-violet-500/10'
+              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
             )}
           >
             <Globe
               className={cn(
                 'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-violet-500/70',
+                isFailed ? 'text-destructive/60' : 'text-foreground/60',
                 isRunning && 'animate-pulse'
               )}
             />
@@ -207,21 +200,22 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium shrink-0',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >
             Browser
           </span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
+            aria-hidden="true"
           />
         </div>
       </button>
@@ -249,7 +243,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
                 <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-violet-500/8">
                   {stepIcon}
                 </div>
-                <span className="ml-2.5 text-xs text-gray-11 min-w-0 truncate">
+                <span className="ml-2.5 text-xs text-lg-text-secondary min-w-0 truncate">
                   {stepLabel.text}
                   {stepLabel.linkUrl ? (
                     <button
@@ -265,7 +259,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
                   ) : null}
                 </span>
                 {isRunning ? (
-                  <Loader2 className="ml-1.5 h-2.5 w-2.5 animate-spin text-gray-11/60 shrink-0" />
+                  <Loader2 className="ml-1.5 h-2.5 w-2.5 animate-spin text-lg-text-secondary/60 shrink-0" />
                 ) : null}
               </div>
 
@@ -305,7 +299,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>
@@ -314,7 +308,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
                   <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-violet-500/8">
                     <Loader2 className="h-2.5 w-2.5 animate-spin text-violet-500/60" />
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-9">Working…</span>
+                  <span className="ml-2.5 text-xs text-muted-foreground">Working…</span>
                 </div>
               ) : null}
             </div>

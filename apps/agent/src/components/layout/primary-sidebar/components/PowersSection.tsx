@@ -4,7 +4,7 @@
  * Mirrors the worktree expand/collapse pattern:
  * icon + label header with chevron, vertical tree line, indented children.
  */
-import { Slash } from 'lucide-react';
+import { Slash, Users } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import { IconMcp } from './IconMcp';
@@ -14,7 +14,7 @@ import { IconSkills } from './IconSkills';
 
 import type { FC } from 'react';
 
-import { cn, getCollapseTransition, SIDEBAR } from '@/lib/utils';
+import { cn, SIDEBAR } from '@/lib/utils';
 
 /** Indent for child items — matches CONVERSATION_INDENT_PX (19px) */
 const POWERS_INDENT_PX = 19;
@@ -27,20 +27,22 @@ const SlashIcon: FC<{ className?: string }> = ({ className }) => (
 interface PowerChildItem {
   readonly icon: FC<{ className?: string }>;
   readonly label: string;
+  readonly comingSoon?: boolean;
 }
 
 const POWER_ITEMS: readonly PowerChildItem[] = [
-  { icon: IconPlugins, label: 'Plugins' },
+  { icon: IconPlugins, label: 'Plugins', comingSoon: true },
   { icon: IconSkills, label: 'Skills' },
-  { icon: IconMcp, label: 'MCP' },
-  { icon: SlashIcon, label: 'Slash Commands' },
+  { icon: IconMcp, label: 'MCP', comingSoon: true },
+  { icon: SlashIcon, label: 'Slash Commands', comingSoon: true },
+  { icon: Users, label: 'Sub Agents', comingSoon: true },
 ];
 
 interface PowersSectionProps {
-  readonly collapsed: boolean;
+  readonly onSkillsClick?: () => void;
 }
 
-export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
+export const PowersSection: FC<PowersSectionProps> = ({ onSkillsClick }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleToggle = useCallback((): void => {
@@ -49,31 +51,13 @@ export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
 
   const iconSizeClass = 'h-4 w-4';
 
-  // When sidebar is fully collapsed, render a compact square button (same as SidebarItem equalSpacing)
-  if (collapsed) {
-    return (
-      <div
-        className="flex items-center justify-center shrink-0"
-        style={{ height: SIDEBAR.itemHeight, width: SIDEBAR.iconColumnWidth }}
-      >
-        <button
-          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
-          aria-label="Powers"
-          title="Powers — Coming soon"
-        >
-          <IconPowers className={cn('shrink-0', iconSizeClass)} />
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col">
       {/* Header — identical structure to SidebarItem expanded layout */}
       <button
         className={cn(
-          'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground',
-          isExpanded && 'bg-gray-3 dark:bg-gray-4 text-foreground'
+          'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-lg-sidebar-hover hover:backdrop-blur-[20px] active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground',
+          isExpanded && 'bg-lg-sidebar-selected backdrop-blur-[20px] text-foreground'
         )}
         onClick={handleToggle}
         aria-expanded={isExpanded}
@@ -87,23 +71,7 @@ export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
         </div>
 
         {/* Label */}
-        <span
-          className="text-base whitespace-nowrap overflow-hidden w-auto opacity-100"
-          style={{ transition: getCollapseTransition(false) }}
-        >
-          Powers
-        </span>
-
-        {/* Badge */}
-        <span
-          className="ml-auto mr-2 shrink-0 inline-flex items-center h-4 rounded px-1.5 text-[10px] font-medium select-none"
-          style={{
-            color: 'var(--gray-11)',
-            backgroundColor: 'var(--gray-a4)',
-          }}
-        >
-          Coming soon
-        </span>
+        <span className="text-base whitespace-nowrap overflow-hidden w-auto">Powers</span>
       </button>
 
       {/* Expandable child items — kept mounted, toggled via CSS */}
@@ -119,13 +87,24 @@ export const PowersSection: FC<PowersSectionProps> = ({ collapsed }) => {
             {POWER_ITEMS.map((item) => (
               <div key={item.label} className="relative group mx-1.5 ml-2">
                 <button
-                  className="flex items-center gap-2 h-7 w-full rounded-lg pl-[7px] pr-3 overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 transition-[background-color] duration-100 text-sidebar-foreground hover:text-foreground"
+                  className={cn(
+                    'flex items-center gap-2 h-7 w-full rounded-lg pl-[7px] pr-3 overflow-hidden transition-[background-color] duration-100',
+                    item.comingSoon === true
+                      ? 'text-sidebar-foreground/40 cursor-default'
+                      : 'hover:bg-lg-sidebar-hover text-sidebar-foreground hover:text-foreground'
+                  )}
                   title={item.label}
+                  onClick={item.label === 'Skills' ? onSkillsClick : undefined}
                 >
                   <item.icon className="h-3.5 w-3.5 shrink-0" />
                   <span className="text-sm overflow-hidden flex-1 text-left truncate">
                     {item.label}
                   </span>
+                  {item.comingSoon === true && (
+                    <span className="text-[10px] leading-none px-1.5 py-0.5 rounded-full bg-foreground/5 text-muted-foreground/50 shrink-0">
+                      Soon
+                    </span>
+                  )}
                 </button>
               </div>
             ))}

@@ -15,24 +15,24 @@ interface InterruptIndicatorProps {
   readonly reason?: string | undefined;
 }
 
-export const InterruptIndicator: FC<InterruptIndicatorProps> = ({ onFeedback, reason }) => {
+export const InterruptIndicator: FC<InterruptIndicatorProps> = ({ reason }) => {
   const isRejection = reason !== undefined;
   const Icon = isRejection ? CircleDashed : SquareIcon;
   const label = isRejection ? reason : 'Response interrupted';
 
   return (
-    <div className="flex items-center justify-between rounded-lg px-3 py-2 bg-destructive/[0.08] border border-destructive/[0.12]">
-      <div className="flex items-center gap-2">
-        <Icon className="h-[13px] w-[13px] text-destructive shrink-0" />
-        <span className="text-xs font-medium text-destructive">{label}</span>
+    <div className="group flex w-full items-center gap-3 py-1.5">
+      {/* Left line */}
+      <div className="flex-1 border-t border-dashed border-destructive/20" />
+
+      {/* Centered icon + label */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <Icon className="h-3 w-3 text-destructive/50" />
+        <span className="text-[11px] font-medium text-destructive/50">{label}</span>
       </div>
-      <button
-        onClick={onFeedback}
-        className="text-[11px] text-destructive/80 bg-destructive/[0.08] border border-destructive/[0.15] rounded-md px-2.5 py-0.5 cursor-pointer hover:bg-destructive/[0.12] transition-colors"
-        type="button"
-      >
-        Retry
-      </button>
+
+      {/* Right line */}
+      <div className="flex-1 border-t border-dashed border-destructive/20" />
     </div>
   );
 };

@@ -3,7 +3,7 @@ import { EMPTY_STATE_PADDING_BOTTOM } from './constants';
 import type { ChatContentProps } from './types';
 import type { FC } from 'react';
 
-import { ChatInput, ChatMessages } from '@/components/chat';
+import { ChatInput, ChatMessages, TodoBar } from '@/components/chat';
 import { StatusAnnouncer } from '@/components/shared';
 import { VaultPage } from '@/features/vault';
 import { useVaultOpen } from '@/stores/ui/ui-store';
@@ -91,8 +91,10 @@ export const ChatContent: FC<ChatContentProps> = ({
           <ChatInput {...inputProps} />
         </div>
       ) : (
-        /* Normal layout: Messages + Input at bottom */
-        <div className="flex-1 flex flex-col min-h-0">
+        /* Normal layout: Messages fill the space, input overlays the bottom.
+           The input is absolutely positioned so messages scroll behind it,
+           creating a frosted-glass blur effect via backdrop-filter. */
+        <div className="flex-1 flex flex-col relative min-h-0">
           <ChatMessages
             messages={messages}
             isAgentRunning={isAgentRunning}
@@ -104,7 +106,11 @@ export const ChatContent: FC<ChatContentProps> = ({
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
           />
-          <ChatInput {...inputProps} />
+          {/* Floating input container — transparent with soft fade at top */}
+          <div className="absolute bottom-0 inset-x-0 z-10 chat-input-frost">
+            <TodoBar />
+            <ChatInput {...inputProps} />
+          </div>
         </div>
       )}
     </div>

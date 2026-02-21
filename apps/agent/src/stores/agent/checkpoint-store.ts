@@ -242,6 +242,9 @@ export interface CheckpointState {
    * Remap checkpoints from old session ID to new session ID.
    * Called during session ID remapping when the frontend temp ID is replaced with SDK ID.
    *
+   * @legacy Still needed for forks and pre-custom-sessionId sessions. New sessions
+   * pass `options.sessionId` to the SDK so IDs match and this is never called.
+   *
    * This updates:
    * - In-flight state (currentUserMessageId, pendingMessageForTurnEnd, currentTurnStartCheckpoint)
    * - Session-keyed records (turnStartCheckpoints, turnEndCheckpoints, etc.)
@@ -534,14 +537,15 @@ export const useCheckpointStore = create<CheckpointState>()(
     },
 
     consumeRewindForkPoint: (sessionId): string | null => {
-      const forkPoint = get().rewindForkPoints[sessionId];
-      if (forkPoint) {
-        set((draft) => {
+      let consumed: string | null = null;
+      set((draft) => {
+        const forkPoint = draft.rewindForkPoints[sessionId];
+        if (forkPoint) {
+          consumed = forkPoint;
           Reflect.deleteProperty(draft.rewindForkPoints, sessionId);
-        });
-        return forkPoint;
-      }
-      return null;
+        }
+      });
+      return consumed;
     },
 
     hasRewindForkPoint: (sessionId): boolean => {
@@ -565,14 +569,15 @@ export const useCheckpointStore = create<CheckpointState>()(
     },
 
     consumePendingConversationFork: (originalSessionId): string | null => {
-      const rewindMessageId = get().pendingConversationForks[originalSessionId];
-      if (rewindMessageId) {
-        set((draft) => {
+      let consumed: string | null = null;
+      set((draft) => {
+        const rewindMessageId = draft.pendingConversationForks[originalSessionId];
+        if (rewindMessageId) {
+          consumed = rewindMessageId;
           Reflect.deleteProperty(draft.pendingConversationForks, originalSessionId);
-        });
-        return rewindMessageId;
-      }
-      return null;
+        }
+      });
+      return consumed;
     },
 
     hasPendingConversationFork: (originalSessionId): boolean => {

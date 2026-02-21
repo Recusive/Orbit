@@ -317,6 +317,7 @@ export class OrbitAgent {
   private cwd: string;
   private _thinkingMode: boolean;
   private _thinkingBudget: number; // 0=off, 4096=think, 10240=hard, 32768=ultra
+  private _effortLevel?: 'low' | 'medium' | 'high' | 'max';
   private _planMode: boolean;
   private _acceptMode: boolean;
   private _critiqueMode: boolean;
@@ -374,8 +375,26 @@ export class OrbitAgent {
   // Auto-refresh timer cleanup function
   private _autoRefreshCleanup?: () => void;
 
+  // [oauth-401-recovery] Flag: set after a 401 + successful token refresh. Cleared by restartSession().
+  // Revert: remove this property and all methods/usages referencing _needsSessionRestart.
+  private _needsSessionRestart = false;
+
   /** Callback for auth failures detected during auto-refresh or credential re-validation */
   private _onAuthFailure?: (message: string) => void;
+
+  // [oauth-401-recovery] Getter + marker for session restart flag.
+  /** Check if session needs restart after auth recovery. */
+  needsSessionRestart(): boolean {
+    return this._needsSessionRestart;
+  }
+
+  /**
+   * Mark that the session needs restart (public for async race fallback in session-manager).
+   * Called when the consumer catch block detects an auth error and explicitly awaits refresh.
+   */
+  markNeedsSessionRestart(): void {
+    this._needsSessionRestart = true;
+  }
 
   constructor(config: OrbitAgentConfig = {}) {
     this.permissionManager = new PermissionManager(
@@ -634,18 +653,37 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       settingSources: ['user', 'project', 'local'],
     };
 
-    // Only add thinking tokens if thinking mode is enabled and budget > 0
-    if (this._thinkingMode && this._thinkingBudget > 0) {
-      options.maxThinkingTokens = this._thinkingBudget;
-      // Map budget to mode name for logging
-      const modeName =
-        this._thinkingBudget <= 4096 ? 'think' : this._thinkingBudget <= 10240 ? 'hard' : 'ultra';
+    // Configure thinking based on model type
+    const isAdaptive = this.model === 'claude-opus-4-6' || this.model === 'claude-sonnet-4-6';
+    if (isAdaptive) {
+      // DO NOT set options.thinking for adaptive models (Opus 4.6, Sonnet 4.6).
+      // The CLI natively uses adaptive thinking for these models.
+      // Explicitly setting it causes the SDK to pass --max-thinking-tokens 32000,
+      // which suppresses StreamEvent messages (text_delta, thinking_delta).
+      // By omitting it, the CLI handles thinking internally while still emitting
+      // stream events for real-time text and thinking output.
+      // Validated against @anthropic-ai/claude-code@1.0.x (CLI v2.1.39).
+      if (this._effortLevel) {
+        options.effort = this._effortLevel;
+      }
       logger.info(
-        { thinkingMode: modeName, thinkingBudget: this._thinkingBudget },
-        'Extended thinking ENABLED'
+        { thinking: 'adaptive (CLI-managed)', effort: this._effortLevel ?? 'default' },
+        'Adaptive thinking delegated to CLI for streaming compatibility'
+      );
+    } else if (this._thinkingMode) {
+      // Non-adaptive models with thinking enabled: use explicit extended thinking.
+      // If user explicitly configured a budget, use that; otherwise default to ultra (32768).
+      const budget = this._thinkingBudget > 0 ? this._thinkingBudget : 32768;
+      options.thinking = { type: 'enabled', budgetTokens: budget };
+      const modeName = budget <= 4096 ? 'think' : budget <= 10240 ? 'hard' : 'ultra';
+      logger.info(
+        { thinkingMode: modeName, thinkingBudget: budget },
+        'Extended thinking ENABLED (fixed budget)'
       );
     } else {
-      logger.info({ thinkingMode: 'off' }, 'Extended thinking DISABLED');
+      // Non-adaptive models with thinking OFF: omit options.thinking entirely
+      // so the SDK uses its default (no thinking).
+      logger.info('Extended thinking DISABLED for non-adaptive model');
     }
 
     // Permission handling based on session mode
@@ -947,9 +985,12 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             void ClaudeCredentials.refreshIfNeeded()
               .then((result) => {
                 if (result.refreshed) {
+                  // [oauth-401-recovery] Set restart flag after successful refresh.
+                  // Revert: remove the _needsSessionRestart line and restore original log message.
                   logger.info(
-                    'Auto-refreshed credentials after CLI auth error — suppressing error'
+                    'Auto-refreshed credentials after CLI auth error — suppressing error, marking restart needed'
                   );
+                  this._needsSessionRestart = true;
                 } else {
                   // Refresh failed — NOW surface both the stderr error and auth failure
                   this._onStderrError?.(categorized);
@@ -972,6 +1013,18 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
 
     // Enable streaming partial messages for real-time text streaming
     options.includePartialMessages = true;
+
+    // For NEW sessions: tell the SDK to use Orbit's session ID instead of auto-generating one.
+    // This eliminates the frontend→SDK UUID remapping that happens on system:init.
+    // Only for new sessions — forks and resumes must NOT set this (would collide with
+    // existing JONLs on disk or conflict with the resume option).
+    if (!this._resumeSessionId && this._effectiveSessionId) {
+      options.sessionId = this._effectiveSessionId;
+      logger.info(
+        { sessionId: this._effectiveSessionId },
+        'Custom sessionId set — SDK will use Orbit session ID (no remap needed)'
+      );
+    }
 
     // Session resume/fork options
     // With resumeSessionAt + forkSession=true, SDK resumes at that specific message
@@ -1205,6 +1258,34 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     return true;
   }
 
+  // [oauth-401-recovery] Restart method — revert: remove this entire method.
+  /**
+   * Restart the SDK session with fresh credentials after a 401 recovery.
+   * Stops the current query and starts a new one that resumes the session.
+   * The new query reads the refreshed OAuth token from the Keychain.
+   */
+  async restartSession(): Promise<void> {
+    const resumeId = this._currentSessionId;
+    if (!resumeId) {
+      throw new Error('Cannot restart session: no current session ID');
+    }
+
+    logger.info({ resumeId }, 'Restarting session with fresh credentials');
+
+    await this.stopSession();
+
+    // Configure for plain resume (no fork, no replay).
+    // shouldEnableReplay evaluates to !resumeSessionId || forkSession = false.
+    // This means replay-user-messages is disabled — no slow message replay,
+    // and no checkpoint events (acceptable since we're not rewinding).
+    this._resumeSessionId = resumeId;
+    this._resumeSessionAt = undefined;
+    this._forkSession = false;
+    this._needsSessionRestart = false;
+
+    await this.startSession();
+  }
+
   /**
    * Check if the session is ready to receive messages
    */
@@ -1250,7 +1331,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
 
     logger.info(
       {
-        model: this.model ?? 'sonnet',
+        model: this.model ?? 'claude-sonnet-4-6',
         thinkingMode: thinkingModeName,
         thinkingBudget: this._thinkingBudget,
         thinkingEnabled: this._thinkingMode,
@@ -1349,6 +1430,11 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       throw new Error('No active query. Call startSession() first.');
     }
 
+    // Capture the query reference so we can detect if startSession() replaced it
+    // during a post-interrupt restart. Without this guard, the cleanup at the end
+    // of the for-await loop would null out the NEW query set by startSession().
+    const queryRef = this.currentQuery;
+
     // Track tool use blocks to match with their results
     const toolUseMap = new Map<string, { name: string; input: Record<string, unknown> }>();
 
@@ -1358,7 +1444,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Yield messages as they arrive
     // In streaming mode, the query continues running and processing messages from the queue
     try {
-      for await (const message of this.currentQuery) {
+      for await (const message of queryRef) {
         messageCount++;
 
         // Debug: Log every message from SDK with details
@@ -1430,6 +1516,43 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
           }
         }
 
+        // Filter out SDK slash-command artifacts that shouldn't reach the frontend:
+        // - User messages with <local-command-stdout> (hook output from /compact)
+        // - Assistant messages with "No response requested." (SDK placeholder for commands)
+        if (message.type === 'assistant') {
+          const contentArray = getMessageContentArray(message);
+          if (contentArray !== null && contentArray.length > 0) {
+            const firstBlock = contentArray[0] as { type?: string; text?: string } | undefined;
+            if (
+              contentArray.length === 1 &&
+              firstBlock?.type === 'text' &&
+              firstBlock.text?.trim() === 'No response requested.'
+            ) {
+              logger.debug('Filtered SDK "No response requested." placeholder message');
+              continue;
+            }
+          }
+        }
+
+        if (message.type === 'user') {
+          const contentArray = getMessageContentArray(message);
+          if (contentArray !== null) {
+            const hasOnlyInternalContent = contentArray.every((block: unknown) => {
+              if (typeof block === 'object' && block !== null && 'type' in block) {
+                const typed = block as { type: string; text?: string };
+                if (typed.type === 'text' && typeof typed.text === 'string') {
+                  return typed.text.trim().startsWith('<local-command-stdout>');
+                }
+              }
+              return false;
+            });
+            if (hasOnlyInternalContent && contentArray.length > 0) {
+              logger.debug('Filtered SDK internal <local-command-stdout> user message');
+              continue;
+            }
+          }
+        }
+
         // Format tool results in user messages
         if (message.type === 'user') {
           const contentArray = getMessageContentArray(message);
@@ -1476,8 +1599,17 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
 
     // Query completed (session ended)
     logger.info({ messageCount }, 'Query session completed');
-    this.sessionActive = false;
-    this.currentQuery = null;
+
+    // Only clean up if the query hasn't been replaced by a restart.
+    // During post-interrupt restart, stopSession() → startSession() replaces
+    // currentQuery before this old generator finishes draining. Without this
+    // guard, we'd null out the NEW query and break interrupt().
+    if (this.currentQuery === queryRef) {
+      this.sessionActive = false;
+      this.currentQuery = null;
+    } else {
+      logger.info('Skipping cleanup — query was replaced by a restart');
+    }
   }
 
   async stopSession(): Promise<void> {
@@ -1564,52 +1696,52 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
   /**
    * Set effort level for adaptive thinking (Opus 4.6).
    * Maps effort levels to thinking token budgets via setMaxThinkingTokens.
+   *
+   * IMPORTANT: This does NOT mutate the active SDK query. The Claude Code SDK does not
+   * expose runtime setters for effort/thinking on an in-flight query. Changes are stored
+   * internally and take effect when `_createOptions()` is called for the next query.
+   * The frontend sends `effort:set` before each message (chat-actions.ts), so the
+   * timing works out — but mid-turn changes have no effect until the next user message.
    */
-  async setEffortLevel(effort: 'low' | 'medium' | 'high' | 'max'): Promise<void> {
+  setEffortLevel(effort: 'low' | 'medium' | 'high' | 'max'): void {
+    this._effortLevel = effort;
+
+    // Also set budget as fallback for non-adaptive models.
+    // Only update _thinkingMode/_thinkingBudget if thinking is not explicitly disabled.
+    // Without this guard, effort:set unconditionally forces _thinkingMode=true,
+    // which overrides the user's "thinking off" setting for non-adaptive models.
     const budgetMap: Record<string, number> = {
       low: 1024,
       medium: 4096,
       high: 10240,
       max: 32768,
     };
-
-    const budget = budgetMap[effort] ?? 4096;
-    this._thinkingMode = true;
-    this._thinkingBudget = budget;
-
-    if (this.currentQuery) {
-      const currentQuery = this.currentQuery;
-
-      await withRetry(async () => currentQuery.setMaxThinkingTokens(budget), {
-        ...RetryPresets.quick,
-        operationName: 'setEffortLevel',
-      });
-
-      logger.info({ effort, budget }, 'Effort level updated mid-session');
+    if (this._thinkingMode) {
+      this._thinkingBudget = budgetMap[effort] ?? 4096;
     }
+
+    logger.info({ effort }, 'Effort level set — applies on next query');
   }
 
-  async setThinkingMode(enabled: boolean, maxTokens?: number): Promise<void> {
+  /**
+   * Enable or disable extended thinking for non-adaptive models.
+   *
+   * IMPORTANT: This does NOT mutate the active SDK query. The Claude Code SDK does not
+   * expose runtime setters for thinking on an in-flight query. Changes are stored
+   * internally and take effect when `_createOptions()` is called for the next query.
+   * The frontend sends `thinking:set` before each message (chat-actions.ts), so the
+   * timing works out — but mid-turn changes have no effect until the next user message.
+   */
+  setThinkingMode(enabled: boolean, maxTokens?: number): void {
     this._thinkingMode = enabled;
     if (maxTokens !== undefined) {
       this._thinkingBudget = maxTokens;
     }
 
-    // Update running query if exists - this is the key fix!
-    // Without this, thinking mode changes wouldn't take effect mid-session
-    if (this.currentQuery) {
-      const budget = enabled && this._thinkingBudget > 0 ? this._thinkingBudget : null;
-      const currentQuery = this.currentQuery;
-
-      await withRetry(async () => currentQuery.setMaxThinkingTokens(budget), {
-        ...RetryPresets.quick,
-        operationName: 'setMaxThinkingTokens',
-      });
-
-      const modeName =
-        budget === null ? 'off' : budget <= 4096 ? 'think' : budget <= 10240 ? 'hard' : 'ultra';
-      logger.info({ thinkingMode: modeName, budget }, 'Thinking mode updated mid-session');
-    }
+    const budget = enabled && this._thinkingBudget > 0 ? this._thinkingBudget : 0;
+    const modeName =
+      budget === 0 ? 'off' : budget <= 4096 ? 'think' : budget <= 10240 ? 'hard' : 'ultra';
+    logger.info({ thinkingMode: modeName, budget }, 'Thinking mode set — applies on next query');
   }
 
   getThinkingMode(): boolean {
@@ -1673,7 +1805,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
   }
 
   getModel(): string {
-    return this.model ?? 'sonnet';
+    return this.model ?? 'claude-sonnet-4-6';
   }
 
   /**
@@ -1775,12 +1907,12 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       );
       try {
         await this.currentQuery.interrupt();
-        // Give the SDK a moment to finalize the session and flush checkpoint data
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        logger.warn(
-          { checkpointId },
-          'REWIND rewindFiles Step 1 — interrupt complete, waited 500ms'
-        );
+        // Brief delay for SDK to flush checkpoint data to disk after interrupt.
+        // interrupt() awaits the SDK response, but file-history writes are async.
+        // 100ms is sufficient for local FS; the resumed query in Step 2 will
+        // re-read checkpoint state regardless.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        logger.warn({ checkpointId }, 'REWIND rewindFiles Step 1 — interrupt complete');
       } catch (interruptErr) {
         const errMsg = interruptErr instanceof Error ? interruptErr.message : String(interruptErr);
         logger.warn(

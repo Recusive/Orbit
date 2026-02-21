@@ -37,6 +37,7 @@ import {
   handleConversationRewind,
 } from './conversation-handlers';
 import { handleFileTreeRequest, handleFileRead } from './file-handlers';
+import { handleSkillsList } from './skill-handlers';
 import {
   handleSubagentsList,
   handleSubagentsCreate,
@@ -178,6 +179,15 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
   // Handle input mode change
   if (message.type === 'inputMode:set') {
     await handleInputModeSet(message);
+    return;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Skill Listing Handler
+  // ═══════════════════════════════════════════════════════════════
+
+  if (message.type === 'skills:list') {
+    await handleSkillsList(message);
     return;
   }
 

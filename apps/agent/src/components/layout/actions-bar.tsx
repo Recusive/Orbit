@@ -4,75 +4,112 @@
  * NOTE: Icon column width comes from @/lib/utils/constants.
  * To change actions bar width, update SIDEBAR.iconColumnWidth in constants.ts.
  */
-import { CircleAlert, FileCode, GitBranch, GitCompareArrows, Globe } from 'lucide-react';
+import {
+  CircleAlert,
+  Code,
+  FileCode,
+  GitBranch,
+  Globe,
+  MessageSquare,
+  Palette,
+} from 'lucide-react';
 
-import type { ActivityTab } from '@/stores/ui/ui-store';
-import type { FC } from 'react';
+import type { ActivityTab, HeaderTab } from '@/stores/ui/ui-store';
+import type { FC, ReactNode } from 'react';
 
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { SFSymbol } from '@/components/shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn, getModifierSymbols, SIDEBAR } from '@/lib/utils';
-import { useActivityTab, useUIStore } from '@/stores/ui/ui-store';
+import { cn, SIDEBAR } from '@/lib/utils';
+import { useActiveTab, useActivityTab, useUIStore } from '@/stores/ui/ui-store';
 
 interface ActionButtonProps {
   readonly icon: FC<{ className?: string }>;
   readonly label: string;
-  readonly shortcut?: readonly string[];
   readonly isActive: boolean;
   readonly onClick: () => void;
   readonly badge?: number;
 }
 
-const ActionButton: FC<ActionButtonProps> = ({
-  icon: Icon,
+const ActionButton: FC<ActionButtonProps> = ({ icon: Icon, label, isActive, onClick, badge }) => {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'relative flex items-center justify-center w-full h-12 transition-colors',
+        isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+      )}
+      aria-label={label}
+      aria-selected={isActive}
+      role="tab"
+    >
+      {/* Active indicator - overlays the left border (VS Code style) */}
+      {isActive ? (
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-[2px] h-6 bg-foreground rounded-r"
+          style={{ left: -1.5 }}
+        />
+      ) : null}
+
+      <Icon className="h-5 w-5" />
+
+      {/* Badge for counts (e.g., pending changes) */}
+      {badge !== undefined && badge > 0 ? (
+        <div className="absolute top-1.5 right-1.5 min-w-4 h-4 flex items-center justify-center rounded-full bg-foreground text-xs font-medium text-background px-1">
+          {badge > 99 ? '99+' : badge}
+        </div>
+      ) : null}
+    </button>
+  );
+};
+
+interface ModeButtonProps {
+  readonly id: HeaderTab;
+  readonly label: string;
+  readonly sfSymbol: string;
+  readonly fallback: ReactNode;
+  readonly disabled?: boolean;
+  readonly tooltipOverride?: string;
+}
+
+const ModeButton: FC<ModeButtonProps> = ({
+  id,
   label,
-  shortcut,
-  isActive,
-  onClick,
-  badge,
+  sfSymbol,
+  fallback,
+  disabled,
+  tooltipOverride,
 }) => {
+  const activeMode = useActiveTab();
+  const setMode = useUIStore((s) => s.setActiveTab);
+  const isActive = activeMode === id;
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
-          onClick={onClick}
+          onClick={() => {
+            if (!disabled) {
+              setMode(id);
+            }
+          }}
+          disabled={disabled}
+          aria-label={`Switch to ${label}`}
+          aria-pressed={isActive}
+          aria-disabled={disabled}
           className={cn(
-            'relative flex items-center justify-center w-full h-12 transition-colors',
-            isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+            'flex items-center justify-center w-full h-10 transition-colors',
+            disabled
+              ? 'text-muted-foreground/25 cursor-not-allowed'
+              : isActive
+                ? 'text-foreground'
+                : 'text-muted-foreground/50 hover:text-foreground'
           )}
-          aria-label={label}
-          aria-selected={isActive}
-          role="tab"
         >
-          {/* Active indicator - overlays the left border (VS Code style) */}
-          {isActive ? (
-            <div
-              className="absolute top-1/2 -translate-y-1/2 w-[2px] h-6 bg-primary rounded-r"
-              style={{ left: -1.5 }}
-            />
-          ) : null}
-
-          <Icon className="h-5 w-5" />
-
-          {/* Badge for counts (e.g., pending changes) */}
-          {badge !== undefined && badge > 0 ? (
-            <div className="absolute top-1.5 right-1.5 min-w-4 h-4 flex items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground px-1">
-              {badge > 99 ? '99+' : badge}
-            </div>
-          ) : null}
+          <SFSymbol name={sfSymbol} size={18} weight="medium" fallback={fallback} />
         </button>
       </TooltipTrigger>
-      <TooltipContent side="left" sideOffset={8} className="flex items-center gap-2">
-        <span>{label}</span>
-        {shortcut ? (
-          <KbdGroup>
-            {shortcut.map((key, index) => (
-              <Kbd key={index} className="bg-white/15 text-inherit border-white/20">
-                {key}
-              </Kbd>
-            ))}
-          </KbdGroup>
-        ) : null}
+      <TooltipContent side="left" sideOffset={8}>
+        {tooltipOverride ?? label}
       </TooltipContent>
     </Tooltip>
   );
@@ -85,15 +122,13 @@ const ActionButton: FC<ActionButtonProps> = ({
 export const ActionsBar: FC = () => {
   const activeTab = useActivityTab();
   const setActiveTab = useUIStore((state) => state.setActivityTab);
-  const modifiers = getModifierSymbols();
-
   const handleTabClick = (tab: ActivityTab): void => {
     setActiveTab(tab);
   };
 
   return (
     <aside
-      className="h-full flex flex-col border-l border-gray-5 bg-card"
+      className="h-full flex flex-col"
       style={{ width: SIDEBAR.iconColumnWidth }}
       role="tablist"
       aria-label="Actions Bar"
@@ -103,24 +138,14 @@ export const ActionsBar: FC = () => {
         <ActionButton
           icon={FileCode}
           label="Editor"
-          shortcut={[modifiers.cmd, 'E']}
           isActive={activeTab === 'file'}
           onClick={() => {
             handleTabClick('file');
           }}
         />
         <ActionButton
-          icon={GitCompareArrows}
-          label="Changed Files"
-          isActive={activeTab === 'files'}
-          onClick={() => {
-            handleTabClick('files');
-          }}
-        />
-        <ActionButton
           icon={GitBranch}
           label="Source Control"
-          shortcut={[modifiers.ctrl, modifiers.shift, 'G']}
           isActive={activeTab === 'source'}
           onClick={() => {
             handleTabClick('source');
@@ -136,8 +161,32 @@ export const ActionsBar: FC = () => {
         />
       </div>
 
+      {/* Mode switcher — pinned to bottom, above disclaimer */}
+      <div className="shrink-0 flex flex-col items-center py-1 gap-1">
+        <ModeButton
+          id="canvas"
+          label="Canvas"
+          sfSymbol="paintpalette"
+          fallback={<Palette className="h-5 w-5" />}
+          disabled
+          tooltipOverride="Canvas coming soon"
+        />
+        <ModeButton
+          id="editor"
+          label="Editor"
+          sfSymbol="chevron.left.forwardslash.chevron.right"
+          fallback={<Code className="h-5 w-5" />}
+        />
+        <ModeButton
+          id="agent"
+          label="Agent"
+          sfSymbol="command"
+          fallback={<MessageSquare className="h-5 w-5" />}
+        />
+      </div>
+
       {/* AI disclaimer icon - pinned to bottom */}
-      <div className="shrink-0 flex items-center justify-center">
+      <div className="shrink-0 flex items-center justify-center py-1">
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex items-center justify-center h-8 w-8 text-muted-foreground/40">

@@ -10,11 +10,17 @@ export * from './editor';
 // Permission modals
 export * from './permissions';
 
+// Projects
+export * from './projects';
+
 // Quick open / command palette
 export * from './quick-open';
 
 // Settings
 export * from './settings';
+
+// Skills
+export * from './skills';
 
 // Worktree / Git
 export * from './worktree';

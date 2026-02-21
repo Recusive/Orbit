@@ -178,8 +178,8 @@ export const StatusBar: FC<StatusBarProps> = ({ className, transparent = false }
   return (
     <div
       className={cn(
-        'relative h-[22px] flex items-stretch justify-between px-3 border-t',
-        transparent ? 'bg-transparent border-gray-8/35' : 'bg-card border-gray-5',
+        'relative h-[22px] flex items-stretch justify-between px-3',
+        transparent ? 'bg-transparent' : 'bg-chat-area',
         'text-muted-foreground',
         className
       )}

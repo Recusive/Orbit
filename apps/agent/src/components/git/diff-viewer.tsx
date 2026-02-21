@@ -44,7 +44,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         <div key={hunkIndex}>
           {/* Hunk header - optional */}
           {showHunkHeaders ? (
-            <div className="bg-gray-4 px-3 py-1 text-xs text-muted-foreground font-mono">
+            <div className="bg-lg-control px-3 py-1 text-xs text-muted-foreground font-mono">
               @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
             </div>
           ) : null}

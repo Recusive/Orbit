@@ -29,7 +29,7 @@ export const ToolCallBlock: FC<ToolCallBlockProps> = ({
   };
 
   return (
-    <div className={`border border-border rounded-lg bg-gray-3 overflow-hidden ${className}`}>
+    <div className={`border border-border rounded-lg bg-lg-control overflow-hidden ${className}`}>
       {/* Header */}
       <div className="p-3 space-y-2">
         {/* Command */}
@@ -47,7 +47,7 @@ export const ToolCallBlock: FC<ToolCallBlockProps> = ({
         <div className="flex items-center justify-between gap-2">
           <button
             onClick={() => onOpenTerminal?.(cwd, command)}
-            className="inline-flex items-center gap-1.5 text-xs text-gray-12 hover:text-foreground hover:underline"
+            className="inline-flex items-center gap-1.5 text-xs text-foreground hover:text-foreground hover:underline"
             disabled={!onOpenTerminal}
           >
             <ExternalLink className="w-3 h-3" />
@@ -70,7 +70,7 @@ export const ToolCallBlock: FC<ToolCallBlockProps> = ({
               onClick={() => {
                 setIsExpanded(!isExpanded);
               }}
-              className="w-full px-3 py-2 flex items-center gap-2 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
+              className="w-full px-3 py-2 flex items-center gap-2 text-xs font-medium text-muted-foreground hover:bg-lg-control-hover transition-colors"
             >
               {isExpanded ? (
                 <ChevronDown className="w-3 h-3" />

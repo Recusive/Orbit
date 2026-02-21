@@ -15,13 +15,13 @@ export const EditorSkeleton: FC<EditorSkeletonProps> = ({ className }) => {
     <div className={cn('h-full w-full flex flex-col bg-background', className)}>
       {/* Gutter area */}
       <div className="flex-1 flex">
-        <div className="w-12 bg-gray-3 border-r border-gray-5">
+        <div className="w-12 bg-lg-control border-r border-lg-separator">
           {/* Line numbers skeleton */}
           <div className="py-2 px-2 space-y-1">
             {Array.from({ length: 20 }).map((_, i) => (
               <div
                 key={i}
-                className="h-4 bg-gray-4 rounded animate-pulse"
+                className="h-4 bg-lg-control rounded animate-pulse"
                 style={{ width: `${String(20 + Math.random() * 10)}px` }}
               />
             ))}
@@ -32,7 +32,7 @@ export const EditorSkeleton: FC<EditorSkeletonProps> = ({ className }) => {
           {Array.from({ length: 15 }).map((_, i) => (
             <div
               key={i}
-              className="h-4 bg-gray-3 rounded animate-pulse"
+              className="h-4 bg-lg-control rounded animate-pulse"
               style={{ width: `${String(30 + Math.random() * 60)}%` }}
             />
           ))}

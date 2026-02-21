@@ -6,7 +6,7 @@ use super::bridge::{AgentBridge, BridgeError, EventCallback, Result};
 use super::protocol::{
     AttachmentContentBlock, BridgeRequest, CanvasSessionConfig, CanvasState, CommandResponse,
     CommandScope, ForkSessionOptions, ForkSessionResult, McpToolResponse, Model,
-    PermissionResponse, SessionConfig, SlashCommandDefinition, SubagentDefinition,
+    PermissionResponse, SessionConfig, SkillDefinition, SlashCommandDefinition, SubagentDefinition,
 };
 use parking_lot::Mutex;
 use std::collections::HashSet;
@@ -120,6 +120,17 @@ impl SessionManager {
         match response {
             CommandResponse::Error { error, .. } => Err(BridgeError::SidecarError(error)),
             CommandResponse::CommandList { commands, .. } => Ok(commands),
+            _ => Err(BridgeError::ReceiveError(
+                "Unexpected response type".to_owned(),
+            )),
+        }
+    }
+
+    /// Check response for skill list
+    fn check_response_skill_list(response: CommandResponse) -> Result<Vec<SkillDefinition>> {
+        match response {
+            CommandResponse::Error { error, .. } => Err(BridgeError::SidecarError(error)),
+            CommandResponse::SkillList { skills, .. } => Ok(skills),
             _ => Err(BridgeError::ReceiveError(
                 "Unexpected response type".to_owned(),
             )),
@@ -503,6 +514,23 @@ impl SessionManager {
         let bridge = self.bridge.lock();
         let response = bridge.send_request(&request)?;
         Self::check_response(response)
+    }
+
+    // ========================================================================
+    // Skill Definition Operations
+    // ========================================================================
+
+    /// List all skills in workspace and user directories
+    pub fn list_skills(&self, workspace_path: &str) -> Result<Vec<SkillDefinition>> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::ListSkills {
+            workspace_path: workspace_path.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_skill_list(response)
     }
 
     // ========================================================================

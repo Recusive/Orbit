@@ -18,7 +18,7 @@ export interface SubagentDefinition {
   prompt: string;
   tools?: string[];
   disallowedTools?: string[];
-  model?: 'sonnet' | 'opus' | 'haiku' | 'claude-opus-4-6' | 'inherit';
+  model?: 'claude-sonnet-4-6' | 'claude-opus-4-6' | 'haiku' | 'inherit';
 }
 
 /**
@@ -112,10 +112,10 @@ function parseAgentFile(content: string, filename: string): SubagentDefinition |
   }
 
   // Validate model
-  let model: 'sonnet' | 'opus' | 'haiku' | 'claude-opus-4-6' | 'inherit' | undefined;
+  let model: 'claude-sonnet-4-6' | 'claude-opus-4-6' | 'haiku' | 'inherit' | undefined;
   const modelValue = metadata.get('model');
   if (modelValue !== undefined) {
-    const validModels = ['sonnet', 'opus', 'haiku', 'claude-opus-4-6', 'inherit'];
+    const validModels = ['claude-sonnet-4-6', 'claude-opus-4-6', 'haiku', 'inherit'];
     if (validModels.includes(modelValue)) {
       model = modelValue as typeof model;
     }

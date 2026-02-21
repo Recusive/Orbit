@@ -34,6 +34,7 @@ const CHAT_EVENT_TYPES: ReadonlySet<string> = new Set([
   'agent:complete',
   'agent:error',
   'agent:checkpoint',
+  'agent:compact_complete',
   'conversation:created',
   'conversation:list',
   'conversation:loading',

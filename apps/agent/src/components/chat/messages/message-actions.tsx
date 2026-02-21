@@ -1,4 +1,4 @@
-import { Check, Copy, Rewind, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Check, ClockFading, Copy, Rewind, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useState } from 'react';
 
 import type { FC, ReactNode } from 'react';
@@ -8,10 +8,21 @@ import { cn } from '@/lib/utils';
 
 interface MessageActionsProps {
   readonly rewindDisabled?: boolean;
+  readonly turnDurationMs?: number | undefined;
   readonly onCopy?: () => void;
   readonly onLike?: () => void;
   readonly onDislike?: () => void;
   readonly onRewind?: () => void;
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) {
+    return `${String(totalSeconds)}s`;
+  }
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds > 0 ? `${String(minutes)}m ${String(seconds)}s` : `${String(minutes)}m`;
 }
 
 interface ActionButtonProps {
@@ -24,7 +35,7 @@ interface ActionButtonProps {
 
 const ActionButton: FC<ActionButtonProps> = ({ label, className, disabled, onClick, children }) => {
   const iconButtonClasses =
-    'h-6 w-6 flex items-center justify-center rounded-md bg-transparent text-muted-foreground/70 transition-[background-color,color,transform] duration-150 hover:bg-accent hover:text-foreground hover:scale-[1.08] active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50';
+    'h-6 w-6 flex items-center justify-center rounded-md bg-transparent text-muted-foreground/70 transition-[background-color,color,transform] duration-150 hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08] active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50';
 
   return (
     <Tooltip>
@@ -47,6 +58,7 @@ const ActionButton: FC<ActionButtonProps> = ({ label, className, disabled, onCli
 
 export const MessageActions: FC<MessageActionsProps> = ({
   rewindDisabled = false,
+  turnDurationMs,
   onCopy,
   onLike,
   onDislike,
@@ -63,7 +75,15 @@ export const MessageActions: FC<MessageActionsProps> = ({
   };
 
   return (
-    <div className="mt-3 flex flex-col gap-2 items-end">
+    <div className="mt-3 flex items-center justify-between">
+      {turnDurationMs !== undefined && turnDurationMs > 0 ? (
+        <span className="flex items-center gap-1 text-xs tabular-nums text-lg-text-secondary">
+          <ClockFading className="h-3.5 w-3.5" aria-hidden="true" />
+          {formatDuration(turnDurationMs)}
+        </span>
+      ) : (
+        <span />
+      )}
       <div className="flex items-center gap-1">
         <ActionButton label={copied ? 'Copied!' : 'Copy'} onClick={handleCopy}>
           {copied ? (

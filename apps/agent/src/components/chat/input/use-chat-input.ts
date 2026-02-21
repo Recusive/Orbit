@@ -1,5 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   EFFORT_LEVEL_INFO,
@@ -40,9 +40,10 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const [inputText, setInputText] = useState('');
   const [attachedContext, setAttachedContext] = useState<ContextItem[]>([]);
 
-  // Slash commands from centralized store (prevents duplicate IPC calls)
+  // Slash commands + skills from centralized store (prevents duplicate IPC calls)
   const slashCommands = useSlashCommands();
   const fetchCommands = useCommandsStore((state) => state.fetchCommands);
+  const fetchSkills = useCommandsStore((state) => state.fetchSkills);
 
   // Refs
   const inputRef = useRef<HTMLDivElement>(null);
@@ -59,10 +60,11 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const removeElementContext = useBrowserStore((state) => state.removeElementContext);
   const clearElementContexts = useBrowserStore((state) => state.clearElementContexts);
 
-  // Fetch commands on mount (store handles deduplication)
+  // Fetch commands and skills on mount (store handles deduplication)
   useEffect(() => {
     void fetchCommands();
-  }, [fetchCommands]);
+    void fetchSkills();
+  }, [fetchCommands, fetchSkills]);
 
   // Listen for focus event from feedback button
   useEffect(() => {
@@ -99,6 +101,23 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     };
   }, []);
 
+  // Listen for addSkillChip event — adds a skill as a context chip and focuses input
+  useEffect(() => {
+    const handleAddSkill = (e: Event): void => {
+      const name = (e as CustomEvent<{ name: string }>).detail.name;
+      if (!name) return;
+      setAttachedContext((prev) => {
+        if (prev.some((item) => item.type === 'skill' && item.name === name)) return prev;
+        return [...prev, { id: crypto.randomUUID(), type: 'skill', name, path: name }];
+      });
+      inputRef.current?.focus();
+    };
+    window.addEventListener('addSkillChip', handleAddSkill);
+    return () => {
+      window.removeEventListener('addSkillChip', handleAddSkill);
+    };
+  }, []);
+
   // Reset stopping guard when agent stops running
   useEffect(() => {
     if (!isAgentRunning) {
@@ -118,18 +137,31 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         const cursorPos = range.startOffset;
         const beforeCursor = text.slice(0, cursorPos);
 
-        // Detect / slash command (only at start of input)
-        if (beforeCursor.startsWith('/')) {
-          const afterSlash = beforeCursor.slice(1);
+        // Detect / slash command — triggers after any whitespace or at start of input.
+        // Find the last "/" before cursor that's either at position 0 or preceded by a space.
+        const lastSlashIndex = beforeCursor.lastIndexOf('/');
+        if (
+          lastSlashIndex !== -1 &&
+          (lastSlashIndex === 0 || beforeCursor[lastSlashIndex - 1] === ' ')
+        ) {
+          const afterSlash = beforeCursor.slice(lastSlashIndex + 1);
           if (!afterSlash.includes(' ')) {
-            popover.setSlashQuery(afterSlash);
-            popover.setSlashOpen(true);
-            // Close mention if open
-            if (popover.mentionOpen) {
-              popover.setMentionOpen(false);
-              popover.setMentionQuery('');
+            // Only keep the popover open if there are matching commands (or query is empty → show all).
+            // When nothing matches the user is likely typing a URL or path, not a slash command.
+            if (afterSlash === '' || getFilteredCommandsCount(afterSlash, slashCommands) > 0) {
+              popover.setSlashQuery(afterSlash);
+              popover.setSlashStartIndex(lastSlashIndex);
+              popover.setSlashOpen(true);
+              // Close mention if open
+              if (popover.mentionOpen) {
+                popover.setMentionOpen(false);
+                popover.setMentionQuery('');
+              }
+              return;
+            } else {
+              // No matches — dismiss the popover silently
+              popover.closeSlashPopover();
             }
-            return;
           }
         }
 
@@ -159,13 +191,36 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         popover.setSlashQuery('');
       }
     },
-    [popover]
+    [popover, slashCommands]
   );
 
   // Send message handler
   const handleSend = useCallback((): void => {
-    const text = inputText.trim();
+    let text = inputText.trim();
     if (!text) return;
+
+    // Append @filename tokens for attached files/folders so they persist in JSONL content.
+    // The file paths are still sent as attachments for the SDK, but the @tokens ensure
+    // the user sees them after switching chats (JSONL content survives, attachedFiles doesn't).
+    // NOTE: File tokens are appended (not prepended) so they don't interfere with
+    // skill prefix `/command` at the start of the message — agent-bridge checks
+    // message.startsWith('/') for slash expansion (agent.ts:1306).
+    const fileItems = attachedContext.filter(
+      (item) => item.type === 'file' || item.type === 'folder'
+    );
+    if (fileItems.length > 0) {
+      const fileSuffix = fileItems.map((item) => `@${item.name}`).join(' ');
+      text = `${text} ${fileSuffix}`;
+    }
+
+    // Prepend skill invocation if a skill chip is attached.
+    // This must be the LAST prefix operation so `/skillName` stays at position 0,
+    // ensuring agent-bridge's `message.startsWith('/')` check succeeds.
+    const skillItems = attachedContext.filter((item) => item.type === 'skill');
+    if (skillItems.length > 0) {
+      const skillPrefix = skillItems.map((s) => `/${s.name}`).join(' ');
+      text = `${skillPrefix} ${text}`;
+    }
 
     // Clear input immediately
     setInputText('');
@@ -191,11 +246,15 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         previewUrl: item.previewUrl ?? '',
       }));
 
+    // Extract skill names from attached context
+    const skillNames = skillItems.map((s) => s.name);
+
     onSend(
       text,
       contextFiles.length > 0 ? contextFiles : undefined,
       images.length > 0 ? images : undefined,
-      elementContexts.length > 0 ? elementContexts : undefined
+      elementContexts.length > 0 ? elementContexts : undefined,
+      skillNames.length > 0 ? skillNames : undefined
     );
     setAttachedContext([]);
     clearElementContexts();
@@ -276,23 +335,61 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     [popover]
   );
 
-  // Slash command selection handler
+  // Slash command selection handler — replaces only the /query token at slashStartIndex
   const handleSlashSelect = useCallback(
     (command: SlashCommand): void => {
-      if (inputRef.current) {
-        inputRef.current.textContent = `/${command.name} `;
-        setInputText(`/${command.name} `);
-        // Move cursor to end
-        const range = document.createRange();
-        const sel = window.getSelection();
-        range.selectNodeContents(inputRef.current);
-        range.collapse(false);
-        sel?.removeAllRanges();
-        sel?.addRange(range);
+      if (!inputRef.current) return;
+
+      const currentText = inputRef.current.textContent;
+      const start = popover.slashStartIndex;
+      // The token to replace: from "/" through the end of the query (no space after yet)
+      const tokenEnd = start + 1 + popover.slashQuery.length; // +1 for the "/" character
+
+      if (command.kind === 'skill') {
+        // Skills become context chips — remove the /query token from text
+        const skillContext: ContextItem = {
+          id: crypto.randomUUID(),
+          type: 'skill',
+          name: command.name,
+          path: command.name,
+        };
+        setAttachedContext((prev) => {
+          if (prev.some((item) => item.type === 'skill' && item.name === command.name)) {
+            return prev;
+          }
+          return [...prev, skillContext];
+        });
+
+        // Remove the /query token, trimming any trailing space
+        const before = currentText.slice(0, start);
+        const after = currentText.slice(tokenEnd).replace(/^ /, '');
+        const newText = (before + after).trim();
+        inputRef.current.textContent = newText;
+        setInputText(newText);
+      } else {
+        // Regular commands: replace /query with /command-name + space
+        const before = currentText.slice(0, start);
+        const after = currentText.slice(tokenEnd);
+        const replacement = `/${command.name} `;
+        const newText = before + replacement + after;
+        inputRef.current.textContent = newText;
+        setInputText(newText);
+
+        // Place cursor right after the inserted command + space
+        const cursorPos = start + replacement.length;
+        const textNode = inputRef.current.firstChild;
+        if (textNode) {
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.setStart(textNode, Math.min(cursorPos, textNode.textContent?.length ?? 0));
+          range.collapse(true);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
       }
 
       popover.closeSlashPopover();
-      inputRef.current?.focus();
+      inputRef.current.focus();
     },
     [popover]
   );
@@ -311,16 +408,34 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     onStop();
   }, [onStop]);
 
+  // Global ESC handler — stops the agent from anywhere on screen,
+  // not just when the input box is focused. Without this, ESC only works
+  // via the React onKeyDown on the contentEditable div.
+  useEffect(() => {
+    if (!isAgentRunning) return;
+
+    const handleGlobalEscape = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return;
+      // Only plain ESC — not Cmd+Esc, Ctrl+Esc, etc.
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      // If a popover is open, ESC should close it (handled by popover's own listener)
+      if (popover.slashOpen || popover.mentionOpen) return;
+
+      e.preventDefault();
+      handleStop();
+    };
+
+    window.addEventListener('keydown', handleGlobalEscape);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalEscape);
+    };
+  }, [isAgentRunning, popover.slashOpen, popover.mentionOpen, handleStop]);
+
   // Keyboard handler
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent): void => {
-      // Escape stops the agent when running (highest priority)
-      // Note: MentionPopover handles its own keyboard events via global listener
-      if (e.key === 'Escape' && isAgentRunning && !popover.slashOpen && !popover.mentionOpen) {
-        e.preventDefault();
-        handleStop();
-        return;
-      }
+      // ESC stop is handled by the global window listener (useEffect above)
+      // so it works regardless of which element has focus.
 
       // Handle slash command popover
       if (popover.slashOpen) {
@@ -356,7 +471,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         handleSend();
       }
     },
-    [isAgentRunning, handleStop, popover, slashCommands, handleSlashSelect, handleSend]
+    [popover, slashCommands, handleSlashSelect, handleSend]
   );
 
   // Paste handler
@@ -411,22 +526,36 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   }, [effortLevel]);
 
   const getInputBoxClasses = useCallback((): string => {
-    const base = cn(
-      'w-full p-1 bg-gray-3 border transition-[border-color,box-shadow] duration-200',
-      'rounded-2xl',
-      'shadow-none'
-    );
+    const base =
+      'w-full p-1 rounded-[14px] border bg-gray-1 dark:bg-[oklch(23%_0_0)] dark:border-white/8 dark:shadow-md border-white shadow-[0_0_12px_rgba(0,0,0,0.08),0_0_24px_rgba(0,0,0,0.05)]';
     switch (inputMode) {
       case 'plan':
-        return `${base} border-2 border-dotted border-mode-plan/40`;
+        return cn(base, 'ring-2 ring-dotted ring-mode-plan/40');
       case 'accept':
-        return `${base} border-2 border-dotted border-mode-accept/40`;
+        return cn(base, 'ring-2 ring-dotted ring-mode-accept/40');
       case 'default':
-        return `${base} border-gray-6`;
+        return base;
     }
   }, [inputMode]);
 
   const isInputEmpty = inputText.length === 0;
+
+  // Ghost text: show the untyped suffix of the top matching slash command.
+  // e.g., typed "/com" → top match "commit" → ghost = "mit"
+  const slashGhostText = useMemo(() => {
+    if (!popover.slashOpen || popover.slashQuery.length === 0) return '';
+    const topCommand = getCommandAtIndex(
+      popover.slashQuery,
+      popover.slashSelectedIndex,
+      slashCommands
+    );
+    if (topCommand === null) return '';
+    const name = topCommand.name.toLowerCase();
+    const query = popover.slashQuery.toLowerCase();
+    // Only show ghost when the query is a prefix of the command name
+    if (!name.startsWith(query)) return '';
+    return topCommand.name.slice(popover.slashQuery.length);
+  }, [popover.slashOpen, popover.slashQuery, popover.slashSelectedIndex, slashCommands]);
 
   return {
     // State
@@ -434,6 +563,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     attachedContext,
     slashCommands,
     isInputEmpty,
+    slashGhostText,
     // Refs
     inputRef,
     imageInputRef,

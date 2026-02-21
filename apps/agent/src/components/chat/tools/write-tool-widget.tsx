@@ -7,7 +7,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   DiffStat,
@@ -36,21 +36,13 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   success,
   onOpenFile,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(isRunning);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showAllLines, setShowAllLines] = useState(false);
-  const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
   const isDarkMode = useIsDarkMode();
   const highlightedTokens = useHighlightedTokens(content, filePath, isDarkMode);
-
-  // Auto-collapse when tool finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   // Reset showAllLines when collapsed to avoid stale state on re-expand
   useEffect(() => {
@@ -86,23 +78,23 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
         }
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        {/* Grouped content — icon, filename, diff, chevron all together */}
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon, filename, badges, spinner, diff, chevron */}
+        <div className="flex items-center gap-2 shrink-0 min-w-0">
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-success/8'
+              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
             )}
           >
             <SquarePlus
               className={cn(
                 'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-success/60',
+                isFailed ? 'text-destructive/60' : 'text-foreground/60',
                 isRunning && 'animate-pulse'
               )}
             />
@@ -113,7 +105,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
             tabIndex={0}
             className={cn(
               'text-xs font-medium truncate cursor-pointer hover:underline',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-12'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
             )}
             onClick={handleFileClick}
             onKeyDown={(e): void => {
@@ -126,22 +118,26 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
           </a>
 
           <span
-            className={cn('text-xs shrink-0', isFailed ? 'text-destructive/60' : 'text-gray-9')}
+            className={cn(
+              'text-xs shrink-0',
+              isFailed ? 'text-destructive/60' : 'text-muted-foreground'
+            )}
           >
             {isFailed ? '(failed)' : '(new)'}
           </span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
 
           {!isRunning && !isFailed ? <DiffStat additions={lineCount} deletions={0} /> : null}
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
+            aria-hidden="true"
           />
         </div>
       </button>
@@ -180,7 +176,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                 {/* Content column — code preview + show-more toggle share one gutter line */}
                 <div className="flex-1 min-w-0 ml-2.5 flex flex-col">
                   {/* Code content */}
-                  <div className="my-1.5 rounded-lg border-3 border-success/40 bg-card overflow-hidden">
+                  <div className="my-1.5 rounded-xl border-3 border-success/40 bg-card overflow-hidden">
                     <div
                       className={cn('overflow-auto bg-success/5', !showAllLines && 'max-h-[300px]')}
                     >
@@ -195,7 +191,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                             <div key={index} className="flex font-mono text-sm leading-4">
                               {/* Sticky gutter + line number */}
                               <div className="sticky left-0 flex shrink-0 bg-success/5">
-                                <div className="w-8 px-1.5 text-right text-gray-9 select-none bg-success/10">
+                                <div className="w-8 px-1.5 text-right text-muted-foreground select-none bg-success/10">
                                   {index + 1}
                                 </div>
                               </div>
@@ -211,7 +207,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                                     </span>
                                   ))
                                 ) : (
-                                  <span className="text-gray-12">{line || ' '}</span>
+                                  <span className="text-foreground">{line || ' '}</span>
                                 )}
                               </div>
                             </div>
@@ -228,7 +224,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                         e.stopPropagation();
                         setShowAllLines(!showAllLines);
                       }}
-                      className="py-1 text-xs text-gray-9 hover:text-gray-12 transition-colors flex items-center gap-0.5"
+                      className="py-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
                     >
                       <span>
                         {showAllLines
@@ -261,7 +257,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

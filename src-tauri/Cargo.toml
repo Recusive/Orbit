@@ -32,6 +32,7 @@ orbit-ai = { path = "../crates/common/ai" }
 orbit-search = { path = "../crates/common/search" }
 orbit-settings = { path = "../crates/common/settings" }
 orbit-conversations = { path = "../crates/common/conversations" }
+orbit-sf-symbols = { path = "../crates/common/sf-symbols" }
 
 # Core dependencies
 tokio = { workspace = true }
@@ -67,12 +68,13 @@ whoami = "2.1"
 # Local fork with fix for decoration-less windows (original crashes)
 orbit-plugin-decorum = { path = "../crates/plugins/decorum" }
 tauri-plugin-window-state = "2"
+tauri-plugin-updater = { workspace = true }
+tauri-plugin-process = { workspace = true }
 
 # Error tracking
 sentry = { workspace = true }
 
-# Window effects (vibrancy/blur)
-window-vibrancy = "0.7"
+# Window effects
 tauri-plugin-liquid-glass = "0.1"
 
 [dev-dependencies]

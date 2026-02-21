@@ -1,12 +1,11 @@
 /**
  * AccountBanner — Fires a Sonner toast on mount showing credential status.
  *
- * Uses the existing Sonner toast infrastructure (positioned bottom-right in
- * App.tsx) so the notification slides in/out natively without clipping.
- * Clicking the toast opens Account settings.
+ * Styled as an Apple macOS Liquid Glass notification — frosted blur bg
+ * with the same tint as the sidebar (via bg-base-layer ::before).
  */
 import { invoke } from '@tauri-apps/api/core';
-import { Clock } from 'lucide-react';
+import { Clock, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { SiClaude } from 'react-icons/si';
 import { toast } from 'sonner';
@@ -45,104 +44,163 @@ function formatTimeRemaining(expiresAtMs: number): string {
 }
 
 function dotBgColor(expiresAtMs: number | null, hasCredentials: boolean): string {
-  if (!hasCredentials) return 'bg-gray-6';
-  if (expiresAtMs === null) return 'bg-green-500';
+  if (!hasCredentials) return 'bg-black/20 dark:bg-white/20';
+  if (expiresAtMs === null) return 'bg-green-400';
   const diffMs = expiresAtMs - Date.now();
-  if (diffMs <= 0) return 'bg-destructive';
-  if (diffMs < 5 * 60_000) return 'bg-destructive';
-  if (diffMs < 60 * 60_000) return 'bg-yellow-500';
-  return 'bg-green-500';
+  if (diffMs <= 0) return 'bg-red-400';
+  if (diffMs < 5 * 60_000) return 'bg-red-400';
+  if (diffMs < 60 * 60_000) return 'bg-yellow-400';
+  return 'bg-green-400';
 }
 
 function timeTextColor(expiresAtMs: number): string {
   const diffMs = expiresAtMs - Date.now();
-  if (diffMs <= 0) return 'text-destructive';
-  if (diffMs < 5 * 60_000) return 'text-destructive';
-  if (diffMs < 60 * 60_000) return 'text-yellow-500';
-  return 'text-green-500';
+  if (diffMs <= 0) return 'text-red-400';
+  if (diffMs < 5 * 60_000) return 'text-red-400';
+  if (diffMs < 60 * 60_000) return 'text-yellow-400';
+  return 'text-green-400';
 }
 
 // ---------------------------------------------------------------------------
 // Toast content renderer
 // ---------------------------------------------------------------------------
 
-/** Returns the toast ID so the caller can schedule manual dismissal. */
+// DEBUG: expose on window for DevTools testing
+// @ts-expect-error -- temporary debug helper
+window.__showAccountToast = (): void => {
+  showAndAutoDismiss({
+    hasCredentials: true,
+    credentialType: 'OAuth',
+    expiresAt: Date.now() + 3 * 60 * 60_000,
+    entryExists: true,
+    error: null,
+  });
+};
+
+const TOAST_DURATION_MS = 6000;
+
 function showAccountToast(status: KeychainStatus): string | number {
   const isConnected = status.hasCredentials;
 
   return toast.custom(
     (id) => (
-      <button
-        type="button"
+      <div
+        className="relative w-[344px] rounded-[14px] overflow-hidden cursor-pointer"
+        style={{
+          backdropFilter: 'blur(40px) saturate(1.5)',
+          WebkitBackdropFilter: 'blur(40px) saturate(1.5)',
+          border: '0.5px solid rgba(0, 0, 0, 0.08)',
+          boxShadow: 'inset 0 0.5px 0 0 rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.08)',
+        }}
         onClick={() => {
           toast.dismiss(id);
           useUIStore.getState().openSettings('account');
         }}
-        className={cn(
-          'flex items-center gap-4 w-full pl-4 pr-5 py-4 cursor-pointer outline-none',
-          'hover:opacity-80 transition-opacity duration-150'
-        )}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            toast.dismiss(id);
+            useUIStore.getState().openSettings('account');
+          }
+        }}
       >
-        {/* Claude icon */}
-        <div
-          className="flex items-center justify-center h-10 w-10 rounded-lg shrink-0"
-          style={{ backgroundColor: isConnected ? 'var(--gray-a4)' : undefined }}
-        >
-          <SiClaude
-            className={cn('h-5 w-5', isConnected ? undefined : 'text-muted-foreground/60')}
-            style={isConnected ? { color: '#d97757' } : undefined}
-          />
-        </div>
+        {/* Tint layer — lighter in light mode, darker in dark */}
+        <div className="absolute inset-0 pointer-events-none bg-black/[0.04] dark:bg-black/[0.15]" />
 
-        {/* Info */}
-        <div className="flex flex-col gap-1 min-w-0 text-left">
-          {/* Row 1: name + status badge */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-foreground/90">Claude Code</span>
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none',
-                isConnected ? 'bg-green-500/10 text-green-500' : 'bg-gray-3 text-gray-11'
-              )}
-            >
-              <span
-                className={cn(
-                  'h-1.5 w-1.5 rounded-full',
-                  dotBgColor(status.expiresAt, isConnected)
-                )}
-              />
-              {isConnected ? 'Connected' : 'Not connected'}
-            </span>
+        {/* Header row — icon, title, dismiss */}
+        <div
+          className="relative z-10 flex items-center gap-3"
+          style={{ padding: '10px 8px 8px 12px' }}
+        >
+          {/* App icon */}
+          <div className="flex items-center justify-center h-8 w-8 rounded-lg shrink-0 bg-black/[0.06] dark:bg-white/10 backdrop-blur-[20px]">
+            <SiClaude
+              className={cn('h-4.5 w-4.5', !isConnected && 'text-black/40 dark:text-white/40')}
+              style={isConnected ? { color: '#d97757' } : undefined}
+            />
           </div>
 
-          {/* Row 2: expiry + auth method */}
-          <div className="flex items-center gap-2">
-            {isConnected && status.expiresAt !== null ? (
+          {/* Title */}
+          <span
+            className="text-[13px] font-bold leading-4 flex-1 truncate text-black/85 dark:text-white/85"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            Claude Code
+          </span>
+
+          {/* Dismiss button */}
+          <button
+            type="button"
+            aria-label="Dismiss notification"
+            onClick={(e) => {
+              e.stopPropagation();
+              toast.dismiss(id);
+            }}
+            className="flex items-center justify-center h-6 w-6 rounded-full shrink-0 bg-black/[0.04] dark:bg-white/[0.06] text-black/50 dark:text-white/50 hover:bg-red-500/20 dark:hover:bg-red-500/20 hover:text-red-400 dark:hover:text-red-400 active:scale-90 transition-[background-color,color,transform] duration-100"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {/* Status bar — secondary bg strip with connection info */}
+        <div
+          className="relative z-10 flex items-center gap-2 bg-black/[0.03] dark:bg-white/[0.05]"
+          style={{ padding: '7px 12px 9px 12px' }}
+        >
+          {/* Status dot + Connected */}
+          <span
+            className="inline-flex items-center gap-1.5 text-[12px] leading-4 text-black/70 dark:text-white/75"
+            style={{ letterSpacing: '-0.008em' }}
+          >
+            <span
+              className={cn(
+                'h-1.5 w-1.5 rounded-full shrink-0',
+                dotBgColor(status.expiresAt, isConnected)
+              )}
+            />
+            {isConnected ? 'Connected' : 'Not connected'}
+          </span>
+
+          {/* Time remaining + credential type (single line) */}
+          {isConnected && status.expiresAt !== null ? (
+            <>
+              <span className="text-black/15 dark:text-white/15">·</span>
               <span
                 className={cn(
-                  'inline-flex items-center gap-1 text-xs font-medium tabular-nums',
+                  'inline-flex items-center gap-1 text-[11px] font-medium tabular-nums leading-4',
                   timeTextColor(status.expiresAt)
                 )}
               >
-                <Clock className="h-3.5 w-3.5" />
+                <Clock className="h-3 w-3" />
                 {formatTimeRemaining(status.expiresAt)}
               </span>
-            ) : null}
-            {status.credentialType !== null ? (
-              <span className="text-[11px] text-muted-foreground/40 uppercase tracking-wider">
-                {status.credentialType}
-              </span>
-            ) : null}
-          </div>
+              {status.credentialType !== null ? (
+                <>
+                  <span className="text-black/15 dark:text-white/15">·</span>
+                  <span className="text-[11px] uppercase tracking-wider leading-4 text-black/35 dark:text-white/35">
+                    {status.credentialType}
+                  </span>
+                </>
+              ) : null}
+            </>
+          ) : null}
         </div>
-      </button>
+      </div>
     ),
     {
-      duration: 5000,
+      duration: TOAST_DURATION_MS,
       unstyled: true,
-      className: '!rounded-lg !border !border-gray-5 !bg-gray-2 dark:!bg-gray-3 !shadow-lg w-full',
+      className: '!p-0 !bg-transparent !border-0 !shadow-none !opacity-100 w-auto',
     }
   );
+}
+
+// Self-managed dismiss: Sonner's toast.custom() can silently ignore duration
+// when unstyled is true. This ensures the toast always auto-dismisses.
+function showAndAutoDismiss(status: KeychainStatus): void {
+  const id = showAccountToast(status);
+  setTimeout(() => toast.dismiss(id), TOAST_DURATION_MS);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,16 +211,15 @@ export const AccountBanner: FC = () => {
   const firedRef = useRef(false);
 
   useEffect(() => {
-    // Only fire once per mount
     if (firedRef.current) return;
     firedRef.current = true;
 
     invoke<KeychainStatus>('check_claude_keychain')
       .then((status) => {
-        showAccountToast(status);
+        showAndAutoDismiss(status);
       })
       .catch(() => {
-        showAccountToast({
+        showAndAutoDismiss({
           hasCredentials: false,
           credentialType: null,
           expiresAt: null,
@@ -172,6 +229,5 @@ export const AccountBanner: FC = () => {
       });
   }, []);
 
-  // This component is a side-effect trigger — no DOM output
   return null;
 };

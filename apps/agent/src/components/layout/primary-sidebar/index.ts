@@ -23,6 +23,7 @@ export { useSidebarActions } from './hooks';
 // Types
 export type {
   ConversationItemProps,
+  EditorSidebarTab,
   PrimarySidebarProps,
   SidebarItemProps,
   SidebarTab,

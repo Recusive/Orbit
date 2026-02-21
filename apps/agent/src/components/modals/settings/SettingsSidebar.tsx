@@ -19,6 +19,8 @@ import { NavItem } from './components';
 import type { NavItemConfig, SettingsSection } from './types';
 import type { FC } from 'react';
 
+import { SFSymbol } from '@/components/shared';
+
 interface SettingsSidebarProps {
   readonly activeSection: SettingsSection;
   readonly onSectionChange: (section: SettingsSection) => void;
@@ -90,12 +92,19 @@ const NAV_ITEMS: NavItemConfig[] = [
 const FEEDBACK_ITEM: NavItemConfig = {
   id: 'feedback',
   label: 'Provide Feedback',
-  icon: <FlaskConical className="h-4 w-4" />,
+  icon: (
+    <SFSymbol
+      name="exclamationmark.bubble"
+      size={18}
+      weight="medium"
+      fallback={<FlaskConical className="h-4 w-4" />}
+    />
+  ),
 };
 
 export const SettingsSidebar: FC<SettingsSidebarProps> = ({ activeSection, onSectionChange }) => {
   return (
-    <div className="w-48 border-r border-border-panel p-2.5 bg-transparent flex flex-col">
+    <div className="w-48 border-r border-r-foreground/10 p-2.5 bg-sidebar flex flex-col">
       <nav className="space-y-1 flex-1">
         {NAV_ITEMS.map((item) => (
           <NavItem

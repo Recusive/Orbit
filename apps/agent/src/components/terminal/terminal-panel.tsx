@@ -4,25 +4,26 @@
  * NOTE: Header heights come from @/lib/utils/constants.
  * To change terminal header dimensions, update HEIGHTS in constants.ts.
  */
-import {
-  ChevronDown,
-  ChevronUp,
-  ChevronsLeftRight,
-  ChevronsRightLeft,
-  Plus,
-  Search,
-  Terminal,
-  X,
-} from 'lucide-react';
+import { IconLayoutAlignBottom } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconLayoutAlignBottom';
+import { IconLayoutAlignLeft } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconLayoutAlignLeft';
+import { IconLayoutAlignRight } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconLayoutAlignRight';
+import { ChevronDown, ChevronUp, Plus, Search, Terminal, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import type { SearchOptions } from '@/components/terminal/terminal-search-bar';
+import type { TerminalPosition } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
 import { TerminalContextMenu } from '@/components/terminal/terminal-context-menu';
 import { TerminalSearchBar } from '@/components/terminal/terminal-search-bar';
 import { ContextMenuTrigger } from '@/components/ui/context-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTerminalInstanceManager } from '@/hooks/terminal/use-terminal-instance-manager';
@@ -34,6 +35,44 @@ import {
   useWorkspacePath,
   useActiveTab,
 } from '@/stores/ui/ui-store';
+
+/** Custom grid icon — matches the user's 2x2+tall-right layout glyph */
+const LayoutGridIcon: FC<{ readonly className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" className={className}>
+    <path
+      d="M4 5C4 4.44772 4.44772 4 5 4H9C9.55228 4 10 4.44772 10 5V9C10 9.55228 9.55228 10 9 10H5C4.44772 10 4 9.55228 4 9V5Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M14 5C14 4.44772 14.4477 4 15 4H19C19.5523 4 20 4.44772 20 5V19C20 19.5523 19.5523 20 19 20H15C14.4477 20 14 19.5523 14 19V5Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M4 15C4 14.4477 4.44772 14 5 14H9C9.55228 14 10 14.4477 10 15V19C10 19.5523 9.55228 20 9 20H5C4.44772 20 4 19.5523 4 19V15Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+/** Position menu items — icon, label, and target position */
+const POSITION_OPTIONS: readonly {
+  readonly position: TerminalPosition;
+  readonly label: string;
+  readonly Icon: FC<{ readonly className?: string; readonly size?: number }>;
+}[] = [
+  { position: 'both', label: 'Full width', Icon: IconLayoutAlignBottom },
+  { position: 'chat', label: 'Chat area', Icon: IconLayoutAlignLeft },
+  { position: 'activity', label: 'Activity panel', Icon: IconLayoutAlignRight },
+];
 
 // Terminal header uses headerBar height (35px) to match chat header
 const TERMINAL_HEADER_HEIGHT = HEIGHTS.headerBar;
@@ -56,10 +95,10 @@ export interface TerminalPanelProps {
 
 export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode = 'agent' }) => {
   // Use useShallow to prevent re-renders when unrelated store state changes
-  const { toggleBottomPanel, cycleTerminalPosition } = useUIStore(
+  const { toggleTerminalCollapsed, setTerminalPosition } = useUIStore(
     useShallow((s) => ({
-      toggleBottomPanel: s.toggleBottomPanel,
-      cycleTerminalPosition: s.cycleTerminalPosition,
+      toggleTerminalCollapsed: s.toggleTerminalCollapsed,
+      setTerminalPosition: s.setTerminalPosition,
     }))
   );
   const terminalPosition = useTerminalPosition();
@@ -299,12 +338,13 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
   const handleCloseSession = useCallback(
     (sessionId: string): void => {
       closeSession(sessionId);
-      // Close panel if this was the last session
+      // Fully hide panel when closing the last session (direct store write —
+      // toggleBottomPanel only toggles collapsed, it never fully hides)
       if (sessions.length === 1) {
-        toggleBottomPanel();
+        useUIStore.setState({ bottomPanelOpen: false });
       }
     },
-    [closeSession, sessions.length, toggleBottomPanel]
+    [closeSession, sessions.length]
   );
 
   const handleNewSession = useCallback((): void => {
@@ -482,10 +522,20 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
     setShowSearch(true);
   }, []);
 
-  // No background - let macOS vibrancy show through
-  const CycleIcon = terminalPosition === 'activity' ? ChevronsLeftRight : ChevronsRightLeft;
-  const cycleTitle =
-    terminalPosition === 'activity' ? 'Expand to full width' : 'Collapse to activity panel';
+  const handleSetPosition = useCallback(
+    (position: TerminalPosition): void => {
+      setTerminalPosition(position);
+      // Ensure terminal is open and expanded when switching positions
+      const state = useUIStore.getState();
+      if (!state.bottomPanelOpen) {
+        useUIStore.setState({ bottomPanelOpen: true, terminalCollapsed: false });
+      } else if (state.terminalCollapsed) {
+        useUIStore.setState({ terminalCollapsed: false });
+      }
+    },
+    [setTerminalPosition]
+  );
+
   const ToggleIcon = collapsed ? ChevronUp : ChevronDown;
 
   return (
@@ -495,10 +545,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
       style={collapsed ? { height: TERMINAL_HEADER_HEIGHT } : undefined}
     >
       <header
-        className={cn(
-          'relative z-10 flex items-center justify-between px-2 shrink-0 border-b border-gray-5',
-          collapsed && 'border-b-0'
-        )}
+        className="relative z-10 flex items-center justify-between px-2 shrink-0"
         style={{ height: TERMINAL_HEADER_HEIGHT }}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0 h-full">
@@ -595,16 +642,33 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
           >
             <Plus className="h-4 w-4" />
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Terminal position"
+              >
+                <LayoutGridIcon className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" sideOffset={8}>
+              {POSITION_OPTIONS.map(({ position, label, Icon }) => (
+                <DropdownMenuItem
+                  key={position}
+                  onClick={() => {
+                    handleSetPosition(position);
+                  }}
+                  className={cn(terminalPosition === position && 'bg-accent')}
+                >
+                  <Icon size={16} className="mr-2 shrink-0" />
+                  {label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-            onClick={cycleTerminalPosition}
-            title={cycleTitle}
-          >
-            <CycleIcon className="h-4 w-4" />
-          </button>
-          <button
-            className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-            onClick={toggleBottomPanel}
+            onClick={toggleTerminalCollapsed}
             title={collapsed ? 'Expand terminal' : 'Collapse terminal'}
           >
             <ToggleIcon className="h-4 w-4" />

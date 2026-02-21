@@ -21,7 +21,7 @@ export const SkillToolWidget: FC<SkillToolWidgetProps> = ({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 py-1.5 px-2.5 text-sm rounded-lg',
+        'flex items-center gap-2 py-1.5 px-2.5 text-sm rounded-xl',
         isFailed && 'border-2 border-dotted border-destructive/40 opacity-60'
       )}
     >
@@ -30,33 +30,35 @@ export const SkillToolWidget: FC<SkillToolWidgetProps> = ({
         <div
           className={cn(
             'w-5 h-5 rounded flex items-center justify-center shrink-0',
-            isFailed ? 'bg-destructive/8' : 'bg-violet-500/8'
+            isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
           )}
         >
           <Sparkles
             className={cn(
               'h-3 w-3',
-              isFailed ? 'text-destructive/60' : 'text-violet-500/60',
+              isFailed ? 'text-destructive/60' : 'text-foreground/60',
               isRunning && 'animate-pulse'
             )}
           />
         </div>
 
         {/* Label */}
-        <span className="text-xs text-gray-11 font-medium">Skill</span>
+        <span className="text-xs text-lg-text-secondary font-medium">Skill</span>
 
         {/* Skill name */}
         <span
           className={cn(
             'text-xs font-medium truncate',
-            isFailed ? 'text-gray-11 line-through' : 'text-gray-12'
+            isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
           )}
         >
           {skillName}
         </span>
 
         {/* Status indicator */}
-        {isRunning ? <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" /> : null}
+        {isRunning ? (
+          <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
+        ) : null}
 
         {isComplete ? (
           <span className="flex items-center gap-1 text-xs text-green-500/80">

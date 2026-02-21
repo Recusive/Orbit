@@ -39,7 +39,7 @@ export interface ReviewFixesStressTestDeps {
   handleSend: (text: string) => void;
   handleStop: () => void;
   handleEffortLevelChange: (level: 'low' | 'medium' | 'high' | 'max') => void;
-  handleModelChange: (model: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6') => void;
+  handleModelChange: (model: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6') => void;
   handleThinkingModeChange: (mode: 'off' | 'think' | 'hard' | 'ultra') => void;
   postMessage: (msg: WebviewMessage) => void;
 }
@@ -237,20 +237,20 @@ export async function runReviewFixesStressTest(
   // Step 1a: Set model to Sonnet (4.5), send message, verify NO effort:set sent.
   // 4.5 models: thinking:set IS sent (toggleable), effort:set is NOT sent.
   let stepOk = await runStep(
-    'Fix 1a: Non-adaptive model (4.5) should NOT send effort:set',
+    'Fix 1a: Non-adaptive model (Haiku) should NOT send effort:set',
     async () => {
-      // Set model to Sonnet (non-adaptive) via the intercepted actions
-      interceptedActions.handleModelChange('sonnet');
+      // Set model to Haiku (non-adaptive, uses extended thinking) via the intercepted actions
+      interceptedActions.handleModelChange('haiku');
       await sleep(100);
 
       const toolState = useToolStore.getState();
-      assertEq(toolState.model, 'sonnet', 'Model should be sonnet');
-      assertFalse(isAdaptiveThinkingModel(toolState.model), 'Sonnet should not be adaptive');
+      assertEq(toolState.model, 'haiku', 'Model should be haiku');
+      assertFalse(isAdaptiveThinkingModel(toolState.model), 'Haiku should not be adaptive');
 
       // Clear capture, send a message via intercepted handleSend, wait for completion
       capture.clear();
-      interceptedActions.handleSend('Say exactly: "Hello from sonnet". Nothing else.');
-      await waitForAgentComplete(agentTimeout, 'Sonnet response');
+      interceptedActions.handleSend('Say exactly: "Hello from haiku". Nothing else.');
+      await waitForAgentComplete(agentTimeout, 'Haiku response');
 
       // Check IPC messages — should have model:set but NOT effort:set
       const effortMessages = capture.getByType('effort:set');
@@ -267,7 +267,7 @@ export async function runReviewFixesStressTest(
       assertGte(thinkingMessages.length, 1, 'thinking:set should be sent for non-adaptive');
 
       return (
-        'No effort:set for sonnet. model:set=' +
+        'No effort:set for haiku. model:set=' +
         String(modelMessages.length) +
         ', thinking:set=' +
         String(thinkingMessages.length)
@@ -335,7 +335,7 @@ export async function runReviewFixesStressTest(
     'Fix 1c: Effort level change with non-adaptive model',
     async () => {
       // Switch to Sonnet
-      interceptedActions.handleModelChange('sonnet');
+      interceptedActions.handleModelChange('haiku');
       await sleep(100);
 
       // Change effort level — store should update
@@ -344,7 +344,7 @@ export async function runReviewFixesStressTest(
 
       const toolState = useToolStore.getState();
       assertEq(toolState.effortLevel, 'max', 'ToolStore effort should be max');
-      assertEq(toolState.model, 'sonnet', 'Model should still be sonnet');
+      assertEq(toolState.model, 'haiku', 'Model should still be haiku');
 
       // Send a message — effort:set should NOT be in the pre-send burst
       capture.clear();
@@ -352,12 +352,12 @@ export async function runReviewFixesStressTest(
       await waitForAgentComplete(agentTimeout, 'Effort gating test');
 
       const effortMessages = capture.getByType('effort:set');
-      assertEq(effortMessages.length, 0, 'effort:set should NOT be in pre-send burst for sonnet');
+      assertEq(effortMessages.length, 0, 'effort:set should NOT be in pre-send burst for haiku');
 
       // Reset to high for subsequent tests
       interceptedActions.handleEffortLevelChange('high');
 
-      return 'ToolStore updated to max but no effort:set IPC for sonnet pre-send';
+      return 'ToolStore updated to max but no effort:set IPC for haiku pre-send';
     },
     results
   );
@@ -381,7 +381,7 @@ export async function runReviewFixesStressTest(
       await sleep(50);
       assertEq(useToolStore.getState().effortLevel, 'low', 'Effort should be low');
 
-      deps.handleModelChange('sonnet');
+      deps.handleModelChange('haiku');
       await sleep(50);
       assertEq(useToolStore.getState().effortLevel, 'low', 'Effort persists across model change');
 
@@ -449,11 +449,11 @@ export async function runReviewFixesStressTest(
   stepOk = await runStep(
     'Fix 4: thinkingDurationMs preserved in conversation reload',
     async () => {
-      // Use a 4.5 model (sonnet) with thinking ENABLED to guarantee thinking blocks.
+      // Use a non-adaptive model (haiku) with thinking ENABLED to guarantee thinking blocks.
       // 4.5 models: thinking is toggled on/off with budget levels (think/hard/ultra).
       // When on, thinking blocks are ALWAYS produced — unlike 4.6 where it's adaptive.
       // This makes the test deterministic for verifying thinkingDurationMs plumbing.
-      deps.handleModelChange('sonnet');
+      deps.handleModelChange('haiku');
       deps.handleThinkingModeChange('think');
       await sleep(100);
 
@@ -562,7 +562,7 @@ export async function runReviewFixesStressTest(
   logger.warn('');
 
   // Reset model, effort, and thinking to defaults
-  deps.handleModelChange('sonnet');
+  deps.handleModelChange('haiku');
   deps.handleEffortLevelChange('high');
   deps.handleThinkingModeChange('off');
 

@@ -316,6 +316,18 @@ export const RewindConversationSchema = z
           role: z.enum(['user', 'assistant']),
           content: z.string(),
           parentUuid: z.string().nullish(),
+          toolUses: z
+            .array(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+                input: z.record(z.string(), z.unknown()),
+                output: z.string().optional(),
+                success: z.boolean(),
+                contentOffset: z.number().optional(),
+              })
+            )
+            .optional(),
         })
       )
       .optional(),
@@ -745,6 +757,27 @@ export const BrowserToolResponseSchema = z
 // SUBAGENTS (Webview → Extension)
 // ═══════════════════════════════════════════════════════════════
 
+// Skill definition
+export const SkillDefinitionSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string(),
+    source: z.enum(['project', 'user']),
+    triggers: z.array(z.string()).optional(),
+    filePath: z.string().optional(),
+  })
+  .strict();
+
+export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>;
+
+// List all skills
+export const SkillsListSchema = z
+  .object({
+    type: z.literal('skills:list'),
+    uuid: UUIDSchema,
+  })
+  .strict();
+
 // Subagent definition
 export const SubagentDefinitionSchema = z
   .object({
@@ -753,7 +786,7 @@ export const SubagentDefinitionSchema = z
     prompt: z.string(),
     tools: z.array(z.string()).optional(),
     disallowedTools: z.array(z.string()).optional(),
-    model: z.enum(['sonnet', 'opus', 'haiku', 'claude-opus-4-6', 'inherit']).optional(),
+    model: z.enum(['claude-sonnet-4-6', 'claude-opus-4-6', 'haiku', 'inherit']).optional(),
   })
   .strict();
 
@@ -809,7 +842,7 @@ export const SlashCommandDefinitionSchema = z
     content: z.string(), // The actual prompt content
     allowedTools: z.array(z.string()).optional(),
     argumentHint: z.string().optional(),
-    model: z.enum(['sonnet', 'opus', 'haiku', 'claude-opus-4-6']).optional(),
+    model: z.enum(['claude-sonnet-4-6', 'claude-opus-4-6', 'haiku']).optional(),
     scope: CommandScopeSchema,
     /** Whether this command is read-only (builtin/default commands) */
     readonly: z.boolean().optional(),
@@ -947,6 +980,8 @@ export const WebviewMessageSchema = z.discriminatedUnion('type', [
   BrowserShowSchema,
   BrowserHideSchema,
   BrowserToolResponseSchema,
+  // Skills
+  SkillsListSchema,
   // Subagents
   SubagentsListSchema,
   SubagentCreateSchema,
@@ -1025,6 +1060,10 @@ export const AgentCompleteSchema = z
     message_id: z.string(),
     duration_ms: z.number().optional(),
     total_cost_usd: z.number().optional(),
+    /** SDK stop_reason forwarded from the bridge. "end_turn" = final response,
+     *  "tool_use" = intermediate turn (more turns coming). Used by ChatMessageService
+     *  to decide whether to clear isAgentRunning immediately or delay. */
+    result_subtype: z.string().optional(),
     usage: z
       .object({
         input_tokens: z.number(),
@@ -1075,6 +1114,14 @@ export const AgentCheckpointSchema = z
     uuid: UUIDSchema,
     session_id: SessionIdSchema,
     checkpoint_id: z.string(),
+  })
+  .strict();
+
+// Compact complete event (SDK compact_boundary signal)
+export const AgentCompactCompleteSchema = z
+  .object({
+    type: z.literal('agent:compact_complete'),
+    session_id: z.string(),
   })
   .strict();
 
@@ -1436,6 +1483,7 @@ const PersistedMessageSchema = z
     thinking: z.string().optional(),
     thinkingDurationMs: z.number().optional(),
     isInterrupted: z.boolean().optional(),
+    turnDurationMs: z.number().optional(),
     // Support both old 'timestamp' and new 'createdAt' field names
     createdAt: z.number().optional(),
     timestamp: z.number().optional(),
@@ -1457,6 +1505,7 @@ const PersistedMessageSchema = z
     thinking: msg.thinking,
     thinkingDurationMs: msg.thinkingDurationMs,
     isInterrupted: msg.isInterrupted,
+    turnDurationMs: msg.turnDurationMs,
     // Prefer createdAt, fall back to timestamp, default to 0
     createdAt: msg.createdAt ?? msg.timestamp ?? 0,
     toolUses: msg.toolUses ?? [],
@@ -1719,6 +1768,30 @@ export const SubagentErrorSchema = z
   .strict();
 
 // ═══════════════════════════════════════════════════════════════
+// SKILLS (Extension → Webview)
+// ═══════════════════════════════════════════════════════════════
+
+// Response with list of all skills
+export const SkillsListResponseSchema = z
+  .object({
+    type: z.literal('skills:list:response'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    skills: z.array(SkillDefinitionSchema),
+  })
+  .strict();
+
+// Skill operation error
+export const SkillsErrorSchema = z
+  .object({
+    type: z.literal('skills:error'),
+    uuid: UUIDSchema,
+    request_uuid: UUIDSchema,
+    error: z.string(),
+  })
+  .strict();
+
+// ═══════════════════════════════════════════════════════════════
 // SLASH COMMANDS (Extension → Webview)
 // ═══════════════════════════════════════════════════════════════
 
@@ -1809,6 +1882,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   AgentPlanModeSchema,
   AgentAcceptModeSchema,
   AgentCheckpointSchema,
+  AgentCompactCompleteSchema,
   // Tools
   ToolStartSchema,
   ToolEndSchema,
@@ -1859,6 +1933,9 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   BrowserOpenSchema,
   BrowserCloseSchema,
   BrowserToolRequestSchema,
+  // Skills
+  SkillsListResponseSchema,
+  SkillsErrorSchema,
   // Subagents
   SubagentsListResponseSchema,
   SubagentCreatedSchema,
@@ -1951,6 +2028,7 @@ export type AgentError = z.infer<typeof AgentErrorSchema>;
 export type AgentPlanMode = z.infer<typeof AgentPlanModeSchema>;
 export type AgentAcceptMode = z.infer<typeof AgentAcceptModeSchema>;
 export type AgentCheckpoint = z.infer<typeof AgentCheckpointSchema>;
+export type AgentCompactComplete = z.infer<typeof AgentCompactCompleteSchema>;
 export type ToolStart = z.infer<typeof ToolStartSchema>;
 export type ToolEnd = z.infer<typeof ToolEndSchema>;
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;

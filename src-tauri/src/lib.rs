@@ -29,7 +29,7 @@ use commands::canvas::PreviewServerState;
 use commands::common::{
     credentials, dev_monitor, diagnostics, files, git, lsp, providers,
     search::{self, FileIndexState},
-    settings, terminal, workspace,
+    settings, sf_symbols, terminal, window, workspace,
 };
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
@@ -287,6 +287,8 @@ pub fn run() {
         .plugin(tauri_plugin_liquid_glass::init())
         .plugin(orbit_plugin_decorum::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         // Setup event callbacks for agent and configure window
         .setup(move |app| {
             agent_cmd::setup_event_callbacks(app.handle(), &session_manager);
@@ -295,25 +297,14 @@ pub fn run() {
             {
                 use orbit_plugin_decorum::WebviewWindowExt as _;
                 use tauri::Manager as _;
-                use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 
                 if let Some(window) = app.get_webview_window("main") {
                     // Enable ProMotion 120Hz on supported displays.
                     drop(window.enable_promotion());
 
-                    // Apply heavy frosted vibrancy (iOS 7 style).
-                    // FullScreenUI has the heaviest gaussian blur of all NSVisualEffectMaterials,
-                    // creating a deeply frosted diffusion instead of a straight see-through look.
-                    // CSS surfaces at 70%/55% opacity mask any material tinting — only the
-                    // blur effect shows through the transparent portion.
-                    if let Err(e) = apply_vibrancy(
-                        &window,
-                        NSVisualEffectMaterial::FullScreenUI,
-                        None,
-                        None,
-                    ) {
-                        log::warn!("Failed to apply frosted vibrancy: {e}");
-                    }
+                    // Liquid Glass effect is managed by the frontend (theme-provider.tsx)
+                    // via tauri-plugin-liquid-glass JS API. This allows dynamic tint
+                    // adjustment when the user switches between light/dark themes.
 
                     // Fix macOS child window z-ordering: when the main window gains
                     // focus, the browser child window can appear behind the parent.
@@ -371,6 +362,8 @@ pub fn run() {
             agent_cmd::agent_create_agent,
             agent_cmd::agent_update_agent,
             agent_cmd::agent_delete_agent,
+            // Skill definition commands
+            agent_cmd::agent_list_skills,
             // Command definition commands
             agent_cmd::agent_list_commands,
             agent_cmd::agent_get_command,
@@ -524,6 +517,7 @@ pub fn run() {
             settings::get_ssh_hosts,
             settings::remove_ssh_host,
             settings::clear_ssh_hosts,
+            settings::pick_directory,
             // Diagnostics commands
             diagnostics::check_previous_crash,
             diagnostics::clear_crash_log,
@@ -576,6 +570,11 @@ pub fn run() {
             browser::browser_detect,
             browser::browser_get_pid,
             browser::browser_clear,
+            // Window management commands
+            window::set_traffic_lights_visible,
+            window::set_glass_theme,
+            // SF Symbol rendering
+            sf_symbols::get_sf_symbol,
         ])
         .run(tauri::generate_context!());
 

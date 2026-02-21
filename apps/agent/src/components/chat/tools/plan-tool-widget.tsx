@@ -63,7 +63,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed
             ? 'border-2 border-dotted border-destructive/40'
             : 'border-2 border-dotted border-mode-plan/40'
@@ -73,13 +73,13 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-mode-plan/8'
+              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
             )}
           >
             <ClipboardList
               className={cn(
                 'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-mode-plan/60',
+                isFailed ? 'text-destructive/60' : 'text-foreground/60',
                 isRunning && 'animate-pulse'
               )}
             />
@@ -88,7 +88,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium',
-              isFailed ? 'text-gray-11 line-through' : 'text-mode-plan'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-mode-plan'
             )}
           >
             Plan
@@ -97,7 +97,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate cursor-pointer hover:underline',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
             onClick={handleFileClick}
             title={filePath}
@@ -106,7 +106,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           </span>
 
           {isRunning ? (
-            <div className="flex items-center gap-1 text-gray-11">
+            <div className="flex items-center gap-1 text-lg-text-secondary">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
               <span className="text-xs">Creating plan...</span>
             </div>
@@ -116,9 +116,10 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
+            aria-hidden="true"
           />
         </div>
       </button>
@@ -141,7 +142,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-mode-plan/20 bg-mode-plan/5 overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-mode-plan/20 bg-mode-plan/5 overflow-hidden">
                   <div className="overflow-auto max-h-[400px]">
                     <div className="p-3">
                       {content.trim() ? (
@@ -156,7 +157,9 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
                           </Streamdown>
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-9 italic">Plan content is empty</div>
+                        <div className="text-sm text-muted-foreground italic">
+                          Plan content is empty
+                        </div>
                       )}
                     </div>
                   </div>

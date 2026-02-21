@@ -33,6 +33,9 @@ pub struct MessageDto {
     /// Whether this message was interrupted by the user
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_interrupted: Option<bool>,
+    /// Wall-clock duration of the entire turn in milliseconds
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_duration_ms: Option<u64>,
     /// Timestamp (Unix epoch ms)
     pub created_at: u64,
     /// Tool uses
@@ -135,6 +138,7 @@ impl From<Message> for MessageDto {
             thinking: msg.thinking,
             thinking_duration_ms: msg.thinking_duration_ms,
             is_interrupted: msg.is_interrupted,
+            turn_duration_ms: msg.turn_duration_ms,
             created_at: msg.created_at,
             tool_uses: msg.tool_uses.into_iter().map(ToolUseDto::from).collect(),
             usage: msg.usage.map(TokenUsageDto::from),
@@ -169,6 +173,7 @@ impl From<MessageDto> for Message {
             thinking: dto.thinking,
             thinking_duration_ms: dto.thinking_duration_ms,
             is_interrupted: dto.is_interrupted,
+            turn_duration_ms: dto.turn_duration_ms,
             created_at: dto.created_at,
             tool_uses: dto.tool_uses.into_iter().map(ToolUse::from).collect(),
             usage: dto.usage.map(TokenUsage::from),

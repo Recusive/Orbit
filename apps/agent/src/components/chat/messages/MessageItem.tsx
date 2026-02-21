@@ -11,7 +11,7 @@ import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'r
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
-import { InterruptIndicator, ThinkingBox } from '../status';
+import { CompactIndicator, InterruptIndicator, ThinkingBox } from '../status';
 
 import { ToolWidgetRenderer } from './ToolWidgetRenderer';
 import { FeedbackDialog } from './feedback-dialog';
@@ -21,9 +21,9 @@ import { arePropsEqual, buildSegments, hasVisibleContent } from './message-utils
 import type { MessageItemProps } from './types';
 import type { FC } from 'react';
 
-import { FileIcon } from '@/components/files';
 import { ErrorBoundary } from '@/components/shared';
 import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
+import { rehypeInsightBlocks } from '@/lib/rehype-insight-blocks';
 import { cn, CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 
 /** Max collapsed height for user message bubbles (px). Content taller than this gets a "Show more" toggle. */
@@ -37,9 +37,12 @@ const LINK_SAFETY_DISABLED = { enabled: false } as const;
 // This is critical for Streamdown performance as it compares plugin arrays by reference.
 const REMARK_PLUGINS = [remarkGfm];
 
-// Rehype configuration: wraps text in <span class="flow-token"> for per-word
-// blur-in animation during streaming. These spans are visually inert when the
-// message is complete — the CSS animation only applies via [data-streaming="true"].
+// Rehype configuration:
+// 1. rehypeInsightBlocks: detects `★ Insight ───` / `───` border patterns and
+//    restructures them into styled <aside class="insight-block"> elements.
+//    Must run BEFORE rehypeFlowTokens so the DOM is finalized before tokenization.
+// 2. rehypeFlowTokens: wraps text in <span class="flow-token"> for per-word
+//    blur-in animation during streaming. Inert when data-streaming="false".
 //
 // IMPORTANT: We use ONE pipeline for both streaming and completed messages.
 // Previously, we switched from streaming→static (empty) plugins when isStreaming
@@ -47,7 +50,7 @@ const REMARK_PLUGINS = [remarkGfm];
 // in one frame), creating a visible flash/glitch at the end of streaming.
 // Keeping the spans avoids the restructuring. The extra DOM weight is negligible
 // since the virtualizer limits to ~15 messages in the DOM.
-const REHYPE_PLUGINS = [rehypeFlowTokens];
+const REHYPE_PLUGINS = [rehypeInsightBlocks, rehypeFlowTokens];
 
 // Streamdown plugins for diagram and code rendering - defined outside component for reference stability.
 // The `code` plugin provides Shiki syntax highlighting with github-light/dark themes.
@@ -93,35 +96,60 @@ const UserMessageBubble: FC<{ readonly content: string; readonly animate: boolea
       setIsExpanded((prev) => !prev);
     }, []);
 
+    // Render leading /slash-command and @file tokens as inline code tags for visual distinction.
+    // Matches tokens like "/commit", "@utils.ts @hooks/" at the start of content.
+    // Both prefixes can coexist: "/review-pr @file.ts explain this"
+    const renderedContent = useMemo(() => {
+      const match = /^((?:(?:\/[\w-]+|@[\w./-]+)(?:\s+|$))+)/.exec(content);
+      if (match === null) return content;
+
+      const rest = content.slice(match[0].length);
+      const tokens = match[0].trim().split(/\s+/);
+
+      return (
+        <>
+          {tokens.map((token, i) => (
+            <span key={i}>
+              <code className="rounded bg-lg-control px-1.5 py-0.5 font-mono text-sm">
+                {token}
+              </code>{' '}
+            </span>
+          ))}
+          {rest}
+        </>
+      );
+    }, [content]);
+
     const isCollapsed = isOverflowing && !isExpanded;
 
     return (
       <div
         className={cn(
-          'w-fit rounded-lg bg-gray-4 px-3.5 pt-2.5',
+          'w-fit rounded-xl bg-lg-control dark:bg-[#272727] px-3.5 pt-2.5',
           isCollapsed ? 'pb-0' : 'pb-2.5',
           animate === true && 'animate-message-in'
         )}
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
-        {/* Content area with optional height clamp */}
+        {/* Content area with optional height clamp + mask fade when collapsed */}
         <div className="relative">
           <p
             ref={contentRef}
             className="text-base leading-relaxed whitespace-pre-wrap select-text"
             style={
               isCollapsed
-                ? { maxHeight: `${String(USER_MESSAGE_MAX_HEIGHT)}px`, overflow: 'hidden' }
+                ? {
+                    maxHeight: `${String(USER_MESSAGE_MAX_HEIGHT)}px`,
+                    overflow: 'hidden',
+                    maskImage: 'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
+                    WebkitMaskImage:
+                      'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
+                  }
                 : undefined
             }
           >
-            {content}
+            {renderedContent}
           </p>
-
-          {/* Gradient fade overlay when collapsed */}
-          {isCollapsed ? (
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-gray-4 to-transparent pointer-events-none" />
-          ) : null}
         </div>
 
         {/* Show more / Show less toggle */}
@@ -142,6 +170,8 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
   tools,
   isLastAssistantMessage,
+  isLastInAssistantGroup,
+  isAgentRunning,
   animate,
   onRewind,
   onOpenFile,
@@ -200,11 +230,6 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
     [message.role, animatedContent, tools]
   );
 
-  // Check for attachments
-  const hasFiles = (message.attachedFiles?.length ?? 0) > 0;
-  const hasImages = (message.attachedImages?.length ?? 0) > 0;
-  const hasAttachments = hasFiles || hasImages;
-
   // Don't render empty assistant message bubbles
   if (!hasVisibleContent(message, segments, isComplete)) {
     return null;
@@ -222,44 +247,14 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
     >
       {/* Message block */}
       {message.role === 'user' ? (
-        /* User message — right-aligned bubble with collapsible long content */
-        <div className="flex flex-col items-end gap-1">
-          <UserMessageBubble content={message.displayedContent} animate={animate} />
-
-          {/* Attached context — right-aligned alongside the bubble */}
-          {hasAttachments ? (
-            <div className="chat-attached-context flex flex-wrap justify-end gap-1.5">
-              {message.attachedFiles?.map((filePath) => {
-                const fileName = filePath.split('/').pop() ?? filePath;
-                return (
-                  <div
-                    key={filePath}
-                    className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-gray-4 rounded-md hover:bg-accent transition-colors cursor-pointer"
-                    title={filePath}
-                  >
-                    <FileIcon fileName={fileName} className="h-3.5 w-3.5" monochrome={false} />
-                    <span className="text-sm text-foreground/70">{fileName}</span>
-                  </div>
-                );
-              })}
-
-              {message.attachedImages?.map((image, index) => (
-                <div
-                  key={`${image.name}-${String(index)}`}
-                  className="chat-attached-context-attachment flex items-center gap-1.5 px-2 py-1 bg-gray-4 rounded-md hover:bg-accent transition-colors cursor-pointer"
-                  title={image.name}
-                >
-                  <img
-                    src={image.previewUrl}
-                    alt={image.name}
-                    className="h-4 w-4 object-cover rounded-md"
-                  />
-                  <span className="text-sm text-foreground/70">{image.name}</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        /* User message — right-aligned bubble, or compact divider for /compact */
+        message.displayedContent.trim() === '/compact' ? (
+          <CompactIndicator messageId={message.id} />
+        ) : (
+          <div className="flex flex-col items-end gap-1">
+            <UserMessageBubble content={message.displayedContent} animate={animate} />
+          </div>
+        )
       ) : (
         /* Assistant message - no bubble, content flows naturally */
         <div
@@ -275,7 +270,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
             {message.thinkingBlocks !== undefined && message.thinkingBlocks.length > 0 ? (
               message.thinkingBlocks.map((block, i) => (
                 <ThinkingBox
-                  key={i}
+                  key={`thinking-${String(i)}-${String(block.durationMs)}`}
                   thinking={block.content}
                   thinkingDurationMs={block.durationMs}
                   isStreaming={
@@ -320,7 +315,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                 <div key={segment.key} className="tool-widget">
                   <ErrorBoundary
                     fallback={
-                      <div className="p-2 rounded-md bg-gray-3 border border-gray-5 text-gray-12 text-sm">
+                      <div className="p-2 rounded-md bg-lg-control border border-lg-separator text-foreground text-sm">
                         Failed to render tool: {segment.tool.toolName}
                       </div>
                     }
@@ -336,11 +331,17 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
             })}
           </div>
 
-          {/* Message actions - shown when complete */}
-          {isComplete ? (
+          {/* Message actions - shown on the last assistant message in a consecutive group.
+           *  Multi-turn responses (tool use + text) produce multiple assistant messages;
+           *  only the final one renders the action bar to avoid duplicate controls.
+           *  NOTE: We intentionally do NOT gate on !isAgentRunning — previous turns' action
+           *  bars should remain visible when the user sends a new message. Rewind is disabled
+           *  while the agent is running to prevent mid-generation forks. */}
+          {isComplete && isLastInAssistantGroup ? (
             <>
               <MessageActions
-                rewindDisabled={isLastAssistantMessage}
+                rewindDisabled={isLastAssistantMessage || isAgentRunning}
+                turnDurationMs={message.turnDurationMs}
                 onCopy={() => {
                   void navigator.clipboard.writeText(message.content);
                 }}

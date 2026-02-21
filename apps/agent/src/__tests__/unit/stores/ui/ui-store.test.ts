@@ -466,22 +466,27 @@ describe('ui-store', () => {
       it('should clamp width to valid range', () => {
         const { setLeftSidebarWidth } = useUIStore.getState();
 
-        // Too small (but above collapsed) - should clamp to minUsable
+        // Below minUsable — snaps to collapsed (no usable state between 0 and minUsable)
         setLeftSidebarWidth(100);
-        expect(useUIStore.getState().leftSidebarWidth).toBe(PANEL_SIZES.sidebar.minUsable);
+        expect(useUIStore.getState().leftSidebarWidth).toBe(SIDEBAR.collapsed);
 
-        // Too large - should clamp to max
+        // Too large — should clamp to max
         setLeftSidebarWidth(1000);
         expect(useUIStore.getState().leftSidebarWidth).toBe(PANEL_SIZES.sidebar.max);
       });
 
-      it('should snap to collapsed when width is at or below collapsed', () => {
+      it('should snap to collapsed when width is below minUsable', () => {
         const { setLeftSidebarWidth } = useUIStore.getState();
 
         setLeftSidebarWidth(SIDEBAR.collapsed);
         expect(useUIStore.getState().leftSidebarWidth).toBe(SIDEBAR.collapsed);
 
+        // Any width below minUsable snaps to collapsed (0) —
+        // there's no usable sidebar state between 0 and minUsable
         setLeftSidebarWidth(30);
+        expect(useUIStore.getState().leftSidebarWidth).toBe(SIDEBAR.collapsed);
+
+        setLeftSidebarWidth(PANEL_SIZES.sidebar.minUsable - 1);
         expect(useUIStore.getState().leftSidebarWidth).toBe(SIDEBAR.collapsed);
       });
 
@@ -558,14 +563,23 @@ describe('ui-store', () => {
 
   describe('bottom panel', () => {
     describe('toggleBottomPanel', () => {
-      it('should toggle bottom panel open state', () => {
+      it('should open panel and toggle collapsed state', () => {
         const { toggleBottomPanel } = useUIStore.getState();
 
+        // First toggle: closed → open (expanded)
         toggleBottomPanel();
         expect(useUIStore.getState().bottomPanelOpen).toBe(true);
+        expect(useUIStore.getState().terminalCollapsed).toBe(false);
 
+        // Second toggle: open expanded → open collapsed (header-only)
         toggleBottomPanel();
-        expect(useUIStore.getState().bottomPanelOpen).toBe(false);
+        expect(useUIStore.getState().bottomPanelOpen).toBe(true);
+        expect(useUIStore.getState().terminalCollapsed).toBe(true);
+
+        // Third toggle: open collapsed → open expanded
+        toggleBottomPanel();
+        expect(useUIStore.getState().bottomPanelOpen).toBe(true);
+        expect(useUIStore.getState().terminalCollapsed).toBe(false);
       });
     });
 
@@ -578,7 +592,7 @@ describe('ui-store', () => {
         expect(useUIStore.getState().bottomPanelHeight).toBe(PANEL_SIZES.terminal.min);
 
         // Too large
-        setBottomPanelHeight(3000);
+        setBottomPanelHeight(99999);
         expect(useUIStore.getState().bottomPanelHeight).toBe(PANEL_SIZES.terminal.max);
 
         // Valid
@@ -630,13 +644,16 @@ describe('ui-store', () => {
     });
 
     describe('cycleTerminalPosition', () => {
-      it('should cycle between activity and both', () => {
+      it('should cycle through activity → both → chat → activity', () => {
         const { cycleTerminalPosition } = useUIStore.getState();
 
         expect(useUIStore.getState().terminalPosition).toBe('activity');
 
         cycleTerminalPosition();
         expect(useUIStore.getState().terminalPosition).toBe('both');
+
+        cycleTerminalPosition();
+        expect(useUIStore.getState().terminalPosition).toBe('chat');
 
         cycleTerminalPosition();
         expect(useUIStore.getState().terminalPosition).toBe('activity');
@@ -649,6 +666,53 @@ describe('ui-store', () => {
 
         expect(useUIStore.getState().bottomPanelOpen).toBe(true);
       });
+    });
+  });
+
+  // ============================================================================
+  // Terminal Position Independence
+  // ============================================================================
+
+  describe('terminal position is independent of activity panel', () => {
+    it('should preserve terminal position when activity panel closes', () => {
+      const { toggleReviewPanel, setTerminalPosition, toggleBottomPanel } = useUIStore.getState();
+
+      // Open activity panel and terminal in activity position
+      toggleReviewPanel(); // open
+      setTerminalPosition('activity');
+      toggleBottomPanel(); // open terminal
+
+      expect(useUIStore.getState().terminalPosition).toBe('activity');
+
+      // Close activity panel — terminal position is unchanged
+      toggleReviewPanel();
+
+      expect(useUIStore.getState().terminalPosition).toBe('activity');
+    });
+
+    it('should preserve both position when activity panel closes', () => {
+      const { toggleReviewPanel, setTerminalPosition, toggleBottomPanel } = useUIStore.getState();
+
+      toggleReviewPanel(); // open
+      setTerminalPosition('both');
+      toggleBottomPanel(); // open terminal
+
+      // Close activity panel — terminal stays in 'both'
+      toggleReviewPanel();
+
+      expect(useUIStore.getState().terminalPosition).toBe('both');
+    });
+
+    it('should preserve chat position when activity panel closes', () => {
+      const { toggleReviewPanel, setTerminalPosition, toggleBottomPanel } = useUIStore.getState();
+
+      toggleReviewPanel(); // open
+      setTerminalPosition('chat');
+      toggleBottomPanel(); // open terminal
+
+      toggleReviewPanel(); // close
+
+      expect(useUIStore.getState().terminalPosition).toBe('chat');
     });
   });
 
@@ -906,10 +970,10 @@ describe('ui-store', () => {
         toggleReviewPanel();
       }
 
-      // After even number of toggles, should be back to initial state
+      // After 10 toggles: sidebar and review flip back, terminal stays open
       const state = useUIStore.getState();
       expect(state.leftSidebarWidth).toBe(SIDEBAR.expanded); // Back to expanded
-      expect(state.bottomPanelOpen).toBe(false); // Back to closed
+      expect(state.bottomPanelOpen).toBe(true); // Opens on first toggle, stays open
       expect(state.reviewPanelOpen).toBe(false); // Back to closed
     });
 

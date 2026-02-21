@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { formatZodError } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
+import { ClaudeCredentials } from '../../common/auth/credentials.js'; // [oauth-401-recovery] import — revert: remove this line
 import { TextEventBatcher } from '../../common/batching/index.js';
 import { Disposable, Emitter } from '../../common/events/events.js';
 import { createLogger } from '../../common/logging/logger.js';
@@ -47,7 +48,7 @@ const GeneratedAgentSchema = z
       .optional()
       .describe('Optional list of specific tool names this agent should use'),
     model: z
-      .enum(['sonnet', 'opus', 'haiku', 'claude-opus-4-6', 'inherit'])
+      .enum(['claude-sonnet-4-6', 'claude-opus-4-6', 'haiku', 'inherit'])
       .optional()
       .describe('Model to use (default: inherit from parent)'),
   })
@@ -75,7 +76,7 @@ const GeneratedCommandSchema = z
       .optional()
       .describe('Optional hint for command arguments (e.g., "[file] [options]")'),
     model: z
-      .enum(['sonnet', 'opus', 'haiku'])
+      .enum(['claude-sonnet-4-6', 'claude-opus-4-6', 'haiku'])
       .optional()
       .describe('Optional model to use for this command'),
   })
@@ -182,7 +183,7 @@ export interface SessionConfig {
   planEnabled?: boolean;
   acceptEnabled?: boolean;
   critiqueEnabled?: boolean;
-  model?: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
+  model?: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
   sessionMode?: 'chat' | 'agent';
   /** SDK session ID to resume from (for session continuity, rewind forks, etc.) */
   resumeSessionId?: string;
@@ -828,6 +829,10 @@ export class SessionManager extends Disposable {
   );
   readonly onCheckpoint = this._onCheckpoint.event;
 
+  // Compact complete event - fired when SDK emits compact_boundary system message
+  private readonly _onCompactComplete = this._register(new Emitter<{ sessionId: string }>());
+  readonly onCompactComplete = this._onCompactComplete.event;
+
   // Browser tool request event - forwarded to frontend for execution
   private readonly _onBrowserToolRequest = this._register(
     new Emitter<{ sessionId: string; request: McpToolRequest }>()
@@ -838,7 +843,12 @@ export class SessionManager extends Disposable {
   private readonly _onAuthError = this._register(
     new Emitter<{
       sessionId: string;
-      category: 'TOKEN_EXPIRED' | 'REFRESH_FAILED' | 'NO_CREDENTIALS' | 'INVALID_TOKEN';
+      category:
+        | 'TOKEN_EXPIRED'
+        | 'REFRESH_FAILED'
+        | 'NO_CREDENTIALS'
+        | 'INVALID_TOKEN'
+        | 'AUTH_RECOVERED';
       message: string;
       recoverable: boolean;
     }>()
@@ -849,7 +859,7 @@ export class SessionManager extends Disposable {
   private activeSessions = new Map<string, OrbitAgent>();
   private sessionConsumers = new Map<
     string,
-    { cancel: () => void; state: { cancelled: boolean; pendingRewindCheckpointId?: string } }
+    { cancel: () => void; state: { cancelled: boolean } }
   >();
   private permissionResolvers = new Map<string, PermissionResolver>();
   private modePreferences = new Map<
@@ -860,7 +870,7 @@ export class SessionManager extends Disposable {
       planEnabled?: boolean;
       acceptEnabled?: boolean;
       critiqueEnabled?: boolean;
-      model?: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
+      model?: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
     }
   >();
   private pendingTools = new Map<
@@ -914,6 +924,14 @@ export class SessionManager extends Disposable {
    * Called when system:init fires and we learn the SDK session ID.
    * After this, both the agent-bridge and the frontend use the SDK ID
    * as the single source of truth — no aliases or translation needed.
+   *
+   * LEGACY PATH: Since SDK v0.2.44, new sessions pass `options.sessionId`
+   * (see agent.ts `_createOptions`), so the SDK uses Orbit's UUID directly
+   * and this method is never called for new sessions.
+   *
+   * Still required for:
+   * - Forks/rewinds: SDK generates a new UUID for the forked JSONL
+   * - Sessions created before the custom sessionId feature was added
    */
   private rekeySession(oldId: string, newId: string): void {
     const rekey = <V>(map: Map<string, V>): void => {
@@ -1126,7 +1144,7 @@ export class SessionManager extends Disposable {
    */
   private _startBackgroundConsumer(initialSessionId: string, agent: OrbitAgent): void {
     let sessionId = initialSessionId;
-    const state: { cancelled: boolean; pendingRewindCheckpointId?: string } = { cancelled: false };
+    const state: { cancelled: boolean } = { cancelled: false };
 
     const cancel = (): void => {
       state.cancelled = true;
@@ -1142,9 +1160,10 @@ export class SessionManager extends Disposable {
           { name: string; input: Record<string, unknown>; pendingMessages: AgentMessage[] }
         >();
 
-        // Track whether text was streamed for this turn (via stream_event)
-        // If not streamed, we need to emit text from the assistant message
+        // Track whether text/thinking was streamed for this turn (via stream_event)
+        // If not streamed, we need to emit from the assistant message
         let textWasStreamed = false;
+        let thinkingWasStreamed = false;
 
         let messageIndex = 0;
         for await (const rawMessage of agent.receiveResponse()) {
@@ -1184,10 +1203,17 @@ export class SessionManager extends Disposable {
 
               // Re-key all Maps from temp ID to SDK ID.
               // After this, both the agent-bridge and frontend use one ID.
+              // For new sessions with custom sessionId (SDK v0.2.44+), IDs already
+              // match so this branch is skipped. Still fires for forks and legacy sessions.
               if (sdkSessionId !== sessionId) {
                 this.rekeySession(sessionId, sdkSessionId);
                 agent.effectiveSessionId = sdkSessionId;
                 sessionId = sdkSessionId; // All subsequent emissions use SDK ID
+              } else {
+                logger.info(
+                  { sessionId },
+                  'Session ID matches SDK ID — no rekeying needed (custom sessionId)'
+                );
               }
 
               const resumeState = this.sessionResumeState.get(sessionId) ?? {
@@ -1241,6 +1267,15 @@ export class SessionManager extends Disposable {
                   );
                 }
               }
+            }
+
+            // Handle compact_boundary — SDK signal that compaction completed
+            if (sdkMessage.subtype === 'compact_boundary') {
+              logger.info(
+                { sessionId },
+                'Context compaction completed (compact_boundary received)'
+              );
+              this._onCompactComplete.fire({ sessionId });
             }
             continue;
           }
@@ -1311,6 +1346,7 @@ export class SessionManager extends Disposable {
             ) {
               const thinkingDelta = event.delta.thinking;
               if (thinkingDelta !== undefined) {
+                thinkingWasStreamed = true;
                 this._onAgentMessage.fire({
                   sessionId,
                   message: { type: 'thinking', content: thinkingDelta, messageId: streamMessageId },
@@ -1371,14 +1407,16 @@ export class SessionManager extends Disposable {
                 continue;
               }
               if (block.type === 'thinking') {
-                this._onAgentMessage.fire({
-                  sessionId,
-                  message: {
-                    type: 'thinking',
-                    content: block.thinking ?? '',
-                    messageId: currentMessageId,
-                  },
-                });
+                if (!thinkingWasStreamed) {
+                  this._onAgentMessage.fire({
+                    sessionId,
+                    message: {
+                      type: 'thinking',
+                      content: block.thinking ?? '',
+                      messageId: currentMessageId,
+                    },
+                  });
+                }
                 continue;
               }
               // block.type === 'tool_use'
@@ -1485,7 +1523,7 @@ export class SessionManager extends Disposable {
               );
             }
 
-            // Tool results
+            // Tool results and command expansion output
             const content = sdkMessage.message?.content;
             if (!Array.isArray(content)) continue;
 
@@ -1535,6 +1573,35 @@ export class SessionManager extends Disposable {
                   toolUseMap.delete(toolUseId);
                 }
               }
+
+              // Surface SDK command expansion errors (e.g. bash pattern failures in
+              // .claude/commands/*.md templates) so they appear inline in chat.
+              const typed = block as { type?: string; text?: string };
+              if (typed.type === 'text' && typeof typed.text === 'string') {
+                const text = typed.text.trim();
+                if (text.startsWith('<local-command-stderr>')) {
+                  const errorText = text.replace(/<\/?local-command-stderr>/g, '').trim();
+                  if (errorText) {
+                    // Ensure a turn ID exists so the frontend can render the error
+                    if (!this.currentTurnId.has(sessionId)) {
+                      this.currentTurnId.set(sessionId, randomUUID());
+                    }
+                    const errorMsgId = this.currentTurnId.get(sessionId);
+                    logger.warn(
+                      { sessionId, errorLength: errorText.length },
+                      'Command expansion error — surfacing to frontend'
+                    );
+                    this._onAgentMessage.fire({
+                      sessionId,
+                      message: {
+                        type: 'error',
+                        content: errorText,
+                        messageId: errorMsgId,
+                      },
+                    });
+                  }
+                }
+              }
             }
           } else {
             // sdkMessage.type === 'result'
@@ -1551,7 +1618,12 @@ export class SessionManager extends Disposable {
             // drain, but no new SDK messages are expected until the next turn begins.
             await this.textBatcher.drainSession(sessionId);
 
-            // Get the final message ID for this turn before resetting
+            // Get the final message ID for this turn before resetting.
+            // For command-only turns (no streaming/assistant), generate a fallback
+            // so the frontend can still render the result event.
+            if (!this.currentTurnId.has(sessionId)) {
+              this.currentTurnId.set(sessionId, randomUUID());
+            }
             const turnMessageId = this.currentTurnId.get(sessionId);
 
             // Clear accumulated length tracking for this message (reset for next turn)
@@ -1605,44 +1677,42 @@ export class SessionManager extends Disposable {
 
             // Reset for next turn - the next turn will get a new message ID from the SDK
             textWasStreamed = false;
+            thinkingWasStreamed = false;
             this.currentTurnId.delete(sessionId);
-          }
-
-          // Check for pending rewind after processing each message
-          // This must be called from INSIDE the for-await loop on the SAME Query object
-          if (state.pendingRewindCheckpointId) {
-            const checkpointId = state.pendingRewindCheckpointId;
-            state.pendingRewindCheckpointId = undefined;
-
-            logger.warn(
-              {
-                sessionId,
-                checkpointId,
-                sdkSessionId: agent.getCurrentSessionId() ?? 'none',
-              },
-              'REWIND executing pending rewind INSIDE message loop'
-            );
-            try {
-              await agent.rewindFilesInLoop(checkpointId);
-              logger.warn(
-                { sessionId, checkpointId },
-                'REWIND pending rewind COMPLETE — breaking out of message loop'
-              );
-            } catch (rewindErr) {
-              const errMsg = rewindErr instanceof Error ? rewindErr.message : String(rewindErr);
-              logger.error(
-                { sessionId, checkpointId, error: errMsg },
-                'REWIND pending rewind FAILED inside message loop'
-              );
-            }
-            break; // Exit loop after rewind as per SDK pattern
           }
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : 'no stack';
-        logger.error({ sessionId, error: errorMessage }, 'Background consumer error');
-        this._onError.fire({ message: `[SDK Error] ${errorMessage}`, stack: errorStack });
+        // [oauth-401-recovery] Auth-aware catch block.
+        // Revert: remove from here to the closing brace of `if (agent.needsSessionRestart())`,
+        // and restore the original two lines:
+        //   logger.error({ sessionId, error: errorMessage }, 'Background consumer error');
+        //   this._onError.fire({ message: `[SDK Error] ${errorMessage}`, stack: errorStack });
+        const isAuthError = /401|unauthorized|authentication|token.*expired/i.test(errorMessage);
+
+        // Guard against async race: stderr handler's refreshIfNeeded() is fire-and-forget.
+        // If the consumer catches the error before the refresh resolves, the flag won't be
+        // set yet. For auth errors, explicitly await a refresh attempt here.
+        if (isAuthError && !agent.needsSessionRestart()) {
+          const refreshResult = await ClaudeCredentials.refreshIfNeeded();
+          if (refreshResult.refreshed) {
+            agent.markNeedsSessionRestart();
+          }
+        }
+
+        if (agent.needsSessionRestart()) {
+          logger.info({ sessionId }, 'Auth recovered — session will restart on next message');
+          this._onAuthError.fire({
+            sessionId,
+            category: 'AUTH_RECOVERED',
+            message: 'Session credentials refreshed. Please resend your message.',
+            recoverable: true,
+          });
+        } else {
+          logger.error({ sessionId, error: errorMessage }, 'Background consumer error');
+          this._onError.fire({ message: `[SDK Error] ${errorMessage}`, stack: errorStack });
+        }
       }
     })();
   }
@@ -1745,7 +1815,38 @@ export class SessionManager extends Disposable {
         message: 'No valid credentials available. Please re-authenticate with "claude login".',
         recoverable: true,
       });
-      return;
+      throw new Error(
+        'No valid credentials available. Please re-authenticate with "claude login".'
+      );
+    }
+
+    // [oauth-401-recovery] Layer 3: Restart session after 401 recovery.
+    // Revert: remove this entire if-block (down to the closing brace before "Track turn start time").
+    if (agent.needsSessionRestart()) {
+      logger.info({ sessionId }, 'Restarting session after auth recovery');
+
+      // Cancel old background consumer (its query is dead)
+      const consumer = this.sessionConsumers.get(sessionId);
+      if (consumer) consumer.cancel();
+
+      // Allow re-initialization for new query
+      this.sessionInitFired.delete(sessionId);
+
+      try {
+        await agent.restartSession();
+        this._startBackgroundConsumer(sessionId, agent);
+        logger.info({ sessionId }, 'Session restarted with fresh credentials');
+      } catch (restartErr) {
+        const errMsg = restartErr instanceof Error ? restartErr.message : String(restartErr);
+        logger.error({ sessionId, error: errMsg }, 'Session restart failed');
+        this._onAuthError.fire({
+          sessionId,
+          category: 'REFRESH_FAILED',
+          message: `Session restart failed: ${errMsg}. Please start a new chat.`,
+          recoverable: false,
+        });
+        return; // Don't queue message to dead session
+      }
     }
 
     // Track turn start time
@@ -1783,16 +1884,11 @@ export class SessionManager extends Disposable {
   /**
    * Set thinking mode for a session
    */
-  async setThinkingMode(sessionId: string, enabled: boolean, maxTokens?: number): Promise<void> {
+  setThinkingMode(sessionId: string, enabled: boolean, maxTokens?: number): void {
     const agent = this.activeSessions.get(sessionId);
-    if (!agent) {
-      const prefs = this.modePreferences.get(sessionId) ?? {};
-      prefs.thinkingEnabled = enabled;
-      prefs.maxThinkingTokens = maxTokens;
-      this.modePreferences.set(sessionId, prefs);
-      return;
+    if (agent) {
+      agent.setThinkingMode(enabled, maxTokens);
     }
-    await agent.setThinkingMode(enabled, maxTokens);
     const prefs = this.modePreferences.get(sessionId) ?? {};
     prefs.thinkingEnabled = enabled;
     prefs.maxThinkingTokens = maxTokens;
@@ -1802,29 +1898,30 @@ export class SessionManager extends Disposable {
   /**
    * Set effort level for a session (adaptive thinking for Opus 4.6)
    */
-  async setEffortLevel(
-    sessionId: string,
-    effort: 'low' | 'medium' | 'high' | 'max'
-  ): Promise<void> {
+  setEffortLevel(sessionId: string, effort: 'low' | 'medium' | 'high' | 'max'): void {
     const agent = this.activeSessions.get(sessionId);
-    if (!agent) {
-      // Store as thinking preference so session creation picks it up.
-      // Without this, the first effort:set is lost (fires before session exists)
-      // and the session creates with default budget instead of the user's choice.
-      const budgetMap: Record<string, number> = {
-        low: 1024,
-        medium: 4096,
-        high: 10240,
-        max: 32768,
-      };
-      const prefs = this.modePreferences.get(sessionId) ?? {};
+    if (agent) {
+      agent.setEffortLevel(effort);
+    }
+    // Store as thinking preference so session creation picks it up.
+    // Without this, the first effort:set is lost (fires before session exists)
+    // and the session creates with default budget instead of the user's choice.
+    // NOTE: Only update thinkingEnabled/maxThinkingTokens if thinking is currently
+    // enabled (or was previously enabled in prefs). Without this guard, effort:set
+    // unconditionally forces thinkingEnabled=true, overriding the user's "thinking off"
+    // setting for non-adaptive models like Haiku.
+    const budgetMap: Record<string, number> = {
+      low: 1024,
+      medium: 4096,
+      high: 10240,
+      max: 32768,
+    };
+    const prefs = this.modePreferences.get(sessionId) ?? {};
+    if (prefs.thinkingEnabled !== false) {
       prefs.thinkingEnabled = true;
       prefs.maxThinkingTokens = budgetMap[effort] ?? 4096;
-      this.modePreferences.set(sessionId, prefs);
-      logger.debug({ sessionId, effort }, 'Stored effort preference for session creation');
-      return;
     }
-    await agent.setEffortLevel(effort);
+    this.modePreferences.set(sessionId, prefs);
   }
 
   /**
@@ -1844,7 +1941,7 @@ export class SessionManager extends Disposable {
    */
   async setModel(
     sessionId: string,
-    model: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6'
+    model: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6'
   ): Promise<void> {
     const agent = this.activeSessions.get(sessionId);
     if (!agent) {
@@ -2186,14 +2283,14 @@ Create a well-structured agent with:
 2. A clear description of when to use this agent
 3. A detailed system prompt that explains the agent's purpose, capabilities, and how it should behave
 4. Optionally specify which tools the agent should use (if not specified, it inherits all tools)
-5. Optionally specify a model (sonnet for balanced, opus for complex tasks, haiku for fast simple tasks)
+5. Optionally specify a model (claude-sonnet-4-6 for balanced, claude-opus-4-6 for complex tasks, haiku for fast simple tasks)
 
 Return ONLY the JSON object with the agent definition.`;
 
     // Create temporary agent with structured output
     const agent = new OrbitAgent({
       outputFormat,
-      model: 'sonnet',
+      model: 'claude-sonnet-4-6',
     });
 
     await agent.startSession();
@@ -2253,14 +2350,14 @@ Create a well-structured command with:
 2. A clear description of what the command does
 3. A detailed prompt content that tells the AI exactly what to do when the command is invoked
 4. Optionally specify argument hints if the command accepts parameters
-5. Optionally specify a model (sonnet for balanced, opus for complex tasks, haiku for fast simple tasks)
+5. Optionally specify a model (claude-sonnet-4-6 for balanced, claude-opus-4-6 for complex tasks, haiku for fast simple tasks)
 
 Return ONLY the JSON object with the command definition.`;
 
     // Create temporary agent with structured output
     const agent = new OrbitAgent({
       outputFormat,
-      model: 'sonnet',
+      model: 'claude-sonnet-4-6',
     });
 
     await agent.startSession();

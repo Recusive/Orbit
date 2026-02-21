@@ -77,7 +77,7 @@ export function useBrowser(): void {
         // browser:close - command from extension to close browser panel
         case 'browser:close': {
           // Switch to a different tab (files is the default)
-          useUIStore.getState().setActivityTab('files');
+          useUIStore.getState().setActivityTab('source');
           break;
         }
 
@@ -209,6 +209,9 @@ export function useBrowser(): void {
         case 'commands:deleted':
         case 'commands:error':
         case 'commands:generated':
+        case 'skills:list:response':
+        case 'skills:error':
+        case 'agent:compact_complete':
           break;
       }
     },

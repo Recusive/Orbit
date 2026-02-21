@@ -14,18 +14,16 @@
  */
 import { createLogger } from '@orbit/common/lib';
 import { Columns2, Ellipsis, Search, X } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { ViewedFile } from '@/stores/file/file-viewer-store';
-import type { AllotmentHandle } from 'allotment';
 import type { FC } from 'react';
 
 import { FileIcon, FileViewer, FileViewerContent } from '@/components/files';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Switch } from '@/components/ui/switch';
-import { TERMINAL_PANEL, ACTIVITY_PANEL } from '@/lib/utils/constants';
+import { ACTIVITY_PANEL } from '@/lib/utils/constants';
 import { cn } from '@/lib/utils/utils';
 import {
   useFileViewerStore,
@@ -33,19 +31,8 @@ import {
   useOpenTabs,
   useWordWrap,
 } from '@/stores/file/file-viewer-store';
-import { useUIStore, useBottomPanelOpen, useBottomPanelHeight } from '@/stores/ui/ui-store';
 
 const logger = createLogger('EditorCenter');
-
-// Lazy load terminal
-const LazyTerminalPanel = lazy(() =>
-  import('@/components/terminal/terminal-panel').then((m) => ({ default: m.TerminalPanel }))
-);
-const TerminalPanel: FC<TerminalPanelProps> = (props) => (
-  <Suspense fallback={null}>
-    <LazyTerminalPanel {...props} />
-  </Suspense>
-);
 
 interface EditorTabProps {
   readonly file: ViewedFile;
@@ -75,6 +62,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
 
   return (
     <div
+      data-tauri-drag-region={false}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
       role="tab"
@@ -86,7 +74,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         'border-r border-gray-5',
         isActive
           ? 'bg-editor-bg text-foreground border-t-2 border-t-primary'
-          : 'bg-chat-area text-muted-foreground hover:text-foreground border-t-2 border-t-transparent'
+          : 'bg-gray-4 dark:bg-gray-1 text-muted-foreground hover:text-foreground border-t-2 border-t-transparent'
       )}
       style={{ maxWidth: 180 }}
     >
@@ -255,7 +243,8 @@ const TabsHeader: FC<TabsHeaderProps> = ({
 
   return (
     <div
-      className="flex shrink-0 bg-chat-area relative"
+      data-tauri-drag-region
+      className="flex shrink-0 bg-gray-4 dark:bg-gray-1 relative"
       style={{ height: ACTIVITY_PANEL.TABS_HEADER_HEIGHT }}
       onMouseEnter={() => {
         setIsHovered(true);
@@ -268,8 +257,9 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       <div className="absolute bottom-0 left-0 right-0 h-px bg-border/50" />
 
       {/* Scrollable tabs container */}
-      <div className="relative flex-1 min-w-0">
+      <div data-tauri-drag-region className="relative flex-1 min-w-0">
         <div
+          data-tauri-drag-region
           ref={scrollContainerRef}
           className="flex items-center h-full overflow-x-auto scrollbar-hide"
           onWheel={handleWheel}
@@ -320,7 +310,10 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       </div>
 
       {/* Editor actions */}
-      <div className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-chat-area">
+      <div
+        data-tauri-drag-region={false}
+        className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-gray-4 dark:bg-gray-1"
+      >
         <button
           onClick={() => {
             if (activeTabPath) onToggleSearch(activeTabPath);
@@ -402,10 +395,6 @@ export const EditorCenter: FC = () => {
   const toggleSearch = useFileViewerStore((state) => state.toggleSearch);
   const wordWrap = useWordWrap();
   const toggleWordWrap = useFileViewerStore((state) => state.toggleWordWrap);
-
-  const bottomPanelOpen = useBottomPanelOpen();
-  const bottomPanelHeight = useBottomPanelHeight();
-  const setBottomPanelHeight = useUIStore((state) => state.setBottomPanelHeight);
 
   // Split editor state - right pane has its OWN independent tabs
   const [isSplit, setIsSplit] = useState(false);
@@ -491,30 +480,6 @@ export const EditorCenter: FC = () => {
     }
   }, [isSplit, rightPaneTabs, rightPaneActiveTab]);
 
-  const terminalAllotmentRef = useRef<AllotmentHandle>(null);
-
-  // Resize terminal when bottomPanelOpen changes
-  useEffect(() => {
-    const allotment = terminalAllotmentRef.current;
-    if (!allotment) return;
-    allotment.reset();
-  }, [bottomPanelOpen]);
-
-  // Track terminal size when user drags
-  const handleTerminalSizeChange = useCallback(
-    (sizes: number[]): void => {
-      const terminalSize = sizes[1];
-      if (
-        terminalSize !== undefined &&
-        terminalSize > TERMINAL_PANEL.DRAG_THRESHOLD &&
-        bottomPanelOpen
-      ) {
-        setBottomPanelHeight(terminalSize);
-      }
-    },
-    [bottomPanelOpen, setBottomPanelHeight]
-  );
-
   // Handle closing a tab
   // Note: LSP lifecycle (didClose) is handled by CodeMirrorEditor's cleanup effect
   const handleCloseTab = useCallback(
@@ -583,24 +548,6 @@ export const EditorCenter: FC = () => {
   );
 
   return (
-    <div className="@container h-full w-full flex flex-col bg-chat-area">
-      <ResizablePanelGroup
-        ref={terminalAllotmentRef}
-        direction="vertical"
-        className="flex-1"
-        onChange={handleTerminalSizeChange}
-      >
-        {/* Editor content */}
-        <ResizablePanel minSize={0}>{contentSection}</ResizablePanel>
-
-        {/* Terminal */}
-        <ResizablePanel
-          preferredSize={bottomPanelOpen ? bottomPanelHeight : TERMINAL_PANEL.COLLAPSED_HEIGHT}
-          minSize={TERMINAL_PANEL.MIN_HEIGHT}
-        >
-          <TerminalPanel variant="full-width" collapsed={!bottomPanelOpen} mode="editor" />
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </div>
+    <div className="@container h-full w-full flex flex-col bg-chat-area">{contentSection}</div>
   );
 };

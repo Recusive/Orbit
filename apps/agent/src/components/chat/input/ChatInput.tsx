@@ -52,6 +52,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     attachedContext,
     slashCommands,
     isInputEmpty,
+    slashGhostText,
     // Refs
     inputRef,
     imageInputRef,
@@ -109,8 +110,9 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   // The active AskUserQuestion request (only one at a time — the first)
   const activeAskQuestion = askUserQuestions[0];
 
-  // Global keyboard shortcuts for regular permission modals
-  // Handled here to avoid conflicts when multiple permissions are pending.
+  // Global keyboard shortcuts for regular permission modals.
+  // Uses capture phase so Enter fires here BEFORE React's onKeyDown on
+  // the input (which would otherwise send a message).
   // AskUserQuestion handles its own keyboard shortcuts internally.
   useEffect(() => {
     if (regularPermissions.length === 0 || !onPermissionApprove || !onPermissionDeny) {
@@ -118,28 +120,37 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     }
 
     const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.metaKey || e.ctrlKey) {
-        const firstPermission = regularPermissions[0];
-        if (firstPermission === undefined) return;
+      const firstPermission = regularPermissions[0];
+      if (firstPermission === undefined) return;
 
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          onPermissionApprove(firstPermission.requestId);
-        } else if (e.key === 'Backspace') {
-          e.preventDefault();
-          onPermissionDeny(firstPermission.requestId);
-        }
+      // Plain Enter approves the first permission
+      if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        onPermissionApprove(firstPermission.requestId);
+      }
+      // ESC denies the first permission (matches the button label)
+      else if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        onPermissionDeny(firstPermission.requestId);
+      }
+      // Cmd+Backspace also denies (legacy shortcut)
+      else if (e.key === 'Backspace' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        onPermissionDeny(firstPermission.requestId);
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [regularPermissions, onPermissionApprove, onPermissionDeny]);
 
   return (
-    <div className="flex justify-center p-4 pt-0 shrink-0 relative">
+    <div className="flex justify-center px-4 pb-1 shrink-0 relative">
       <div
         className={getInputBoxClasses()}
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
@@ -169,7 +180,6 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
                     request={request}
                     onApprove={onPermissionApprove}
                     onDeny={onPermissionDeny}
-                    isFirst={index === 0}
                     isLast={index === regularPermissions.length - 1}
                   />
                 ))}
@@ -184,22 +194,39 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
               <ContextChips items={attachedContext} onRemove={handleRemoveContext} />
             ) : null}
 
-            {/* Input Area */}
-            <div
-              ref={inputRef}
-              className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden wrap-break-word"
-              style={{
-                minHeight: INPUT_SIZES.textareaMinHeight,
-                maxHeight: INPUT_SIZES.textareaMaxHeight,
-              }}
-              contentEditable
-              suppressContentEditableWarning
-              data-placeholder="Plan, @ for context, / for commands"
-              data-empty={isInputEmpty}
-              onInput={handleInputChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-            />
+            {/* Input Area — relative wrapper for ghost text overlay */}
+            <div className="relative">
+              <div
+                ref={inputRef}
+                className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden wrap-break-word"
+                style={{
+                  minHeight: INPUT_SIZES.textareaMinHeight,
+                  maxHeight: INPUT_SIZES.textareaMaxHeight,
+                }}
+                contentEditable
+                suppressContentEditableWarning
+                data-placeholder="Plan, @ for context, / for commands"
+                data-empty={isInputEmpty}
+                onInput={handleInputChange}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+              />
+
+              {/* Ghost autocomplete text — mirrors input position, typed portion is invisible */}
+              {slashGhostText.length > 0 ? (
+                <div
+                  aria-hidden
+                  className="absolute top-0 left-0 p-2 text-base pointer-events-none whitespace-pre-wrap wrap-break-word"
+                  style={{
+                    minHeight: INPUT_SIZES.textareaMinHeight,
+                    maxHeight: INPUT_SIZES.textareaMaxHeight,
+                  }}
+                >
+                  <span className="invisible">{inputRef.current?.textContent ?? ''}</span>
+                  <span className="text-muted-foreground/40">{slashGhostText}</span>
+                </div>
+              ) : null}
+            </div>
 
             {/* Mention Popover */}
             <MentionPopover

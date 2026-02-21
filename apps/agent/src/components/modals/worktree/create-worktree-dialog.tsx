@@ -299,7 +299,7 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
           {/* Worktree path preview */}
           <div className="grid gap-2">
             <span className="text-sm text-muted-foreground">Worktree Path</span>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-4 text-sm text-gray-12">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-lg-control text-sm text-foreground">
               <Folder className="h-4 w-4 shrink-0" />
               <span className="truncate">{worktreePath || 'Enter a branch name...'}</span>
             </div>

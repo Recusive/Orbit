@@ -94,7 +94,7 @@ export const GoToLineDialog: FC<GoToLineDialogProps> = ({ open, onOpenChange }) 
           </div>
 
           {/* Status/hint area */}
-          <div className="px-3 py-2 text-xs text-muted-foreground bg-gray-3">
+          <div className="px-3 py-2 text-xs text-muted-foreground bg-lg-control">
             {showError ? (
               <span className="text-destructive">
                 Line number must be between 1 and {totalLines}

@@ -117,13 +117,13 @@ export const DiagnosticsPanel: FC<DiagnosticsPanelProps> = ({ onDiagnosticClick,
             const fileWarnings = diags.filter((d) => d.severity === 'warning').length;
 
             return (
-              <div key={path} className="border-b border-gray-5 last:border-b-0">
+              <div key={path} className="border-b border-lg-separator last:border-b-0">
                 {/* File header */}
                 <button
                   onClick={(): void => {
                     toggleFile(path);
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-4 text-left"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-lg-control-hover text-left"
                 >
                   {isExpanded ? (
                     <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -157,7 +157,7 @@ export const DiagnosticsPanel: FC<DiagnosticsPanelProps> = ({ onDiagnosticClick,
                           onClick={(): void => {
                             void onDiagnosticClick?.(path, diag);
                           }}
-                          className="w-full flex items-start gap-2 px-3 py-1 hover:bg-gray-4 text-left"
+                          className="w-full flex items-start gap-2 px-3 py-1 hover:bg-lg-control-hover text-left"
                         >
                           <Icon className={cn('h-3.5 w-3.5 mt-0.5 shrink-0', colorClass)} />
                           <span className={cn('text-xs shrink-0', colorClass)}>

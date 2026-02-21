@@ -103,8 +103,8 @@ pub struct SessionConfig {
 #[serde(rename_all = "lowercase")]
 pub enum Model {
     Haiku,
-    Sonnet,
-    Opus,
+    #[serde(rename = "claude-sonnet-4-6")]
+    ClaudeSonnet46,
     #[serde(rename = "claude-opus-4-6")]
     ClaudeOpus46,
 }
@@ -423,6 +423,11 @@ pub enum BridgeRequest {
         name: String,
         scope: CommandScope,
     },
+    // Skill Definition Operations
+    ListSkills {
+        #[serde(rename = "workspacePath")]
+        workspace_path: String,
+    },
     // Fork and Generate Operations
     ForkSession {
         #[serde(rename = "sessionId")]
@@ -547,6 +552,12 @@ pub enum CommandResponse {
         request_type: String,
         command: Option<SlashCommandDefinition>,
     },
+    #[serde(rename = "skill_list")]
+    SkillList {
+        #[serde(rename = "requestType")]
+        request_type: String,
+        skills: Vec<SkillDefinition>,
+    },
     #[serde(rename = "fork_result")]
     ForkResult {
         #[serde(rename = "requestType")]
@@ -589,6 +600,10 @@ pub enum BridgeEvent {
         session_id: String,
         #[serde(rename = "checkpointId")]
         checkpoint_id: String,
+    },
+    CompactComplete {
+        #[serde(rename = "sessionId")]
+        session_id: String,
     },
     // Canvas Events
     #[serde(rename = "canvas:message")]
@@ -668,9 +683,9 @@ impl BridgeResponse {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AgentModel {
-    Sonnet,
-    Opus,
     Haiku,
+    #[serde(rename = "claude-sonnet-4-6")]
+    ClaudeSonnet46,
     #[serde(rename = "claude-opus-4-6")]
     ClaudeOpus46,
     Inherit,
@@ -689,6 +704,31 @@ pub struct SubagentDefinition {
     pub disallowed_tools: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<AgentModel>,
+}
+
+// ============================================================================
+// Skill Definition Types
+// ============================================================================
+
+/// Skill source: where the skill was discovered
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SkillSource {
+    Project,
+    User,
+}
+
+/// Skill definition from .claude/skills/ directories
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillDefinition {
+    pub name: String,
+    pub description: String,
+    pub source: SkillSource,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub triggers: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
 }
 
 // ============================================================================

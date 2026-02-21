@@ -1,5 +1,9 @@
 export { ActionsBar } from './actions-bar';
+export { ActivityCard } from './activity-card';
+export { AppShell } from './app-shell';
 export { ChatArea } from './chat-area';
+export { ContentCard } from './content-card';
+export { ContentTopBar } from './content-top-bar';
 export { PrimarySidebar } from './primary-sidebar';
 export { ResizeHandle } from './resize-handle';
 export { RootLayout } from './root-layout';

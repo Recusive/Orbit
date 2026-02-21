@@ -12,7 +12,7 @@
  */
 import { CheckCircle2, ChevronRight, MessageCircleQuestion, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
@@ -84,20 +84,12 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
   success,
   output,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(isRunning);
-  const wasRunningRef = useRef(isRunning);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(false);
   const shouldReduceMotion = useReducedMotion();
 
   const isFailed = success === false;
   const isComplete = !isRunning && success !== undefined;
-
-  // Auto-collapse when tool finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   const questionTexts = extractQuestions(questions);
   const answerMap = resolveAnswers(injectedAnswers, output);
@@ -123,39 +115,38 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse question details' : 'Expand question details'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon + tool name */}
+        <div className="flex items-center gap-2 shrink-0">
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-gray-5'
+              isFailed ? 'bg-destructive/8' : 'bg-lg-separator'
             )}
           >
             <MessageCircleQuestion
               className={cn(
                 'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-gray-9',
+                isFailed ? 'text-destructive/60' : 'text-muted-foreground',
                 isRunning && 'animate-pulse'
               )}
             />
           </div>
 
-          <span className={cn('text-xs font-medium truncate', 'text-gray-11')}>{statusLabel}</span>
-
-          {/* Preview: first question text in collapsed state */}
-          {!isExpanded && pairs[0] !== undefined ? (
-            <span className="text-xs text-gray-9 truncate">{pairs[0].question}</span>
-          ) : null}
+          <span className={cn('text-xs font-medium truncate', 'text-lg-text-secondary')}>
+            {statusLabel}
+          </span>
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
+            aria-hidden="true"
           />
         </div>
       </button>
@@ -175,13 +166,13 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
                 {/* Gutter: vertical connector line — gradient to green/red like other tool widgets */}
                 <div className="w-5 flex justify-center shrink-0">
                   <div
-                    className={cn('w-[2px] rounded-full h-full', !isComplete && 'bg-gray-6')}
+                    className={cn('w-[2px] rounded-full h-full', !isComplete && 'bg-lg-separator')}
                     style={
                       isComplete
                         ? {
                             background: isFailed
-                              ? 'linear-gradient(to bottom, var(--color-gray-6) 60%, color-mix(in oklch, #ef4444 50%, transparent) 100%)'
-                              : 'linear-gradient(to bottom, var(--color-gray-6) 60%, color-mix(in oklch, #22c55e 50%, transparent) 100%)',
+                              ? 'linear-gradient(to bottom, var(--lg-separator) 60%, color-mix(in oklch, #ef4444 50%, transparent) 100%)'
+                              : 'linear-gradient(to bottom, var(--lg-separator) 60%, color-mix(in oklch, #22c55e 50%, transparent) 100%)',
                           }
                         : undefined
                     }
@@ -189,12 +180,12 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-6 bg-gray-4 overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl bg-lg-control overflow-hidden">
                   {pairs.map((pair, idx) => (
                     <div key={pair.question}>
                       <div className="px-3 py-2">
                         {/* Question text */}
-                        <div className="text-sm text-gray-12 leading-snug">{pair.question}</div>
+                        <div className="text-sm text-foreground leading-snug">{pair.question}</div>
 
                         {/* Answer */}
                         {isComplete ? (
@@ -205,18 +196,22 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
                                 Rejected
                               </span>
                             ) : pair.answer ? (
-                              <span className="inline-block bg-gray-6 text-gray-12 text-xs font-medium px-2 py-0.5 rounded-md">
+                              <span className="inline-block bg-lg-separator text-foreground text-xs font-medium px-2 py-0.5 rounded-md">
                                 {pair.answer}
                               </span>
                             ) : (
-                              <span className="text-xs text-gray-9 italic">No answer</span>
+                              <span className="text-xs text-muted-foreground italic">
+                                No answer
+                              </span>
                             )}
                           </div>
                         ) : null}
                       </div>
 
                       {/* Separator between questions */}
-                      {idx < pairs.length - 1 ? <div className="h-px bg-gray-5 mx-3" /> : null}
+                      {idx < pairs.length - 1 ? (
+                        <div className="h-px bg-lg-separator mx-3" />
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -237,7 +232,7 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Rejected' : 'Answered'}
                   </span>
                 </div>

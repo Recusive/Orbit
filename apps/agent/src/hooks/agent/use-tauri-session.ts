@@ -5,6 +5,7 @@ import type { SessionConfig } from '@/lib/api';
 import { agentCreateSession, agentGetStoredSession, getWorkspacePath } from '@/lib/api';
 import {
   ADAPTIVE_THINKING_DEFAULT_BUDGET,
+  THINKING_MODE_BUDGET,
   isAdaptiveThinkingModel,
   useToolStore,
 } from '@/stores/agent/tool-store';
@@ -76,13 +77,17 @@ export async function ensureSession(sessionId: string): Promise<void> {
   const inputMode = toolState.inputMode;
 
   // Build config with optional cwd and current mode settings.
-  // For adaptive thinking models (Opus 4.6), always enable thinking with a default
-  // budget so thinking works on the first message before effort:set can update it.
+  // All models get thinking enabled with appropriate budgets:
+  // - Adaptive (Opus 4.6): default budget, effort controls intensity
+  // - Others: budget from thinking mode (defaults to ultra/32768)
   const isAdaptive = isAdaptiveThinkingModel(toolState.model);
+  const thinkingBudget = isAdaptive
+    ? ADAPTIVE_THINKING_DEFAULT_BUDGET
+    : THINKING_MODE_BUDGET[toolState.thinkingMode];
   const config: SessionConfig = {
     model: toolState.model,
     thinkingEnabled: isAdaptive || toolState.thinkingMode !== 'off',
-    ...(isAdaptive ? { maxThinkingTokens: ADAPTIVE_THINKING_DEFAULT_BUDGET } : {}),
+    ...(thinkingBudget !== undefined ? { maxThinkingTokens: thinkingBudget } : {}),
     acceptEnabled: inputMode === 'accept',
     planEnabled: inputMode === 'plan',
   };

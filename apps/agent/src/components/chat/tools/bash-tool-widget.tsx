@@ -1,6 +1,6 @@
 import { CheckCircle2, ChevronRight, Loader2, Terminal, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   getShiki,
@@ -31,19 +31,10 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   const isDarkMode = useIsDarkMode();
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
-  // Start expanded if running, collapsed if already completed (restored from persistence)
-  const [isExpanded, setIsExpanded] = useState(isRunning);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(false);
   const [highlightedCommand, setHighlightedCommand] = useState<string>('');
   const [highlightedOutput, setHighlightedOutput] = useState<string>('');
-  const wasRunningRef = useRef(isRunning);
-
-  // Auto-collapse when tool finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   // Syntax highlight the command (responds to theme changes via MutationObserver)
   useEffect(() => {
@@ -131,22 +122,23 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Bash output' : 'Expand Bash output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon + tool name + spinner */}
+        <div className="flex items-center gap-2 shrink-0">
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-primary/15'
+              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
             )}
           >
             <Terminal
               className={cn(
                 'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-primary/80',
+                isFailed ? 'text-destructive/60' : 'text-foreground/60',
                 isRunning && 'animate-pulse'
               )}
             />
@@ -155,21 +147,22 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >
             {statusLabel}
           </span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
+            aria-hidden="true"
           />
         </div>
       </button>
@@ -195,14 +188,14 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                   <div
                     className={cn(
                       'w-[2px] rounded-full h-full',
-                      success === undefined && 'bg-primary/40'
+                      success === undefined && 'bg-foreground/20'
                     )}
                     style={
                       success !== undefined
                         ? {
                             background: success
-                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
-                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
+                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
+                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
                           }
                         : undefined
                     }
@@ -210,19 +203,19 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-lg-separator bg-card overflow-hidden">
                   {/* Command section */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
                       command
                     </div>
                     {highlightedCommand ? (
                       <div
-                        className="bg-gray-4 rounded-md px-2 py-1 font-mono text-sm [&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word [&_code]:bg-transparent!"
+                        className="bg-lg-control rounded-lg px-2 py-1 font-mono text-sm [&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word [&_code]:bg-transparent!"
                         dangerouslySetInnerHTML={{ __html: highlightedCommand }}
                       />
                     ) : (
-                      <code className="block bg-gray-4 rounded-md px-2 py-1 font-mono text-sm text-gray-12 break-all">
+                      <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground break-all">
                         {command}
                       </code>
                     )}
@@ -233,10 +226,10 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                     <>
                       <div className="h-px bg-border/20 mx-3" />
                       <div className="px-3 py-2">
-                        <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1">
+                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1">
                           description
                         </div>
-                        <div className="text-sm text-gray-11">{description}</div>
+                        <div className="text-sm text-lg-text-secondary">{description}</div>
                       </div>
                     </>
                   ) : null}
@@ -244,16 +237,16 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                   {/* Output section */}
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
                       output
                     </div>
                     {isRunning && !output ? (
-                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
+                      <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Running command...</span>
                       </div>
                     ) : output ? (
-                      <div className="bg-gray-3 rounded-md p-2 font-mono text-sm leading-relaxed text-gray-12 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
+                      <div className="bg-lg-control rounded-lg p-2 font-mono text-sm leading-relaxed text-foreground overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
                         {highlightedOutput ? (
                           /* SECURITY: Safe — highlightedOutput comes from Shiki's codeToHtml() which HTML-escapes all content */
                           <div
@@ -266,13 +259,13 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                           </pre>
                         )}
                         {hasMoreLines ? (
-                          <div className="mt-1.5 text-gray-9 text-xs">
+                          <div className="mt-1.5 text-muted-foreground text-xs">
                             {String(outputLines.length)} lines total
                           </div>
                         ) : null}
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-9 italic">No output</div>
+                      <div className="text-sm text-muted-foreground italic">No output</div>
                     )}
                   </div>
                 </div>
@@ -293,7 +286,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

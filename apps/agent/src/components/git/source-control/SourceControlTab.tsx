@@ -98,7 +98,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
         <p className="text-sm text-muted-foreground">{error}</p>
         <button
           onClick={() => void refresh()}
-          className="text-sm text-gray-12 hover:text-foreground hover:underline"
+          className="text-sm text-foreground hover:text-foreground hover:underline"
         >
           Retry
         </button>
@@ -122,7 +122,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header with Branch Dropdown */}
       <div
-        className="flex items-center justify-between px-4 border-b border-gray-5 shrink-0"
+        className="flex items-center justify-between px-4 shrink-0"
         style={{ height: HEADER_HEIGHT }} // Extracted constant
       >
         <BranchSelector
@@ -137,7 +137,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
             onClick={() => void handleFetch()}
             disabled={isFetching}
             className={cn(
-              'flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium',
+              'flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium',
               'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
               'active:scale-[0.97] transition-[background-color,color,transform] duration-150',
               'disabled:opacity-40'
@@ -150,7 +150,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
             onClick={() => void refresh()}
             disabled={isLoading}
             className={cn(
-              'flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium',
+              'flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium',
               'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
               'active:scale-[0.97] transition-[background-color,color,transform] duration-150',
               'disabled:opacity-40'
@@ -176,12 +176,21 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           />
         ) : null}
 
-        {/* Commit Message */}
+        {/* Commit Message + Actions */}
         <CommitForm
           value={commitMessage}
           onChange={setCommitMessage}
           onCommit={handleCommit}
           error={commitError}
+        />
+        <GitActions
+          onCommit={handleCommit}
+          isCommitting={isCommitting}
+          canCommit={canCommit}
+          onPull={handlePull}
+          isPulling={isPulling}
+          onPush={handlePush}
+          isPushing={isPushing}
         />
 
         {/* Changes List */}
@@ -198,17 +207,6 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           onRequestDiscard={handleRequestDiscard}
         />
       </div>
-
-      {/* Footer with Commit/Push/Pull */}
-      <GitActions
-        onCommit={handleCommit}
-        isCommitting={isCommitting}
-        canCommit={canCommit}
-        onPull={handlePull}
-        isPulling={isPulling}
-        onPush={handlePush}
-        isPushing={isPushing}
-      />
     </div>
   );
 };

@@ -48,6 +48,7 @@ import {
   listCommands,
   updateCommand,
 } from './agent/definitions/command-definitions.js';
+import { listSkills } from './agent/definitions/skill-definitions.js';
 import { SessionManager } from './agent/session/session-manager.js';
 import {
   cleanupOldSessions,
@@ -216,6 +217,15 @@ function main(): void {
       type: 'checkpoint',
       sessionId: data.sessionId,
       checkpointId: data.checkpointId,
+    });
+  });
+
+  // Emit compact complete event when SDK compact_boundary is received
+  sessionManager.onCompactComplete((data) => {
+    logger.info({ sessionId: data.sessionId }, 'Compact complete — sending event to Rust/frontend');
+    sendEvent({
+      type: 'compact_complete',
+      sessionId: data.sessionId,
     });
   });
 
@@ -435,13 +445,13 @@ async function handleRequest(
     }
 
     case 'set_thinking_mode': {
-      await sessionManager.setThinkingMode(request.sessionId, request.enabled, request.maxTokens);
+      sessionManager.setThinkingMode(request.sessionId, request.enabled, request.maxTokens);
       sendResponse({ type: 'success', requestType: request.type });
       break;
     }
 
     case 'set_effort_level': {
-      await sessionManager.setEffortLevel(request.sessionId, request.effort);
+      sessionManager.setEffortLevel(request.sessionId, request.effort);
       sendResponse({ type: 'success', requestType: request.type });
       break;
     }
@@ -539,6 +549,13 @@ async function handleRequest(
     case 'delete_agent': {
       deleteAgent(request.workspacePath, request.name);
       sendResponse({ type: 'success', requestType: request.type });
+      break;
+    }
+
+    // Skill Definition Operations
+    case 'list_skills': {
+      const skills = listSkills(request.workspacePath);
+      sendResponse({ type: 'skill_list', requestType: request.type, skills });
       break;
     }
 

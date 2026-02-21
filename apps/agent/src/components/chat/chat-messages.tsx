@@ -350,6 +350,24 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     return null;
   }, [messages]);
 
+  // Compute the set of assistant messages that are LAST in a consecutive group.
+  // In multi-turn responses the SDK creates separate ChatMessage objects per turn,
+  // producing consecutive assistant messages. Only the final one in each run should
+  // render the action bar (copy/like/rewind). Older turns — separated by a user
+  // message — each keep their own action bar since they're separate groups.
+  const lastInAssistantGroupIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      if (msg?.role !== 'assistant') continue;
+      // Last in group if next message is not assistant (user/undefined/end)
+      if (messages[i + 1]?.role !== 'assistant') {
+        ids.add(msg.id);
+      }
+    }
+    return ids;
+  }, [messages]);
+
   // Rotating loading message for a bit of personality (fallback)
   const rotatingMessage = useRotatingMessage(isLoading);
 
@@ -450,7 +468,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   return (
     <div
       ref={scrollRef}
-      className="flex-1 overflow-y-auto overflow-x-hidden p-4"
+      className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-28"
       style={{
         scrollbarGutter: 'stable both-edges',
         // PERF: contain layout + style to this scroll container.
@@ -489,6 +507,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             if (!msg) return null;
 
             const isLastAssistant = msg.id === lastAssistantMessageId;
+            const isLastInGroup = lastInAssistantGroupIds.has(msg.id);
             const shouldAnimate = animatingMessageIds.has(msg.id);
             const tools = toolsByMessageId.get(msg.id) ?? [];
 
@@ -506,6 +525,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                   message={msg}
                   tools={tools}
                   isLastAssistantMessage={isLastAssistant}
+                  isLastInAssistantGroup={isLastInGroup}
+                  isAgentRunning={isAgentRunning}
                   animate={shouldAnimate}
                   onRewind={onRewind}
                   onOpenFile={onOpenFile}

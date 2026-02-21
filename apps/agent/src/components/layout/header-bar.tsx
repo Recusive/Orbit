@@ -1,9 +1,10 @@
 import { IconSquareGridCircle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSquareGridCircle';
-import { Search, Terminal } from 'lucide-react';
+import { PanelRight, Search, Terminal } from 'lucide-react';
 import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
 
+import { SFSymbol } from '@/components/shared';
 import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, getCommandKey } from '@/lib/utils';
@@ -12,6 +13,9 @@ import { useUIStore, useWorkspaceName, useActiveTab, useHasWorkspace } from '@/s
 
 // Re-export for backwards compatibility
 export type { HeaderTab } from '@/stores/ui/ui-store';
+
+// Parsed once at module load — query params don't change during the app's lifetime.
+const IS_DEMO = new URLSearchParams(window.location.search).get('demo') === 'true';
 
 export interface HeaderBarProps {
   className?: string;
@@ -35,7 +39,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       data-tauri-drag-region={false}
       className={cn(
         'relative flex items-center justify-center h-7 px-3 transition-[background-color] duration-100',
-        active ? 'text-foreground' : 'text-gray-10 dark:text-gray-11 hover:text-gray-12'
+        active ? 'text-foreground' : 'text-lg-text-secondary hover:text-foreground'
       )}
       onClick={onClick}
     >
@@ -43,12 +47,12 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       <div
         className={cn(
           'absolute inset-0 rounded-md transition-[background-color] duration-100',
-          active ? 'bg-gray-4' : 'hover:bg-gray-4'
+          active ? 'bg-lg-control' : 'hover:bg-lg-control'
         )}
       />
       {/* Active indicator - offset to sit on header's bottom border */}
       {active ? (
-        <div className="absolute inset-x-0 h-0.5 bg-primary" style={{ bottom: '-3.5px' }} />
+        <div className="absolute inset-x-0 h-0.5 bg-foreground" style={{ bottom: '-3.5px' }} />
       ) : null}
       <span className="relative text-base font-medium">{label}</span>
     </button>
@@ -65,7 +69,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
   const hasWorkspace = useHasWorkspace();
 
   // Demo mode: bypass workspace/auth gates when embedded in marketing site iframe
-  const isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
+  const isDemo = IS_DEMO;
 
   // Use useShallow to prevent re-renders when unrelated store state changes
   const {
@@ -77,6 +81,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
     reviewPanelOpen,
     rightSidebarOpen,
     bottomPanelOpen,
+    terminalCollapsed,
   } = useUIStore(
     useShallow((s) => ({
       setActiveTab: s.setActiveTab,
@@ -87,6 +92,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
       reviewPanelOpen: s.reviewPanelOpen,
       rightSidebarOpen: s.rightSidebarOpen,
       bottomPanelOpen: s.bottomPanelOpen,
+      terminalCollapsed: s.terminalCollapsed,
     }))
   );
 
@@ -96,13 +102,12 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
 
   // Smart terminal toggle: position depends on whether activity panel is open
   const handleToggleTerminal = (): void => {
-    if (!bottomPanelOpen) {
-      // Opening terminal — choose position based on activity panel state
-      if (reviewPanelOpen) {
-        setTerminalPosition('activity');
-      } else {
-        setTerminalPosition('both');
-      }
+    // Always pick a visible position — if the activity panel is closed,
+    // the 'activity' slot is off-screen so force 'chat'.
+    if (!reviewPanelOpen) {
+      setTerminalPosition('chat');
+    } else if (!bottomPanelOpen) {
+      setTerminalPosition('activity');
     }
     toggleBottomPanel();
   };
@@ -114,7 +119,9 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
       data-tauri-drag-region
       className={cn(
         'flex items-center justify-between border-b shrink-0',
-        transparent ? 'bg-transparent border-gray-8/35' : 'bg-card shadow-lg border-gray-5',
+        transparent
+          ? 'bg-transparent border-lg-separator/35'
+          : 'bg-chat-area shadow-lg border-lg-separator',
         // Left padding for macOS traffic light buttons (matches Cursor: x:11 + ~69px for 3 buttons)
         'pl-[80px]',
         className
@@ -172,7 +179,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
             className={cn(
               'flex items-center gap-2 h-7 px-2.5 rounded-md',
               'text-sidebar-foreground hover:text-foreground',
-              'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+              'hover:bg-lg-control-hover active:scale-[0.98]',
               'transition-[color,background-color,transform] duration-150'
             )}
             title="Search files (⌘K)"
@@ -180,13 +187,13 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
           >
             <Search className="h-3.5 w-3.5 shrink-0" />
             <span className="text-sm truncate max-w-[120px]">{searchText}</span>
-            <Kbd className="h-[18px] !text-[12px] px-1.5 bg-gray-5 text-inherit border-gray-6">
+            <Kbd className="h-[18px] !text-[12px] px-1.5 bg-lg-control text-inherit border-lg-separator">
               <span className="text-[14px] leading-none">⌘</span> K
             </Kbd>
           </button>
 
           {/* Divider */}
-          <div className="w-px h-4 bg-gray-5 shrink-0" />
+          <div className="w-px h-4 bg-lg-separator shrink-0" />
 
           {/* Panel toggles */}
           <div className="flex items-center gap-0.5 px-1">
@@ -199,36 +206,19 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                   aria-label={reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}
                   className={cn(
                     'h-6 w-6 flex items-center justify-center rounded-md',
-                    'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                    'hover:bg-lg-control-hover active:scale-[0.98]',
                     'transition-[color,background-color,transform] duration-150',
                     reviewPanelOpen
                       ? 'text-foreground'
                       : 'text-sidebar-foreground hover:text-foreground'
                   )}
                 >
-                  <div className="rotate-180">
-                    <svg
-                      aria-hidden="true"
-                      width="16"
-                      height="16"
-                      viewBox="1 1 22 22"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M19 5V19H21V5H19ZM19 19H5V21H19V19ZM5 19V5H3V19H5ZM5 5H19V3H5V5ZM5 5V5V3C3.89543 3 3 3.89543 3 5H5ZM5 19H3C3 20.1046 3.89543 21 5 21V19ZM19 19V21C20.1046 21 21 20.1046 21 19H19ZM21 5C21 3.89543 20.1046 3 19 3V5H21Z"
-                        fill="currentColor"
-                      />
-                      <rect
-                        x="7"
-                        y="7"
-                        width={reviewPanelOpen ? 5 : 2}
-                        height="10"
-                        rx="1"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  </div>
+                  <SFSymbol
+                    name="sidebar.squares.right"
+                    size={18}
+                    weight="medium"
+                    fallback={<PanelRight className="h-4 w-4" />}
+                  />
                 </button>
               </TooltipTrigger>
               <TooltipContent className="flex items-center gap-2">
@@ -246,14 +236,19 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                   aria-label={bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}
                   className={cn(
                     'h-6 w-6 flex items-center justify-center rounded-md',
-                    'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                    'hover:bg-lg-control-hover active:scale-[0.98]',
                     'transition-[color,background-color,transform] duration-150',
-                    bottomPanelOpen
+                    bottomPanelOpen && !terminalCollapsed
                       ? 'text-foreground'
                       : 'text-sidebar-foreground hover:text-foreground'
                   )}
                 >
-                  <Terminal className="h-3.5 w-3.5" />
+                  <SFSymbol
+                    name="apple.terminal"
+                    size={18}
+                    weight="medium"
+                    fallback={<Terminal className="h-4 w-4" />}
+                  />
                 </button>
               </TooltipTrigger>
               <TooltipContent className="flex items-center gap-2">
@@ -271,14 +266,19 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                   aria-label={rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
                   className={cn(
                     'h-6 w-6 flex items-center justify-center rounded-md',
-                    'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                    'hover:bg-lg-control-hover active:scale-[0.98]',
                     'transition-[color,background-color,transform] duration-150',
                     rightSidebarOpen
                       ? 'text-foreground'
                       : 'text-sidebar-foreground hover:text-foreground'
                   )}
                 >
-                  <IconSquareGridCircle className="h-4 w-4" />
+                  <SFSymbol
+                    name="switch.2"
+                    size={18}
+                    weight="medium"
+                    fallback={<IconSquareGridCircle className="h-4 w-4" />}
+                  />
                 </button>
               </TooltipTrigger>
               <TooltipContent>

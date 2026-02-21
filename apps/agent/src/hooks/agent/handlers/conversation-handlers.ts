@@ -94,6 +94,8 @@ export async function handleConversationLoad(
             ...(m.thinkingDurationMs !== undefined
               ? { thinkingDurationMs: m.thinkingDurationMs }
               : {}),
+            ...(m.isInterrupted === true ? { isInterrupted: true } : {}),
+            ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
             ...(m.toolUses && m.toolUses.length > 0 ? { toolUses: m.toolUses } : {}),
             ...(m.usage ? { usage: m.usage } : {}),
             // parentUuid for active chain resolution (getActiveChain defense-in-depth)
@@ -217,9 +219,9 @@ export async function handleConversationRewind(
     }
 
     // Step 3: Load conversation from disk to get the SDK message ID
-    logger.warn('Rewind step 3: loading conversation from disk', { session_id });
+    logger.debug('Rewind step 3: loading conversation from disk', { session_id });
     const conv = await conversationLoad(session_id);
-    logger.warn('Rewind step 3: conversation loaded', {
+    logger.debug('Rewind step 3: conversation loaded', {
       hasConv: conv !== null,
       messageCount: conv?.messages.length ?? 0,
     });
@@ -267,7 +269,7 @@ export async function handleConversationRewind(
         if (positionCandidate && contentMatches) {
           targetMessage = positionCandidate;
           sdkMessageId = targetMessage.id;
-          logger.warn('Rewind: Priority 2 — content-validated position match', {
+          logger.debug('Rewind: Priority 2 — content-validated position match', {
             sdkMessageId,
             index: message_index,
           });
@@ -300,7 +302,7 @@ export async function handleConversationRewind(
     // approach. The SDK creates a new session with parentUuid branching that naturally
     // handles dead branches. No timeouts needed: bridge calls are awaited directly.
     if (sdkMessageId && !useFrontendMessages) {
-      logger.warn('Rewind step 4: forking session at target', { session_id, sdkMessageId });
+      logger.debug('Rewind step 4: forking session at target', { session_id, sdkMessageId });
       try {
         await agentForkSessionAt(session_id, sdkMessageId);
         checkpointStore.setPendingConversationFork(session_id, sdkMessageId);
@@ -310,7 +312,7 @@ export async function handleConversationRewind(
         });
       }
     } else {
-      logger.warn('Rewind step 4: skipping fork', {
+      logger.debug('Rewind step 4: skipping fork', {
         sdkMessageId,
         useFrontendMessages,
       });
@@ -318,7 +320,7 @@ export async function handleConversationRewind(
 
     // Step 5: Build the message list to display
     // Priority: disk messages (first rewind) > frontend messages (rewind 2+) > empty
-    logger.warn('Rewind step 5: building message list', {
+    logger.debug('Rewind step 5: building message list', {
       hasConv: conv !== null,
       hasTarget: targetMessage !== undefined,
       useFrontendMessages,
@@ -380,6 +382,7 @@ export async function handleConversationRewind(
             role: m.role,
             content: m.content,
             timestamp: Date.now(),
+            toolUses: m.toolUses,
             parentUuid: m.parentUuid,
           })),
         },

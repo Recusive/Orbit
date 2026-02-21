@@ -1,0 +1,132 @@
+[package]
+name = "orbit-sf-symbols"
+version = "0.0.1"
+edition = "2021"
+description = "Native macOS SF Symbol rendering via AppKit"
+license = "MIT"
+repository = "https://github.com/Recusive/Orbit"
+readme = "README.md"
+keywords = ["macos", "sf-symbols", "appkit", "icons"]
+categories = ["gui"]
+
+# =============================================================================
+# LINTS - Mirror workspace lints but allow unsafe for objc2 FFI
+# =============================================================================
+[lints.rust]
+# Safety - ALLOW for objc2 FFI (workspace uses forbid)
+unsafe_code = "allow"
+unsafe_op_in_unsafe_fn = "allow"
+
+# Correctness - DENY (same as workspace)
+unused = { level = "deny", priority = -1 }
+nonstandard_style = { level = "deny", priority = -1 }
+rust_2018_idioms = { level = "deny", priority = -1 }
+rust_2021_compatibility = { level = "deny", priority = -1 }
+future_incompatible = { level = "deny", priority = -1 }
+
+# Specific denials
+dead_code = "deny"
+deprecated = "deny"
+improper_ctypes = "deny"
+non_shorthand_field_patterns = "deny"
+path_statements = "deny"
+trivial_casts = "deny"
+trivial_numeric_casts = "deny"
+unconditional_recursion = "deny"
+unused_allocation = "deny"
+unused_comparisons = "deny"
+unused_extern_crates = "deny"
+unused_import_braces = "deny"
+unused_lifetimes = "deny"
+unused_macro_rules = "deny"
+unused_must_use = "deny"
+unused_parens = "deny"
+unused_qualifications = "deny"
+unused_results = "deny"
+unreachable_pub = "deny"
+variant_size_differences = "deny"
+
+# Documentation - relaxed for FFI code
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+# Category enables
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+
+# Allowed - outside our control or intentional
+multiple_crate_versions = "allow"  # Transitive dependency conflicts
+redundant_pub_crate = "allow"  # pub(crate) in private mod is intentional
+
+# Panics and unwraps
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+panic_in_result_fn = "deny"
+unwrap_in_result = "deny"
+indexing_slicing = "deny"
+
+# Debug/development code
+dbg_macro = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+
+# Suspicious code
+suspicious = { level = "deny", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+
+# Complexity
+cognitive_complexity = { level = "warn", priority = 1 }
+too_many_arguments = "warn"
+too_many_lines = "warn"
+
+# Safety adjacent
+cast_possible_truncation = "deny"
+cast_possible_wrap = "deny"
+cast_precision_loss = "deny"
+cast_sign_loss = "deny"
+cast_lossless = "warn"
+ptr_as_ptr = "deny"
+ptr_cast_constness = "deny"
+
+# Error handling
+map_err_ignore = "deny"
+result_unit_err = "deny"
+
+# Performance
+inefficient_to_string = "deny"
+invalid_upcast_comparisons = "deny"
+linkedlist = "deny"
+mutex_atomic = "deny"
+rc_buffer = "deny"
+rc_mutex = "deny"
+redundant_clone = "deny"
+
+# Correctness
+clone_on_ref_ptr = "deny"
+expl_impl_clone_on_copy = "deny"
+float_cmp = "deny"
+float_cmp_const = "deny"
+lossy_float_literal = "deny"
+same_name_method = "deny"
+string_add = "deny"
+
+[dependencies]
+log = "0.4"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString"] }
+objc2-app-kit = { version = "0.3", features = [
+    "NSImage",
+    "NSImageRep",
+    "NSBitmapImageRep",
+    "NSGraphicsContext",
+    "NSGraphics",
+] }

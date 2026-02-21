@@ -1,5 +1,7 @@
 import { createLogger } from '@orbit/common/lib';
+import { invoke } from '@tauri-apps/api/core';
 import { createContext, useContext, useEffect, useState } from 'react';
+import { GlassMaterialVariant, setLiquidGlassEffect } from 'tauri-plugin-liquid-glass-api';
 
 import type { FC, ReactNode } from 'react';
 
@@ -95,6 +97,22 @@ export const ThemeProvider: FC<ThemeProviderProps> = ({
     root.classList.remove('window-mode-liquid-glass', 'window-mode-solid');
     root.classList.add(`window-mode-${windowMode}`);
   }, [windowMode]);
+
+  // Sync liquid glass effect and native defocus color with the current theme.
+  useEffect(() => {
+    // Tell the native glass-defocus layer which theme we're using so the
+    // opaque fallback on window defocus matches Orbit's theme, not the system.
+    void invoke('set_glass_theme', { isDark: effectiveTheme === 'dark' });
+
+    if (windowMode === 'solid') {
+      void setLiquidGlassEffect({ enabled: false });
+      return;
+    }
+    void setLiquidGlassEffect({
+      variant: GlassMaterialVariant.Sidebar,
+      tintColor: effectiveTheme === 'light' ? '#F5F5F560' : '#18181860',
+    });
+  }, [effectiveTheme, windowMode]);
 
   const setTheme = (newTheme: Theme): void => {
     logger.debug('Theme changed', { theme: newTheme });

@@ -36,6 +36,8 @@ export interface ChatMessage {
   displayedContent: string;
   isStreaming?: boolean | undefined;
   isInterrupted?: boolean | undefined;
+  /** Wall-clock duration of the entire assistant turn in milliseconds (from SDK). */
+  turnDurationMs?: number | undefined;
   /**
    * Flat thinking string for persistence compatibility.
    * During live streaming, prefer `thinkingBlocks` for per-phase rendering.
@@ -78,6 +80,12 @@ export interface MessageItemProps {
   readonly message: ChatMessage;
   readonly tools: ToolExecution[];
   readonly isLastAssistantMessage: boolean;
+  /** Whether this is the last assistant message in a consecutive group.
+   *  Multi-turn responses produce multiple assistant messages — only the
+   *  last one in the group should render the action bar. */
+  readonly isLastInAssistantGroup: boolean;
+  /** Whether the agent is still running (entire turn not yet complete) */
+  readonly isAgentRunning: boolean;
   /** Whether to animate this message sliding in (for newly sent messages) */
   readonly animate?: boolean | undefined;
   readonly onRewind: (messageId: string) => void;

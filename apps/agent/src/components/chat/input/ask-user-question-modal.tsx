@@ -230,7 +230,7 @@ export const AskUserQuestionModal: FC<AskUserQuestionModalProps> = ({
                 onClick={() => {
                   setCurrentIndex((i) => Math.max(0, i - 1));
                 }}
-                className="size-6 flex items-center justify-center rounded-md text-muted-foreground disabled:opacity-30 hover:bg-gray-5 transition-colors"
+                className="size-6 flex items-center justify-center rounded-md text-muted-foreground disabled:opacity-30 hover:bg-lg-control-hover transition-colors"
                 aria-label="Previous question"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -243,7 +243,7 @@ export const AskUserQuestionModal: FC<AskUserQuestionModalProps> = ({
                 onClick={() => {
                   setCurrentIndex((i) => Math.min(totalQuestions - 1, i + 1));
                 }}
-                className="size-6 flex items-center justify-center rounded-md text-muted-foreground disabled:opacity-30 hover:bg-gray-5 transition-colors"
+                className="size-6 flex items-center justify-center rounded-md text-muted-foreground disabled:opacity-30 hover:bg-lg-control-hover transition-colors"
                 aria-label="Next question"
               >
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -253,7 +253,7 @@ export const AskUserQuestionModal: FC<AskUserQuestionModalProps> = ({
 
           <button
             onClick={handleDismiss}
-            className="size-5 flex items-center justify-center rounded-md text-muted-foreground hover:bg-gray-5 hover:text-foreground transition-colors ml-1"
+            className="size-5 flex items-center justify-center rounded-md text-muted-foreground hover:bg-lg-control-hover hover:text-foreground transition-colors ml-1"
             aria-label="Dismiss"
           >
             <X className="h-3.5 w-3.5" />
@@ -272,14 +272,14 @@ export const AskUserQuestionModal: FC<AskUserQuestionModalProps> = ({
                   handleOptionClick(idx);
                 }}
                 className={`group/row flex w-full items-center gap-3 h-[3.25rem] px-3 text-left cursor-pointer rounded-2xl outline-none transition-all duration-100 active:scale-[0.99] ${
-                  selectedOption === idx ? 'bg-primary/10' : 'hover:bg-gray-5'
+                  selectedOption === idx ? 'bg-foreground/8' : 'hover:bg-lg-control-hover'
                 }`}
               >
                 <span
                   className={`relative flex size-[28px] shrink-0 items-center justify-center rounded-[10px] overflow-hidden text-sm transition-colors ${
                     selectedOption === idx
-                      ? 'bg-primary/15 text-primary'
-                      : 'bg-gray-4 text-muted-foreground'
+                      ? 'bg-foreground/10 text-foreground'
+                      : 'bg-lg-control text-muted-foreground'
                   }`}
                 >
                   {idx + 1}
@@ -295,18 +295,18 @@ export const AskUserQuestionModal: FC<AskUserQuestionModalProps> = ({
                 </span>
               </button>
               {idx < currentQuestion.options.length - 1 ? (
-                <div className="h-px bg-gray-4 mx-3" />
+                <div className="h-px bg-lg-control mx-3" />
               ) : null}
             </div>
           ))}
         </div>
 
         {/* Separator */}
-        <div className="h-px bg-gray-4 mx-3 my-0.5" />
+        <div className="h-px bg-lg-control mx-3 my-0.5" />
 
         {/* "Something else" row */}
         <div className="group/row flex w-full items-center gap-3 h-[3.25rem] px-3">
-          <span className="relative flex size-[28px] shrink-0 items-center justify-center rounded-[10px] overflow-hidden bg-gray-4">
+          <span className="relative flex size-[28px] shrink-0 items-center justify-center rounded-[10px] overflow-hidden bg-lg-control">
             <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
           </span>
           <input
@@ -328,7 +328,7 @@ export const AskUserQuestionModal: FC<AskUserQuestionModalProps> = ({
           {customText.trim() ? (
             <button
               onClick={handleCustomSubmit}
-              className="size-7 flex items-center justify-center rounded-lg transition-colors bg-primary/15 hover:bg-primary/25 text-primary shrink-0"
+              className="size-7 flex items-center justify-center rounded-lg transition-colors bg-foreground/10 hover:bg-foreground/15 text-foreground shrink-0"
               type="button"
               aria-label="Submit"
             >

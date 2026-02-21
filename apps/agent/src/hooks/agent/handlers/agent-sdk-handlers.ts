@@ -18,6 +18,8 @@ import {
   agentSetAcceptMode,
 } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
+import { THINKING_MODE_BUDGET } from '@/stores/agent/tool-store';
+import { useChatStore } from '@/stores/chat/chat-store';
 
 export async function handleMessageSend(
   message: Extract<WebviewMessage, { type: 'message:send' }>
@@ -29,6 +31,11 @@ export async function handleMessageSend(
     // Track this user message ID for checkpoint association
     // The checkpoint that arrives will be stored against this user message ID
     useCheckpointStore.getState().onUserMessageSent(message.session_id, message.uuid);
+
+    // Mark message as compacting when /compact is sent (cleared by compact_complete event)
+    if (message.content.trim() === '/compact') {
+      useChatStore.getState().markCompacting(message.uuid);
+    }
 
     // Convert context images to attachments if present
     const attachments: AttachmentContentBlock[] = [];
@@ -116,14 +123,7 @@ export async function handleThinkingSet(
 ): Promise<void> {
   try {
     const enabled = message.mode !== 'off';
-    const maxTokens =
-      message.mode === 'think'
-        ? 4096
-        : message.mode === 'hard'
-          ? 10240
-          : message.mode === 'ultra'
-            ? 32768
-            : undefined;
+    const maxTokens = THINKING_MODE_BUDGET[message.mode];
     await agentSetThinkingMode(message.session_id, enabled, maxTokens);
   } catch (err: unknown) {
     logger.error('Set thinking mode error', err);

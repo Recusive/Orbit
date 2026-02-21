@@ -4,7 +4,7 @@
  * Tests for the ModelSelector dropdown component in InputControls.
  *
  * The Model Selector:
- * - Displays the currently selected AI model (Haiku, Sonnet, Opus)
+ * - Displays the currently selected AI model (Haiku 4.5, Sonnet 4.6, Opus 4.6)
  * - Opens a dropdown with model groups (Claude, Codex)
  * - Allows selecting a different model
  * - Calls onModelChange callback when a valid model is selected
@@ -31,7 +31,7 @@ import { useToolStore } from '@/stores/agent/tool-store';
  */
 function resetStore(): void {
   useToolStore.setState({
-    model: 'sonnet',
+    model: 'claude-sonnet-4-6',
   });
 }
 
@@ -47,12 +47,11 @@ const TestWrapper: FC<{ children: ReactNode }> = ({ children }) => {
 // =============================================================================
 
 describe('Model Groups Configuration', () => {
-  it('should have Claude model group with Haiku, Sonnet, Opus 4.5, Opus 4.6', () => {
+  it('should have Claude model group with Haiku 4.5, Sonnet 4.6, Opus 4.6', () => {
     // These are the valid models that can be selected
-    const validModels = ['haiku', 'sonnet', 'opus', 'claude-opus-4-6'];
+    const validModels = ['haiku', 'claude-sonnet-4-6', 'claude-opus-4-6'];
     expect(validModels).toContain('haiku');
-    expect(validModels).toContain('sonnet');
-    expect(validModels).toContain('opus');
+    expect(validModels).toContain('claude-sonnet-4-6');
     expect(validModels).toContain('claude-opus-4-6');
   });
 });
@@ -71,7 +70,7 @@ describe('ModelSelector Component', () => {
       render(<ModelSelector />, { wrapper: TestWrapper });
 
       // Should display the selected model name
-      expect(screen.getByText('Sonnet 4.5')).toBeInTheDocument();
+      expect(screen.getByText('Sonnet 4.6')).toBeInTheDocument();
     });
 
     it('should display the selected model from store', () => {
@@ -79,13 +78,6 @@ describe('ModelSelector Component', () => {
       render(<ModelSelector />, { wrapper: TestWrapper });
 
       expect(screen.getByText('Haiku 4.5')).toBeInTheDocument();
-    });
-
-    it('should display Opus when selected', () => {
-      useToolStore.setState({ model: 'opus' });
-      render(<ModelSelector />, { wrapper: TestWrapper });
-
-      expect(screen.getByText('Opus 4.5')).toBeInTheDocument();
     });
 
     it('should display Opus 4.6 when selected', () => {
@@ -128,9 +120,8 @@ describe('ModelSelector Component', () => {
 
       // All Claude models should be visible
       expect(screen.getAllByText('Haiku 4.5')).toHaveLength(1);
-      // Sonnet appears twice: in button and dropdown
-      expect(screen.getAllByText('Sonnet 4.5').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText('Opus 4.5')).toHaveLength(1);
+      // Sonnet 4.6 appears twice: in button and dropdown
+      expect(screen.getAllByText('Sonnet 4.6').length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('Opus 4.6')).toHaveLength(1);
     });
 
@@ -189,11 +180,11 @@ describe('ModelSelector Component', () => {
       // Open dropdown
       await user.click(screen.getByRole('button'));
 
-      // Select Opus 4.5
-      await user.click(screen.getByText('Opus 4.5'));
+      // Select Opus 4.6
+      await user.click(screen.getByText('Opus 4.6'));
 
       // Store should be updated
-      expect(useToolStore.getState().model).toBe('opus');
+      expect(useToolStore.getState().model).toBe('claude-opus-4-6');
     });
 
     it('should call onModelChange when selecting Opus 4.6', async () => {
@@ -246,7 +237,7 @@ describe('ModelSelector Component', () => {
     });
 
     it('should show checkmark on selected model', async () => {
-      useToolStore.setState({ model: 'sonnet' });
+      useToolStore.setState({ model: 'claude-sonnet-4-6' });
       const user = userEvent.setup();
 
       render(<ModelSelector />, { wrapper: TestWrapper });
@@ -256,7 +247,7 @@ describe('ModelSelector Component', () => {
 
       // The selected model row should have special styling (border-l-2)
       // We check that Sonnet option exists in dropdown
-      const sonnetOption = screen.getAllByText('Sonnet 4.5');
+      const sonnetOption = screen.getAllByText('Sonnet 4.6');
       // Should appear at least once (in dropdown, possibly also in trigger)
       expect(sonnetOption.length).toBeGreaterThanOrEqual(1);
     });
@@ -308,9 +299,9 @@ describe('ModelSelector Edge Cases', () => {
 
     // Open and select
     await user.click(screen.getByRole('button'));
-    await user.click(screen.getByText('Opus 4.5'));
+    await user.click(screen.getByText('Opus 4.6'));
 
     // Should still update store
-    expect(useToolStore.getState().model).toBe('opus');
+    expect(useToolStore.getState().model).toBe('claude-opus-4-6');
   });
 });

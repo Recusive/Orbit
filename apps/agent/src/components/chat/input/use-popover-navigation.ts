@@ -16,6 +16,8 @@ export function usePopoverNavigation(): PopoverNavigationState {
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+  // Character index in inputText where the current "/" token starts (for mid-text replacement)
+  const [slashStartIndex, setSlashStartIndex] = useState(0);
 
   // Thinking mode hover state
   const [thinkingHoverOpen, setThinkingHoverOpen] = useState(false);
@@ -45,6 +47,7 @@ export function usePopoverNavigation(): PopoverNavigationState {
     setSlashOpen(false);
     setSlashQuery('');
     setSlashSelectedIndex(0);
+    setSlashStartIndex(0);
   }, []);
 
   return {
@@ -62,6 +65,8 @@ export function usePopoverNavigation(): PopoverNavigationState {
     setSlashQuery,
     slashSelectedIndex,
     setSlashSelectedIndex,
+    slashStartIndex,
+    setSlashStartIndex,
     // Thinking hover
     thinkingHoverOpen,
     setThinkingHoverOpen,
@@ -111,6 +116,13 @@ export function handlePopoverKeyDown(
   }
 
   if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    onSelect();
+    return true;
+  }
+
+  // Tab autocompletes the currently selected item
+  if (e.key === 'Tab') {
     e.preventDefault();
     onSelect();
     return true;

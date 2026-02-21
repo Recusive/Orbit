@@ -67,10 +67,10 @@ const WorktreeUIStateArraySchema = z.array(WorktreeUIStateSchema);
 export type ConversationSummary = StoredConversationSummary;
 
 // Terminal position options
-export type TerminalPosition = 'activity' | 'both';
+export type TerminalPosition = 'activity' | 'chat' | 'both';
 
 // Activity panel tabs
-export type ActivityTab = 'file' | 'files' | 'source' | 'browser';
+export type ActivityTab = 'file' | 'source' | 'browser';
 
 // Bottom panel tabs
 export type BottomPanelTab = 'terminal' | 'problems';
@@ -110,6 +110,7 @@ interface UIState {
   bottomPanelHeight: number;
   bottomPanelTab: BottomPanelTab;
   terminalPosition: TerminalPosition;
+  terminalCollapsed: boolean;
   // Activity Panel Tab
   activityTab: ActivityTab;
   // Header Tab (main app view)
@@ -145,6 +146,7 @@ interface UIActions {
   setConversations: (conversations: ConversationSummary[]) => void;
   addConversation: (conversation: ConversationSummary) => void;
   removeConversation: (sessionId: string) => void;
+  /** @legacy Still needed for forks and pre-custom-sessionId sessions. New sessions skip remap. */
   remapConversation: (oldSessionId: string, newSessionId: string) => void;
   updateConversationTitle: (sessionId: string, title: string) => void;
   setEditingConversationId: (id: string | null) => void;
@@ -156,6 +158,7 @@ interface UIActions {
   toggleReviewPanel: () => void;
   toggleRightSidebar: () => void;
   toggleBottomPanel: () => void;
+  toggleTerminalCollapsed: () => void;
   setReviewPanelWidth: (width: number) => void;
   setBottomPanelHeight: (height: number) => void;
   setTerminalPosition: (position: TerminalPosition) => void;
@@ -278,6 +281,7 @@ export const useUIStore = create<UIStore>()(
     bottomPanelHeight: DEFAULT_UI_STATE.bottomPanelHeight,
     bottomPanelTab: 'terminal' as BottomPanelTab,
     terminalPosition: 'activity' as TerminalPosition,
+    terminalCollapsed: false,
     activityTab: 'file' as ActivityTab,
     activeTab: 'agent' as HeaderTab,
     goToLineDialogOpen: false,
@@ -464,14 +468,13 @@ export const useUIStore = create<UIStore>()(
 
     setLeftSidebarWidth: (width: number): void => {
       set((state) => {
-        // Clamp to valid range: either collapsed or minUsable-max
-        if (width <= SIDEBAR.collapsed) {
+        // Clamp to valid range: either collapsed (0) or minUsable-max.
+        // Any width below minUsable snaps to collapsed — there's no usable
+        // sidebar state between 0 and minUsable.
+        if (width < PANEL_SIZES.sidebar.minUsable) {
           state.leftSidebarWidth = SIDEBAR.collapsed;
         } else {
-          const clampedWidth = Math.max(
-            PANEL_SIZES.sidebar.minUsable,
-            Math.min(PANEL_SIZES.sidebar.max, width)
-          );
+          const clampedWidth = Math.min(PANEL_SIZES.sidebar.max, width);
           state.leftSidebarWidth = clampedWidth;
           // Remember this width for when user toggles via button
           state.lastExpandedSidebarWidth = clampedWidth;
@@ -493,7 +496,21 @@ export const useUIStore = create<UIStore>()(
 
     toggleBottomPanel: (): void => {
       set((state) => {
-        state.bottomPanelOpen = !state.bottomPanelOpen;
+        if (!state.bottomPanelOpen) {
+          // Closed → open fully
+          state.bottomPanelOpen = true;
+          state.terminalCollapsed = false;
+        } else {
+          // Open → toggle between expanded and collapsed (header-only).
+          // The header bar always stays visible; Cmd+J never fully hides.
+          state.terminalCollapsed = !state.terminalCollapsed;
+        }
+      });
+    },
+
+    toggleTerminalCollapsed: (): void => {
+      set((state) => {
+        state.terminalCollapsed = !state.terminalCollapsed;
       });
     },
 
@@ -523,7 +540,10 @@ export const useUIStore = create<UIStore>()(
 
     cycleTerminalPosition: (): void => {
       set((state) => {
-        state.terminalPosition = state.terminalPosition === 'activity' ? 'both' : 'activity';
+        const order: TerminalPosition[] = ['activity', 'both', 'chat'];
+        const idx = order.indexOf(state.terminalPosition);
+        const next = order[(idx + 1) % order.length];
+        if (next !== undefined) state.terminalPosition = next;
         // Ensure terminal is open when cycling positions
         state.bottomPanelOpen = true;
       });
@@ -691,14 +711,13 @@ export const useUIStore = create<UIStore>()(
 
     setCanvasRightSidebarWidth: (width: number): void => {
       set((state) => {
-        // Clamp to valid range: either collapsed or minUsable-max
-        if (width <= SIDEBAR.collapsed) {
+        // Clamp to valid range: either collapsed (0) or minUsable-max.
+        // Any width below minUsable snaps to collapsed — there's no usable
+        // sidebar state between 0 and minUsable.
+        if (width < PANEL_SIZES.sidebar.minUsable) {
           state.canvasRightSidebarWidth = SIDEBAR.collapsed;
         } else {
-          const clampedWidth = Math.max(
-            PANEL_SIZES.sidebar.minUsable,
-            Math.min(PANEL_SIZES.sidebar.max, width)
-          );
+          const clampedWidth = Math.min(PANEL_SIZES.sidebar.max, width);
           state.canvasRightSidebarWidth = clampedWidth;
           // Remember this width for when user toggles via button
           state.lastExpandedCanvasRightSidebarWidth = clampedWidth;
@@ -793,6 +812,10 @@ export const useWorkspaceConversations = (): ConversationSummary[] => {
 
 export const useTerminalPosition = (): TerminalPosition => {
   return useUIStore((state) => state.terminalPosition);
+};
+
+export const useTerminalCollapsed = (): boolean => {
+  return useUIStore((state) => state.terminalCollapsed);
 };
 
 export const useActivityTab = (): ActivityTab => {

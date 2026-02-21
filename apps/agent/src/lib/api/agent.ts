@@ -12,7 +12,7 @@ import { invoke, listen } from './core';
 
 export interface SessionConfig {
   cwd?: string;
-  model?: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
+  model?: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
   thinkingEnabled?: boolean;
   maxThinkingTokens?: number;
   acceptEnabled?: boolean;
@@ -121,12 +121,17 @@ export interface CheckpointEvent {
 
 export interface AuthErrorEvent {
   sessionId: string;
-  category: 'TOKEN_EXPIRED' | 'REFRESH_FAILED' | 'NO_CREDENTIALS' | 'INVALID_TOKEN';
+  category:
+    | 'TOKEN_EXPIRED'
+    | 'REFRESH_FAILED'
+    | 'NO_CREDENTIALS'
+    | 'INVALID_TOKEN'
+    | 'AUTH_RECOVERED'; // [oauth-401-recovery] added AUTH_RECOVERED
   message: string;
   recoverable: boolean;
 }
 
-export type AgentModel = 'sonnet' | 'opus' | 'haiku' | 'claude-opus-4-6' | 'inherit';
+export type AgentModel = 'claude-sonnet-4-6' | 'claude-opus-4-6' | 'haiku' | 'inherit';
 
 export interface SubagentDefinition {
   name: string;
@@ -145,9 +150,19 @@ export interface SlashCommandDefinition {
   content: string;
   allowedTools?: string[];
   argumentHint?: string;
-  model?: 'sonnet' | 'opus' | 'haiku' | 'claude-opus-4-6';
+  model?: 'claude-sonnet-4-6' | 'claude-opus-4-6' | 'haiku';
   scope: CommandScope;
   readonly?: boolean;
+}
+
+export type SkillSource = 'project' | 'user';
+
+export interface SkillDefinition {
+  name: string;
+  description: string;
+  source: SkillSource;
+  triggers?: string[];
+  filePath?: string;
 }
 
 export interface ForkSessionOptions {
@@ -230,7 +245,7 @@ export async function agentGetThinkingMode(sessionId: string): Promise<boolean> 
 
 export async function agentSetModel(
   sessionId: string,
-  model: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6'
+  model: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6'
 ): Promise<void> {
   return invoke('agent_set_model', { sessionId, model });
 }
@@ -302,6 +317,16 @@ export async function onAgentCheckpoint(
   callback: (event: CheckpointEvent) => void
 ): Promise<() => void> {
   return listen<CheckpointEvent>('agent:checkpoint', callback);
+}
+
+export interface CompactCompleteEvent {
+  sessionId: string;
+}
+
+export async function onAgentCompactComplete(
+  callback: (event: CompactCompleteEvent) => void
+): Promise<() => void> {
+  return listen<CompactCompleteEvent>('agent:compact_complete', callback);
 }
 
 export async function onAgentReady(callback: () => void): Promise<() => void> {
@@ -395,6 +420,14 @@ export async function updateAgent(
 
 export async function deleteAgent(workspacePath: string, name: string): Promise<void> {
   return invoke('agent_delete_agent', { workspacePath, name });
+}
+
+// ============================================
+// Skill Definition Operations
+// ============================================
+
+export async function listSkills(workspacePath: string): Promise<SkillDefinition[]> {
+  return invoke<SkillDefinition[]>('agent_list_skills', { workspacePath });
 }
 
 // ============================================

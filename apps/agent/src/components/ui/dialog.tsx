@@ -19,7 +19,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+      'fixed inset-0 z-50 bg-black/15 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className
     )}
     {...props}
@@ -32,23 +32,20 @@ const DialogContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className="flex items-center justify-center" />
+    <DialogOverlay className="flex items-center justify-center backdrop-blur-none bg-black/0" />
     {/* Flexbox centering wrapper - avoids blurry text from transform translate(-50%) subpixel issues */}
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       <div className="relative">
         <DialogPrimitive.Content
           ref={ref}
           className={cn(
-            'relative z-10 grid w-full max-w-lg gap-4 border border-gray-5 bg-popover glass-float p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg pointer-events-auto',
+            'relative z-10 grid w-full max-w-lg gap-4 bg-sidebar border-0 p-6 shadow-none duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-[10px] pointer-events-auto',
             className
           )}
-          style={{
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.03)',
-          }}
           {...props}
         >
           {children}
-          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-2 -m-1 opacity-70 ring-offset-background transition-[opacity,background-color] duration-150 hover:opacity-100 hover:bg-gray-4 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-gray-4 data-[state=open]:text-gray-12">
+          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-2 -m-1 opacity-70 ring-offset-background transition-[opacity,background-color] duration-150 hover:opacity-100 hover:bg-lg-control-hover focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-lg-control-hover data-[state=open]:text-foreground">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
@@ -72,15 +69,12 @@ const DialogContentTopCenter = React.forwardRef<
         <DialogPrimitive.Content
           ref={ref}
           className={cn(
-            'relative z-10 grid border border-gray-5 bg-popover glass-float rounded-lg',
+            'relative z-10 grid glass-popover bg-sidebar border-0 shadow-none rounded-[12px]',
             'duration-150 data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-[0.98] data-[state=open]:zoom-in-[0.98]',
             className
           )}
-          style={{
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.03)',
-          }}
           {...props}
         >
           {children}
@@ -90,6 +84,32 @@ const DialogContentTopCenter = React.forwardRef<
   </DialogPortal>
 ));
 DialogContentTopCenter.displayName = 'DialogContentTopCenter';
+
+// Apple Liquid Glass dialog — dim overlay without blur so the app stays crisp behind it
+const DialogContentGlass = React.forwardRef<
+  React.ComponentRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
+  <DialogPortal>
+    {/* Dim overlay without blur */}
+    <DialogOverlay className="flex items-center justify-center backdrop-blur-none" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+      <div className="relative">
+        <DialogPrimitive.Content
+          ref={ref}
+          className={cn(
+            'relative z-10 grid bg-sidebar duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 pointer-events-auto',
+            className
+          )}
+          {...props}
+        >
+          {children}
+        </DialogPrimitive.Content>
+      </div>
+    </div>
+  </DialogPortal>
+));
+DialogContentGlass.displayName = 'DialogContentGlass';
 
 const DialogHeader = ({
   className,
@@ -141,6 +161,7 @@ export {
   DialogTrigger,
   DialogClose,
   DialogContent,
+  DialogContentGlass,
   DialogContentTopCenter,
   DialogHeader,
   DialogFooter,

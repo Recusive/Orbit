@@ -19,7 +19,7 @@ use tauri::{AppHandle, Emitter as _, State};
 
 use crate::agent::{
     AttachmentContentBlock, CommandScope, ForkSessionOptions, ForkSessionResult, McpToolResponse,
-    Model, PermissionDecision, PermissionResponse, SessionConfig, SessionManager,
+    Model, PermissionDecision, PermissionResponse, SessionConfig, SessionManager, SkillDefinition,
     SlashCommandDefinition, SubagentDefinition,
 };
 
@@ -182,12 +182,12 @@ pub async fn agent_set_model(
 ) -> Result<()> {
     let model = match model.as_str() {
         "haiku" => Model::Haiku,
-        "sonnet" => Model::Sonnet,
-        "opus" => Model::Opus,
+        "claude-sonnet-4-6" => Model::ClaudeSonnet46,
         "claude-opus-4-6" => Model::ClaudeOpus46,
         _ => {
             return Err(
-                "Invalid model: must be 'haiku', 'sonnet', 'opus', or 'claude-opus-4-6'".to_owned(),
+                "Invalid model: must be 'haiku', 'claude-sonnet-4-6', or 'claude-opus-4-6'"
+                    .to_owned(),
             )
         },
     };
@@ -311,6 +311,19 @@ pub async fn agent_delete_agent(
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<()> {
     state.delete_agent(&workspace_path, &name).map_err(to_error)
+}
+
+// ============================================================================
+// Skill Definition Commands
+// ============================================================================
+
+/// List all skills in workspace and user directories
+#[tauri::command]
+pub async fn agent_list_skills(
+    workspace_path: String,
+    state: State<'_, Arc<SessionManager>>,
+) -> Result<Vec<SkillDefinition>> {
+    state.list_skills(&workspace_path).map_err(to_error)
 }
 
 // ============================================================================
@@ -565,6 +578,16 @@ fn emit_checkpoint(app: &AppHandle, session_id: &str, checkpoint_id: &str) {
     ));
 }
 
+/// Emit compact complete event
+fn emit_compact_complete(app: &AppHandle, session_id: &str) {
+    drop(app.emit(
+        "agent:compact_complete",
+        serde_json::json!({
+            "sessionId": session_id,
+        }),
+    ));
+}
+
 /// Emit canvas message event
 fn emit_canvas_message(app: &AppHandle, session_id: &str, message: &SDKMessage) {
     drop(app.emit(
@@ -659,6 +682,9 @@ pub fn setup_event_callbacks(app: &AppHandle, session_manager: &Arc<SessionManag
             session_id,
             checkpoint_id,
         } => emit_checkpoint(&app_handle, &session_id, &checkpoint_id),
+        BridgeEvent::CompactComplete { session_id } => {
+            emit_compact_complete(&app_handle, &session_id);
+        },
         BridgeEvent::CanvasMessage {
             session_id,
             message,

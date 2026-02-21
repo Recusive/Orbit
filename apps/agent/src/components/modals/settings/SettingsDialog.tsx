@@ -8,6 +8,7 @@ import { SETTINGS_PAGE_COMPONENTS, SlashCommandsSettings, SubagentsSettings } fr
 import type { SettingsDialogProps, SettingsSection } from './types';
 import type { FC, ReactNode } from 'react';
 
+import { SFSymbol } from '@/components/shared';
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { cn } from '@/lib/utils';
@@ -71,7 +72,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
-        <DialogOverlay />
+        <DialogOverlay className="backdrop-blur-none bg-black/40" />
 
         {/* Centering wrapper */}
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
@@ -81,9 +82,9 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               aria-describedby={undefined}
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
-                'bg-card',
-                'border border-gray-5 rounded-lg overflow-hidden flex flex-col',
-                'shadow-lg duration-200',
+                'bg-sidebar border-0 shadow-none',
+                'rounded-[14px] overflow-hidden flex flex-col',
+                'duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
                 'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
                 'data-[state=closed]:zoom-out-[0.98] data-[state=open]:zoom-in-[0.98]'
@@ -95,28 +96,33 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               </DialogPrimitive.Title>
 
               {/* Title bar */}
-              <div className="flex items-center justify-between px-4 py-2.5 bg-transparent">
+              <div className="flex items-center justify-between px-4 py-2.5 bg-sidebar">
                 <div className="flex items-center gap-2 font-medium text-base">
-                  <Settings2 className="h-4 w-4 shrink-0 text-gray-9" />
-                  <span className="text-gray-9">Settings</span>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-8" />
+                  <SFSymbol
+                    name="gear"
+                    size={18}
+                    weight="medium"
+                    className="shrink-0 text-muted-foreground"
+                    fallback={<Settings2 className="h-4 w-4" />}
+                  />
+                  <span className="text-muted-foreground">Settings</span>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span>{activeItem.icon}</span>
                   <span>{activeItem.label}</span>
                 </div>
-                <DialogPrimitive.Close className="rounded-md p-1 text-gray-11 hover:text-foreground hover:bg-gray-4 active:scale-95 transition-[opacity,background-color,color,transform] duration-150">
+                <DialogPrimitive.Close className="rounded-md p-1 text-lg-text-secondary hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-[opacity,background-color,color,transform] duration-150">
                   <X className="h-4 w-4" />
                   <span className="sr-only">Close</span>
                 </DialogPrimitive.Close>
               </div>
-              <div className="h-px bg-border/40 shrink-0" />
 
               {/* Content */}
-              <div className="flex flex-1 overflow-hidden">
+              <div className="flex flex-1 overflow-hidden border-t border-foreground/10">
                 {/* Sidebar */}
                 <SettingsSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
 
                 {/* Main content */}
-                <div className="flex-1 overflow-auto bg-transparent relative">
+                <div className="flex-1 overflow-auto bg-sidebar relative">
                   {/* Static sections - render via lazy components (unmounted when inactive) */}
                   {!isAsyncSection && (
                     <div className="absolute inset-0 p-6 overflow-auto">

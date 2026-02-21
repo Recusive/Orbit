@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
-import { ActionsBar } from './actions-bar';
 import { ChatArea } from './chat-area';
-import { PrimarySidebar } from './primary-sidebar';
-import { SidebarResizeHandle } from './sidebar-resize-handle';
 
 import type { ExtensionMessage } from '@/types/protocol';
 import type { FC } from 'react';
@@ -13,28 +10,22 @@ import { GoToLineDialog, QuickOpen } from '@/components/modals';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { useGitPolling } from '@/hooks/git/use-git-polling';
 import { useDefaultKeyboardShortcuts } from '@/hooks/ui/use-keyboard-shortcuts';
-import { useLeftSidebarWidth, useUIStore } from '@/stores/ui/ui-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 /**
  * RootLayout is the Agent mode content.
- * Renders the sidebar, chat area, and actions bar.
- * HeaderBar and StatusBar are rendered by App.tsx.
- *
- * PERF: Uses granular selectors to prevent full-tree re-renders.
- * leftSidebarWidth is isolated so sidebar animation only re-renders
- * PrimarySidebar — not ChatArea, Terminal, Browser, etc.
+ * Renders the chat area, actions bar, and modals.
+ * Sidebar is rendered by App.tsx/AppShell (global, all modes).
+ * ContentTopBar and StatusBar are rendered by App.tsx.
  */
 export const RootLayout: FC = () => {
   // Granular data selectors — only re-render when THESE specific values change
-  const leftSidebarWidth = useLeftSidebarWidth();
-  const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const goToLineDialogOpen = useUIStore((s) => s.goToLineDialogOpen);
   const chatAreaDetached = useUIStore((s) => s.chatAreaDetached);
 
   // Actions via useShallow — stable references, no spurious re-renders
   const {
     setGoToLineDialogOpen,
-    toggleLeftSidebar,
     toggleReviewPanel,
     toggleBottomPanel,
     setTerminalPosition,
@@ -43,7 +34,6 @@ export const RootLayout: FC = () => {
   } = useUIStore(
     useShallow((s) => ({
       setGoToLineDialogOpen: s.setGoToLineDialogOpen,
-      toggleLeftSidebar: s.toggleLeftSidebar,
       toggleReviewPanel: s.toggleReviewPanel,
       toggleBottomPanel: s.toggleBottomPanel,
       setTerminalPosition: s.setTerminalPosition,
@@ -83,14 +73,14 @@ export const RootLayout: FC = () => {
     setQuickOpenVisible(true);
   }, []);
 
-  // Smart terminal toggle: if activity panel is closed, open terminal in full-width mode
-  // PERF: Reads reviewPanelOpen/bottomPanelOpen from getState() instead of subscribing.
-  // These values are only needed at callback-invocation time, not for rendering.
+  // Smart terminal toggle: if activity panel is closed and terminal is fully hidden,
+  // open terminal in chat mode. Otherwise just toggle collapsed/expanded.
+  // PERF: Reads state from getState() — only needed at callback-invocation time.
   const handleToggleTerminal = useCallback((): void => {
     const { reviewPanelOpen, bottomPanelOpen } = useUIStore.getState();
     if (!reviewPanelOpen && !bottomPanelOpen) {
-      // Activity panel is closed and terminal is closed - open in full-width mode
-      setTerminalPosition('both');
+      // Activity panel is closed and terminal is fully hidden - open in chat mode
+      setTerminalPosition('chat');
     }
     toggleBottomPanel();
   }, [setTerminalPosition, toggleBottomPanel]);
@@ -124,7 +114,6 @@ export const RootLayout: FC = () => {
     window.addEventListener('openCommandPalette', handleOpenCommandPalette);
     window.addEventListener('quickOpenFile', handleQuickOpenFile);
     window.addEventListener('goToLine', handleGoToLine);
-    window.addEventListener('toggleLeftSidebar', toggleLeftSidebar);
     window.addEventListener('toggleActivityPanel', toggleReviewPanel);
     window.addEventListener('toggleFileBrowser', handleToggleFileBrowser);
     window.addEventListener('toggleTerminal', handleToggleTerminal);
@@ -136,7 +125,6 @@ export const RootLayout: FC = () => {
       window.removeEventListener('openCommandPalette', handleOpenCommandPalette);
       window.removeEventListener('quickOpenFile', handleQuickOpenFile);
       window.removeEventListener('goToLine', handleGoToLine);
-      window.removeEventListener('toggleLeftSidebar', toggleLeftSidebar);
       window.removeEventListener('toggleActivityPanel', toggleReviewPanel);
       window.removeEventListener('toggleFileBrowser', handleToggleFileBrowser);
       window.removeEventListener('toggleTerminal', handleToggleTerminal);
@@ -148,7 +136,6 @@ export const RootLayout: FC = () => {
     handleOpenCommandPalette,
     handleQuickOpenFile,
     handleGoToLine,
-    toggleLeftSidebar,
     toggleReviewPanel,
     handleToggleFileBrowser,
     handleToggleTerminal,
@@ -159,19 +146,9 @@ export const RootLayout: FC = () => {
 
   return (
     <div className="h-full w-full flex overflow-hidden text-foreground">
-      {/* Primary Sidebar - File explorer, conversations */}
-      <PrimarySidebar width={leftSidebarWidth} />
-
-      {/* Sidebar resize handle */}
-      <SidebarResizeHandle />
-
       {/* Chat Area - Main chat interface with Activity panel */}
       {/* Hidden when detached (e.g., canvas expanded view uses its own ChatArea) */}
       {!chatAreaDetached ? <ChatArea /> : null}
-
-      {/* Actions Bar - Activity Panel tab switcher */}
-      {/* Also hidden when ChatArea is detached to prevent orphaned controls */}
-      {rightSidebarOpen && !chatAreaDetached ? <ActionsBar /> : null}
 
       {/* Quick Open Dialog */}
       <QuickOpen open={quickOpenVisible} onOpenChange={setQuickOpenVisible} />

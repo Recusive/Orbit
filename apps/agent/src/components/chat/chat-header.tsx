@@ -98,7 +98,7 @@ const HeaderBranchSelector: FC = () => {
     <DropdownMenu onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger
         disabled={isCheckingOut || branches.length === 0}
-        className="flex items-center gap-1.5 text-sm min-w-0 hover:bg-accent rounded-md px-2 py-1 active:scale-[0.98] transition-[background-color,transform] duration-150 disabled:opacity-40"
+        className="flex items-center gap-1.5 text-sm min-w-0 hover:bg-lg-control-hover rounded-md px-2 py-1 active:scale-[0.98] transition-[background-color,transform] duration-150 disabled:opacity-40"
       >
         {isCheckingOut ? (
           <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground/70" />
@@ -154,7 +154,7 @@ const DiffStatsButton: FC = () => {
       : `${String(fileCount)} file${fileCount !== 1 ? 's' : ''} changed on branch`;
 
   const handleClick = (): void => {
-    setActivityTab('files');
+    setActivityTab('source');
   };
 
   return (
@@ -218,7 +218,7 @@ export const ChatHeader: FC<ChatHeaderProps> = ({ hideGitControls }) => {
 
   return (
     <header
-      className="flex items-center justify-between px-4 border-b border-gray-5 shrink-0"
+      className="flex items-center justify-between px-4 border-b border-lg-separator shrink-0"
       style={{ height: HEIGHTS.headerBar }}
     >
       {/* Breadcrumb */}

@@ -7,6 +7,8 @@ import type { FC } from 'react';
 
 import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { useTauri } from '@/hooks/agent/use-tauri';
+import { useFullscreen } from '@/hooks/ui/use-fullscreen';
+import { CONTENT_CARD } from '@/lib/utils/constants';
 import {
   selectFormattedIdleTime,
   selectIsBrowserRunning,
@@ -25,10 +27,15 @@ import { generateUUID } from '@/types/protocol';
 // Inset to prevent webview from overlapping panel drag handles (3px separator)
 /** Minimal left inset to prevent native webview from overlapping the panel border */
 const WEBVIEW_LEFT_INSET = 1;
+/** Bottom inset to prevent native webview from overflowing the card's rounded corners.
+ *  The ActivityCard applies border-radius to all corners; since the native OS webview
+ *  isn't clipped by CSS overflow/border-radius, we shrink the bounds instead. */
+const WEBVIEW_BOTTOM_INSET = CONTENT_CARD.borderRadius;
 
 export const BrowserPanel: FC = () => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const isActive = useBrowserIsActive();
+  const isFullscreen = useFullscreen();
   const error = useBrowserError();
   const { postMessage } = useTauri({});
   // Use selector to prevent re-renders on unrelated store changes
@@ -91,11 +98,12 @@ export const BrowserPanel: FC = () => {
     // Get viewport bounds for initial webview position
     // Apply inset to prevent webview from overlapping panel borders
     // Note: rect was already fetched above for validation
+    const bottomInset = isFullscreen ? 0 : WEBVIEW_BOTTOM_INSET;
     const bounds = {
       x: Math.round(rect.x) + WEBVIEW_LEFT_INSET,
       y: Math.round(rect.y),
       width: Math.round(rect.width) - WEBVIEW_LEFT_INSET,
-      height: Math.round(rect.height),
+      height: Math.round(rect.height) - bottomInset,
       url: initialUrl,
     };
 
@@ -105,7 +113,7 @@ export const BrowserPanel: FC = () => {
       uuid: generateUUID(),
       bounds,
     });
-  }, [isActive, isCreating, lifecycleState, postMessage, pendingUrl]);
+  }, [isActive, isCreating, isFullscreen, lifecycleState, postMessage, pendingUrl]);
 
   // Close browser handler
   const handleCloseBrowser = useCallback((): void => {
@@ -215,14 +223,15 @@ export const BrowserPanel: FC = () => {
       rafId = requestAnimationFrame(() => {
         rafId = null;
         if (!viewportRef.current) return;
-        // Apply inset to prevent webview from overlapping panel borders
+        // Apply inset to prevent webview from overlapping panel borders and rounded corners
         const rect = viewportRef.current.getBoundingClientRect();
         const totalLeftInset = WEBVIEW_LEFT_INSET + sashExtraInset;
+        const bottomInset = isFullscreen ? 0 : WEBVIEW_BOTTOM_INSET;
         const bounds = {
           x: Math.round(rect.x) + totalLeftInset,
           y: Math.round(rect.y),
           width: Math.round(rect.width) - totalLeftInset,
-          height: Math.round(rect.height),
+          height: Math.round(rect.height) - bottomInset,
         };
 
         // Only send if bounds actually changed
@@ -306,7 +315,7 @@ export const BrowserPanel: FC = () => {
         fn();
       });
     };
-  }, [isActive, postMessage]);
+  }, [isActive, isFullscreen, postMessage]);
 
   // Navigation handlers
   const handleBack = useCallback((): void => {
@@ -418,7 +427,7 @@ export const BrowserPanel: FC = () => {
                 useBrowserStore.getState().reset();
                 useBrowserLifecycleStore.getState().reset();
               }}
-              className="px-3 py-1 text-xs font-medium bg-gray-4 text-gray-12 rounded hover:bg-accent transition-colors"
+              className="px-3 py-1 text-xs font-medium bg-lg-control text-foreground rounded hover:bg-accent transition-colors"
             >
               Reset
             </button>
@@ -428,7 +437,7 @@ export const BrowserPanel: FC = () => {
         {/* Empty state (before browser is created) */}
         {!isActive && !isCreating && !error && lifecycleState === 'idle' ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-            <div className="flex flex-col items-center gap-3 rounded-lg bg-gray-3 dark:bg-background px-8 py-6 w-fit min-w-[14rem]">
+            <div className="flex flex-col items-center gap-3 rounded-lg bg-lg-control dark:bg-background px-8 py-6 w-fit min-w-[14rem]">
               <div className="flex items-center gap-3 opacity-50">
                 <OrbitLogo className="h-18 w-18" />
                 <div className="w-0.5 h-8 bg-current opacity-40" />
@@ -436,7 +445,7 @@ export const BrowserPanel: FC = () => {
               </div>
               <button
                 onClick={handleLaunchBrowser}
-                className="px-6 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+                className="px-6 py-2 text-sm font-medium bg-foreground text-background rounded-full hover:bg-foreground/90 transition-colors"
               >
                 Launch Browser
               </button>
@@ -454,7 +463,7 @@ export const BrowserPanel: FC = () => {
           <div className="absolute bottom-4 right-4">
             <button
               onClick={handleCloseBrowser}
-              className="px-3 py-1 text-xs font-medium bg-gray-4 text-gray-12 rounded hover:bg-accent transition-colors"
+              className="px-3 py-1 text-xs font-medium bg-lg-control text-foreground rounded hover:bg-accent transition-colors"
             >
               Reset Browser State
             </button>

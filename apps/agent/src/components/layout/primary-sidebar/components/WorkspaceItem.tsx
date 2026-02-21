@@ -6,17 +6,12 @@ import { ChevronDown } from 'lucide-react';
 import type { WorkspaceItemProps } from '../types';
 import type { FC } from 'react';
 
-import { cn, getCollapseTransition, SIDEBAR } from '@/lib/utils';
+import { cn, SIDEBAR } from '@/lib/utils';
 
-export const WorkspaceItem: FC<WorkspaceItemProps> = ({
-  name,
-  collapsed = false,
-  expanded = true,
-  onToggle,
-}) => {
+export const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, expanded = true, onToggle }) => {
   return (
     <button
-      className="flex items-center h-8 rounded-lg mx-1.5 overflow-hidden text-sidebar-foreground hover:text-foreground hover:bg-gray-3 dark:hover:bg-gray-4 transition-[background-color] duration-100"
+      className="flex items-center h-8 rounded-lg mx-1.5 overflow-hidden text-sidebar-foreground hover:text-foreground hover:bg-lg-sidebar-hover transition-[background-color] duration-100"
       onClick={onToggle}
     >
       {/* Fixed-width icon column */}
@@ -31,16 +26,8 @@ export const WorkspaceItem: FC<WorkspaceItemProps> = ({
           )}
         />
       </div>
-      {/* Text that slides in */}
-      <span
-        className={cn(
-          'text-base whitespace-nowrap overflow-hidden pr-2',
-          collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
-        )}
-        style={{ transition: getCollapseTransition(collapsed) }}
-      >
-        {name}
-      </span>
+      {/* Workspace name */}
+      <span className="text-base whitespace-nowrap overflow-hidden pr-2 w-auto">{name}</span>
     </button>
   );
 };

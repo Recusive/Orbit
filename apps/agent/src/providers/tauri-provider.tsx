@@ -20,12 +20,13 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 
-import type { ExtensionMessage, WebviewMessage } from '@/types/protocol';
+import type { WebviewMessage } from '@/types/protocol';
 import type { FC, ReactNode } from 'react';
 
 import {
   onAgentAuthError,
   onAgentCheckpoint,
+  onAgentCompactComplete,
   onAgentError,
   onAgentMessage,
   onAgentAcceptModeChanged,
@@ -96,16 +97,12 @@ function postWindowMessage(data: Record<string, unknown>): void {
 // React Context
 // ============================================================================
 
-type MessageHandler = (message: ExtensionMessage) => void;
-
 interface TauriContextValue {
   /** Whether connected to Tauri backend */
   isConnected: boolean;
   /** Whether in mock mode (browser dev) */
   isMockMode: boolean;
-  /** Subscribe to messages - returns unsubscribe function */
-  subscribe: (handler: MessageHandler) => () => void;
-  /** Post a message to the backend */
+  /** Post a message to the backend (schema validation only — actual sends go through use-tauri.ts) */
   postMessage: (message: WebviewMessage) => void;
 }
 
@@ -260,9 +257,6 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
   const [isConnected] = useState(() => isTauriEnvironment());
   const [isMockMode] = useState(() => !isTauriEnvironment());
 
-  // Message handler registry
-  const handlersRef = useRef<Set<MessageHandler>>(new Set());
-
   // Track if listeners have been initialized (persists across renders)
   const initializedRef = useRef(false);
 
@@ -383,6 +377,9 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
                 uuid: crypto.randomUUID(),
                 session_id: sessionId,
                 message_id: messageId,
+                // Forward SDK stop_reason so the service can distinguish
+                // intermediate tool turns from the final response.
+                result_subtype: message.resultSubtype,
                 // Transform SDK camelCase to protocol snake_case
                 usage: usage
                   ? {
@@ -561,19 +558,42 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
           })
       );
 
-      // Auth error events (OAuth token expiry, refresh failure)
+      // Compact complete events (reload conversation after /compact)
+      listenerPromises.push(
+        onAgentCompactComplete((event) => {
+          postWindowMessage({
+            type: 'agent:compact_complete',
+            session_id: event.sessionId,
+          });
+        })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
+          })
+      );
+
+      // [oauth-401-recovery] Updated toast handler — revert: restore original block from git.
+      // Auth error events (OAuth token expiry, refresh failure, auth recovery)
       listenerPromises.push(
         onAgentAuthError((event) => {
           logger.warn('Auth error received', {
             category: event.category,
             recoverable: event.recoverable,
           });
+
+          // Show "Copy command" for recoverable errors that need manual re-auth,
+          // but NOT for AUTH_RECOVERED (token was already refreshed automatically)
+          const showCopyCommand = event.recoverable && event.category !== 'AUTH_RECOVERED';
+
           toast.error('Authentication Error', {
-            description: event.recoverable
-              ? 'Your session token has expired. Run "claude login" in your terminal to re-authenticate.'
-              : event.message,
+            description: event.message,
             duration: 10_000,
-            action: event.recoverable
+            action: showCopyCommand
               ? {
                   label: 'Copy command',
                   onClick: (): void => {
@@ -751,15 +771,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
     };
   }, []);
 
-  // Subscribe function for hooks to register handlers
-  const subscribe = useCallback((handler: MessageHandler): (() => void) => {
-    handlersRef.current.add(handler);
-    return () => {
-      handlersRef.current.delete(handler);
-    };
-  }, []);
-
-  // Post message to backend
+  // Post message to backend (schema validation only — actual sends go through use-tauri.ts)
   const postMessage = useCallback(
     (message: WebviewMessage): void => {
       const result = WebviewMessageSchema.safeParse(message);
@@ -781,10 +793,9 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
     (): TauriContextValue => ({
       isConnected,
       isMockMode,
-      subscribe,
       postMessage,
     }),
-    [isConnected, isMockMode, subscribe, postMessage]
+    [isConnected, isMockMode, postMessage]
   );
 
   return <TauriContext.Provider value={value}>{children}</TauriContext.Provider>;
@@ -800,16 +811,4 @@ export function useTauriContext(): TauriContextValue {
     throw new Error('useTauriContext must be used within a TauriProvider');
   }
   return context;
-}
-
-/**
- * Hook to subscribe to Tauri messages
- * This is a convenience hook that handles subscription lifecycle
- */
-export function useTauriMessages(handler: MessageHandler): void {
-  const { subscribe } = useTauriContext();
-
-  useEffect(() => {
-    return subscribe(handler);
-  }, [subscribe, handler]);
 }

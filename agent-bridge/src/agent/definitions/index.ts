@@ -18,3 +18,6 @@ export {
   deleteCommand,
 } from './command-definitions.js';
 export type { SlashCommandDefinition, CommandScope } from './command-definitions.js';
+
+export { listSkills } from './skill-definitions.js';
+export type { SkillDefinition } from './skill-definitions.js';

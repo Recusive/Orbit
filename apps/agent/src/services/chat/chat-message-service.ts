@@ -25,7 +25,7 @@ import type { ExtensionMessage } from '@/types/protocol';
 import { getActiveChain } from '@/components/chat/messages/message-utils';
 import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-handlers';
 import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
-import { conversationAddMessage, conversationList } from '@/lib/api';
+import { conversationAddMessage, conversationList, conversationLoad } from '@/lib/api';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { toConversationSummaries } from '@/lib/mappers';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
@@ -129,6 +129,11 @@ class ChatMessageService {
   private pendingChunkLengths = new Map<string, number>();
   private thinkingStartTimes = new Map<string, number>();
 
+  // Track whether the current turn used tools (for re-asserting isAgentRunning on tool:start)
+  private turnHadTools = new Map<string, boolean>();
+  // Safety timers for edge-case cleanup (interrupted sessions, errors)
+  private agentRunningTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
   // Checkpoint batching — debounces rapid checkpoint events (100ms window)
   // Reduces ~30 checkpoint state updates per agent run to ~2-3
   private batchedCheckpoint = createCheckpointBatcher((sessionId, checkpointId) => {
@@ -152,6 +157,16 @@ class ChatMessageService {
     }
   }
 
+  /** Cancel a pending delayed isAgentRunning clear for a session.
+   *  Called when new events arrive, proving the agent is still active. */
+  private cancelAgentRunningTimer(sessionId: string): void {
+    const timer = this.agentRunningTimers.get(sessionId);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.agentRunningTimers.delete(sessionId);
+    }
+  }
+
   /** Flush all pending batchers for a session (call on agent:complete). */
   flushSession(sessionId: string): void {
     this.chunkBatchers.get(sessionId)?.cancel(FLUSH_PENDING);
@@ -166,25 +181,27 @@ class ChatMessageService {
     this.toolBatchers.get(sessionId)?.cancel();
   }
 
-  /** Full cleanup for a session — cancel batchers, delete from Maps. */
+  /** Full cleanup for a session — cancel batchers, timers, delete from Maps. */
   destroySession(sessionId: string): void {
     this.cancelSession(sessionId);
     this.cleanupBatchers(sessionId);
-    // Clear per-message tracking for this session's messages
-    // (we don't track which messages belong to which session, so we clear globally
-    // on session destroy — acceptable because destroyed sessions won't stream again)
+    this.cancelAgentRunningTimer(sessionId);
+    this.turnHadTools.delete(sessionId);
   }
 
-  /** Cancel all batchers across all sessions (for HMR cleanup). */
+  /** Cancel all batchers and timers across all sessions (for HMR cleanup). */
   destroyAll(): void {
     for (const [, batcher] of this.chunkBatchers) batcher.cancel();
     for (const [, batcher] of this.thinkingBatchers) batcher.cancel();
     for (const [, batcher] of this.toolBatchers) batcher.cancel();
+    for (const [, timer] of this.agentRunningTimers) clearTimeout(timer);
     this.chunkBatchers.clear();
     this.thinkingBatchers.clear();
     this.toolBatchers.clear();
     this.pendingChunkLengths.clear();
     this.thinkingStartTimes.clear();
+    this.agentRunningTimers.clear();
+    this.turnHadTools.clear();
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -210,6 +227,9 @@ class ChatMessageService {
         break;
       case 'agent:checkpoint':
         this.handleAgentCheckpoint(message);
+        break;
+      case 'agent:compact_complete':
+        this.handleCompactComplete(message);
         break;
       case 'conversation:created':
         this.handleConversationCreated(message);
@@ -292,6 +312,8 @@ class ChatMessageService {
       case 'commands:deleted':
       case 'commands:error':
       case 'commands:generated':
+      case 'skills:list:response':
+      case 'skills:error':
         break;
     }
   }
@@ -319,7 +341,15 @@ class ChatMessageService {
         ? message.session_id
         : chatStore.activeSessionId;
 
+    // LEGACY REMAP PATH: Since SDK v0.2.44, new sessions pass `options.sessionId`
+    // in agent-bridge's _createOptions(), so the SDK uses Orbit's UUID directly and
+    // this entire block is skipped (IDs match). This remap cascade is still required for:
+    //   1. Forks/rewinds — SDK generates a new UUID for the forked JSONL
+    //   2. Sessions created before the custom sessionId feature was added
     if (sdkSessionId && frontendSessionId && sdkSessionId !== frontendSessionId) {
+      logger.info(
+        `system:init — session IDs differ (frontend=${frontendSessionId}, sdk=${sdkSessionId}), remapping`
+      );
       // Remap session in ChatStore (atomically moves data, updates activeSessionId if active)
       useChatStore.getState().remapSession(frontendSessionId, sdkSessionId);
 
@@ -348,6 +378,9 @@ class ChatMessageService {
       if (isStillActive) {
         useToolStore.getState().switchSession(sdkSessionId);
       }
+    } else if (sdkSessionId && frontendSessionId && sdkSessionId === frontendSessionId) {
+      // Session IDs match — custom sessionId was used, no remap needed
+      logger.info('system:init — session IDs match, skipping remap (custom sessionId)');
     } else if (
       !chatStore.activeSessionId ||
       (chatStore.sessions[chatStore.activeSessionId]?.messages.length ?? 0) === 0
@@ -377,6 +410,9 @@ class ChatMessageService {
 
   private handleAgentChunk(message: Extract<ExtensionMessage, { type: 'agent:chunk' }>): void {
     const sid = message.session_id;
+
+    // New turn event — cancel any pending delayed clear from a previous tool-using turn.
+    this.cancelAgentRunningTimer(sid);
 
     if (!message.message_id) {
       logger.error(
@@ -412,6 +448,9 @@ class ChatMessageService {
   private handleAgentThinking(
     message: Extract<ExtensionMessage, { type: 'agent:thinking' }>
   ): void {
+    // New turn event — cancel any pending delayed clear from a previous tool-using turn.
+    this.cancelAgentRunningTimer(message.session_id);
+
     // Record thinking start time on first chunk
     if (!this.thinkingStartTimes.has(message.message_id)) {
       this.thinkingStartTimes.set(message.message_id, Date.now());
@@ -562,7 +601,19 @@ class ChatMessageService {
     // Mark checkpoint completion (associates checkpoint with the user message)
     useCheckpointStore.getState().onMessageComplete(sid);
 
-    // Clear running + stop-pending for THIS session only
+    // The SDK sends exactly ONE result message per sendMessage() call — always at
+    // the very end, after all tool-use turns complete internally. So agent:complete
+    // is ALWAYS the final event; there are no "intermediate" agent:complete events.
+    //
+    // result_subtype is the SDK's SDKResultMessage.subtype:
+    //   "success"                              → normal completion
+    //   "error_max_turns" / "error_during_execution" / etc. → error completion
+    // (NOT "end_turn" — that's the raw Anthropic API stop_reason, not the SDK subtype)
+    //
+    // Clear isAgentRunning immediately in all cases.
+    this.forceCompleteOrphanedTools(sid);
+    this.cancelAgentRunningTimer(sid);
+    this.turnHadTools.set(sid, false);
     useChatStore.getState().setAgentRunning(sid, false);
     useChatStore.getState().setStopPending(sid, false);
 
@@ -578,6 +629,10 @@ class ChatMessageService {
     this.cleanupBatchers(sid);
     this.pendingChunkLengths.delete(message.message_id);
 
+    // Errors are always terminal — clear immediately, cancel any delayed clear
+    this.forceCompleteOrphanedTools(sid);
+    this.cancelAgentRunningTimer(sid);
+    this.turnHadTools.delete(sid);
     useChatStore.getState().setAgentRunning(sid, false);
     useChatStore.getState().setStopPending(sid, false);
 
@@ -636,6 +691,76 @@ class ChatMessageService {
 
     if (oldFrontendId) {
       useChatStore.getState().reconcileMessageId(checkpointSessionId, oldFrontendId, checkpoint_id);
+    }
+  }
+
+  private handleCompactComplete(
+    message: Extract<ExtensionMessage, { type: 'agent:compact_complete' }>
+  ): void {
+    const { session_id } = message;
+    logger.info(`Context compaction completed (bridge event) for session ${session_id}`);
+    useChatStore.getState().markCompacted();
+
+    // The SDK rewrites the JSONL asynchronously after compact_boundary fires.
+    // Retry with backoff to handle slow machines where the SDK hasn't finished writing.
+    void this.reloadConversationWithRetry(session_id);
+  }
+
+  /** Reload compacted conversation with retry and backoff. */
+  private async reloadConversationWithRetry(sessionId: string): Promise<void> {
+    const delays = [500, 1000, 2000];
+    for (let attempt = 0; attempt < delays.length; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+      try {
+        await this.reloadConversationFromDisk(sessionId);
+        return; // Success — stop retrying
+      } catch {
+        if (attempt < delays.length - 1) {
+          logger.warn(`Compact reload attempt ${String(attempt + 1)} failed, retrying...`);
+        } else {
+          logger.warn(`Compact reload failed after ${String(delays.length)} attempts`);
+        }
+      }
+    }
+  }
+
+  /** Read compacted JSONL from disk and replace in-memory messages. */
+  private async reloadConversationFromDisk(sessionId: string): Promise<void> {
+    try {
+      const conv = await conversationLoad(sessionId);
+      if (!conv) {
+        logger.warn(`Compact reload: no conversation found for ${sessionId}`);
+        return;
+      }
+
+      // Build ChatMessage[] from the disk data
+      const chainableMessages = conv.messages.map((m) => ({
+        id: m.id,
+        parentUuid: m.parentUuid ?? undefined,
+      }));
+      const activeChainIds = new Set(getActiveChain(chainableMessages).map((m) => m.id));
+
+      const newMessages: ChatMessage[] = conv.messages
+        .filter((m) => activeChainIds.has(m.id))
+        .map((m) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          displayedContent: m.content,
+          thinking: m.thinking ?? undefined,
+          thinkingDurationMs: m.thinkingDurationMs ?? undefined,
+          turnDurationMs: m.turnDurationMs ?? undefined,
+          isInterrupted: m.isInterrupted ?? undefined,
+          parentUuid: m.parentUuid ?? undefined,
+        }));
+
+      // Replace messages in store — full swap, no merge
+      useChatStore.getState().setMessages(sessionId, newMessages);
+      logger.info(
+        `Compact reload: replaced ${String(newMessages.length)} messages for ${sessionId}`
+      );
+    } catch (err) {
+      logger.warn(`Compact reload failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -807,6 +932,7 @@ class ChatMessageService {
               ...(m.thinkingDurationMs !== undefined
                 ? { thinkingDurationMs: m.thinkingDurationMs }
                 : {}),
+              ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
             };
             if (m.isInterrupted === true) {
               const hasRejectedQuestion = m.toolUses.some(
@@ -1073,12 +1199,17 @@ class ChatMessageService {
     const toolId = message.tool_id;
     const toolName = message.tool_name;
 
+    // Mark that this turn used tools — handleAgentComplete uses this to decide
+    // whether to delay clearing isAgentRunning (intermediate turn) or clear immediately.
+    this.turnHadTools.set(sid, true);
+    this.cancelAgentRunningTimer(sid);
+
     // Record browser activity for AI Playwright tools
     if (toolName.toLowerCase().includes('browser')) {
       recordBrowserActivityFromAI();
     }
 
-    // Calculate contentOffset from store + pending chunks
+    // Look up current message state (needed for thinking finalization + message creation below)
     const store = useChatStore.getState();
     const session = store.sessions[sid];
     const messages = session?.messages ?? [];
@@ -1088,14 +1219,18 @@ class ChatMessageService {
         ? lastMsg
         : messages.find((m) => m.id === message.message_id);
 
-    const displayedLength = currentMsg?.content.length ?? 0;
-    const pendingLength = this.pendingChunkLengths.get(message.message_id) ?? 0;
-    const maxKnownLength = displayedLength + pendingLength;
-
-    const contentOffset =
-      message.content_offset !== undefined
-        ? Math.min(message.content_offset, maxKnownLength)
-        : maxKnownLength;
+    // Use the bridge's content_offset directly — it represents the total text
+    // streamed before this tool, calculated after flushing buffered text.
+    // Do NOT clamp with Math.min(offset, maxKnownLength): that permanently
+    // corrupts the stored offset when the frontend hasn't received all flushed
+    // text yet (small IPC delivery window). string.slice() with an offset beyond
+    // content length safely returns the available text, and once the message
+    // completes the offset falls within range.
+    const contentOffset = Math.max(
+      0,
+      message.content_offset ??
+        (currentMsg?.content.length ?? 0) + (this.pendingChunkLengths.get(message.message_id) ?? 0)
+    );
 
     // Call startTool synchronously for immediate widget rendering
     useToolStore
@@ -1137,6 +1272,13 @@ class ChatMessageService {
         parentUuid,
       });
     }
+
+    // Re-assert isAgentRunning — tool:start is the first SYNCHRONOUS signal
+    // that a new turn has started. agent:complete from the previous turn set
+    // this to false, and the RAF-deferred batchers (thinking/chunk) can't fix
+    // it fast enough. This must be synchronous to prevent even a single frame
+    // where isAgentRunning is false while streaming is active.
+    useChatStore.getState().setAgentRunning(sid, true);
   }
 
   private handleToolEnd(message: Extract<ExtensionMessage, { type: 'tool:end' }>): void {
@@ -1218,6 +1360,40 @@ class ChatMessageService {
   }
 
   // ══════════════════════════════════════════════════════════════════════
+  // Tool Cleanup
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Safety net: force-complete any tools still in `activeTools` for the given session.
+   *
+   * Normally the SDK guarantees tool:end before agent:complete within a single
+   * session's `for await` loop. But in concurrent multi-session scenarios (stress
+   * tests, interruptions, error races) a tool:end event can be lost in transit
+   * across the async bridge → Rust → Tauri event → postMessage pipeline.
+   *
+   * Called from handleAgentComplete and handleAgentError so no tools stay orphaned.
+   */
+  private forceCompleteOrphanedTools(sessionId: string): void {
+    const toolStore = useToolStore.getState();
+    const orphanIds: string[] = [];
+
+    for (const [id, tool] of Object.entries(toolStore.activeTools)) {
+      if (tool.sessionId === sessionId) {
+        orphanIds.push(id);
+      }
+    }
+
+    if (orphanIds.length > 0) {
+      logger.warn(
+        `Force-completing ${String(orphanIds.length)} orphaned tool(s) for session ${sessionId}`
+      );
+      for (const id of orphanIds) {
+        toolStore.completeTool(id, undefined, true);
+      }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
   // Batcher Management (Per-Session, Lazy Creation)
   // ══════════════════════════════════════════════════════════════════════
 
@@ -1288,7 +1464,7 @@ class ChatMessageService {
               return { ...m, content: newContent, displayedContent: newContent };
             });
           } else {
-            // First chunk of new response
+            // First chunk of new response (possibly a new turn in multi-tool flow)
             const parentUuid = msgs.at(-1)?.id ?? null;
             useChatStore.getState().addMessage(sessionId, {
               id: messageId,
@@ -1298,6 +1474,10 @@ class ChatMessageService {
               isStreaming: true,
               parentUuid,
             });
+            // Re-assert isAgentRunning — agent:complete from the previous turn
+            // may have set it to false before this chunk arrived. Without this,
+            // the loading indicator disappears between multi-turn tool calls.
+            useChatStore.getState().setAgentRunning(sessionId, true);
           }
         }
       }
@@ -1374,6 +1554,9 @@ class ChatMessageService {
             isThinkingActive: true,
             parentUuid,
           });
+          // Re-assert isAgentRunning — agent:complete from the previous turn
+          // may have set it to false before this thinking chunk arrived.
+          useChatStore.getState().setAgentRunning(sessionId, true);
         }
       }
     });

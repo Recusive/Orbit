@@ -1,6 +1,6 @@
 import { ChevronRight, CircleCheck } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from '../tools/shared';
 
@@ -68,19 +68,9 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
   defaultExpanded = false,
   isStreaming = false,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded || isStreaming);
-  const wasStreamingRef = useRef(false);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const shouldReduceMotion = useReducedMotion();
-
-  // Auto-expand when streaming starts, auto-collapse when streaming ends
-  useEffect(() => {
-    if (isStreaming && !wasStreamingRef.current) {
-      setIsExpanded(true);
-    } else if (!isStreaming && wasStreamingRef.current) {
-      setIsExpanded(false);
-    }
-    wasStreamingRef.current = isStreaming;
-  }, [isStreaming]);
 
   const durationText = formatDuration(thinkingDurationMs);
 
@@ -100,14 +90,15 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
           setIsExpanded(!isExpanded);
         }}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
           'cursor-pointer w-full text-left rounded-lg'
         )}
         aria-expanded={isExpanded}
         aria-label={`Thought for ${durationText}, ${isExpanded ? 'expanded' : 'collapsed'}`}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-violet-500/8">
+        {/* Left: icon + label + duration */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-foreground/8">
             <svg
               aria-hidden="true"
               width="12"
@@ -115,7 +106,7 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
               viewBox="0 0 24 24"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
-              className={cn('text-violet-500/60', isStreaming && 'animate-pulse')}
+              className={cn('text-foreground/60', isStreaming && 'animate-pulse')}
             >
               <path
                 d="M7 21V16.267C7 15.9401 6.83705 15.6376 6.58354 15.4312C5.00702 14.1477 4 12.1914 4 10C4 6.13401 7.13401 3 11 3C14.7645 3 17.8349 5.97158 17.9936 9.69702C18.002 9.89426 18.0584 10.0877 18.1679 10.2519L19.7376 12.6064C19.8848 12.8272 19.8339 13.1246 19.6216 13.2838L18.4 14.2C18.1482 14.3889 18 14.6852 18 15V16C18 17.1046 17.1046 18 16 18H15C14.4477 18 14 18.4477 14 19V21"
@@ -138,14 +129,17 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
           {!isStreaming && thinkingDurationMs > 0 ? (
             <span className="text-xs text-muted-foreground/50">for {durationText}</span>
           ) : null}
-
-          <ChevronRight
-            className={cn(
-              'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
-              isExpanded && 'rotate-90'
-            )}
-          />
         </div>
+
+        <div className="flex-1" />
+
+        {/* Right: chevron */}
+        <ChevronRight
+          className={cn(
+            'h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-[transform,opacity] duration-200 ease-out shrink-0',
+            isExpanded && 'rotate-90'
+          )}
+        />
       </button>
 
       {/* Tree-style expanded content */}
@@ -162,11 +156,11 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line */}
                 <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-[2px] h-full rounded-full bg-violet-500/40" />
+                  <div className="w-[2px] h-full rounded-full bg-foreground/20" />
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-lg-separator bg-card overflow-hidden">
                   <div className="px-3 py-2 max-h-[500px] overflow-y-auto">
                     <div className="text-sm text-muted-foreground/90 dark:text-muted-foreground/60 leading-[1.7] whitespace-pre-wrap font-mono tracking-tighter">
                       {tokenizedThinking ?? thinking}
@@ -178,8 +172,8 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
               {/* Completed status */}
               {!isStreaming ? (
                 <div className="flex flex-row items-center px-2.5 py-1">
-                  <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-violet-500/15">
-                    <CircleCheck className="h-3 w-3 text-violet-500/80" />
+                  <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-foreground/8">
+                    <CircleCheck className="h-3 w-3 text-foreground/60" />
                   </div>
                   <span className="ml-2.5 text-xs text-muted-foreground/90">Completed</span>
                 </div>

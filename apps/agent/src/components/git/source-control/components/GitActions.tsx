@@ -29,7 +29,7 @@ export const GitActions: React.FC<GitActionsProps> = ({
   const isSyncing = isPulling || isPushing;
 
   return (
-    <div className="px-2 py-2 flex gap-1.5 border-t border-gray-6">
+    <div className="px-3 py-2 flex gap-1.5 border-b border-lg-separator">
       {/* Commit button - primary action */}
       <button
         onClick={() => void onCommit()}
@@ -38,8 +38,8 @@ export const GitActions: React.FC<GitActionsProps> = ({
         className="
           flex-1 flex items-center justify-center gap-1.5
           h-7 rounded-lg text-sm font-medium
-          bg-primary text-primary-foreground
-          hover:bg-primary/90
+          bg-foreground text-background
+          hover:bg-foreground/90
           active:scale-[0.98] transition-[background-color,transform] duration-150
           disabled:opacity-30 disabled:cursor-not-allowed
         "
@@ -60,8 +60,8 @@ export const GitActions: React.FC<GitActionsProps> = ({
         className="
           h-7 px-2.5 flex items-center justify-center gap-1 rounded-lg
           text-sm text-muted-foreground
-          border border-gray-5
-          hover:bg-gray-4 hover:text-foreground hover:border-gray-7
+          border border-lg-separator
+          hover:bg-lg-control-hover hover:text-foreground hover:border-lg-border
           active:scale-[0.98] transition-[background-color,color,border-color,transform] duration-150
           disabled:opacity-30 disabled:cursor-not-allowed
         "
@@ -82,8 +82,8 @@ export const GitActions: React.FC<GitActionsProps> = ({
         className="
           h-7 px-2.5 flex items-center justify-center gap-1 rounded-lg
           text-sm text-muted-foreground
-          border border-gray-5
-          hover:bg-gray-4 hover:text-foreground hover:border-gray-7
+          border border-lg-separator
+          hover:bg-lg-control-hover hover:text-foreground hover:border-lg-border
           active:scale-[0.98] transition-[background-color,color,border-color,transform] duration-150
           disabled:opacity-30 disabled:cursor-not-allowed
         "

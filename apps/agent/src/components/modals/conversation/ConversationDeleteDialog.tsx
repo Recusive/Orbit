@@ -2,11 +2,10 @@ import { AlertTriangle, X } from 'lucide-react';
 
 import type { FC } from 'react';
 
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogClose,
-  DialogContent,
+  DialogContentGlass,
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -20,7 +19,7 @@ export interface ConversationDeleteDialogProps {
 
 /**
  * Confirmation dialog for deleting a conversation.
- * Shows warning about permanent deletion and requires explicit confirmation.
+ * Apple Liquid Glass alert — macOS 26 UI Kit spec.
  */
 export const ConversationDeleteDialog: FC<ConversationDeleteDialogProps> = ({
   open,
@@ -35,41 +34,58 @@ export const ConversationDeleteDialog: FC<ConversationDeleteDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] gap-0 overflow-hidden p-0 [&>.absolute]:hidden">
-        {/* Header: icon + title + close, all on one line */}
-        <div className="flex items-center gap-3 px-3 pt-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-destructive/10">
-            <AlertTriangle className="h-4 w-4 text-destructive" />
+      <DialogContentGlass className="liquid-glass-dialog gap-0 overflow-hidden border-0 p-0 [&>.absolute]:hidden">
+        {/* Close button */}
+        <DialogClose className="liquid-glass-close absolute right-2 top-2 z-10 rounded-full p-1 opacity-60 transition-opacity duration-150 hover:opacity-100">
+          <X className="h-3.5 w-3.5" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
+
+        {/* Content — matches Figma: padding 20px 16px 16px, gap 16px */}
+        <div
+          className="relative flex flex-col items-center"
+          style={{ padding: '20px 16px 16px', gap: 16 }}
+        >
+          {/* Icon — 64x64, left-aligned within 228px row (6px padding) */}
+          <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-destructive/10">
+              <AlertTriangle className="h-7 w-7 text-destructive" />
+            </div>
           </div>
-          <DialogTitle className="flex-1">Delete conversation?</DialogTitle>
-          <DialogClose className="shrink-0 rounded-md p-1.5 opacity-70 transition-[opacity,background-color] duration-150 hover:opacity-100 hover:bg-gray-4">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </DialogClose>
-        </div>
 
-        {/* Body */}
-        <DialogDescription className="px-3 pt-3 pb-6">
-          This will permanently delete &ldquo;{conversationTitle}&rdquo;. This action cannot be
-          undone.
-        </DialogDescription>
-
-        {/* Footer with distinct background */}
-        <div className="flex justify-end gap-2 border-t border-gray-5 bg-gray-3 px-3 py-3">
-          <Button
-            variant="outline"
-            className="text-base"
-            onClick={() => {
-              onOpenChange(false);
-            }}
+          {/* Title + Description — left-aligned, padding 0 6px 2px, gap 10px */}
+          <div
+            className="flex w-full flex-col items-start"
+            style={{ padding: '0 6px 2px', gap: 10 }}
           >
-            Cancel
-          </Button>
-          <Button variant="destructive" className="text-base" onClick={handleConfirm}>
-            Delete
-          </Button>
+            <DialogTitle className="liquid-glass-title w-full">Delete conversation?</DialogTitle>
+            <DialogDescription className="liquid-glass-desc w-full">
+              This will permanently delete &ldquo;{conversationTitle}&rdquo;. This action cannot be
+              undone.
+            </DialogDescription>
+          </div>
+
+          {/* Buttons — pill-shaped, 32px height, gap 8px */}
+          <div className="flex w-full items-center" style={{ gap: 8 }}>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-all duration-150 active:scale-[0.97]"
+              onClick={() => {
+                onOpenChange(false);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-destructive flex-1 cursor-pointer transition-all duration-150 active:scale-[0.97]"
+              onClick={handleConfirm}
+            >
+              Delete
+            </button>
+          </div>
         </div>
-      </DialogContent>
+      </DialogContentGlass>
     </Dialog>
   );
 };

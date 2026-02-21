@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn, getCollapseTransition, SIDEBAR } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 // Hoisted RegExp for path splitting (avoids recreation on each render)
 const PATH_SEPARATOR_RE = /[/\\]/;
@@ -25,7 +25,6 @@ const PATH_SEPARATOR_RE = /[/\\]/;
 interface WorktreeItemProps {
   readonly worktreeState: WorktreeUIState;
   readonly active?: boolean;
-  readonly collapsed?: boolean;
   /** Called when clicking the chevron to expand/collapse conversations */
   readonly onToggle?: () => void;
   /** Called when clicking the worktree row to switch to this workspace */
@@ -36,7 +35,6 @@ interface WorktreeItemProps {
 export const WorktreeItem: FC<WorktreeItemProps> = ({
   worktreeState,
   active = false,
-  collapsed = false,
   onToggle,
   onSelect,
   onRemove,
@@ -88,9 +86,9 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         role="group"
         tabIndex={0}
         className={cn(
-          'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-100 hover:bg-gray-3 dark:hover:bg-gray-4 cursor-default',
+          'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-100 hover:bg-lg-sidebar-hover cursor-default',
           active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground',
-          isExpanded && !active && 'bg-gray-4'
+          isExpanded && !active && 'bg-lg-sidebar-selected'
         )}
         onClick={handleRowClick}
         onKeyDown={(e) => {
@@ -104,8 +102,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         <button
           type="button"
           aria-label={isExpanded ? 'Collapse worktree' : 'Expand worktree'}
-          className="flex items-center justify-center shrink-0 hover:bg-gray-4 rounded-md"
-          style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
+          className="flex items-center justify-center shrink-0 h-5 w-5 hover:bg-lg-control-hover rounded-md ml-0.5"
           onClick={handleChevronClick}
           onKeyDown={(e) => {
             // Stop Enter/Space from bubbling to parent role="button" div,
@@ -126,12 +123,8 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
 
         {/* Workspace name */}
         <span
-          className={cn(
-            'text-base whitespace-nowrap overflow-hidden text-left flex-1',
-            collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
-          )}
+          className="text-base whitespace-nowrap overflow-hidden text-left flex-1 w-auto"
           style={{
-            transition: getCollapseTransition(collapsed),
             maskImage: 'linear-gradient(to right, black 80%, transparent 95%)',
             WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 95%)',
           }}
@@ -139,27 +132,29 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           {workspaceName}
         </span>
 
-        {/* Branch badge */}
-        {!collapsed && (
-          <div
-            className={cn(
-              'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium mr-1 shrink-0 transition-colors duration-200',
-              worktree.isMain ? 'bg-primary/12 text-primary' : 'bg-gray-4 text-gray-11'
-            )}
-          >
-            <GitBranch className="h-3 w-3" />
-            <span className="max-w-[60px] truncate">{branchName}</span>
-          </div>
-        )}
+        {/* Branch badge — Apple liquid glass pill style */}
+        <div
+          className={cn(
+            'flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] mr-1 shrink-0 transition-colors duration-200',
+            'backdrop-blur-[20px] font-[510]',
+            worktree.isMain
+              ? 'bg-black/[0.05] text-[#4C4C4C] dark:bg-white/[0.10] dark:text-[#B0B0B0]'
+              : 'bg-black/[0.04] text-[#4C4C4C] dark:bg-white/[0.08] dark:text-[#999]'
+          )}
+          style={{ mixBlendMode: 'plus-darker' }}
+        >
+          <GitBranch className="h-3 w-3" />
+          <span className="max-w-[60px] truncate">{branchName}</span>
+        </div>
       </div>
 
       {/* More options dropdown - appears on hover */}
-      {!collapsed && !worktree.isMain && (
+      {!worktree.isMain && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               className={cn(
-                'absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md transition-[background-color,opacity,transform] duration-150 hover:bg-gray-4 active:scale-90',
+                'absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md transition-[background-color,opacity,transform] duration-150 hover:bg-lg-control-hover active:scale-90',
                 isHovered ? 'opacity-100' : 'opacity-0'
               )}
               onClick={(e) => {
@@ -184,7 +179,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
       )}
 
       {/* Locked indicator */}
-      {worktree.locked !== null && !collapsed && (
+      {worktree.locked !== null && (
         <div
           className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-amber-500 font-medium uppercase tracking-wide"
           title={`Locked: ${worktree.locked}`}

@@ -14,8 +14,9 @@ Use this to find the right file. Read the file directly — no links needed.
 | `reference/`    | SDK docs, prompts, external guides | API references, prompt templates |
 | `orbitweb/`     | Marketing site context             | Orbitweb-specific (read-only)    |
 
-## architecture/ (11 files)
+## architecture/ (12 files)
 
+- `AUTO-UPDATE.md` — Auto-update pipeline (Tauri updater, signing, CI, Orbit-Release public repo)
 - `TECH-STACK.md` — Complete technology overview
 - `EMBEDDED_BROWSER.md` — WebKit browser panel via Tauri multiwebview
 - `CSP-SECURITY.md` — Content Security Policy and unsafe-eval

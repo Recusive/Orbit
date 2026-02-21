@@ -62,7 +62,7 @@ function highlightMatches(name: string, indices: number[]): ReactNode {
   return chars.map((char, idx) => {
     if (matchSet.has(idx)) {
       return (
-        <mark key={idx} className="bg-primary/25 text-foreground rounded-[2px] px-px -mx-px">
+        <mark key={idx} className="bg-foreground/15 text-foreground rounded-[2px] px-px -mx-px">
           {char}
         </mark>
       );
@@ -171,7 +171,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[320px] p-0 rounded-lg border border-gray-5 shadow-lg"
+        className="w-[320px] p-0 rounded-[12px] border border-lg-separator shadow-lg"
         side="top"
         align="start"
         sideOffset={8}
@@ -182,7 +182,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
           e.preventDefault();
         }}
       >
-        <Command shouldFilter={false} className="rounded-lg bg-transparent">
+        <Command shouldFilter={false} className="rounded-[12px] bg-transparent">
           <CommandList className="scroll-py-2 max-h-[300px] pb-1.5">
             {/* Loading state */}
             {isLoading && results.length === 0 ? (
@@ -283,8 +283,8 @@ const FileItem: FC<FileItemProps> = ({ result, isSelected, isFirst, isLast, onSe
       className={cn(
         'relative flex cursor-pointer gap-2.5 select-none items-center border-l-2 border-transparent pl-2 pr-2.5 py-2 outline-none',
         isSelected
-          ? 'rounded-r-md bg-primary/10 text-foreground border-primary/60'
-          : 'rounded-md hover:bg-gray-4 active:scale-[0.99]'
+          ? 'rounded-r-md bg-foreground/8 text-foreground border-foreground/40'
+          : 'rounded-md hover:bg-lg-control-hover active:scale-[0.99]'
       )}
     >
       <FileIcon fileName={result.name} className="h-4 w-4 shrink-0" monochrome={false} />

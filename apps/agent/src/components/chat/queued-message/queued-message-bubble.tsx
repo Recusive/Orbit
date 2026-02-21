@@ -18,7 +18,7 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
   return (
     <div className="space-y-2">
       {/* Queued message bubble - muted with dashed border */}
-      <div className="p-3 rounded-lg border-2 border-dashed border-gray-7 bg-gray-3">
+      <div className="p-3 rounded-lg border-2 border-dashed border-lg-border bg-lg-control">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             {/* Queued indicator */}
@@ -32,7 +32,7 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
           {/* Cancel button */}
           <button
             onClick={onCancel}
-            className="shrink-0 h-5 w-5 flex items-center justify-center rounded hover:bg-accent text-gray-12 hover:text-foreground transition-colors"
+            className="shrink-0 h-5 w-5 flex items-center justify-center rounded hover:bg-lg-control-hover text-foreground hover:text-foreground transition-colors"
             title="Cancel queued message"
           >
             <X className="h-3.5 w-3.5" />
@@ -49,7 +49,7 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
             return (
               <div
                 key={filePath}
-                className="flex items-center gap-1.5 px-1.5 py-1 bg-gray-3 rounded border border-dashed border-gray-6"
+                className="flex items-center gap-1.5 px-1.5 py-1 bg-lg-control rounded border border-dashed border-lg-separator"
                 title={filePath}
               >
                 <FileIcon
@@ -65,7 +65,7 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
           {message.images?.map((image, index) => (
             <div
               key={`${image.name}-${String(index)}`}
-              className="flex items-center gap-1.5 px-1.5 py-1 bg-gray-3 rounded border border-dashed border-gray-6"
+              className="flex items-center gap-1.5 px-1.5 py-1 bg-lg-control rounded border border-dashed border-lg-separator"
               title={image.name}
             >
               <img

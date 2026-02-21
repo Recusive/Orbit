@@ -1,6 +1,6 @@
 import { CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import {
   DiffStat,
@@ -31,22 +31,14 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   success,
   onOpenFile,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(isRunning);
+  // Always start collapsed — user expands manually if they want the full view
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showAllLines, setShowAllLines] = useState(false);
-  const wasRunningRef = useRef(isRunning);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
   const isDarkMode = useIsDarkMode();
   const oldTokens = useHighlightedTokens(oldString, filePath, isDarkMode);
   const newTokens = useHighlightedTokens(newString, filePath, isDarkMode);
-
-  // Auto-collapse when tool finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setIsExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   const fileName = filePath.split('/').pop() ?? filePath;
   const oldLines = oldString.split('\n');
@@ -79,22 +71,23 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
         }
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: icon, filename, badges, spinner, diff */}
+        <div className="flex items-center gap-2 shrink-0 min-w-0">
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-warning/8'
+              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
             )}
           >
             <Pencil
               className={cn(
                 'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-warning/60',
+                isFailed ? 'text-destructive/60' : 'text-foreground/60',
                 isRunning && 'animate-pulse'
               )}
             />
@@ -105,7 +98,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
             tabIndex={0}
             className={cn(
               'text-xs font-medium truncate cursor-pointer hover:underline',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-12'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
             )}
             onClick={handleFileClick}
             onKeyDown={(e): void => {
@@ -118,13 +111,16 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
           </a>
 
           <span
-            className={cn('text-xs shrink-0', isFailed ? 'text-destructive/60' : 'text-gray-9')}
+            className={cn(
+              'text-xs shrink-0',
+              isFailed ? 'text-destructive/60' : 'text-muted-foreground'
+            )}
           >
             {isFailed ? '(failed)' : '(modified)'}
           </span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
 
           {!isRunning && !isFailed ? (
@@ -133,9 +129,10 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
+            aria-hidden="true"
           />
         </div>
       </button>
@@ -180,7 +177,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                       <div
                         className={cn(
                           'border-3 border-destructive/40 bg-card overflow-hidden',
-                          displayNewLines.length > 0 ? 'rounded-t-lg border-b-0' : 'rounded-lg'
+                          displayNewLines.length > 0 ? 'rounded-t-xl border-b-0' : 'rounded-xl'
                         )}
                       >
                         <div className={cn('overflow-auto', !showAllLines && 'max-h-[150px]')}>
@@ -208,7 +205,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                                         </span>
                                       ))
                                     ) : (
-                                      <span className="text-gray-12">{line || ' '}</span>
+                                      <span className="text-foreground">{line || ' '}</span>
                                     )}
                                   </div>
                                 </div>
@@ -224,7 +221,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                       <div
                         className={cn(
                           'border-3 border-success/40 bg-card overflow-hidden',
-                          displayOldLines.length > 0 ? 'rounded-b-lg border-t-0' : 'rounded-lg'
+                          displayOldLines.length > 0 ? 'rounded-b-xl border-t-0' : 'rounded-xl'
                         )}
                       >
                         <div className={cn('overflow-auto', !showAllLines && 'max-h-[150px]')}>
@@ -252,7 +249,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                                         </span>
                                       ))
                                     ) : (
-                                      <span className="text-gray-12">{line || ' '}</span>
+                                      <span className="text-foreground">{line || ' '}</span>
                                     )}
                                   </div>
                                 </div>
@@ -272,7 +269,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                         e.stopPropagation();
                         setShowAllLines(!showAllLines);
                       }}
-                      className="py-1 text-xs text-gray-9 hover:text-gray-12 transition-colors flex items-center gap-0.5"
+                      className="py-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
                     >
                       <span>
                         {showAllLines
@@ -305,7 +302,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

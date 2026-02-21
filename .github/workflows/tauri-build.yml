@@ -1,26 +1,55 @@
-name: Tauri Build
+name: Tauri Build & Release
 
-# Only build releases - NOT on every push (saves storage)
+# Trigger on version tags and manual dispatch
 on:
   push:
     tags:
-      - 'v*' # Only on version tags like v1.0.0
-  workflow_dispatch: # Manual trigger for testing
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            target: aarch64-apple-darwin
-          - os: macos-latest
-            target: x86_64-apple-darwin
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
+  # ──────────────────────────────────────────────
+  # 1. Create a draft GitHub Release
+  # ──────────────────────────────────────────────
+  create-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create.outputs.result }}
+    steps:
+      - uses: actions/checkout@v6
 
-    runs-on: ${{ matrix.os }}
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create draft release
+        id: create
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: `v${process.env.VERSION}`,
+              name: `Orbit v${process.env.VERSION}`,
+              draft: true,
+              prerelease: false,
+            });
+            return data.id;
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+
+  # ──────────────────────────────────────────────
+  # 2. Build macOS Apple Silicon (aarch64)
+  #    Signs update bundles + generates latest.json
+  # ──────────────────────────────────────────────
+  build-tauri:
+    needs: create-release
+    permissions:
+      contents: write
+    runs-on: macos-15
 
     steps:
       - uses: actions/checkout@v6
@@ -35,33 +64,101 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: aarch64-apple-darwin
 
       - uses: Swatinem/rust-cache@v2
+
+      - name: Select Xcode 26.2
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build Tauri
-        run: bunx tauri build -- --target ${{ matrix.target }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v6
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Updater signing keys (Ed25519 — separate from Apple code signing)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Apple code signing + notarization
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
-          name: orbit-${{ matrix.target }}
-          path: |
-            src-tauri/target/${{ matrix.target }}/release/bundle/
-          retention-days: 30 # Don't keep forever
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: --target aarch64-apple-darwin
 
-      # Create GitHub Release on tags
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+  # ──────────────────────────────────────────────
+  # 3. Un-draft the release once all builds pass
+  # ──────────────────────────────────────────────
+  publish-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    needs: [create-release, build-tauri]
+    steps:
+      - name: Publish release
+        uses: actions/github-script@v7
+        env:
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
         with:
-          files: |
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
-          draft: true
+          script: |
+            github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: process.env.RELEASE_ID,
+              draft: false,
+              prerelease: false,
+            });
+
+  # ──────────────────────────────────────────────
+  # 4. Mirror release artifacts to the public repo
+  #    (Orbit-Release) for auto-update delivery.
+  #    The Tauri updater fetches latest.json from
+  #    the public repo — users never need access
+  #    to the private source repo.
+  # ──────────────────────────────────────────────
+  mirror-update:
+    runs-on: ubuntu-latest
+    needs: [create-release, publish-release]
+    steps:
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download release assets from private repo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release-assets
+          gh release download "v${{ steps.version.outputs.VERSION }}" \
+            --repo "${{ github.repository }}" \
+            --dir release-assets
+
+      - name: Rewrite latest.json URLs to public repo
+        run: |
+          if [ -f release-assets/latest.json ]; then
+            sed -i "s|${{ github.repository }}|Recusive/Orbit-Release|g" release-assets/latest.json
+            echo "Rewritten latest.json:"
+            cat release-assets/latest.json
+          else
+            echo "::warning::latest.json not found in release assets"
+          fi
+
+      - name: Publish to public repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
+        run: |
+          # Delete existing release if re-running
+          gh release delete "v${{ steps.version.outputs.VERSION }}" \
+            --repo Recusive/Orbit-Release --yes 2>/dev/null || true
+
+          gh release create "v${{ steps.version.outputs.VERSION }}" \
+            --repo Recusive/Orbit-Release \
+            --title "Orbit v${{ steps.version.outputs.VERSION }}" \
+            --notes "Auto-update release for Orbit v${{ steps.version.outputs.VERSION }}" \
+            release-assets/*

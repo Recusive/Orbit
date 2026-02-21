@@ -8,6 +8,7 @@ import type {
   CommandScope,
   SlashCommandDefinition,
 } from '../agent/definitions/command-definitions.js';
+import type { SkillDefinition } from '../agent/definitions/skill-definitions.js';
 import type {
   AgentMessage,
   PermissionRequest,
@@ -105,7 +106,7 @@ export interface SetEffortLevelRequest {
 export interface SetModelRequest {
   type: 'set_model';
   sessionId: string;
-  model: 'haiku' | 'sonnet' | 'opus' | 'claude-opus-4-6';
+  model: 'haiku' | 'claude-sonnet-4-6' | 'claude-opus-4-6';
 }
 
 /**
@@ -274,6 +275,18 @@ export interface DeleteCommandRequest {
   scope: CommandScope;
 }
 
+// ============================================================================
+// Skill Definition Requests
+// ============================================================================
+
+/**
+ * List all skills in workspace and user directories
+ */
+export interface ListSkillsRequest {
+  type: 'list_skills';
+  workspacePath: string;
+}
+
 /**
  * Fork a session (create a checkpoint/branch)
  */
@@ -440,6 +453,7 @@ export type BridgeRequest =
   | CreateCommandRequest
   | UpdateCommandRequest
   | DeleteCommandRequest
+  | ListSkillsRequest
   | ForkSessionRequest
   | RewindFilesRequest
   | ForkSessionAtRequest
@@ -521,6 +535,15 @@ export interface AgentResponse {
 }
 
 /**
+ * Skill list response
+ */
+export interface SkillListResponse {
+  type: 'skill_list';
+  requestType: string;
+  skills: SkillDefinition[];
+}
+
+/**
  * Command list response
  */
 export interface CommandListResponse {
@@ -558,6 +581,7 @@ export type BridgeCommandResponse =
   | NumberResponse
   | AgentListResponse
   | AgentResponse
+  | SkillListResponse
   | CommandListResponse
   | CommandResponse
   | ForkSessionResponse;
@@ -634,6 +658,15 @@ export interface CheckpointEvent {
   checkpointId: string;
 }
 
+/**
+ * Compact complete event - emitted when the SDK fires compact_boundary,
+ * signaling that context compaction has finished.
+ */
+export interface CompactCompleteEvent {
+  type: 'compact_complete';
+  sessionId: string;
+}
+
 // ============================================================================
 // Canvas Event Types
 // ============================================================================
@@ -680,7 +713,12 @@ export interface CanvasErrorEvent {
 export interface AuthErrorEvent {
   type: 'auth_error';
   sessionId: string;
-  category: 'TOKEN_EXPIRED' | 'REFRESH_FAILED' | 'NO_CREDENTIALS' | 'INVALID_TOKEN';
+  category:
+    | 'TOKEN_EXPIRED'
+    | 'REFRESH_FAILED'
+    | 'NO_CREDENTIALS'
+    | 'INVALID_TOKEN'
+    | 'AUTH_RECOVERED'; // [oauth-401-recovery] added AUTH_RECOVERED
   message: string;
   /** Whether the user can retry (e.g., re-login) vs unrecoverable */
   recoverable: boolean;
@@ -698,6 +736,7 @@ export type BridgeEvent =
   | ErrorEvent
   | ReadyEvent
   | CheckpointEvent
+  | CompactCompleteEvent
   | CanvasMessageEvent
   | CanvasToolRequestEvent
   | CanvasErrorEvent
