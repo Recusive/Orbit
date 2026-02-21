@@ -29,13 +29,14 @@ import { SidebarItem } from './components/SidebarItem';
 import { SidebarToggleIcon } from './components/SidebarToggleIcon';
 import { useSidebarActions } from './hooks/use-sidebar-actions';
 
-import type { SidebarTab } from './types';
+import type { EditorSidebarTab, SidebarTab } from './types';
 import type { ProjectsDialogProps } from '@/components/modals/projects';
 import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { SkillsDialogProps } from '@/components/modals/skills';
 import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/files';
+import { SourceControlTab } from '@/components/git';
 import {
   ConversationDeleteDialog,
   CreateWorktreeDialog,
@@ -134,7 +135,11 @@ export const PrimarySidebar: FC = () => {
   const updateStatus = useUpdateStore((s) => s.status);
   const updateDismissed = useUpdateStore((s) => s.toastDismissed);
 
+  const globalActiveTab = useUIStore((s) => s.activeTab);
+  const isEditorMode = globalActiveTab === 'editor';
+
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
+  const [editorTab, setEditorTab] = useState<EditorSidebarTab>('explorer');
   const [projectsDialogOpen, setProjectsDialogOpen] = useState(false);
   const [skillsDialogOpen, setSkillsDialogOpen] = useState(false);
 
@@ -292,31 +297,58 @@ export const PrimarySidebar: FC = () => {
 
       {/* Tab heading + toggle (workspace mode only) */}
       {!isWelcome ? (
-        <div className="flex items-center justify-between px-3 py-1 shrink-0">
-          <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
-            {activeTab === 'conversations' ? 'Sessions' : 'Explorer'}
-          </span>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div>
-                <Switch
-                  checked={activeTab === 'explorer'}
-                  onCheckedChange={(checked) => {
-                    setActiveTab(checked ? 'explorer' : 'conversations');
-                  }}
-                  aria-label="Toggle Sessions / Explorer"
-                  className="h-3.5 w-7 !rounded-md data-[state=checked]:bg-primary data-[state=unchecked]:bg-gray-6 [&>span]:!h-2.5 [&>span]:!w-2.5 [&>span]:!rounded-sm [&>span]:data-[state=checked]:!translate-x-3.5"
-                />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              {activeTab === 'conversations' ? 'Switch to Explorer' : 'Switch to Sessions'}
-            </TooltipContent>
-          </Tooltip>
-        </div>
+        isEditorMode ? (
+          /* Editor mode: Explorer / Source Control toggle — matches agent mode pattern */
+          <div className="flex items-center justify-between px-3 py-1 shrink-0">
+            <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
+              {editorTab === 'explorer' ? 'Explorer' : 'Source Control'}
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Switch
+                    checked={editorTab === 'source'}
+                    onCheckedChange={(checked) => {
+                      setEditorTab(checked ? 'source' : 'explorer');
+                    }}
+                    aria-label="Toggle Explorer / Source Control"
+                    className="h-3.5 w-7 !rounded-md data-[state=checked]:bg-primary data-[state=unchecked]:bg-gray-6 [&>span]:!h-2.5 [&>span]:!w-2.5 [&>span]:!rounded-sm [&>span]:data-[state=checked]:!translate-x-3.5"
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {editorTab === 'explorer' ? 'Switch to Source Control' : 'Switch to Explorer'}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        ) : (
+          /* Agent mode: Sessions / Explorer toggle switch */
+          <div className="flex items-center justify-between px-3 py-1 shrink-0">
+            <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
+              {activeTab === 'conversations' ? 'Sessions' : 'Explorer'}
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Switch
+                    checked={activeTab === 'explorer'}
+                    onCheckedChange={(checked) => {
+                      setActiveTab(checked ? 'explorer' : 'conversations');
+                    }}
+                    aria-label="Toggle Sessions / Explorer"
+                    className="h-3.5 w-7 !rounded-md data-[state=checked]:bg-primary data-[state=unchecked]:bg-gray-6 [&>span]:!h-2.5 [&>span]:!w-2.5 [&>span]:!rounded-sm [&>span]:data-[state=checked]:!translate-x-3.5"
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {activeTab === 'conversations' ? 'Switch to Explorer' : 'Switch to Sessions'}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )
       ) : null}
 
-      {/* Main Actions */}
+      {/* Main Actions — hidden in editor mode (sidebar shows explorer/git tabs instead) */}
       {isWelcome ? (
         <div className="flex flex-col shrink-0 gap-1 py-1.5">
           <SidebarItem
@@ -340,7 +372,7 @@ export const PrimarySidebar: FC = () => {
             }}
           />
         </div>
-      ) : activeTab === 'conversations' ? (
+      ) : !isEditorMode && activeTab === 'conversations' ? (
         <div className="flex flex-col shrink-0 gap-1 py-1.5">
           <SidebarItem
             icon={() => (
@@ -434,6 +466,13 @@ export const PrimarySidebar: FC = () => {
               ))}
             </div>
           </>
+        ) : isEditorMode ? (
+          /* Editor mode: Explorer or Source Control */
+          editorTab === 'explorer' ? (
+            <FileExplorer />
+          ) : (
+            <SourceControlTab />
+          )
         ) : activeTab === 'conversations' ? (
           <ConversationList
             conversations={conversations}

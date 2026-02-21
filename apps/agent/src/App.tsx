@@ -1,5 +1,6 @@
 import { CanvasApp } from '@canvas/CanvasApp';
 import { EditorApp } from '@editor/EditorApp';
+import { EditorChatPanel } from '@editor/components/EditorChatPanel';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -407,6 +408,7 @@ const App: FC = () => {
   // When closed, marginRight = -width slides the entire panel off the right edge
   // as one rigid body. Content inside never compresses.
   const isWelcome = !hasWorkspace && !isDemo;
+  // reviewPanelOpen drives the activity card for all modes — ContentTopBar's toggle works everywhere
   const activityOpen = reviewPanelOpen && !isWelcome;
   const activityWrapperStyle = useMemo(
     (): CSSProperties => ({
@@ -597,17 +599,20 @@ const App: FC = () => {
                       </>
                     ) : null}
 
-                    {/* ContentTopBar replaces HeaderBar — inside the card */}
-                    <ContentTopBar
-                      sidebarOpen={sidebarOpen}
-                      transparent={isWelcome}
-                      className="relative z-10"
-                    />
+                    {/* ContentTopBar — follows the chat area.
+                        In editor mode the chat moves to ActivityCard, so the header goes with it. */}
+                    {activeTab !== 'editor' ? (
+                      <ContentTopBar
+                        sidebarOpen={sidebarOpen}
+                        transparent={isWelcome}
+                        className="relative z-10"
+                      />
+                    ) : null}
 
                     {/* Mode content — wrapped in relative container so gradient overlays scroll area */}
                     <div className="flex-1 min-h-0 overflow-hidden relative z-0">
-                      {/* Gradient fade below header — blends card color into content */}
-                      {!isWelcome ? (
+                      {/* Gradient fade below header — follows the chat area (skipped in editor mode) */}
+                      {!isWelcome && activeTab !== 'editor' ? (
                         <div
                           className="absolute inset-x-0 top-0 h-8 z-10 pointer-events-none"
                           style={{
@@ -739,7 +744,11 @@ const App: FC = () => {
                         isFullscreen={isFullscreen}
                         terminalBelow={terminalActivityOpen || terminalBothOpen}
                       >
-                        <ActivityPanel canManageBrowser />
+                        {activeTab === 'editor' ? (
+                          <EditorChatPanel />
+                        ) : (
+                          <ActivityPanel canManageBrowser />
+                        )}
                       </ActivityCard>
 
                       {/* Terminal in 'activity' position — below ActivityCard in same column */}
