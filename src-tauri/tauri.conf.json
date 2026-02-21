@@ -68,7 +68,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE3ODVEMDY5QUVENzM4ODkKUldTSk9OZXVhZENGRnpZMEIyVE9NZXhqbUZWM3VzN05aUjVuSGY0dmNBSGhtajAvMjQ3bEN2WGQK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU0NDM4Qzk4MENGOUU5ODMKUldTRDZma01tSXhEVkp1cFlERXVqRGVIRFVaL2ZCUE5VWmFGUHhKMjNzY2VYQnlOSmZJRXBmNEsK",
       "endpoints": [
         "https://github.com/Recusive/Orbit-Release/releases/latest/download/latest.json"
       ],
