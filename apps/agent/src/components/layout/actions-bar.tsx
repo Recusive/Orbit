@@ -67,9 +67,18 @@ interface ModeButtonProps {
   readonly label: string;
   readonly sfSymbol: string;
   readonly fallback: ReactNode;
+  readonly disabled?: boolean;
+  readonly tooltipOverride?: string;
 }
 
-const ModeButton: FC<ModeButtonProps> = ({ id, label, sfSymbol, fallback }) => {
+const ModeButton: FC<ModeButtonProps> = ({
+  id,
+  label,
+  sfSymbol,
+  fallback,
+  disabled,
+  tooltipOverride,
+}) => {
   const activeMode = useActiveTab();
   const setMode = useUIStore((s) => s.setActiveTab);
   const isActive = activeMode === id;
@@ -79,20 +88,28 @@ const ModeButton: FC<ModeButtonProps> = ({ id, label, sfSymbol, fallback }) => {
       <TooltipTrigger asChild>
         <button
           onClick={() => {
-            setMode(id);
+            if (!disabled) {
+              setMode(id);
+            }
           }}
+          disabled={disabled}
           aria-label={`Switch to ${label}`}
           aria-pressed={isActive}
+          aria-disabled={disabled}
           className={cn(
             'flex items-center justify-center w-full h-10 transition-colors',
-            isActive ? 'text-foreground' : 'text-muted-foreground/50 hover:text-foreground'
+            disabled
+              ? 'text-muted-foreground/25 cursor-not-allowed'
+              : isActive
+                ? 'text-foreground'
+                : 'text-muted-foreground/50 hover:text-foreground'
           )}
         >
           <SFSymbol name={sfSymbol} size={18} weight="medium" fallback={fallback} />
         </button>
       </TooltipTrigger>
       <TooltipContent side="left" sideOffset={8}>
-        {label}
+        {tooltipOverride ?? label}
       </TooltipContent>
     </Tooltip>
   );
@@ -151,6 +168,8 @@ export const ActionsBar: FC = () => {
           label="Canvas"
           sfSymbol="paintpalette"
           fallback={<Palette className="h-5 w-5" />}
+          disabled
+          tooltipOverride="Canvas coming soon"
         />
         <ModeButton
           id="editor"
