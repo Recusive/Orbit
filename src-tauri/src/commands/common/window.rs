@@ -14,9 +14,12 @@ pub fn set_glass_theme(is_dark: bool) {
 /// Uses `setHidden:` on each button. Positioning is handled by wry via
 /// `trafficLightPosition` in `tauri.conf.json`. No-op on non-macOS platforms.
 #[tauri::command]
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Tauri command macro requires owned AppHandle"
+#[cfg_attr(
+    target_os = "macos",
+    expect(
+        clippy::needless_pass_by_value,
+        reason = "Tauri command macro requires owned AppHandle"
+    )
 )]
 pub fn set_traffic_lights_visible(
     app: tauri::AppHandle,
