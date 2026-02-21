@@ -182,7 +182,7 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-lg-separator bg-lg-control overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg bg-lg-control overflow-hidden">
                   {pairs.map((pair, idx) => (
                     <div key={pair.question}>
                       <div className="px-3 py-2">

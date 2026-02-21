@@ -281,16 +281,17 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       tabIndex={-1}
       onKeyDown={handlePopoverKeyDown}
       className={cn(
-        'fixed bg-popover border border-lg-separator rounded-[10px] shadow-lg overflow-hidden z-50 outline-none',
+        'fixed glass-popover rounded-[10px] overflow-hidden z-50 outline-none',
         position.side === 'top' ? 'origin-bottom-left' : 'origin-top-left',
-        // Enter: rich 3-property animation (scale + fade + slide), ease-out
+        // Enter: scale + slide (no fade — opacity:0 hides backdrop-filter blur)
         !isAnimatingOut &&
           cn(
-            'animate-in fade-in-0 zoom-in-[0.97]',
+            'animate-in zoom-in-[0.97]',
             position.side === 'top' ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1'
           ),
-        // Exit: fade-only for clean disappearance (no zoom/slide = no "deflating ghost")
-        isAnimatingOut && 'animate-out fade-out-0'
+        // Exit: no animation (fade breaks glass blur, scale too subtle)
+        // The 100ms unmount timeout handles removal
+        isAnimatingOut && 'opacity-0'
       )}
       style={{
         width: CHAT_WIDTH.dropdown,
@@ -330,7 +331,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                     TRANSITION_CLASSES.item,
                     'mt-0.5 first:mt-0 group',
                     selectedModel === model.id
-                      ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
+                      ? 'backdrop-blur-[20px] text-white rounded-md [background:rgba(0,122,255,0.85)]'
                       : 'rounded-md hover:bg-lg-control-hover active:scale-[0.98]'
                   )}
                 >
@@ -352,7 +353,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                       </span>
                     ) : null}
                     {selectedModel === model.id ? (
-                      <Check className="h-3.5 w-3.5 text-primary/80" />
+                      <Check className="h-3.5 w-3.5 text-white" />
                     ) : null}
                   </div>
                 </button>

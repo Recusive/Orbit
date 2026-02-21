@@ -55,8 +55,8 @@ export const PowersSection: FC<PowersSectionProps> = ({ onSkillsClick }) => {
       {/* Header — identical structure to SidebarItem expanded layout */}
       <button
         className={cn(
-          'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground',
-          isExpanded && 'bg-lg-sidebar-selected text-foreground'
+          'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-lg-sidebar-hover hover:backdrop-blur-[20px] active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground',
+          isExpanded && 'bg-lg-sidebar-selected backdrop-blur-[20px] text-foreground'
         )}
         onClick={handleToggle}
         aria-expanded={isExpanded}

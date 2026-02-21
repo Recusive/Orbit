@@ -275,7 +275,7 @@ export const PrimarySidebar: FC = () => {
         >
           <button
             onClick={handleOpenQuickSearch}
-            className="flex items-center h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-lg-control hover:bg-lg-control-hover transition-[background-color] duration-100"
+            className="flex items-center gap-1.5 h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-lg-control hover:bg-lg-control-hover transition-[background-color] duration-100"
             title="Search files (⌘P)"
           >
             {/* Fixed-width icon column - never moves */}
@@ -286,8 +286,8 @@ export const PrimarySidebar: FC = () => {
               <Search className="h-4 w-4 shrink-0" />
             </div>
             {/* Text that slides in */}
-            <span className="text-xs whitespace-nowrap overflow-hidden w-auto opacity-100">
-              Search files...
+            <span className="text-base whitespace-nowrap overflow-hidden text-ellipsis w-auto opacity-100">
+              {workspaceName}
             </span>
             <Kbd className="ml-auto mr-2 h-[18px] !text-[12px] px-1.5 bg-lg-control text-inherit border-lg-separator">
               <span className="text-[14px] leading-none">⌘</span> P
@@ -344,7 +344,7 @@ export const PrimarySidebar: FC = () => {
                       setActiveTab(checked ? 'explorer' : 'conversations');
                     }}
                     aria-label="Toggle Sessions / Explorer"
-                    className="h-3.5 w-7 !rounded-md [&>span]:!h-2.5 [&>span]:!w-2.5 [&>span]:!rounded-sm [&>span]:data-[state=checked]:!translate-x-3.5"
+                    className="h-4 w-8 !rounded-[6px] [&>span]:!h-3 [&>span]:!w-3 [&>span]:!rounded-[4px] [&>span]:data-[state=checked]:!translate-x-4"
                   />
                 </div>
               </TooltipTrigger>

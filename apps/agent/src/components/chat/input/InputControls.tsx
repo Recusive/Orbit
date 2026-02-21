@@ -231,7 +231,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                   ? 'bg-destructive/10 text-destructive hover:bg-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30'
                   : isInputEmpty
                     ? 'bg-lg-control text-muted-foreground/50 cursor-not-allowed'
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 hover:shadow-[0_0_16px_-2px_var(--primary)] active:scale-95'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 active:scale-95'
               )}
             >
               {isAgentRunning && isInputEmpty ? (

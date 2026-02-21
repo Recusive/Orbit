@@ -237,7 +237,7 @@
   --card-foreground: var(--gray-12);
   --popover: var(--gray-a2);
   --popover-foreground: var(--gray-12);
-  --primary: var(--gray-10);
+  --primary: #007AFF;
   --primary-foreground: #fff;
   --secondary: var(--gray-4);
   --secondary-foreground: var(--gray-12);
@@ -408,7 +408,7 @@ html.dark {
   --card-foreground: var(--gray-12);
   --popover: var(--gray-a2);
   --popover-foreground: var(--gray-12);
-  --primary: var(--gray-10);
+  --primary: #007AFF;
   --primary-foreground: #fff;
   --secondary: var(--gray-4);
   --secondary-foreground: var(--gray-12);
@@ -500,13 +500,13 @@ html.window-mode-solid.dark {
 /* Light mode - Liquid Glass (sidebar-only glass) */
 html.window-mode-liquid-glass:root,
 html.window-mode-liquid-glass.light {
-  /* Main surfaces — opaque (same values as solid mode) */
-  --surface: var(--gray-2);
-  --background: var(--gray-2);
-  --card: var(--gray-2);
+  /* Main surfaces — pure white to match chat area */
+  --surface: #ffffff;
+  --background: #ffffff;
+  --card: #ffffff;
   --popover: var(--gray-2);
-  --chat-area: var(--gray-2);
-  --editor-bg: var(--gray-2);
+  --chat-area: #ffffff;
+  --editor-bg: #ffffff;
   --sidebar: var(--gray-2);
 }
 
@@ -522,24 +522,112 @@ html.window-mode-liquid-glass.dark {
   --sidebar: var(--gray-2);
 }
 
-/* Base layer becomes transparent so tauri-plugin-liquid-glass
-   (GlassMaterialVariant::Sidebar) shows through the sidebar area.
-   ContentCard provides its own opaque background (var(--background)).
-   Scoped to .bg-base-layer (AppShell root) — NOT [data-tauri-drag-region]
-   because that also matches the ContentTopBar header and makes it
-   transparent/washed-out in liquid glass mode. */
+/* Base layer — frosted glass over native vibrancy.
+   The entire base layer (sidebar + card insets/margins) gets the frost
+   so the exposed glass looks uniform everywhere behind the content cards.
+   ContentCard provides its own opaque background on top.
+
+   LIGHT MODE: backdrop-filter: blur(40px) + subtle white tint.
+   DARK MODE: NO backdrop-filter (blur kernel samples white at window
+   rounded corners, creating visible artifact). Uses ::before tint only. */
 html.window-mode-liquid-glass .bg-base-layer {
   background-color: transparent;
+  position: relative;
+  isolation: isolate;
 }
 
-/* Sidebar — fully transparent so native vibrancy shows through.
-   No CSS blur or backdrop-filter needed; the OS handles it. */
+html.window-mode-liquid-glass .bg-base-layer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.01);
+}
+
+/* Dark mode: no CSS blur (corner artifact). Native NSGlassEffectView
+   provides the blur; ::before dark tint darkens it for sidebar contrast. */
+html.window-mode-liquid-glass.dark .bg-base-layer {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Dark tint over the opaque --chat-area base to darken the sidebar. */
+html.window-mode-liquid-glass.dark .bg-base-layer::before {
+  background: rgba(15, 15, 18, 0.20);
+}
+
+/* Sidebar — transparent so the base layer frost shows through */
 html.window-mode-liquid-glass [data-sidebar="primary"] {
   background: transparent;
 }
 
-/* Chat input glass override removed — .glass-input now uses backdrop-filter
-   with transparent background by default (all window modes). */
+
+/* ── Glass Input — Liquid Glass mode tint ────────────────
+   Match the sidebar's glass material: same tint overlay approach
+   so input and sidebar feel like the same surface.
+   Figma "Medium" spec adapted for solid-bg context:
+   - ::before becomes the tint layer (matching base-layer treatment)
+   - ::after keeps rim shine but drops shadows (native glass has its own depth)
+   - backdrop-filter still frosts but the tint unifies with sidebar material */
+html.window-mode-liquid-glass .glass-input::before {
+  background: rgba(0, 0, 0, 0.15);
+  background-blend-mode: normal;
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+  backdrop-filter: blur(40px) saturate(1.2);
+}
+
+html.window-mode-liquid-glass .glass-input::after {
+  background: rgba(0, 0, 0, 0.004);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.10),
+    inset 0 -0.5px 0 0 rgba(0, 0, 0, 0.15),
+    0 0 0 0.5px rgba(255, 255, 255, 0.06);
+}
+
+/* Light mode liquid glass input */
+html.window-mode-liquid-glass:not(.dark) .glass-input::before {
+  background: rgba(220, 222, 225, 0.30);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+  backdrop-filter: blur(40px) saturate(1.2);
+}
+
+html.window-mode-liquid-glass:not(.dark) .glass-input::after {
+  border: 1px solid #ffffff;
+  background: rgba(255, 255, 255, 0.004);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Liquid glass popover */
+html.window-mode-liquid-glass .glass-popover::before {
+  background: rgba(0, 0, 0, 0.15);
+  background-blend-mode: normal;
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+  backdrop-filter: blur(40px) saturate(1.2);
+}
+
+html.window-mode-liquid-glass .glass-popover::after {
+  background: rgba(0, 0, 0, 0.004);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.10),
+    inset 0 -0.5px 0 0 rgba(0, 0, 0, 0.15),
+    0 0 0 0.5px rgba(255, 255, 255, 0.06);
+}
+
+html.window-mode-liquid-glass:not(.dark) .glass-popover::before {
+  background: rgba(255, 255, 255, 0.97);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+  backdrop-filter: blur(40px) saturate(1.2);
+}
+
+html.window-mode-liquid-glass:not(.dark) .glass-popover::after {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: transparent;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
 
 /* Liquid Glass sidebar overrides removed — components now use
    bg-lg-sidebar-hover / bg-lg-sidebar-selected tokens directly,
@@ -776,11 +864,15 @@ html.dark [data-streamdown='code-block-container'] {
   position: relative;
   padding: 0.125rem 0.25rem;
   border-radius: var(--radius-md);
-  background-color: var(--muted);
+  background-color: rgba(0, 0, 0, 0.06);
   font-family: 'Geist Mono Variable', 'Geist Mono', ui-monospace, Menlo, monospace;
   font-size: 0.75rem; /* 12px - VS Code inline code */
   font-weight: 500;
   color: var(--foreground);
+}
+
+html.dark .chat-markdown code:not(pre code) {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Code blocks */
@@ -1012,8 +1104,15 @@ html.dark [data-streamdown='code-block-container'] {
     font-feature-settings:
       'rlig' 1,
       'calt' 1;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    /* Use auto instead of antialiased — lets macOS use its native font
+       rendering pipeline. 'antialiased' forces grayscale AA which makes
+       text appear thinner and pixelated vs native app text. */
+    -webkit-font-smoothing: auto;
+    -moz-osx-font-smoothing: auto;
+    /* Enables kerning + ligature adjustments — noticeable at small sizes (10-13px) */
+    text-rendering: optimizeLegibility;
+    /* Lets the font adjust its design for the rendered size (e.g., thicker stems at 11px) */
+    font-optical-sizing: auto;
   }
 
   /* Contenteditable placeholder */
@@ -1192,7 +1291,7 @@ html.dark [data-streamdown='code-block-container'] {
    On white bg, frost is invisible (blurring white = white).
    Match iMessage: nearly transparent + thin subtle border. */
 html:not(.dark) .glass-input::before {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.75);
   -webkit-backdrop-filter: blur(40px);
   backdrop-filter: blur(40px);
 }
@@ -1204,6 +1303,86 @@ html:not(.dark) .glass-input::after {
   box-shadow:
     inset 0 0.5px 0 0 rgba(255, 255, 255, 0.70),
     0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+/* ── Glass Popover ──────────────────────────────────────
+   Mirrors glass-input material for dropdown menus/popovers.
+   Same multi-layer stack: blur (::before) + fill/border (::after). */
+.glass-popover {
+  border: none;
+  background: transparent;
+  isolation: isolate;
+}
+
+/* Neutralise fade animations on glass popovers — opacity:0 hides backdrop-filter.
+   Overrides tw-animate's --tw-enter/exit-opacity so scale+slide still animate
+   but opacity stays at 1 throughout. Works with Radix data-[state] selectors. */
+.glass-popover[data-state="open"] {
+  --tw-enter-opacity: 1;
+}
+.glass-popover[data-state="closed"] {
+  --tw-exit-opacity: 0;
+  --tw-exit-scale: 0.95;
+  animation-duration: 80ms !important;
+}
+
+.glass-popover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.1);
+  background-blend-mode: hard-light;
+  -webkit-backdrop-filter: blur(40px);
+  backdrop-filter: blur(40px);
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+.glass-popover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  border: 0.5px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.004);
+  box-shadow:
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.18),
+    2px 4px 20px rgba(0, 0, 0, 0.10);
+}
+
+/* Light mode */
+html:not(.dark) .glass-popover::before {
+  background: rgba(255, 255, 255, 0.97);
+  -webkit-backdrop-filter: blur(40px);
+  backdrop-filter: blur(40px);
+}
+
+html:not(.dark) .glass-popover::after {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: transparent;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Frosted Input Container ────────────────────────────
+   Transparent wrapper that floats above the messages scroll area.
+   No backdrop-filter here — the .glass-input box handles its own
+   frosting via ::before. This just needs to be see-through so
+   messages are visible scrolling behind the input.
+   The ::after solid strip covers the small gap between the
+   input box bottom edge and the status bar. */
+.chat-input-frost {
+  /* Transparent except for the last 4px (pb-1 gap below input) which
+     is solid to prevent messages peeking between input and status bar */
+  background: linear-gradient(to bottom, transparent calc(100% - 4px), var(--chat-area) calc(100% - 4px));
+  pointer-events: none;
+}
+.chat-input-frost > * {
+  pointer-events: auto;
 }
 
 /* Accessibility: respect reduced motion preference */
@@ -1277,10 +1456,11 @@ html:not(.dark) .glass-input::after {
   }
 }
 
-/* Scrollbar styling for WKWebView */
+/* Scrollbar — Apple Liquid Glass spec
+   12px track, 6px thumb centered with 3px inset, pill-shaped */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
   background: transparent;
 }
 
@@ -1289,14 +1469,16 @@ html:not(.dark) .glass-input::after {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--gray-8) 50%, transparent);
-  border-radius: var(--radius-md);
-  border: 2px solid transparent;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 1000px;
+  border: 3px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--gray-8) 70%, transparent);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 1000px;
+  border: 3px solid transparent;
   background-clip: padding-box;
 }
 
@@ -1304,14 +1486,18 @@ html:not(.dark) .glass-input::after {
   background: transparent;
 }
 
-/* Dark mode scrollbar (+1 bump) */
+/* Dark mode scrollbar — inverted for contrast */
 html.dark ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--gray-8) 40%, transparent);
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 1000px;
+  border: 3px solid transparent;
   background-clip: padding-box;
 }
 
 html.dark ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--gray-8) 60%, transparent);
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 1000px;
+  border: 3px solid transparent;
   background-clip: padding-box;
 }
 
@@ -1632,7 +1818,7 @@ html:not(.window-mode-solid) .glass-float {
 
 /* ── Design Tokens (Dark) ───────────────────────────── */
 html.dark {
-  --lg-tint: rgba(190, 190, 190, 0.1);
+  --lg-tint: rgba(0, 0, 0, 0.15);
 
   --lg-control-bg: rgba(255, 255, 255, 0.07);
   --lg-control-bg-hover: rgba(255, 255, 255, 0.1);
@@ -1726,9 +1912,15 @@ html.dark {
   isolation: isolate;
   backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
   -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
-  box-shadow: 0 0 1px rgba(0, 0, 0, 0.2), 0 17px 45px rgba(0, 0, 0, 0.5);
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 0.5px 0 0 rgba(255, 255, 255, 0.06), 0 0 1px rgba(0, 0, 0, 0.2), 0 17px 45px rgba(0, 0, 0, 0.5);
   -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
   mask-image: linear-gradient(#000, #000);
+}
+
+html.dark .liquid-glass-dialog {
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: inset 0 0.5px 0 0 rgba(255, 255, 255, 0.12), 0 0 1px rgba(0, 0, 0, 0.2), 0 17px 45px rgba(0, 0, 0, 0.5);
 }
 
 .liquid-glass-dialog::after {
@@ -1912,6 +2104,26 @@ html.dark {
 
 .lg-search:focus {
   box-shadow: var(--lg-input-border), var(--lg-input-focus);
+}
+
+
+/* ── COMPONENT: Apple Tooltip ───────────────────────
+   macOS 26 Tooltip — Thick material, 11px SF Pro weight 510.
+   From Apple UI Kit Figma spec. */
+
+.apple-tooltip {
+  padding: 3px 6px 2px;
+  background: rgba(0, 0, 0, 0.04);
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(40px) saturate(1.5);
+  -webkit-backdrop-filter: blur(40px) saturate(1.5);
+  color: #4D4D4D;
+}
+
+html.dark .apple-tooltip {
+  background: rgba(15, 15, 18, 0.20);
+  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 

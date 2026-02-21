@@ -37,6 +37,11 @@ static SUSPENDED: AtomicBool = AtomicBool::new(false);
 /// 2 = dark.
 static EFFECTIVE_THEME: AtomicU8 = AtomicU8::new(0);
 
+/// Tracks whether glass is currently hidden (window is defocused).
+/// When the theme changes while defocused, we re-apply `toggle_glass(true)`
+/// so the background color updates immediately without waiting for a focus cycle.
+static GLASS_HIDDEN: AtomicBool = AtomicBool::new(false);
+
 // =========================================================================
 // View hierarchy — find & toggle NSGlassEffectView
 // =========================================================================
@@ -80,6 +85,8 @@ unsafe fn set_glass_hidden_recursive(view: *mut AnyObject, glass_class: &AnyClas
 ///
 /// Must be called on the main thread.
 unsafe fn toggle_glass(hidden: bool) {
+    GLASS_HIDDEN.store(hidden, Ordering::Relaxed);
+
     let Some(glass_class) = AnyClass::get(c"NSGlassEffectView") else {
         return;
     };
@@ -127,8 +134,8 @@ unsafe fn toggle_glass(hidden: bool) {
             },
         };
 
-        // Sidebar tint colors from theme-provider.tsx, fully opaque:
-        //   Light: #D2D2D2  (neutral gray-4)
+        // Defocus fallback colors (fully opaque, no glass).
+        //   Light: #F0F0F0  (near-white, matches the light LG surface tone)
         //   Dark:  #121212  (neutral gray-1)
         let (r, g, b) = if is_dark {
             (
@@ -138,9 +145,9 @@ unsafe fn toggle_glass(hidden: bool) {
             )
         } else {
             (
-                f64::from(0xD2_u8) / 255.0,
-                f64::from(0xD2_u8) / 255.0,
-                f64::from(0xD2_u8) / 255.0,
+                f64::from(0xF0_u8) / 255.0,
+                f64::from(0xF0_u8) / 255.0,
+                f64::from(0xF0_u8) / 255.0,
             )
         };
         let color: *mut AnyObject = msg_send![
@@ -438,8 +445,19 @@ pub(crate) fn suppress_glass_defocus_dimming() {
 
 /// Set the app-level effective theme so defocus background matches Orbit's
 /// chosen theme rather than the system appearance.
+///
+/// If the window is currently defocused (glass hidden), re-applies
+/// `toggle_glass(true)` so the background color updates immediately
+/// without waiting for a focus → defocus cycle.
 pub(crate) fn set_effective_theme(is_dark: bool) {
     EFFECTIVE_THEME.store(if is_dark { 2 } else { 1 }, Ordering::Relaxed);
+
+    // Re-paint the defocus background if the window is already unfocused.
+    if GLASS_HIDDEN.load(Ordering::Relaxed) {
+        unsafe {
+            toggle_glass(true);
+        }
+    }
 }
 
 /// Suspend glass defocus observers — callbacks become no-ops.

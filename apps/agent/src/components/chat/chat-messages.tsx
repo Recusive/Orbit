@@ -450,7 +450,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   return (
     <div
       ref={scrollRef}
-      className="flex-1 overflow-y-auto overflow-x-hidden p-4"
+      className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-28"
       style={{
         scrollbarGutter: 'stable both-edges',
         // PERF: contain layout + style to this scroll container.

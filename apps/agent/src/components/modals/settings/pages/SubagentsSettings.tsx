@@ -7,7 +7,6 @@ import type { FC } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -214,11 +213,11 @@ const AgentEditor: FC<AgentEditorProps> = ({
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-60 bg-[var(--gray-a10)] flex items-center justify-center" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-60 bg-black/15 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         {/* Flexbox centering wrapper - avoids blurry text from transform translate(-50%) subpixel issues */}
         <div className="fixed inset-0 z-60 flex items-center justify-center pointer-events-none">
           <DialogPrimitive.Content
-            className="w-[600px] max-w-[90vw] max-h-[80vh] bg-card border border-lg-separator rounded-lg shadow-xl flex flex-col pointer-events-auto"
+            className="relative w-[600px] max-w-[90vw] max-h-[80vh] glass-popover bg-transparent border-0 shadow-none rounded-[14px] pointer-events-auto"
             onPointerDownOutside={(e) => {
               e.preventDefault();
             }}
@@ -235,210 +234,213 @@ const AgentEditor: FC<AgentEditorProps> = ({
                 : 'Create a new subagent configuration'}
             </DialogPrimitive.Description>
 
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-lg-separator">
-              <h2 className="font-semibold text-lg">
-                {agent !== undefined ? 'Edit Subagent' : 'Create Subagent'}
-              </h2>
-              <DialogPrimitive.Close asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogPrimitive.Close>
-            </div>
+            {/* Inner wrapper: overflow-hidden here constrains flex scroll without clipping glass border */}
+            <div className="flex flex-col overflow-hidden rounded-[inherit] max-h-[80vh] bg-chat-area">
+              {/* Header */}
+              <div className="shrink-0 flex items-center justify-between px-5 py-3.5 border-b border-lg-separator">
+                <h2 className="font-semibold text-lg">
+                  {agent !== undefined ? 'Edit Subagent' : 'Create Subagent'}
+                </h2>
+                <DialogPrimitive.Close asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </DialogPrimitive.Close>
+              </div>
 
-            {/* Form */}
-            <ScrollArea className="flex-1 py-5 px-6">
-              <div className="space-y-5 px-px">
-                {/* Name */}
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
-                    Name <span className="text-red-500/70">*</span>
-                  </label>
-                  <Input
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                    }}
-                    placeholder="code-reviewer"
-                    className="mt-1 h-8 text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground/90 mt-1.5 leading-relaxed">
-                    Used as the filename and identifier. Use lowercase with dashes.
-                  </p>
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
-                    Description
-                  </label>
-                  <Input
-                    value={description}
-                    onChange={(e) => {
-                      setDescription(e.target.value);
-                    }}
-                    placeholder="Expert code review specialist for quality and security"
-                    className="mt-1 h-8 text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground/90 mt-1.5 leading-relaxed">
-                    Describes when this agent should be used. Claude uses this to decide when to
-                    invoke it.
-                  </p>
-                </div>
-
-                {/* Prompt */}
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
-                    System Prompt <span className="text-red-500/70">*</span>
-                  </label>
-                  <Textarea
-                    value={prompt}
-                    onChange={(e) => {
-                      setPrompt(e.target.value);
-                    }}
-                    placeholder="You are a code review specialist with expertise in security, performance, and best practices..."
-                    className="mt-1 text-sm min-h-[120px]"
-                  />
-                  <p className="text-xs text-muted-foreground/90 mt-1.5 leading-relaxed">
-                    Instructions that define the agent&apos;s behavior and expertise.
-                  </p>
-                </div>
-
-                {/* Model */}
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
-                    Model
-                  </label>
-                  <Select
-                    value={model}
-                    onValueChange={(v) => {
-                      setModel(v as typeof model);
-                    }}
-                  >
-                    <SelectTrigger className="mt-1 h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-70">
-                      <SelectItem value="inherit">Inherit from parent</SelectItem>
-                      <SelectItem value="haiku">Haiku 4.5 (fast)</SelectItem>
-                      <SelectItem value="claude-sonnet-4-6">Sonnet 4.6 (balanced)</SelectItem>
-                      <SelectItem value="claude-opus-4-6">Opus 4.6 (best)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Tools */}
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
-                    Allowed Tools
-                  </label>
-                  <p className="text-xs text-muted-foreground/90 mb-2 mt-1">
-                    Select which tools this agent can use. Leave empty to inherit all tools.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {AVAILABLE_TOOLS.map((tool) => (
-                      <button
-                        key={tool}
-                        type="button"
-                        onClick={() => {
-                          handleToolToggle(tool);
-                        }}
-                        className={cn(
-                          'text-sm px-2.5 py-1.5 rounded-lg border transition-[background-color,border-color,transform] duration-150 active:scale-[0.98]',
-                          tools.includes(tool)
-                            ? 'bg-lg-separator text-foreground border-lg-separator hover:bg-lg-control-hover hover:border-lg-border'
-                            : 'bg-lg-control text-foreground border-lg-separator hover:bg-lg-control-hover hover:border-lg-separator'
-                        )}
-                      >
-                        {tool}
-                      </button>
-                    ))}
+              {/* Form */}
+              <div className="flex-1 min-h-0 overflow-y-auto py-5 px-6">
+                <div className="space-y-5 px-px">
+                  {/* Name */}
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
+                      Name <span className="text-red-500/70">*</span>
+                    </label>
+                    <Input
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                      }}
+                      placeholder="code-reviewer"
+                      className="mt-1 h-8 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground/90 mt-1.5 leading-relaxed">
+                      Used as the filename and identifier. Use lowercase with dashes.
+                    </p>
                   </div>
-                </div>
 
-                {/* Generate with AI Input - Only show when creating new agent and generate mode is active */}
-                {agent === undefined && showGenerateInput ? (
-                  <div className="p-3.5 rounded-lg border border-lg-separator bg-lg-control">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <Sparkles className="h-4 w-4 text-lg-text-secondary" />
-                        Generate with AI
-                      </div>
-                      <Textarea
-                        value={generateDescription}
-                        onChange={(e) => {
-                          setGenerateDescription(e.target.value);
-                        }}
-                        placeholder="Describe what this agent should do... e.g., 'An expert code reviewer that focuses on security vulnerabilities and best practices'"
-                        className="text-sm min-h-[80px]"
-                        disabled={isGenerating}
-                      />
+                  {/* Description */}
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
+                      Description
+                    </label>
+                    <Input
+                      value={description}
+                      onChange={(e) => {
+                        setDescription(e.target.value);
+                      }}
+                      placeholder="Expert code review specialist for quality and security"
+                      className="mt-1 h-8 text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground/90 mt-1.5 leading-relaxed">
+                      Describes when this agent should be used. Claude uses this to decide when to
+                      invoke it.
+                    </p>
+                  </div>
+
+                  {/* Prompt */}
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
+                      System Prompt <span className="text-red-500/70">*</span>
+                    </label>
+                    <Textarea
+                      value={prompt}
+                      onChange={(e) => {
+                        setPrompt(e.target.value);
+                      }}
+                      placeholder="You are a code review specialist with expertise in security, performance, and best practices..."
+                      className="mt-1 text-sm min-h-[120px]"
+                    />
+                    <p className="text-xs text-muted-foreground/90 mt-1.5 leading-relaxed">
+                      Instructions that define the agent&apos;s behavior and expertise.
+                    </p>
+                  </div>
+
+                  {/* Model */}
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
+                      Model
+                    </label>
+                    <Select
+                      value={model}
+                      onValueChange={(v) => {
+                        setModel(v as typeof model);
+                      }}
+                    >
+                      <SelectTrigger className="mt-1 h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-70">
+                        <SelectItem value="inherit">Inherit from parent</SelectItem>
+                        <SelectItem value="haiku">Haiku 4.5 (fast)</SelectItem>
+                        <SelectItem value="claude-sonnet-4-6">Sonnet 4.6 (balanced)</SelectItem>
+                        <SelectItem value="claude-opus-4-6">Opus 4.6 (best)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Tools */}
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
+                      Allowed Tools
+                    </label>
+                    <p className="text-xs text-muted-foreground/90 mb-2 mt-1">
+                      Select which tools this agent can use. Leave empty to inherit all tools.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {AVAILABLE_TOOLS.map((tool) => (
+                        <button
+                          key={tool}
+                          type="button"
+                          onClick={() => {
+                            handleToolToggle(tool);
+                          }}
+                          className={cn(
+                            'text-sm px-2.5 py-1.5 rounded-full border-0 transition-[background-color,transform] duration-150 active:scale-[0.98]',
+                            tools.includes(tool)
+                              ? 'bg-[rgba(0,122,255,0.85)] text-white'
+                              : 'bg-[var(--lg-alert-secondary-bg)] text-[var(--lg-alert-secondary-text)] hover:bg-[var(--lg-alert-secondary-bg-hover)]'
+                          )}
+                        >
+                          {tool}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                ) : null}
-              </div>
-            </ScrollArea>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-lg-separator bg-lg-control">
-              {/* Generate with AI button - only show when creating new agent */}
-              {agent === undefined &&
-                (showGenerateInput ? (
-                  <Button
-                    variant={generateDescription.trim() !== '' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={handleGenerate}
-                    disabled={generateDescription.trim() === '' || isGenerating}
-                    className="mr-auto gap-1.5"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-3.5 w-3.5" />
-                        Generate
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setShowGenerateInput(true);
-                    }}
-                    className="mr-auto gap-1.5"
-                  >
-                    <Sparkles className="h-3.5 w-3.5 text-amber-500/70" />
-                    Generate with AI
-                  </Button>
-                ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (showGenerateInput) {
-                    setShowGenerateInput(false);
-                    setGenerateDescription('');
-                  } else {
-                    onClose();
-                  }
-                }}
-                disabled={isGenerating}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={name.trim() === '' || prompt.trim() === '' || isGenerating}
-              >
-                {agent !== undefined ? 'Save Changes' : 'Create Agent'}
-              </Button>
+                  {/* Generate with AI Input - Only show when creating new agent and generate mode is active */}
+                  {agent === undefined && showGenerateInput ? (
+                    <div className="p-3.5 rounded-[14px] border border-lg-separator bg-lg-control">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <Sparkles className="h-4 w-4 text-lg-text-secondary" />
+                          Generate with AI
+                        </div>
+                        <Textarea
+                          value={generateDescription}
+                          onChange={(e) => {
+                            setGenerateDescription(e.target.value);
+                          }}
+                          placeholder="Describe what this agent should do... e.g., 'An expert code reviewer that focuses on security vulnerabilities and best practices'"
+                          className="text-sm min-h-[80px]"
+                          disabled={isGenerating}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="shrink-0 flex items-center justify-end gap-2 px-5 py-3.5 border-t border-lg-separator">
+                {/* Generate with AI button - only show when creating new agent */}
+                {agent === undefined &&
+                  (showGenerateInput ? (
+                    <Button
+                      variant={generateDescription.trim() !== '' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={handleGenerate}
+                      disabled={generateDescription.trim() === '' || isGenerating}
+                      className="mr-auto gap-1.5"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Generate
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowGenerateInput(true);
+                      }}
+                      className="mr-auto gap-1.5"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-amber-500/70" />
+                      Generate with AI
+                    </Button>
+                  ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (showGenerateInput) {
+                      setShowGenerateInput(false);
+                      setGenerateDescription('');
+                    } else {
+                      onClose();
+                    }
+                  }}
+                  disabled={isGenerating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={name.trim() === '' || prompt.trim() === '' || isGenerating}
+                >
+                  {agent !== undefined ? 'Save Changes' : 'Create Agent'}
+                </Button>
+              </div>
             </div>
           </DialogPrimitive.Content>
         </div>

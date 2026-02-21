@@ -307,7 +307,7 @@ export const AccountSettings: FC = () => {
       <SectionHeader title="Authentication">Manage your Claude authentication</SectionHeader>
 
       {/* ── OAuth Status Card ─────────────────────────────────────── */}
-      <div className="rounded-lg border border-lg-separator bg-background min-h-[120px] overflow-hidden">
+      <div className="rounded-[14px] border border-lg-separator bg-background min-h-[120px] overflow-hidden">
         {isChecking ? (
           <div className="flex items-center justify-center gap-3 p-6">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -377,7 +377,7 @@ export const AccountSettings: FC = () => {
 
             {/* Token expiry details */}
             {isConnected && keychainStatus.expiresAt !== null ? (
-              <div className="mx-4 mb-4 rounded-md bg-lg-control px-3 py-2.5 flex items-center justify-between">
+              <div className="mx-4 mb-4 rounded-[12px] bg-lg-control px-3 py-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock
                     className={cn('h-3.5 w-3.5 shrink-0', expiryColor(keychainStatus.expiresAt))}
@@ -419,7 +419,7 @@ export const AccountSettings: FC = () => {
 
       {storedApiKey !== null ? (
         /* Key is saved — show masked key with remove button */
-        <div className="rounded-lg border border-lg-separator p-4 bg-background">
+        <div className="rounded-[14px] border border-lg-separator p-4 bg-background">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-2.5 w-2.5 rounded-full bg-green-600 shrink-0" />
@@ -508,7 +508,7 @@ export const AccountSettings: FC = () => {
 
       {/* Refresh feedback bar */}
       {refreshMessage !== null ? (
-        <div className="mt-6 flex w-full items-center justify-between rounded-lg border border-lg-separator bg-background">
+        <div className="mt-6 flex w-full items-center justify-between rounded-[14px] border border-lg-separator bg-background">
           <div className="flex flex-1 items-center gap-3 py-2.5 pl-3.5">
             <Info className="h-4 w-4 shrink-0 text-lg-text-secondary" />
             <span className="text-sm font-medium">{refreshMessage}</span>

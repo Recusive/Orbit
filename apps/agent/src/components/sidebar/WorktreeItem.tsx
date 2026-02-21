@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn, SIDEBAR } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 // Hoisted RegExp for path splitting (avoids recreation on each render)
 const PATH_SEPARATOR_RE = /[/\\]/;
@@ -102,8 +102,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         <button
           type="button"
           aria-label={isExpanded ? 'Collapse worktree' : 'Expand worktree'}
-          className="flex items-center justify-center shrink-0 hover:bg-lg-control-hover rounded-md"
-          style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
+          className="flex items-center justify-center shrink-0 h-5 w-5 hover:bg-lg-control-hover rounded-md ml-0.5"
           onClick={handleChevronClick}
           onKeyDown={(e) => {
             // Stop Enter/Space from bubbling to parent role="button" div,
@@ -133,12 +132,16 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           {workspaceName}
         </span>
 
-        {/* Branch badge */}
+        {/* Branch badge — Apple liquid glass pill style */}
         <div
           className={cn(
-            'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium mr-1 shrink-0 transition-colors duration-200',
-            worktree.isMain ? 'bg-primary/12 text-primary' : 'bg-lg-control text-lg-text-secondary'
+            'flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] mr-1 shrink-0 transition-colors duration-200',
+            'backdrop-blur-[20px] font-[510]',
+            worktree.isMain
+              ? 'bg-black/[0.05] text-[#4C4C4C] dark:bg-white/[0.10] dark:text-[#B0B0B0]'
+              : 'bg-black/[0.04] text-[#4C4C4C] dark:bg-white/[0.08] dark:text-[#999]'
           )}
+          style={{ mixBlendMode: 'plus-darker' }}
         >
           <GitBranch className="h-3 w-3" />
           <span className="max-w-[60px] truncate">{branchName}</span>

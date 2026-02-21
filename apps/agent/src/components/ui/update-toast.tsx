@@ -31,7 +31,7 @@ const TOAST_STYLES = `
   max-width: 24rem;
   border-radius: 0.75rem;
   border: 3px solid var(--lg-separator);
-  background: var(--lg-control);
+  background: var(--card);
   overflow: hidden;
   box-shadow: none;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -155,7 +155,7 @@ const TOAST_STYLES = `
 
 .ot-btn {
   padding: 0.375rem 0.75rem;
-  border-radius: 0.375rem;
+  border-radius: 9999px;
   border: none;
   font-family: inherit;
   font-size: 0.75rem;
@@ -173,8 +173,13 @@ const TOAST_STYLES = `
 }
 
 .ot-btn-ghost {
-  background: var(--lg-control);
-  color: var(--lg-text-secondary);
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.ot-btn-ghost:hover {
+  background: var(--border);
+  opacity: 1;
 }
 `;
 

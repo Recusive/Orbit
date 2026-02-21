@@ -153,11 +153,11 @@ export const ConversationItem: FC<ConversationItemProps> = ({
     >
       <button
         className={cn(
-          'flex items-center h-7 w-full rounded-lg pl-[7px] overflow-hidden hover:bg-lg-sidebar-hover transition-[background-color,padding] duration-100',
+          'flex items-center h-7 w-full rounded-lg pl-[7px] overflow-hidden transition-[background-color,padding] duration-100',
           isHovered ? 'pr-7' : 'pr-9',
           active
-            ? 'bg-lg-sidebar-selected text-foreground'
-            : 'text-lg-text-secondary hover:text-foreground'
+            ? 'bg-primary text-white hover:bg-primary/90'
+            : 'text-lg-text-secondary hover:text-foreground hover:bg-lg-sidebar-hover hover:backdrop-blur-[20px]'
         )}
         title={conversation.title}
         onClick={onClick}
@@ -192,7 +192,8 @@ export const ConversationItem: FC<ConversationItemProps> = ({
         <span
           className={cn(
             'absolute right-1.5 top-1/2 -translate-y-1/2',
-            'text-[11px] text-muted-foreground/60 tabular-nums',
+            'text-[11px] tabular-nums',
+            active ? 'text-white/70' : 'text-muted-foreground/60',
             showTimestamp ? 'opacity-100' : 'opacity-0 pointer-events-none'
           )}
         >

@@ -1,10 +1,9 @@
 import { useState } from 'react';
 
-import { SectionDivider, SectionHeader, SettingItem } from '../components';
+import { SectionHeader, SettingItem } from '../components';
 
 import type { FC } from 'react';
 
-import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -48,24 +47,6 @@ export const GeneralSettings: FC = () => {
           description="Send anonymous usage data to help improve the app"
         >
           <Switch checked={telemetry} onCheckedChange={setTelemetry} />
-        </SettingItem>
-      </div>
-
-      <SectionDivider />
-
-      <SectionHeader title="Data">Manage your data and storage</SectionHeader>
-
-      <div className="space-y-0 divide-y divide-border/40">
-        <SettingItem label="Clear Cache" description="Rched data to free up space">
-          <Button variant="outline" size="sm" className="h-8">
-            Clear
-          </Button>
-        </SettingItem>
-
-        <SettingItem label="Export Data" description="Download all your data as a backup">
-          <Button variant="outline" size="sm" className="h-8">
-            Export
-          </Button>
         </SettingItem>
       </div>
     </div>

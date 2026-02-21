@@ -132,7 +132,7 @@ export const AppearanceSettings: FC = () => {
 
       <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Font Size" description="Adjust the interface font size">
-          <Select value={fontSize} onValueChange={setFontSize}>
+          <Select value={fontSize} onValueChange={setFontSize} disabled>
             <SelectTrigger className="w-32 h-8 text-sm">
               <SelectValue />
             </SelectTrigger>
@@ -151,11 +151,11 @@ export const AppearanceSettings: FC = () => {
 
       <div className="space-y-0 divide-y divide-border/40">
         <SettingItem label="Reduce Motion" description="Minimize animations and transitions">
-          <Switch checked={reduceMotion} onCheckedChange={setReduceMotion} />
+          <Switch checked={reduceMotion} onCheckedChange={setReduceMotion} disabled />
         </SettingItem>
 
         <SettingItem label="Compact Mode" description="Use a more compact interface layout">
-          <Switch checked={compactMode} onCheckedChange={setCompactMode} />
+          <Switch checked={compactMode} onCheckedChange={setCompactMode} disabled />
         </SettingItem>
       </div>
     </div>

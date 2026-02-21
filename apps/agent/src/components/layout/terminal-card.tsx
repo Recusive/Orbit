@@ -92,7 +92,11 @@ export const TerminalCard: FC<TerminalCardProps> = ({
   }, [position, sidebarOpen, actionsBarOpen, isFullscreen]);
 
   return (
-    <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative" style={style}>
+    <div
+      data-content-card
+      className="flex flex-col flex-1 min-w-0 overflow-hidden relative"
+      style={style}
+    >
       {children}
     </div>
   );

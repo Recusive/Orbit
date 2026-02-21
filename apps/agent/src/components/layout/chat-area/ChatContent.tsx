@@ -91,8 +91,10 @@ export const ChatContent: FC<ChatContentProps> = ({
           <ChatInput {...inputProps} />
         </div>
       ) : (
-        /* Normal layout: Messages + Input at bottom */
-        <div className="flex-1 flex flex-col min-h-0">
+        /* Normal layout: Messages fill the space, input overlays the bottom.
+           The input is absolutely positioned so messages scroll behind it,
+           creating a frosted-glass blur effect via backdrop-filter. */
+        <div className="flex-1 flex flex-col relative min-h-0">
           <ChatMessages
             messages={messages}
             isAgentRunning={isAgentRunning}
@@ -104,8 +106,11 @@ export const ChatContent: FC<ChatContentProps> = ({
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
           />
-          <TodoBar />
-          <ChatInput {...inputProps} />
+          {/* Frosted input overlay — sits above messages with backdrop blur */}
+          <div className="absolute bottom-0 inset-x-0 z-10 chat-input-frost">
+            <TodoBar />
+            <ChatInput {...inputProps} />
+          </div>
         </div>
       )}
     </div>

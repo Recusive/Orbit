@@ -174,9 +174,9 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
               aria-describedby={undefined}
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
-                'bg-card',
-                'border border-lg-separator rounded-[14px] overflow-hidden flex flex-col',
-                'shadow-lg duration-200',
+                'glass-popover bg-transparent border-0 shadow-none',
+                'rounded-[14px] overflow-hidden flex flex-col',
+                'duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
                 'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
                 'data-[state=closed]:zoom-out-[0.98] data-[state=open]:zoom-in-[0.98]'

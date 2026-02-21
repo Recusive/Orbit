@@ -695,7 +695,7 @@ const App: FC = () => {
                     ) : null}
 
                     {/* Toast notifications — offset accounts for card margin */}
-                    <Toaster position="bottom-right" offset={46} />
+                    <Toaster position="bottom-right" offset={46} expand />
                   </ContentCard>
 
                   {/* Terminal in 'chat' position — below ContentCard in same column */}

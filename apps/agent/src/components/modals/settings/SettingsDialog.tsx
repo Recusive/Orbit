@@ -82,9 +82,9 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               aria-describedby={undefined}
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
-                'bg-card',
-                'border border-lg-separator rounded-[14px] overflow-hidden flex flex-col',
-                'shadow-lg duration-200',
+                'glass-popover bg-transparent border-0 shadow-none',
+                'rounded-[14px] overflow-hidden flex flex-col',
+                'duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
                 'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
                 'data-[state=closed]:zoom-out-[0.98] data-[state=open]:zoom-in-[0.98]'
@@ -118,12 +118,12 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               <div className="h-px bg-border/40 shrink-0" />
 
               {/* Content */}
-              <div className="flex flex-1 overflow-hidden">
+              <div className="flex flex-1 overflow-hidden pb-px pr-px">
                 {/* Sidebar */}
                 <SettingsSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
 
                 {/* Main content */}
-                <div className="flex-1 overflow-auto bg-transparent relative">
+                <div className="flex-1 overflow-auto bg-chat-area relative">
                   {/* Static sections - render via lazy components (unmounted when inactive) */}
                   {!isAsyncSection && (
                     <div className="absolute inset-0 p-6 overflow-auto">

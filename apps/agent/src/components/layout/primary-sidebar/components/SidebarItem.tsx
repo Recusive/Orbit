@@ -24,8 +24,10 @@ export const SidebarItem: FC<SidebarItemProps> = ({
   return (
     <button
       className={cn(
-        'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100',
-        active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground',
+        'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-lg-sidebar-hover hover:backdrop-blur-[20px] active:scale-[0.98] transition-[background-color,transform] duration-100',
+        active
+          ? 'bg-lg-sidebar-selected backdrop-blur-[20px] text-foreground'
+          : 'text-sidebar-foreground hover:text-foreground',
         className
       )}
       onClick={onClick}
@@ -42,11 +44,16 @@ export const SidebarItem: FC<SidebarItemProps> = ({
       {/* Badge */}
       {badge ? (
         <span
-          className="ml-auto mr-2 shrink-0 inline-flex items-center h-4 rounded px-1.5 text-[10px] font-medium select-none"
+          className={cn(
+            'ml-auto mr-2 shrink-0 inline-flex items-center h-5 rounded-full px-1.5 text-[11px] font-[510] select-none backdrop-blur-[20px]',
+            badgeVariant === 'primary'
+              ? ''
+              : 'bg-black/[0.04] text-[#4C4C4C] dark:bg-white/[0.08] dark:text-[#B0B0B0]'
+          )}
           style={
             badgeVariant === 'primary'
               ? { color: 'var(--primary-foreground)', backgroundColor: 'var(--primary)' }
-              : { color: 'var(--lg-text-secondary)', backgroundColor: 'var(--lg-control)' }
+              : undefined
           }
         >
           {badge}
