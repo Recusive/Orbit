@@ -518,6 +518,37 @@ html.window-mode-liquid-glass [data-sidebar="primary"] {
   background: transparent;
 }
 
+/* ── Liquid Glass sidebar item states (macOS 26 UI Kit) ────────
+   Fixed hex colors (bg-gray-3) are invisible against vibrancy.
+   Apple uses semi-transparent overlays that darken/lighten the
+   vibrancy proportionally, so they're visible against any backdrop.
+   Selected: rgba(0,0,0,0.11) with multiply blend.
+   Hover: rgba(0,0,0,0.07) — lighter than selected.
+   ────────────────────────────────────────────────────────────── */
+
+/* Light mode — hover: warm semi-transparent overlay visible against vibrancy.
+   Uses our warm brown hue (from Radix gray-8 #ba998c) at low opacity. */
+html.window-mode-liquid-glass:not(.dark) [data-sidebar="primary"] .hover\:bg-gray-3:hover {
+  background-color: rgba(140, 110, 95, 0.13) !important;
+}
+
+/* Light mode — active/selected: stronger warm tint */
+html.window-mode-liquid-glass:not(.dark) [data-sidebar="primary"] .bg-gray-3 {
+  background-color: rgba(140, 110, 95, 0.18) !important;
+}
+
+/* Dark mode — hover: warm light overlay against dark vibrancy */
+html.window-mode-liquid-glass.dark [data-sidebar="primary"] .hover\:bg-gray-3:hover,
+html.window-mode-liquid-glass.dark [data-sidebar="primary"] .dark\:hover\:bg-gray-4:hover {
+  background-color: rgba(200, 175, 160, 0.09) !important;
+}
+
+/* Dark mode — active/selected: stronger warm tint */
+html.window-mode-liquid-glass.dark [data-sidebar="primary"] .bg-gray-3,
+html.window-mode-liquid-glass.dark [data-sidebar="primary"] .dark\:bg-gray-4 {
+  background-color: rgba(200, 175, 160, 0.14) !important;
+}
+
 /* ── Streamdown code blocks ──────────────────────────────
    Claude.ai-style: hairline border, no header bar,
    hover-reveal copy button with backdrop blur.
