@@ -281,7 +281,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       tabIndex={-1}
       onKeyDown={handlePopoverKeyDown}
       className={cn(
-        'fixed bg-popover border border-gray-5 rounded-[10px] shadow-lg overflow-hidden z-50 outline-none',
+        'fixed bg-popover border border-lg-separator rounded-[10px] shadow-lg overflow-hidden z-50 outline-none',
         position.side === 'top' ? 'origin-bottom-left' : 'origin-top-left',
         // Enter: rich 3-property animation (scale + fade + slide), ease-out
         !isAnimatingOut &&
@@ -310,13 +310,13 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       <div className="p-1.5">
         {MODEL_GROUPS.map((group) => (
           <div key={group.label} className="mb-1 last:mb-0">
-            <div className="px-2 py-1.5 text-xs font-medium text-gray-10 uppercase tracking-wider">
+            <div className="px-2 py-1.5 text-xs font-medium text-lg-text-secondary uppercase tracking-wider">
               {group.label}
             </div>
             {group.comingSoon === true ? (
-              <div className="mx-1.5 mt-0.5 mb-2 flex items-center gap-2 rounded-md bg-gray-3 px-2.5 py-2">
-                <Info className="h-3.5 w-3.5 shrink-0 text-gray-9" />
-                <span className="text-xs text-gray-10">Coming Soon</span>
+              <div className="mx-1.5 mt-0.5 mb-2 flex items-center gap-2 rounded-md bg-lg-control px-2.5 py-2">
+                <Info className="h-3.5 w-3.5 shrink-0 text-lg-text-secondary" />
+                <span className="text-xs text-lg-text-secondary">Coming Soon</span>
               </div>
             ) : (
               group.models.map((model) => (
@@ -331,7 +331,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                     'mt-0.5 first:mt-0 group',
                     selectedModel === model.id
                       ? 'bg-primary/10 text-foreground border-l-2 border-primary/60 pl-[6px] rounded-r-md'
-                      : 'rounded-md hover:bg-gray-4 active:scale-[0.98]'
+                      : 'rounded-md hover:bg-lg-control-hover active:scale-[0.98]'
                   )}
                 >
                   <div className="flex items-center gap-2">
@@ -345,7 +345,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                           'text-[9px] font-medium px-1.5 py-0.5 rounded-full',
                           model.badge === 'New'
                             ? 'text-primary bg-primary/15'
-                            : 'text-gray-10 bg-gray-4'
+                            : 'text-lg-text-secondary bg-lg-control'
                         )}
                       >
                         {model.badge}
@@ -374,17 +374,17 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
           'h-7 px-2.5 flex items-center gap-1.5 rounded-lg',
           'bg-transparent text-muted-foreground',
           TRANSITION_CLASSES.button,
-          'hover:bg-gray-4 hover:text-foreground',
+          'hover:bg-lg-control-hover hover:text-foreground',
           'active:scale-[0.98]',
           'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
-          isOpen && 'bg-gray-4 text-foreground'
+          isOpen && 'bg-lg-control text-foreground'
         )}
       >
         {selectedModelData ? <selectedModelData.icon /> : null}
         <span className="text-sm font-medium">{selectedModelData?.name ?? 'Select Model'}</span>
         <ChevronDown
           className={cn(
-            'h-3 w-3 text-gray-10 transition-transform duration-150',
+            'h-3 w-3 text-lg-text-secondary transition-transform duration-150',
             isOpen && 'rotate-180'
           )}
         />

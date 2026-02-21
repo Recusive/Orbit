@@ -200,14 +200,14 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium shrink-0',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >
             Browser
           </span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
         </div>
 
@@ -216,7 +216,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
         {/* Right: chevron */}
         <ChevronRight
           className={cn(
-            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
             isExpanded && 'rotate-90'
           )}
         />
@@ -245,7 +245,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
                 <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-violet-500/8">
                   {stepIcon}
                 </div>
-                <span className="ml-2.5 text-xs text-gray-11 min-w-0 truncate">
+                <span className="ml-2.5 text-xs text-lg-text-secondary min-w-0 truncate">
                   {stepLabel.text}
                   {stepLabel.linkUrl ? (
                     <button
@@ -261,7 +261,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
                   ) : null}
                 </span>
                 {isRunning ? (
-                  <Loader2 className="ml-1.5 h-2.5 w-2.5 animate-spin text-gray-11/60 shrink-0" />
+                  <Loader2 className="ml-1.5 h-2.5 w-2.5 animate-spin text-lg-text-secondary/60 shrink-0" />
                 ) : null}
               </div>
 
@@ -301,7 +301,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>
@@ -310,7 +310,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
                   <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-violet-500/8">
                     <Loader2 className="h-2.5 w-2.5 animate-spin text-violet-500/60" />
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-9">Working…</span>
+                  <span className="ml-2.5 text-xs text-muted-foreground">Working…</span>
                 </div>
               ) : null}
             </div>

@@ -41,7 +41,7 @@ export const WelcomeStep: FC<WelcomeStepProps> = ({ onContinue, className }) => 
       <div
         className={cn(
           'flex flex-col gap-4 p-5 rounded-lg w-full max-w-[380px]',
-          'bg-gray-3 border border-border'
+          'bg-lg-control border border-border'
         )}
       >
         <div className="flex flex-col gap-1.5">

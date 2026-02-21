@@ -136,9 +136,9 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
 
         {/* Crash Summary */}
         {summary ? (
-          <div className="rounded-lg border border-gray-7 bg-gray-3 p-3 space-y-2">
+          <div className="rounded-lg border border-lg-border bg-lg-control p-3 space-y-2">
             <div>
-              <div className="text-xs font-medium tracking-wide text-gray-10 uppercase mb-1">
+              <div className="text-xs font-medium tracking-wide text-lg-text-secondary uppercase mb-1">
                 Error
               </div>
               <code className="text-sm text-destructive font-mono break-all">
@@ -147,13 +147,13 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
             </div>
             <div className="flex gap-4">
               <div className="flex-1">
-                <div className="text-xs font-medium tracking-wide text-gray-10 uppercase mb-1">
+                <div className="text-xs font-medium tracking-wide text-lg-text-secondary uppercase mb-1">
                   Location
                 </div>
                 <code className="text-xs text-muted-foreground font-mono">{summary.location}</code>
               </div>
               <div>
-                <div className="text-xs font-medium tracking-wide text-gray-10 uppercase mb-1">
+                <div className="text-xs font-medium tracking-wide text-lg-text-secondary uppercase mb-1">
                   Time
                 </div>
                 <span className="text-xs text-muted-foreground">
@@ -170,7 +170,7 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
           onClick={() => {
             setShowDetails(!showDetails);
           }}
-          className="text-xs text-gray-12 hover:text-foreground transition-colors flex items-center gap-1"
+          className="text-xs text-foreground hover:text-foreground transition-colors flex items-center gap-1"
         >
           {showDetails ? 'Hide' : 'Show'} full crash log
           <ExternalLink className="h-3 w-3" />
@@ -179,7 +179,7 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
         {/* Full Crash Log */}
         {showDetails ? (
           <div className="space-y-2">
-            <ScrollArea className="h-48 rounded-lg border border-gray-7 bg-gray-2">
+            <ScrollArea className="h-48 rounded-lg border border-lg-border bg-background">
               <pre className="p-3 text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all">
                 {crashLog}
               </pre>
@@ -199,7 +199,7 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
               </button>
 
               {logPath ? (
-                <code className="text-xs text-gray-10 font-mono">{logPath}</code>
+                <code className="text-xs text-lg-text-secondary font-mono">{logPath}</code>
               ) : (
                 <button
                   type="button"

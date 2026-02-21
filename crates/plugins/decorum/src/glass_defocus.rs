@@ -128,19 +128,19 @@ unsafe fn toggle_glass(hidden: bool) {
         };
 
         // Sidebar tint colors from theme-provider.tsx, fully opaque:
-        //   Light: #DDCFC9  (warm beige)
-        //   Dark:  #16110F  (dark brown)
+        //   Light: #D2D2D2  (neutral gray-4)
+        //   Dark:  #121212  (neutral gray-1)
         let (r, g, b) = if is_dark {
             (
-                f64::from(0x16_u8) / 255.0,
-                f64::from(0x11_u8) / 255.0,
-                f64::from(0x0F_u8) / 255.0,
+                f64::from(0x12_u8) / 255.0,
+                f64::from(0x12_u8) / 255.0,
+                f64::from(0x12_u8) / 255.0,
             )
         } else {
             (
-                f64::from(0xDD_u8) / 255.0,
-                f64::from(0xCF_u8) / 255.0,
-                f64::from(0xC9_u8) / 255.0,
+                f64::from(0xD2_u8) / 255.0,
+                f64::from(0xD2_u8) / 255.0,
+                f64::from(0xD2_u8) / 255.0,
             )
         };
         let color: *mut AnyObject = msg_send![

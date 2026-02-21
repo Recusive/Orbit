@@ -231,7 +231,7 @@ export const PrimarySidebar: FC = () => {
         <button
           onClick={toggleLeftSidebar}
           aria-label="Collapse sidebar"
-          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
+          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
         >
           <SFSymbol
             name="sidebar.left"
@@ -244,7 +244,7 @@ export const PrimarySidebar: FC = () => {
         <div className="flex items-center gap-0.5 ml-auto">
           <button
             aria-label="Go back"
-            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
           >
             <SFSymbol
               name="arrow.left"
@@ -255,7 +255,7 @@ export const PrimarySidebar: FC = () => {
           </button>
           <button
             aria-label="Go forward"
-            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
           >
             <SFSymbol
               name="arrow.right"
@@ -275,7 +275,7 @@ export const PrimarySidebar: FC = () => {
         >
           <button
             onClick={handleOpenQuickSearch}
-            className="flex items-center h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-gray-6 hover:bg-gray-7 dark:bg-gray-4 dark:hover:bg-gray-5 transition-[background-color] duration-100"
+            className="flex items-center h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-lg-control hover:bg-lg-control-hover transition-[background-color] duration-100"
             title="Search files (⌘P)"
           >
             {/* Fixed-width icon column - never moves */}
@@ -289,7 +289,7 @@ export const PrimarySidebar: FC = () => {
             <span className="text-xs whitespace-nowrap overflow-hidden w-auto opacity-100">
               Search files...
             </span>
-            <Kbd className="ml-auto mr-2 h-[18px] !text-[12px] px-1.5 bg-gray-5 text-inherit border-gray-6">
+            <Kbd className="ml-auto mr-2 h-[18px] !text-[12px] px-1.5 bg-lg-control text-inherit border-lg-separator">
               <span className="text-[14px] leading-none">⌘</span> P
             </Kbd>
           </button>
@@ -344,7 +344,7 @@ export const PrimarySidebar: FC = () => {
                       setActiveTab(checked ? 'explorer' : 'conversations');
                     }}
                     aria-label="Toggle Sessions / Explorer"
-                    className="h-3.5 w-7 !rounded-md data-[state=checked]:bg-primary data-[state=unchecked]:bg-gray-6 [&>span]:!h-2.5 [&>span]:!w-2.5 [&>span]:!rounded-sm [&>span]:data-[state=checked]:!translate-x-3.5"
+                    className="h-3.5 w-7 !rounded-md [&>span]:!h-2.5 [&>span]:!w-2.5 [&>span]:!rounded-sm [&>span]:data-[state=checked]:!translate-x-3.5"
                   />
                 </div>
               </TooltipTrigger>
@@ -445,15 +445,12 @@ export const PrimarySidebar: FC = () => {
                   className={cn(
                     'group flex items-center gap-2.5 px-2 py-2 rounded-lg',
                     'transition-[background-color] duration-100',
-                    'hover:bg-gray-3 dark:hover:bg-gray-4',
+                    'hover:bg-lg-sidebar-hover',
                     'text-left outline-none'
                   )}
                 >
-                  <div className="flex items-center justify-center w-6 h-6 rounded-md bg-gray-3 dark:bg-gray-5 shrink-0">
-                    <FolderOpen
-                      className="h-3.5 w-3.5 text-gray-9 dark:text-gray-10"
-                      aria-hidden="true"
-                    />
+                  <div className="flex items-center justify-center w-6 h-6 rounded-md bg-lg-control shrink-0">
+                    <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                   </div>
                   <div className="flex flex-col min-w-0 flex-1">
                     <span className="text-sm font-medium text-foreground truncate">
@@ -467,7 +464,7 @@ export const PrimarySidebar: FC = () => {
                     className={cn(
                       'h-3 w-3 text-transparent shrink-0',
                       'transition-[color] duration-100',
-                      'group-hover:text-gray-8 dark:group-hover:text-gray-9'
+                      'group-hover:text-muted-foreground'
                     )}
                     aria-hidden="true"
                   />
@@ -546,7 +543,7 @@ export const PrimarySidebar: FC = () => {
             label={updateStatus === 'ready' ? 'Restart to update' : 'Update available'}
             badge={updateStatus === 'ready' ? 'Restart' : 'Update'}
             badgeVariant="primary"
-            className="border border-dashed border-gray-6"
+            className="border border-dashed border-lg-separator"
             onClick={() => {
               const store = useUpdateStore.getState();
               if (store.status === 'ready') {
@@ -560,7 +557,7 @@ export const PrimarySidebar: FC = () => {
         {/* Settings | Feedback — inline row */}
         <div className="flex items-center h-8 mx-1.5 gap-1.5 overflow-hidden">
           <button
-            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-lg px-2 hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
+            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-lg px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
             onClick={() => {
               openSettings('agent');
             }}
@@ -573,9 +570,9 @@ export const PrimarySidebar: FC = () => {
             />
             <span className="text-base whitespace-nowrap">Settings</span>
           </button>
-          <div className="w-px h-3.5 bg-gray-6 shrink-0" />
+          <div className="w-px h-3.5 bg-lg-separator shrink-0" />
           <button
-            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-lg px-2 hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
+            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-lg px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
             onClick={() => {
               openSettings('feedback');
             }}

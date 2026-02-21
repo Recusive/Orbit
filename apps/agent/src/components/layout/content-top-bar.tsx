@@ -285,7 +285,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
               aria-label="Show sidebar"
               className={cn(
                 'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
-                'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                'hover:bg-lg-control-hover active:scale-[0.98]',
                 'transition-[color,background-color,transform] duration-150',
                 'text-sidebar-foreground hover:text-foreground'
               )}
@@ -297,12 +297,12 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
                 fallback={<PanelLeft className="h-4 w-4" />}
               />
             </button>
-            <div className="w-px h-3.5 bg-gray-6 shrink-0" />
+            <div className="w-px h-3.5 bg-lg-separator shrink-0" />
             {/* Back / Forward arrows — matches sidebar style */}
             <button
               data-tauri-drag-region={false}
               aria-label="Go back"
-              className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-5 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+              className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
             >
               <SFSymbol
                 name="arrow.left"
@@ -314,7 +314,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
             <button
               data-tauri-drag-region={false}
               aria-label="Go forward"
-              className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-gray-5 dark:hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+              className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
             >
               <SFSymbol
                 name="arrow.right"
@@ -329,7 +329,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
               aria-label="New session"
               className={cn(
                 'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
-                'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                'hover:bg-lg-control-hover active:scale-[0.98]',
                 'transition-[color,background-color,transform] duration-150',
                 'text-sidebar-foreground hover:text-foreground'
               )}
@@ -345,13 +345,13 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
         ) : null}
 
         {/* Separator between icons and heading */}
-        {!sidebarOpen && !isDemo ? <div className="w-px h-3.5 bg-gray-6 shrink-0" /> : null}
+        {!sidebarOpen && !isDemo ? <div className="w-px h-3.5 bg-lg-separator shrink-0" /> : null}
 
         {/* Project name */}
         {workspaceName ? (
           <span
             data-tauri-drag-region={false}
-            className="text-base text-gray-11 cursor-pointer hover:text-foreground transition-colors shrink-0"
+            className="text-base text-lg-text-secondary cursor-pointer hover:text-foreground transition-colors shrink-0"
           >
             {workspaceName}
           </span>
@@ -360,10 +360,10 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
         {/* Separator + Chat name */}
         {conversationTitle ? (
           <>
-            <div className="w-px h-3.5 bg-gray-6 shrink-0" />
+            <div className="w-px h-3.5 bg-lg-separator shrink-0" />
             <span
               data-tauri-drag-region={false}
-              className="text-base text-gray-12 cursor-pointer hover:text-foreground transition-colors truncate"
+              className="text-base text-foreground cursor-pointer hover:text-foreground transition-colors truncate"
             >
               {conversationTitle}
             </span>
@@ -385,7 +385,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
           </div>
 
           {/* Divider between git controls and panel toggles */}
-          <div className="w-px h-4 bg-gray-5 shrink-0 mr-0.5" />
+          <div className="w-px h-4 bg-lg-separator shrink-0 mr-0.5" />
 
           {/* Activity Panel Toggle */}
           <button
@@ -394,7 +394,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
             aria-label={reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}
             className={cn(
               'h-6 w-6 flex items-center justify-center rounded-md',
-              'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+              'hover:bg-lg-control-hover active:scale-[0.98]',
               'transition-[color,background-color,transform] duration-150',
               reviewPanelOpen ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'
             )}
@@ -414,7 +414,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
             aria-label={bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}
             className={cn(
               'h-6 w-6 flex items-center justify-center rounded-md',
-              'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+              'hover:bg-lg-control-hover active:scale-[0.98]',
               'transition-[color,background-color,transform] duration-150',
               bottomPanelOpen && !terminalCollapsed
                 ? 'text-foreground'
@@ -436,7 +436,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
             aria-label={rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
             className={cn(
               'h-6 w-6 flex items-center justify-center rounded-md',
-              'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+              'hover:bg-lg-control-hover active:scale-[0.98]',
               'transition-[color,background-color,transform] duration-150',
               rightSidebarOpen ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'
             )}

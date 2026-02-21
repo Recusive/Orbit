@@ -45,7 +45,7 @@ function formatTimeRemaining(expiresAtMs: number): string {
 }
 
 function dotBgColor(expiresAtMs: number | null, hasCredentials: boolean): string {
-  if (!hasCredentials) return 'bg-gray-6';
+  if (!hasCredentials) return 'bg-lg-control';
   if (expiresAtMs === null) return 'bg-green-500';
   const diffMs = expiresAtMs - Date.now();
   if (diffMs <= 0) return 'bg-destructive';
@@ -102,7 +102,9 @@ function showAccountToast(status: KeychainStatus): string | number {
             <span
               className={cn(
                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none',
-                isConnected ? 'bg-green-500/10 text-green-500' : 'bg-gray-3 text-gray-11'
+                isConnected
+                  ? 'bg-green-500/10 text-green-500'
+                  : 'bg-lg-control text-lg-text-secondary'
               )}
             >
               <span
@@ -140,7 +142,8 @@ function showAccountToast(status: KeychainStatus): string | number {
     {
       duration: 5000,
       unstyled: true,
-      className: '!rounded-lg !border !border-gray-5 !bg-gray-2 dark:!bg-gray-3 !shadow-lg w-full',
+      className:
+        '!rounded-lg !border !border-lg-separator !bg-background dark:!bg-lg-control !shadow-lg w-full',
     }
   );
 }

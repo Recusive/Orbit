@@ -36,7 +36,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       data-tauri-drag-region={false}
       className={cn(
         'relative flex items-center justify-center h-7 px-3 transition-[background-color] duration-100',
-        active ? 'text-foreground' : 'text-gray-10 dark:text-gray-11 hover:text-gray-12'
+        active ? 'text-foreground' : 'text-lg-text-secondary hover:text-foreground'
       )}
       onClick={onClick}
     >
@@ -44,7 +44,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       <div
         className={cn(
           'absolute inset-0 rounded-md transition-[background-color] duration-100',
-          active ? 'bg-gray-4' : 'hover:bg-gray-4'
+          active ? 'bg-lg-control' : 'hover:bg-lg-control'
         )}
       />
       {/* Active indicator - offset to sit on header's bottom border */}
@@ -116,7 +116,9 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
       data-tauri-drag-region
       className={cn(
         'flex items-center justify-between border-b shrink-0',
-        transparent ? 'bg-transparent border-gray-8/35' : 'bg-card shadow-lg border-gray-5',
+        transparent
+          ? 'bg-transparent border-lg-separator/35'
+          : 'bg-card shadow-lg border-lg-separator',
         // Left padding for macOS traffic light buttons (matches Cursor: x:11 + ~69px for 3 buttons)
         'pl-[80px]',
         className
@@ -174,7 +176,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
             className={cn(
               'flex items-center gap-2 h-7 px-2.5 rounded-md',
               'text-sidebar-foreground hover:text-foreground',
-              'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+              'hover:bg-lg-control-hover active:scale-[0.98]',
               'transition-[color,background-color,transform] duration-150'
             )}
             title="Search files (⌘K)"
@@ -182,13 +184,13 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
           >
             <Search className="h-3.5 w-3.5 shrink-0" />
             <span className="text-sm truncate max-w-[120px]">{searchText}</span>
-            <Kbd className="h-[18px] !text-[12px] px-1.5 bg-gray-5 text-inherit border-gray-6">
+            <Kbd className="h-[18px] !text-[12px] px-1.5 bg-lg-control text-inherit border-lg-separator">
               <span className="text-[14px] leading-none">⌘</span> K
             </Kbd>
           </button>
 
           {/* Divider */}
-          <div className="w-px h-4 bg-gray-5 shrink-0" />
+          <div className="w-px h-4 bg-lg-separator shrink-0" />
 
           {/* Panel toggles */}
           <div className="flex items-center gap-0.5 px-1">
@@ -201,7 +203,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                   aria-label={reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}
                   className={cn(
                     'h-6 w-6 flex items-center justify-center rounded-md',
-                    'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                    'hover:bg-lg-control-hover active:scale-[0.98]',
                     'transition-[color,background-color,transform] duration-150',
                     reviewPanelOpen
                       ? 'text-foreground'
@@ -231,7 +233,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                   aria-label={bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}
                   className={cn(
                     'h-6 w-6 flex items-center justify-center rounded-md',
-                    'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                    'hover:bg-lg-control-hover active:scale-[0.98]',
                     'transition-[color,background-color,transform] duration-150',
                     bottomPanelOpen && !terminalCollapsed
                       ? 'text-foreground'
@@ -261,7 +263,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
                   aria-label={rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
                   className={cn(
                     'h-6 w-6 flex items-center justify-center rounded-md',
-                    'hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98]',
+                    'hover:bg-lg-control-hover active:scale-[0.98]',
                     'transition-[color,background-color,transform] duration-150',
                     rightSidebarOpen
                       ? 'text-foreground'

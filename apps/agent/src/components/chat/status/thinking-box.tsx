@@ -160,7 +160,7 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-lg-separator bg-card overflow-hidden">
                   <div className="px-3 py-2 max-h-[500px] overflow-y-auto">
                     <div className="text-sm text-muted-foreground/90 dark:text-muted-foreground/60 leading-[1.7] whitespace-pre-wrap font-mono tracking-tighter">
                       {tokenizedThinking ?? thinking}

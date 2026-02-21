@@ -67,7 +67,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
   // Clean state — nothing to show
   if (!hasChanges) {
     return (
-      <div className="p-5 text-center text-base text-gray-11">
+      <div className="p-5 text-center text-base text-lg-text-secondary">
         <Check className="h-5 w-5 mx-auto mb-1.5 text-emerald-500/80" />
         Working tree clean
       </div>
@@ -77,7 +77,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex items-center gap-0.5 px-1.5 h-[34px] border-b border-gray-5">
+      <div className="flex items-center gap-0.5 px-1.5 h-[34px] border-b border-lg-separator">
         {/* Staged tab */}
         <button
           onClick={() => {
@@ -87,8 +87,8 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             'flex items-center gap-1 px-2 h-6 rounded-md text-xs tracking-wide',
             'transition-[background-color] duration-100',
             activeTab === 'staged'
-              ? 'bg-gray-4 text-foreground font-medium'
-              : 'text-gray-12 hover:text-foreground hover:bg-gray-4'
+              ? 'bg-lg-control text-foreground font-medium'
+              : 'text-foreground hover:text-foreground hover:bg-lg-control-hover'
           )}
         >
           Staged
@@ -96,7 +96,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             <span
               className={cn(
                 'inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded text-[9px] font-semibold tabular-nums',
-                activeTab === 'staged' ? 'bg-primary/12 text-primary/80' : 'text-gray-11'
+                activeTab === 'staged' ? 'bg-primary/12 text-primary/80' : 'text-lg-text-secondary'
               )}
             >
               {stagedFiles.length}
@@ -113,8 +113,8 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             'flex items-center gap-1 px-2 h-6 rounded-md text-xs tracking-wide',
             'transition-[background-color] duration-100',
             activeTab === 'changes'
-              ? 'bg-gray-4 text-foreground font-medium'
-              : 'text-gray-12 hover:text-foreground hover:bg-gray-4'
+              ? 'bg-lg-control text-foreground font-medium'
+              : 'text-foreground hover:text-foreground hover:bg-lg-control-hover'
           )}
         >
           Changes
@@ -122,7 +122,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             <span
               className={cn(
                 'inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded text-[9px] font-semibold tabular-nums',
-                activeTab === 'changes' ? 'bg-primary/12 text-primary/80' : 'text-gray-11'
+                activeTab === 'changes' ? 'bg-primary/12 text-primary/80' : 'text-lg-text-secondary'
               )}
             >
               {unstagedFiles.length}
@@ -137,7 +137,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
           <button
             onClick={() => void activeBulkAction()}
             disabled={isStaging}
-            className="flex items-center gap-1 px-2 h-6 rounded-md text-xs text-gray-12 hover:text-foreground hover:bg-gray-4 active:scale-95 transition-[background-color,transform] duration-100"
+            className="flex items-center gap-1 px-2 h-6 rounded-md text-xs text-foreground hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-[background-color,transform] duration-100"
             aria-label={isStaged ? 'Unstage all files' : 'Stage all files'}
           >
             {isStaged ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
@@ -161,7 +161,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             />
           ))
         ) : (
-          <div className="px-3 py-4 text-center text-xs text-gray-11">
+          <div className="px-3 py-4 text-center text-xs text-lg-text-secondary">
             {isStaged ? 'No staged changes' : 'No unstaged changes'}
           </div>
         )}

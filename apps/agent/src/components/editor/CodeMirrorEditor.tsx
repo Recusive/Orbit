@@ -147,26 +147,26 @@ const darkTheme = EditorView.theme(
   {
     '&': {
       backgroundColor: 'var(--editor-bg)', // Transparent in liquid glass, solid in solid mode
-      color: 'var(--gray-12)',
+      color: 'var(--foreground)',
     },
     '.cm-scroller': {
       overflow: 'auto',
     },
     '.cm-content': {
-      caretColor: 'var(--gray-12)',
+      caretColor: 'var(--foreground)',
     },
     '&.cm-focused .cm-cursor': {
-      borderLeftColor: 'var(--gray-12)',
+      borderLeftColor: 'var(--foreground)',
     },
     '.cm-dropCursor': {
-      borderLeftColor: 'var(--gray-12)',
+      borderLeftColor: 'var(--foreground)',
     },
     '&.cm-focused .cm-selectionBackground, ::selection': {
       backgroundColor: 'var(--gray-a5)',
     },
     '.cm-gutters': {
       backgroundColor: 'var(--editor-bg)', // Match editor background
-      color: 'var(--gray-10)', // Warm brown matching --muted-foreground (+1 bump)
+      color: 'var(--muted-foreground)', // Warm brown matching --muted-foreground
       border: 'none',
     },
     '.cm-activeLineGutter': {
@@ -177,11 +177,11 @@ const darkTheme = EditorView.theme(
     },
     // Hover tooltip dark theme
     '.cm-tooltip': {
-      backgroundColor: 'var(--gray-4)',
-      color: 'var(--gray-12)',
+      backgroundColor: 'var(--lg-control)',
+      color: 'var(--foreground)',
     },
     '.cm-tooltip .cm-lsp-hover': {
-      backgroundColor: 'var(--gray-4)',
+      backgroundColor: 'var(--lg-control)',
     },
     // Diagnostic squiggles
     '.cm-lintRange-error': {
@@ -225,7 +225,7 @@ const darkTheme = EditorView.theme(
     '.cm-search.cm-panel': {
       position: 'relative',
       // Use solid background - backdropFilter causes blur in Tauri WebView
-      backgroundColor: 'var(--gray-3)',
+      backgroundColor: 'var(--lg-control)',
       borderRadius: '12px',
       border: 'none',
       boxShadow: '0 8px 32px -8px rgba(0,0,0,0.4), 0 4px 16px -4px rgba(0,0,0,0.2)',
@@ -242,7 +242,7 @@ const darkTheme = EditorView.theme(
       backgroundColor: 'var(--gray-a4)',
       border: '1px solid var(--gray-a6)',
       borderRadius: '8px',
-      color: 'var(--gray-12)',
+      color: 'var(--foreground)',
       padding: '0 10px',
       fontSize: '12px',
       outline: 'none',
@@ -265,7 +265,7 @@ const darkTheme = EditorView.theme(
       backgroundImage: 'none',
       border: '1px solid var(--gray-a6)',
       borderRadius: '6px',
-      color: 'var(--gray-12)',
+      color: 'var(--foreground)',
       padding: '0 10px',
       fontSize: '11px',
       fontWeight: '500',
@@ -278,7 +278,7 @@ const darkTheme = EditorView.theme(
       backgroundColor: 'var(--gray-a6)',
       backgroundImage: 'none',
       borderColor: 'var(--gray-a8)',
-      color: 'var(--gray-12)',
+      color: 'var(--foreground)',
       transform: 'scale(1.02)',
     },
     '.cm-search.cm-panel .cm-button:active': {
@@ -308,7 +308,7 @@ const darkTheme = EditorView.theme(
     },
     '.cm-search.cm-panel button[name="close"]:hover': {
       backgroundColor: 'var(--gray-a5)',
-      color: 'var(--gray-12)',
+      color: 'var(--foreground)',
       transform: 'scale(1.1)',
     },
     '.cm-search.cm-panel button[name="close"]:active': {
@@ -334,7 +334,7 @@ const darkTheme = EditorView.theme(
     },
     '.cm-search.cm-panel label:hover': {
       backgroundColor: 'var(--gray-a5)',
-      color: 'var(--gray-12)',
+      color: 'var(--foreground)',
     },
     '.cm-search.cm-panel label:has(input:checked)': {
       backgroundColor: 'oklch(0.55 0.15 250 / 0.15)',
@@ -422,26 +422,26 @@ const darkHighlightStyle = HighlightStyle.define([
 const lightTheme = EditorView.theme({
   '&': {
     backgroundColor: 'var(--editor-bg)', // Transparent in liquid glass, solid in solid mode
-    color: 'var(--gray-12)',
+    color: 'var(--foreground)',
   },
   '.cm-scroller': {
     overflow: 'auto',
   },
   '.cm-content': {
-    caretColor: 'var(--gray-12)',
+    caretColor: 'var(--foreground)',
   },
   '&.cm-focused .cm-cursor': {
-    borderLeftColor: 'var(--gray-12)',
+    borderLeftColor: 'var(--foreground)',
   },
   '.cm-dropCursor': {
-    borderLeftColor: 'var(--gray-12)',
+    borderLeftColor: 'var(--foreground)',
   },
   '&.cm-focused .cm-selectionBackground, ::selection': {
     backgroundColor: 'var(--gray-a5)',
   },
   '.cm-gutters': {
     backgroundColor: 'var(--editor-bg)', // Match editor background
-    color: 'var(--gray-10)', // Warm brown matching --muted-foreground (+1 bump)
+    color: 'var(--muted-foreground)', // Warm brown matching --muted-foreground
     border: 'none',
   },
   '.cm-activeLineGutter': {
@@ -450,14 +450,14 @@ const lightTheme = EditorView.theme({
   '.cm-activeLine': {
     backgroundColor: 'var(--gray-a4)',
   },
-  // Hover tooltip light theme (+1 bump)
+  // Hover tooltip light theme
   '.cm-tooltip': {
-    backgroundColor: 'var(--gray-2)',
-    color: 'var(--gray-12)',
+    backgroundColor: 'var(--background)',
+    color: 'var(--foreground)',
     border: '1px solid var(--gray-a5)',
   },
   '.cm-tooltip .cm-lsp-hover': {
-    backgroundColor: 'var(--gray-2)',
+    backgroundColor: 'var(--background)',
   },
   // Diagnostic squiggles (darker colors for light mode)
   '.cm-lintRange-error': {
@@ -501,7 +501,7 @@ const lightTheme = EditorView.theme({
   '.cm-search.cm-panel': {
     position: 'relative',
     // Use solid background - backdropFilter causes blur in Tauri WebView
-    backgroundColor: 'var(--gray-2)',
+    backgroundColor: 'var(--background)',
     borderRadius: '12px',
     border: 'none',
     boxShadow: '0 8px 32px -8px rgba(0,0,0,0.12), 0 4px 16px -4px rgba(0,0,0,0.06)',
@@ -518,7 +518,7 @@ const lightTheme = EditorView.theme({
     backgroundColor: 'var(--gray-a3)',
     border: '1px solid var(--gray-a5)',
     borderRadius: '8px',
-    color: 'var(--gray-12)',
+    color: 'var(--foreground)',
     padding: '0 10px',
     fontSize: '12px',
     outline: 'none',
@@ -541,7 +541,7 @@ const lightTheme = EditorView.theme({
     backgroundImage: 'none',
     border: '1px solid var(--gray-a5)',
     borderRadius: '6px',
-    color: 'var(--gray-12)',
+    color: 'var(--foreground)',
     padding: '0 10px',
     fontSize: '11px',
     fontWeight: '500',
@@ -554,7 +554,7 @@ const lightTheme = EditorView.theme({
     backgroundColor: 'var(--gray-a5)',
     backgroundImage: 'none',
     borderColor: 'var(--gray-a7)',
-    color: 'var(--gray-12)',
+    color: 'var(--foreground)',
     transform: 'scale(1.02)',
   },
   '.cm-search.cm-panel .cm-button:active': {
@@ -584,13 +584,13 @@ const lightTheme = EditorView.theme({
   },
   '.cm-search.cm-panel button[name="close"]:hover': {
     backgroundColor: 'var(--gray-a4)',
-    color: 'var(--gray-12)',
+    color: 'var(--foreground)',
     transform: 'scale(1.1)',
   },
   '.cm-search.cm-panel button[name="close"]:active': {
     transform: 'scale(0.95)',
   },
-  // Checkbox labels as pill toggles (+1 bump)
+  // Checkbox labels as pill toggles
   '.cm-search.cm-panel label': {
     display: 'inline-flex',
     alignItems: 'center',
@@ -610,7 +610,7 @@ const lightTheme = EditorView.theme({
   },
   '.cm-search.cm-panel label:hover': {
     backgroundColor: 'var(--gray-a4)',
-    color: 'var(--gray-12)',
+    color: 'var(--foreground)',
   },
   '.cm-search.cm-panel label:has(input:checked)': {
     backgroundColor: 'oklch(0.55 0.15 250 / 0.12)',

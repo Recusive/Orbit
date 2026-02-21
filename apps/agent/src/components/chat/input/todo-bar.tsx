@@ -62,7 +62,7 @@ function StatusIcon({ status }: { readonly status: TodoItem['status'] }): ReactE
       return <Loader2 className="h-3 w-3 text-primary animate-spin shrink-0" />;
     case 'pending':
     default:
-      return <Circle className="h-3 w-3 text-gray-9 shrink-0" />;
+      return <Circle className="h-3 w-3 text-muted-foreground shrink-0" />;
   }
 }
 
@@ -87,7 +87,7 @@ function ProgressPie({ percentage }: { readonly percentage: number }): ReactElem
         fill="none"
         stroke="currentColor"
         strokeWidth={strokeWidth}
-        className="text-gray-9"
+        className="text-muted-foreground"
       />
       <circle
         cx={size / 2}
@@ -180,7 +180,7 @@ export const TodoBar: FC = memo(function TodoBar() {
   return (
     <div className="flex justify-center px-6 shrink-0">
       <div
-        className="w-full overflow-hidden rounded-t-xl border border-b-0 border-gray-6 bg-gray-3/80 backdrop-blur-sm"
+        className="w-full overflow-hidden rounded-t-xl border border-b-0 border-lg-separator bg-lg-control/80 backdrop-blur-sm"
         style={{
           maxWidth: `calc(var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px) - 16px)`,
         }}
@@ -193,16 +193,16 @@ export const TodoBar: FC = memo(function TodoBar() {
           }}
           aria-expanded={isExpanded}
           aria-label={isExpanded ? 'Collapse task list' : 'Expand task list'}
-          className="flex items-center gap-2 w-full px-3 py-1.5 text-sm transition-colors hover:bg-gray-4/50"
+          className="flex items-center gap-2 w-full px-3 py-1.5 text-sm transition-colors hover:bg-lg-control-hover/50"
         >
           <ListTodo
             className={cn('h-3.5 w-3.5 text-primary/70 shrink-0', isRunning && 'animate-pulse')}
             aria-hidden="true"
           />
 
-          <span className="text-xs font-medium text-gray-11">Tasks</span>
+          <span className="text-xs font-medium text-lg-text-secondary">Tasks</span>
 
-          <span className="text-xs text-gray-9">
+          <span className="text-xs text-muted-foreground">
             {String(completedCount)}/{String(totalCount)}
             {inProgressCount > 0 ? ` · ${String(inProgressCount)} active` : ''}
           </span>
@@ -210,14 +210,14 @@ export const TodoBar: FC = memo(function TodoBar() {
           {/* Active task label — shown only when collapsed so user sees what's running */}
           {!isExpanded && inProgressItem !== undefined ? (
             <>
-              <span className="text-gray-7 select-none" aria-hidden="true">
+              <span className="text-muted-foreground/40 select-none" aria-hidden="true">
                 ·
               </span>
               <Loader2
                 className="h-2.5 w-2.5 animate-spin text-primary shrink-0"
                 aria-hidden="true"
               />
-              <span className="text-xs text-gray-11 truncate min-w-0">
+              <span className="text-xs text-lg-text-secondary truncate min-w-0">
                 {inProgressItem.activeForm}
               </span>
             </>
@@ -227,12 +227,12 @@ export const TodoBar: FC = memo(function TodoBar() {
 
           {/* Progress circle + percentage — anchored right, before chevron */}
           <ProgressPie percentage={percentage} />
-          <span className="text-xs tabular-nums text-gray-9">{String(percentage)}%</span>
+          <span className="text-xs tabular-nums text-muted-foreground">{String(percentage)}%</span>
 
           {isExpanded ? (
-            <ChevronDown className="h-3 w-3 text-gray-9 shrink-0" aria-hidden="true" />
+            <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" />
           ) : (
-            <ChevronUp className="h-3 w-3 text-gray-9 shrink-0" aria-hidden="true" />
+            <ChevronUp className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" />
           )}
         </button>
 
@@ -246,7 +246,7 @@ export const TodoBar: FC = memo(function TodoBar() {
               transition={shouldReduceMotion === true ? EXPAND_TRANSITION_NONE : EXPAND_TRANSITION}
               style={{ overflow: 'hidden' }}
             >
-              <div className="border-t border-gray-5 px-3 py-1.5 max-h-[200px] overflow-y-auto">
+              <div className="border-t border-lg-separator px-3 py-1.5 max-h-[200px] overflow-y-auto">
                 <div className="space-y-0.5">
                   {todos.map((todo, index) => (
                     <div
@@ -260,8 +260,8 @@ export const TodoBar: FC = memo(function TodoBar() {
                       <StatusIcon status={todo.status} />
                       <span
                         className={cn(
-                          'text-gray-12 flex-1 leading-relaxed',
-                          todo.status === 'completed' && 'line-through text-gray-11'
+                          'text-foreground flex-1 leading-relaxed',
+                          todo.status === 'completed' && 'line-through text-lg-text-secondary'
                         )}
                       >
                         {todo.status === 'in_progress' ? todo.activeForm : todo.content}
@@ -271,9 +271,9 @@ export const TodoBar: FC = memo(function TodoBar() {
                 </div>
 
                 {/* Progress bar */}
-                <div className="mt-1.5 pt-1.5 border-t border-gray-5">
+                <div className="mt-1.5 pt-1.5 border-t border-lg-separator">
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1 bg-gray-4 rounded-full overflow-hidden">
+                    <div className="flex-1 h-1 bg-lg-control rounded-full overflow-hidden">
                       <div
                         className="h-full bg-success rounded-full transition-transform duration-300 origin-left"
                         style={{
@@ -281,7 +281,7 @@ export const TodoBar: FC = memo(function TodoBar() {
                         }}
                       />
                     </div>
-                    <span className="text-xs tabular-nums text-gray-9 font-medium">
+                    <span className="text-xs tabular-nums text-muted-foreground font-medium">
                       {String(percentage)}%
                     </span>
                   </div>

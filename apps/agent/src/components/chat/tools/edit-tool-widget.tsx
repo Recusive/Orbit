@@ -98,7 +98,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
             tabIndex={0}
             className={cn(
               'text-xs font-medium truncate cursor-pointer hover:underline',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-12'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
             )}
             onClick={handleFileClick}
             onKeyDown={(e): void => {
@@ -111,13 +111,16 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
           </a>
 
           <span
-            className={cn('text-xs shrink-0', isFailed ? 'text-destructive/60' : 'text-gray-9')}
+            className={cn(
+              'text-xs shrink-0',
+              isFailed ? 'text-destructive/60' : 'text-muted-foreground'
+            )}
           >
             {isFailed ? '(failed)' : '(modified)'}
           </span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
 
           {!isRunning && !isFailed ? (
@@ -130,7 +133,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
         {/* Right: chevron */}
         <ChevronRight
           className={cn(
-            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
             isExpanded && 'rotate-90'
           )}
         />
@@ -204,7 +207,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                                         </span>
                                       ))
                                     ) : (
-                                      <span className="text-gray-12">{line || ' '}</span>
+                                      <span className="text-foreground">{line || ' '}</span>
                                     )}
                                   </div>
                                 </div>
@@ -248,7 +251,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                                         </span>
                                       ))
                                     ) : (
-                                      <span className="text-gray-12">{line || ' '}</span>
+                                      <span className="text-foreground">{line || ' '}</span>
                                     )}
                                   </div>
                                 </div>
@@ -268,7 +271,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                         e.stopPropagation();
                         setShowAllLines(!showAllLines);
                       }}
-                      className="py-1 text-xs text-gray-9 hover:text-gray-12 transition-colors flex items-center gap-0.5"
+                      className="py-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
                     >
                       <span>
                         {showAllLines
@@ -301,7 +304,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

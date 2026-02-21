@@ -73,10 +73,10 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       tabIndex={isActive ? 0 : -1}
       className={cn(
         'group relative flex items-center h-full px-3 text-base cursor-pointer select-none shrink-0',
-        'border-r border-gray-5',
+        'border-r border-lg-separator',
         isActive
           ? 'bg-editor-bg text-foreground'
-          : 'bg-gray-4 dark:bg-gray-1 text-muted-foreground hover:text-foreground'
+          : 'bg-lg-control dark:bg-background text-muted-foreground hover:text-foreground'
       )}
       style={{ maxWidth: 180 }}
     >
@@ -99,7 +99,7 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
         {/* Modified dot - show when modified, inactive, and not hovering */}
         {isModified && !isActive ? (
           <div className="absolute inset-0 flex items-center justify-center group-hover:hidden">
-            <div className="w-2 h-2 rounded-full bg-gray-10" />
+            <div className="w-2 h-2 rounded-full bg-muted-foreground" />
           </div>
         ) : null}
         {/* Close button - show on hover, or always when active */}
@@ -251,7 +251,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
   return (
     <div
       data-tauri-drag-region
-      className="flex shrink-0 bg-gray-4 dark:bg-gray-1 relative"
+      className="flex shrink-0 bg-lg-control dark:bg-background relative"
       style={{ height: ACTIVITY_PANEL.TABS_HEADER_HEIGHT }}
       onMouseEnter={() => {
         setIsHovered(true);
@@ -305,7 +305,9 @@ const TabsHeader: FC<TabsHeaderProps> = ({
               onMouseDown={handleScrollbarMouseDown}
               className={cn(
                 'absolute top-[3px] h-[3px] rounded-full cursor-grab transition-colors',
-                isDragging ? 'bg-gray-9' : 'bg-gray-8/50 hover:bg-gray-8'
+                isDragging
+                  ? 'bg-muted-foreground'
+                  : 'bg-muted-foreground/50 hover:bg-muted-foreground'
               )}
               style={{
                 width: scrollbarWidth,
@@ -319,7 +321,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       {/* Editor actions - VS Code style */}
       <div
         data-tauri-drag-region={false}
-        className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-gray-4 dark:bg-gray-1"
+        className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-lg-control dark:bg-background"
       >
         <button
           onClick={() => {
@@ -339,7 +341,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
               <Ellipsis className="h-4 w-4" />
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-48 p-2 border-gray-7">
+          <PopoverContent align="end" className="w-48 p-2 border-lg-border">
             <div className="flex items-center justify-between">
               <label htmlFor="word-wrap-toggle" className="text-sm cursor-pointer">
                 Line Wrap

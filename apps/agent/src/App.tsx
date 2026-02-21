@@ -241,8 +241,8 @@ const ModeErrorFallback: FC<ModeErrorFallbackProps> = ({ mode, error, onReset })
       <div
         className="flex flex-col items-center gap-6 max-w-[400px] w-full text-center px-5 py-5 rounded-2xl"
         style={{
-          backgroundColor: 'var(--gray-2)',
-          border: '1px solid var(--gray-5)',
+          backgroundColor: 'var(--background)',
+          border: '1px solid var(--lg-separator)',
         }}
       >
         {/* Icon with ambient radial glow */}

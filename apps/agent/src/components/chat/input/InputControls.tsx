@@ -81,7 +81,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                 'hover:scale-[1.02] active:scale-[0.98]',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
                 inputMode === 'default' &&
-                  'bg-gray-4 text-gray-12 hover:bg-gray-5 hover:text-foreground',
+                  'bg-lg-control text-foreground hover:bg-lg-control-hover',
                 inputMode === 'plan' && 'bg-mode-plan/10 text-mode-plan hover:bg-mode-plan/20',
                 inputMode === 'accept' &&
                   'bg-mode-accept/10 text-mode-accept hover:bg-mode-accept/20'
@@ -123,7 +123,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                     'h-7 w-7 flex items-center justify-center rounded-lg',
                     'bg-transparent text-muted-foreground/70',
                     TRANSITION_CLASSES.button,
-                    'hover:bg-accent hover:text-foreground hover:scale-[1.08]',
+                    'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
                     'active:scale-95',
                     'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
                   )}
@@ -167,7 +167,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                     'h-7 w-7 flex items-center justify-center rounded-lg',
                     'bg-transparent text-muted-foreground/70',
                     TRANSITION_CLASSES.button,
-                    'hover:bg-accent hover:text-foreground hover:scale-[1.08]',
+                    'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
                     'active:scale-95',
                     'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
                   )}
@@ -230,7 +230,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                 isAgentRunning && isInputEmpty
                   ? 'bg-destructive/10 text-destructive hover:bg-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30'
                   : isInputEmpty
-                    ? 'bg-gray-4 text-muted-foreground/50 cursor-not-allowed'
+                    ? 'bg-lg-control text-muted-foreground/50 cursor-not-allowed'
                     : 'bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 hover:shadow-[0_0_16px_-2px_var(--primary)] active:scale-95'
               )}
             >

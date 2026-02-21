@@ -30,8 +30,8 @@ const TOAST_STYLES = `
   width: 100%;
   max-width: 24rem;
   border-radius: 0.75rem;
-  border: 3px solid var(--gray-6);
-  background: var(--gray-3);
+  border: 3px solid var(--lg-separator);
+  background: var(--lg-control);
   overflow: hidden;
   box-shadow: none;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -44,7 +44,7 @@ const TOAST_STYLES = `
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 0.5rem;
-  background: var(--gray-4);
+  background: var(--lg-control);
 }
 
 .ot-overlay-text {
@@ -90,7 +90,7 @@ const TOAST_STYLES = `
   height: 1.5rem;
   width: 1.5rem;
   border-radius: 0.375rem;
-  background: var(--gray-4);
+  background: var(--lg-control);
   color: var(--foreground);
   flex-shrink: 0;
 }
@@ -124,7 +124,7 @@ const TOAST_STYLES = `
 .ot-progress-track {
   flex: 1;
   height: 0.375rem;
-  background: var(--gray-5);
+  background: var(--lg-separator);
   border-radius: 9999px;
   overflow: hidden;
 }
@@ -173,8 +173,8 @@ const TOAST_STYLES = `
 }
 
 .ot-btn-ghost {
-  background: var(--gray-4);
-  color: var(--gray-11);
+  background: var(--lg-control);
+  color: var(--lg-text-secondary);
 }
 `;
 

@@ -50,13 +50,16 @@ const ProjectTile: FC<ProjectTileProps> = ({ project, onClick }) => (
     className={cn(
       'flex flex-col items-center gap-2 p-4 rounded-xl cursor-pointer',
       'transition-[background-color,transform] duration-150',
-      'hover:bg-gray-4 dark:hover:bg-gray-5',
+      'hover:bg-lg-control-hover dark:hover:bg-lg-control-hover',
       'active:scale-[0.96]',
       'outline-none focus-visible:ring-2 focus-visible:ring-primary/50'
     )}
   >
-    <div className="flex items-center justify-center h-12 w-12 rounded-xl bg-gray-4 dark:bg-gray-5">
-      <FolderOpen className="h-6 w-6 text-gray-10 dark:text-gray-11" aria-hidden="true" />
+    <div className="flex items-center justify-center h-12 w-12 rounded-xl bg-lg-control dark:bg-lg-separator">
+      <FolderOpen
+        className="h-6 w-6 text-lg-text-secondary dark:text-lg-text-secondary"
+        aria-hidden="true"
+      />
     </div>
     <div className="flex flex-col items-center gap-0.5 min-w-0 w-full">
       <span className="text-sm font-medium text-foreground truncate max-w-full">
@@ -77,9 +80,9 @@ const ProjectsSkeleton: FC = () => (
   <div className="grid grid-cols-4 gap-4">
     {[1, 2, 3, 4, 5, 6].map((i) => (
       <div key={i} className="flex flex-col items-center gap-2 p-4">
-        <div className="h-12 w-12 rounded-xl bg-gray-4 animate-pulse" />
-        <div className="h-3.5 w-20 rounded bg-gray-4 animate-pulse" />
-        <div className="h-2.5 w-16 rounded bg-gray-4 animate-pulse" />
+        <div className="h-12 w-12 rounded-xl bg-lg-control animate-pulse" />
+        <div className="h-3.5 w-20 rounded bg-lg-control animate-pulse" />
+        <div className="h-2.5 w-16 rounded bg-lg-control animate-pulse" />
       </div>
     ))}
   </div>
@@ -139,14 +142,14 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
         <DialogHeader className="px-4 py-2.5 shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2 text-base">
-              <FolderOpen className="h-4 w-4 shrink-0 text-gray-9" aria-hidden="true" />
+              <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               Projects
             </DialogTitle>
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-sm text-gray-11"
+                className="h-7 px-2 text-sm text-lg-text-secondary"
                 onClick={() => void handleOpenFolder()}
               >
                 <FolderPlus className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
@@ -156,7 +159,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-0 text-gray-11 hover:bg-red-500/10 hover:text-red-500 active:bg-red-500/15"
+                  className="h-7 w-7 p-0 text-lg-text-secondary hover:bg-red-500/10 hover:text-red-500 active:bg-red-500/15"
                   aria-label="Close"
                 >
                   <X className="h-4 w-4" />

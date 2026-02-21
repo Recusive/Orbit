@@ -88,7 +88,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium',
-              isFailed ? 'text-gray-11 line-through' : 'text-mode-plan'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-mode-plan'
             )}
           >
             Plan
@@ -97,7 +97,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate cursor-pointer hover:underline',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
             onClick={handleFileClick}
             title={filePath}
@@ -106,7 +106,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           </span>
 
           {isRunning ? (
-            <div className="flex items-center gap-1 text-gray-11">
+            <div className="flex items-center gap-1 text-lg-text-secondary">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
               <span className="text-xs">Creating plan...</span>
             </div>
@@ -116,7 +116,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
 
           <ChevronRight
             className={cn(
-              'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
           />
@@ -156,7 +156,9 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
                           </Streamdown>
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-9 italic">Plan content is empty</div>
+                        <div className="text-sm text-muted-foreground italic">
+                          Plan content is empty
+                        </div>
                       )}
                     </div>
                   </div>

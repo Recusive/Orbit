@@ -171,7 +171,7 @@ export const MentionPopover: FC<MentionPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[320px] p-0 rounded-[12px] border border-gray-5 shadow-lg"
+        className="w-[320px] p-0 rounded-[12px] border border-lg-separator shadow-lg"
         side="top"
         align="start"
         sideOffset={8}
@@ -284,7 +284,7 @@ const FileItem: FC<FileItemProps> = ({ result, isSelected, isFirst, isLast, onSe
         'relative flex cursor-pointer gap-2.5 select-none items-center border-l-2 border-transparent pl-2 pr-2.5 py-2 outline-none',
         isSelected
           ? 'rounded-r-md bg-primary/10 text-foreground border-primary/60'
-          : 'rounded-md hover:bg-gray-4 active:scale-[0.99]'
+          : 'rounded-md hover:bg-lg-control-hover active:scale-[0.99]'
       )}
     >
       <FileIcon fileName={result.name} className="h-4 w-4 shrink-0" monochrome={false} />

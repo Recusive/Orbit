@@ -38,7 +38,7 @@ export const ProgressStep: FC<ProgressStepProps> = ({
       case 'pending':
       default:
         return (
-          <div className="w-5 h-5 rounded-full bg-gray-4 flex items-center justify-center">
+          <div className="w-5 h-5 rounded-full bg-lg-control flex items-center justify-center">
             <Circle className="w-3 h-3 text-muted-foreground" />
           </div>
         );

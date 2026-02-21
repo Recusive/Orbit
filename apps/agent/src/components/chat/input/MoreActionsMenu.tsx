@@ -52,7 +52,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
             'h-7 w-7 flex items-center justify-center rounded-lg',
             'bg-transparent text-muted-foreground/70',
             TRANSITION_CLASSES.button,
-            'hover:bg-gray-4 hover:text-foreground hover:scale-[1.08]',
+            'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
             'active:scale-95',
             'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
           )}
@@ -69,7 +69,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
                 y1="8"
                 x2="16"
                 y2="8"
-                stroke="var(--gray-8)"
+                stroke="var(--muted-foreground)"
                 strokeWidth="0.5"
                 opacity="0.3"
               />

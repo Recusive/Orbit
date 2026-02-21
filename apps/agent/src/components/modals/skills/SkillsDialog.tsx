@@ -37,14 +37,14 @@ interface SkillCardProps {
 
 const SkillCard: FC<SkillCardProps> = ({ skill, onSelect }) => (
   <div
-    className="rounded-lg border border-gray-5 p-4 hover:bg-gray-4 transition-[background-color] duration-150 cursor-pointer active:scale-[0.99]"
+    className="rounded-lg border border-lg-separator p-4 hover:bg-lg-control-hover transition-[background-color] duration-150 cursor-pointer active:scale-[0.99]"
     onClick={() => {
       onSelect(skill);
     }}
   >
     <div className="flex items-start gap-3 min-w-0">
-      <div className="h-8 w-8 rounded-lg bg-gray-4 flex items-center justify-center shrink-0">
-        <IconSkills className="h-4 w-4 text-gray-11" />
+      <div className="h-8 w-8 rounded-lg bg-lg-control flex items-center justify-center shrink-0">
+        <IconSkills className="h-4 w-4 text-lg-text-secondary" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="font-medium text-base truncate">{skill.name}</div>
@@ -58,7 +58,7 @@ const SkillCard: FC<SkillCardProps> = ({ skill, onSelect }) => (
             {skill.triggers.map((trigger) => (
               <span
                 key={trigger}
-                className="text-xs px-1.5 py-0.5 rounded-md bg-gray-4 text-muted-foreground/90"
+                className="text-xs px-1.5 py-0.5 rounded-md bg-lg-control text-muted-foreground/90"
               >
                 {trigger}
               </span>
@@ -77,12 +77,12 @@ const SkillCard: FC<SkillCardProps> = ({ skill, onSelect }) => (
 const SkillsSkeleton: FC = () => (
   <div className="space-y-2">
     {[1, 2, 3].map((i) => (
-      <div key={i} className="rounded-lg border border-gray-5 p-4">
+      <div key={i} className="rounded-lg border border-lg-separator p-4">
         <div className="flex items-start gap-3">
-          <div className="h-8 w-8 rounded-lg bg-gray-4 animate-pulse" />
+          <div className="h-8 w-8 rounded-lg bg-lg-control animate-pulse" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-28 rounded bg-gray-4 animate-pulse" />
-            <div className="h-3 w-48 rounded bg-gray-4 animate-pulse" />
+            <div className="h-4 w-28 rounded bg-lg-control animate-pulse" />
+            <div className="h-3 w-48 rounded bg-lg-control animate-pulse" />
           </div>
         </div>
       </div>
@@ -175,7 +175,7 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
                 'bg-card',
-                'border border-gray-5 rounded-[14px] overflow-hidden flex flex-col',
+                'border border-lg-separator rounded-[14px] overflow-hidden flex flex-col',
                 'shadow-lg duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
                 'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -188,10 +188,10 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
               {/* Title bar */}
               <div className="flex items-center justify-between px-4 py-2.5 bg-transparent">
                 <div className="flex items-center gap-2 font-medium text-base">
-                  <IconSkills className="h-4 w-4 shrink-0 text-gray-9" />
+                  <IconSkills className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span>Skills</span>
                 </div>
-                <DialogPrimitive.Close className="rounded-md p-1 text-gray-11 hover:text-foreground hover:bg-gray-4 active:scale-95 transition-[opacity,background-color,color,transform] duration-150">
+                <DialogPrimitive.Close className="rounded-md p-1 text-lg-text-secondary hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-[opacity,background-color,color,transform] duration-150">
                   <X className="h-4 w-4" />
                   <span className="sr-only">Close</span>
                 </DialogPrimitive.Close>
@@ -215,9 +215,11 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
                     <p className="text-base">No skills found.</p>
                     <p className="text-sm mt-1">
                       Add skills to{' '}
-                      <code className="bg-gray-4 px-1 py-0.5 rounded-md">.claude/skills/</code> in
-                      your project or{' '}
-                      <code className="bg-gray-4 px-1 py-0.5 rounded-md">~/.claude/skills/</code>{' '}
+                      <code className="bg-lg-control px-1 py-0.5 rounded-md">.claude/skills/</code>{' '}
+                      in your project or{' '}
+                      <code className="bg-lg-control px-1 py-0.5 rounded-md">
+                        ~/.claude/skills/
+                      </code>{' '}
                       for personal skills.
                     </p>
                   </div>
@@ -245,16 +247,20 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
 
                 {/* Info section — shown when loaded without error */}
                 {!isLoading && error === null && (
-                  <div className="mt-6 p-3.5 rounded-lg bg-gray-3 border border-gray-5 text-sm text-muted-foreground/90">
+                  <div className="mt-6 p-3.5 rounded-lg bg-lg-control border border-lg-separator text-sm text-muted-foreground/90">
                     <p className="font-medium mb-1.5 text-foreground/80">How Skills Work</p>
                     <ul className="list-disc list-inside space-y-0.5">
                       <li>
                         Project skills live in{' '}
-                        <code className="bg-gray-4 px-1 py-0.5 rounded-md">.claude/skills/</code>
+                        <code className="bg-lg-control px-1 py-0.5 rounded-md">
+                          .claude/skills/
+                        </code>
                       </li>
                       <li>
                         Personal skills live in{' '}
-                        <code className="bg-gray-4 px-1 py-0.5 rounded-md">~/.claude/skills/</code>
+                        <code className="bg-lg-control px-1 py-0.5 rounded-md">
+                          ~/.claude/skills/
+                        </code>
                       </li>
                       <li>Each skill is a SKILL.md file with YAML frontmatter</li>
                       <li>Skills are automatically loaded when matched by triggers</li>

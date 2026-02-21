@@ -24,7 +24,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
   return (
     <button
       className={cn(
-        'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98] transition-[background-color,transform] duration-100',
+        'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100',
         active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground',
         className
       )}
@@ -46,7 +46,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
           style={
             badgeVariant === 'primary'
               ? { color: 'var(--primary-foreground)', backgroundColor: 'var(--primary)' }
-              : { color: 'var(--gray-11)', backgroundColor: 'var(--gray-a4)' }
+              : { color: 'var(--lg-text-secondary)', backgroundColor: 'var(--lg-control)' }
           }
         >
           {badge}
@@ -54,7 +54,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
       ) : null}
       {/* Keyboard shortcut */}
       {shortcut ? (
-        <Kbd className="ml-auto mr-2 h-[18px] !text-[12px] px-1.5 bg-gray-5 text-inherit border-gray-6">
+        <Kbd className="ml-auto mr-2 h-[18px] !text-[12px] px-1.5 bg-lg-control text-inherit border-lg-separator">
           {shortcut.map((key, index) => (
             <span key={index} className={index === 0 ? 'text-[14px] leading-none' : ''}>
               {key}

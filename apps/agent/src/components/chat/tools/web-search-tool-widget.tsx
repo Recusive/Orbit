@@ -142,20 +142,20 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >
             {statusLabel}
           </span>
 
           {!isRunning && !isFailed && resultCount > 0 ? (
-            <span className="text-xs text-gray-9">
+            <span className="text-xs text-muted-foreground">
               ({resultCount} {resultCount === 1 ? 'result' : 'results'})
             </span>
           ) : null}
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
         </div>
 
@@ -164,7 +164,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
         {/* Right: chevron */}
         <ChevronRight
           className={cn(
-            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
             isExpanded && 'rotate-90'
           )}
         />
@@ -202,13 +202,13 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-lg-separator bg-card overflow-hidden">
                   {/* Query */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
                       query
                     </div>
-                    <code className="block bg-gray-4 rounded-md px-2 py-1 font-mono text-sm text-gray-12">
+                    <code className="block bg-lg-control rounded-md px-2 py-1 font-mono text-sm text-foreground">
                       {query}
                     </code>
                   </div>
@@ -217,12 +217,12 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
                     {isRunning ? (
-                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
+                      <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Searching for results...</span>
                       </div>
                     ) : results.length > 0 ? (
-                      <div className="relative max-h-[200px] overflow-y-auto bg-gray-3 rounded-md p-2">
+                      <div className="relative max-h-[200px] overflow-y-auto bg-lg-control rounded-md p-2">
                         {results.map((result, index) => (
                           <button
                             key={`${result.url}-${String(index)}`}
@@ -230,7 +230,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                             onClick={() => {
                               onOpenUrl?.(result.url);
                             }}
-                            className="block w-full text-left rounded-md p-1.5 hover:bg-gray-4 transition-colors focus:outline-none cursor-pointer"
+                            className="block w-full text-left rounded-md p-1.5 hover:bg-lg-control transition-colors focus:outline-none cursor-pointer"
                           >
                             <div className="relative flex items-start gap-2">
                               {/* Vertical connecting line */}
@@ -244,14 +244,14 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                                 <Globe className="h-2.5 w-2.5 text-info/70" />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="text-gray-12 mb-0.5 line-clamp-2 text-sm font-medium">
+                                <div className="text-foreground mb-0.5 line-clamp-2 text-sm font-medium">
                                   {result.title}
                                 </div>
-                                <div className="text-gray-9 truncate font-mono text-xs">
+                                <div className="text-muted-foreground truncate font-mono text-xs">
                                   {getHostname(result.url)}
                                 </div>
                                 {result.snippet ? (
-                                  <div className="text-gray-11 mt-0.5 line-clamp-2 text-xs">
+                                  <div className="text-lg-text-secondary mt-0.5 line-clamp-2 text-xs">
                                     {result.snippet}
                                   </div>
                                 ) : null}
@@ -261,7 +261,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                         ))}
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-9 italic">No results found</div>
+                      <div className="text-sm text-muted-foreground italic">No results found</div>
                     )}
                   </div>
                 </div>
@@ -282,7 +282,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

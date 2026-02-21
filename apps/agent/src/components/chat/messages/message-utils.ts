@@ -280,7 +280,7 @@ export function hasVisibleContent(
   // User messages must have non-empty content to render. Empty user messages can appear
   // from SDK protocol artifacts (e.g., interrupt markers stripped by backend, or edge
   // cases where content blocks yield no text). Without this check, an empty <p> tag
-  // renders inside a bg-gray-4 bubble, creating a visible empty rectangle.
+  // renders inside a bg-lg-control bubble, creating a visible empty rectangle.
   // Also filter out SDK internal messages (e.g., <local-command-stdout> from /compact).
   if (message.role === 'user') {
     const trimmed = message.content.trim();

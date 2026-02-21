@@ -148,21 +148,21 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >
             {statusLabel}
           </span>
 
           {!isRunning && !isFailed && fileCount > 0 ? (
-            <span className="text-xs text-gray-9">
+            <span className="text-xs text-muted-foreground">
               ({fileCount} {fileCount === 1 ? 'file' : 'files'}
               {isContentMode && matchCount !== fileCount ? `, ${String(matchCount)} matches` : ''})
             </span>
           ) : null}
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
         </div>
 
@@ -171,7 +171,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
         {/* Right: chevron */}
         <ChevronRight
           className={cn(
-            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
             isExpanded && 'rotate-90'
           )}
         />
@@ -209,39 +209,39 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-lg-separator bg-card overflow-hidden">
                   {/* Pattern & filters */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
                       pattern
                     </div>
-                    <code className="block bg-gray-4 rounded-md px-2 py-1 font-mono text-sm text-gray-12 break-all">
+                    <code className="block bg-lg-control rounded-md px-2 py-1 font-mono text-sm text-foreground break-all">
                       {pattern}
                     </code>
                     {path ? (
                       <>
-                        <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1 mt-2">
+                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
                           in
                         </div>
-                        <span className="text-sm text-gray-11 font-mono truncate block">
+                        <span className="text-sm text-lg-text-secondary font-mono truncate block">
                           {path}
                         </span>
                       </>
                     ) : null}
                     {glob ? (
                       <>
-                        <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1 mt-2">
+                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
                           glob
                         </div>
-                        <code className="text-sm text-gray-11 font-mono">{glob}</code>
+                        <code className="text-sm text-lg-text-secondary font-mono">{glob}</code>
                       </>
                     ) : null}
                     {fileType ? (
                       <>
-                        <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1 mt-2">
+                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
                           type
                         </div>
-                        <span className="text-sm text-gray-11 font-mono">{fileType}</span>
+                        <span className="text-sm text-lg-text-secondary font-mono">{fileType}</span>
                       </>
                     ) : null}
                   </div>
@@ -250,12 +250,12 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
                     {isRunning ? (
-                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
+                      <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Searching for matches...</span>
                       </div>
                     ) : matches.length > 0 ? (
-                      <div className="relative max-h-[200px] overflow-y-auto overflow-x-hidden bg-gray-3 rounded-md p-2">
+                      <div className="relative max-h-[200px] overflow-y-auto overflow-x-hidden bg-lg-control rounded-md p-2">
                         {isContentMode
                           ? Object.entries(groupedMatches).map(
                               ([filePath, fileMatches], index, arr) => (
@@ -265,7 +265,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                                     onClick={() => {
                                       onOpenFile?.(filePath);
                                     }}
-                                    className="w-full flex items-center gap-2 text-xs py-1 hover:bg-gray-4 rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
+                                    className="w-full flex items-center gap-2 text-xs py-1 hover:bg-lg-control rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
                                   >
                                     {/* Vertical connecting line */}
                                     {index < arr.length - 1 ? (
@@ -275,13 +275,13 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                                       />
                                     ) : null}
                                     <div className="relative z-10 w-3.5 h-3.5 flex items-center justify-center shrink-0">
-                                      <File className="h-3.5 w-3.5 text-gray-11/60" />
+                                      <File className="h-3.5 w-3.5 text-lg-text-secondary/60" />
                                     </div>
-                                    <span className="font-mono text-gray-12 shrink-0">
+                                    <span className="font-mono text-foreground shrink-0">
                                       {getFileName(filePath)}
                                     </span>
                                     <span
-                                      className="text-gray-11/60 truncate text-right flex-1"
+                                      className="text-lg-text-secondary/60 truncate text-right flex-1"
                                       title={filePath}
                                     >
                                       {filePath}
@@ -295,18 +295,18 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                                         onClick={() => {
                                           onOpenFile?.(filePath, match.lineNumber);
                                         }}
-                                        className="w-full flex items-center gap-2 text-xs py-0.5 hover:bg-gray-4 rounded-md px-1 -mx-1 transition-colors overflow-hidden cursor-pointer text-left"
+                                        className="w-full flex items-center gap-2 text-xs py-0.5 hover:bg-lg-control rounded-md px-1 -mx-1 transition-colors overflow-hidden cursor-pointer text-left"
                                       >
-                                        <span className="text-gray-11/60 shrink-0 w-8 text-right font-mono">
+                                        <span className="text-lg-text-secondary/60 shrink-0 w-8 text-right font-mono">
                                           {match.lineNumber}:
                                         </span>
-                                        <code className="truncate font-mono text-xs rounded bg-gray-4 px-1 text-gray-11">
+                                        <code className="truncate font-mono text-xs rounded bg-lg-control px-1 text-lg-text-secondary">
                                           {match.content}
                                         </code>
                                       </button>
                                     ))}
                                     {fileMatches.length > 10 ? (
-                                      <div className="text-xs text-gray-11/60 italic pl-8">
+                                      <div className="text-xs text-lg-text-secondary/60 italic pl-8">
                                         ...and {String(fileMatches.length - 10)} more matches
                                       </div>
                                     ) : null}
@@ -322,7 +322,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                                   onClick={() => {
                                     onOpenFile?.(match.filePath);
                                   }}
-                                  className="relative w-full flex items-center gap-2 text-xs py-1 hover:bg-gray-4 rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
+                                  className="relative w-full flex items-center gap-2 text-xs py-1 hover:bg-lg-control rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
                                 >
                                   {/* Vertical connecting line */}
                                   {index < matches.length - 1 ? (
@@ -332,16 +332,16 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                                     />
                                   ) : null}
                                   <div className="relative z-10 w-3.5 h-3.5 flex items-center justify-center shrink-0">
-                                    <File className="h-3.5 w-3.5 text-gray-11/60" />
+                                    <File className="h-3.5 w-3.5 text-lg-text-secondary/60" />
                                   </div>
-                                  <span className="font-mono text-gray-12 shrink-0">
+                                  <span className="font-mono text-foreground shrink-0">
                                     {getFileName(match.filePath)}
                                   </span>
-                                  <span className="text-gray-11/60 font-mono shrink-0">
+                                  <span className="text-lg-text-secondary/60 font-mono shrink-0">
                                     ({match.count} {match.count === 1 ? 'match' : 'matches'})
                                   </span>
                                   <span
-                                    className="text-gray-11/60 truncate text-right flex-1"
+                                    className="text-lg-text-secondary/60 truncate text-right flex-1"
                                     title={match.filePath}
                                   >
                                     {match.filePath}
@@ -355,7 +355,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                                   onClick={() => {
                                     onOpenFile?.(match.filePath);
                                   }}
-                                  className="relative w-full flex items-center gap-2 text-xs py-1 hover:bg-gray-4 rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
+                                  className="relative w-full flex items-center gap-2 text-xs py-1 hover:bg-lg-control rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
                                 >
                                   {/* Vertical connecting line */}
                                   {index < matches.length - 1 ? (
@@ -365,13 +365,13 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                                     />
                                   ) : null}
                                   <div className="relative z-10 w-3.5 h-3.5 flex items-center justify-center shrink-0">
-                                    <File className="h-3.5 w-3.5 text-gray-11/60" />
+                                    <File className="h-3.5 w-3.5 text-lg-text-secondary/60" />
                                   </div>
-                                  <span className="font-mono text-gray-12 shrink-0">
+                                  <span className="font-mono text-foreground shrink-0">
                                     {getFileName(match.filePath)}
                                   </span>
                                   <span
-                                    className="text-gray-11/60 truncate text-right flex-1"
+                                    className="text-lg-text-secondary/60 truncate text-right flex-1"
                                     title={match.filePath}
                                   >
                                     {match.filePath}
@@ -380,7 +380,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                               ))}
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-9 italic">No matches found</div>
+                      <div className="text-sm text-muted-foreground italic">No matches found</div>
                     )}
                   </div>
                 </div>
@@ -401,7 +401,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

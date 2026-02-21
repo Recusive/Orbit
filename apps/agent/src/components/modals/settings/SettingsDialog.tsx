@@ -83,7 +83,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
                 'bg-card',
-                'border border-gray-5 rounded-[14px] overflow-hidden flex flex-col',
+                'border border-lg-separator rounded-[14px] overflow-hidden flex flex-col',
                 'shadow-lg duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
                 'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -102,15 +102,15 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                     name="gear"
                     size={18}
                     weight="medium"
-                    className="shrink-0 text-gray-9"
+                    className="shrink-0 text-muted-foreground"
                     fallback={<Settings2 className="h-4 w-4" />}
                   />
-                  <span className="text-gray-9">Settings</span>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-8" />
+                  <span className="text-muted-foreground">Settings</span>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span>{activeItem.icon}</span>
                   <span>{activeItem.label}</span>
                 </div>
-                <DialogPrimitive.Close className="rounded-md p-1 text-gray-11 hover:text-foreground hover:bg-gray-4 active:scale-95 transition-[opacity,background-color,color,transform] duration-150">
+                <DialogPrimitive.Close className="rounded-md p-1 text-lg-text-secondary hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-[opacity,background-color,color,transform] duration-150">
                   <X className="h-4 w-4" />
                   <span className="sr-only">Close</span>
                 </DialogPrimitive.Close>

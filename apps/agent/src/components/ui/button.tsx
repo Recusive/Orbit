@@ -12,15 +12,14 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground shadow-sm hover:bg-gray-11 hover:shadow active:scale-[0.98]',
+          'bg-lg-default-bg text-lg-default-text shadow-sm hover:opacity-85 active:scale-[0.97]',
         destructive:
-          'bg-destructive/10 text-destructive hover:bg-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 focus-visible:border-destructive/40 active:scale-[0.98]',
+          'bg-lg-destructive-bg text-lg-destructive hover:brightness-90 focus-visible:ring-lg-destructive/20 active:scale-[0.98]',
         outline:
-          'border border-gray-5 bg-transparent hover:bg-gray-4 hover:border-gray-6 active:scale-[0.98]',
-        secondary:
-          'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 active:scale-[0.98]',
-        ghost: 'hover:bg-gray-4 hover:text-foreground active:bg-gray-5',
-        link: 'text-gray-12 underline-offset-4 hover:text-gray-12 hover:underline',
+          'border border-lg-separator bg-transparent hover:bg-lg-control-hover active:scale-[0.98]',
+        secondary: 'bg-lg-btn text-lg-text shadow-sm hover:bg-lg-btn-hover active:scale-[0.98]',
+        ghost: 'hover:bg-lg-control-hover hover:text-foreground active:bg-lg-control',
+        link: 'text-foreground underline-offset-4 hover:underline',
       },
       size: {
         default: 'h-9 px-4 py-2',

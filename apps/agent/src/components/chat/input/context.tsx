@@ -129,7 +129,7 @@ export const ContextTrigger: FC<ContextTriggerProps> = ({ children, className })
     <HoverCardTrigger asChild>
       <button
         className={cn(
-          'h-7 flex items-center px-1.5 rounded hover:bg-accent transition-colors',
+          'h-7 flex items-center px-1.5 rounded hover:bg-lg-control-hover transition-colors',
           className
         )}
         title="Context usage"
@@ -151,7 +151,7 @@ export const ContextContent: FC<ContextContentProps> = ({ children, className })
     <HoverCardContent
       side="top"
       align="end"
-      className={cn('w-56 p-0 rounded-[12px] border border-gray-5 shadow-lg', className)}
+      className={cn('w-56 p-0 rounded-[12px] border border-lg-separator shadow-lg', className)}
     >
       {children}
     </HoverCardContent>
@@ -168,7 +168,7 @@ export const ContextContentHeader: FC<ContextContentHeaderProps> = ({ children, 
   const { percentage, usedTokens, maxTokens } = useContextData();
 
   if (children !== undefined) {
-    return <div className={cn('p-3 border-b border-gray-5', className)}>{children}</div>;
+    return <div className={cn('p-3 border-b border-lg-separator', className)}>{children}</div>;
   }
 
   // Determine progress bar color based on percentage (uses CSS variables from globals.css)
@@ -192,7 +192,7 @@ export const ContextContentHeader: FC<ContextContentHeaderProps> = ({ children, 
   };
 
   return (
-    <div className={cn('p-3 border-b border-gray-5', className)}>
+    <div className={cn('p-3 border-b border-lg-separator', className)}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium tracking-tighter">Context Window</span>
         <span className="text-sm font-medium text-muted-foreground/70 tabular-nums">
@@ -205,7 +205,7 @@ export const ContextContentHeader: FC<ContextContentHeaderProps> = ({ children, 
         <span>{formatTokens(maxTokens)} tokens</span>
       </div>
       {/* Progress bar — uses scaleX instead of width to stay on GPU (no layout reflow) */}
-      <div className="mt-2.5 h-2 bg-gray-4 rounded-full overflow-hidden shadow-inner">
+      <div className="mt-2.5 h-2 bg-lg-control rounded-full overflow-hidden shadow-inner">
         <div
           className="h-full w-full origin-left rounded-full transition-transform duration-300 ease-out"
           style={{ transform: `scaleX(${String(percentage / 100)})`, ...getProgressStyle() }}
@@ -235,7 +235,7 @@ export const ContextContentFooter: FC<ContextContentFooterProps> = ({ children, 
   return (
     <div
       className={cn(
-        'px-3 py-2 bg-gray-4 border-t border-border text-xs text-muted-foreground',
+        'px-3 py-2 bg-lg-control border-t border-border text-xs text-muted-foreground',
         className
       )}
     >

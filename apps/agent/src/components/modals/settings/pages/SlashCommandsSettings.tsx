@@ -81,11 +81,11 @@ const CommandCard: FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
   const scopeConfig = SCOPE_CONFIG[command.scope];
 
   return (
-    <div className="rounded-lg border border-gray-5 p-4 hover:bg-gray-4 transition-[background-color] duration-150">
+    <div className="rounded-lg border border-lg-separator p-4 hover:bg-lg-control-hover transition-[background-color] duration-150">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0 flex-1">
-          <div className="h-8 w-8 rounded-lg bg-gray-4 flex items-center justify-center shrink-0">
-            <Slash className="h-3.5 w-3.5 -rotate-25 text-gray-11" />
+          <div className="h-8 w-8 rounded-lg bg-lg-control flex items-center justify-center shrink-0">
+            <Slash className="h-3.5 w-3.5 -rotate-25 text-lg-text-secondary" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -108,13 +108,13 @@ const CommandCard: FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
                 {command.allowedTools.slice(0, 4).map((tool) => (
                   <span
                     key={tool}
-                    className="text-xs px-1.5 py-0.5 rounded-md bg-gray-4 text-muted-foreground/90"
+                    className="text-xs px-1.5 py-0.5 rounded-md bg-lg-control text-muted-foreground/90"
                   >
                     {tool}
                   </span>
                 ))}
                 {command.allowedTools.length > 4 && (
-                  <span className="text-xs px-1.5 py-0.5 rounded-md bg-gray-4 text-muted-foreground/90">
+                  <span className="text-xs px-1.5 py-0.5 rounded-md bg-lg-control text-muted-foreground/90">
                     +{command.allowedTools.length - 4} more
                   </span>
                 )}
@@ -273,7 +273,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
         {/* Flexbox centering wrapper - avoids blurry text from transform translate(-50%) subpixel issues */}
         <div className="fixed inset-0 z-60 flex items-center justify-center pointer-events-none">
           <DialogPrimitive.Content
-            className="w-[600px] max-w-[90vw] max-h-[80vh] bg-card border border-gray-5 rounded-lg shadow-xl flex flex-col pointer-events-auto"
+            className="w-[600px] max-w-[90vw] max-h-[80vh] bg-card border border-lg-separator rounded-lg shadow-xl flex flex-col pointer-events-auto"
             onPointerDownOutside={(e) => {
               e.preventDefault();
             }}
@@ -291,7 +291,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
             </DialogPrimitive.Description>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-5">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-lg-separator">
               <h2 className="font-semibold text-lg">
                 {command !== undefined ? 'Edit Slash Command' : 'Create Slash Command'}
               </h2>
@@ -375,11 +375,11 @@ const CommandEditor: FC<CommandEditorProps> = ({
                   />
                   <p className="text-xs text-muted-foreground/90 mt-1.5 leading-relaxed">
                     Use{' '}
-                    <code className="bg-gray-4 px-1.5 py-0.5 rounded-md font-mono text-[9px] text-foreground/70">
+                    <code className="bg-lg-control px-1.5 py-0.5 rounded-md font-mono text-[9px] text-foreground/70">
                       $ARGUMENTS
                     </code>{' '}
                     for user input. Use{' '}
-                    <code className="bg-gray-4 px-1.5 py-0.5 rounded-md font-mono text-[9px] text-foreground/70">
+                    <code className="bg-lg-control px-1.5 py-0.5 rounded-md font-mono text-[9px] text-foreground/70">
                       @filename
                     </code>{' '}
                     to include file contents.
@@ -462,8 +462,8 @@ const CommandEditor: FC<CommandEditorProps> = ({
                         className={cn(
                           'text-sm px-2.5 py-1.5 rounded-lg border transition-[background-color,border-color,transform] duration-150 active:scale-[0.98]',
                           tools.includes(tool)
-                            ? 'bg-gray-5 text-foreground border-gray-6 hover:bg-gray-6 hover:border-gray-7'
-                            : 'bg-gray-3 text-foreground border-gray-5 hover:bg-gray-4 hover:border-gray-6'
+                            ? 'bg-lg-separator text-foreground border-lg-separator hover:bg-lg-control-hover hover:border-lg-border'
+                            : 'bg-lg-control text-foreground border-lg-separator hover:bg-lg-control-hover hover:border-lg-separator'
                         )}
                       >
                         {tool}
@@ -474,10 +474,10 @@ const CommandEditor: FC<CommandEditorProps> = ({
 
                 {/* Generate with AI Input - Only show when creating new command and generate mode is active */}
                 {command === undefined && showGenerateInput ? (
-                  <div className="p-3.5 rounded-lg border border-gray-5 bg-gray-4">
+                  <div className="p-3.5 rounded-lg border border-lg-separator bg-lg-control">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm font-medium">
-                        <Sparkles className="h-4 w-4 text-gray-11" />
+                        <Sparkles className="h-4 w-4 text-lg-text-secondary" />
                         Generate with AI
                       </div>
                       <Textarea
@@ -496,7 +496,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
             </ScrollArea>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-gray-5 bg-gray-3">
+            <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-lg-separator bg-lg-control">
               {/* Generate with AI button - only show when creating new command */}
               {command === undefined &&
                 (showGenerateInput ? (
@@ -689,15 +689,15 @@ export const SlashCommandsSettings: FC = () => {
           Custom commands that expand into prompts. Type / in the chat to see available commands.
         </SectionHeader>
         <div className="space-y-3">
-          <div className="h-9 w-full rounded-md bg-gray-4 animate-pulse" />
+          <div className="h-9 w-full rounded-md bg-lg-control animate-pulse" />
           <div className="space-y-2">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-lg border border-gray-5 p-4">
+              <div key={i} className="rounded-lg border border-lg-separator p-4">
                 <div className="flex items-start gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-gray-4 animate-pulse" />
+                  <div className="h-8 w-8 rounded-lg bg-lg-control animate-pulse" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 w-32 rounded bg-gray-4 animate-pulse" />
-                    <div className="h-3 w-48 rounded bg-gray-4 animate-pulse" />
+                    <div className="h-4 w-32 rounded bg-lg-control animate-pulse" />
+                    <div className="h-3 w-48 rounded bg-lg-control animate-pulse" />
                   </div>
                 </div>
               </div>
@@ -844,28 +844,28 @@ export const SlashCommandsSettings: FC = () => {
       </div>
 
       {/* Info section */}
-      <div className="mt-6 p-3.5 rounded-lg bg-gray-3 border border-gray-5 text-sm text-muted-foreground/90">
+      <div className="mt-6 p-3.5 rounded-lg bg-lg-control border border-lg-separator text-sm text-muted-foreground/90">
         <p className="font-medium mb-1.5 text-foreground/80">How Slash Commands Work</p>
         <ul className="list-disc list-inside space-y-0.5">
           <li>
             Project commands are stored in{' '}
-            <code className="bg-gray-4 px-1 py-0.5 rounded-md">.claude/commands/</code>
+            <code className="bg-lg-control px-1 py-0.5 rounded-md">.claude/commands/</code>
           </li>
           <li>
             Personal commands are stored in{' '}
-            <code className="bg-gray-4 px-1 py-0.5 rounded-md">~/.claude/commands/</code>
+            <code className="bg-lg-control px-1 py-0.5 rounded-md">~/.claude/commands/</code>
           </li>
           <li>
-            Type <code className="bg-gray-4 px-1 py-0.5 rounded-md">/command-name</code> in chat to
-            run
+            Type <code className="bg-lg-control px-1 py-0.5 rounded-md">/command-name</code> in chat
+            to run
           </li>
           <li>
-            Use <code className="bg-gray-4 px-1 py-0.5 rounded-md">$ARGUMENTS</code> to pass user
-            input
+            Use <code className="bg-lg-control px-1 py-0.5 rounded-md">$ARGUMENTS</code> to pass
+            user input
           </li>
           <li>
-            Use <code className="bg-gray-4 px-1 py-0.5 rounded-md">@filename</code> to include file
-            contents
+            Use <code className="bg-lg-control px-1 py-0.5 rounded-md">@filename</code> to include
+            file contents
           </li>
         </ul>
       </div>

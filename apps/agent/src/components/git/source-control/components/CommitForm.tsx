@@ -37,10 +37,10 @@ export const CommitForm: React.FC<CommitFormProps> = ({ value, onChange, onCommi
         className="
           w-full px-2.5 py-2 rounded-lg text-sm
           bg-background border-3 border-transparent
-          ring-1 ring-gray-5
-          placeholder:text-gray-10
-          hover:ring-gray-6
-          focus:outline-none focus:ring-0 focus:border-ring focus:bg-gray-4
+          ring-1 ring-lg-separator
+          placeholder:text-lg-text-secondary
+          hover:ring-lg-border
+          focus:outline-none focus:ring-0 focus:border-ring focus:bg-lg-control
           transition-[background-color,border-color,box-shadow] duration-200 resize-none
         "
       />

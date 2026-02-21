@@ -30,7 +30,7 @@ const NoteCard: FC<NoteCardProps> = ({ title, preview, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className="aspect-square flex flex-col items-start p-4 rounded-lg bg-card border border-gray-6 hover:border-gray-7 hover:bg-card/80 transition-colors duration-150 text-left overflow-hidden"
+      className="aspect-square flex flex-col items-start p-4 rounded-lg bg-card border border-lg-separator hover:border-lg-border hover:bg-card/80 transition-colors duration-150 text-left overflow-hidden"
     >
       <h3 className="font-medium text-foreground text-sm truncate w-full">{title}</h3>
       <p className="text-xs text-muted-foreground mt-1 line-clamp-3">{preview}</p>
@@ -63,10 +63,10 @@ export const VaultPage: FC = () => {
               <input
                 type="text"
                 placeholder="Search notes..."
-                className="w-full h-8 pl-9 pr-4 rounded-md bg-card border border-gray-6 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-0 transition-colors"
+                className="w-full h-8 pl-9 pr-4 rounded-md bg-card border border-lg-separator text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-0 transition-colors"
               />
             </div>
-            <button className="h-8 px-3 rounded-md bg-card border border-gray-6 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-gray-7 hover:bg-card/80 active:scale-[0.97] transition-[background-color,color,border-color,transform] duration-150">
+            <button className="h-8 px-3 rounded-md bg-card border border-lg-separator text-sm font-medium text-muted-foreground hover:text-foreground hover:border-lg-border hover:bg-card/80 active:scale-[0.97] transition-[background-color,color,border-color,transform] duration-150">
               Search
             </button>
           </div>

@@ -116,14 +116,14 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >
             {statusLabel}
           </span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
         </div>
 
@@ -132,7 +132,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
         {/* Right: chevron */}
         <ChevronRight
           className={cn(
-            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
             isExpanded && 'rotate-90'
           )}
         />
@@ -170,22 +170,24 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-lg-separator bg-card overflow-hidden">
                   {/* Task details */}
                   <div className="px-3 py-2">
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase">
+                      <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase">
                         agent
                       </div>
-                      <span className="px-1 py-0.5 rounded bg-gray-4 text-sm font-medium text-gray-12">
+                      <span className="px-1 py-0.5 rounded bg-lg-control text-sm font-medium text-foreground">
                         {formattedType}
                       </span>
-                      {model ? <span className="text-sm text-gray-9">({model})</span> : null}
+                      {model ? (
+                        <span className="text-sm text-muted-foreground">({model})</span>
+                      ) : null}
                     </div>
-                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1">
                       prompt
                     </div>
-                    <div className="text-sm text-gray-11 line-clamp-3" title={prompt}>
+                    <div className="text-sm text-lg-text-secondary line-clamp-3" title={prompt}>
                       {truncatePrompt(prompt, 300)}
                     </div>
                   </div>
@@ -194,7 +196,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
                     {isRunning ? (
-                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
+                      <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Agent is working on the task...</span>
                       </div>
@@ -209,7 +211,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                         </Streamdown>
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-9 italic">Task completed</div>
+                      <div className="text-sm text-muted-foreground italic">Task completed</div>
                     )}
                   </div>
                 </div>
@@ -230,7 +232,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

@@ -35,7 +35,7 @@ interface ActionButtonProps {
 
 const ActionButton: FC<ActionButtonProps> = ({ label, className, disabled, onClick, children }) => {
   const iconButtonClasses =
-    'h-6 w-6 flex items-center justify-center rounded-md bg-transparent text-muted-foreground/70 transition-[background-color,color,transform] duration-150 hover:bg-accent hover:text-foreground hover:scale-[1.08] active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50';
+    'h-6 w-6 flex items-center justify-center rounded-md bg-transparent text-muted-foreground/70 transition-[background-color,color,transform] duration-150 hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08] active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50';
 
   return (
     <Tooltip>
@@ -77,7 +77,7 @@ export const MessageActions: FC<MessageActionsProps> = ({
   return (
     <div className="mt-3 flex items-center justify-between">
       {turnDurationMs !== undefined && turnDurationMs > 0 ? (
-        <span className="flex items-center gap-1 text-xs tabular-nums text-gray-11">
+        <span className="flex items-center gap-1 text-xs tabular-nums text-lg-text-secondary">
           <ClockFading className="h-3.5 w-3.5" aria-hidden="true" />
           {formatDuration(turnDurationMs)}
         </span>

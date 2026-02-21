@@ -72,7 +72,7 @@ export const DeleteWorktreeDialog: FC<DeleteWorktreeDialogProps> = ({
 
         {/* Branch deletion option */}
         {worktree.branch !== null ? (
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-4 border border-gray-7">
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-lg-control border border-lg-border">
             <div className="flex-1 space-y-1">
               <div className="flex items-center justify-between">
                 <label

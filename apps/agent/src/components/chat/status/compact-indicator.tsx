@@ -30,12 +30,16 @@ export const CompactIndicator: FC<CompactIndicatorProps> = ({ messageId }) => {
         {isCompacting ? (
           <>
             <ThinkingDots size={10} speed={1.2} />
-            <span className="text-[11px] font-medium text-gray-10">Context compacting</span>
+            <span className="text-[11px] font-medium text-lg-text-secondary">
+              Context compacting
+            </span>
           </>
         ) : (
           <>
-            <Minimize2 className="h-3 w-3 text-gray-10" />
-            <span className="text-[11px] font-medium text-gray-10">Context compacted</span>
+            <Minimize2 className="h-3 w-3 text-lg-text-secondary" />
+            <span className="text-[11px] font-medium text-lg-text-secondary">
+              Context compacted
+            </span>
           </>
         )}
       </div>

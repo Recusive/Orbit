@@ -129,26 +129,46 @@
 
   /* Content card (Dia-style floating layout) */
   --color-base-layer: var(--base-layer);
+
+  /* ── Liquid Glass design tokens as Tailwind utilities ──
+     Maps --lg-* CSS custom properties to Tailwind color utilities.
+     Usage: bg-lg-control, hover:bg-lg-control-hover, text-lg-text, etc. */
+  --color-lg-control: var(--lg-control-bg);
+  --color-lg-control-hover: var(--lg-control-bg-hover);
+  --color-lg-sidebar-selected: var(--lg-sidebar-selected);
+  --color-lg-sidebar-hover: var(--lg-sidebar-hover);
+  --color-lg-btn: var(--lg-btn-bg);
+  --color-lg-btn-hover: var(--lg-btn-bg-hover);
+  --color-lg-default-bg: var(--lg-default-bg);
+  --color-lg-default-text: var(--lg-default-text);
+  --color-lg-separator: var(--lg-separator);
+  --color-lg-border: var(--lg-border);
+  --color-lg-input: var(--lg-input-bg);
+  --color-lg-text: var(--lg-text-primary);
+  --color-lg-text-secondary: var(--lg-text-secondary);
+  --color-lg-text-label: var(--lg-text-label);
+  --color-lg-destructive: var(--lg-destructive);
+  --color-lg-destructive-bg: var(--lg-destructive-bg);
 }
 
 :root {
   /* Force light color scheme for native form controls (number spinners, scrollbars) */
   color-scheme: light;
 
-  /* ── Radix 12-step raw scales (light) ──────────────────────────────── */
-  /* Gray = structure (borders, text, backgrounds) */
-  --gray-1: #eee9e8;
-  --gray-2: #eae4e1;
-  --gray-3: #e3d9d5;
-  --gray-4: #ddcfc9;
-  --gray-5: #d6c6c0;
-  --gray-6: #d0bcb4;
-  --gray-7: #c8afa5;
-  --gray-8: #ba998c;
-  --gray-9: #8f6a5b;
-  --gray-10: #826053;
-  --gray-11: #60463b;
-  --gray-12: #301910;
+  /* ── Neutral 12-step raw scales (light) ────────────────────────────── */
+  /* Gray = structure (borders, text, backgrounds) — neutral, no warm tint */
+  --gray-1: #ebebeb;
+  --gray-2: #e5e5e5;
+  --gray-3: #dbdbdb;
+  --gray-4: #d2d2d2;
+  --gray-5: #cacaca;
+  --gray-6: #c1c1c1;
+  --gray-7: #b5b5b5;
+  --gray-8: #a1a1a1;
+  --gray-9: #737373;
+  --gray-10: #696969;
+  --gray-11: #4c4c4c;
+  --gray-12: #202020;
 
   /* Accent = interaction (buttons, links, selected states, focus rings) */
   --accent-1: #eceae9;
@@ -164,19 +184,19 @@
   --accent-11: #945036;
   --accent-12: #572e1e;
 
-  /* Gray alpha variants */
-  --gray-a1: #ccd3ff26;
-  --gray-a2: #0d1d9f0b;
-  --gray-a3: #2f053716;
-  --gray-a4: #43061421;
-  --gray-a5: #3e010a2a;
-  --gray-a6: #4b060236;
-  --gray-a7: #560f0147;
-  --gray-a8: #5f150263;
-  --gray-a9: #4c14029a;
-  --gray-a10: #421002a3;
-  --gray-a11: #2e0d02be;
-  --gray-a12: #220a01ee;
+  /* Gray alpha variants (neutral black over white) */
+  --gray-a1: #00000014;
+  --gray-a2: #0000001a;
+  --gray-a3: #00000024;
+  --gray-a4: #0000002d;
+  --gray-a5: #00000035;
+  --gray-a6: #0000003e;
+  --gray-a7: #0000004a;
+  --gray-a8: #0000005e;
+  --gray-a9: #0000008c;
+  --gray-a10: #00000096;
+  --gray-a11: #000000b3;
+  --gray-a12: #000000df;
 
   /* Accent alpha variants */
   --accent-a1: #cadeff30;
@@ -199,8 +219,8 @@
   --accent-track: #6b4030;
   --gray-contrast: #fff;
   --gray-surface: #ffffffcc;
-  --gray-indicator: #8f6a5b;
-  --gray-track: #8f6a5b;
+  --gray-indicator: #737373;
+  --gray-track: #737373;
 
   /* Input modes */
   --mode-plan: oklch(0.65 0.12 140); /* Olive green */
@@ -225,12 +245,12 @@
   --muted-foreground: var(--gray-10);
   --accent: var(--gray-6);
   --accent-foreground: var(--gray-12);
-  --destructive: #e5484d;
+  --destructive: var(--lg-destructive);
   --destructive-foreground: #fff;
   --destructive-hover: #dc3d43;
   --border: var(--gray-7);
-  --border-panel: var(--gray-5);
-  --divider: var(--gray-5);
+  --border-panel: var(--lg-separator);
+  --divider: var(--lg-separator);
   --input: var(--gray-7);
   --ring: var(--gray-8);
   --chat-area: var(--gray-a2);
@@ -308,19 +328,19 @@ html.dark {
   /* Force dark color scheme for scrollbars in WKWebView */
   color-scheme: dark;
 
-  /* ── Radix 12-step raw scales (dark) ─────────────────────────────── */
-  --gray-1: #16110f;
-  --gray-2: #1d1816;
-  --gray-3: #28211d;
-  --gray-4: #302724;
-  --gray-5: #3a2e29;
-  --gray-6: #463630;
-  --gray-7: #56433b;
-  --gray-8: #75594e;
-  --gray-9: #856557;
-  --gray-10: #937265;
-  --gray-11: #caaca0;
-  --gray-12: #f5ece8;
+  /* ── Neutral 12-step raw scales (dark) ───────────────────────────── */
+  --gray-1: #121212;
+  --gray-2: #191919;
+  --gray-3: #232323;
+  --gray-4: #2a2a2a;
+  --gray-5: #313131;
+  --gray-6: #3a3a3a;
+  --gray-7: #484848;
+  --gray-8: #606060;
+  --gray-9: #6d6d6d;
+  --gray-10: #7b7b7b;
+  --gray-11: #b3b3b3;
+  --gray-12: #eeeeee;
 
   --accent-1: #151110;
   --accent-2: #1d1714;
@@ -335,19 +355,19 @@ html.dark {
   --accent-11: #e9ad97;
   --accent-12: #fdddd1;
 
-  /* Gray alpha variants (dark) */
-  --gray-a1: #16118e02;
-  --gray-a2: #ddd8f009;
-  --gray-a3: #fcddce14;
-  --gray-a4: #fbd3d01d;
-  --gray-a5: #fbcabb28;
-  --gray-a6: #fdc4b235;
-  --gray-a7: #fcc5b047;
-  --gray-a8: #ffc2ab68;
-  --gray-a9: #ffc1a77a;
-  --gray-a10: #ffc6b089;
-  --gray-a11: #ffdacbc5;
-  --gray-a12: #fef5f0f5;
+  /* Gray alpha variants (neutral white over black) */
+  --gray-a1: #ffffff12;
+  --gray-a2: #ffffff19;
+  --gray-a3: #ffffff23;
+  --gray-a4: #ffffff2a;
+  --gray-a5: #ffffff31;
+  --gray-a6: #ffffff3a;
+  --gray-a7: #ffffff48;
+  --gray-a8: #ffffff60;
+  --gray-a9: #ffffff6d;
+  --gray-a10: #ffffff7b;
+  --gray-a11: #ffffffb3;
+  --gray-a12: #ffffffee;
 
   /* Accent alpha variants (dark) */
   --accent-a1: #0011b803;
@@ -370,8 +390,8 @@ html.dark {
   --accent-track: #7a5040;
   --gray-contrast: #FFFFFF;
   --gray-surface: rgba(0, 0, 0, 0.05);
-  --gray-indicator: #856557;
-  --gray-track: #856557;
+  --gray-indicator: #6d6d6d;
+  --gray-track: #6d6d6d;
 
   /* Input modes */
   --mode-plan: oklch(0.58 0.1 140);
@@ -396,12 +416,12 @@ html.dark {
   --muted-foreground: var(--gray-11);
   --accent: var(--gray-6);
   --accent-foreground: var(--gray-12);
-  --destructive: #e5484d;
+  --destructive: var(--lg-destructive);
   --destructive-foreground: #fff;
   --destructive-hover: #ec5d5e;
   --border: var(--gray-7);
-  --border-panel: var(--gray-5);
-  --divider: var(--gray-5);
+  --border-panel: var(--lg-separator);
+  --divider: var(--lg-separator);
   --input: var(--gray-7);
   --ring: var(--gray-8);
   --chat-area: var(--surface);
@@ -518,36 +538,12 @@ html.window-mode-liquid-glass [data-sidebar="primary"] {
   background: transparent;
 }
 
-/* ── Liquid Glass sidebar item states (macOS 26 UI Kit) ────────
-   Fixed hex colors (bg-gray-3) are invisible against vibrancy.
-   Apple uses semi-transparent overlays that darken/lighten the
-   vibrancy proportionally, so they're visible against any backdrop.
-   Selected: rgba(0,0,0,0.11) with multiply blend.
-   Hover: rgba(0,0,0,0.07) — lighter than selected.
-   ────────────────────────────────────────────────────────────── */
+/* Chat input glass override removed — .glass-input now uses backdrop-filter
+   with transparent background by default (all window modes). */
 
-/* Light mode — hover: warm semi-transparent overlay visible against vibrancy.
-   Uses our warm brown hue (from Radix gray-8 #ba998c) at low opacity. */
-html.window-mode-liquid-glass:not(.dark) [data-sidebar="primary"] .hover\:bg-gray-3:hover {
-  background-color: rgba(140, 110, 95, 0.13) !important;
-}
-
-/* Light mode — active/selected: stronger warm tint */
-html.window-mode-liquid-glass:not(.dark) [data-sidebar="primary"] .bg-gray-3 {
-  background-color: rgba(140, 110, 95, 0.18) !important;
-}
-
-/* Dark mode — hover: warm light overlay against dark vibrancy */
-html.window-mode-liquid-glass.dark [data-sidebar="primary"] .hover\:bg-gray-3:hover,
-html.window-mode-liquid-glass.dark [data-sidebar="primary"] .dark\:hover\:bg-gray-4:hover {
-  background-color: rgba(200, 175, 160, 0.09) !important;
-}
-
-/* Dark mode — active/selected: stronger warm tint */
-html.window-mode-liquid-glass.dark [data-sidebar="primary"] .bg-gray-3,
-html.window-mode-liquid-glass.dark [data-sidebar="primary"] .dark\:bg-gray-4 {
-  background-color: rgba(200, 175, 160, 0.14) !important;
-}
+/* Liquid Glass sidebar overrides removed — components now use
+   bg-lg-sidebar-hover / bg-lg-sidebar-selected tokens directly,
+   which are semi-transparent rgba and work on all window modes. */
 
 /* ── Streamdown code blocks ──────────────────────────────
    Claude.ai-style: hairline border, no header bar,
@@ -1032,6 +1028,9 @@ html.dark [data-streamdown='code-block-container'] {
     position: absolute;
   }
 
+  /* Glass input styles moved outside @layer base for cascade priority —
+     see unlayered .glass-input rules after the closing brace. */
+
   /* Cursor blink — CSS-only, no React re-renders */
   @keyframes blink {
     0%,
@@ -1127,6 +1126,84 @@ html.dark [data-streamdown='code-block-container'] {
     animation: flow-token-in var(--flow-duration, 0.6s) ease-out both;
   }
 
+}
+
+/* ── Glass Input ─────────────────────────────────────────
+   Apple Liquid Glass "Large" — multi-layer material.
+   UNLAYERED (outside @layer base) for highest cascade priority.
+
+   Figma layer stack (bottom → top):
+   ┌─ Shape ─────── border-radius mask
+   ├─ Mask ──────── clip region
+   ├─ Blur ──────── backdrop-filter frost + hard-light tint   → ::before
+   ├─ Fill ──────── color-dodge (light) / color-burn (dark)  → ::after
+   └─ Glass Effect  rgba(0,0,0,0.004) micro-overlay          → ::after (combined)
+   Content children sit at z:auto (above both layers). */
+.glass-input {
+  position: relative;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  isolation: isolate;
+}
+
+/* ── Blur layer (::before, z:-2) ──────────────────────
+   backdrop-filter frost + hard-light tint.
+   Dark:  rgba(0,0,0,0.1)  — from Apple "Medium" spec
+   Light: rgba(0,0,0,0.08) — from Apple "Large" spec */
+.glass-input::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.1);
+  background-blend-mode: hard-light;
+  -webkit-backdrop-filter: blur(40px);
+  backdrop-filter: blur(40px);
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+/* ── Fill + Glass Effect layer (::after, z:-1) ────────
+   Combines Apple's Fill (color-dodge/burn tint) with
+   Glass Effect (rgba(0,0,0,0.004) micro-overlay).
+   Also carries the border shine + ambient shadow.
+
+   Dark:  color-burn fill (from Medium spec)
+   Light: color-dodge fill (from Large spec) — produces off-white */
+.glass-input::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 0.5px solid rgba(255, 255, 255, 0.10);
+  border-radius: inherit;
+  pointer-events: none;
+  /* Dark mode: Glass Effect only (color-burn Fill produces grey on solid bg) */
+  background: rgba(0, 0, 0, 0.004);
+  box-shadow:
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.18),
+    2px 4px 20px rgba(0, 0, 0, 0.10);
+}
+
+/* ── Light mode overrides ─────────────────────────────
+   On white bg, frost is invisible (blurring white = white).
+   Match iMessage: nearly transparent + thin subtle border. */
+html:not(.dark) .glass-input::before {
+  background: transparent;
+  -webkit-backdrop-filter: blur(40px);
+  backdrop-filter: blur(40px);
+}
+
+html:not(.dark) .glass-input::after {
+  border-color: rgba(255, 255, 255, 0.90);
+  background: transparent;
+  opacity: 1;
+  box-shadow:
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.70),
+    0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 /* Accessibility: respect reduced motion preference */
@@ -1348,35 +1425,35 @@ html:not(.window-mode-solid) .glass-float {
       --accent-indicator: oklch(41.9% 0.0657 41.09);
       --accent-track: oklch(41.9% 0.0657 41.09);
 
-      /* Gray P3 (light) */
-      --gray-1: oklch(93.9% 0.0057 43.2);
-      --gray-2: oklch(92.3% 0.0076 43.2);
-      --gray-3: oklch(89.2% 0.0116 43.2);
-      --gray-4: oklch(86.5% 0.0174 43.2);
-      --gray-5: oklch(83.8% 0.0197 43.2);
-      --gray-6: oklch(81% 0.0256 43.2);
-      --gray-7: oklch(77.4% 0.032 43.2);
-      --gray-8: oklch(71% 0.0427 43.2);
-      --gray-9: oklch(55.7% 0.0529 43.2);
-      --gray-10: oklch(52.2% 0.0494 43.2);
-      --gray-11: oklch(41.8% 0.0406 43.2);
-      --gray-12: oklch(24.3% 0.0409 43.2);
-      --gray-a1: color(display-p3 0.7529 0.7961 1 / 0.116);
-      --gray-a2: color(display-p3 0.0196 0.0902 0.5255 / 0.042);
-      --gray-a3: color(display-p3 0.1255 0.0078 0.2039 / 0.085);
-      --gray-a4: color(display-p3 0.2157 0.0039 0.0667 / 0.127);
-      --gray-a5: color(display-p3 0.1765 0.0039 0.0235 / 0.161);
-      --gray-a6: color(display-p3 0.2471 0.0353 0.0039 / 0.21);
-      --gray-a7: color(display-p3 0.2863 0.0627 0.0039 / 0.276);
-      --gray-a8: color(display-p3 0.3137 0.0745 0.0039 / 0.38);
-      --gray-a9: color(display-p3 0.251 0.0745 0 / 0.594);
-      --gray-a10: color(display-p3 0.2196 0.0588 0 / 0.629);
-      --gray-a11: color(display-p3 0.1451 0.0431 0 / 0.734);
-      --gray-a12: color(display-p3 0.1098 0.0353 0 / 0.922);
+      /* Gray P3 (light) — neutral, chroma = 0 */
+      --gray-1: oklch(93.9% 0 0);
+      --gray-2: oklch(92.3% 0 0);
+      --gray-3: oklch(89.2% 0 0);
+      --gray-4: oklch(86.5% 0 0);
+      --gray-5: oklch(83.8% 0 0);
+      --gray-6: oklch(81% 0 0);
+      --gray-7: oklch(77.4% 0 0);
+      --gray-8: oklch(71% 0 0);
+      --gray-9: oklch(55.7% 0 0);
+      --gray-10: oklch(52.2% 0 0);
+      --gray-11: oklch(41.8% 0 0);
+      --gray-12: oklch(24.3% 0 0);
+      --gray-a1: color(display-p3 0 0 0 / 0.078);
+      --gray-a2: color(display-p3 0 0 0 / 0.102);
+      --gray-a3: color(display-p3 0 0 0 / 0.141);
+      --gray-a4: color(display-p3 0 0 0 / 0.176);
+      --gray-a5: color(display-p3 0 0 0 / 0.208);
+      --gray-a6: color(display-p3 0 0 0 / 0.243);
+      --gray-a7: color(display-p3 0 0 0 / 0.290);
+      --gray-a8: color(display-p3 0 0 0 / 0.369);
+      --gray-a9: color(display-p3 0 0 0 / 0.549);
+      --gray-a10: color(display-p3 0 0 0 / 0.588);
+      --gray-a11: color(display-p3 0 0 0 / 0.702);
+      --gray-a12: color(display-p3 0 0 0 / 0.875);
       --gray-contrast: #FFFFFF;
       --gray-surface: color(display-p3 1 1 1 / 80%);
-      --gray-indicator: oklch(55.7% 0.0529 43.2);
-      --gray-track: oklch(55.7% 0.0529 43.2);
+      --gray-indicator: oklch(55.7% 0 0);
+      --gray-track: oklch(55.7% 0 0);
     }
 
     html.dark {
@@ -1410,76 +1487,260 @@ html:not(.window-mode-solid) .glass-float {
       --accent-indicator: oklch(47.4% 0.0623 41.64);
       --accent-track: oklch(47.4% 0.0623 41.64);
 
-      /* Gray P3 (dark) */
-      --gray-1: oklch(18.3% 0.0097 43.2);
-      --gray-2: oklch(21.5% 0.0092 43.2);
-      --gray-3: oklch(25.4% 0.0133 43.2);
-      --gray-4: oklch(28.3% 0.0152 43.2);
-      --gray-5: oklch(31.3% 0.019 43.2);
-      --gray-6: oklch(34.9% 0.0245 43.2);
-      --gray-7: oklch(40.1% 0.03 43.2);
-      --gray-8: oklch(49% 0.0406 43.2);
-      --gray-9: oklch(53.5% 0.0468 43.2);
-      --gray-10: oklch(58.1% 0.0459 43.2);
-      --gray-11: oklch(76.7% 0.039 43.2);
-      --gray-12: oklch(94.8% 0.0111 43.2);
-      --gray-a1: color(display-p3 0.0863 0.0706 0.8431 / 0.005);
-      --gray-a2: color(display-p3 0.8902 0.8745 0.9765 / 0.034);
-      --gray-a3: color(display-p3 1 0.8824 0.8706 / 0.077);
-      --gray-a4: color(display-p3 0.9961 0.8392 0.8275 / 0.112);
-      --gray-a5: color(display-p3 1 0.8275 0.7882 / 0.15);
-      --gray-a6: color(display-p3 1 0.8235 0.7529 / 0.197);
-      --gray-a7: color(display-p3 1 0.8235 0.7373 / 0.265);
-      --gray-a8: color(display-p3 1 0.7961 0.7137 / 0.394);
-      --gray-a9: color(display-p3 1 0.7961 0.6941 / 0.458);
-      --gray-a10: color(display-p3 1 0.8118 0.7294 / 0.518);
-      --gray-a11: color(display-p3 1 0.8824 0.8275 / 0.753);
-      --gray-a12: color(display-p3 1 0.9725 0.9569 / 0.949);
+      /* Gray P3 (dark) — neutral, chroma = 0 */
+      --gray-1: oklch(18.3% 0 0);
+      --gray-2: oklch(21.5% 0 0);
+      --gray-3: oklch(25.4% 0 0);
+      --gray-4: oklch(28.3% 0 0);
+      --gray-5: oklch(31.3% 0 0);
+      --gray-6: oklch(34.9% 0 0);
+      --gray-7: oklch(40.1% 0 0);
+      --gray-8: oklch(49% 0 0);
+      --gray-9: oklch(53.5% 0 0);
+      --gray-10: oklch(58.1% 0 0);
+      --gray-11: oklch(76.7% 0 0);
+      --gray-12: oklch(94.8% 0 0);
+      --gray-a1: color(display-p3 1 1 1 / 0.071);
+      --gray-a2: color(display-p3 1 1 1 / 0.098);
+      --gray-a3: color(display-p3 1 1 1 / 0.137);
+      --gray-a4: color(display-p3 1 1 1 / 0.165);
+      --gray-a5: color(display-p3 1 1 1 / 0.192);
+      --gray-a6: color(display-p3 1 1 1 / 0.227);
+      --gray-a7: color(display-p3 1 1 1 / 0.282);
+      --gray-a8: color(display-p3 1 1 1 / 0.376);
+      --gray-a9: color(display-p3 1 1 1 / 0.427);
+      --gray-a10: color(display-p3 1 1 1 / 0.482);
+      --gray-a11: color(display-p3 1 1 1 / 0.702);
+      --gray-a12: color(display-p3 1 1 1 / 0.933);
       --gray-contrast: #FFFFFF;
       --gray-surface: color(display-p3 0 0 0 / 5%);
-      --gray-indicator: oklch(53.5% 0.0468 43.2);
-      --gray-track: oklch(53.5% 0.0468 43.2);
+      --gray-indicator: oklch(53.5% 0 0);
+      --gray-track: oklch(53.5% 0 0);
     }
   }
 }
 
 /* ============================================
-   Apple Liquid Glass Dialog
-   macOS 26 UI Kit spec — multi-layer glass material
+   Apple Liquid Glass Design System
+   macOS 26 UI Kit — complete design tokens + components.
+   Source: Apple Design Resources Figma (light) +
+   Apple HIG dark-mode inversion rules.
+
+   IMPORTANT CSS GOTCHAS (see docs/architecture/LIQUID-GLASS.md):
+   • filter + backdrop-filter on SAME element = broken blur
+     (filter creates a "backdrop root" — blur sees empty pixels)
+   • Use box-shadow, not filter: drop-shadow()
+   • WebKit corner artifacts: -webkit-mask-image fix
+   • background-blend-mode only blends bg layers, not content behind
    ============================================ */
 
-/* Container — glass surface with backdrop blur directly on the element.
-   IMPORTANT: filter + backdrop-filter on the SAME element breaks the blur.
-   filter creates a new "backdrop root" — backdrop-filter sees empty pixels.
-   Use box-shadow instead of filter: drop-shadow() to avoid this.
-   WebKit corner fix: mask-image forces proper compositing of rounded corners. */
-.liquid-glass-dialog {
-  width: 260px;
-  border-radius: 10px !important;
-  overflow: hidden;
+/* ── Design Tokens (Light) ──────────────────────────── */
+:root {
+  /* Glass material */
+  --lg-blur: 40px;
+  --lg-saturate: 1.4;
+  --lg-tint: rgba(255, 255, 255, 0.55);
+
+  /* Controls — Apple's universal 24px/6px pattern */
+  --lg-control-h: 24px;
+  --lg-control-r: 6px;
+  --lg-control-bg: rgba(0, 0, 0, 0.05);
+  --lg-control-bg-hover: rgba(0, 0, 0, 0.08);
+
+  /* Typography — SF Pro weight 510 is "Medium" in Apple's scale */
+  --lg-text-primary: rgba(0, 0, 0, 0.85);
+  --lg-text-secondary: rgba(0, 0, 0, 0.5);
+  --lg-text-label: rgba(0, 0, 0, 0.55);
+  --lg-font-weight: 510;
+  --lg-font-weight-bold: 700;
+  --lg-font-size: 13px;
+  --lg-font-size-sm: 11px;
+  --lg-line-height: 16px;
+  --lg-line-height-sm: 14px;
+  --lg-letter-spacing: -0.02em;
+
+  /* Text fields */
+  --lg-input-bg: #FFFFFF;
+  --lg-input-border: 0px 0px 0px 1px rgba(0, 0, 0, 0.08);
+  --lg-input-focus: 0px 0px 0px 3.5px rgba(0, 122, 255, 0.25);
+  --lg-input-focus-thin: 0px 0px 0px 1px rgba(0, 122, 255, 0.15);
+  --lg-input-cursor: #0091FF;
+  --lg-input-placeholder: rgba(0, 0, 0, 0.35);
+
+  /* Glass border — layered shadows that simulate light refracting through a glass edge.
+     Top inner highlight (light catching rim) + subtle outer ring + soft depth shadow. */
+  --lg-glass-border:
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.45),
+    inset 0 -0.5px 0 0 rgba(0, 0, 0, 0.06),
+    0 0 0 0.5px rgba(0, 0, 0, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.04);
+
+  /* Separators & borders */
+  --lg-separator: rgba(0, 0, 0, 0.1);
+  --lg-border: rgba(0, 0, 0, 0.08);
+
+  /* Accent colors */
+  --lg-accent: #007AFF;
+  --lg-destructive: #FF3B30;
+  --lg-destructive-bg: rgba(255, 59, 48, 0.15);
+
+  /* Default button (primary action — Save, OK) */
+  --lg-default-bg: #000000;
+  --lg-default-text: #FFFFFF;
+
+  /* Regular button (secondary actions — Cancel, etc.) */
+  --lg-btn-bg: rgba(0, 0, 0, 0.05);
+  --lg-btn-bg-hover: rgba(0, 0, 0, 0.08);
+  --lg-btn-text: rgba(0, 0, 0, 0.85);
+
+  /* Alert dialog pill buttons (taller, fully rounded) */
+  --lg-alert-h: 32px;
+  --lg-alert-r: 100px;
+  --lg-alert-secondary-bg: rgba(0, 0, 0, 0.06);
+  --lg-alert-secondary-bg-hover: rgba(0, 0, 0, 0.1);
+  --lg-alert-secondary-text: rgba(0, 0, 0, 0.85);
+  --lg-alert-destructive-bg: rgba(255, 56, 60, 0.15);
+  --lg-alert-destructive-bg-hover: rgba(255, 56, 60, 0.22);
+  --lg-alert-destructive-text: #E5484D;
+
+  /* Window chrome */
+  --lg-window-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.23), 0px 16px 48px rgba(0, 0, 0, 0.35);
+  --lg-window-r: 10px;
+
+  /* Sidebar item states */
+  --lg-sidebar-selected: rgba(0, 0, 0, 0.11);
+  --lg-sidebar-hover: rgba(0, 0, 0, 0.07);
+
+  /* Segmented control */
+  --lg-segment-bg: rgba(0, 0, 0, 0.05);
+  --lg-segment-separator: rgba(0, 0, 0, 0.15);
+  --lg-segment-active: rgba(0, 0, 0, 0.85);
+  --lg-segment-inactive: rgba(0, 0, 0, 0.4);
+
+  /* Table */
+  --lg-table-header-border: rgba(0, 0, 0, 0.05);
+  --lg-table-col-border: rgba(0, 0, 0, 0.1);
+  --lg-table-row-h: 20px;
+  --lg-table-header-h: 28px;
+
+  /* Search field (pill shape) */
+  --lg-search-r: 1000px;
+
+  /* Close / disclosure button text */
+  --lg-close-text: rgba(0, 0, 0, 0.4);
+}
+
+/* ── Design Tokens (Dark) ───────────────────────────── */
+html.dark {
+  --lg-tint: rgba(190, 190, 190, 0.1);
+
+  --lg-control-bg: rgba(255, 255, 255, 0.07);
+  --lg-control-bg-hover: rgba(255, 255, 255, 0.1);
+
+  --lg-text-primary: rgba(255, 255, 255, 0.85);
+  --lg-text-secondary: rgba(255, 255, 255, 0.55);
+  --lg-text-label: rgba(255, 255, 255, 0.55);
+
+  --lg-input-bg: rgba(255, 255, 255, 0.08);
+  --lg-input-border: 0px 0px 0px 1px rgba(255, 255, 255, 0.08);
+  --lg-input-focus: 0px 0px 0px 3.5px rgba(10, 132, 255, 0.30);
+  --lg-input-focus-thin: 0px 0px 0px 1px rgba(10, 132, 255, 0.18);
+  --lg-input-cursor: #0A84FF;
+  --lg-input-placeholder: rgba(255, 255, 255, 0.35);
+
+  --lg-glass-border:
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.10),
+    inset 0 -0.5px 0 0 rgba(0, 0, 0, 0.25),
+    0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.20);
+
+  --lg-separator: rgba(255, 255, 255, 0.1);
+  --lg-border: rgba(255, 255, 255, 0.08);
+
+  --lg-accent: #0A84FF;
+  --lg-destructive: #FF453A;
+  --lg-destructive-bg: rgba(255, 69, 58, 0.23);
+
+  --lg-default-bg: #FFFFFF;
+  --lg-default-text: #000000;
+
+  --lg-btn-bg: rgba(255, 255, 255, 0.07);
+  --lg-btn-bg-hover: rgba(255, 255, 255, 0.1);
+  --lg-btn-text: rgba(255, 255, 255, 0.85);
+
+  --lg-alert-secondary-bg: #141414;
+  --lg-alert-secondary-bg-hover: #1f1f1f;
+  --lg-alert-secondary-text: rgba(255, 255, 255, 0.85);
+  --lg-alert-destructive-bg: rgba(255, 56, 60, 0.23);
+  --lg-alert-destructive-bg-hover: rgba(255, 56, 60, 0.32);
+  --lg-alert-destructive-text: #FF4245;
+
+  --lg-window-shadow: 0px 0px 0px 1px rgba(255, 255, 255, 0.08), 0px 16px 48px rgba(0, 0, 0, 0.5);
+
+  --lg-sidebar-selected: rgba(255, 255, 255, 0.11);
+  --lg-sidebar-hover: rgba(255, 255, 255, 0.07);
+
+  --lg-segment-bg: rgba(255, 255, 255, 0.04);
+  --lg-segment-separator: rgba(255, 255, 255, 0.1);
+  --lg-segment-active: rgba(255, 255, 255, 0.85);
+  --lg-segment-inactive: rgba(255, 255, 255, 0.4);
+
+  --lg-table-header-border: rgba(255, 255, 255, 0.05);
+  --lg-table-col-border: rgba(255, 255, 255, 0.1);
+
+  --lg-close-text: rgba(255, 255, 255, 0.5);
+}
+
+
+/* ── COMPONENT: Glass Surface ───────────────────────
+   Base backdrop-filter + tint for any glass container.
+   WebKit mask-image fixes rounded-corner compositing. */
+
+.lg-surface {
   isolation: isolate;
-  backdrop-filter: blur(40px) saturate(1.4);
-  -webkit-backdrop-filter: blur(40px) saturate(1.4);
-  box-shadow:
-    0 0 1px rgba(0, 0, 0, 0.2),
-    0 17px 45px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
   -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
   mask-image: linear-gradient(#000, #000);
 }
 
-/* Tint layer — adds the dark/light glass color on top of the blur.
-   Tuned to match the visual result of Figma's color-burn composite
-   while remaining translucent enough to let the blur show through */
+.lg-surface::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--lg-tint);
+}
+
+
+/* ── COMPONENT: Alert Dialog ────────────────────────
+   macOS 26 alert — glass surface + pill buttons.
+   Used by ConversationDeleteDialog. */
+
+.liquid-glass-dialog {
+  width: 260px;
+  border-radius: var(--lg-window-r) !important;
+  overflow: hidden;
+  isolation: isolate;
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  box-shadow: 0 0 1px rgba(0, 0, 0, 0.2), 0 17px 45px rgba(0, 0, 0, 0.5);
+  -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
+  mask-image: linear-gradient(#000, #000);
+}
+
 .liquid-glass-dialog::after {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 10px;
+  border-radius: var(--lg-window-r);
   z-index: -1;
   pointer-events: none;
+  background: var(--lg-tint);
 }
 
-/* Icon — 64x64 app icon with drop-shadow */
 .liquid-glass-icon {
   width: 64px;
   height: 64px;
@@ -1487,127 +1748,352 @@ html:not(.window-mode-solid) .glass-float {
   border-radius: 14px;
 }
 
-/* Title — SF Pro Bold 13/16 */
 .liquid-glass-title {
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 16px;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--lg-font-size);
+  font-weight: var(--lg-font-weight-bold);
+  line-height: var(--lg-line-height);
+  color: var(--lg-text-primary);
 }
 
-/* Description — SF Pro Regular 11/14 */
 .liquid-glass-desc {
-  font-size: 11px;
+  font-size: var(--lg-font-size-sm);
   font-weight: 400;
-  line-height: 14px;
-  color: rgba(255, 255, 255, 0.85);
+  line-height: var(--lg-line-height-sm);
+  color: var(--lg-text-secondary);
 }
 
-/* Buttons — pill-shaped, 32px height, SF Pro Medium 13/16 (weight 510) */
 .liquid-glass-btn {
-  height: 32px;
-  border-radius: 100px;
-  font-size: 13px;
-  font-weight: 510;
-  line-height: 16px;
+  height: var(--lg-alert-h);
+  border-radius: var(--lg-alert-r);
+  font-size: var(--lg-font-size);
+  font-weight: var(--lg-font-weight);
+  line-height: var(--lg-line-height);
   text-align: center;
   border: none;
 }
 
-/* Secondary button — solid dark */
 .liquid-glass-btn-secondary {
-  background: #141414;
-  color: rgba(255, 255, 255, 0.85);
+  background: var(--lg-alert-secondary-bg);
+  color: var(--lg-alert-secondary-text);
 }
 
 .liquid-glass-btn-secondary:hover {
-  background: #1f1f1f;
+  background: var(--lg-alert-secondary-bg-hover);
 }
 
-/* Primary destructive — translucent red */
 .liquid-glass-btn-destructive {
-  background: rgba(255, 56, 60, 0.23);
-  color: #FF4245;
+  background: var(--lg-alert-destructive-bg);
+  color: var(--lg-alert-destructive-text);
 }
 
 .liquid-glass-btn-destructive:hover {
-  background: rgba(255, 56, 60, 0.32);
+  background: var(--lg-alert-destructive-bg-hover);
 }
 
-/* Close button */
 .liquid-glass-close {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--lg-close-text);
 }
 
-/* ── Light mode overrides ──────────────────────────────── */
-/* Light: bright frosted tint — mostly white with slight warmth */
-:root .liquid-glass-dialog::after {
-  background: rgba(255, 255, 255, 0.55);
+
+/* ── COMPONENT: Regular Button (24px) ───────────────
+   Standard macOS 26 control button.
+   BG: #000 at 5% opacity (light) / #FFF at 7% (dark). */
+
+.lg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--lg-control-h);
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--lg-control-r);
+  font-size: var(--lg-font-size);
+  font-weight: var(--lg-font-weight);
+  line-height: var(--lg-line-height);
+  background: var(--lg-btn-bg);
+  color: var(--lg-btn-text);
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
-:root .liquid-glass-title {
-  color: rgba(0, 0, 0, 0.85);
+.lg-btn:hover {
+  background: var(--lg-btn-bg-hover);
 }
 
-:root .liquid-glass-desc {
-  color: rgba(0, 0, 0, 0.65);
+.lg-btn:active {
+  transform: scale(0.97);
 }
 
-:root .liquid-glass-btn-secondary {
-  background: rgba(0, 0, 0, 0.06);
-  color: rgba(0, 0, 0, 0.85);
+
+/* ── COMPONENT: Default Button (Primary Action) ────
+   Save, OK — solid tint with inverted text.
+   Light: black bg / white text.  Dark: white bg / black text. */
+
+.lg-btn-default {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--lg-control-h);
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--lg-control-r);
+  font-size: var(--lg-font-size);
+  font-weight: var(--lg-font-weight);
+  line-height: var(--lg-line-height);
+  background: var(--lg-default-bg);
+  color: var(--lg-default-text);
+  cursor: pointer;
+  transition: opacity 0.15s;
 }
 
-:root .liquid-glass-btn-secondary:hover {
-  background: rgba(0, 0, 0, 0.1);
+.lg-btn-default:hover {
+  opacity: 0.85;
 }
 
-:root .liquid-glass-btn-destructive {
-  background: rgba(255, 56, 60, 0.15);
-  color: #E5484D;
+.lg-btn-default:active {
+  transform: scale(0.97);
 }
 
-:root .liquid-glass-btn-destructive:hover {
-  background: rgba(255, 56, 60, 0.22);
+
+/* ── COMPONENT: Text Field ──────────────────────────
+   24px, 6px radius, white fill, 1px border.
+   Focus ring: 3.5px blue (thick) + 1px blue (thin). */
+
+.lg-input {
+  height: var(--lg-control-h);
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--lg-control-r);
+  background: var(--lg-input-bg);
+  box-shadow: var(--lg-input-border);
+  font-size: var(--lg-font-size);
+  font-weight: var(--lg-font-weight);
+  line-height: var(--lg-line-height);
+  color: var(--lg-text-primary);
+  outline: none;
+  caret-color: var(--lg-input-cursor);
+  transition: box-shadow 0.15s;
 }
 
-:root .liquid-glass-close {
-  color: rgba(0, 0, 0, 0.4);
+.lg-input::placeholder {
+  color: var(--lg-input-placeholder);
+  font-weight: var(--lg-font-weight);
 }
 
-/* ── Dark mode — slightly LIGHTER tint over blurred dark content.
-   Apple's dark glass is elevated (brighter than bg), not darker.
-   Warm light grey at low opacity lets the blur dominate. */
-html.dark .liquid-glass-dialog::after {
-  background: rgba(200, 190, 180, 0.1);
+.lg-input:focus {
+  box-shadow: var(--lg-input-border), var(--lg-input-focus);
 }
 
-html.dark .liquid-glass-title {
-  color: rgba(255, 255, 255, 0.85);
+
+/* ── COMPONENT: Search Field ────────────────────────
+   Pill-shaped variant of text field (border-radius 1000px).
+   Includes leading magnifying glass icon slot. */
+
+.lg-search {
+  height: var(--lg-control-h);
+  padding: 0 8px 0 8px;
+  border: none;
+  border-radius: var(--lg-search-r);
+  background: var(--lg-input-bg);
+  box-shadow: var(--lg-input-border);
+  font-size: var(--lg-font-size);
+  font-weight: var(--lg-font-weight);
+  line-height: var(--lg-line-height);
+  color: var(--lg-text-primary);
+  outline: none;
+  caret-color: var(--lg-input-cursor);
+  transition: box-shadow 0.15s;
 }
 
-html.dark .liquid-glass-desc {
-  color: rgba(255, 255, 255, 0.85);
+.lg-search::placeholder {
+  color: var(--lg-input-placeholder);
+  font-weight: var(--lg-font-weight);
 }
 
-html.dark .liquid-glass-btn-secondary {
-  background: #141414;
-  color: rgba(255, 255, 255, 0.85);
+.lg-search:focus {
+  box-shadow: var(--lg-input-border), var(--lg-input-focus);
 }
 
-html.dark .liquid-glass-btn-secondary:hover {
-  background: #1f1f1f;
+
+/* ── COMPONENT: Form Label ──────────────────────────
+   Right-aligned labels for form rows.
+   Apple uses weight 510, 13px, letter-spacing -0.02em. */
+
+.lg-label {
+  font-size: var(--lg-font-size);
+  font-weight: var(--lg-font-weight);
+  line-height: var(--lg-line-height-sm);
+  letter-spacing: var(--lg-letter-spacing);
+  color: var(--lg-text-label);
 }
 
-html.dark .liquid-glass-btn-destructive {
-  background: rgba(255, 56, 60, 0.23);
-  color: #FF4245;
+
+/* ── COMPONENT: Section Header ──────────────────────
+   Sidebar / list section divider — bold 11px, muted text. */
+
+.lg-section-header {
+  padding: 15px 12px 5px 18px;
+  font-size: var(--lg-font-size-sm);
+  font-weight: var(--lg-font-weight-bold);
+  line-height: var(--lg-line-height-sm);
+  color: var(--lg-text-secondary);
 }
 
-html.dark .liquid-glass-btn-destructive:hover {
-  background: rgba(255, 56, 60, 0.32);
+
+/* ── COMPONENT: Segmented Control ───────────────────
+   24px height, 6px radius, subtle background.
+   Active segment: primary text. Inactive: muted text.
+   1px separator between segments. */
+
+.lg-segmented {
+  display: inline-flex;
+  align-items: center;
+  height: var(--lg-control-h);
+  padding: 0;
+  border-radius: var(--lg-control-r);
+  background: var(--lg-segment-bg);
+  isolation: isolate;
 }
 
-html.dark .liquid-glass-close {
-  color: rgba(255, 255, 255, 0.5);
+.lg-segmented-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
+  height: 100%;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  font-size: var(--lg-font-size);
+  font-weight: var(--lg-font-weight);
+  line-height: var(--lg-line-height);
+  color: var(--lg-segment-inactive);
+  cursor: pointer;
+  border-radius: var(--lg-control-r);
+  transition: color 0.15s;
+}
+
+.lg-segmented-item[aria-selected="true"],
+.lg-segmented-item.active {
+  color: var(--lg-segment-active);
+}
+
+.lg-segmented-separator {
+  width: 1px;
+  height: 14px;
+  background: var(--lg-segment-separator);
+  flex-shrink: 0;
+}
+
+
+/* ── COMPONENT: Separator / Divider ─────────────────
+   1px line — horizontal (default) or vertical. */
+
+.lg-separator {
+  border: none;
+  border-top: 1px solid var(--lg-separator);
+  margin: 0;
+}
+
+.lg-separator-vertical {
+  border: none;
+  border-left: 1px solid var(--lg-separator);
+  align-self: stretch;
+}
+
+
+/* ── COMPONENT: Table ───────────────────────────────
+   Compact data table matching Apple's file picker table.
+   Header: 28px, bold 11px. Rows: 20px, medium 13px. */
+
+.lg-table-header {
+  display: flex;
+  align-items: center;
+  height: var(--lg-table-header-h);
+  border-bottom: 1px solid var(--lg-table-header-border);
+}
+
+.lg-table-header-cell {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: var(--lg-font-size-sm);
+  font-weight: var(--lg-font-weight-bold);
+  line-height: var(--lg-line-height-sm);
+  color: var(--lg-text-primary);
+}
+
+.lg-table-header-cell-secondary {
+  color: var(--lg-text-secondary);
+  font-weight: var(--lg-font-weight);
+}
+
+.lg-table-row {
+  display: flex;
+  align-items: center;
+  height: var(--lg-table-row-h);
+}
+
+.lg-table-cell {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: var(--lg-font-size);
+  font-weight: var(--lg-font-weight);
+  line-height: var(--lg-line-height);
+  color: var(--lg-text-primary);
+}
+
+.lg-table-cell-secondary {
+  color: var(--lg-text-secondary);
+}
+
+
+/* ── COMPONENT: Pulldown / Pop-Up Button ────────────
+   Dropdown trigger — same height/radius as buttons.
+   Includes trailing chevron indicator. */
+
+.lg-pulldown {
+  display: inline-flex;
+  align-items: center;
+  height: var(--lg-control-h);
+  padding: 0 0 0 12px;
+  gap: 8px;
+  border: none;
+  border-radius: var(--lg-control-r);
+  background: var(--lg-control-bg);
+  font-size: var(--lg-font-size);
+  font-weight: var(--lg-font-weight);
+  line-height: var(--lg-line-height);
+  color: var(--lg-text-primary);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.lg-pulldown:hover {
+  background: var(--lg-control-bg-hover);
+}
+
+.lg-pulldown-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+  font-weight: var(--lg-font-weight-bold);
+  color: var(--lg-text-primary);
+}
+
+
+/* ── COMPONENT: Bottom Button Bar ───────────────────
+   Dialog footer — separator top, leading + trailing buttons.
+   Spacing element in middle pushes trailing to the right. */
+
+.lg-button-bar {
+  display: flex;
+  align-items: center;
+  padding: 22px 17px 20px;
+  gap: 8px;
+  border-top: 1px solid var(--lg-separator);
 }

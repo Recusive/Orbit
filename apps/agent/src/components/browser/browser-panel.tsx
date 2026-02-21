@@ -427,7 +427,7 @@ export const BrowserPanel: FC = () => {
                 useBrowserStore.getState().reset();
                 useBrowserLifecycleStore.getState().reset();
               }}
-              className="px-3 py-1 text-xs font-medium bg-gray-4 text-gray-12 rounded hover:bg-accent transition-colors"
+              className="px-3 py-1 text-xs font-medium bg-lg-control text-foreground rounded hover:bg-accent transition-colors"
             >
               Reset
             </button>
@@ -437,7 +437,7 @@ export const BrowserPanel: FC = () => {
         {/* Empty state (before browser is created) */}
         {!isActive && !isCreating && !error && lifecycleState === 'idle' ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
-            <div className="flex flex-col items-center gap-3 rounded-lg bg-gray-3 dark:bg-background px-8 py-6 w-fit min-w-[14rem]">
+            <div className="flex flex-col items-center gap-3 rounded-lg bg-lg-control dark:bg-background px-8 py-6 w-fit min-w-[14rem]">
               <div className="flex items-center gap-3 opacity-50">
                 <OrbitLogo className="h-18 w-18" />
                 <div className="w-0.5 h-8 bg-current opacity-40" />
@@ -463,7 +463,7 @@ export const BrowserPanel: FC = () => {
           <div className="absolute bottom-4 right-4">
             <button
               onClick={handleCloseBrowser}
-              className="px-3 py-1 text-xs font-medium bg-gray-4 text-gray-12 rounded hover:bg-accent transition-colors"
+              className="px-3 py-1 text-xs font-medium bg-lg-control text-foreground rounded hover:bg-accent transition-colors"
             >
               Reset Browser State
             </button>

@@ -67,7 +67,10 @@ export const PermissionModal: FC<PermissionModalProps> = ({
 
   return (
     <div
-      className={cn('animate-permission-in overflow-hidden', !isLast && 'border-b border-gray-5')}
+      className={cn(
+        'animate-permission-in overflow-hidden',
+        !isLast && 'border-b border-lg-separator'
+      )}
     >
       {/* Single row: Icon + Label + Loader + Buttons */}
       <div className="flex items-center gap-2.5 px-3.5 py-2">
@@ -92,7 +95,7 @@ export const PermissionModal: FC<PermissionModalProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleDeny}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-gray-4 hover:bg-gray-5 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-lg-control hover:bg-lg-control-hover text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             Reject <span className="text-muted-foreground/50 ml-1">ESC</span>
           </button>

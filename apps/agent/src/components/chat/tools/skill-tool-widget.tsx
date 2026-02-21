@@ -43,20 +43,22 @@ export const SkillToolWidget: FC<SkillToolWidgetProps> = ({
         </div>
 
         {/* Label */}
-        <span className="text-xs text-gray-11 font-medium">Skill</span>
+        <span className="text-xs text-lg-text-secondary font-medium">Skill</span>
 
         {/* Skill name */}
         <span
           className={cn(
             'text-xs font-medium truncate',
-            isFailed ? 'text-gray-11 line-through' : 'text-gray-12'
+            isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
           )}
         >
           {skillName}
         </span>
 
         {/* Status indicator */}
-        {isRunning ? <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" /> : null}
+        {isRunning ? (
+          <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
+        ) : null}
 
         {isComplete ? (
           <span className="flex items-center gap-1 text-xs text-green-500/80">

@@ -135,7 +135,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
           onKeyDown={handleKeyDown}
           spellCheck={false}
           autoComplete="off"
-          className="h-7 w-full rounded-lg px-2 text-base bg-gray-4 border border-primary/50 outline-none focus:ring-1 focus:ring-primary/30"
+          className="h-7 w-full rounded-lg px-2 text-base bg-lg-input border border-lg-separator outline-none focus:ring-1 focus:ring-primary/30"
         />
       </form>
     );
@@ -153,9 +153,11 @@ export const ConversationItem: FC<ConversationItemProps> = ({
     >
       <button
         className={cn(
-          'flex items-center h-7 w-full rounded-lg pl-[7px] overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 transition-[background-color,padding] duration-100',
+          'flex items-center h-7 w-full rounded-lg pl-[7px] overflow-hidden hover:bg-lg-sidebar-hover transition-[background-color,padding] duration-100',
           isHovered ? 'pr-7' : 'pr-9',
-          active ? 'bg-gray-3 dark:bg-gray-4 text-foreground' : 'text-gray-11 hover:text-gray-12'
+          active
+            ? 'bg-lg-sidebar-selected text-foreground'
+            : 'text-lg-text-secondary hover:text-foreground'
         )}
         title={conversation.title}
         onClick={onClick}

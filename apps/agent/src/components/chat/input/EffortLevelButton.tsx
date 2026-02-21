@@ -63,7 +63,7 @@ export const EffortLevelButton: FC<EffortLevelButtonProps> = ({
             className={cn(
               'h-7 flex items-center justify-center gap-1 px-1.5 rounded-lg',
               TRANSITION_CLASSES.button,
-              'hover:bg-accent hover:scale-[1.02]',
+              'hover:bg-lg-control-hover hover:scale-[1.02]',
               'active:scale-95',
               'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
             )}
@@ -80,7 +80,7 @@ export const EffortLevelButton: FC<EffortLevelButtonProps> = ({
                 y1="8"
                 x2="16"
                 y2="8"
-                stroke="var(--gray-8)"
+                stroke="var(--muted-foreground)"
                 strokeWidth="0.5"
                 opacity="0.3"
               />
@@ -113,7 +113,7 @@ export const EffortLevelButton: FC<EffortLevelButtonProps> = ({
       <HoverCardContent
         side="top"
         align="center"
-        className="w-auto p-2.5 rounded-lg border border-gray-5"
+        className="w-auto p-2.5 rounded-lg border border-lg-separator"
         onMouseEnter={() => {
           setEffortHoverOpen(true);
         }}

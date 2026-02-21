@@ -196,7 +196,7 @@ export const ConversationDropdownMenu: FC<ConversationDropdownMenuProps> = ({
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            'h-6 w-6 flex items-center justify-center rounded-md transition-[background-color,transform] duration-100 hover:bg-gray-4 active:scale-90 focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+            'h-6 w-6 flex items-center justify-center rounded-md transition-[background-color,transform] duration-100 hover:bg-lg-control-hover active:scale-90 focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
             visible || open ? 'opacity-100' : 'opacity-0 pointer-events-none',
             className
           )}

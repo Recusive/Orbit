@@ -86,9 +86,9 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         role="group"
         tabIndex={0}
         className={cn(
-          'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-100 hover:bg-gray-5 dark:hover:bg-gray-4 cursor-default',
+          'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-100 hover:bg-lg-sidebar-hover cursor-default',
           active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground',
-          isExpanded && !active && 'bg-gray-5'
+          isExpanded && !active && 'bg-lg-sidebar-selected'
         )}
         onClick={handleRowClick}
         onKeyDown={(e) => {
@@ -102,7 +102,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         <button
           type="button"
           aria-label={isExpanded ? 'Collapse worktree' : 'Expand worktree'}
-          className="flex items-center justify-center shrink-0 hover:bg-gray-4 rounded-md"
+          className="flex items-center justify-center shrink-0 hover:bg-lg-control-hover rounded-md"
           style={{ width: SIDEBAR.iconColumnWidth - SIDEBAR.itemPadding }}
           onClick={handleChevronClick}
           onKeyDown={(e) => {
@@ -137,7 +137,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         <div
           className={cn(
             'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium mr-1 shrink-0 transition-colors duration-200',
-            worktree.isMain ? 'bg-primary/12 text-primary' : 'bg-gray-4 text-gray-11'
+            worktree.isMain ? 'bg-primary/12 text-primary' : 'bg-lg-control text-lg-text-secondary'
           )}
         >
           <GitBranch className="h-3 w-3" />
@@ -151,7 +151,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           <DropdownMenuTrigger asChild>
             <button
               className={cn(
-                'absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md transition-[background-color,opacity,transform] duration-150 hover:bg-gray-4 active:scale-90',
+                'absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md transition-[background-color,opacity,transform] duration-150 hover:bg-lg-control-hover active:scale-90',
                 isHovered ? 'opacity-100' : 'opacity-0'
               )}
               onClick={(e) => {

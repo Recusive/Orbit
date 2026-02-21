@@ -98,7 +98,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
         <p className="text-sm text-muted-foreground">{error}</p>
         <button
           onClick={() => void refresh()}
-          className="text-sm text-gray-12 hover:text-foreground hover:underline"
+          className="text-sm text-foreground hover:text-foreground hover:underline"
         >
           Retry
         </button>

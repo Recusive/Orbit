@@ -55,7 +55,7 @@ export const ChangeItem: React.FC<ChangeItemProps> = ({
   const dirChanged = oldFileDir !== null && oldFileDir !== fileDir;
 
   return (
-    <div className="group flex items-center gap-2 px-3 h-7 hover:bg-accent transition-[background-color] duration-150">
+    <div className="group flex items-center gap-2 px-3 h-7 hover:bg-lg-control-hover transition-[background-color] duration-150">
       {/* Status indicator */}
       <span className="w-4 flex justify-center shrink-0">{getStatusIcon(file.displayStatus)}</span>
 
@@ -63,14 +63,14 @@ export const ChangeItem: React.FC<ChangeItemProps> = ({
       <div className="flex items-baseline gap-1.5 flex-1 min-w-0">
         {file.oldPath ? (
           <span className="truncate text-sm">
-            <span className="text-gray-11">{oldFileName}</span>
+            <span className="text-lg-text-secondary">{oldFileName}</span>
             <span className="text-muted-foreground/40 mx-1">→</span>
             <span>{fileName}</span>
           </span>
         ) : (
           <span className="truncate text-sm">{fileName}</span>
         )}
-        <span className="text-[10px] text-gray-11 truncate shrink-[2]">
+        <span className="text-[10px] text-lg-text-secondary truncate shrink-[2]">
           {dirChanged ? `${oldFileDir} → ${fileDir}` : fileDir}
         </span>
       </div>
@@ -83,7 +83,7 @@ export const ChangeItem: React.FC<ChangeItemProps> = ({
               onDiscard(file.path);
             }}
             disabled={isLoading}
-            className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-accent active:scale-95 transition-[background-color,color,transform] duration-150"
+            className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-lg-control-hover active:scale-95 transition-[background-color,color,transform] duration-150"
             title="Discard"
           >
             <X className="h-3 w-3" />
@@ -92,7 +92,7 @@ export const ChangeItem: React.FC<ChangeItemProps> = ({
         <button
           onClick={() => void onAction(file.path)}
           disabled={isLoading}
-          className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-accent active:scale-95 transition-[background-color,color,transform] duration-150"
+          className="h-5 w-5 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-[background-color,color,transform] duration-150"
           title={actionIcon === 'stage' ? 'Stage' : 'Unstage'}
         >
           {actionIcon === 'stage' ? <Plus className="h-3 w-3" /> : <Minus className="h-3 w-3" />}

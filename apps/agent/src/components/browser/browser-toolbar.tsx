@@ -172,7 +172,7 @@ export const BrowserToolbar: FC<BrowserToolbarProps> = ({
           onKeyDown={handleUrlKeyDown}
           placeholder="Enter URL..."
           aria-label="Browser URL"
-          className="w-full h-7 px-3 rounded-md bg-gray-4 dark:bg-background border-2 border-transparent text-sm outline-none placeholder:text-gray-10 focus:border-primary/40 transition-colors duration-200"
+          className="w-full h-7 px-3 rounded-md bg-lg-control dark:bg-background border-2 border-transparent text-sm outline-none placeholder:text-lg-text-secondary focus:border-primary/40 transition-colors duration-200"
         />
       </div>
 

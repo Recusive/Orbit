@@ -55,8 +55,8 @@ export const PowersSection: FC<PowersSectionProps> = ({ onSkillsClick }) => {
       {/* Header — identical structure to SidebarItem expanded layout */}
       <button
         className={cn(
-          'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground',
-          isExpanded && 'bg-gray-5 dark:bg-gray-4 text-foreground'
+          'flex items-center gap-1.5 h-8 rounded-lg mx-1.5 overflow-hidden hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground',
+          isExpanded && 'bg-lg-sidebar-selected text-foreground'
         )}
         onClick={handleToggle}
         aria-expanded={isExpanded}
@@ -86,7 +86,7 @@ export const PowersSection: FC<PowersSectionProps> = ({ onSkillsClick }) => {
             {POWER_ITEMS.map((item) => (
               <div key={item.label} className="relative group mx-1.5 ml-2">
                 <button
-                  className="flex items-center gap-2 h-7 w-full rounded-lg pl-[7px] pr-3 overflow-hidden hover:bg-gray-3 dark:hover:bg-gray-4 transition-[background-color] duration-100 text-sidebar-foreground hover:text-foreground"
+                  className="flex items-center gap-2 h-7 w-full rounded-lg pl-[7px] pr-3 overflow-hidden hover:bg-lg-sidebar-hover transition-[background-color] duration-100 text-sidebar-foreground hover:text-foreground"
                   title={item.label}
                   onClick={item.label === 'Skills' ? onSkillsClick : undefined}
                 >

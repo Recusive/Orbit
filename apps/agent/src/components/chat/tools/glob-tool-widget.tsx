@@ -85,20 +85,20 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >
             {statusLabel}
           </span>
 
           {!isRunning && !isFailed && fileCount > 0 ? (
-            <span className="text-xs text-gray-9">
+            <span className="text-xs text-muted-foreground">
               ({fileCount} {fileCount === 1 ? 'file' : 'files'})
             </span>
           ) : null}
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
         </div>
 
@@ -107,7 +107,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
         {/* Right: chevron */}
         <ChevronRight
           className={cn(
-            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
             isExpanded && 'rotate-90'
           )}
         />
@@ -145,21 +145,21 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-lg-separator bg-card overflow-hidden">
                   {/* Pattern & Path */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
                       pattern
                     </div>
-                    <code className="block bg-gray-4 rounded-md px-2 py-1 font-mono text-sm text-gray-12">
+                    <code className="block bg-lg-control rounded-md px-2 py-1 font-mono text-sm text-foreground">
                       {pattern}
                     </code>
                     {path ? (
                       <>
-                        <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1 mt-2">
+                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
                           in
                         </div>
-                        <span className="text-sm text-gray-11 font-mono">{path}</span>
+                        <span className="text-sm text-lg-text-secondary font-mono">{path}</span>
                       </>
                     ) : null}
                   </div>
@@ -168,12 +168,12 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
                     {isRunning ? (
-                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
+                      <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Searching for files...</span>
                       </div>
                     ) : files.length > 0 ? (
-                      <div className="space-y-0.5 max-h-[200px] overflow-y-auto overflow-x-hidden bg-gray-3 rounded-md p-2">
+                      <div className="space-y-0.5 max-h-[200px] overflow-y-auto overflow-x-hidden bg-lg-control rounded-md p-2">
                         {files.map((file, index) => (
                           <button
                             key={`${file}-${String(index)}`}
@@ -181,24 +181,27 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                             onClick={() => {
                               onOpenFile?.(file);
                             }}
-                            className="w-full flex items-center gap-1.5 text-sm py-0.5 hover:bg-gray-4 rounded px-1.5 -mx-1.5 transition-colors overflow-hidden cursor-pointer text-left"
+                            className="w-full flex items-center gap-1.5 text-sm py-0.5 hover:bg-lg-control rounded px-1.5 -mx-1.5 transition-colors overflow-hidden cursor-pointer text-left"
                           >
                             {file.endsWith('/') ? (
-                              <Folder className="h-3 w-3 text-gray-9 shrink-0" />
+                              <Folder className="h-3 w-3 text-muted-foreground shrink-0" />
                             ) : (
-                              <File className="h-3 w-3 text-gray-9 shrink-0" />
+                              <File className="h-3 w-3 text-muted-foreground shrink-0" />
                             )}
-                            <span className="font-mono text-gray-12 shrink-0">
+                            <span className="font-mono text-foreground shrink-0">
                               {getFileName(file)}
                             </span>
-                            <span className="text-gray-9 truncate text-right flex-1" title={file}>
+                            <span
+                              className="text-muted-foreground truncate text-right flex-1"
+                              title={file}
+                            >
                               {file}
                             </span>
                           </button>
                         ))}
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-9 italic">No files found</div>
+                      <div className="text-sm text-muted-foreground italic">No files found</div>
                     )}
                   </div>
                 </div>
@@ -219,7 +222,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>

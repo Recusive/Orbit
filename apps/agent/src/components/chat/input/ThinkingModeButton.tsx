@@ -35,7 +35,7 @@ export const ThinkingModeButton: FC<ThinkingModeButtonProps> = ({
             className={cn(
               'h-7 flex items-center justify-center gap-1 px-1.5 rounded-lg',
               TRANSITION_CLASSES.button,
-              'hover:bg-accent hover:scale-[1.02]',
+              'hover:bg-lg-control-hover hover:scale-[1.02]',
               'active:scale-95',
               'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
               thinkingMode === 'off' && 'text-muted-foreground/70 hover:text-foreground'
@@ -71,7 +71,7 @@ export const ThinkingModeButton: FC<ThinkingModeButtonProps> = ({
       <HoverCardContent
         side="top"
         align="center"
-        className="w-auto p-2.5 rounded-lg border border-gray-5"
+        className="w-auto p-2.5 rounded-lg border border-lg-separator"
         onMouseEnter={() => {
           setThinkingHoverOpen(true);
         }}

@@ -71,7 +71,7 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={measurableRef} />
       <PopoverContent
-        className="w-[280px] p-0 rounded-[12px] border border-gray-5 shadow-lg"
+        className="w-[280px] p-0 rounded-[12px] border border-lg-separator shadow-lg"
         side="top"
         align="start"
         sideOffset={8}
@@ -199,7 +199,7 @@ const CommandItem: FC<CommandItemProps> = ({ command, isSelected, isFirst, isLas
         'relative flex cursor-pointer gap-2.5 select-none items-center border-l-2 border-transparent pl-2 pr-2.5 py-2 outline-none',
         isSelected
           ? 'rounded-r-md bg-primary/10 text-foreground border-primary/60'
-          : 'rounded-md hover:bg-accent active:scale-[0.99]'
+          : 'rounded-md hover:bg-lg-control-hover active:scale-[0.99]'
       )}
     >
       {command.kind === 'skill' ? (

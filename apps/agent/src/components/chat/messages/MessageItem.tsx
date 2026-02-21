@@ -110,7 +110,7 @@ const UserMessageBubble: FC<{ readonly content: string; readonly animate: boolea
         <>
           {tokens.map((token, i) => (
             <span key={i}>
-              <code className="rounded bg-gray-6 px-1.5 py-0.5 font-mono text-sm">
+              <code className="rounded bg-lg-control px-1.5 py-0.5 font-mono text-sm">
                 {token}
               </code>{' '}
             </span>
@@ -125,7 +125,7 @@ const UserMessageBubble: FC<{ readonly content: string; readonly animate: boolea
     return (
       <div
         className={cn(
-          'w-fit rounded-lg bg-gray-4 px-3.5 pt-2.5',
+          'w-fit rounded-lg bg-lg-control px-3.5 pt-2.5',
           isCollapsed ? 'pb-0' : 'pb-2.5',
           animate === true && 'animate-message-in'
         )}
@@ -147,7 +147,7 @@ const UserMessageBubble: FC<{ readonly content: string; readonly animate: boolea
 
           {/* Gradient fade overlay when collapsed */}
           {isCollapsed ? (
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-gray-4 to-transparent pointer-events-none" />
+            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-lg-control to-transparent pointer-events-none" />
           ) : null}
         </div>
 
@@ -313,7 +313,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                 <div key={segment.key} className="tool-widget">
                   <ErrorBoundary
                     fallback={
-                      <div className="p-2 rounded-md bg-gray-3 border border-gray-5 text-gray-12 text-sm">
+                      <div className="p-2 rounded-md bg-lg-control border border-lg-separator text-foreground text-sm">
                         Failed to render tool: {segment.tool.toolName}
                       </div>
                     }

@@ -68,24 +68,24 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
           />
         </div>
 
-        <span className="text-xs text-gray-11 font-medium">Read</span>
+        <span className="text-xs text-lg-text-secondary font-medium">Read</span>
         <span
           className={cn(
             'text-xs font-medium truncate',
-            isFailed ? 'text-gray-11 line-through' : 'text-gray-12'
+            isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
           )}
         >
           {fileName}
           {!isRunning && !isFailed && lineCount > 0 ? (
-            <span className="text-gray-11 ml-1 font-mono text-xs">#L1-{lineCount}</span>
+            <span className="text-lg-text-secondary ml-1 font-mono text-xs">#L1-{lineCount}</span>
           ) : null}
         </span>
         {isFailed ? <span className="text-xs text-destructive/60">Failed</span> : null}
 
         {isRunning ? (
-          <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+          <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
         ) : (
-          <ArrowUpRight className="h-3 w-3 text-gray-9 opacity-0 translate-y-0.5 -translate-x-0.5 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-[opacity,translate] duration-200 ease-out shrink-0" />
+          <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-0 translate-y-0.5 -translate-x-0.5 group-hover:opacity-100 group-hover:translate-y-0 group-hover:translate-x-0 transition-[opacity,translate] duration-200 ease-out shrink-0" />
         )}
       </div>
     </button>

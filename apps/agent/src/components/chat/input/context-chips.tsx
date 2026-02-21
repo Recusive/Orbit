@@ -56,7 +56,7 @@ const ContextChip: FC<ContextChipProps> = ({ item, onRemove }) => {
         'group flex items-center gap-1.5 pl-2 pr-1 py-1 text-xs rounded-md border transition-colors shrink-0 max-w-[180px]',
         isSkill
           ? 'bg-primary/10 hover:bg-primary/15 border-primary/30'
-          : 'bg-gray-4 hover:bg-gray-5 border-gray-7'
+          : 'bg-lg-control hover:bg-lg-control-hover border-lg-border'
       )}
     >
       {/* Icon: skill / image / file */}
@@ -80,7 +80,7 @@ const ContextChip: FC<ContextChipProps> = ({ item, onRemove }) => {
         onClick={() => {
           onRemove(item.id);
         }}
-        className="h-4 w-4 flex items-center justify-center rounded transition-opacity opacity-0 group-hover:opacity-100 hover:bg-accent shrink-0 -mr-0.5"
+        className="h-4 w-4 flex items-center justify-center rounded transition-opacity opacity-0 group-hover:opacity-100 hover:bg-lg-control-hover shrink-0 -mr-0.5"
         title="Remove"
       >
         <X className="h-3 w-3" />

@@ -44,10 +44,10 @@ const Toaster: FC<ToasterProps> = (props) => {
       toastOptions={{
         classNames: {
           toast:
-            'group toast group-[.toaster]:bg-gray-2 group-[.toaster]:text-gray-12 group-[.toaster]:border group-[.toaster]:border-gray-5 group-[.toaster]:shadow-lg group-[.toaster]:rounded-lg dark:group-[.toaster]:bg-gray-3',
-          description: 'group-[.toast]:text-gray-10',
-          actionButton: 'group-[.toast]:bg-gray-12 group-[.toast]:text-gray-1',
-          cancelButton: 'group-[.toast]:bg-gray-4 group-[.toast]:text-gray-11',
+            'group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border group-[.toaster]:border-lg-separator group-[.toaster]:shadow-lg group-[.toaster]:rounded-lg',
+          description: 'group-[.toast]:text-lg-text-secondary',
+          actionButton: 'group-[.toast]:bg-lg-default-bg group-[.toast]:text-lg-default-text',
+          cancelButton: 'group-[.toast]:bg-lg-control group-[.toast]:text-lg-text-secondary',
           error:
             'group-[.toaster]:border-destructive/40 group-[.toaster]:text-destructive [&_[data-icon]>svg]:text-destructive',
           success:

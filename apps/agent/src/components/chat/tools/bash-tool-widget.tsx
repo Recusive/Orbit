@@ -147,14 +147,14 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
           <span
             className={cn(
               'text-xs font-medium truncate',
-              isFailed ? 'text-gray-11 line-through' : 'text-gray-11'
+              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >
             {statusLabel}
           </span>
 
           {isRunning ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-gray-11 shrink-0" />
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
         </div>
 
@@ -163,7 +163,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
         {/* Right: chevron */}
         <ChevronRight
           className={cn(
-            'h-3 w-3 text-gray-9 opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+            'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
             isExpanded && 'rotate-90'
           )}
         />
@@ -205,19 +205,19 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-gray-5 bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-lg-separator bg-card overflow-hidden">
                   {/* Command section */}
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
                       command
                     </div>
                     {highlightedCommand ? (
                       <div
-                        className="bg-gray-4 rounded-md px-2 py-1 font-mono text-sm [&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word [&_code]:bg-transparent!"
+                        className="bg-lg-control rounded-md px-2 py-1 font-mono text-sm [&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word [&_code]:bg-transparent!"
                         dangerouslySetInnerHTML={{ __html: highlightedCommand }}
                       />
                     ) : (
-                      <code className="block bg-gray-4 rounded-md px-2 py-1 font-mono text-sm text-gray-12 break-all">
+                      <code className="block bg-lg-control rounded-md px-2 py-1 font-mono text-sm text-foreground break-all">
                         {command}
                       </code>
                     )}
@@ -228,10 +228,10 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                     <>
                       <div className="h-px bg-border/20 mx-3" />
                       <div className="px-3 py-2">
-                        <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1">
+                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1">
                           description
                         </div>
-                        <div className="text-sm text-gray-11">{description}</div>
+                        <div className="text-sm text-lg-text-secondary">{description}</div>
                       </div>
                     </>
                   ) : null}
@@ -239,16 +239,16 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                   {/* Output section */}
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-gray-9 uppercase mb-1.5">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
                       output
                     </div>
                     {isRunning && !output ? (
-                      <div className="flex items-center gap-1.5 text-sm text-gray-11">
+                      <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         <span>Running command...</span>
                       </div>
                     ) : output ? (
-                      <div className="bg-gray-3 rounded-md p-2 font-mono text-sm leading-relaxed text-gray-12 overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
+                      <div className="bg-lg-control rounded-md p-2 font-mono text-sm leading-relaxed text-foreground overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
                         {highlightedOutput ? (
                           /* SECURITY: Safe — highlightedOutput comes from Shiki's codeToHtml() which HTML-escapes all content */
                           <div
@@ -261,13 +261,13 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                           </pre>
                         )}
                         {hasMoreLines ? (
-                          <div className="mt-1.5 text-gray-9 text-xs">
+                          <div className="mt-1.5 text-muted-foreground text-xs">
                             {String(outputLines.length)} lines total
                           </div>
                         ) : null}
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-9 italic">No output</div>
+                      <div className="text-sm text-muted-foreground italic">No output</div>
                     )}
                   </div>
                 </div>
@@ -288,7 +288,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                       <CheckCircle2 className="h-3 w-3 text-green-500/80" />
                     )}
                   </div>
-                  <span className="ml-2.5 text-xs text-gray-11">
+                  <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>
