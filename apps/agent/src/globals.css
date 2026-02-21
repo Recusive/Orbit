@@ -1411,3 +1411,172 @@ html:not(.window-mode-solid) .glass-float {
     }
   }
 }
+
+/* ============================================
+   Apple Liquid Glass Dialog
+   macOS 26 UI Kit spec — multi-layer glass material
+   ============================================ */
+
+/* Container — glass surface with backdrop blur directly on the element.
+   IMPORTANT: filter + backdrop-filter on the SAME element breaks the blur.
+   filter creates a new "backdrop root" — backdrop-filter sees empty pixels.
+   Use box-shadow instead of filter: drop-shadow() to avoid this.
+   WebKit corner fix: mask-image forces proper compositing of rounded corners. */
+.liquid-glass-dialog {
+  width: 260px;
+  border-radius: 10px !important;
+  overflow: hidden;
+  isolation: isolate;
+  backdrop-filter: blur(40px) saturate(1.4);
+  -webkit-backdrop-filter: blur(40px) saturate(1.4);
+  box-shadow:
+    0 0 1px rgba(0, 0, 0, 0.2),
+    0 17px 45px rgba(0, 0, 0, 0.5);
+  -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
+  mask-image: linear-gradient(#000, #000);
+}
+
+/* Tint layer — adds the dark/light glass color on top of the blur.
+   Tuned to match the visual result of Figma's color-burn composite
+   while remaining translucent enough to let the blur show through */
+.liquid-glass-dialog::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Icon — 64x64 app icon with drop-shadow */
+.liquid-glass-icon {
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.25));
+  border-radius: 14px;
+}
+
+/* Title — SF Pro Bold 13/16 */
+.liquid-glass-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 16px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Description — SF Pro Regular 11/14 */
+.liquid-glass-desc {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 14px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Buttons — pill-shaped, 32px height, SF Pro Medium 13/16 (weight 510) */
+.liquid-glass-btn {
+  height: 32px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 510;
+  line-height: 16px;
+  text-align: center;
+  border: none;
+}
+
+/* Secondary button — solid dark */
+.liquid-glass-btn-secondary {
+  background: #141414;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.liquid-glass-btn-secondary:hover {
+  background: #1f1f1f;
+}
+
+/* Primary destructive — translucent red */
+.liquid-glass-btn-destructive {
+  background: rgba(255, 56, 60, 0.23);
+  color: #FF4245;
+}
+
+.liquid-glass-btn-destructive:hover {
+  background: rgba(255, 56, 60, 0.32);
+}
+
+/* Close button */
+.liquid-glass-close {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Light mode overrides ──────────────────────────────── */
+/* Light: bright frosted tint — mostly white with slight warmth */
+:root .liquid-glass-dialog::after {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+:root .liquid-glass-title {
+  color: rgba(0, 0, 0, 0.85);
+}
+
+:root .liquid-glass-desc {
+  color: rgba(0, 0, 0, 0.65);
+}
+
+:root .liquid-glass-btn-secondary {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.85);
+}
+
+:root .liquid-glass-btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+:root .liquid-glass-btn-destructive {
+  background: rgba(255, 56, 60, 0.15);
+  color: #E5484D;
+}
+
+:root .liquid-glass-btn-destructive:hover {
+  background: rgba(255, 56, 60, 0.22);
+}
+
+:root .liquid-glass-close {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+/* ── Dark mode — slightly LIGHTER tint over blurred dark content.
+   Apple's dark glass is elevated (brighter than bg), not darker.
+   Warm light grey at low opacity lets the blur dominate. */
+html.dark .liquid-glass-dialog::after {
+  background: rgba(200, 190, 180, 0.1);
+}
+
+html.dark .liquid-glass-title {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+html.dark .liquid-glass-desc {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+html.dark .liquid-glass-btn-secondary {
+  background: #141414;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+html.dark .liquid-glass-btn-secondary:hover {
+  background: #1f1f1f;
+}
+
+html.dark .liquid-glass-btn-destructive {
+  background: rgba(255, 56, 60, 0.23);
+  color: #FF4245;
+}
+
+html.dark .liquid-glass-btn-destructive:hover {
+  background: rgba(255, 56, 60, 0.32);
+}
+
+html.dark .liquid-glass-close {
+  color: rgba(255, 255, 255, 0.5);
+}

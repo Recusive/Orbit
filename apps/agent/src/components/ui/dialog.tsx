@@ -91,6 +91,32 @@ const DialogContentTopCenter = React.forwardRef<
 ));
 DialogContentTopCenter.displayName = 'DialogContentTopCenter';
 
+// Apple Liquid Glass dialog — transparent overlay so backdrop-filter sees the real app
+const DialogContentGlass = React.forwardRef<
+  React.ComponentRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
+  <DialogPortal>
+    {/* Near-transparent overlay — keeps app content visible for backdrop blur */}
+    <DialogOverlay className="flex items-center justify-center !bg-black/5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+      <div className="relative">
+        <DialogPrimitive.Content
+          ref={ref}
+          className={cn(
+            'relative z-10 grid bg-transparent duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 pointer-events-auto',
+            className
+          )}
+          {...props}
+        >
+          {children}
+        </DialogPrimitive.Content>
+      </div>
+    </div>
+  </DialogPortal>
+));
+DialogContentGlass.displayName = 'DialogContentGlass';
+
 const DialogHeader = ({
   className,
   ...props
@@ -141,6 +167,7 @@ export {
   DialogTrigger,
   DialogClose,
   DialogContent,
+  DialogContentGlass,
   DialogContentTopCenter,
   DialogHeader,
   DialogFooter,
