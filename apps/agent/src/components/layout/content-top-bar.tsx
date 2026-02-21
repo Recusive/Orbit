@@ -266,15 +266,6 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
     >
       {/* Left section: [button] | project name | chat name */}
       <div className="flex items-center gap-1.5 pl-2 min-w-0">
-        {/* In demo mode, render fake macOS traffic light dots */}
-        {isDemo ? (
-          <div className="flex items-center gap-[7px] mr-3">
-            <div className="size-[11px] rounded-full bg-[#FF5F57]" />
-            <div className="size-[11px] rounded-full bg-[#FEBC2E]" />
-            <div className="size-[11px] rounded-full bg-[#28C840]" />
-          </div>
-        ) : null}
-
         {/* Navigation + sidebar controls — only visible when sidebar is closed */}
         {!sidebarOpen && !isDemo ? (
           <div className="flex items-center gap-1 shrink-0">

@@ -474,9 +474,11 @@ html.window-mode-solid.light {
   --background: var(--gray-2);
   --card: var(--gray-2);
   --popover: var(--gray-2);
-  --chat-area: var(--gray-2);
+  --chat-area: #ffffff;
   --editor-bg: var(--gray-2);
   --sidebar: var(--gray-2);
+  /* Match native glass defocus fallback (#F0F0F0) from glass_defocus.rs */
+  --base-layer: #F0F0F0;
 }
 
 /* Dark mode - Solid (+1 bump) */
@@ -488,6 +490,8 @@ html.window-mode-solid.dark {
   --chat-area: var(--gray-1);
   --editor-bg: var(--gray-2);
   --sidebar: var(--gray-3);
+  /* Match defocused liquid glass sidebar appearance */
+  --base-layer: #2A2A2A;
 }
 
 /* ============================================

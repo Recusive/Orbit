@@ -801,6 +801,10 @@ Use specific API names in queries (e.g., "canUseTool", "permissionMode", "PreToo
 Search SDK docs whenever working on agent-bridge, SDK integration, permissions, hooks, MCP, sessions, or tools.
 </sdk_documentation>
 
+<git_policy importance="critical">
+<rule name="PR merge method">NEVER use squash merge. Use "Rebase and merge" (preferred) or "Create a merge commit". Squash merge collapses all branch commits into one, losing individual contributions from the GitHub graph. Squash merge is disabled in repo settings.</rule>
+</git_policy>
+
 <changelog>
   <period date="February 2026">
     <entry>Knip dead code analysis - Fixed config for non-standard monorepo workspace structure</entry>

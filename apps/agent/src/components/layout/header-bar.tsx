@@ -130,16 +130,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
     >
       {/* Navigation arrows — hidden until handlers are implemented
        * (Code review: Opus cycle 3, issue #18) */}
-      <div className="flex items-center gap-0.5">
-        {/* In demo mode, render fake macOS traffic light dots (native Tauri controls don't exist in iframe) */}
-        {isDemo ? (
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-[7px]">
-            <div className="size-[11px] rounded-full bg-[#FF5F57]" />
-            <div className="size-[11px] rounded-full bg-[#FEBC2E]" />
-            <div className="size-[11px] rounded-full bg-[#28C840]" />
-          </div>
-        ) : null}
-      </div>
+      <div className="flex items-center gap-0.5" />
 
       {/* Center tabs - only show when workspace is open (or in demo mode) */}
       {hasWorkspace || isDemo ? (
