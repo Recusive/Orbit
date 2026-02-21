@@ -345,7 +345,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                         className={cn(
                           'text-[9px] font-medium px-1.5 py-0.5 rounded-full',
                           model.badge === 'New'
-                            ? 'text-primary bg-primary/15'
+                            ? 'text-foreground bg-foreground/10'
                             : 'text-lg-text-secondary bg-lg-control'
                         )}
                       >

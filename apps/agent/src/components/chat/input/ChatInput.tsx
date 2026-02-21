@@ -129,7 +129,13 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
         e.stopPropagation();
         onPermissionApprove(firstPermission.requestId);
       }
-      // Cmd+Backspace denies
+      // ESC denies the first permission (matches the button label)
+      else if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        onPermissionDeny(firstPermission.requestId);
+      }
+      // Cmd+Backspace also denies (legacy shortcut)
       else if (e.key === 'Backspace' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         e.stopPropagation();

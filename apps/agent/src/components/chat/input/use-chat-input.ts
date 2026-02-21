@@ -526,7 +526,8 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   }, [effortLevel]);
 
   const getInputBoxClasses = useCallback((): string => {
-    const base = 'w-full p-1 glass-input';
+    const base =
+      'w-full p-1 rounded-[14px] border bg-gray-1 dark:bg-[oklch(23%_0_0)] dark:border-white/8 dark:shadow-md border-white shadow-[0_0_12px_rgba(0,0,0,0.08),0_0_24px_rgba(0,0,0,0.05)]';
     switch (inputMode) {
       case 'plan':
         return cn(base, 'ring-2 ring-dotted ring-mode-plan/40');

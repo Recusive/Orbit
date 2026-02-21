@@ -64,7 +64,7 @@ const PREFERS_REDUCED_MOTION =
 /** Activity panel slide transition — margin reclaims space, transform moves it off-screen */
 const ACTIVITY_TRANSITION: string | undefined = PREFERS_REDUCED_MOTION
   ? undefined
-  : `margin-right ${CONTENT_CARD.transition}, transform ${CONTENT_CARD.transition}`;
+  : `margin-right ${CONTENT_CARD.transition}`;
 
 /** Terminal panel slide transition — height for collapse, margin/transform for hide */
 const TERMINAL_TRANSITION: string | undefined = PREFERS_REDUCED_MOTION
@@ -415,12 +415,10 @@ const App: FC = () => {
     (): CSSProperties => ({
       width: reviewPanelWidth,
       marginRight: activityOpen ? 0 : -reviewPanelWidth,
-      transform: activityOpen ? 'translateX(0)' : 'translateX(100%)',
       flexShrink: 0,
-      // No overflow:hidden here — it was blocking CSS height transitions on the
-      // terminal card inside (WebKit doesn't repaint children's transitions inside
-      // an overflow:hidden + transform container). The main content wrapper's
-      // overflow-hidden clips the slide animation instead.
+      // marginRight alone drives both the slide and space-reclaim — the parent's
+      // overflow-hidden clips the panel as it moves past the edge. This keeps the
+      // activity card and chat area edges perfectly in sync (no gap/flash).
       transition: ACTIVITY_TRANSITION,
     }),
     [activityOpen, reviewPanelWidth]
@@ -617,7 +615,7 @@ const App: FC = () => {
                         <div
                           className="absolute inset-x-0 top-0 h-8 z-10 pointer-events-none"
                           style={{
-                            background: 'linear-gradient(to bottom, var(--card), transparent)',
+                            background: 'linear-gradient(to bottom, var(--chat-area), transparent)',
                           }}
                           aria-hidden="true"
                         />

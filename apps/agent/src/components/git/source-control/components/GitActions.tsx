@@ -38,8 +38,8 @@ export const GitActions: React.FC<GitActionsProps> = ({
         className="
           flex-1 flex items-center justify-center gap-1.5
           h-7 rounded-lg text-sm font-medium
-          bg-primary text-primary-foreground
-          hover:bg-primary/90
+          bg-foreground text-background
+          hover:bg-foreground/90
           active:scale-[0.98] transition-[background-color,transform] duration-150
           disabled:opacity-30 disabled:cursor-not-allowed
         "

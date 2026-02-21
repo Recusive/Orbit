@@ -58,7 +58,7 @@ export const TriStateSwitch: FC<TriStateSwitchProps> = ({
       onKeyDown={handleKeyDown}
       className={cn(
         'relative inline-flex shrink-0 cursor-pointer',
-        'h-3.5 w-[42px] rounded-md bg-primary',
+        'h-3.5 w-[42px] rounded-md bg-foreground/20',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
       )}
     >

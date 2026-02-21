@@ -124,7 +124,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
@@ -133,13 +133,13 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-primary/15'
+              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
             )}
           >
             <Search
               className={cn(
                 'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-primary/80',
+                isFailed ? 'text-destructive/60' : 'text-foreground/60',
                 isRunning && 'animate-pulse'
               )}
             />
@@ -164,17 +164,15 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
           {isRunning ? (
             <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
+
+          <ChevronRight
+            className={cn(
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-90'
+            )}
+            aria-hidden="true"
+          />
         </div>
-
-        <div className="flex-1" />
-
-        {/* Right: chevron */}
-        <ChevronRight
-          className={cn(
-            'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
-            isExpanded && 'rotate-90'
-          )}
-        />
       </button>
 
       {/* Tree-style expanded content */}
@@ -194,14 +192,14 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                   <div
                     className={cn(
                       'w-[2px] rounded-full h-full',
-                      success === undefined && 'bg-primary/40'
+                      success === undefined && 'bg-foreground/20'
                     )}
                     style={
                       success !== undefined
                         ? {
                             background: success
-                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
-                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-primary) 40%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
+                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
+                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
                           }
                         : undefined
                     }
@@ -209,7 +207,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-lg-separator bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-lg-separator bg-card overflow-hidden">
                   {/* Pattern & filters */}
                   <div className="px-3 py-2">
                     <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">

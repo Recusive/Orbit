@@ -329,7 +329,7 @@ html.dark {
   color-scheme: dark;
 
   /* ── Neutral 12-step raw scales (dark) ───────────────────────────── */
-  --gray-1: #121212;
+  --gray-1: #181818;
   --gray-2: #191919;
   --gray-3: #232323;
   --gray-4: #2a2a2a;
@@ -424,11 +424,11 @@ html.dark {
   --divider: var(--lg-separator);
   --input: var(--gray-7);
   --ring: var(--gray-8);
-  --chat-area: var(--surface);
+  --chat-area: var(--gray-1);
   --editor-bg: transparent;
 
   /* Sidebar */
-  --sidebar: var(--surface);
+  --sidebar: var(--gray-3);
   --sidebar-foreground: var(--gray-11);
 
   /* Status colors */
@@ -485,9 +485,9 @@ html.window-mode-solid.dark {
   --background: var(--gray-3);
   --card: var(--gray-2);
   --popover: var(--gray-2);
-  --chat-area: var(--gray-2);
+  --chat-area: var(--gray-1);
   --editor-bg: var(--gray-2);
-  --sidebar: var(--gray-2);
+  --sidebar: var(--gray-3);
 }
 
 /* ============================================
@@ -517,9 +517,9 @@ html.window-mode-liquid-glass.dark {
   --background: var(--gray-3);
   --card: var(--gray-2);
   --popover: var(--gray-2);
-  --chat-area: var(--gray-2);
+  --chat-area: var(--gray-1);
   --editor-bg: var(--gray-2);
-  --sidebar: var(--gray-2);
+  --sidebar: var(--gray-3);
 }
 
 /* Base layer — frosted glass over native vibrancy.
@@ -545,20 +545,35 @@ html.window-mode-liquid-glass .bg-base-layer::before {
   background: rgba(0, 0, 0, 0.01);
 }
 
-/* Dark mode: no CSS blur (corner artifact). Native NSGlassEffectView
-   provides the blur. Tint applied directly on the root element. */
+/* Dark mode: Liquid Glass frost on the entire base layer */
 html.window-mode-liquid-glass.dark .bg-base-layer {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background-color: rgba(18, 18, 18, 0.62);
+  background-color: transparent;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  isolation: isolate;
 }
 
 html.window-mode-liquid-glass.dark .bg-base-layer::before {
-  background: rgba(0, 0, 0, 0.01);
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(0deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.85)),
+    #CCCCCC;
+  background-blend-mode: normal, normal, color-burn;
+  opacity: 0.67;
 }
 
 /* Sidebar — transparent so the base layer tint shows through */
 html.window-mode-liquid-glass [data-sidebar="primary"] {
+  background: transparent;
+}
+
+/* Dark mode sidebar: transparent — inherits frost from base layer above */
+html.window-mode-liquid-glass.dark [data-sidebar="primary"] {
   background: transparent;
 }
 
@@ -1310,7 +1325,6 @@ html:not(.dark) .glass-input::after {
    Same multi-layer stack: blur (::before) + fill/border (::after). */
 .glass-popover {
   border: none;
-  background: transparent;
   isolation: isolate;
 }
 
@@ -1376,9 +1390,8 @@ html:not(.dark) .glass-popover::after {
    The ::after solid strip covers the small gap between the
    input box bottom edge and the status bar. */
 .chat-input-frost {
-  /* Transparent except for the last 4px (pb-1 gap below input) which
-     is solid to prevent messages peeking between input and status bar */
-  background: linear-gradient(to bottom, transparent calc(100% - 4px), var(--chat-area) calc(100% - 4px));
+  /* Soft fade so messages dissolve behind the floating input */
+  background: linear-gradient(to bottom, transparent, var(--chat-area) 70%);
   pointer-events: none;
 }
 .chat-input-frost > * {
@@ -1674,7 +1687,7 @@ html:not(.window-mode-solid) .glass-float {
       --accent-track: oklch(47.4% 0.0623 41.64);
 
       /* Gray P3 (dark) — neutral, chroma = 0 */
-      --gray-1: oklch(18.3% 0 0);
+      --gray-1: oklch(20.7% 0 0);
       --gray-2: oklch(21.5% 0 0);
       --gray-3: oklch(25.4% 0 0);
       --gray-4: oklch(28.3% 0 0);
@@ -1864,7 +1877,7 @@ html.dark {
   --lg-window-shadow: 0px 0px 0px 1px rgba(255, 255, 255, 0.08), 0px 16px 48px rgba(0, 0, 0, 0.5);
 
   --lg-sidebar-selected: rgba(255, 255, 255, 0.11);
-  --lg-sidebar-hover: rgba(255, 255, 255, 0.07);
+  --lg-sidebar-hover: rgba(255, 255, 255, 0.04);
 
   --lg-segment-bg: rgba(255, 255, 255, 0.04);
   --lg-segment-separator: rgba(255, 255, 255, 0.1);
@@ -1906,21 +1919,21 @@ html.dark {
    Used by ConversationDeleteDialog. */
 
 .liquid-glass-dialog {
-  width: 260px;
+  width: 360px;
   border-radius: var(--lg-window-r) !important;
   overflow: hidden;
   isolation: isolate;
   backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
   -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
-  border: 0.5px solid rgba(0, 0, 0, 0.08);
-  box-shadow: inset 0 0.5px 0 0 rgba(255, 255, 255, 0.06), 0 0 1px rgba(0, 0, 0, 0.2), 0 17px 45px rgba(0, 0, 0, 0.5);
+  border: none;
+  box-shadow: 0 17px 45px rgba(0, 0, 0, 0.5);
   -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
   mask-image: linear-gradient(#000, #000);
 }
 
 html.dark .liquid-glass-dialog {
-  border-color: rgba(255, 255, 255, 0.10);
-  box-shadow: inset 0 0.5px 0 0 rgba(255, 255, 255, 0.12), 0 0 1px rgba(0, 0, 0, 0.2), 0 17px 45px rgba(0, 0, 0, 0.5);
+  border-color: transparent;
+  box-shadow: 0 17px 45px rgba(0, 0, 0, 0.5);
 }
 
 .liquid-glass-dialog::after {

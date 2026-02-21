@@ -52,7 +52,7 @@ export const ThinkingDots: FC<ThinkingDotsProps> = ({
     <div
       role="status"
       aria-label="Loading"
-      className={cn('text-primary inline-grid shrink-0', className)}
+      className={cn('text-foreground/60 inline-grid shrink-0', className)}
       style={{
         gridTemplateColumns: `repeat(3, ${String(cellSize)}px)`,
         gridTemplateRows: `repeat(3, ${String(cellSize)}px)`,

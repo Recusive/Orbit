@@ -220,8 +220,8 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
     >
       {/* Logo/Branding - consistent with WelcomeStep */}
       <div className="flex items-center gap-4 w-full max-w-[380px]">
-        <div className="flex items-center justify-center w-14 h-14 rounded-lg bg-primary/10">
-          <OrbitLogo size={40} className="text-primary" />
+        <div className="flex items-center justify-center w-14 h-14 rounded-lg bg-foreground/8">
+          <OrbitLogo size={40} className="text-foreground" />
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-2xl font-semibold text-foreground tracking-tight">Orbit</span>
@@ -237,7 +237,7 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
             'rounded-lg border border-border bg-lg-control'
           )}
         >
-          <Loader2 className="h-6 w-6 animate-spin text-primary/60" />
+          <Loader2 className="h-6 w-6 animate-spin text-foreground/50" />
           <span className="text-sm text-muted-foreground">
             {detection.phase === 'authenticating'
               ? 'Authenticating with Claude...'
@@ -270,7 +270,10 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
           </div>
           <Button
             onClick={handleUseKeychain}
-            className={cn('w-full h-10 text-sm font-medium', 'bg-primary/90 hover:bg-primary')}
+            className={cn(
+              'w-full h-10 text-sm font-medium',
+              'bg-foreground text-background hover:bg-foreground/90'
+            )}
           >
             Continue with Claude Code
             <ArrowRight className="h-4 w-4 ml-2" />
@@ -343,7 +346,10 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
             <Button
               onClick={handleValidateApiKey}
               disabled={isValidating || apiKey.trim().length === 0}
-              className={cn('w-full h-10 text-sm font-medium', 'bg-primary/90 hover:bg-primary')}
+              className={cn(
+                'w-full h-10 text-sm font-medium',
+                'bg-foreground text-background hover:bg-foreground/90'
+              )}
             >
               {isValidating ? (
                 <>

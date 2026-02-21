@@ -1048,6 +1048,10 @@ export const AgentCompleteSchema = z
     message_id: z.string(),
     duration_ms: z.number().optional(),
     total_cost_usd: z.number().optional(),
+    /** SDK stop_reason forwarded from the bridge. "end_turn" = final response,
+     *  "tool_use" = intermediate turn (more turns coming). Used by ChatMessageService
+     *  to decide whether to clear isAgentRunning immediately or delay. */
+    result_subtype: z.string().optional(),
     usage: z
       .object({
         input_tokens: z.number(),

@@ -384,6 +384,9 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
                 uuid: crypto.randomUUID(),
                 session_id: sessionId,
                 message_id: messageId,
+                // Forward SDK stop_reason so the service can distinguish
+                // intermediate tool turns from the final response.
+                result_subtype: message.resultSubtype,
                 // Transform SDK camelCase to protocol snake_case
                 usage: usage
                   ? {

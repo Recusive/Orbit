@@ -52,7 +52,7 @@ const ProjectTile: FC<ProjectTileProps> = ({ project, onClick }) => (
       'transition-[background-color,transform] duration-150',
       'hover:bg-lg-control-hover dark:hover:bg-lg-control-hover',
       'active:scale-[0.96]',
-      'outline-none focus-visible:ring-2 focus-visible:ring-primary/50'
+      'outline-none focus-visible:ring-2 focus-visible:ring-foreground/30'
     )}
   >
     <div className="flex items-center justify-center h-12 w-12 rounded-xl bg-lg-control dark:bg-lg-separator">

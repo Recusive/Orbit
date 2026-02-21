@@ -242,7 +242,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({
       {!borderless ? (
         <div
           className={cn(
-            'absolute bg-primary transition-opacity duration-100 opacity-0 group-hover:opacity-100',
+            'absolute bg-foreground/40 transition-opacity duration-100 opacity-0 group-hover:opacity-100',
             isFocused && 'opacity-100'
           )}
           style={

@@ -106,7 +106,7 @@ export const ChatContent: FC<ChatContentProps> = ({
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
           />
-          {/* Frosted input overlay — sits above messages with backdrop blur */}
+          {/* Floating input container — transparent with soft fade at top */}
           <div className="absolute bottom-0 inset-x-0 z-10 chat-input-frost">
             <TodoBar />
             <ChatInput {...inputProps} />

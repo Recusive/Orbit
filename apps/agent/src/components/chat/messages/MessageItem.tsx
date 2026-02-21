@@ -125,30 +125,31 @@ const UserMessageBubble: FC<{ readonly content: string; readonly animate: boolea
     return (
       <div
         className={cn(
-          'w-fit rounded-lg bg-lg-control px-3.5 pt-2.5',
+          'w-fit rounded-xl bg-lg-control dark:bg-[#272727] px-3.5 pt-2.5',
           isCollapsed ? 'pb-0' : 'pb-2.5',
           animate === true && 'animate-message-in'
         )}
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
-        {/* Content area with optional height clamp */}
+        {/* Content area with optional height clamp + mask fade when collapsed */}
         <div className="relative">
           <p
             ref={contentRef}
             className="text-base leading-relaxed whitespace-pre-wrap select-text"
             style={
               isCollapsed
-                ? { maxHeight: `${String(USER_MESSAGE_MAX_HEIGHT)}px`, overflow: 'hidden' }
+                ? {
+                    maxHeight: `${String(USER_MESSAGE_MAX_HEIGHT)}px`,
+                    overflow: 'hidden',
+                    maskImage: 'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
+                    WebkitMaskImage:
+                      'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
+                  }
                 : undefined
             }
           >
             {renderedContent}
           </p>
-
-          {/* Gradient fade overlay when collapsed */}
-          {isCollapsed ? (
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-lg-control to-transparent pointer-events-none" />
-          ) : null}
         </div>
 
         {/* Show more / Show less toggle */}
@@ -169,6 +170,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
   tools,
   isLastAssistantMessage,
+  isLastInAssistantGroup,
   isAgentRunning,
   animate,
   onRewind,
@@ -329,11 +331,16 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
             })}
           </div>
 
-          {/* Message actions - shown when turn is fully complete (not just this message) */}
-          {isComplete && !isAgentRunning ? (
+          {/* Message actions - shown on the last assistant message in a consecutive group.
+           *  Multi-turn responses (tool use + text) produce multiple assistant messages;
+           *  only the final one renders the action bar to avoid duplicate controls.
+           *  NOTE: We intentionally do NOT gate on !isAgentRunning — previous turns' action
+           *  bars should remain visible when the user sends a new message. Rewind is disabled
+           *  while the agent is running to prevent mid-generation forks. */}
+          {isComplete && isLastInAssistantGroup ? (
             <>
               <MessageActions
-                rewindDisabled={isLastAssistantMessage}
+                rewindDisabled={isLastAssistantMessage || isAgentRunning}
                 turnDurationMs={message.turnDurationMs}
                 onCopy={() => {
                   void navigator.clipboard.writeText(message.content);

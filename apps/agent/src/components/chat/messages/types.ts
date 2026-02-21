@@ -80,6 +80,10 @@ export interface MessageItemProps {
   readonly message: ChatMessage;
   readonly tools: ToolExecution[];
   readonly isLastAssistantMessage: boolean;
+  /** Whether this is the last assistant message in a consecutive group.
+   *  Multi-turn responses produce multiple assistant messages — only the
+   *  last one in the group should render the action bar. */
+  readonly isLastInAssistantGroup: boolean;
   /** Whether the agent is still running (entire turn not yet complete) */
   readonly isAgentRunning: boolean;
   /** Whether to animate this message sliding in (for newly sent messages) */

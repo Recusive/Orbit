@@ -72,7 +72,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
@@ -81,13 +81,13 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-warning/8'
+              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
             )}
           >
             <Pencil
               className={cn(
                 'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-warning/60',
+                isFailed ? 'text-destructive/60' : 'text-foreground/60',
                 isRunning && 'animate-pulse'
               )}
             />
@@ -126,17 +126,15 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
           {!isRunning && !isFailed ? (
             <DiffStat additions={additions} deletions={deletions} />
           ) : null}
+
+          <ChevronRight
+            className={cn(
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-90'
+            )}
+            aria-hidden="true"
+          />
         </div>
-
-        <div className="flex-1" />
-
-        {/* Right: chevron */}
-        <ChevronRight
-          className={cn(
-            'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
-            isExpanded && 'rotate-90'
-          )}
-        />
       </button>
 
       {/* Tree-style expanded content */}
@@ -179,7 +177,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                       <div
                         className={cn(
                           'border-3 border-destructive/40 bg-card overflow-hidden',
-                          displayNewLines.length > 0 ? 'rounded-t-lg border-b-0' : 'rounded-lg'
+                          displayNewLines.length > 0 ? 'rounded-t-xl border-b-0' : 'rounded-xl'
                         )}
                       >
                         <div className={cn('overflow-auto', !showAllLines && 'max-h-[150px]')}>
@@ -223,7 +221,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                       <div
                         className={cn(
                           'border-3 border-success/40 bg-card overflow-hidden',
-                          displayOldLines.length > 0 ? 'rounded-b-lg border-t-0' : 'rounded-lg'
+                          displayOldLines.length > 0 ? 'rounded-b-xl border-t-0' : 'rounded-xl'
                         )}
                       >
                         <div className={cn('overflow-auto', !showAllLines && 'max-h-[150px]')}>

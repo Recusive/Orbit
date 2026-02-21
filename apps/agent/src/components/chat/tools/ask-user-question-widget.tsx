@@ -116,7 +116,7 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
@@ -140,17 +140,15 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
           <span className={cn('text-xs font-medium truncate', 'text-lg-text-secondary')}>
             {statusLabel}
           </span>
+
+          <ChevronRight
+            className={cn(
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-90'
+            )}
+            aria-hidden="true"
+          />
         </div>
-
-        <div className="flex-1" />
-
-        {/* Right: chevron */}
-        <ChevronRight
-          className={cn(
-            'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
-            isExpanded && 'rotate-90'
-          )}
-        />
       </button>
 
       {/* Expandable content */}
@@ -182,7 +180,7 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg bg-lg-control overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl bg-lg-control overflow-hidden">
                   {pairs.map((pair, idx) => (
                     <div key={pair.question}>
                       <div className="px-3 py-2">

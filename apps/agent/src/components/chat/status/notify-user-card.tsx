@@ -68,7 +68,7 @@ export const NotifyUserCard: FC<NotifyUserCardProps> = ({
   const getButtonStyles = (variant: NotificationAction['variant'] = 'default'): string => {
     switch (variant) {
       case 'primary':
-        return 'bg-primary text-primary-foreground hover:bg-primary/90';
+        return 'bg-foreground text-background hover:bg-foreground/90';
       case 'destructive':
         return 'bg-destructive text-destructive-foreground hover:bg-destructive/90';
       case 'default':

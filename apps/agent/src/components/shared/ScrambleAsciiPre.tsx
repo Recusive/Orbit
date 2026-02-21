@@ -135,7 +135,7 @@ export const ScrambleAsciiPre: FC<ScrambleAsciiPreProps> = ({ text, ariaLabel, c
     <pre
       className={cn(
         'font-mono text-[3.5px] leading-[1.1] whitespace-pre select-none',
-        'text-primary',
+        'text-foreground/70',
         className
       )}
       aria-label={ariaLabel}

@@ -82,7 +82,7 @@ const ProgressPie: FC<ProgressPieProps> = ({ percentage, size = 16 }) => {
           d={path}
           fill="currentColor"
           className={cn(
-            percentage < 50 && 'text-primary',
+            percentage < 50 && 'text-foreground',
             percentage >= 50 && percentage < 80 && 'text-warning',
             percentage >= 80 && 'text-destructive'
           )}

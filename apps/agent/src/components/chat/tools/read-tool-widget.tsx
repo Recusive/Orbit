@@ -47,7 +47,7 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
       title={filePath}
       className={cn(
         'group w-full flex items-center gap-2 py-1.5 px-2.5 text-left',
-        'cursor-pointer rounded-lg',
+        'cursor-pointer rounded-xl',
         isFailed && 'border-2 border-dotted border-destructive/40 opacity-60'
       )}
     >
@@ -56,13 +56,13 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
         <div
           className={cn(
             'w-5 h-5 rounded flex items-center justify-center shrink-0',
-            isFailed ? 'bg-destructive/8' : 'bg-sky-500/8'
+            isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
           )}
         >
           <File
             className={cn(
               'h-3 w-3',
-              isFailed ? 'text-destructive/60' : 'text-sky-500/60',
+              isFailed ? 'text-destructive/60' : 'text-foreground/60',
               isRunning && 'animate-pulse'
             )}
           />

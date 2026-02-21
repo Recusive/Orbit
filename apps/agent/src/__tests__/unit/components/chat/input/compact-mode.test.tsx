@@ -182,14 +182,14 @@ describe('MoreActionsMenu', () => {
       const trigger = screen.getByRole('button', { name: 'More actions' });
       await user.click(trigger);
 
-      // Find the thinking menu item and check the icon has text-primary class
+      // Find the thinking menu item and check the icon has text-foreground class
       const thinkingItem = await screen.findByRole('menuitem', { name: /Thinking/i });
       const icon = thinkingItem.querySelector('svg');
       expect(icon).toBeInTheDocument();
-      expect(icon).toHaveClass('text-primary');
+      expect(icon).toHaveClass('text-foreground');
     });
 
-    it('should not show primary color when thinking is off', async () => {
+    it('should not show foreground color when thinking is off', async () => {
       const user = userEvent.setup();
       render(<MoreActionsMenu {...createMenuProps({ model: 'haiku', thinkingMode: 'off' })} />, {
         wrapper: TestWrapper,
@@ -201,7 +201,7 @@ describe('MoreActionsMenu', () => {
       const thinkingItem = await screen.findByRole('menuitem', { name: /Thinking/i });
       const icon = thinkingItem.querySelector('svg');
       expect(icon).toBeInTheDocument();
-      expect(icon).not.toHaveClass('text-primary');
+      expect(icon).not.toHaveClass('text-foreground');
     });
   });
 

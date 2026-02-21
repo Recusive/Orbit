@@ -259,7 +259,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
       data-tauri-drag-region
       className={cn(
         'flex items-center justify-between shrink-0',
-        transparent ? 'bg-transparent' : 'bg-card',
+        transparent ? 'bg-transparent' : 'bg-chat-area',
         className
       )}
       style={{ height: HEIGHTS.headerBar }}

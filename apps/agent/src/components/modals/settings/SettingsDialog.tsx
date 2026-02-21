@@ -72,7 +72,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
-        <DialogOverlay />
+        <DialogOverlay className="backdrop-blur-none bg-black/40" />
 
         {/* Centering wrapper */}
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
@@ -82,7 +82,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               aria-describedby={undefined}
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
-                'glass-popover bg-transparent border-0 shadow-none',
+                'bg-sidebar border-0 shadow-none',
                 'rounded-[14px] overflow-hidden flex flex-col',
                 'duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
@@ -96,7 +96,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               </DialogPrimitive.Title>
 
               {/* Title bar */}
-              <div className="flex items-center justify-between px-4 py-2.5 bg-transparent">
+              <div className="flex items-center justify-between px-4 py-2.5 bg-sidebar">
                 <div className="flex items-center gap-2 font-medium text-base">
                   <SFSymbol
                     name="gear"
@@ -115,15 +115,14 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                   <span className="sr-only">Close</span>
                 </DialogPrimitive.Close>
               </div>
-              <div className="h-px bg-border/40 shrink-0" />
 
               {/* Content */}
-              <div className="flex flex-1 overflow-hidden pb-px pr-px">
+              <div className="flex flex-1 overflow-hidden border-t border-foreground/10">
                 {/* Sidebar */}
                 <SettingsSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
 
                 {/* Main content */}
-                <div className="flex-1 overflow-auto bg-chat-area relative">
+                <div className="flex-1 overflow-auto bg-sidebar relative">
                   {/* Static sections - render via lazy components (unmounted when inactive) */}
                   {!isAsyncSection && (
                     <div className="absolute inset-0 p-6 overflow-auto">

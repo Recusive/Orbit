@@ -129,6 +129,19 @@ class ChatMessageService {
   private pendingChunkLengths = new Map<string, number>();
   private thinkingStartTimes = new Map<string, number>();
 
+  // Multi-turn tool flow tracking:
+  // When a turn uses tools, agent:complete is an intermediate signal (more turns coming).
+  // We delay clearing isAgentRunning so the loader dots persist between turns.
+  // The final turn (text-only, no tools) clears isAgentRunning immediately.
+  private turnHadTools = new Map<string, boolean>();
+  private agentRunningTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /** Safety timeout after a tool-using turn completes.
+   *  Kept short (3s) to avoid visible delay on the final turn when tools and text
+   *  appear in the same response. Between turns, if the API call takes >3s the
+   *  dots briefly disappear — acceptable tradeoff vs a 30s delay on completion. */
+  private static readonly AGENT_RUNNING_SAFETY_TIMEOUT_MS = 3_000;
+
   // Checkpoint batching — debounces rapid checkpoint events (100ms window)
   // Reduces ~30 checkpoint state updates per agent run to ~2-3
   private batchedCheckpoint = createCheckpointBatcher((sessionId, checkpointId) => {
@@ -152,6 +165,16 @@ class ChatMessageService {
     }
   }
 
+  /** Cancel a pending delayed isAgentRunning clear for a session.
+   *  Called when new events arrive, proving the agent is still active. */
+  private cancelAgentRunningTimer(sessionId: string): void {
+    const timer = this.agentRunningTimers.get(sessionId);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.agentRunningTimers.delete(sessionId);
+    }
+  }
+
   /** Flush all pending batchers for a session (call on agent:complete). */
   flushSession(sessionId: string): void {
     this.chunkBatchers.get(sessionId)?.cancel(FLUSH_PENDING);
@@ -166,25 +189,27 @@ class ChatMessageService {
     this.toolBatchers.get(sessionId)?.cancel();
   }
 
-  /** Full cleanup for a session — cancel batchers, delete from Maps. */
+  /** Full cleanup for a session — cancel batchers, timers, delete from Maps. */
   destroySession(sessionId: string): void {
     this.cancelSession(sessionId);
     this.cleanupBatchers(sessionId);
-    // Clear per-message tracking for this session's messages
-    // (we don't track which messages belong to which session, so we clear globally
-    // on session destroy — acceptable because destroyed sessions won't stream again)
+    this.cancelAgentRunningTimer(sessionId);
+    this.turnHadTools.delete(sessionId);
   }
 
-  /** Cancel all batchers across all sessions (for HMR cleanup). */
+  /** Cancel all batchers and timers across all sessions (for HMR cleanup). */
   destroyAll(): void {
     for (const [, batcher] of this.chunkBatchers) batcher.cancel();
     for (const [, batcher] of this.thinkingBatchers) batcher.cancel();
     for (const [, batcher] of this.toolBatchers) batcher.cancel();
+    for (const [, timer] of this.agentRunningTimers) clearTimeout(timer);
     this.chunkBatchers.clear();
     this.thinkingBatchers.clear();
     this.toolBatchers.clear();
     this.pendingChunkLengths.clear();
     this.thinkingStartTimes.clear();
+    this.agentRunningTimers.clear();
+    this.turnHadTools.clear();
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -394,6 +419,9 @@ class ChatMessageService {
   private handleAgentChunk(message: Extract<ExtensionMessage, { type: 'agent:chunk' }>): void {
     const sid = message.session_id;
 
+    // New turn event — cancel any pending delayed clear from a previous tool-using turn.
+    this.cancelAgentRunningTimer(sid);
+
     if (!message.message_id) {
       logger.error(
         `CRITICAL: Chunk received without message_id - content will be lost. ` +
@@ -428,6 +456,9 @@ class ChatMessageService {
   private handleAgentThinking(
     message: Extract<ExtensionMessage, { type: 'agent:thinking' }>
   ): void {
+    // New turn event — cancel any pending delayed clear from a previous tool-using turn.
+    this.cancelAgentRunningTimer(message.session_id);
+
     // Record thinking start time on first chunk
     if (!this.thinkingStartTimes.has(message.message_id)) {
       this.thinkingStartTimes.set(message.message_id, Date.now());
@@ -578,9 +609,41 @@ class ChatMessageService {
     // Mark checkpoint completion (associates checkpoint with the user message)
     useCheckpointStore.getState().onMessageComplete(sid);
 
-    // Clear running + stop-pending for THIS session only
-    useChatStore.getState().setAgentRunning(sid, false);
-    useChatStore.getState().setStopPending(sid, false);
+    // Decide whether to clear isAgentRunning immediately or delay it.
+    //
+    // The bridge forwards SDK stop_reason as result_subtype:
+    //   "end_turn"  → model finished naturally (FINAL turn)
+    //   "tool_use"  → model wants to use tools (INTERMEDIATE, more turns coming)
+    //   undefined   → unknown, fall back to turnHadTools heuristic
+    //
+    // For intermediate turns, we delay clearing isAgentRunning so the loader dots
+    // persist between turns. The next turn's thinking/chunk/tool events cancel the
+    // timer. For the final turn, we clear immediately.
+    const resultSubtype = message.result_subtype;
+    const hadTools = this.turnHadTools.get(sid) ?? false;
+    this.turnHadTools.set(sid, false); // Reset for next turn
+
+    // Determine if this is a final turn:
+    // 1. result_subtype === 'end_turn' is the authoritative signal
+    // 2. Fallback: no tools this turn → likely final (text-only response)
+    const isFinalTurn = resultSubtype === 'end_turn' || (resultSubtype === undefined && !hadTools);
+
+    if (isFinalTurn) {
+      // Final turn — clear immediately
+      this.cancelAgentRunningTimer(sid);
+      useChatStore.getState().setAgentRunning(sid, false);
+      useChatStore.getState().setStopPending(sid, false);
+    } else {
+      // Intermediate turn — delay clearing with a safety timeout.
+      // The next turn's thinking/chunk/tool events will cancel this timer.
+      this.cancelAgentRunningTimer(sid);
+      const timer = setTimeout(() => {
+        this.agentRunningTimers.delete(sid);
+        useChatStore.getState().setAgentRunning(sid, false);
+        useChatStore.getState().setStopPending(sid, false);
+      }, ChatMessageService.AGENT_RUNNING_SAFETY_TIMEOUT_MS);
+      this.agentRunningTimers.set(sid, timer);
+    }
 
     // Schedule coalesced sidebar refresh
     scheduleSidebarRefresh();
@@ -594,6 +657,9 @@ class ChatMessageService {
     this.cleanupBatchers(sid);
     this.pendingChunkLengths.delete(message.message_id);
 
+    // Errors are always terminal — clear immediately, cancel any delayed clear
+    this.cancelAgentRunningTimer(sid);
+    this.turnHadTools.delete(sid);
     useChatStore.getState().setAgentRunning(sid, false);
     useChatStore.getState().setStopPending(sid, false);
 
@@ -1145,6 +1211,11 @@ class ChatMessageService {
     const toolId = message.tool_id;
     const toolName = message.tool_name;
 
+    // Mark that this turn used tools — handleAgentComplete uses this to decide
+    // whether to delay clearing isAgentRunning (intermediate turn) or clear immediately.
+    this.turnHadTools.set(sid, true);
+    this.cancelAgentRunningTimer(sid);
+
     // Record browser activity for AI Playwright tools
     if (toolName.toLowerCase().includes('browser')) {
       recordBrowserActivityFromAI();
@@ -1213,6 +1284,13 @@ class ChatMessageService {
         parentUuid,
       });
     }
+
+    // Re-assert isAgentRunning — tool:start is the first SYNCHRONOUS signal
+    // that a new turn has started. agent:complete from the previous turn set
+    // this to false, and the RAF-deferred batchers (thinking/chunk) can't fix
+    // it fast enough. This must be synchronous to prevent even a single frame
+    // where isAgentRunning is false while streaming is active.
+    useChatStore.getState().setAgentRunning(sid, true);
   }
 
   private handleToolEnd(message: Extract<ExtensionMessage, { type: 'tool:end' }>): void {
@@ -1364,7 +1442,7 @@ class ChatMessageService {
               return { ...m, content: newContent, displayedContent: newContent };
             });
           } else {
-            // First chunk of new response
+            // First chunk of new response (possibly a new turn in multi-tool flow)
             const parentUuid = msgs.at(-1)?.id ?? null;
             useChatStore.getState().addMessage(sessionId, {
               id: messageId,
@@ -1374,6 +1452,10 @@ class ChatMessageService {
               isStreaming: true,
               parentUuid,
             });
+            // Re-assert isAgentRunning — agent:complete from the previous turn
+            // may have set it to false before this chunk arrived. Without this,
+            // the loading indicator disappears between multi-turn tool calls.
+            useChatStore.getState().setAgentRunning(sessionId, true);
           }
         }
       }
@@ -1450,6 +1532,9 @@ class ChatMessageService {
             isThinkingActive: true,
             parentUuid,
           });
+          // Re-assert isAgentRunning — agent:complete from the previous turn
+          // may have set it to false before this thinking chunk arrived.
+          useChatStore.getState().setAgentRunning(sessionId, true);
         }
       }
     });

@@ -28,8 +28,8 @@ export const WelcomeStep: FC<WelcomeStepProps> = ({ onContinue, className }) => 
     >
       {/* Logo/Branding */}
       <div className="flex items-center gap-4 w-full max-w-[380px]">
-        <div className="flex items-center justify-center w-14 h-14 rounded-lg bg-primary/10">
-          <OrbitLogo size={40} className="text-primary" />
+        <div className="flex items-center justify-center w-14 h-14 rounded-lg bg-foreground/8">
+          <OrbitLogo size={40} className="text-foreground" />
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-2xl font-semibold text-foreground tracking-tight">Orbit</span>
@@ -55,11 +55,11 @@ export const WelcomeStep: FC<WelcomeStepProps> = ({ onContinue, className }) => 
         {/* Feature highlights - compact list */}
         <div className="flex flex-col gap-2 pt-1">
           <div className="flex items-center gap-2.5 text-sm text-foreground/80">
-            <Sparkles className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+            <Sparkles className="h-3.5 w-3.5 text-foreground/60 shrink-0" />
             <span>Intelligent code completion</span>
           </div>
           <div className="flex items-center gap-2.5 text-sm text-foreground/80">
-            <Zap className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+            <Zap className="h-3.5 w-3.5 text-foreground/60 shrink-0" />
             <span>Natural language to code</span>
           </div>
         </div>
@@ -70,7 +70,7 @@ export const WelcomeStep: FC<WelcomeStepProps> = ({ onContinue, className }) => 
         onClick={onContinue}
         className={cn(
           'w-full max-w-[380px] h-10 text-sm font-medium',
-          'bg-primary/90 hover:bg-primary'
+          'bg-foreground text-background hover:bg-foreground/90'
         )}
       >
         Get Started

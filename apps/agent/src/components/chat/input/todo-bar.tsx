@@ -59,7 +59,7 @@ function StatusIcon({ status }: { readonly status: TodoItem['status'] }): ReactE
     case 'completed':
       return <CheckCircle2 className="h-3 w-3 text-success shrink-0" />;
     case 'in_progress':
-      return <Loader2 className="h-3 w-3 text-primary animate-spin shrink-0" />;
+      return <Loader2 className="h-3 w-3 text-foreground/60 animate-spin shrink-0" />;
     case 'pending':
     default:
       return <Circle className="h-3 w-3 text-muted-foreground shrink-0" />;
@@ -196,7 +196,7 @@ export const TodoBar: FC = memo(function TodoBar() {
           className="flex items-center gap-2 w-full px-3 py-1.5 text-sm transition-colors hover:bg-lg-control-hover/50"
         >
           <ListTodo
-            className={cn('h-3.5 w-3.5 text-primary/70 shrink-0', isRunning && 'animate-pulse')}
+            className={cn('h-3.5 w-3.5 text-foreground/60 shrink-0', isRunning && 'animate-pulse')}
             aria-hidden="true"
           />
 
@@ -214,7 +214,7 @@ export const TodoBar: FC = memo(function TodoBar() {
                 ·
               </span>
               <Loader2
-                className="h-2.5 w-2.5 animate-spin text-primary shrink-0"
+                className="h-2.5 w-2.5 animate-spin text-foreground/60 shrink-0"
                 aria-hidden="true"
               />
               <span className="text-xs text-lg-text-secondary truncate min-w-0">
@@ -253,7 +253,7 @@ export const TodoBar: FC = memo(function TodoBar() {
                       key={`${todo.content}-${String(index)}`}
                       className={cn(
                         'flex items-center gap-2 py-1 px-1.5 -mx-1.5 rounded text-xs',
-                        todo.status === 'in_progress' && 'bg-primary/5',
+                        todo.status === 'in_progress' && 'bg-foreground/5',
                         todo.status === 'completed' && 'opacity-50'
                       )}
                     >

@@ -198,7 +198,7 @@ const CommandItem: FC<CommandItemProps> = ({ command, isSelected, isFirst, isLas
       className={cn(
         'relative flex cursor-pointer gap-2.5 select-none items-center border-l-2 border-transparent pl-2 pr-2.5 py-2 outline-none',
         isSelected
-          ? 'rounded-r-md bg-primary/10 text-foreground border-primary/60'
+          ? 'rounded-r-md bg-foreground/8 text-foreground border-foreground/40'
           : 'rounded-md hover:bg-lg-control-hover active:scale-[0.99]'
       )}
     >

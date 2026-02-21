@@ -96,7 +96,9 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             <span
               className={cn(
                 'inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded text-[9px] font-semibold tabular-nums',
-                activeTab === 'staged' ? 'bg-primary/12 text-primary/80' : 'text-lg-text-secondary'
+                activeTab === 'staged'
+                  ? 'bg-foreground/10 text-foreground/80'
+                  : 'text-lg-text-secondary'
               )}
             >
               {stagedFiles.length}
@@ -122,7 +124,9 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             <span
               className={cn(
                 'inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded text-[9px] font-semibold tabular-nums',
-                activeTab === 'changes' ? 'bg-primary/12 text-primary/80' : 'text-lg-text-secondary'
+                activeTab === 'changes'
+                  ? 'bg-foreground/10 text-foreground/80'
+                  : 'text-lg-text-secondary'
               )}
             >
               {unstagedFiles.length}

@@ -445,7 +445,7 @@ export const BrowserPanel: FC = () => {
               </div>
               <button
                 onClick={handleLaunchBrowser}
-                className="px-6 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
+                className="px-6 py-2 text-sm font-medium bg-foreground text-background rounded-full hover:bg-foreground/90 transition-colors"
               >
                 Launch Browser
               </button>

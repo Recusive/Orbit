@@ -63,7 +63,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed
             ? 'border-2 border-dotted border-destructive/40'
             : 'border-2 border-dotted border-mode-plan/40'
@@ -73,13 +73,13 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-mode-plan/8'
+              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
             )}
           >
             <ClipboardList
               className={cn(
                 'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-mode-plan/60',
+                isFailed ? 'text-destructive/60' : 'text-foreground/60',
                 isRunning && 'animate-pulse'
               )}
             />
@@ -119,6 +119,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
               'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
               isExpanded && 'rotate-90'
             )}
+            aria-hidden="true"
           />
         </div>
       </button>
@@ -141,7 +142,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-lg border border-mode-plan/20 bg-mode-plan/5 overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-mode-plan/20 bg-mode-plan/5 overflow-hidden">
                   <div className="overflow-auto max-h-[400px]">
                     <div className="p-3">
                       {content.trim() ? (

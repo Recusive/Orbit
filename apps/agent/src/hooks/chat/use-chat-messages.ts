@@ -23,6 +23,7 @@ import type { ReviewFixesStressTestConfig } from '@/stress-tests/review-fixes-st
 import type { MegaStressTestConfig } from '@/stress-tests/rewind-mega-stress-test';
 import type { StressTestConfig } from '@/stress-tests/rewind-stress-test';
 import type { SessionStressTestConfig } from '@/stress-tests/session-stress-test';
+import type { ToolGauntletStressTestConfig } from '@/stress-tests/tool-gauntlet-stress-test';
 import type { UpdateSimulationConfig } from '@/stress-tests/update-simulation';
 import type { VerifiedReviewCycle1StressTestConfig } from '@/stress-tests/verified-review-cycle1-stress-test';
 import type {
@@ -57,6 +58,7 @@ declare global {
           runMegaStressTest?: (config?: MegaStressTestConfig) => Promise<unknown>;
           runSessionStressTest?: (config?: SessionStressTestConfig) => Promise<unknown>;
           runReviewFixesStressTest?: (config?: ReviewFixesStressTestConfig) => Promise<unknown>;
+          runToolGauntletStressTest?: (config?: ToolGauntletStressTestConfig) => Promise<unknown>;
           runVerifiedReviewCycle1StressTest?: (
             config?: VerifiedReviewCycle1StressTestConfig
           ) => Promise<unknown>;
@@ -462,6 +464,18 @@ export function useChatMessages(): UseChatMessagesReturn {
             handleEffortLevelChange: actions.handleEffortLevelChange,
             handleModelChange: actions.handleModelChange,
             handleThinkingModeChange: actions.handleThinkingModeChange,
+            postMessage,
+          },
+          config
+        );
+      },
+      runToolGauntletStressTest: async (config?: ToolGauntletStressTestConfig) => {
+        const { runToolGauntletStressTest } =
+          await import('@/stress-tests/tool-gauntlet-stress-test');
+        return runToolGauntletStressTest(
+          {
+            handleSend: actions.handleSend,
+            handleStop: actions.handleStop,
             postMessage,
           },
           config

@@ -176,7 +176,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
-          'cursor-pointer w-full text-left rounded-lg',
+          'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
       >
@@ -185,13 +185,13 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
           <div
             className={cn(
               'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-violet-500/10'
+              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
             )}
           >
             <Globe
               className={cn(
                 'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-violet-500/70',
+                isFailed ? 'text-destructive/60' : 'text-foreground/60',
                 isRunning && 'animate-pulse'
               )}
             />
@@ -209,17 +209,15 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
           {isRunning ? (
             <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
           ) : null}
+
+          <ChevronRight
+            className={cn(
+              'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
+              isExpanded && 'rotate-90'
+            )}
+            aria-hidden="true"
+          />
         </div>
-
-        <div className="flex-1" />
-
-        {/* Right: chevron */}
-        <ChevronRight
-          className={cn(
-            'h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-[rotate,opacity] duration-200 ease-out shrink-0',
-            isExpanded && 'rotate-90'
-          )}
-        />
       </button>
 
       {/* Expanded — vertical timeline of steps */}

@@ -75,20 +75,20 @@ export const PermissionModal: FC<PermissionModalProps> = ({
       {/* Single row: Icon + Label + Loader + Buttons */}
       <div className="flex items-center gap-2.5 px-3.5 py-2">
         {/* Icon */}
-        <div className="w-6 h-6 rounded-md flex items-center justify-center bg-primary/10">
+        <div className="w-6 h-6 rounded-md flex items-center justify-center bg-foreground/8">
           {isBash ? (
-            <Terminal className="h-3.5 w-3.5 text-primary/70" />
+            <Terminal className="h-3.5 w-3.5 text-foreground/60" />
           ) : isBrowser ? (
-            <Globe className="h-3.5 w-3.5 text-primary/70" />
+            <Globe className="h-3.5 w-3.5 text-foreground/60" />
           ) : (
-            <File className="h-3.5 w-3.5 text-primary/70" />
+            <File className="h-3.5 w-3.5 text-foreground/60" />
           )}
         </div>
 
         {/* Label + Loader */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="text-base font-medium text-foreground shrink-0">{confirmLabel}</span>
-          <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+          <Loader2 className="h-3 w-3 animate-spin text-foreground/60 shrink-0" />
         </div>
 
         {/* Action buttons */}
@@ -101,9 +101,9 @@ export const PermissionModal: FC<PermissionModalProps> = ({
           </button>
           <button
             onClick={handleApprove}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-foreground text-background hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            Accept <span className="text-primary-foreground/60 ml-1">⏎</span>
+            Accept <span className="text-background/60 ml-1">⏎</span>
           </button>
         </div>
       </div>

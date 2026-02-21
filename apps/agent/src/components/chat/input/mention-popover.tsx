@@ -62,7 +62,7 @@ function highlightMatches(name: string, indices: number[]): ReactNode {
   return chars.map((char, idx) => {
     if (matchSet.has(idx)) {
       return (
-        <mark key={idx} className="bg-primary/25 text-foreground rounded-[2px] px-px -mx-px">
+        <mark key={idx} className="bg-foreground/15 text-foreground rounded-[2px] px-px -mx-px">
           {char}
         </mark>
       );
@@ -283,7 +283,7 @@ const FileItem: FC<FileItemProps> = ({ result, isSelected, isFirst, isLast, onSe
       className={cn(
         'relative flex cursor-pointer gap-2.5 select-none items-center border-l-2 border-transparent pl-2 pr-2.5 py-2 outline-none',
         isSelected
-          ? 'rounded-r-md bg-primary/10 text-foreground border-primary/60'
+          ? 'rounded-r-md bg-foreground/8 text-foreground border-foreground/40'
           : 'rounded-md hover:bg-lg-control-hover active:scale-[0.99]'
       )}
     >

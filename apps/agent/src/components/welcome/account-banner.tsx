@@ -67,14 +67,17 @@ function timeTextColor(expiresAtMs: number): string {
 
 // DEBUG: expose on window for DevTools testing
 // @ts-expect-error -- temporary debug helper
-window.__showAccountToast = (): string | number =>
-  showAccountToast({
+window.__showAccountToast = (): void => {
+  showAndAutoDismiss({
     hasCredentials: true,
     credentialType: 'OAuth',
     expiresAt: Date.now() + 3 * 60 * 60_000,
     entryExists: true,
     error: null,
   });
+};
+
+const TOAST_DURATION_MS = 6000;
 
 function showAccountToast(status: KeychainStatus): string | number {
   const isConnected = status.hasCredentials;
@@ -186,11 +189,18 @@ function showAccountToast(status: KeychainStatus): string | number {
       </div>
     ),
     {
-      duration: Infinity,
+      duration: TOAST_DURATION_MS,
       unstyled: true,
       className: '!p-0 !bg-transparent !border-0 !shadow-none !opacity-100 w-auto',
     }
   );
+}
+
+// Self-managed dismiss: Sonner's toast.custom() can silently ignore duration
+// when unstyled is true. This ensures the toast always auto-dismisses.
+function showAndAutoDismiss(status: KeychainStatus): void {
+  const id = showAccountToast(status);
+  setTimeout(() => toast.dismiss(id), TOAST_DURATION_MS);
 }
 
 // ---------------------------------------------------------------------------
@@ -206,10 +216,10 @@ export const AccountBanner: FC = () => {
 
     invoke<KeychainStatus>('check_claude_keychain')
       .then((status) => {
-        showAccountToast(status);
+        showAndAutoDismiss(status);
       })
       .catch(() => {
-        showAccountToast({
+        showAndAutoDismiss({
           hasCredentials: false,
           credentialType: null,
           expiresAt: null,

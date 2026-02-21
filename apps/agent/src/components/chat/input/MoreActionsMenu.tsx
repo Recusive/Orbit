@@ -91,7 +91,7 @@ export const MoreActionsMenu: FC<MoreActionsMenuProps> = memo(function MoreActio
           <DropdownMenuItem onClick={cycleThinkingMode}>
             <IconImagine
               size={16}
-              className={cn('mr-2', thinkingMode !== 'off' && 'text-primary')}
+              className={cn('mr-2', thinkingMode !== 'off' && 'text-foreground')}
             />
             <span className="flex-1">Thinking</span>
             <span className="text-xs text-muted-foreground">{thinkingInfo.level}</span>

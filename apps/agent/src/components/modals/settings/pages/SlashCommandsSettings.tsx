@@ -272,7 +272,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
         {/* Flexbox centering wrapper - avoids blurry text from transform translate(-50%) subpixel issues */}
         <div className="fixed inset-0 z-60 flex items-center justify-center pointer-events-none">
           <DialogPrimitive.Content
-            className="relative w-[600px] max-w-[90vw] max-h-[80vh] glass-popover bg-transparent border-0 shadow-none rounded-[14px] pointer-events-auto"
+            className="relative w-[600px] max-w-[90vw] max-h-[80vh] glass-popover bg-sidebar border-0 shadow-none rounded-[14px] pointer-events-auto"
             onPointerDownOutside={(e) => {
               e.preventDefault();
             }}
@@ -290,7 +290,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
             </DialogPrimitive.Description>
 
             {/* Inner wrapper: overflow-hidden here constrains flex scroll without clipping glass border */}
-            <div className="flex flex-col overflow-hidden rounded-[inherit] max-h-[80vh] bg-chat-area">
+            <div className="flex flex-col overflow-hidden rounded-[inherit] max-h-[80vh] bg-sidebar">
               {/* Header */}
               <div className="shrink-0 flex items-center justify-between px-5 py-3.5 border-b border-lg-separator">
                 <h2 className="font-semibold text-lg">

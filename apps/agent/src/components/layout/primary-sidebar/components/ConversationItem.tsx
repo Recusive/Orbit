@@ -135,7 +135,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
           onKeyDown={handleKeyDown}
           spellCheck={false}
           autoComplete="off"
-          className="h-7 w-full rounded-lg px-2 text-base bg-lg-input border border-lg-separator outline-none focus:ring-1 focus:ring-primary/30"
+          className="h-7 w-full rounded-lg px-2 text-base bg-lg-input border border-lg-separator outline-none focus:ring-1 focus:ring-foreground/20"
         />
       </form>
     );
@@ -156,7 +156,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
           'flex items-center h-7 w-full rounded-lg pl-[7px] overflow-hidden transition-[background-color,padding] duration-100',
           isHovered ? 'pr-7' : 'pr-9',
           active
-            ? 'bg-primary text-white hover:bg-primary/90'
+            ? 'bg-foreground/10 text-foreground hover:bg-foreground/15'
             : 'text-lg-text-secondary hover:text-foreground hover:bg-lg-sidebar-hover hover:backdrop-blur-[20px]'
         )}
         title={conversation.title}

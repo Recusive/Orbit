@@ -32,14 +32,14 @@ const DialogContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay className="flex items-center justify-center" />
+    <DialogOverlay className="flex items-center justify-center backdrop-blur-none bg-black/0" />
     {/* Flexbox centering wrapper - avoids blurry text from transform translate(-50%) subpixel issues */}
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       <div className="relative">
         <DialogPrimitive.Content
           ref={ref}
           className={cn(
-            'relative z-10 grid w-full max-w-lg gap-4 glass-popover bg-transparent border-0 p-6 shadow-none duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-[10px] pointer-events-auto',
+            'relative z-10 grid w-full max-w-lg gap-4 bg-sidebar border-0 p-6 shadow-none duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-[10px] pointer-events-auto',
             className
           )}
           {...props}
@@ -69,7 +69,7 @@ const DialogContentTopCenter = React.forwardRef<
         <DialogPrimitive.Content
           ref={ref}
           className={cn(
-            'relative z-10 grid glass-popover bg-transparent border-0 shadow-none rounded-[12px]',
+            'relative z-10 grid glass-popover bg-sidebar border-0 shadow-none rounded-[12px]',
             'duration-150 data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-[0.98] data-[state=open]:zoom-in-[0.98]',
@@ -85,20 +85,20 @@ const DialogContentTopCenter = React.forwardRef<
 ));
 DialogContentTopCenter.displayName = 'DialogContentTopCenter';
 
-// Apple Liquid Glass dialog — transparent overlay so backdrop-filter sees the real app
+// Apple Liquid Glass dialog — dim overlay without blur so the app stays crisp behind it
 const DialogContentGlass = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
-    {/* Light blur overlay — keeps app content visible for glass dialog */}
-    <DialogOverlay className="flex items-center justify-center" />
+    {/* Dim overlay without blur */}
+    <DialogOverlay className="flex items-center justify-center backdrop-blur-none" />
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       <div className="relative">
         <DialogPrimitive.Content
           ref={ref}
           className={cn(
-            'relative z-10 grid bg-transparent duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 pointer-events-auto',
+            'relative z-10 grid bg-sidebar duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 pointer-events-auto',
             className
           )}
           {...props}

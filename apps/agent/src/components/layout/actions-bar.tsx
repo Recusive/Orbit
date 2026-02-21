@@ -45,7 +45,7 @@ const ActionButton: FC<ActionButtonProps> = ({ icon: Icon, label, isActive, onCl
       {/* Active indicator - overlays the left border (VS Code style) */}
       {isActive ? (
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-[2px] h-6 bg-primary rounded-r"
+          className="absolute top-1/2 -translate-y-1/2 w-[2px] h-6 bg-foreground rounded-r"
           style={{ left: -1.5 }}
         />
       ) : null}
@@ -54,7 +54,7 @@ const ActionButton: FC<ActionButtonProps> = ({ icon: Icon, label, isActive, onCl
 
       {/* Badge for counts (e.g., pending changes) */}
       {badge !== undefined && badge > 0 ? (
-        <div className="absolute top-1.5 right-1.5 min-w-4 h-4 flex items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground px-1">
+        <div className="absolute top-1.5 right-1.5 min-w-4 h-4 flex items-center justify-center rounded-full bg-foreground text-xs font-medium text-background px-1">
           {badge > 99 ? '99+' : badge}
         </div>
       ) : null}

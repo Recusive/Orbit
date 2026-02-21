@@ -45,7 +45,7 @@ export const ContentCard: FC<ContentCardProps> = ({
       return {
         margin: 0,
         borderRadius: 0,
-        background: 'var(--background)',
+        background: 'var(--chat-area)',
         boxShadow: 'none',
         transition: PREFERS_REDUCED_MOTION
           ? undefined
@@ -62,7 +62,7 @@ export const ContentCard: FC<ContentCardProps> = ({
     return {
       margin: `${String(top)}px ${String(right)}px ${String(bottom)}px ${String(left)}px`,
       borderRadius: `var(--content-card-radius)`,
-      background: 'var(--background)',
+      background: 'var(--chat-area)',
       boxShadow: 'none',
       transition: PREFERS_REDUCED_MOTION
         ? undefined

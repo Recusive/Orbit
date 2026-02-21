@@ -272,13 +272,13 @@ export const AskUserQuestionModal: FC<AskUserQuestionModalProps> = ({
                   handleOptionClick(idx);
                 }}
                 className={`group/row flex w-full items-center gap-3 h-[3.25rem] px-3 text-left cursor-pointer rounded-2xl outline-none transition-all duration-100 active:scale-[0.99] ${
-                  selectedOption === idx ? 'bg-primary/10' : 'hover:bg-lg-control-hover'
+                  selectedOption === idx ? 'bg-foreground/8' : 'hover:bg-lg-control-hover'
                 }`}
               >
                 <span
                   className={`relative flex size-[28px] shrink-0 items-center justify-center rounded-[10px] overflow-hidden text-sm transition-colors ${
                     selectedOption === idx
-                      ? 'bg-primary/15 text-primary'
+                      ? 'bg-foreground/10 text-foreground'
                       : 'bg-lg-control text-muted-foreground'
                   }`}
                 >
@@ -328,7 +328,7 @@ export const AskUserQuestionModal: FC<AskUserQuestionModalProps> = ({
           {customText.trim() ? (
             <button
               onClick={handleCustomSubmit}
-              className="size-7 flex items-center justify-center rounded-lg transition-colors bg-primary/15 hover:bg-primary/25 text-primary shrink-0"
+              className="size-7 flex items-center justify-center rounded-lg transition-colors bg-foreground/10 hover:bg-foreground/15 text-foreground shrink-0"
               type="button"
               aria-label="Submit"
             >

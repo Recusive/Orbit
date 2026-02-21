@@ -45,7 +45,7 @@ export const ThinkingModeButton: FC<ThinkingModeButtonProps> = ({
               size={16}
               className={cn(
                 'transition-colors duration-150',
-                thinkingMode !== 'off' && 'text-primary'
+                thinkingMode !== 'off' && 'text-foreground'
               )}
             />
             {/* Vertical dots indicator */}
@@ -83,7 +83,7 @@ export const ThinkingModeButton: FC<ThinkingModeButtonProps> = ({
           <div className="flex items-center gap-1.5">
             <IconImagine
               size={16}
-              className={cn(thinkingMode !== 'off' ? 'text-primary' : 'text-muted-foreground')}
+              className={cn(thinkingMode !== 'off' ? 'text-foreground' : 'text-muted-foreground')}
             />
             <span className="text-xs font-medium">{thinkingInfo.level}</span>
           </div>

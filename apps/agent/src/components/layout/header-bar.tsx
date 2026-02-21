@@ -49,7 +49,7 @@ const TabButton: FC<TabButtonProps> = ({ label, active, onClick }) => {
       />
       {/* Active indicator - offset to sit on header's bottom border */}
       {active ? (
-        <div className="absolute inset-x-0 h-0.5 bg-primary" style={{ bottom: '-3.5px' }} />
+        <div className="absolute inset-x-0 h-0.5 bg-foreground" style={{ bottom: '-3.5px' }} />
       ) : null}
       <span className="relative text-base font-medium">{label}</span>
     </button>
@@ -118,7 +118,7 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
         'flex items-center justify-between border-b shrink-0',
         transparent
           ? 'bg-transparent border-lg-separator/35'
-          : 'bg-card shadow-lg border-lg-separator',
+          : 'bg-chat-area shadow-lg border-lg-separator',
         // Left padding for macOS traffic light buttons (matches Cursor: x:11 + ~69px for 3 buttons)
         'pl-[80px]',
         className
