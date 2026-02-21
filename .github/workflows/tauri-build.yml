@@ -74,6 +74,21 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Build agent-bridge sidecar (Bun standalone binary)
+      - name: Build agent-bridge sidecar
+        run: |
+          cd agent-bridge
+          bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile=../src-tauri/binaries/agent-bridge-aarch64-apple-darwin
+          chmod +x ../src-tauri/binaries/agent-bridge-aarch64-apple-darwin
+
+      # Install Claude Code CLI and copy the binary
+      - name: Install Claude Code CLI
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          cp "$HOME/.local/bin/claude" src-tauri/binaries/claude-aarch64-apple-darwin
+          chmod +x src-tauri/binaries/claude-aarch64-apple-darwin
+          ls -la src-tauri/binaries/
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
