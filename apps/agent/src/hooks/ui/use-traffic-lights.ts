@@ -15,7 +15,7 @@ import { invoke, IS_TAURI } from '@/lib/api/core';
 
 /** Traffic light position (points from top-left of window) */
 const TRAFFIC_LIGHT_X = 11;
-const TRAFFIC_LIGHT_Y = 24;
+const TRAFFIC_LIGHT_Y = 25;
 
 export function useTrafficLights(sidebarOpen: boolean): void {
   useEffect(() => {

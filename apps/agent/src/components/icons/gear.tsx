@@ -1,17 +1,17 @@
+/**
+ * Gear — SF Symbol "gear"
+ * Traced from native macOS SF Symbol PNG via potrace.
+ */
 import { forwardRef } from 'react';
 
 import type { SVGProps } from 'react';
 
-interface SettingsIconProps extends SVGProps<SVGSVGElement> {
+interface GearProps extends SVGProps<SVGSVGElement> {
   size?: number | string;
 }
 
-/**
- * SettingsIcon - Gear/cog icon traced from the original base64 PNG asset.
- * Usage: <SettingsIcon size={18} className="text-muted-foreground" />
- */
-const SettingsIcon = forwardRef<SVGSVGElement, SettingsIconProps>(
-  ({ size = 18, color = 'currentColor', className, ...props }, ref) => (
+const Gear = forwardRef<SVGSVGElement, GearProps>(
+  ({ size = 16, color = 'currentColor', className, ...props }, ref) => (
     <svg
       ref={ref}
       xmlns="http://www.w3.org/2000/svg"
@@ -30,6 +30,6 @@ const SettingsIcon = forwardRef<SVGSVGElement, SettingsIconProps>(
   )
 );
 
-SettingsIcon.displayName = 'SettingsIcon';
+Gear.displayName = 'Gear';
 
-export { SettingsIcon };
+export { Gear };
