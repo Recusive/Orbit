@@ -35,9 +35,10 @@ Use this to find the right file. Read the file directly — no links needed.
 - `ICON-THEME-SYSTEM.md` — File and folder icon theme system
 - `flash-prevention-guide.md` — Preventing UI flash on load
 
-## development/ (5 files)
+## development/ (6 files)
 
 - `DEVELOPMENT.md` — Development workflow and setup
+- `RELEASE-GUIDE.md` — How to tag, build, and ship a new version (step-by-step)
 - `TROUBLESHOOTING.md` — Common issues and solutions
 - `CI-CD-GUIDE.md` — GitHub Actions CI/CD pipeline
 - `DMG-BUILD-GUIDE.md` — Building macOS distributable
