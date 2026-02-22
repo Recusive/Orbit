@@ -77,7 +77,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               onClick={cycleInputMode}
               aria-label={`Input mode: ${INPUT_MODE_LABELS[inputMode]}. Click to change.`}
               className={cn(
-                `h-7 px-2.5 flex items-center gap-1.5 rounded-lg ${TRANSITION_CLASSES.button}`,
+                `h-7 px-2.5 flex items-center gap-1.5 rounded-full ${TRANSITION_CLASSES.button}`,
                 'hover:scale-[1.02] active:scale-[0.98]',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
                 inputMode === 'default' &&
@@ -120,7 +120,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                   onClick={handleImageClick}
                   aria-label="Attach image"
                   className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-lg',
+                    'h-7 w-7 flex items-center justify-center rounded-full',
                     'bg-transparent text-muted-foreground/70',
                     TRANSITION_CLASSES.button,
                     'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
@@ -164,7 +164,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                   onClick={handleImageClick}
                   aria-label="Attach image"
                   className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-lg',
+                    'h-7 w-7 flex items-center justify-center rounded-full',
                     'bg-transparent text-muted-foreground/70',
                     TRANSITION_CLASSES.button,
                     'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',

@@ -74,10 +74,10 @@ Required so the updater can verify that downloaded updates haven't been tampered
 Generated with:
 
 ```bash
-bunx tauri signer generate -w ~/.tauri/orbit-updater.key
+bunx tauri signer generate -w ~/.tauri/orbit.key
 ```
 
-Local backup: `~/.tauri/orbit-updater.key` (private) and `~/.tauri/orbit-updater.key.pub` (public).
+Local backup: `~/.tauri/orbit.key` (private) and `~/.tauri/orbit.key.pub` (public). Current password: `build`.
 
 ---
 
@@ -372,76 +372,25 @@ The version in `tauri.conf.json` must be lower than the version in `latest.json`
 
 ---
 
-## Current Status & Next Steps
+## Current Status
 
-**Status:** Implementation complete, not yet tested end-to-end. All code is on the `fix/prod` branch.
+**Status:** Fully tested end-to-end. Auto-update verified on v0.0.3 → v0.0.4 (Feb 2026).
 
-### What's Done
+### Release History
 
-- All auto-update code (store, hook, toast, sidebar button, simulation)
-- Tauri updater + process plugins wired in (Rust + frontend)
-- CI workflow (`tauri-build.yml`) configured for macOS ARM64 only
-- Public release repo (`Recusive/Orbit-Release`) created with README + branding
-- Signing keys generated and stored as GitHub Secrets (all 10 secrets configured)
-- Version unified to `0.0.1` across all manifests
-- `AUTO-UPDATE.md` documentation (this file)
+| Version | Result                                                                                    |
+| ------- | ----------------------------------------------------------------------------------------- |
+| v0.0.1  | Built successfully but missing `createUpdaterArtifacts` — no `latest.json` generated      |
+| v0.0.2  | Failed: corrupted signing key, then empty password issue with GitHub Secrets              |
+| v0.0.3  | First successful full release (new key with password `build`)                             |
+| v0.0.4  | Auto-update verified: v0.0.3 detected update, downloaded, installed, relaunched on v0.0.4 |
 
-### What's Next
+### Lessons Learned
 
-The pipeline has never been run. To test it end-to-end:
+- **Never use an empty password for the signing key.** GitHub Secrets can't reliably store/pass empty strings. Use a real password (current: `build`).
+- **`createUpdaterArtifacts: true`** is required in `tauri.conf.json` for the updater to work. Without it, no `.app.tar.gz` or `.sig` is generated.
+- **Regenerating the signing key breaks auto-update for existing installs.** The pubkey is baked into the binary. Users must manually install a new DMG to get the updated pubkey.
 
-#### Step 1: Merge to main
+### Practical Guide
 
-Review all changes on `fix/prod`, then merge into `main` when ready:
-
-```bash
-git checkout main
-git merge fix/prod
-git push origin main
-```
-
-#### Step 2: First release (v0.0.1)
-
-Tag and push to trigger the CI pipeline for the first time:
-
-```bash
-git tag v0.0.1
-git push origin v0.0.1
-```
-
-This creates the baseline release. The app built from this version will be the one that later checks for updates. Watch the GitHub Actions tab for the 4-job pipeline to complete (~15 min). Verify that `Recusive/Orbit-Release` has a release with `.dmg`, `.app.tar.gz`, `latest.json`, and `.sig` files.
-
-#### Step 3: Install the v0.0.1 build
-
-Download the `.dmg` from Orbit-Release and install it on your machine. This is the "old" version that will later detect the update.
-
-#### Step 4: Ship a test update (v0.0.2)
-
-Bump the version, push, and let CI build the new release:
-
-```bash
-./scripts/bump-version.sh 0.0.2
-git push && git push --tags
-```
-
-#### Step 5: Verify the update flow
-
-Open the installed v0.0.1 app. Within a few seconds (or up to 4 hours for the periodic check), it should:
-
-1. Fetch `latest.json` from Orbit-Release
-2. See that `0.0.2 > 0.0.1`
-3. Show the update toast with "Orbit v0.0.2 available"
-4. Clicking "Update now" downloads and installs
-5. "Restart now" relaunches on v0.0.2
-
-If the toast doesn't appear, check the DevTools console for `[UpdateStore]` and `[AutoUpdate]` log messages.
-
-#### Step 6: Clean up the test version (optional)
-
-If v0.0.2 was just a test, you can delete the release from Orbit-Release and continue development. The next real release can be any version > 0.0.1.
-
-### Known Risks
-
-- **First CI run may fail** — The Xcode 26.2 path in `xcode-select` assumes the GitHub runner has it installed. If it fails, check [runner-images](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-arm64-Readme.md) for available Xcode versions and update the workflow.
-- **Apple notarization** — First-time notarization can take longer (up to 30 min). Subsequent runs are faster (~5 min).
-- **`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`** — Set to a single space because GitHub rejects empty secret values. If the key was generated without a password, this should work. If signing fails, try regenerating the key with an explicit password.
+See `docs/development/RELEASE-GUIDE.md` for step-by-step release instructions.
