@@ -811,13 +811,15 @@ impl ConversationManager {
         title: &str,
         workspace_path: Option<&str>,
     ) -> Result<()> {
-        let jsonl_path = self.conversation_path(session_id, workspace_path);
-
-        // Skip if the JSONL file doesn't exist yet — the CLI hasn't created it.
-        // Creating it prematurely would trigger the CLI's "Session ID already in use" guard.
-        if !jsonl_path.exists() {
+        // Use find_conversation_path (searches all workspaces) instead of
+        // conversation_path (single workspace). Matches how delete() works.
+        // This prevents silent skips when the workspace path doesn't match
+        // where the JSONL was actually stored.
+        let Some(jsonl_path) = self.find_conversation_path(session_id, workspace_path) else {
+            // JSONL doesn't exist yet — the CLI hasn't created it.
+            // Creating it prematurely would trigger the CLI's "Session ID already in use" guard.
             return Ok(());
-        }
+        };
 
         let line = serde_json::json!({
             "type": "custom-title",
