@@ -123,15 +123,14 @@ export const ThemeProvider: FC<ThemeProviderProps> = ({
         tintColor: '#18181860',
       });
     } else {
-      // Light mode: frost at full strength for blur diffusion.
-      // Screen-blend tint overlay lightens the grey WITHOUT covering the blur
-      // pattern (screen blend preserves per-pixel texture contrast).
-      void invoke('set_frost_alpha', { alpha: 1.0 });
-      void invoke('set_tint_opacity', { opacity: 0.7 });
+      // Light mode: reduced frost for more see-through, white tint from below
+      // via liquid glass to lighten the grey without blocking blur texture.
+      void invoke('set_frost_alpha', { alpha: 0.2 });
+      void invoke('set_tint_opacity', { opacity: 0.15 });
       void invoke('configure_frost_theme', { isDark: false });
       void setLiquidGlassEffect({
-        variant: GlassMaterialVariant.Regular,
-        tintColor: '#FFFFFF15',
+        variant: GlassMaterialVariant.Clear,
+        tintColor: '#FFFFFF80',
       });
     }
   }, [effectiveTheme, windowMode]);
