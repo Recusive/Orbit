@@ -500,3 +500,10 @@ export async function enhanceBugReport(
 ): Promise<string> {
   return invoke<string>('agent_enhance_bug_report', { description, messageContent });
 }
+
+export async function generateSessionTitle(
+  userMessage: string,
+  assistantResponse: string
+): Promise<string> {
+  return invoke<string>('agent_generate_title', { userMessage, assistantResponse });
+}

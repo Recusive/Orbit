@@ -30,6 +30,7 @@ import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { toConversationSummaries } from '@/lib/mappers';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { createCheckpointBatcher, rafBatch } from '@/lib/utils/event-batcher';
+import { flushPendingTitle, generateAITitle } from '@/services/session';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
@@ -402,6 +403,15 @@ class ChatMessageService {
           logger.error('Failed to load conversation list', err);
         });
     }
+
+    // Flush pending title now that the JSONL file is guaranteed to exist.
+    // The effective session ID (JSONL filename) is sdkSessionId; the pending title
+    // was stored under the original frontend session ID (message.session_id).
+    const effectiveId = sdkSessionId ?? message.session_id;
+    flushPendingTitle(
+      effectiveId,
+      message.session_id !== effectiveId ? message.session_id : undefined
+    );
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -619,6 +629,25 @@ class ChatMessageService {
 
     // Schedule coalesced sidebar refresh
     scheduleSidebarRefresh();
+
+    // Generate AI title after the first completed turn (1 user + 1 assistant message).
+    // Fire-and-forget — the placeholder title from generateFallbackTitle() stays until
+    // Haiku responds (~1-2s), then gets overwritten with the AI summary.
+    {
+      const currentSession = useChatStore.getState().sessions[sid];
+      if (currentSession) {
+        const msgs = currentSession.messages;
+        const userMsgs = msgs.filter((m) => m.role === 'user');
+        const assistantMsgs = msgs.filter((m) => m.role === 'assistant');
+        if (userMsgs.length === 1 && assistantMsgs.length === 1) {
+          const userText = userMsgs[0]?.content ?? '';
+          const assistantText = assistantMsgs[0]?.content ?? '';
+          if (userText.length > 0 && assistantText.length > 0) {
+            generateAITitle(sid, userText, assistantText);
+          }
+        }
+      }
+    }
   }
 
   private handleAgentError(message: Extract<ExtensionMessage, { type: 'agent:error' }>): void {

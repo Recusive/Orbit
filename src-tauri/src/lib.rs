@@ -302,6 +302,11 @@ pub fn run() {
                     // Enable ProMotion 120Hz on supported displays.
                     drop(window.enable_promotion());
 
+                    // Install native frosted glass (NSVisualEffectView) behind
+                    // the webview. Replaces CSS backdrop-filter which causes
+                    // white glow at window rounded corners.
+                    drop(window.setup_frost_layer());
+
                     // Liquid Glass effect is managed by the frontend (theme-provider.tsx)
                     // via tauri-plugin-liquid-glass JS API. This allows dynamic tint
                     // adjustment when the user switches between light/dark themes.
@@ -377,6 +382,7 @@ pub fn run() {
             agent_cmd::agent_generate_agent_definition,
             agent_cmd::agent_generate_command_definition,
             agent_cmd::agent_enhance_bug_report,
+            agent_cmd::agent_generate_title,
             // Canvas session commands
             canvas_cmd::canvas_create_session,
             canvas_cmd::canvas_delete_session,
@@ -573,6 +579,7 @@ pub fn run() {
             // Window management commands
             window::set_traffic_lights_visible,
             window::set_glass_theme,
+            window::set_frost_alpha,
             // SF Symbol rendering
             sf_symbols::get_sf_symbol,
         ])

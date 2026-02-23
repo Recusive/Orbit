@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { query } from '@anthropic-ai/claude-agent-sdk';
 import { formatZodError } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
@@ -2472,6 +2473,68 @@ Example format:
     }
 
     return parseResult.data;
+  }
+
+  /**
+   * Generate a concise AI title for a conversation.
+   *
+   * Uses query() directly with minimal options — no tools, no system prompt,
+   * no MCP, maxTurns=1. This avoids the heavy OrbitAgent initialization
+   * (system prompt, MCP servers, file checkpointing, permissions) that caused
+   * ~10s latency. Direct query() completes in ~1-2s.
+   */
+  async generateTitle(userMessage: string, assistantResponse: string): Promise<string> {
+    const maxTitleChars = 50;
+
+    const prompt = `Generate a short title (max ${String(maxTitleChars)} characters) for this conversation.
+The title should capture the main topic or intent.
+Do NOT use quotes, periods, or prefixes like "Title:".
+Do NOT exceed ${String(maxTitleChars)} characters. Just output the title text and nothing else.
+
+User: "${userMessage.slice(0, 300)}"
+
+Assistant (truncated): "${assistantResponse.slice(0, 300)}"`;
+
+    const envClaudePath = process.env.CLAUDE_CLI_PATH;
+    const claudePath =
+      envClaudePath !== undefined && envClaudePath !== '' ? envClaudePath : undefined;
+
+    const q = query({
+      prompt,
+      options: {
+        pathToClaudeCodeExecutable: claudePath,
+        model: 'haiku',
+        maxTurns: 1,
+      },
+    });
+
+    let resultText = '';
+
+    for await (const message of q) {
+      const msg = message as Record<string, unknown>;
+      if (msg.type === 'result') {
+        if (typeof msg.result === 'string') {
+          resultText = msg.result;
+        }
+        break;
+      }
+    }
+
+    // Clean up: remove quotes, "Title:" prefix, trailing period
+    let title = resultText
+      .replace(/^["']|["']$/g, '')
+      .replace(/^Title:\s*/i, '')
+      .replace(/\.$/, '')
+      .trim();
+
+    // Hard cap: truncate at word boundary if Haiku exceeded the limit
+    if (title.length > maxTitleChars) {
+      const truncated = title.slice(0, maxTitleChars);
+      const lastSpace = truncated.lastIndexOf(' ');
+      title = lastSpace > maxTitleChars * 0.4 ? truncated.slice(0, lastSpace) : truncated;
+    }
+
+    return title || 'Untitled';
   }
 
   /**

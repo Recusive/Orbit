@@ -275,7 +275,7 @@ export const PrimarySidebar: FC = () => {
         >
           <button
             onClick={handleOpenQuickSearch}
-            className="flex items-center gap-1.5 h-8 rounded-[8px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-lg-control hover:bg-lg-control-hover transition-[background-color] duration-100"
+            className="flex items-center gap-1.5 h-8 rounded-[9px] text-sidebar-foreground hover:text-foreground overflow-hidden w-full bg-lg-control hover:bg-lg-control-hover transition-[background-color] duration-100"
             title="Search files (⌘P)"
           >
             {/* Fixed-width icon column - never moves */}
@@ -443,7 +443,7 @@ export const PrimarySidebar: FC = () => {
                   type="button"
                   onClick={handleRecentProjectClick(project.path)}
                   className={cn(
-                    'group flex items-center gap-2.5 px-2 py-2 rounded-lg',
+                    'group flex items-center gap-2.5 px-2 py-2 rounded-[9px]',
                     'transition-[background-color] duration-100',
                     'hover:bg-lg-sidebar-hover',
                     'text-left outline-none'
@@ -489,7 +489,7 @@ export const PrimarySidebar: FC = () => {
               onLoadConversation={handleLoadConversation}
               onStartEditConversation={setEditingConversationId}
               onRenameConversation={(sessionId, newTitle) => {
-                void handleRenameConversation(sessionId, newTitle);
+                handleRenameConversation(sessionId, newTitle);
               }}
               onCancelEditConversation={() => {
                 setEditingConversationId(null);
@@ -515,7 +515,7 @@ export const PrimarySidebar: FC = () => {
             onLoadConversation={handleLoadConversation}
             onStartEditConversation={setEditingConversationId}
             onRenameConversation={(sessionId, newTitle) => {
-              void handleRenameConversation(sessionId, newTitle);
+              handleRenameConversation(sessionId, newTitle);
             }}
             onCancelEditConversation={() => {
               setEditingConversationId(null);
@@ -557,7 +557,7 @@ export const PrimarySidebar: FC = () => {
         {/* Settings | Feedback — inline row */}
         <div className="flex items-center h-8 mx-1.5 gap-1.5 overflow-hidden">
           <button
-            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-lg px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
+            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
             onClick={() => {
               openSettings('agent');
             }}
@@ -572,7 +572,7 @@ export const PrimarySidebar: FC = () => {
           </button>
           <div className="w-px h-3.5 bg-lg-separator shrink-0" />
           <button
-            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-lg px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
+            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
             onClick={() => {
               openSettings('feedback');
             }}

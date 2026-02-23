@@ -424,9 +424,15 @@ export const useUIStore = create<UIStore>()(
 
     updateConversationTitle: (sessionId: string, title: string): void => {
       set((state) => {
-        const conversation = state.conversations.find((c) => c.sessionId === sessionId);
-        if (conversation) {
-          conversation.title = title;
+        // Replace entire element to ensure Immer produces a new array reference.
+        // Direct property mutation (conversation.title = title) can be silently
+        // dropped — see MEMORY.md "Immer nested property mutation" note.
+        const idx = state.conversations.findIndex((c) => c.sessionId === sessionId);
+        if (idx !== -1) {
+          const existing = state.conversations[idx];
+          if (existing) {
+            state.conversations[idx] = { ...existing, title };
+          }
         }
         // Also update active title if this is the active conversation
         if (state.activeConversationId === sessionId) {

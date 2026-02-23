@@ -1,7 +1,7 @@
 //! Orbit Conversations — pure disk reader for Claude Code JSONL files.
 //!
 //! The Claude Agent SDK writes JSONL files to `~/.claude/projects/`. This crate
-//! **reads** them. It never caches, never writes (except fork). The frontend
+//! **reads** them. It never caches and rarely writes (fork, custom-title). The frontend
 //! Zustand store owns all in-memory state.
 //!
 //! # Storage Location
@@ -18,7 +18,10 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::io::{self, BufRead as _, BufReader, ErrorKind, Read as _, Seek as _, SeekFrom};
+use std::fs::OpenOptions;
+use std::io::{
+    self, BufRead as _, BufReader, ErrorKind, Read as _, Seek as _, SeekFrom, Write as _,
+};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -789,8 +792,57 @@ impl ConversationManager {
         Ok(())
     }
 
-    /// No-op. The Claude Agent SDK manages its own summary/custom-title lines.
-    pub fn update_title(&self, _session_id: &str, _title: String) -> Result<()> {
+    /// Persist a custom title by appending a `custom-title` line to the JSONL.
+    ///
+    /// Matches the Claude Code CLI convention: `{"type":"custom-title","title":"..."}`.
+    /// The backend already reads this line type with highest priority in
+    /// `parse_title_line()` and `read_last_summary()`.
+    ///
+    /// IMPORTANT: We must NOT create the JSONL file if it doesn't exist yet.
+    /// The Claude CLI checks for file existence on startup and refuses to start
+    /// with "Session ID already in use" if the file is present. The CLI itself
+    /// creates the file on first message. We only append to an existing file.
+    ///
+    /// POSIX guarantees atomic appends for writes under `PIPE_BUF` (4096 bytes),
+    /// so this is safe even if the SDK sidecar is also writing to the same file.
+    pub fn update_title(
+        &self,
+        session_id: &str,
+        title: &str,
+        workspace_path: Option<&str>,
+    ) -> Result<()> {
+        let jsonl_path = self.conversation_path(session_id, workspace_path);
+
+        // Skip if the JSONL file doesn't exist yet — the CLI hasn't created it.
+        // Creating it prematurely would trigger the CLI's "Session ID already in use" guard.
+        if !jsonl_path.exists() {
+            return Ok(());
+        }
+
+        let line = serde_json::json!({
+            "type": "custom-title",
+            "title": title,
+        });
+
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open(&jsonl_path)
+            .map_err(|e| {
+                Error::Config(format!(
+                    "Failed to open JSONL for title update {}: {}",
+                    jsonl_path.display(),
+                    e
+                ))
+            })?;
+
+        writeln!(file, "{line}").map_err(|e| {
+            Error::Config(format!(
+                "Failed to write custom-title to {}: {}",
+                jsonl_path.display(),
+                e
+            ))
+        })?;
+
         Ok(())
     }
 
@@ -2136,12 +2188,13 @@ mod tests {
     }
 
     #[test]
-    fn test_update_title_is_noop() {
+    fn test_update_title_skips_missing_file() {
         let (manager, _temp) = create_test_manager();
 
+        // No JSONL file exists — update_title should silently skip (no error).
         manager
-            .update_title("session-1", "New Title".to_owned())
-            .expect("update_title should be a no-op");
+            .update_title("session-1", "New Title", None)
+            .expect("update_title should skip when JSONL doesn't exist");
     }
 
     #[test]

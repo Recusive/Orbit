@@ -15,8 +15,8 @@
     "test:watch": "bun test --watch"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.44",
-    "@anthropic-ai/claude-code": "^2.0.76",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.50",
+    "@anthropic-ai/claude-code": "^2.1.50",
     "@anthropic-ai/sdk": "^0.74.0",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "@orbit/shared-schemas": "workspace:*",

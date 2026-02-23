@@ -46,7 +46,7 @@ const DropdownMenuSubContent = React.forwardRef<
   <DropdownMenuPrimitive.SubContent
     ref={ref}
     className={cn(
-      'z-50 min-w-32 overflow-hidden rounded-lg bg-gray-1 dark:bg-[oklch(23%_0_0)] border border-white dark:border-white/8 shadow-[0_0_12px_rgba(0,0,0,0.08),0_0_24px_rgba(0,0,0,0.05)] dark:shadow-md p-1 text-popover-foreground',
+      'z-50 min-w-32 overflow-hidden rounded-lg bg-[#f3f3f3] dark:bg-[oklch(23%_0_0)] border border-white dark:border-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md p-1 text-popover-foreground',
       // Transform origin from Radix - scales from where it connects to parent menu
       'origin-[--radix-dropdown-menu-content-transform-origin]',
       // Enter animation: subtle scale + fade + directional slide
@@ -77,7 +77,7 @@ const DropdownMenuContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-32 overflow-y-auto overflow-x-hidden rounded-xl bg-gray-1 dark:bg-[oklch(23%_0_0)] border border-white dark:border-white/8 shadow-[0_0_12px_rgba(0,0,0,0.08),0_0_24px_rgba(0,0,0,0.05)] dark:shadow-md p-1 text-popover-foreground',
+        'z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-32 overflow-y-auto overflow-x-hidden rounded-xl bg-[#f3f3f3] dark:bg-[oklch(23%_0_0)] border border-white dark:border-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md p-1 text-popover-foreground',
         // Transform origin from Radix - scales from where it connects to trigger
         'origin-[--radix-dropdown-menu-content-transform-origin]',
         // Enter animation: subtle scale + fade + directional slide

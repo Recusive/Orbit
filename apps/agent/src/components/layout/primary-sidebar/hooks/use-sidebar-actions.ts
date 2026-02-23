@@ -9,12 +9,8 @@ import type { WorktreeInfo } from '@/lib/api';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
-import {
-  conversationDelete,
-  conversationUpdateTitle,
-  gitWorktreeList,
-  gitWorktreeRemove,
-} from '@/lib/api';
+import { conversationDelete, gitWorktreeList, gitWorktreeRemove } from '@/lib/api';
+import { applySessionTitle } from '@/services/session';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
@@ -79,7 +75,7 @@ interface UseSidebarActionsReturn {
   handleOpenCreateWorktree: () => void;
   handleOpenDeleteWorktreeDialog: (worktree: WorktreeInfo) => void;
   handleRemoveWorktree: (deleteBranch: boolean) => Promise<void>;
-  handleRenameConversation: (sessionId: string, newTitle: string) => Promise<void>;
+  handleRenameConversation: (sessionId: string, newTitle: string) => void;
   handleDeleteConversation: (sessionId: string) => Promise<void>;
   handleOpenDeleteDialog: (conv: ConversationSummary) => void;
   handleDuplicateConversation: (sessionId: string) => void;
@@ -101,7 +97,6 @@ export const useSidebarActions = ({
     removeWorktree,
     setCreateWorktreeDialogOpen,
     setEditingConversationId,
-    updateConversationTitle,
     removeConversation,
     setVaultOpen,
   } = useUIStore();
@@ -314,20 +309,13 @@ export const useSidebarActions = ({
 
   // Conversation rename handler
   const handleRenameConversation = useCallback(
-    async (sessionId: string, newTitle: string): Promise<void> => {
-      try {
-        // Optimistic update
-        updateConversationTitle(sessionId, newTitle);
-        setEditingConversationId(null);
-        // Persist to backend
-        await conversationUpdateTitle(sessionId, newTitle);
-        toast.success('Conversation renamed');
-      } catch (err) {
-        logger.error('Failed to rename conversation', err);
-        toast.error('Failed to rename conversation');
-      }
+    (sessionId: string, newTitle: string): void => {
+      // Persist to UIStore (memory) + Rust backend (JSONL on disk)
+      applySessionTitle(sessionId, newTitle);
+      setEditingConversationId(null);
+      toast.success('Conversation renamed');
     },
-    [updateConversationTitle, setEditingConversationId]
+    [setEditingConversationId]
   );
 
   // Conversation delete handler

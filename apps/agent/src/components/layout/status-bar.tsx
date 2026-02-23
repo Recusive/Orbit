@@ -117,7 +117,7 @@ interface StatusItemProps {
 }
 
 const StatusItem: FC<StatusItemProps> = ({ children, title, onClick, className }) => {
-  const baseClasses = 'flex items-center gap-1 px-1.5 h-full text-sm';
+  const baseClasses = 'flex items-center gap-1 px-1.5 h-full text-sm rounded-full';
   const interactiveClasses = onClick ? 'hover:bg-accent/50 cursor-pointer' : '';
 
   return (

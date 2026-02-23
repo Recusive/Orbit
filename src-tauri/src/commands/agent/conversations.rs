@@ -328,14 +328,15 @@ pub fn conversation_delete(
     manager.delete(&session_id, workspace_path.as_deref())
 }
 
-/// Update conversation title
+/// Update conversation title by appending a `custom-title` line to the session JSONL.
 #[tauri::command]
 pub fn conversation_update_title(
     session_id: String,
     title: String,
+    workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
 ) -> Result<()> {
-    manager.update_title(&session_id, title)
+    manager.update_title(&session_id, &title, workspace_path.as_deref())
 }
 
 /// Add a message to a conversation

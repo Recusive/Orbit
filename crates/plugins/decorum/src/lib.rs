@@ -3,6 +3,7 @@
 //! Provides:
 //! - `ProMotion` 120Hz rendering support via `CADisplayLink` and
 //!   `WebKit` 60fps cap removal via the `_WKFeature` private API
+//! - Native frosted glass via `NSVisualEffectView` (replaces CSS `backdrop-filter`)
 //! - Runtime traffic light (close/minimize/zoom) repositioning
 //! - Child window z-ordering fix
 
@@ -11,6 +12,8 @@ use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Error;
 use tauri::{Runtime, WebviewWindow};
 
+#[cfg(target_os = "macos")]
+mod frost;
 #[cfg(target_os = "macos")]
 mod glass_defocus;
 #[cfg(target_os = "macos")]
@@ -55,6 +58,28 @@ pub trait WebviewWindowExt {
     #[cfg(target_os = "macos")]
     fn set_traffic_lights_visible(&self, visible: bool, x: f64, y: f64) -> Result<(), Error>;
 
+    /// Install native frosted glass on the window.
+    ///
+    /// Adds an `NSVisualEffectView` with `.sidebar` material and
+    /// `.behindWindow` blending, producing a frosted blur at the macOS
+    /// compositor level. Replaces CSS `backdrop-filter` which causes white
+    /// glow at window rounded corners.
+    ///
+    /// The frost view is always installed but only visible when the webview
+    /// content above it is transparent (i.e., liquid-glass mode). In solid
+    /// mode, the opaque CSS background naturally covers the frost.
+    ///
+    /// # Compatibility
+    ///
+    /// - **macOS 10.14+**: Full frosted blur via `NSVisualEffectView`
+    /// - **Pre-macOS 10.14**: Silent no-op
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be dispatched to the main thread.
+    #[cfg(target_os = "macos")]
+    fn setup_frost_layer(&self) -> Result<(), Error>;
+
     /// Show a native folder picker dialog, safe for use with liquid glass.
     ///
     /// On macOS 26+, `NSOpenPanel` crashes when `NSGlassEffectView` is active
@@ -83,6 +108,20 @@ impl WebviewWindowExt for WebviewWindow {
             self.run_on_main_thread(move || {
                 promotion::enable_promotion();
                 promotion::unlock_webview_framerate();
+            })?;
+        }
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
+    fn setup_frost_layer(&self) -> Result<(), Error> {
+        if is_main_thread() {
+            unsafe {
+                frost::install_frost();
+            }
+        } else {
+            self.run_on_main_thread(move || unsafe {
+                frost::install_frost();
             })?;
         }
         Ok(())
@@ -133,6 +172,21 @@ impl WebviewWindowExt for WebviewWindow {
 
         Ok(result)
     }
+}
+
+/// Set the opacity of the native frost layer (0.0–1.0).
+///
+/// On non-macOS platforms, this is a no-op.
+// Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
+#[allow(clippy::missing_const_for_fn)]
+pub fn set_frost_opacity(alpha: f64) {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        frost::set_frost_alpha(alpha);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = alpha;
 }
 
 /// Tell the glass defocus system which theme Orbit is using.

@@ -254,7 +254,7 @@
   --input: var(--gray-7);
   --ring: var(--gray-8);
   --chat-area: var(--gray-a2);
-  --editor-bg: transparent; /* Liquid glass: see-through to vibrancy */
+  --editor-bg: var(--chat-area); /* Match chat area background */
 
   /* Sidebar */
   --sidebar: var(--surface);
@@ -425,7 +425,7 @@ html.dark {
   --input: var(--gray-7);
   --ring: var(--gray-8);
   --chat-area: var(--gray-1);
-  --editor-bg: transparent;
+  --editor-bg: var(--gray-1);
 
   /* Sidebar */
   --sidebar: var(--gray-3);
@@ -475,7 +475,7 @@ html.window-mode-solid.light {
   --card: var(--gray-2);
   --popover: var(--gray-2);
   --chat-area: #ffffff;
-  --editor-bg: var(--gray-2);
+  --editor-bg: #ffffff;
   --sidebar: var(--gray-2);
   /* Match native glass defocus fallback (#F0F0F0) from glass_defocus.rs */
   --base-layer: #F0F0F0;
@@ -488,10 +488,10 @@ html.window-mode-solid.dark {
   --card: var(--gray-2);
   --popover: var(--gray-2);
   --chat-area: var(--gray-1);
-  --editor-bg: var(--gray-2);
+  --editor-bg: var(--gray-1);
   --sidebar: var(--gray-3);
   /* Match defocused liquid glass sidebar appearance */
-  --base-layer: #2A2A2A;
+  --base-layer: #222222;
 }
 
 /* ============================================
@@ -522,7 +522,7 @@ html.window-mode-liquid-glass.dark {
   --card: var(--gray-2);
   --popover: var(--gray-2);
   --chat-area: var(--gray-1);
-  --editor-bg: var(--gray-2);
+  --editor-bg: var(--gray-1);
   --sidebar: var(--gray-3);
 }
 
@@ -531,9 +531,10 @@ html.window-mode-liquid-glass.dark {
    so the exposed glass looks uniform everywhere behind the content cards.
    ContentCard provides its own opaque background on top.
 
-   LIGHT MODE: backdrop-filter: blur(40px) + subtle white tint.
-   DARK MODE: NO backdrop-filter (blur kernel samples white at window
-   rounded corners, creating visible artifact). Uses ::before tint only. */
+   Blur is provided by a native NSVisualEffectView (frost.rs in the
+   decorum plugin) — NOT CSS backdrop-filter, which samples the macOS
+   window border at rounded corners and creates white glow artifacts.
+   The CSS here just provides background transparency + tint overlays. */
 html.window-mode-liquid-glass .bg-base-layer {
   background-color: transparent;
   position: relative;
@@ -546,14 +547,12 @@ html.window-mode-liquid-glass .bg-base-layer::before {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: rgba(0, 0, 0, 0.01);
+  background: rgba(255, 255, 255, 0.55);
 }
 
-/* Dark mode: Liquid Glass frost on the entire base layer */
+/* Dark mode: native frost handles blur (no CSS backdrop-filter needed) */
 html.window-mode-liquid-glass.dark .bg-base-layer {
   background-color: transparent;
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
   isolation: isolate;
 }
 
@@ -565,8 +564,8 @@ html.window-mode-liquid-glass.dark .bg-base-layer::before {
   pointer-events: none;
   background:
     linear-gradient(0deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.85)),
-    #CCCCCC;
+    linear-gradient(0deg, rgba(0, 0, 0, 0.90), rgba(0, 0, 0, 0.90)),
+    #AAAAAA;
   background-blend-mode: normal, normal, color-burn;
   opacity: 0.45;
 }
@@ -1811,7 +1810,7 @@ html:not(.window-mode-solid) .glass-float {
   --lg-window-r: 10px;
 
   /* Sidebar item states */
-  --lg-sidebar-selected: rgba(0, 0, 0, 0.11);
+  --lg-sidebar-selected: rgba(0, 0, 0, 0.09);
   --lg-sidebar-hover: rgba(0, 0, 0, 0.07);
 
   /* Segmented control */
@@ -1880,7 +1879,7 @@ html.dark {
 
   --lg-window-shadow: 0px 0px 0px 1px rgba(255, 255, 255, 0.08), 0px 16px 48px rgba(0, 0, 0, 0.5);
 
-  --lg-sidebar-selected: rgba(255, 255, 255, 0.11);
+  --lg-sidebar-selected: rgba(255, 255, 255, 0.09);
   --lg-sidebar-hover: rgba(255, 255, 255, 0.04);
 
   --lg-segment-bg: rgba(255, 255, 255, 0.04);
@@ -1926,21 +1925,20 @@ html.dark {
   width: 360px;
   border-radius: var(--lg-window-r) !important;
   overflow: hidden;
-  isolation: isolate;
-  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
-  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
-  border: none;
-  box-shadow: 0 17px 45px rgba(0, 0, 0, 0.5);
-  -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
-  mask-image: linear-gradient(#000, #000);
 }
 
 html.dark .liquid-glass-dialog {
-  border-color: transparent;
+  isolation: isolate;
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+  -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
+  mask-image: linear-gradient(#000, #000);
+  background: var(--sidebar);
+  border-color: rgba(255, 255, 255, 0.05);
   box-shadow: 0 17px 45px rgba(0, 0, 0, 0.5);
 }
 
-.liquid-glass-dialog::after {
+html.dark .liquid-glass-dialog::after {
   content: '';
   position: absolute;
   inset: 0;

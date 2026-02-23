@@ -671,6 +671,15 @@ async function handleRequest(
       break;
     }
 
+    case 'generate_title': {
+      const title = await sessionManager.generateTitle(
+        request.userMessage,
+        request.assistantResponse
+      );
+      sendResponse({ type: 'string', requestType: request.type, value: title });
+      break;
+    }
+
     // Canvas Operations
     case 'canvas:create_session': {
       await canvasSessionManager.createSession(request.sessionId, request.config);

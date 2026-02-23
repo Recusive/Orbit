@@ -37,7 +37,7 @@ interface SkillCardProps {
 
 const SkillCard: FC<SkillCardProps> = ({ skill, onSelect }) => (
   <div
-    className="rounded-[14px] border border-lg-separator p-4 hover:bg-lg-control-hover transition-[background-color] duration-150 cursor-pointer active:scale-[0.99]"
+    className="rounded-[14px] border border-black/10 dark:border-white/5 p-4 hover:bg-lg-control-hover transition-[background-color] duration-150 cursor-pointer active:scale-[0.99]"
     onClick={() => {
       onSelect(skill);
     }}
@@ -77,7 +77,7 @@ const SkillCard: FC<SkillCardProps> = ({ skill, onSelect }) => (
 const SkillsSkeleton: FC = () => (
   <div className="space-y-2">
     {[1, 2, 3].map((i) => (
-      <div key={i} className="rounded-[14px] border border-lg-separator p-4">
+      <div key={i} className="rounded-[14px] border border-black/10 dark:border-white/5 p-4">
         <div className="flex items-start gap-3">
           <div className="h-8 w-8 rounded-lg bg-lg-control animate-pulse" />
           <div className="flex-1 space-y-2">
@@ -165,7 +165,7 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
-        <DialogOverlay className="backdrop-blur-none bg-black/40" />
+        <DialogOverlay className="backdrop-blur-none" />
 
         {/* Centering wrapper */}
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
@@ -174,7 +174,7 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
               aria-describedby={undefined}
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
-                'bg-sidebar border-0 shadow-none',
+                'bg-chat-area dark:bg-[oklch(23%_0_0)] border-0 shadow-none',
                 'rounded-[14px] overflow-hidden flex flex-col',
                 'duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
@@ -186,7 +186,7 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
               <DialogPrimitive.Title className="sr-only">Skills</DialogPrimitive.Title>
 
               {/* Title bar */}
-              <div className="flex items-center justify-between px-4 py-2.5 bg-sidebar">
+              <div className="flex items-center justify-between px-4 py-2.5 bg-chat-area dark:bg-[oklch(23%_0_0)]">
                 <div className="flex items-center gap-2 font-medium text-base">
                   <IconSkills className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span>Skills</span>
@@ -247,7 +247,7 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
 
                 {/* Info section — shown when loaded without error */}
                 {!isLoading && error === null && (
-                  <div className="mt-6 p-3.5 rounded-[14px] bg-lg-control border border-lg-separator text-sm text-muted-foreground/90">
+                  <div className="mt-6 p-3.5 rounded-[14px] bg-lg-control border-0 text-sm text-muted-foreground/90">
                     <p className="font-medium mb-1.5 text-foreground/80">How Skills Work</p>
                     <ul className="list-disc list-inside space-y-0.5">
                       <li>

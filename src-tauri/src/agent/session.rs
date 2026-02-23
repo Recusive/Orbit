@@ -719,6 +719,21 @@ impl SessionManager {
         })
     }
 
+    /// Generate a concise AI title for a conversation
+    pub fn generate_title(&self, user_message: &str, assistant_response: &str) -> Result<String> {
+        self.ensure_running()?;
+
+        let request = BridgeRequest::GenerateTitle {
+            user_message: user_message.to_owned(),
+            assistant_response: assistant_response.to_owned(),
+        };
+
+        let bridge = self.bridge.lock();
+        let response = bridge.send_request(&request)?;
+        Self::check_response_string(response)?
+            .ok_or_else(|| BridgeError::SidecarError("Title generation returned null".to_owned()))
+    }
+
     /// Generate a command definition from a natural language description
     pub fn generate_command_definition(&self, description: &str) -> Result<SlashCommandDefinition> {
         self.ensure_running()?;

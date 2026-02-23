@@ -176,7 +176,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                 {/* Content column — code preview + show-more toggle share one gutter line */}
                 <div className="flex-1 min-w-0 ml-2.5 flex flex-col">
                   {/* Code content */}
-                  <div className="my-1.5 rounded-xl border-3 border-success/40 bg-card overflow-hidden">
+                  <div className="my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
                     <div
                       className={cn('overflow-auto bg-success/5', !showAllLines && 'max-h-[300px]')}
                     >
