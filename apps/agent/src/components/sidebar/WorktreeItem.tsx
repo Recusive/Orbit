@@ -5,9 +5,12 @@
  * To change icon widths, padding, or animation timing,
  * update SIDEBAR and TRANSITIONS in constants.ts - DO NOT hardcode here.
  */
-import { ChevronDown, GitBranch, MoreHorizontal, Trash2 } from 'lucide-react';
+import { createLogger } from '@orbit/common/lib';
+import { ChevronDown, GitBranch, Loader2, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 
+import type { GitBranch as GitBranchInfo } from '@/lib/api';
 import type { WorktreeUIState } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
@@ -17,7 +20,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { gitBranches, gitCheckout, gitStatus } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useGitStore } from '@/stores/git/git-store';
+import { useUIStore } from '@/stores/ui/ui-store';
+
+const logger = createLogger('WorktreeItem');
 
 // Hoisted RegExp for path splitting (avoids recreation on each render)
 const PATH_SEPARATOR_RE = /[/\\]/;
@@ -41,6 +56,8 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
 }) => {
   const { worktree, isExpanded } = worktreeState;
   const [isHovered, setIsHovered] = useState(false);
+  const [branches, setBranches] = useState<GitBranchInfo[]>([]);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   // Extract workspace name from path (last segment)
   // Handles edge case: empty path or path with only separators falls back to '/' (root indicator)
@@ -70,6 +87,75 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
       onRemove?.();
     },
     [onRemove]
+  );
+
+  // Pre-fetch branches on badge hover so they're ready before the select opens
+  const handleBadgeHover = useCallback((): void => {
+    if (worktree.path && branches.length === 0) {
+      void gitBranches(worktree.path).then((branchList) => {
+        setBranches(branchList);
+      });
+    }
+  }, [worktree.path, branches.length]);
+
+  // Fetch branches when the select opens (skip if already loaded from hover prefetch)
+  const handleBranchDropdownOpen = useCallback(
+    (open: boolean): void => {
+      if (open && worktree.path && branches.length === 0) {
+        void gitBranches(worktree.path).then((branchList) => {
+          setBranches(branchList);
+        });
+      }
+    },
+    [worktree.path, branches.length]
+  );
+
+  // Checkout a branch within this worktree
+  const handleBranchCheckout = useCallback(
+    async (targetBranch: string): Promise<void> => {
+      if (!worktree.path || isCheckingOut || targetBranch === branchName) return;
+      setIsCheckingOut(true);
+      try {
+        await gitCheckout(worktree.path, targetBranch);
+        // Refresh status and branches after checkout
+        const [newStatus, newBranches] = await Promise.all([
+          gitStatus(worktree.path),
+          gitBranches(worktree.path),
+        ]);
+        const gitStore = useGitStore.getState();
+        gitStore.setStatus(newStatus);
+        gitStore.setBranches(newBranches);
+        setBranches(newBranches);
+        // Update the worktree's branch in UIStore so the badge text refreshes
+        const uiStore = useUIStore.getState();
+        const updated = uiStore.worktrees.map((w) =>
+          w.worktree.path === worktree.path
+            ? {
+                ...w,
+                worktree: {
+                  ...w.worktree,
+                  branch: `refs/heads/${targetBranch}`,
+                  shortHead: targetBranch,
+                },
+              }
+            : w
+        );
+        uiStore.setWorktrees(updated);
+        toast.success(`Switched to ${targetBranch}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const displayMessage = message.replace(/^Git error:\s*/i, '');
+        logger.warn('Checkout failed from worktree badge', {
+          worktree: worktree.path,
+          branch: targetBranch,
+          error: message,
+        });
+        toast.error('Checkout failed', { description: displayMessage });
+      } finally {
+        setIsCheckingOut(false);
+      }
+    },
+    [worktree.path, isCheckingOut, branchName]
   );
 
   return (
@@ -132,19 +218,52 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           {workspaceName}
         </span>
 
-        {/* Branch badge — Apple liquid glass pill style */}
+        {/* Branch badge — Apple liquid glass pill with Select dropdown */}
         <div
-          className={cn(
-            'flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] mr-1 shrink-0 transition-colors duration-200',
-            'backdrop-blur-[20px] font-[510]',
-            worktree.isMain
-              ? 'bg-black/[0.05] text-[#4C4C4C] dark:bg-white/[0.10] dark:text-[#B0B0B0]'
-              : 'bg-black/[0.04] text-[#4C4C4C] dark:bg-white/[0.08] dark:text-[#999]'
-          )}
-          style={{ mixBlendMode: 'plus-darker' }}
+          className="mr-1 shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+          onMouseEnter={handleBadgeHover}
         >
-          <GitBranch className="h-3 w-3" />
-          <span className="max-w-[60px] truncate">{branchName}</span>
+          <Select
+            value={branchName}
+            onValueChange={(value) => {
+              void handleBranchCheckout(value);
+            }}
+            onOpenChange={handleBranchDropdownOpen}
+            disabled={isCheckingOut}
+          >
+            <SelectTrigger
+              className={cn(
+                'flex items-center gap-0.5 h-auto w-auto px-1.5 py-0.5 rounded-full text-[11px] border-0',
+                'backdrop-blur-[20px] font-[510] cursor-pointer',
+                'hover:bg-black/[0.08] dark:hover:bg-white/[0.15]',
+                'active:scale-[0.97] disabled:opacity-50',
+                'focus-visible:ring-0',
+                '[&>svg:last-child]:h-2.5 [&>svg:last-child]:w-2.5 [&>svg:last-child]:opacity-60',
+                worktree.isMain
+                  ? 'bg-black/[0.05] text-[#4C4C4C] dark:bg-white/[0.10] dark:text-[#B0B0B0]'
+                  : 'bg-black/[0.04] text-[#4C4C4C] dark:bg-white/[0.08] dark:text-[#999]'
+              )}
+              style={{ mixBlendMode: 'plus-darker' }}
+              aria-label={`Switch branch (${branchName})`}
+            >
+              {isCheckingOut ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <GitBranch className="h-3 w-3" />
+              )}
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="!bg-[#f3f3f3] dark:!bg-[oklch(23%_0_0)] !border !border-white dark:!border-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md [&::before]:hidden [&::after]:hidden">
+              {branches.map((b) => (
+                <SelectItem key={b.name} value={b.name}>
+                  {b.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
