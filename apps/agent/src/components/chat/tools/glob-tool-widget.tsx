@@ -143,7 +143,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
                 </div>
 
                 {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-lg-separator bg-card overflow-hidden">
+                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
                   {/* Pattern & Path */}
                   <div className="px-3 py-2">
                     <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">

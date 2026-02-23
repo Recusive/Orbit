@@ -176,7 +176,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                     {displayOldLines.length > 0 ? (
                       <div
                         className={cn(
-                          'border-3 border-destructive/40 bg-card overflow-hidden',
+                          'border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden',
                           displayNewLines.length > 0 ? 'rounded-t-xl border-b-0' : 'rounded-xl'
                         )}
                       >
@@ -220,7 +220,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                     {displayNewLines.length > 0 ? (
                       <div
                         className={cn(
-                          'border-3 border-success/40 bg-card overflow-hidden',
+                          'border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden',
                           displayOldLines.length > 0 ? 'rounded-b-xl border-t-0' : 'rounded-xl'
                         )}
                       >

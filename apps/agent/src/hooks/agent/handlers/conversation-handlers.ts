@@ -158,10 +158,11 @@ export async function handleConversationDelete(
 }
 
 export async function handleConversationUpdateTitle(
-  message: Extract<WebviewMessage, { type: 'conversation:updateTitle' }>
+  message: Extract<WebviewMessage, { type: 'conversation:updateTitle' }>,
+  workspacePath?: string
 ): Promise<void> {
   try {
-    await conversationUpdateTitle(message.session_id, message.title);
+    await conversationUpdateTitle(message.session_id, message.title, workspacePath);
   } catch (err: unknown) {
     logger.error('Conversation title update error', err);
   }

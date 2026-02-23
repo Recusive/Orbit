@@ -36,6 +36,7 @@ import type {
 
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { conversationAddMessage, conversationLoad } from '@/lib/api';
+import { applySessionTitle, generateFallbackTitle } from '@/services/session';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
 import {
@@ -299,14 +300,8 @@ export function useChatMessages(): UseChatMessagesReturn {
       });
     }
 
-    // Update title
-    useUIStore.getState().updateConversationTitle(lastCreatedSessionId, text);
-    postMessage({
-      type: 'conversation:updateTitle',
-      uuid: crypto.randomUUID(),
-      session_id: lastCreatedSessionId,
-      title: text,
-    });
+    // Update title (persists to UIStore + JSONL via Rust backend)
+    applySessionTitle(lastCreatedSessionId, generateFallbackTitle(text));
 
     // Build user message
     const chatStore = useChatStore.getState();

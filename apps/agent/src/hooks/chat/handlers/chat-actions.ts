@@ -10,6 +10,7 @@ import type {
 } from '@/types/protocol';
 
 import { conversationAddMessage } from '@/lib/api';
+import { applySessionTitle, generateFallbackTitle } from '@/services/session';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
@@ -112,7 +113,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           postMessage({
             type: 'conversation:create',
             uuid: crypto.randomUUID(),
-            title: text,
+            title: generateFallbackTitle(text),
             workspace_path: workspacePath ?? undefined,
             worktree_path: activeWorktreePath ?? undefined,
           });
@@ -122,13 +123,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         // If first message but conversation exists (created via "New conversation" button),
         // update the title from "Untitled" to the message text
         if (messages.length === 0 && conversationExists) {
-          useUIStore.getState().updateConversationTitle(sessionId, text);
-          postMessage({
-            type: 'conversation:updateTitle',
-            uuid: crypto.randomUUID(),
-            session_id: sessionId,
-            title: text,
-          });
+          applySessionTitle(sessionId, generateFallbackTitle(text));
         }
 
         // Always send current thinking mode and model BEFORE message:send

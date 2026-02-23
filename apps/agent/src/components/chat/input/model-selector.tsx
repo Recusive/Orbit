@@ -281,7 +281,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       tabIndex={-1}
       onKeyDown={handlePopoverKeyDown}
       className={cn(
-        'fixed bg-gray-1 dark:bg-[oklch(23%_0_0)] border border-white dark:border-white/8 rounded-[10px] overflow-hidden z-50 outline-none shadow-[0_0_12px_rgba(0,0,0,0.08),0_0_24px_rgba(0,0,0,0.05)] dark:shadow-md',
+        'fixed bg-[#f3f3f3] dark:bg-[oklch(23%_0_0)] border border-white dark:border-white/5 rounded-[10px] overflow-hidden z-50 outline-none shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md',
         position.side === 'top' ? 'origin-bottom-left' : 'origin-top-left',
         !isAnimatingOut &&
           cn(
@@ -312,7 +312,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
               {group.label}
             </div>
             {group.comingSoon === true ? (
-              <div className="mx-1.5 mt-0.5 mb-2 flex items-center gap-2 rounded-lg bg-lg-sidebar-hover px-2.5 py-2">
+              <div className="mx-1.5 mt-0.5 mb-2 flex items-center gap-2 rounded-[9px] bg-lg-sidebar-hover px-2.5 py-2">
                 <Info className="h-3.5 w-3.5 shrink-0 text-lg-text-secondary" />
                 <span className="text-xs text-lg-text-secondary">Coming Soon</span>
               </div>
@@ -328,8 +328,8 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
                     TRANSITION_CLASSES.item,
                     'mt-0.5 first:mt-0 group',
                     selectedModel === model.id
-                      ? 'bg-lg-sidebar-selected text-foreground rounded-lg'
-                      : 'rounded-lg hover:bg-lg-sidebar-hover active:scale-[0.98]'
+                      ? 'bg-lg-sidebar-selected text-foreground rounded-[9px]'
+                      : 'rounded-[9px] hover:bg-lg-sidebar-hover active:scale-[0.98]'
                   )}
                 >
                   <div className="flex items-center gap-2">

@@ -480,7 +480,7 @@ describe('useSidebarActions', () => {
   // =============================================================================
 
   describe('handleRenameConversation', () => {
-    it('should update conversation title in store optimistically', async () => {
+    it('should update conversation title in store optimistically', () => {
       // Pre-populate store with a conversation
       const conversation = createMockConversation({
         sessionId: 'rename-me',
@@ -499,8 +499,8 @@ describe('useSidebarActions', () => {
         )
       );
 
-      await act(async () => {
-        await result.current.handleRenameConversation('rename-me', 'New Title');
+      act(() => {
+        result.current.handleRenameConversation('rename-me', 'New Title');
       });
 
       const updatedConversations = useUIStore.getState().conversations;
@@ -510,15 +510,15 @@ describe('useSidebarActions', () => {
       expect(updated?.title).toBe('New Title');
     });
 
-    it('should clear editing state after rename', async () => {
+    it('should clear editing state after rename', () => {
       useUIStore.setState({
         editingConversationId: 'rename-me',
       });
 
       const { result } = renderHook(() => useSidebarActions(createDefaultHookProps()));
 
-      await act(async () => {
-        await result.current.handleRenameConversation('rename-me', 'New Title');
+      act(() => {
+        result.current.handleRenameConversation('rename-me', 'New Title');
       });
 
       expect(useUIStore.getState().editingConversationId).toBe(null);

@@ -73,21 +73,13 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       tabIndex={isActive ? 0 : -1}
       className={cn(
         'group relative flex items-center h-full px-3 text-base cursor-pointer select-none shrink-0',
-        'border-r border-lg-separator',
+        '',
         isActive
           ? 'bg-editor-bg text-foreground'
-          : 'bg-lg-control dark:bg-background text-muted-foreground hover:text-foreground'
+          : 'bg-sidebar dark:bg-sidebar text-muted-foreground hover:text-foreground'
       )}
       style={{ maxWidth: 180 }}
     >
-      {/* Bottom border - hide for active tab (connects to content) */}
-      <div
-        className={cn(
-          'absolute bottom-0 inset-x-0 h-px z-10',
-          isActive ? 'bg-editor-bg' : 'bg-border/50'
-        )}
-      />
-
       {/* File icon */}
       <FileIcon fileName={fileName} className="h-4 w-4 shrink-0" />
 
@@ -251,7 +243,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
   return (
     <div
       data-tauri-drag-region
-      className="flex shrink-0 bg-lg-control dark:bg-background relative"
+      className="flex shrink-0 bg-sidebar dark:bg-sidebar relative"
       style={{ height: ACTIVITY_PANEL.TABS_HEADER_HEIGHT }}
       onMouseEnter={() => {
         setIsHovered(true);
@@ -260,8 +252,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
         setIsHovered(false);
       }}
     >
-      {/* Bottom border line - spans full width, tabs' bottom borders overlay this */}
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-border/50" />
+      {/* No bottom border — tab bar blends into editor */}
 
       {/* Scrollable tabs container */}
       <div data-tauri-drag-region className="relative flex-1 min-w-0">
@@ -321,7 +312,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       {/* Editor actions - VS Code style */}
       <div
         data-tauri-drag-region={false}
-        className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-lg-control dark:bg-background"
+        className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-chat-area dark:bg-chat-area"
       >
         <button
           onClick={() => {

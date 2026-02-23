@@ -104,13 +104,21 @@ export const ThemeProvider: FC<ThemeProviderProps> = ({
     // opaque fallback on window defocus matches Orbit's theme, not the system.
     void invoke('set_glass_theme', { isDark: effectiveTheme === 'dark' });
 
+    // Frost alpha: light liquid-glass gets reduced opacity so you can see
+    // through the frosted material. Dark and solid stay fully opaque.
+    const frostAlpha = windowMode === 'liquid-glass' && effectiveTheme === 'light' ? 0.55 : 1.0;
+    void invoke('set_frost_alpha', { alpha: frostAlpha });
+
     if (windowMode === 'solid') {
       void setLiquidGlassEffect({ enabled: false });
       return;
     }
     void setLiquidGlassEffect({
       variant: GlassMaterialVariant.Sidebar,
-      tintColor: effectiveTheme === 'light' ? '#F5F5F560' : '#18181860',
+      // Light: very subtle tint — native frost (NSVisualEffectView) provides
+      // the blur, so heavy glass tint just makes it look solid grey.
+      // Dark: moderate tint for depth.
+      tintColor: effectiveTheme === 'light' ? '#FFFFFF15' : '#18181860',
     });
   }, [effectiveTheme, windowMode]);
 

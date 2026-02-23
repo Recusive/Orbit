@@ -527,7 +527,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
 
   const getInputBoxClasses = useCallback((): string => {
     const base =
-      'w-full p-1 rounded-[14px] border bg-gray-1 dark:bg-[oklch(23%_0_0)] dark:border-white/8 dark:shadow-md border-white shadow-[0_0_12px_rgba(0,0,0,0.08),0_0_24px_rgba(0,0,0,0.05)]';
+      'w-full p-1 rounded-[14px] border-0 bg-[#f3f3f3] dark:bg-[oklch(23%_0_0)] dark:border dark:border-white/5 shadow-[0_0_0_2px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md';
     switch (inputMode) {
       case 'plan':
         return cn(base, 'ring-2 ring-dotted ring-mode-plan/40');

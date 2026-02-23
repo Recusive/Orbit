@@ -107,7 +107,7 @@ export const ChatContent: FC<ChatContentProps> = ({
             onFeedback={onFeedback}
           />
           {/* Floating input container — transparent with soft fade at top */}
-          <div className="absolute bottom-0 inset-x-0 z-10 chat-input-frost">
+          <div className="absolute bottom-0 inset-x-0 z-20 chat-input-frost">
             <TodoBar />
             <ChatInput {...inputProps} />
           </div>

@@ -9,6 +9,12 @@ pub fn set_glass_theme(is_dark: bool) {
     orbit_plugin_decorum::set_glass_effective_theme(is_dark);
 }
 
+/// Set the opacity of the native frost layer (0.0–1.0).
+#[tauri::command]
+pub fn set_frost_alpha(alpha: f64) {
+    orbit_plugin_decorum::set_frost_opacity(alpha);
+}
+
 /// Show or hide the macOS traffic light buttons (close/minimize/zoom).
 ///
 /// Uses `setHidden:` on each button. Positioning is handled by wry via

@@ -107,8 +107,12 @@ export async function conversationDelete(sessionId: string, workspacePath?: stri
   return invoke('conversation_delete', { sessionId, workspacePath });
 }
 
-export async function conversationUpdateTitle(sessionId: string, title: string): Promise<void> {
-  return invoke('conversation_update_title', { sessionId, title });
+export async function conversationUpdateTitle(
+  sessionId: string,
+  title: string,
+  workspacePath?: string
+): Promise<void> {
+  return invoke('conversation_update_title', { sessionId, title, workspacePath });
 }
 
 export async function conversationAddMessage(

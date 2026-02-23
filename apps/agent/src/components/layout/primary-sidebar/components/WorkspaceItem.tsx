@@ -11,7 +11,7 @@ import { cn, SIDEBAR } from '@/lib/utils';
 export const WorkspaceItem: FC<WorkspaceItemProps> = ({ name, expanded = true, onToggle }) => {
   return (
     <button
-      className="flex items-center h-8 rounded-lg mx-1.5 overflow-hidden text-sidebar-foreground hover:text-foreground hover:bg-lg-sidebar-hover transition-[background-color] duration-100"
+      className="flex items-center h-8 rounded-[9px] mx-1.5 overflow-hidden text-sidebar-foreground hover:text-foreground hover:bg-lg-sidebar-hover transition-[background-color] duration-100"
       onClick={onToggle}
     >
       {/* Fixed-width icon column */}

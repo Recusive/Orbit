@@ -491,6 +491,15 @@ export const EnhanceBugReportRequestSchema = z
   .strict();
 export type EnhanceBugReportRequest = z.infer<typeof EnhanceBugReportRequestSchema>;
 
+export const GenerateTitleRequestSchema = z
+  .object({
+    type: z.literal('generate_title'),
+    userMessage: z.string(),
+    assistantResponse: z.string(),
+  })
+  .strict();
+export type GenerateTitleRequest = z.infer<typeof GenerateTitleRequestSchema>;
+
 export const ShutdownRequestSchema = z
   .object({
     type: z.literal('shutdown'),
@@ -631,6 +640,7 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   GenerateAgentDefinitionRequestSchema,
   GenerateCommandDefinitionRequestSchema,
   EnhanceBugReportRequestSchema,
+  GenerateTitleRequestSchema,
   ShutdownRequestSchema,
   CanvasCreateSessionRequestSchema,
   CanvasDeleteSessionRequestSchema,

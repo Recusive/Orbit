@@ -359,6 +359,15 @@ export interface EnhanceBugReportRequest {
 }
 
 /**
+ * Generate a concise AI title for a conversation
+ */
+export interface GenerateTitleRequest {
+  type: 'generate_title';
+  userMessage: string;
+  assistantResponse: string;
+}
+
+/**
  * Shutdown the bridge
  */
 export interface ShutdownRequest {
@@ -460,6 +469,7 @@ export type BridgeRequest =
   | GenerateAgentDefinitionRequest
   | GenerateCommandDefinitionRequest
   | EnhanceBugReportRequest
+  | GenerateTitleRequest
   | ShutdownRequest
   | CanvasCreateSessionRequest
   | CanvasDeleteSessionRequest

@@ -74,17 +74,6 @@ function countChanges(diff: FileDiff): { additions: number; deletions: number } 
   return { additions, deletions };
 }
 
-/**
- * Determine thick border color for the diff box based on change composition.
- * Matches the Edit tool's red/green sections and Write tool's green box.
- */
-function getDiffBorderClass(additions: number, deletions: number): string {
-  if (additions > 0 && deletions === 0) return 'border-success/40';
-  if (deletions > 0 && additions === 0) return 'border-destructive/40';
-  // Mixed changes — use warning like the Edit tool's in-progress state
-  return 'border-warning/40';
-}
-
 /** Tinted scroll container background — matches Write tool's bg-success/5 pattern */
 function getScrollBgClass(additions: number, deletions: number): string {
   if (additions > 0 && deletions === 0) return 'bg-success/5';
@@ -317,8 +306,8 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
             <div className="px-2.5 pb-1.5">
               <div
                 className={cn(
-                  'rounded-lg border-3 bg-card overflow-hidden',
-                  isBinary ? 'border-muted-foreground/20' : getDiffBorderClass(additions, deletions)
+                  'rounded-lg border bg-card overflow-hidden',
+                  isBinary ? 'border-muted-foreground/20' : 'border-white dark:border-white/5'
                 )}
               >
                 {isBinary ? (
