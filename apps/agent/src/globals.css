@@ -531,51 +531,24 @@ html.window-mode-liquid-glass.dark {
    so the exposed glass looks uniform everywhere behind the content cards.
    ContentCard provides its own opaque background on top.
 
-   Blur is provided by a native NSVisualEffectView (frost.rs in the
-   decorum plugin) — NOT CSS backdrop-filter, which samples the macOS
-   window border at rounded corners and creates white glow artifacts.
-   The CSS here just provides background transparency + tint overlays. */
+   Blur and tinting are handled entirely at the native level:
+   - NSVisualEffectView (frost.rs) provides the blur
+   - CIScreenBlendMode tint overlay lightens the frost in light mode
+   - No CSS tint overlays — they cover the blur pattern.
+   CSS only sets transparency so the native layers show through. */
 html.window-mode-liquid-glass .bg-base-layer {
   background-color: transparent;
-  position: relative;
-  isolation: isolate;
 }
 
-html.window-mode-liquid-glass .bg-base-layer::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: rgba(255, 255, 255, 0.55);
-}
-
-/* Dark mode: native frost handles blur (no CSS backdrop-filter needed) */
 html.window-mode-liquid-glass.dark .bg-base-layer {
   background-color: transparent;
-  isolation: isolate;
 }
 
-html.window-mode-liquid-glass.dark .bg-base-layer::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    linear-gradient(0deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.90), rgba(0, 0, 0, 0.90)),
-    #AAAAAA;
-  background-blend-mode: normal, normal, color-burn;
-  opacity: 0.45;
-}
-
-/* Sidebar — transparent so the base layer tint shows through */
+/* Sidebar — transparent so the native frost shows through */
 html.window-mode-liquid-glass [data-sidebar="primary"] {
   background: transparent;
 }
 
-/* Dark mode sidebar: transparent — inherits frost from base layer above */
 html.window-mode-liquid-glass.dark [data-sidebar="primary"] {
   background: transparent;
 }

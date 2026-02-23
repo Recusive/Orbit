@@ -189,6 +189,61 @@ pub fn set_frost_opacity(alpha: f64) {
     let _ = alpha;
 }
 
+/// Set the opacity of the screen-blend tint overlay (0.0–1.0).
+///
+/// Uses `CIScreenBlendMode` compositing: lightens per-pixel, preserving
+/// blur texture. 0.0 = hidden, 0.3–0.6 = typical light mode range.
+///
+/// On non-macOS platforms, this is a no-op.
+// Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
+#[allow(clippy::missing_const_for_fn)]
+pub fn set_tint_opacity(opacity: f64) {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        frost::set_tint_opacity(opacity);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = opacity;
+}
+
+/// Change the `NSVisualEffectMaterial` of the frost layer at runtime.
+///
+/// Allows the frontend to use different materials for light vs dark mode
+/// (e.g. lighter `.menu` material for light mode, standard `.sidebar` for dark).
+///
+/// On non-macOS platforms, this is a no-op.
+// Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
+#[allow(clippy::missing_const_for_fn)]
+pub fn set_frost_material(material: i64) {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        frost::set_frost_material(material);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = material;
+}
+
+/// Configure the frost layer for a specific theme.
+///
+/// Sets material, appearance (`VibrantLight`/`VibrantDark`), and
+/// `isEmphasized` to produce the brightest possible frost in light mode
+/// while keeping the standard sidebar look in dark mode.
+///
+/// On non-macOS platforms, this is a no-op.
+// Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
+#[allow(clippy::missing_const_for_fn)]
+pub fn configure_frost_for_theme(is_dark: bool) {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        frost::configure_frost_for_theme(is_dark);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = is_dark;
+}
+
 /// Tell the glass defocus system which theme Orbit is using.
 ///
 /// Without this, the defocus fallback color follows the **system** appearance

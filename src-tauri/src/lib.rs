@@ -582,6 +582,9 @@ pub fn run() {
             window::set_traffic_lights_visible,
             window::set_glass_theme,
             window::set_frost_alpha,
+            window::set_frost_material,
+            window::set_tint_opacity,
+            window::configure_frost_theme,
             // SF Symbol rendering
             sf_symbols::get_sf_symbol,
         ])

@@ -104,22 +104,36 @@ export const ThemeProvider: FC<ThemeProviderProps> = ({
     // opaque fallback on window defocus matches Orbit's theme, not the system.
     void invoke('set_glass_theme', { isDark: effectiveTheme === 'dark' });
 
-    // Frost alpha: light liquid-glass gets reduced opacity so you can see
-    // through the frosted material. Dark and solid stay fully opaque.
-    const frostAlpha = windowMode === 'liquid-glass' && effectiveTheme === 'light' ? 0.55 : 1.0;
-    void invoke('set_frost_alpha', { alpha: frostAlpha });
-
     if (windowMode === 'solid') {
+      void invoke('set_frost_alpha', { alpha: 1.0 });
+      void invoke('set_tint_opacity', { opacity: 0.0 });
+      void invoke('configure_frost_theme', { isDark: effectiveTheme === 'dark' });
       void setLiquidGlassEffect({ enabled: false });
       return;
     }
-    void setLiquidGlassEffect({
-      variant: GlassMaterialVariant.Sidebar,
-      // Light: very subtle tint — native frost (NSVisualEffectView) provides
-      // the blur, so heavy glass tint just makes it look solid grey.
-      // Dark: moderate tint for depth.
-      tintColor: effectiveTheme === 'light' ? '#FFFFFF15' : '#18181860',
-    });
+
+    if (effectiveTheme === 'dark') {
+      // Dark mode: NSVisualEffectView frost at full strength (looks great).
+      // Liquid glass behind it adds depth. Screen tint hidden.
+      void invoke('set_frost_alpha', { alpha: 1.0 });
+      void invoke('set_tint_opacity', { opacity: 0.0 });
+      void invoke('configure_frost_theme', { isDark: true });
+      void setLiquidGlassEffect({
+        variant: GlassMaterialVariant.Sidebar,
+        tintColor: '#18181860',
+      });
+    } else {
+      // Light mode: frost at full strength for blur diffusion.
+      // Screen-blend tint overlay lightens the grey WITHOUT covering the blur
+      // pattern (screen blend preserves per-pixel texture contrast).
+      void invoke('set_frost_alpha', { alpha: 1.0 });
+      void invoke('set_tint_opacity', { opacity: 0.7 });
+      void invoke('configure_frost_theme', { isDark: false });
+      void setLiquidGlassEffect({
+        variant: GlassMaterialVariant.Regular,
+        tintColor: '#FFFFFF15',
+      });
+    }
   }, [effectiveTheme, windowMode]);
 
   const setTheme = (newTheme: Theme): void => {
