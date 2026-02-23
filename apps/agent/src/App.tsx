@@ -18,7 +18,6 @@ import { PrimarySidebar } from '@/components/layout/primary-sidebar';
 import { ResizeHandle } from '@/components/layout/resize-handle';
 import { RootLayout } from '@/components/layout/root-layout';
 import { SidebarResizeHandle } from '@/components/layout/sidebar-resize-handle';
-import { StatusBar } from '@/components/layout/status-bar';
 import { TerminalCard } from '@/components/layout/terminal-card';
 import { CrashNotification } from '@/components/modals';
 import { OnboardingFlow } from '@/components/onboarding';
@@ -678,9 +677,6 @@ const App: FC = () => {
                         </>
                       )}
                     </div>
-
-                    {/* Status Bar — inside the card */}
-                    <StatusBar transparent={isWelcome} className="relative z-10" />
 
                     {/* Crash notification dialog */}
                     {hasCrash && crashLog ? (

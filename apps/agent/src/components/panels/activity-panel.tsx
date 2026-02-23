@@ -7,6 +7,7 @@ import type { FC } from 'react';
 
 import { FileIcon, FileViewer } from '@/components/files';
 import { SourceControlTab } from '@/components/git';
+import { StatusBar } from '@/components/layout/status-bar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { useTauri } from '@/hooks/agent/use-tauri';
@@ -449,6 +450,9 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canManageBrowser = true 
           </div>
         )}
       </div>
+
+      {/* Status bar — only visible when viewing a file */}
+      {activeTab === 'file' ? <StatusBar /> : null}
     </>
   );
 

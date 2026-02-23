@@ -1,12 +1,4 @@
-import {
-  AlertCircle,
-  AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  CheckCircle2,
-  GitBranch,
-  XCircle,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { useCallback } from 'react';
 import { useShallow } from 'zustand/shallow';
 
@@ -15,31 +7,10 @@ import type { FC } from 'react';
 import { useDiagnostics } from '@/hooks/lsp/use-diagnostics';
 import { cn } from '@/lib/utils';
 import { useActiveFile, useCursorPosition } from '@/stores/file/file-viewer-store';
-import {
-  selectAhead,
-  selectBehind,
-  selectBranch,
-  selectTotalChanges,
-  useGitStore,
-} from '@/stores/git/git-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 export interface StatusBarProps {
   className?: string;
-  /** When true, renders with a transparent background (used on welcome page) */
-  transparent?: boolean;
-}
-
-/** Maximum length for branch name before truncation */
-const MAX_BRANCH_LENGTH = 20;
-
-/**
- * Truncate a branch name if it exceeds max length
- */
-function truncateBranch(branch: string, maxLength: number = MAX_BRANCH_LENGTH): string {
-  if (branch.length <= maxLength) return branch;
-  const halfLength = Math.floor((maxLength - 3) / 2);
-  return `${branch.slice(0, halfLength)}...${branch.slice(-halfLength)}`;
 }
 
 /**
@@ -134,19 +105,10 @@ const StatusItem: FC<StatusItemProps> = ({ children, title, onClick, className }
 };
 
 /**
- * StatusBar displays git info, cursor position, and file info.
- * Styled similar to VS Code's status bar.
+ * StatusBar displays cursor position, file info, and LSP diagnostics.
+ * Rendered inside the ActivityPanel below the editor when a file is open.
  */
-export const StatusBar: FC<StatusBarProps> = ({ className, transparent = false }) => {
-  // Git state
-  const branch = useGitStore(selectBranch);
-  const ahead = useGitStore(selectAhead);
-  const behind = useGitStore(selectBehind);
-  const totalChanges = useGitStore(selectTotalChanges);
-  const isLoading = useGitStore((s) => s.isLoading);
-  const error = useGitStore((s) => s.error);
-  const repoPath = useGitStore((s) => s.repoPath);
-
+export const StatusBar: FC<StatusBarProps> = ({ className }) => {
   // File state
   const activeFile = useActiveFile();
   const cursorPosition = useCursorPosition(activeFile?.path ?? null);
@@ -155,15 +117,13 @@ export const StatusBar: FC<StatusBarProps> = ({ className, transparent = false }
   const { totalErrors, totalWarnings } = useDiagnostics();
 
   // UI actions — use useShallow to prevent re-renders on unrelated store changes
-  const { openSourceControl, openProblemsPanel, setGoToLineDialogOpen } = useUIStore(
+  const { openProblemsPanel, setGoToLineDialogOpen } = useUIStore(
     useShallow((s) => ({
-      openSourceControl: s.openSourceControl,
       openProblemsPanel: s.openProblemsPanel,
       setGoToLineDialogOpen: s.setGoToLineDialogOpen,
     }))
   );
 
-  const isGitRepo = repoPath !== null;
   const hasFile = activeFile !== null;
   const hasProblems = totalErrors > 0 || totalWarnings > 0;
 
@@ -172,83 +132,19 @@ export const StatusBar: FC<StatusBarProps> = ({ className, transparent = false }
     setGoToLineDialogOpen(true);
   }, [setGoToLineDialogOpen]);
 
-  // Note: Indentation, encoding, line ending, and language pickers are not yet implemented.
-  // StatusItem components without onClick are rendered as non-interactive text.
+  // Don't render if no file is open
+  if (!hasFile) return null;
 
   return (
     <div
       className={cn(
         'relative h-[22px] flex items-stretch justify-between px-3',
-        transparent ? 'bg-transparent' : 'bg-chat-area',
-        'text-muted-foreground',
+        'bg-editor-bg text-muted-foreground',
         className
       )}
     >
-      {/* Left section - Git info */}
+      {/* Left section - LSP diagnostics */}
       <div className="flex items-stretch gap-0.5 min-w-0">
-        {/* Git branch */}
-        {error ? (
-          <StatusItem
-            title={`Git error: ${error}`}
-            className="text-destructive"
-            onClick={openSourceControl}
-          >
-            <AlertCircle className="h-3 w-3" />
-            <span>error</span>
-          </StatusItem>
-        ) : branch ? (
-          <StatusItem
-            title={branch.length > MAX_BRANCH_LENGTH ? branch : `Branch: ${branch}`}
-            onClick={openSourceControl}
-          >
-            <GitBranch className="h-3 w-3" />
-            <span className="truncate max-w-[100px]">{truncateBranch(branch)}</span>
-            {/* Sync indicators inline */}
-            {ahead > 0 || behind > 0 ? (
-              <span className="flex items-center gap-0.5 ml-0.5">
-                {behind > 0 ? (
-                  <>
-                    <ArrowDown className="h-2.5 w-2.5" />
-                    <span>{behind}</span>
-                  </>
-                ) : null}
-                {ahead > 0 ? (
-                  <>
-                    <ArrowUp className="h-2.5 w-2.5" />
-                    <span>{ahead}</span>
-                  </>
-                ) : null}
-              </span>
-            ) : null}
-          </StatusItem>
-        ) : isGitRepo ? (
-          <StatusItem title="Detached HEAD" onClick={openSourceControl}>
-            <GitBranch className="h-3 w-3" />
-            <span className="italic opacity-70">detached</span>
-          </StatusItem>
-        ) : null}
-
-        {/* Changes indicator */}
-        {totalChanges > 0 ? (
-          <StatusItem
-            title={`${String(totalChanges)} uncommitted change${totalChanges !== 1 ? 's' : ''} - Click to open Source Control`}
-            onClick={openSourceControl}
-          >
-            <span className="text-yellow-500">●</span>
-            <span>{totalChanges}</span>
-          </StatusItem>
-        ) : null}
-
-        {/* Loading indicator - with aria-live for screen readers */}
-        {isLoading ? (
-          <StatusItem>
-            <span className="animate-pulse opacity-50" aria-live="polite">
-              syncing...
-            </span>
-          </StatusItem>
-        ) : null}
-
-        {/* Problems indicator - LSP diagnostics */}
         {hasProblems ? (
           <StatusItem
             title={`${String(totalErrors)} error${totalErrors !== 1 ? 's' : ''}, ${String(totalWarnings)} warning${totalWarnings !== 1 ? 's' : ''} - Click to open Problems`}
@@ -269,7 +165,7 @@ export const StatusBar: FC<StatusBarProps> = ({ className, transparent = false }
               </>
             ) : null}
           </StatusItem>
-        ) : hasFile ? (
+        ) : (
           <StatusItem
             title="No problems detected - Click to open Problems"
             onClick={openProblemsPanel}
@@ -277,41 +173,37 @@ export const StatusBar: FC<StatusBarProps> = ({ className, transparent = false }
             <CheckCircle2 className="h-3 w-3 text-green-500" />
             <span>0</span>
           </StatusItem>
-        ) : null}
+        )}
       </div>
 
       {/* Right section - File info */}
       <div className="flex items-stretch gap-0.5">
-        {hasFile ? (
-          <>
-            {/* Cursor position */}
-            <StatusItem title="Go to Line" onClick={handleGoToLine}>
-              <span>
-                Ln {cursorPosition.line}, Col {cursorPosition.column}
-              </span>
-            </StatusItem>
+        {/* Cursor position */}
+        <StatusItem title="Go to Line" onClick={handleGoToLine}>
+          <span>
+            Ln {cursorPosition.line}, Col {cursorPosition.column}
+          </span>
+        </StatusItem>
 
-            {/* Indentation */}
-            <StatusItem title="Indentation">
-              <span>Spaces: 2</span>
-            </StatusItem>
+        {/* Indentation */}
+        <StatusItem title="Indentation">
+          <span>Spaces: 2</span>
+        </StatusItem>
 
-            {/* Encoding */}
-            <StatusItem title="Encoding">
-              <span>UTF-8</span>
-            </StatusItem>
+        {/* Encoding */}
+        <StatusItem title="Encoding">
+          <span>UTF-8</span>
+        </StatusItem>
 
-            {/* End of line */}
-            <StatusItem title="End of Line Sequence">
-              <span>LF</span>
-            </StatusItem>
+        {/* End of line */}
+        <StatusItem title="End of Line Sequence">
+          <span>LF</span>
+        </StatusItem>
 
-            {/* Language */}
-            <StatusItem title="Language Mode">
-              <span>{getLanguageDisplayName(activeFile.language)}</span>
-            </StatusItem>
-          </>
-        ) : null}
+        {/* Language */}
+        <StatusItem title="Language Mode">
+          <span>{getLanguageDisplayName(activeFile.language)}</span>
+        </StatusItem>
       </div>
     </div>
   );
