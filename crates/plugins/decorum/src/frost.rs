@@ -372,10 +372,10 @@ pub(crate) unsafe fn configure_frost_for_theme(is_dark: bool) {
             let _: () = msg_send![frost, setAppearance: appearance];
         }
     } else {
-        // Light mode: menu material (brightest) + VibrantLight appearance +
+        // Light mode: titlebar material (lightest) + VibrantLight appearance +
         // emphasized — three levers to push the frost as white as possible
         // while preserving blur diffusion.
-        let _: () = msg_send![frost, setMaterial: 5_i64]; // .menu
+        let _: () = msg_send![frost, setMaterial: 3_i64]; // .titlebar
         let _: () = msg_send![frost, setEmphasized: true];
 
         let name = objc2_foundation::ns_string!("NSAppearanceNameVibrantLight");
