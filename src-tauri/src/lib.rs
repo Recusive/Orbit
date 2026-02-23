@@ -15,6 +15,7 @@ use std::sync::Arc;
 use orbit_search::FileIndex;
 use parking_lot::RwLock;
 
+use agent::SessionManager;
 use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations};
 use commands::browser::{self, BrowserResultState, BrowserWindowState};
@@ -33,6 +34,7 @@ use commands::common::{
 };
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
+use tauri::Manager as _;
 use tauri_plugin_log::{Target, TargetKind};
 
 /// Log mode for the application.
@@ -253,7 +255,7 @@ pub fn run() {
     // - Development: in src-tauri/binaries/
     let sidecar_path = resolve_sidecar_path();
     log::info!("Agent bridge sidecar path: {}", sidecar_path.display());
-    let session_manager = Arc::new(agent::SessionManager::new(sidecar_path));
+    let session_manager = Arc::new(SessionManager::new(sidecar_path));
 
     // Clone for .manage() before moving into .setup()
     let session_manager_for_state = Arc::clone(&session_manager);
@@ -583,9 +585,22 @@ pub fn run() {
             // SF Symbol rendering
             sf_symbols::get_sf_symbol,
         ])
-        .run(tauri::generate_context!());
+        .build(tauri::generate_context!());
 
-    if let Err(e) = result {
-        log::error!("Error running Tauri application: {e}");
+    match result {
+        Ok(app) => app.run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                // Explicitly kill the agent-bridge sidecar before process exits.
+                // Cannot rely on Drop — Arc<SessionManager> refcount may not reach
+                // zero during Tauri's teardown, and macOS can kill the process
+                // before destructors run.
+                log::info!("RunEvent::Exit — shutting down agent bridge sidecar");
+                let state = app.state::<Arc<SessionManager>>();
+                if let Err(e) = state.shutdown() {
+                    log::error!("Failed to shut down agent bridge on exit: {e}");
+                }
+            }
+        }),
+        Err(e) => log::error!("Error building Tauri application: {e}"),
     }
 }
