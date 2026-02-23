@@ -402,12 +402,19 @@ export const useUIStore = create<UIStore>()(
 
     remapConversation: (oldSessionId: string, newSessionId: string): void => {
       set((state) => {
-        const conversation = state.conversations.find((c) => c.sessionId === oldSessionId);
-        if (conversation) {
-          // Swap sessionId in place — keeps the sidebar entry visible during session remap
-          // instead of removing + re-adding (which causes a flash of missing entry).
-          conversation.sessionId = newSessionId;
-          conversation.updatedAt = Date.now();
+        // Replace entire element to ensure Immer produces a new array reference.
+        // Direct property mutation (conversation.sessionId = x) via .find() can be
+        // silently dropped — see MEMORY.md "Immer nested property mutation" note.
+        const idx = state.conversations.findIndex((c) => c.sessionId === oldSessionId);
+        if (idx !== -1) {
+          const existing = state.conversations[idx];
+          if (existing) {
+            state.conversations[idx] = {
+              ...existing,
+              sessionId: newSessionId,
+              updatedAt: Date.now(),
+            };
+          }
         }
         // Update active conversation pointer if it was the remapped session
         if (state.activeConversationId === oldSessionId) {
