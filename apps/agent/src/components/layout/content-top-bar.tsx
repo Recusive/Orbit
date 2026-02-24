@@ -8,13 +8,17 @@
  * - Renders inside ContentCard (not at the window root)
  */
 import { IconSquareGridCircle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSquareGridCircle';
-import { ArrowLeft, ArrowRight, PanelLeft, PanelRight, SquarePen, Terminal } from 'lucide-react';
+import { ArrowLeft, ArrowRight, PanelLeft, PanelRight, Terminal } from 'lucide-react';
+import { useCallback } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
 
+import { SquareAndPencil } from '@/components/icons';
+import { conversationBelongsToWorktree } from '@/components/layout/primary-sidebar/hooks/use-sidebar-actions';
 import { SFSymbol } from '@/components/shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useTauri } from '@/hooks/agent/use-tauri';
 import { cn } from '@/lib/utils';
 import { HEIGHTS } from '@/lib/utils/constants';
 import { useBranchDiffStats } from '@/stores/git/git-store';
@@ -93,12 +97,19 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
 
   const isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
 
+  const { postMessage } = useTauri();
+
   const {
     toggleLeftSidebar,
     toggleReviewPanel,
     toggleRightSidebar,
     toggleBottomPanel,
     setTerminalPosition,
+    setVaultOpen,
+    conversations,
+    activeConversationId,
+    workspacePath,
+    activeWorktreePath,
     rightSidebarOpen,
     bottomPanelOpen,
     terminalCollapsed,
@@ -109,11 +120,41 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
       toggleRightSidebar: s.toggleRightSidebar,
       toggleBottomPanel: s.toggleBottomPanel,
       setTerminalPosition: s.setTerminalPosition,
+      setVaultOpen: s.setVaultOpen,
+      conversations: s.conversations,
+      activeConversationId: s.activeConversationId,
+      workspacePath: s.workspacePath,
+      activeWorktreePath: s.activeWorktreePath,
       rightSidebarOpen: s.rightSidebarOpen,
       bottomPanelOpen: s.bottomPanelOpen,
       terminalCollapsed: s.terminalCollapsed,
     }))
   );
+
+  const handleNewSession = useCallback((): void => {
+    setVaultOpen(false);
+    const activeConv = conversations.find((c) => c.sessionId === activeConversationId);
+    if (
+      activeConv?.title === 'Untitled' &&
+      conversationBelongsToWorktree(activeConv, activeWorktreePath)
+    ) {
+      return;
+    }
+    postMessage({
+      type: 'conversation:create',
+      uuid: crypto.randomUUID(),
+      title: 'Untitled',
+      workspace_path: workspacePath ?? undefined,
+      worktree_path: activeWorktreePath ?? undefined,
+    });
+  }, [
+    conversations,
+    activeConversationId,
+    workspacePath,
+    activeWorktreePath,
+    postMessage,
+    setVaultOpen,
+  ]);
 
   const handleToggleTerminal = (): void => {
     // Always pick a visible position — if the activity panel is closed,
@@ -190,6 +231,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
             <button
               data-tauri-drag-region={false}
               aria-label="New session"
+              onClick={handleNewSession}
               className={cn(
                 'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
                 'hover:bg-lg-control-hover active:scale-[0.98]',
@@ -197,12 +239,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
                 'text-sidebar-foreground hover:text-foreground'
               )}
             >
-              <SFSymbol
-                name="square.and.pencil"
-                size={18}
-                weight="medium"
-                fallback={<SquarePen className="h-4 w-4" />}
-              />
+              <SquareAndPencil size={18} />
             </button>
           </div>
         ) : null}

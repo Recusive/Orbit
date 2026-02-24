@@ -31,7 +31,7 @@ const logger = createLogger('PrimarySidebar');
  * @param activeWorktreePath - The currently active worktree path (can be null)
  * @returns true if the conversation belongs to the current worktree context
  */
-function conversationBelongsToWorktree(
+export function conversationBelongsToWorktree(
   conversation: ConversationSummary | undefined,
   activeWorktreePath: string | null
 ): boolean {
