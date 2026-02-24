@@ -630,18 +630,22 @@ class ChatMessageService {
     // Schedule coalesced sidebar refresh
     scheduleSidebarRefresh();
 
-    // Generate AI title after the first completed turn (1 user + 1 assistant message).
-    // Fire-and-forget — the placeholder title from generateFallbackTitle() stays until
-    // Haiku responds (~1-2s), then gets overwritten with the AI summary.
+    // Generate AI title after a completed turn with at least 1 user + 1 assistant message.
+    // Uses >= 1 instead of === 1 so retries work on subsequent turns if the first attempt
+    // failed (e.g., Haiku call error, network issue). The aiTitleGenerated Set in
+    // session-title-service.ts prevents duplicate generation after success.
+    // Fire-and-forget — the placeholder title stays until Haiku responds (~1-2s).
     {
       const currentSession = useChatStore.getState().sessions[sid];
       if (currentSession) {
         const msgs = currentSession.messages;
         const userMsgs = msgs.filter((m) => m.role === 'user');
         const assistantMsgs = msgs.filter((m) => m.role === 'assistant');
-        if (userMsgs.length === 1 && assistantMsgs.length === 1) {
+        if (userMsgs.length >= 1 && assistantMsgs.length >= 1) {
           const userText = userMsgs[0]?.content ?? '';
-          const assistantText = assistantMsgs[0]?.content ?? '';
+          // Use first non-empty assistant message — tool-heavy first turns may have
+          // empty content on the first assistant message (only tool use, no text).
+          const assistantText = assistantMsgs.find((m) => m.content.length > 0)?.content ?? '';
           if (userText.length > 0 && assistantText.length > 0) {
             generateAITitle(sid, userText, assistantText);
           }
