@@ -20,7 +20,7 @@ import { SFSymbol } from '@/components/shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { cn } from '@/lib/utils';
-import { HEIGHTS } from '@/lib/utils/constants';
+import { CONTENT_CARD, HEIGHTS } from '@/lib/utils/constants';
 import { useBranchDiffStats } from '@/stores/git/git-store';
 import {
   useUIStore,
@@ -29,6 +29,22 @@ import {
   useActiveConversationTitle,
   useReviewPanelOpen,
 } from '@/stores/ui/ui-store';
+
+/** Evaluated once — reduced-motion preference is static for session lifetime */
+const PREFERS_REDUCED_MOTION =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * Max width for the navigation controls container.
+ * Buttons: sidebar(24) + sep(1) + back(28) + fwd(28) + newSession(24) + gaps(16) + trailing sep(8) = ~129px.
+ * Rounded up for breathing room.
+ */
+const CONTROLS_MAX_WIDTH = 148;
+
+/** Transition synced with sidebar slide — same easing and duration as CONTENT_CARD.transition */
+const CONTROLS_TRANSITION: string | undefined = PREFERS_REDUCED_MOTION
+  ? undefined
+  : `max-width ${CONTENT_CARD.transition}, opacity ${CONTENT_CARD.transition}`;
 
 /**
  * GitHub-style diff stats indicator showing additions/deletions
@@ -179,73 +195,87 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
     >
       {/* Left section: [button] | project name | chat name */}
       <div className="flex items-center gap-1.5 pl-2 min-w-0">
-        {/* Navigation + sidebar controls — only visible when sidebar is closed */}
-        {!sidebarOpen && !isDemo ? (
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Sidebar toggle */}
-            <button
-              data-tauri-drag-region={false}
-              onClick={toggleLeftSidebar}
-              aria-label="Show sidebar"
-              className={cn(
-                'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
-                'hover:bg-lg-control-hover active:scale-[0.98]',
-                'transition-[color,background-color,transform] duration-150',
-                'text-sidebar-foreground hover:text-foreground'
-              )}
-            >
-              <SFSymbol
-                name="sidebar.left"
-                size={18}
-                weight="medium"
-                fallback={<PanelLeft className="h-4 w-4" />}
-              />
-            </button>
-            <div className="w-px h-3.5 bg-lg-separator shrink-0" />
-            {/* Back / Forward arrows — matches sidebar style */}
-            <button
-              data-tauri-drag-region={false}
-              aria-label="Go back"
-              className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
-            >
-              <SFSymbol
-                name="arrow.left"
-                size={13}
-                weight="semibold"
-                fallback={<ArrowLeft className="h-3.5 w-3.5" />}
-              />
-            </button>
-            <button
-              data-tauri-drag-region={false}
-              aria-label="Go forward"
-              className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
-            >
-              <SFSymbol
-                name="arrow.right"
-                size={13}
-                weight="semibold"
-                fallback={<ArrowRight className="h-3.5 w-3.5" />}
-              />
-            </button>
-            {/* New session */}
-            <button
-              data-tauri-drag-region={false}
-              aria-label="New session"
-              onClick={handleNewSession}
-              className={cn(
-                'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
-                'hover:bg-lg-control-hover active:scale-[0.98]',
-                'transition-[color,background-color,transform] duration-150',
-                'text-sidebar-foreground hover:text-foreground'
-              )}
-            >
-              <SquareAndPencil size={18} />
-            </button>
+        {/* Navigation + sidebar controls — always rendered, animated in/out with sidebar */}
+        {!isDemo ? (
+          <div
+            className="shrink-0 overflow-hidden"
+            aria-hidden={sidebarOpen}
+            style={{
+              maxWidth: sidebarOpen ? 0 : CONTROLS_MAX_WIDTH,
+              opacity: sidebarOpen ? 0 : 1,
+              pointerEvents: sidebarOpen ? 'none' : 'auto',
+              transition: CONTROLS_TRANSITION,
+            }}
+          >
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Sidebar toggle */}
+              <button
+                data-tauri-drag-region={false}
+                onClick={toggleLeftSidebar}
+                aria-label="Show sidebar"
+                tabIndex={sidebarOpen ? -1 : 0}
+                className={cn(
+                  'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
+                  'hover:bg-lg-control-hover active:scale-[0.98]',
+                  'transition-[color,background-color,transform] duration-150',
+                  'text-sidebar-foreground hover:text-foreground'
+                )}
+              >
+                <SFSymbol
+                  name="sidebar.left"
+                  size={18}
+                  weight="medium"
+                  fallback={<PanelLeft className="h-4 w-4" />}
+                />
+              </button>
+              <div className="w-px h-3.5 bg-lg-separator shrink-0" />
+              {/* Back / Forward arrows — matches sidebar style */}
+              <button
+                data-tauri-drag-region={false}
+                aria-label="Go back"
+                tabIndex={sidebarOpen ? -1 : 0}
+                className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+              >
+                <SFSymbol
+                  name="arrow.left"
+                  size={13}
+                  weight="semibold"
+                  fallback={<ArrowLeft className="h-3.5 w-3.5" />}
+                />
+              </button>
+              <button
+                data-tauri-drag-region={false}
+                aria-label="Go forward"
+                tabIndex={sidebarOpen ? -1 : 0}
+                className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+              >
+                <SFSymbol
+                  name="arrow.right"
+                  size={13}
+                  weight="semibold"
+                  fallback={<ArrowRight className="h-3.5 w-3.5" />}
+                />
+              </button>
+              {/* New session */}
+              <button
+                data-tauri-drag-region={false}
+                aria-label="New session"
+                onClick={handleNewSession}
+                tabIndex={sidebarOpen ? -1 : 0}
+                className={cn(
+                  'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
+                  'hover:bg-lg-control-hover active:scale-[0.98]',
+                  'transition-[color,background-color,transform] duration-150',
+                  'text-sidebar-foreground hover:text-foreground'
+                )}
+              >
+                <SquareAndPencil size={18} />
+              </button>
+              {/* Trailing separator between controls and heading */}
+              <div className="w-px h-3.5 bg-lg-separator shrink-0 ml-0.5" />
+            </div>
           </div>
         ) : null}
-
-        {/* Separator between icons and heading */}
-        {!sidebarOpen && !isDemo ? <div className="w-px h-3.5 bg-lg-separator shrink-0" /> : null}
 
         {/* Project name */}
         {workspaceName ? (
