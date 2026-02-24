@@ -19,6 +19,11 @@ import { buildContentBlocks } from '../utils/content.js';
 import { formatToolResult } from '../utils/formatter.js';
 
 import type { McpToolRequest, McpToolResponse } from '../../browser/index.js';
+import type {
+  LocalSDKMessage,
+  ToolResultBlock,
+  ToolUseBlock,
+} from '../../common/types/claude-sdk.js';
 import type { PermissionRequestCallback, SnapshotCallback } from '../permissions/permissions.js';
 import type { OrbitSessionMode } from '../session/session-mode.js';
 import type { AttachmentContentBlock } from '../types/messages.js';
@@ -35,7 +40,6 @@ import type {
   PreCompactHookInput,
   PreToolUseHookInput,
   Query,
-  SDKMessage,
   SDKUserMessage,
   SessionEndHookInput,
   SessionStartHookInput,
@@ -45,26 +49,6 @@ import type {
 
 const logger = createLogger('OrbitAgent');
 const BROWSER_MCP_SERVER_KEY = 'orbit-browser';
-
-/**
- * Tool result block type for type guard
- */
-interface ToolResultBlock {
-  type: 'tool_result';
-  tool_use_id: string;
-  content: string;
-  is_error?: boolean;
-}
-
-/**
- * Tool use block type for type guard
- */
-interface ToolUseBlock {
-  type: 'tool_use';
-  id: string;
-  name: string;
-  input: Record<string, unknown>;
-}
 
 /**
  * Type guard for tool_result blocks
@@ -101,17 +85,14 @@ function isToolUseBlock(block: unknown): block is ToolUseBlock {
 /**
  * Helper to safely get message content as array
  */
-function getMessageContentArray(message: SDKMessage): unknown[] | null {
-  if (message.type !== 'assistant' && message.type !== 'user') {
-    return null;
+function getMessageContentArray(message: LocalSDKMessage): unknown[] | null {
+  if (message.type === 'assistant') {
+    return message.message.content;
   }
-  const msg = message as { message?: { content?: unknown } };
-  const content = msg.message?.content;
-  if (!Array.isArray(content)) {
-    return null;
+  if (message.type === 'user') {
+    return message.message.content;
   }
-  // Cast to unknown[] to satisfy type checker
-  return content as unknown[];
+  return null;
 }
 
 /** Categorized stderr error types for structured error handling */
@@ -1421,7 +1402,7 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     return content;
   }
 
-  async *receiveResponse(): AsyncGenerator<SDKMessage, void, unknown> {
+  async *receiveResponse(): AsyncGenerator<LocalSDKMessage, void, unknown> {
     /**
      * Receive responses from the persistent streaming session.
      * Messages are yielded as they arrive from the query.
@@ -1444,12 +1425,15 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     // Yield messages as they arrive
     // In streaming mode, the query continues running and processing messages from the queue
     try {
-      for await (const message of queryRef) {
+      for await (const rawMessage of queryRef) {
+        // Cast SDK message to local type for ESLint-safe property access.
+        // The SDK's SDKMessage type is well-typed but ESLint's projectService
+        // cannot resolve it across the agent-bridge tsconfig boundary.
+        const message = rawMessage as LocalSDKMessage;
         messageCount++;
 
         // Debug: Log every message from SDK with details
-        const msgSubtype =
-          message.type === 'system' ? (message as { subtype?: string }).subtype : undefined;
+        const msgSubtype = message.type === 'system' ? message.subtype : undefined;
         logger.debug(
           {
             messageCount,
@@ -1460,9 +1444,8 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         );
 
         // Capture session ID from system:init message
-        if (message.type === 'system' && (message as { subtype?: string }).subtype === 'init') {
-          const initMessage = message as { session_id?: string };
-          if (initMessage.session_id) {
+        if (message.type === 'system' && message.subtype === 'init') {
+          if (message.session_id) {
             // Detect fork session: either SDK fork (with resumeSessionAt) or
             // manual forkSessionAt (forkSession=true but NO resumeSessionAt,
             // because we pre-truncate the JSONL ourselves).
@@ -1470,14 +1453,14 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
             logger.warn(
               {
                 previousSessionId: this._currentSessionId ?? 'none',
-                newSessionId: initMessage.session_id,
+                newSessionId: message.session_id,
                 isForkedSession,
                 resumeSessionId: this._resumeSessionId ?? 'none',
                 resumeSessionAt: this._resumeSessionAt ?? 'none',
               },
               'CHECKPOINT system:init — capturing SDK session ID (required for rewindFiles)'
             );
-            this._currentSessionId = initMessage.session_id;
+            this._currentSessionId = message.session_id;
 
             // CRITICAL: After a fork completes, clear the fork options so subsequent
             // messages continue the forked session instead of re-forking.
@@ -1489,12 +1472,12 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
               logger.info(
                 {
                   oldResumeId: this._resumeSessionId,
-                  newSessionId: initMessage.session_id,
+                  newSessionId: message.session_id,
                   clearedForkPoint: this._resumeSessionAt ?? 'none (manual forkSessionAt)',
                 },
                 'Fork completed - clearing fork options for subsequent messages'
               );
-              this._resumeSessionId = initMessage.session_id;
+              this._resumeSessionId = message.session_id;
               this._resumeSessionAt = undefined;
               this._forkSession = false;
             }
@@ -1557,8 +1540,6 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
         if (message.type === 'user') {
           const contentArray = getMessageContentArray(message);
           if (contentArray !== null) {
-            // Create a shallow copy of the message for formatting
-            const msg = message as { message: { content: unknown } };
             const formattedContent = contentArray.map((block: unknown) => {
               if (isToolResultBlock(block)) {
                 const toolInfo = toolUseMap.get(block.tool_use_id);
@@ -1575,11 +1556,11 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
               }
               return block;
             });
-            const formattedMessage = {
+            const formattedMessage: LocalSDKMessage = {
               ...message,
-              message: { ...msg.message, content: formattedContent },
+              message: { content: formattedContent },
             };
-            yield formattedMessage as SDKMessage;
+            yield formattedMessage;
           } else {
             yield message;
           }
@@ -1978,14 +1959,15 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
       // Step 4: Iterate through the resumed query and call rewindFiles
       // We need to enter the async iterator once to establish the connection
       let msgCount = 0;
-      for await (const msg of rewindQuery) {
+      for await (const rawMsg of rewindQuery) {
+        const msg = rawMsg as LocalSDKMessage;
         msgCount++;
         // Log the message type we received (for debugging replay issues)
         logger.warn(
           {
             checkpointId,
             msgType: msg.type,
-            msgSubtype: (msg as { subtype?: string }).subtype,
+            msgSubtype: msg.type === 'system' ? msg.subtype : undefined,
             msgCount,
           },
           'REWIND rewindFiles Step 4 — got message from resumed query, calling rewindFiles()'

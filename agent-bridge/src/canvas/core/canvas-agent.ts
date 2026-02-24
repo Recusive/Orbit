@@ -24,18 +24,14 @@ import { createCanvasMcpServer } from '../mcp/canvas-mcp-server.js';
 import { CanvasToolBridge } from '../mcp/canvas-tool-bridge.js';
 import { getCanvasSystemPrompt } from '../prompts/system-prompt.js';
 
+import type { LocalSDKMessage } from '../../common/types/claude-sdk.js';
 import type {
   CanvasState,
   CanvasSessionConfig,
   SDKMessage,
   McpToolRequest,
 } from '../types/types.js';
-import type {
-  Options,
-  Query,
-  SDKMessage as ClaudeSDKMessage,
-  SDKUserMessage,
-} from '@anthropic-ai/claude-agent-sdk';
+import type { Options, Query, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
 const logger = createLogger('CanvasAgent');
 
@@ -585,8 +581,8 @@ export class CanvasAgent {
     }
 
     try {
-      for await (const message of this.currentQuery) {
-        this.handleClaudeMessage(message);
+      for await (const rawMessage of this.currentQuery) {
+        this.handleClaudeMessage(rawMessage as LocalSDKMessage);
       }
     } catch (error) {
       logger.error({ error }, 'Error processing responses');
@@ -604,36 +600,34 @@ export class CanvasAgent {
   /**
    * Handle incoming Claude SDK message and convert to canvas SDKMessage
    */
-  private handleClaudeMessage(message: ClaudeSDKMessage): void {
+  private handleClaudeMessage(message: LocalSDKMessage): void {
     logger.debug({ messageType: message.type }, 'Received Claude message');
 
     switch (message.type) {
       case 'assistant': {
-        const content = message.message.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block.type === 'text') {
-              this.emitter.emit('message', {
-                type: 'text',
-                content: block.text,
-              } as SDKMessage);
-            } else if (block.type === 'tool_use') {
-              this.emitter.emit('message', {
-                type: 'tool_use',
-                content: '',
-                metadata: {
-                  toolName: block.name,
-                  toolId: block.id,
-                  toolInput: block.input as Record<string, unknown>,
-                  status: 'running',
-                },
-              } as SDKMessage);
-            } else if (block.type === 'thinking') {
-              this.emitter.emit('message', {
-                type: 'thinking',
-                content: (block as { type: 'thinking'; thinking: string }).thinking || '',
-              } as SDKMessage);
-            }
+        for (const block of message.message.content) {
+          if (block.type === 'text') {
+            this.emitter.emit('message', {
+              type: 'text',
+              content: block.text,
+            } as SDKMessage);
+          } else if (block.type === 'tool_use') {
+            this.emitter.emit('message', {
+              type: 'tool_use',
+              content: '',
+              metadata: {
+                toolName: block.name,
+                toolId: block.id,
+                toolInput: block.input,
+                status: 'running',
+              },
+            } as SDKMessage);
+          } else {
+            // Remaining variant: thinking
+            this.emitter.emit('message', {
+              type: 'thinking',
+              content: block.thinking,
+            } as SDKMessage);
           }
         }
         break;
@@ -657,7 +651,17 @@ export class CanvasAgent {
       case 'system':
       case 'stream_event':
       case 'tool_progress':
-      case 'auth_status': {
+      case 'auth_status':
+      case 'status':
+      case 'compact_boundary':
+      case 'hook_started':
+      case 'hook_progress':
+      case 'hook_response':
+      case 'files_persisted':
+      case 'rate_limit':
+      case 'prompt_suggestion':
+      case 'task_notification':
+      case 'task_started': {
         // These message types are logged but not emitted to listeners
         logger.debug({ type: message.type }, 'Received SDK message');
         break;
