@@ -108,6 +108,83 @@ const JS_EVAL_TIMEOUT: Duration = Duration::from_secs(30);
 /// The label for the browser window.
 const BROWSER_WINDOW_LABEL: &str = "browser-window";
 
+/// Corner radius for the browser window, matching the activity card's CSS
+/// `--content-card-radius` (10px). On macOS, a CALayer mask clips the native
+/// `WKWebView` to rounded corners so it sits flush inside the activity card.
+const BROWSER_CORNER_RADIUS: f64 = 10.0;
+
+/// Handle an `orbit-eval://result?...` navigation callback.
+///
+/// Parses the query-string for `id`, `success`, `data`, and `error` params,
+/// then completes the pending eval result. Returns `true` if the URL matched.
+fn handle_eval_result_url(url: &tauri::Url, result_state: &BrowserResultState) -> bool {
+    let url_str = url.as_str();
+    if !url_str.starts_with("orbit-eval://result?") {
+        return false;
+    }
+    if let Some(query) = url.query() {
+        let mut id = None;
+        let mut success = false;
+        let mut data = None;
+        let mut error = None;
+
+        for pair in query.split('&') {
+            if let Some((key, value)) = pair.split_once('=') {
+                match key {
+                    "id" => id = Some(value.to_owned()),
+                    "success" => success = value == "true",
+                    "data" => {
+                        if let Ok(decoded) = urlencoding::decode(value) {
+                            data = Some(decoded.into_owned());
+                        }
+                    },
+                    "error" => {
+                        if let Ok(decoded) = urlencoding::decode(value) {
+                            error = Some(decoded.into_owned());
+                        }
+                    },
+                    _ => {},
+                }
+            }
+        }
+
+        if let Some(req_id) = id {
+            if success {
+                result_state.complete_ok(&req_id, data.unwrap_or_else(|| "null".to_owned()));
+            } else {
+                result_state
+                    .complete_err(&req_id, error.unwrap_or_else(|| "Unknown error".to_owned()));
+            }
+        } else {
+            log::warn!("Malformed eval result URL: missing 'id' parameter in query: {query}");
+        }
+    } else {
+        log::warn!("Malformed eval result URL: no query string in {url_str}");
+    }
+    true
+}
+
+/// Handle an `orbit-eval://element-selected?data=...` navigation callback.
+///
+/// Decodes the `data` query param and emits a `browser:element-selected` Tauri
+/// event. Returns `true` if the URL matched.
+fn handle_element_selected_url(url: &tauri::Url, app: &AppHandle) -> bool {
+    let url_str = url.as_str();
+    if !url_str.starts_with("orbit-eval://element-selected?") {
+        return false;
+    }
+    if let Some(query) = url.query() {
+        for pair in query.split('&') {
+            if let Some(("data", value)) = pair.split_once('=') {
+                if let Ok(decoded) = urlencoding::decode(value) {
+                    let _ = app.emit("browser:element-selected", decoded.into_owned());
+                }
+            }
+        }
+    }
+    true
+}
+
 /// Information about the embedded browser.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserInfo {
@@ -228,10 +305,6 @@ impl BrowserResultState {
 /// - Has its own independent Web Inspector
 /// - Can be positioned within the parent's bounds
 #[tauri::command]
-#[expect(
-    clippy::too_many_lines,
-    reason = "window creation with many config options"
-)]
 pub async fn browser_create(
     x: f64,
     y: f64,
@@ -304,54 +377,18 @@ pub async fn browser_create(
         .initialization_script(include_str!("browser_init.js"))
         // Navigation handler for eval result interception
         .on_navigation(move |url: &tauri::Url| {
-            let url_str = url.to_string();
-
-            // Check for eval result URL pattern
-            if url_str.starts_with("orbit-eval://result?") {
-                if let Some(query) = url.query() {
-                    let mut id = None;
-                    let mut success = false;
-                    let mut data = None;
-                    let mut error = None;
-
-                    for pair in query.split('&') {
-                        if let Some((key, value)) = pair.split_once('=') {
-                            match key {
-                                "id" => id = Some(value.to_owned()),
-                                "success" => success = value == "true",
-                                "data" => {
-                                    if let Ok(decoded) = urlencoding::decode(value) {
-                                        data = Some(decoded.into_owned());
-                                    }
-                                }
-                                "error" => {
-                                    if let Ok(decoded) = urlencoding::decode(value) {
-                                        error = Some(decoded.into_owned());
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-
-                    if let Some(req_id) = id {
-                        if success {
-                            result_state_for_nav.complete_ok(&req_id, data.unwrap_or_else(|| "null".to_owned()));
-                        } else {
-                            result_state_for_nav.complete_err(&req_id, error.unwrap_or_else(|| "Unknown error".to_owned()));
-                        }
-                    } else {
-                        log::warn!("Malformed eval result URL: missing 'id' parameter in query: {query}");
-                    }
-                } else {
-                    log::warn!("Malformed eval result URL: no query string in {url_str}");
-                }
-                // Block the navigation - this was just a result callback
+            // Intercept orbit-eval:// callback URLs (eval results, element selection)
+            if handle_eval_result_url(url, &result_state_for_nav) {
+                return false;
+            }
+            if handle_element_selected_url(url, &app_for_navigation) {
                 return false;
             }
 
             // Emit navigation event for regular navigations
-            let payload = BrowserNavigatedPayload { url: url_str };
+            let payload = BrowserNavigatedPayload {
+                url: url.to_string(),
+            };
             if let Err(e) = app_for_navigation.emit("browser:navigated", payload) {
                 log::warn!("Failed to emit browser:navigated event: {e}");
             }
@@ -370,6 +407,18 @@ pub async fn browser_create(
     let _window = builder
         .build()
         .map_err(|e| format!("Failed to create browser window: {e}"))?;
+
+    // Apply rounded corners on macOS so the native webview clips to the
+    // activity card's border-radius (no visible gap at bottom corners).
+    #[cfg(target_os = "macos")]
+    {
+        let radius = BROWSER_CORNER_RADIUS;
+        if let Err(e) = app.run_on_main_thread(move || {
+            orbit_plugin_decorum::set_child_windows_corner_radius(radius);
+        }) {
+            log::warn!("Failed to set browser corner radius: {e}");
+        }
+    }
 
     // Update state
     *state.exists.lock() = true;
@@ -797,6 +846,34 @@ pub async fn browser_show(app: AppHandle, state: State<'_, Arc<BrowserWindowStat
     // If z-ordering ever drifts, the focus handler in lib.rs calls
     // orderFront:nil on the main thread (NSWindow APIs require main thread;
     // this command runs on a Tokio thread, so we must not call them here).
+
+    Ok(())
+}
+
+/// Focus the browser window so it becomes the key window and receives input.
+///
+/// Used after injecting element selection (react-grab) so the cursor changes
+/// immediately without the user needing to click inside the browser area first.
+///
+/// Safe to call on a visible child window — the parent-child relationship
+/// (established by `addChildWindow:ordered:NSWindowAbove`) is preserved because
+/// we never called `orderOut:` before this.
+#[tauri::command]
+pub async fn browser_focus(
+    app: AppHandle,
+    state: State<'_, Arc<BrowserWindowState>>,
+) -> Result<()> {
+    if !*state.exists.lock() {
+        return Err("No browser exists".to_owned());
+    }
+
+    let window = app
+        .get_webview_window(BROWSER_WINDOW_LABEL)
+        .ok_or("Browser window not found")?;
+
+    window
+        .set_focus()
+        .map_err(|e| format!("Failed to focus browser: {e}"))?;
 
     Ok(())
 }

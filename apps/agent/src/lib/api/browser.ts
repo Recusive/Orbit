@@ -269,6 +269,15 @@ export async function browserHide(): Promise<void> {
   return invoke('browser_hide');
 }
 
+/**
+ * Focus the browser child window so it receives input immediately.
+ * Used after activating element selection (react-grab) so the cursor
+ * changes without the user needing to click inside the browser first.
+ */
+export async function browserFocus(): Promise<void> {
+  return invoke('browser_focus');
+}
+
 // ============================================
 // MCP Tool Responses
 // ============================================
@@ -286,6 +295,18 @@ export async function browserToolResponse(
 // ============================================
 // Event Listeners
 // ============================================
+
+/**
+ * Listen for element selection events from react-grab in the embedded browser.
+ *
+ * Called when the user selects an element via the react-grab overlay.
+ * The data payload is a JSON string matching the ReactElementContext shape.
+ */
+export async function onBrowserElementSelected(
+  callback: (data: string) => void
+): Promise<() => void> {
+  return listen<string>('browser:element-selected', callback);
+}
 
 /**
  * Listen for browser navigation events.

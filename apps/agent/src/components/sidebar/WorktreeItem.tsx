@@ -254,7 +254,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
               ) : (
                 <GitBranch className="h-3 w-3" />
               )}
-              <SelectValue />
+              <SelectValue>{branchName}</SelectValue>
             </SelectTrigger>
             <SelectContent className="!bg-[#f3f3f3] dark:!bg-[oklch(23%_0_0)] !border !border-white dark:!border-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md [&::before]:hidden [&::after]:hidden">
               {branches.map((b) => (

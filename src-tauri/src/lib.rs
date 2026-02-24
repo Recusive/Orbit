@@ -574,6 +574,7 @@ pub fn run() {
             // Browser visibility commands
             browser::browser_show,
             browser::browser_hide,
+            browser::browser_focus,
             // Legacy browser commands
             browser::browser_detect,
             browser::browser_get_pid,

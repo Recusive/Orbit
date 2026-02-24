@@ -13,6 +13,7 @@ import {
   browserBack,
   browserClose,
   browserCreate,
+  browserFocus,
   browserForward,
   browserHide,
   browserNavigate,
@@ -22,6 +23,7 @@ import {
   browserShow,
   browserStop,
 } from '@/lib/api';
+import { deactivateGrab, injectAndActivateGrab } from '@/lib/browser/react-grab-injector';
 import { useBrowserLifecycleStore } from '@/stores/browser/browser-lifecycle-store';
 import { useBrowserStore } from '@/stores/browser/browser-store';
 
@@ -401,5 +403,55 @@ export async function handleBrowserDevTools(
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Failed to open DevTools';
     logger.warn('Failed to open DevTools', { error: errorMessage });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Element selection handlers (react-grab injection)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Handle browser:select-element:start — inject react-grab and activate element picker.
+ *
+ * Loads react-grab into the embedded WKWebView, registers an Orbit plugin,
+ * and activates the hover overlay. The user clicks an element to select it;
+ * the data flows back via `orbit-eval://element-selected` URL interception.
+ */
+export async function handleBrowserSelectElementStart(
+  message: Extract<WebviewMessage, { type: 'browser:select-element:start' }>
+): Promise<void> {
+  const browserStore = useBrowserStore.getState();
+  browserStore.setSelectingElement(true);
+
+  try {
+    await injectAndActivateGrab();
+    // Focus the browser child window so the grab cursor appears immediately
+    // without the user needing to click inside the browser area first.
+    await browserFocus();
+    logger.info('Element selection mode activated', { requestId: message.uuid });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Failed to start element selection';
+    logger.error('Element selection failed', new Error(errorMessage));
+    browserStore.setSelectingElement(false);
+    browserStore.setError(errorMessage);
+  }
+}
+
+/**
+ * Handle browser:select-element:cancel — deactivate react-grab overlay.
+ */
+export async function handleBrowserSelectElementCancel(
+  message: Extract<WebviewMessage, { type: 'browser:select-element:cancel' }>
+): Promise<void> {
+  useBrowserStore.getState().setSelectingElement(false);
+
+  try {
+    await deactivateGrab();
+    logger.info('Element selection mode cancelled', { requestId: message.uuid });
+  } catch (err: unknown) {
+    // Non-fatal — the page may have navigated, destroying the injected script
+    logger.warn('Failed to deactivate element picker', {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
