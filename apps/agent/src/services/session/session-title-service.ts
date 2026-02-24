@@ -144,16 +144,16 @@ export function generateAITitle(
 ): void {
   // Prevent duplicate calls for the same session
   if (aiTitleGenerated.has(sessionId)) return;
-  aiTitleGenerated.add(sessionId);
 
   void (async (): Promise<void> => {
     try {
       const title = await generateSessionTitle(userMessage, assistantResponse);
+      aiTitleGenerated.add(sessionId); // Mark AFTER success — allows retry on failure
       applySessionTitle(sessionId, title);
       logger.info('AI title generated', { sessionId, title });
     } catch (err: unknown) {
-      logger.warn('AI title generation failed, keeping placeholder', { sessionId, err });
-      // Placeholder title from generateFallbackTitle() remains — no action needed
+      aiTitleGenerated.delete(sessionId); // Defense-in-depth: allow retry on next agent:complete
+      logger.warn('AI title generation failed, will retry on next turn', { sessionId, err });
     }
   })();
 }

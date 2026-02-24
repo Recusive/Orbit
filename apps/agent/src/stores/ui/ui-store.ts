@@ -350,6 +350,16 @@ export const useUIStore = create<UIStore>()(
 
     setConversations: (conversations: ConversationSummary[]): void => {
       set((state) => {
+        // Build map of current in-memory titles for merge below.
+        // AI-generated titles are written to UIStore ~1-2s after agent:complete,
+        // but persistTitle is fire-and-forget. If a conversationList disk read
+        // races ahead of the persist, the disk still has the old fallback title.
+        // Preserving in-memory titles prevents this stale data from overwriting.
+        const existingTitleMap = new Map<string, string>();
+        for (const c of state.conversations) {
+          existingTitleMap.set(c.sessionId, c.title);
+        }
+
         // Merge backend-scanned JSONL list with any optimistic conversations.
         // handleConversationCreated adds a conversation to the sidebar immediately
         // (messageCount === 0) before the SDK session exists on disk. If conversation:list
@@ -370,7 +380,20 @@ export const useUIStore = create<UIStore>()(
             !incomingIds.has(c.sessionId) &&
             now - c.updatedAt < OPTIMISTIC_TTL_MS
         );
-        state.conversations = [...optimistic, ...conversations];
+
+        // Merge: preserve in-memory titles that were updated more recently than
+        // the disk data. This prevents AI-generated titles (applied to UIStore but
+        // not yet persisted to JSONL) from being clobbered by stale disk reads.
+        // On app restart, we load from disk, so the cycle self-corrects.
+        const merged = conversations.map((c) => {
+          const existingTitle = existingTitleMap.get(c.sessionId);
+          if (existingTitle !== undefined && existingTitle !== c.title) {
+            return { ...c, title: existingTitle };
+          }
+          return c;
+        });
+
+        state.conversations = [...optimistic, ...merged];
       });
     },
 
