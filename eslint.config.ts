@@ -140,31 +140,6 @@ export default defineConfig(
     },
   },
   /*
-   * Agent-bridge source files - Relaxed unsafe-access rules for Claude SDK types
-   *
-   * agent-bridge has its own tsconfig.json with moduleResolution: "bundler".
-   * ESLint's projectService cannot resolve Claude Agent SDK types (SDKMessage,
-   * BetaMessage, MessageParam) across this tsconfig boundary — they appear as
-   * unresolvable. `tsc --noEmit` passes fine because TypeScript's own resolver
-   * handles bundler resolution correctly.
-   *
-   * Same root cause as the Vitest globals issue above. SDK message iteration
-   * in agent.ts, canvas-agent.ts, and base-agent.ts triggers false positives
-   * for no-unsafe-member-access, no-unsafe-assignment, and restrict-plus-operands.
-   */
-  {
-    files: ['agent-bridge/src/**/*.ts'],
-    ignores: ['agent-bridge/src/__tests__/**/*.ts'],
-    rules: {
-      '@typescript-eslint/no-unsafe-member-access': 'off',
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/no-unsafe-argument': 'off',
-      '@typescript-eslint/no-unsafe-call': 'off',
-      '@typescript-eslint/no-unsafe-return': 'off',
-      '@typescript-eslint/restrict-plus-operands': 'off',
-    },
-  },
-  /*
    * Agent-bridge test files - Additional relaxed rules for Bun test runner
    *
    * agent-bridge uses bun:test (not Vitest). ESLint's projectService cannot
