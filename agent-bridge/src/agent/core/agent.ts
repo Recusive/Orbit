@@ -90,7 +90,8 @@ function getMessageContentArray(message: LocalSDKMessage): unknown[] | null {
     return message.message.content;
   }
   if (message.type === 'user') {
-    return message.message.content;
+    const content = message.message.content;
+    return Array.isArray(content) ? content : null;
   }
   return null;
 }

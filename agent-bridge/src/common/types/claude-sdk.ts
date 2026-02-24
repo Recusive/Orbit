@@ -78,7 +78,7 @@ export interface LocalSDKUserMessage {
   uuid?: string;
   session_id?: string;
   message: {
-    content: unknown[];
+    content: string | unknown[];
   };
   parent_tool_use_id?: string | null;
 }

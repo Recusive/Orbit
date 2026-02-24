@@ -248,6 +248,38 @@ The `@typescript-eslint/no-unsafe-*` rules are disabled for test files because E
 cannot resolve Vitest's global types (even though `tsc --noEmit` passes).
 See `eslint.config.ts` for the documented override.
 </eslint_test_override>
+
+<agent_bridge_sdk_types importance="high">
+ESLint's `projectService` cannot resolve `SDKMessage` from `@anthropic-ai/claude-agent-sdk` across the agent-bridge tsconfig `moduleResolution: "bundler"` boundary. TypeScript's own `tsc --noEmit` resolves it fine, but ESLint sees every property access on SDK messages as `no-unsafe-*` errors.
+
+<workaround status="pragmatic, not ideal">
+Local mirror types in `agent-bridge/src/common/types/claude-sdk.ts` define a `LocalSDKMessage` discriminated union that mirrors the SDK's `SDKMessage`. Files cast once at the `for await` iteration boundary:
+
+```typescript
+for await (const rawMessage of this.currentQuery) {
+  const message = rawMessage as LocalSDKMessage;
+  // ESLint-safe property access via discriminated union narrowing
+}
+```
+
+</workaround>
+
+<maintenance_risks>
+<risk severity="high">Local types can drift from SDK — if SDK updates message shapes, local types must be updated manually or runtime crashes occur (no compile-time enforcement since `as` cast is unsafe)</risk>
+<risk severity="high">User message content is `string | unknown[]` (string for text, array for tool results). Always guard with `Array.isArray()` before calling array methods. Missing this caused a production crash.</risk>
+<risk severity="medium">When adding new SDK message type handling, add the type to `LocalSDKOtherMessage.type` union for switch exhaustiveness</risk>
+</maintenance_risks>
+
+<affected_files>
+<file path="agent-bridge/src/common/types/claude-sdk.ts" role="Shared local type definitions (source of truth for mirror types)"/>
+<file path="agent-bridge/src/agent/core/agent.ts" role="Main agent — heaviest usage of LocalSDKMessage"/>
+<file path="agent-bridge/src/agent/session/session-manager.ts" role="Session management — typed narrowing on result messages"/>
+<file path="agent-bridge/src/canvas/core/canvas-agent.ts" role="Canvas agent — same cast-at-boundary pattern"/>
+<file path="agent-bridge/src/canvas/orchestrator/agents/base-agent.ts" role="Base agent — same pattern"/>
+</affected_files>
+
+<proper_fix>Resolve ESLint's type resolution for the SDK package. Either configure `projectService` to find the SDK's `.d.ts` files, or wait for tooling improvements. Until then, keep local mirror types in sync with the SDK manually.</proper_fix>
+</agent_bridge_sdk_types>
 </testing_architecture>
 
 <development_workflow>
@@ -617,6 +649,16 @@ The knip config reflects this by scanning all app source files as part of the ro
       <file>packages/shared-schemas/</file>
     </files_to_check>
     <quick_fix>Use .loose() for external data, .strict() for internal. See CLAUDE-CONTINUOUS.md for examples.</quick_fix>
+  </issue>
+
+<issue name="Agent Bridge SDK Type Mismatch Crash" symptoms="J.every is not a function, J.map is not a function, or similar TypeError in compiled agent-bridge binary">
+    <solution>The local mirror types in `agent-bridge/src/common/types/claude-sdk.ts` are out of sync with the SDK's actual runtime types. The `as LocalSDKMessage` cast hides mismatches from TypeScript.</solution>
+    <common_cause>User message `content` is `string` for text messages but `unknown[]` for tool results. Always use `Array.isArray()` before calling array methods on user message content.</common_cause>
+    <files_to_check>
+      <file>agent-bridge/src/common/types/claude-sdk.ts</file>
+      <file>agent-bridge/src/agent/core/agent.ts (getMessageContentArray function)</file>
+    </files_to_check>
+    <quick_fix>Compare local types against actual SDK runtime data. Add `DEBUG_TESTS=1 bun test` to see real message shapes. After fixing types, rebuild sidecar with `bun run build:sidecar` (NOT `build:dev` — that outputs to wrong path).</quick_fix>
   </issue>
 
 <integration_test_coverage importance="high">
