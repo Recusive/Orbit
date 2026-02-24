@@ -238,13 +238,13 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
               className={cn(
                 'flex items-center gap-0.5 h-auto w-auto px-1.5 py-0.5 rounded-full text-[11px] border-0',
                 'backdrop-blur-[20px] font-[510] cursor-pointer',
-                'hover:bg-black/[0.08] dark:hover:bg-white/[0.15]',
+                'hover:bg-black/8 dark:hover:bg-white/15',
                 'active:scale-[0.97] disabled:opacity-50',
                 'focus-visible:ring-0',
                 '[&>svg:last-child]:h-2.5 [&>svg:last-child]:w-2.5 [&>svg:last-child]:opacity-60',
                 worktree.isMain
-                  ? 'bg-black/[0.05] text-[#4C4C4C] dark:bg-white/[0.10] dark:text-[#B0B0B0]'
-                  : 'bg-black/[0.04] text-[#4C4C4C] dark:bg-white/[0.08] dark:text-[#999]'
+                  ? 'bg-black/5 text-[#4C4C4C] dark:bg-white/10 dark:text-[#B0B0B0]'
+                  : 'bg-black/4 text-[#4C4C4C] dark:bg-white/8 dark:text-[#999]'
               )}
               style={{ mixBlendMode: 'plus-darker' }}
               aria-label={`Switch branch (${branchName})`}
@@ -256,7 +256,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
               )}
               <SelectValue>{branchName}</SelectValue>
             </SelectTrigger>
-            <SelectContent className="!bg-[#f3f3f3] dark:!bg-[oklch(23%_0_0)] !border !border-white dark:!border-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md [&::before]:hidden [&::after]:hidden">
+            <SelectContent className="bg-[#f3f3f3]! dark:bg-[oklch(23%_0_0)]! border! border-white! dark:border-white/5! shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md [&::before]:hidden [&::after]:hidden">
               {branches.map((b) => (
                 <SelectItem key={b.name} value={b.name}>
                   {b.name}
