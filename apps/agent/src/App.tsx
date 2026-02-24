@@ -352,6 +352,7 @@ const App: FC = () => {
 
   // Sidebar state — now global (shared across all modes)
   const leftSidebarWidth = useLeftSidebarWidth();
+  const lastExpandedSidebarWidth = useUIStore((s) => s.lastExpandedSidebarWidth);
   const sidebarOpen = leftSidebarWidth > SIDEBAR.collapsed;
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const reviewPanelOpen = useUIStore((s) => s.reviewPanelOpen);
@@ -564,6 +565,7 @@ const App: FC = () => {
             sidebar={<PrimarySidebar />}
             resizeHandle={<SidebarResizeHandle />}
             sidebarWidth={leftSidebarWidth}
+            lastExpandedSidebarWidth={lastExpandedSidebarWidth}
             actionsBar={rightSidebarOpen && !isWelcome ? <ActionsBar /> : undefined}
           >
             {/* Main content wrapper — flex column for cards row + full-width terminal.

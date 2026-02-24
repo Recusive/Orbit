@@ -13,14 +13,26 @@ import { useIsLeftSidebarCollapsed, useUIStore } from '@/stores/ui/ui-store';
 
 /**
  * Apply sidebar width to a wrapper element that uses the margin-left slide pattern.
- * Above minUsable: real width grows, marginLeft stays 0.
- * Below minUsable: width stays fixed at minUsable, marginLeft slides it off-screen.
+ *
+ * Three visual states (all during drag with transition: none):
+ * - Normal range (>= minUsable): actual width, no marginLeft
+ * - Resistance zone (< minUsable, > collapsed): stuck at minUsable, no marginLeft
+ * - Collapsed (<= 0): expanded width preserved, marginLeft = -expandedWidth
+ *
+ * The collapsed case uses expandedWidth (not minUsable) so the DOM matches
+ * what React will set on mouseup — prevents a visible width flash when
+ * transitions re-enable.
  */
-function applySidebarWidth(el: HTMLElement, width: number): void {
+function applySidebarWidth(el: HTMLElement, width: number, expandedWidth: number): void {
   const minWidth = PANEL_SIZES.sidebar.minUsable;
-  if (width < minWidth) {
+  if (width <= SIDEBAR.collapsed) {
+    // Fully collapsed: match React's layout so no flash on mouseup
+    el.style.width = `${String(expandedWidth)}px`;
+    el.style.marginLeft = `${String(-expandedWidth)}px`;
+  } else if (width < minWidth) {
+    // Resistance zone: sidebar appears stuck at minimum usable width
     el.style.width = `${String(minWidth)}px`;
-    el.style.marginLeft = `${String(width - minWidth)}px`;
+    el.style.marginLeft = '0px';
   } else {
     el.style.width = `${String(width)}px`;
     el.style.marginLeft = '0px';
@@ -127,15 +139,15 @@ export const SidebarResizeHandle: FC = () => {
 
       // Snap behavior: if below threshold, slide to collapsed
       if (newWidth < PANEL_SIZES.sidebar.snapThreshold) {
-        applySidebarWidth(sidebarElement, SIDEBAR.collapsed);
+        applySidebarWidth(sidebarElement, SIDEBAR.collapsed, startWidth);
         currentWidthRef.current = SIDEBAR.collapsed;
       } else if (newWidth < PANEL_SIZES.sidebar.minUsable) {
         // Between threshold and minUsable: show minUsable (visual resistance)
-        applySidebarWidth(sidebarElement, PANEL_SIZES.sidebar.minUsable);
+        applySidebarWidth(sidebarElement, PANEL_SIZES.sidebar.minUsable, startWidth);
         currentWidthRef.current = newWidth; // Keep actual value for snap decision
       } else {
         // Normal range: show actual width
-        applySidebarWidth(sidebarElement, newWidth);
+        applySidebarWidth(sidebarElement, newWidth, startWidth);
         currentWidthRef.current = newWidth;
       }
     };
