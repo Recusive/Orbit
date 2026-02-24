@@ -567,6 +567,25 @@ The Tauri app depends on workspace crates in `crates/common/`:
 
 ## Common Patterns
 
+### Module Organization
+
+```rust
+// commands/mod.rs - Just declare modules, no re-exports
+pub mod agent;
+pub mod common;
+
+// commands/common/mod.rs - Declare submodules
+pub mod files;
+pub mod git;
+pub mod terminal;
+
+// crates/common/core/src/lib.rs - Re-export commonly used types
+pub mod types;
+pub mod error;
+pub use error::{Error, Result};
+pub use types::{FileStatus, GitStatus};
+```
+
 ### Sidecar Communication
 
 ```rust
