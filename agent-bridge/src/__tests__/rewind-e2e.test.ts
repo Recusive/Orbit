@@ -160,22 +160,23 @@ async function runConversation(
 
     // Collect responses in a single loop
     for await (const sdkMessage of agent.receiveResponse()) {
-      const m = sdkMessage as Record<string, unknown>;
-
-      log('[TEST] Message type:', sdkMessage.type, m.subtype ?? '', m.uuid ?? '');
+      log(
+        '[TEST] Message type:',
+        sdkMessage.type,
+        sdkMessage.type === 'system' ? (sdkMessage.subtype ?? '') : '',
+        'uuid' in sdkMessage ? String(sdkMessage.uuid ?? '') : ''
+      );
 
       // Capture session ID from init message
-      if (sdkMessage.type === 'system' && m.subtype === 'init') {
-        sessionId = m.session_id as string;
+      if (sdkMessage.type === 'system' && sdkMessage.subtype === 'init') {
+        sessionId = sdkMessage.session_id ?? '';
         log('[TEST] Session ID:', sessionId);
       }
 
       // Capture streaming text from events (content_block_delta with text_delta)
       // This is where the actual response text comes through during streaming
       if (sdkMessage.type === 'stream_event') {
-        const event = m.event as
-          | { type?: string; delta?: { type?: string; text?: string } }
-          | undefined;
+        const event = sdkMessage.event;
         if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
           const text = event.delta.text;
           if (text) {
@@ -186,28 +187,28 @@ async function runConversation(
 
       // Capture user message UUID (checkpoint ID) - only the FIRST one per turn
       // Tool results are also "user" messages but we want the original prompt
-      if (sdkMessage.type === 'user' && typeof m.uuid === 'string' && !capturedUserUuidForTurn) {
-        currentUserUuid = m.uuid;
+      if (
+        sdkMessage.type === 'user' &&
+        typeof sdkMessage.uuid === 'string' &&
+        !capturedUserUuidForTurn
+      ) {
+        currentUserUuid = sdkMessage.uuid;
         capturedUserUuidForTurn = true;
         log('[TEST] User UUID:', currentUserUuid);
       }
 
       // Capture assistant message UUID
-      if (sdkMessage.type === 'assistant' && typeof m.uuid === 'string') {
-        currentAssistantUuid = m.uuid;
+      if (sdkMessage.type === 'assistant' && typeof sdkMessage.uuid === 'string') {
+        currentAssistantUuid = sdkMessage.uuid;
         log('[TEST] Assistant UUID:', currentAssistantUuid);
 
         // Also try to extract text from assistant message content (fallback)
-        const assistantMsg = m.message as
-          | { content?: { type: string; text?: string }[] }
-          | undefined;
-        if (assistantMsg?.content) {
-          for (const block of assistantMsg.content) {
-            if (block.type === 'text' && block.text) {
-              // Only add if we didn't get it via streaming
-              if (currentText === '') {
-                currentText += block.text;
-              }
+        const content = sdkMessage.message.content;
+        for (const block of content) {
+          if (block.type === 'text' && block.text !== '') {
+            // Only add if we didn't get it via streaming
+            if (currentText === '') {
+              currentText += block.text;
             }
           }
         }

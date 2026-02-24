@@ -145,13 +145,15 @@ describe('File Rewind (SDK rewindFiles)', () => {
 
       // Collect responses in a single loop
       for await (const sdkMessage of agent.receiveResponse()) {
-        const m = sdkMessage as Record<string, unknown>;
-
-        log('[TEST] Message type:', sdkMessage.type, m.subtype ?? '');
+        log(
+          '[TEST] Message type:',
+          sdkMessage.type,
+          sdkMessage.type === 'system' ? (sdkMessage.subtype ?? '') : ''
+        );
 
         // Capture session ID from init message
-        if (sdkMessage.type === 'system' && m.subtype === 'init') {
-          sessionId = m.session_id as string;
+        if (sdkMessage.type === 'system' && sdkMessage.subtype === 'init') {
+          sessionId = sdkMessage.session_id ?? '';
           log('[TEST] Session ID:', sessionId);
         }
 
@@ -159,10 +161,10 @@ describe('File Rewind (SDK rewindFiles)', () => {
         // Tool results are also "user" messages but we only want the original prompt's UUID
         if (
           sdkMessage.type === 'user' &&
-          typeof m.uuid === 'string' &&
+          typeof sdkMessage.uuid === 'string' &&
           !capturedCheckpointForCurrentPrompt
         ) {
-          const checkpointId = m.uuid;
+          const checkpointId = sdkMessage.uuid;
           checkpoints.push(checkpointId);
           capturedCheckpointForCurrentPrompt = true;
           log('[TEST] Checkpoint ID:', checkpointId);

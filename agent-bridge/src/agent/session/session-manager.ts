@@ -2437,8 +2437,7 @@ Example format:
 
     let resultText = '';
 
-    for await (const rawMessage of agent.receiveResponse()) {
-      const sdkMessage = rawMessage as Record<string, unknown>;
+    for await (const sdkMessage of agent.receiveResponse()) {
       if (sdkMessage.type === 'result') {
         if (typeof sdkMessage.result === 'string') {
           resultText = sdkMessage.result;

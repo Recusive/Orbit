@@ -15,11 +15,11 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { ClaudeCredentials } from '../../../common/auth/credentials.js';
 import { createLogger } from '../../../common/logging/logger.js';
 
+import type { LocalSDKMessage } from '../../../common/types/claude-sdk.js';
 import type { AgentType, BlackboardSlice, CanvasChange, Task, TaskOutput } from '../types.js';
 import type {
   Options,
   Query,
-  SDKMessage as ClaudeSDKMessage,
   McpSdkServerConfigWithInstance,
 } from '@anthropic-ai/claude-agent-sdk';
 
@@ -373,7 +373,8 @@ export abstract class BaseAgent {
 
     let textOutput = '';
 
-    for await (const message of this.currentQuery) {
+    for await (const rawMessage of this.currentQuery) {
+      const message = rawMessage as LocalSDKMessage;
       this.handleMessage(message);
 
       // Collect text output
@@ -401,26 +402,23 @@ export abstract class BaseAgent {
   /**
    * Handle a message from Claude
    */
-  protected handleMessage(message: ClaudeSDKMessage): void {
+  protected handleMessage(message: LocalSDKMessage): void {
     switch (message.type) {
       case 'assistant': {
-        const content = message.message.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block.type === 'text') {
-              this.emitter.emit('text', block.text);
-            } else if (block.type === 'tool_use') {
-              this.emitter.emit('toolUse', {
-                name: block.name,
-                id: block.id,
-                input: block.input,
-              });
-              // Track node modifications from tool use
-              this.trackToolUse(block.name, block.input as Record<string, unknown>);
-            } else if (block.type === 'thinking') {
-              const thinking = (block as { type: 'thinking'; thinking: string }).thinking || '';
-              this.emitter.emit('thinking', thinking);
-            }
+        for (const block of message.message.content) {
+          if (block.type === 'text') {
+            this.emitter.emit('text', block.text);
+          } else if (block.type === 'tool_use') {
+            this.emitter.emit('toolUse', {
+              name: block.name,
+              id: block.id,
+              input: block.input,
+            });
+            // Track node modifications from tool use
+            this.trackToolUse(block.name, block.input);
+          } else {
+            // Remaining variant: thinking
+            this.emitter.emit('thinking', block.thinking);
           }
         }
         break;
@@ -440,7 +438,17 @@ export abstract class BaseAgent {
       case 'system':
       case 'stream_event':
       case 'tool_progress':
-      case 'auth_status': {
+      case 'auth_status':
+      case 'status':
+      case 'compact_boundary':
+      case 'hook_started':
+      case 'hook_progress':
+      case 'hook_response':
+      case 'files_persisted':
+      case 'rate_limit':
+      case 'prompt_suggestion':
+      case 'task_notification':
+      case 'task_started': {
         // Handle other message types - no action needed
         break;
       }
