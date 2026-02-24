@@ -67,9 +67,26 @@ export async function handleMessageSend(
       });
     }
 
-    // NOTE: The old rewind system prepended XML conversation context here.
-    // The new rewind system uses parentUuid chains (like Claude Code) instead.
-    // Context prepending has been removed - see Task #6 for parentUuid implementation.
+    // Convert element contexts (from browser element selection) to a descriptive
+    // text attachment so the agent knows what the user selected on the page.
+    if (message.context?.elements && message.context.elements.length > 0) {
+      const elementDescriptions = message.context.elements.map((el) => {
+        const lines: string[] = [];
+        lines.push(`Component: ${el.componentName}`);
+        lines.push(`Tag: <${el.tagName}>`);
+        if (el.filePath) lines.push(`File: ${el.filePath}:${String(el.lineNumber)}`);
+        if (el.selector) lines.push(`Selector: ${el.selector}`);
+        if (el.componentStack.length > 0) lines.push(`Stack: ${el.componentStack.join(' > ')}`);
+        if (Object.keys(el.props).length > 0) lines.push(`Props: ${JSON.stringify(el.props)}`);
+        if (el.outerHTML) lines.push(`HTML:\n\`\`\`html\n${el.outerHTML.slice(0, 3000)}\n\`\`\``);
+        return lines.join('\n');
+      });
+
+      attachments.push({
+        type: 'text',
+        text: `The user selected the following element(s) from the embedded browser:\n\n${elementDescriptions.join('\n\n---\n\n')}`,
+      });
+    }
 
     // Send message to agent
     await agentSendMessage(

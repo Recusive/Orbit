@@ -1,7 +1,7 @@
 import { Plus, X } from 'lucide-react';
 
 import type { ContextItem } from '@/types/agent/context';
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 
 import { FileIcon } from '@/components/files/file-icon';
 import { IconSkills } from '@/components/layout/primary-sidebar/components/IconSkills';
@@ -12,9 +12,16 @@ interface ContextChipsProps {
   readonly onRemove: (id: string) => void;
   readonly onAddClick?: () => void;
   readonly className?: string;
+  readonly children?: ReactNode;
 }
 
-export const ContextChips: FC<ContextChipsProps> = ({ items, onRemove, onAddClick, className }) => {
+export const ContextChips: FC<ContextChipsProps> = ({
+  items,
+  onRemove,
+  onAddClick,
+  className,
+  children,
+}) => {
   return (
     <div
       className={cn(
@@ -32,6 +39,9 @@ export const ContextChips: FC<ContextChipsProps> = ({ items, onRemove, onAddClic
           <span>Add context</span>
         </button>
       ) : null}
+
+      {/* Extra chips (e.g. element context from browser selection) */}
+      {children}
 
       {/* Context chips */}
       {items.map((item) => (

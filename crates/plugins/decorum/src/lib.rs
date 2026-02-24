@@ -283,6 +283,29 @@ pub fn order_child_windows_front() {
     window_order::order_child_windows_front();
 }
 
+/// Apply rounded corners to all child windows of the application.
+///
+/// Iterates `[NSApplication windows]`, finds child windows (those with a
+/// `parentWindow`), and applies:
+/// 1. `window.opaque = NO` + `clearColor` background for transparent corners
+/// 2. `CALayer.cornerRadius` + `masksToBounds` on content view and subviews
+///
+/// This clips the native `WKWebView` to a rounded shape so the embedded
+/// browser sits flush inside the rounded activity card.
+///
+/// On non-macOS platforms, this is a no-op.
+///
+/// **Must be called from the main thread.**
+// Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
+#[allow(clippy::missing_const_for_fn)]
+pub fn set_child_windows_corner_radius(radius: f64) {
+    #[cfg(target_os = "macos")]
+    window_order::set_child_windows_corner_radius(radius);
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = radius;
+}
+
 /// Initialize the decorum plugin.
 ///
 /// # Example

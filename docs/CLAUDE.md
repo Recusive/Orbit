@@ -6,6 +6,7 @@ Use this to find the right file. Read the file directly — no links needed.
 
 | Folder          | What's in it                       | When to look                     |
 | --------------- | ---------------------------------- | -------------------------------- |
+| `decisions/`    | ADRs, why we chose X over Y        | Understanding past trade-offs    |
 | `architecture/` | System design, technical decisions | How something works internally   |
 | `design/`       | UI/UX guidelines, visual systems   | Typography, icons, themes        |
 | `development/`  | Build workflow, CI/CD, debugging   | Setup, builds, fixing issues     |
@@ -13,6 +14,10 @@ Use this to find the right file. Read the file directly — no links needed.
 | `quality/`      | Linting, audits, health metrics    | Code standards, audit results    |
 | `reference/`    | SDK docs, prompts, external guides | API references, prompt templates |
 | `orbitweb/`     | Marketing site context             | Orbitweb-specific (read-only)    |
+
+## decisions/ (1 file)
+
+- `BROWSER-WINDOW-CORNER-RADIUS.md` — Why native CALayer rounding is needed for the embedded browser (CSS can't clip NSWindows)
 
 ## architecture/ (12 files)
 

@@ -70,7 +70,7 @@ const LoadingState: FC<LoadingStateProps> = ({ path }) => {
 const EmptyState: FC = () => {
   return (
     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-      <div className="flex flex-col items-center gap-3 rounded-lg bg-lg-control dark:bg-background px-8 py-6 w-fit min-w-[14rem]">
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-lg-control dark:bg-background px-8 py-6 w-fit min-w-[14rem]">
         <div className="flex items-center gap-3 opacity-50">
           <OrbitLogo className="h-18 w-18" />
           <div className="w-0.5 h-8 bg-current opacity-40" />

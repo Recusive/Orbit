@@ -213,6 +213,13 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
       text = `${text} ${fileSuffix}`;
     }
 
+    // Append <ComponentName> tokens for selected browser elements so they
+    // persist in JSONL content and are visible in the user message bubble.
+    if (elementContexts.length > 0) {
+      const elementSuffix = elementContexts.map((el) => `<${el.componentName}>`).join(' ');
+      text = `${text} ${elementSuffix}`;
+    }
+
     // Prepend skill invocation if a skill chip is attached.
     // This must be the LAST prefix operation so `/skillName` stays at position 0,
     // ensuring agent-bridge's `message.startsWith('/')` check succeeds.

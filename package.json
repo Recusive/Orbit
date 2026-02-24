@@ -170,6 +170,7 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
     "react-devtools": "^7.0.1",
+    "react-grab": "^0.1.19",
     "react-scan": "^0.5.0",
     "rollup-plugin-visualizer": "^6.0.5",
     "typescript": "^5.9.3",

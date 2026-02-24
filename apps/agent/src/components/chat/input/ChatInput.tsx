@@ -17,7 +17,7 @@ import { useChatInput } from './use-chat-input';
 import type { ChatInputProps } from './types';
 import type { FC } from 'react';
 
-import { ElementContextList } from '@/components/browser';
+import { ElementContextChip } from '@/components/browser';
 import { PermissionModal } from '@/components/modals';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils';
 import { useModel } from '@/stores/agent/tool-store';
@@ -186,12 +186,20 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
               </div>
             ) : null}
 
-            {/* Element Context Chips - selected browser elements */}
-            <ElementContextList elements={elementContexts} onRemove={removeElementContext} />
-
-            {/* Context Chips Row - shown when items attached */}
-            {attachedContext.length > 0 ? (
-              <ContextChips items={attachedContext} onRemove={handleRemoveContext} />
+            {/* Context Chips Row — element + file/skill chips in one row */}
+            {elementContexts.length > 0 || attachedContext.length > 0 ? (
+              <ContextChips items={attachedContext} onRemove={handleRemoveContext}>
+                {elementContexts.map((element, index) => (
+                  <ElementContextChip
+                    key={`el-${element.displayName}-${String(index)}`}
+                    element={element}
+                    onRemove={(): void => {
+                      removeElementContext(index);
+                    }}
+                    compact
+                  />
+                ))}
+              </ContextChips>
             ) : null}
 
             {/* Input Area — relative wrapper for ghost text overlay */}

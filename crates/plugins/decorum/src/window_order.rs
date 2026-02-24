@@ -59,6 +59,112 @@ pub(crate) fn order_child_windows_front() {
     order_children_of(target_window);
 }
 
+/// Apply rounded corners to all child windows of the application.
+///
+/// Iterates `[NSApplication windows]` and applies corner radius to any window
+/// that has a non-nil `parentWindow` (i.e., Tauri child windows like the embedded
+/// browser). This is more reliable than `keyWindow.childWindows` because the
+/// browser child window may itself become the key window after creation.
+///
+/// For each child window:
+/// 1. Sets `window.opaque = NO` so the compositor renders transparent corners
+/// 2. Sets `window.backgroundColor = NSColor.clearColor` to remove opaque fill
+/// 3. Sets `contentView.layer.cornerRadius` + `masksToBounds` to clip the `WKWebView`
+/// 4. Also applies to all subviews (`WKWebView` may have its own compositor layer)
+///
+/// **Must be called from the main thread.**
+pub(crate) fn set_child_windows_corner_radius(radius: f64) {
+    let Some(ns_app_class) = AnyClass::get(c"NSApplication") else {
+        return;
+    };
+
+    let app: *mut AnyObject = unsafe { msg_send![ns_app_class, sharedApplication] };
+    if app.is_null() {
+        return;
+    }
+
+    // Get ALL application windows — more reliable than keyWindow.childWindows
+    // which fails when the child window itself becomes the key window.
+    let windows: *mut AnyObject = unsafe { msg_send![app, windows] };
+    if windows.is_null() {
+        return;
+    }
+
+    let count: usize = unsafe { msg_send![windows, count] };
+    let mut applied = 0usize;
+
+    for i in 0..count {
+        let window: *mut AnyObject = unsafe { msg_send![windows, objectAtIndex: i] };
+        if window.is_null() {
+            continue;
+        }
+
+        // Only process child windows (those that have a parent).
+        let parent: *mut AnyObject = unsafe { msg_send![window, parentWindow] };
+        if parent.is_null() {
+            continue;
+        }
+
+        // ── Make window non-opaque ──
+        // Borderless NSWindows are opaque by default. Without this, the window
+        // draws an opaque background at the corners even when masksToBounds
+        // clips the layer content — the rounded corners appear black or white.
+        unsafe {
+            let _: () = msg_send![window, setOpaque: false];
+        }
+
+        // ── Set clear background color ──
+        let Some(ns_color_class) = AnyClass::get(c"NSColor") else {
+            continue;
+        };
+        let clear_color: *mut AnyObject = unsafe { msg_send![ns_color_class, clearColor] };
+        if !clear_color.is_null() {
+            unsafe {
+                let _: () = msg_send![window, setBackgroundColor: clear_color];
+            }
+        }
+
+        // ── Apply corner radius to content view ──
+        let content_view: *mut AnyObject = unsafe { msg_send![window, contentView] };
+        if content_view.is_null() {
+            continue;
+        }
+
+        unsafe {
+            let _: () = msg_send![content_view, setWantsLayer: true];
+            let layer: *mut AnyObject = msg_send![content_view, layer];
+            if !layer.is_null() {
+                let _: () = msg_send![layer, setCornerRadius: radius];
+                let _: () = msg_send![layer, setMasksToBounds: true];
+            }
+
+            // ── Also apply to subviews (belt-and-suspenders) ──
+            // WKWebView may use its own compositor layer that doesn't respect
+            // the parent's mask. Applying to subviews directly ensures clipping.
+            let subviews: *mut AnyObject = msg_send![content_view, subviews];
+            if !subviews.is_null() {
+                let sub_count: usize = msg_send![subviews, count];
+                for j in 0..sub_count {
+                    let subview: *mut AnyObject = msg_send![subviews, objectAtIndex: j];
+                    if subview.is_null() {
+                        continue;
+                    }
+                    let _: () = msg_send![subview, setWantsLayer: true];
+                    let sub_layer: *mut AnyObject = msg_send![subview, layer];
+                    if !sub_layer.is_null() {
+                        let _: () = msg_send![sub_layer, setCornerRadius: radius];
+                        let _: () = msg_send![sub_layer, setMasksToBounds: true];
+                    }
+                }
+            }
+        }
+
+        applied += 1;
+    }
+
+    log::debug!("WindowOrder: applied {radius}px corner radius to {applied} child window(s)");
+}
+
 /// Call `orderFront:nil` on every child of the given `NSWindow`.
 fn order_children_of(window: *mut AnyObject) {
     let child_windows: *mut AnyObject = unsafe { msg_send![window, childWindows] };

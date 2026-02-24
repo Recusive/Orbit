@@ -1,11 +1,12 @@
 import { createLogger } from '@orbit/common/lib';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useShallow } from 'zustand/shallow';
 
-import type { ExtensionMessage } from '@/types/protocol';
+import type { ExtensionMessage, ReactElementContext } from '@/types/protocol';
 
 import { executeBrowserTool } from '@/hooks/agent/handlers/browser-tool-handler';
 import { useTauri } from '@/hooks/agent/use-tauri';
+import { onBrowserElementSelected } from '@/lib/api/browser';
 import { useBrowserStore } from '@/stores/browser/browser-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 import { generateUUID } from '@/types/protocol';
@@ -227,6 +228,39 @@ export function useBrowser(): void {
       postMessage,
     ]
   );
+
+  // Bridge Tauri `browser:element-selected` event → window.postMessage.
+  // The Rust on_navigation handler intercepts `orbit-eval://element-selected?data=...`
+  // from the react-grab plugin and emits this event. We bridge it into the
+  // existing ExtensionMessage flow so the switch/case above handles it.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    void (async () => {
+      unlisten = await onBrowserElementSelected((data: string) => {
+        try {
+          const element = JSON.parse(data) as ReactElementContext;
+          window.postMessage(
+            {
+              type: 'browser:element-selected',
+              uuid: generateUUID(),
+              element,
+            },
+            '*'
+          );
+        } catch (err) {
+          logger.error(
+            'Failed to parse element selection data',
+            err instanceof Error ? err : new Error(String(err))
+          );
+        }
+      });
+    })();
+
+    return (): void => {
+      unlisten?.();
+    };
+  }, []);
 
   // Browser visibility on mount is handled by ActivityPanel's consolidated effect.
   // No mount-time browser:show needed here — ActivityPanel fires it when

@@ -17,6 +17,8 @@ import {
   handleBrowserHide,
   handleBrowserNavigate,
   handleBrowserReload,
+  handleBrowserSelectElementCancel,
+  handleBrowserSelectElementStart,
   handleBrowserShow,
   handleBrowserStop,
 } from './browser-handlers';
@@ -312,6 +314,17 @@ export async function handleTauriMessage(message: WebviewMessage): Promise<void>
 
   if (message.type === 'browser:tool_response') {
     await handleBrowserToolResponse(message);
+    return;
+  }
+
+  // Element selection handlers (react-grab injection)
+  if (message.type === 'browser:select-element:start') {
+    await handleBrowserSelectElementStart(message);
+    return;
+  }
+
+  if (message.type === 'browser:select-element:cancel') {
+    await handleBrowserSelectElementCancel(message);
     return;
   }
 

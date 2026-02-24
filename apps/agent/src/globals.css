@@ -630,20 +630,21 @@ html.window-mode-liquid-glass:not(.dark) .glass-popover::after {
    Easing: ease-out-quart — matches TOOL_EXPAND_TRANSITION.
    ───────────────────────────────────────────────────────── */
 
-/* Outer frame — hairline border, card surface */
+/* Outer frame — matches tool widget content boxes (bash, edit, etc.) */
 [data-streamdown='code-block'],
 [data-streamdown='code-block-container'] {
   position: relative !important;
   margin: 0.75rem 0 !important;
-  border-radius: var(--radius-lg) !important;
-  border: 0.5px solid var(--gray-a4) !important;
-  background-color: var(--gray-3) !important;
+  border-radius: 0.75rem !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  background-color: var(--chat-area) !important;
   overflow: hidden !important;
 }
 
 html.dark [data-streamdown='code-block'],
 html.dark [data-streamdown='code-block-container'] {
-  border-color: var(--gray-a5) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+  background-color: oklch(23% 0 0) !important;
 }
 
 /* Header — no visual bar, label flows into code */
@@ -870,7 +871,7 @@ html.dark .chat-markdown code:not(pre code) {
 .chat-markdown pre {
   margin-top: 0.75rem;
   margin-bottom: 0.75rem;
-  border-radius: var(--radius-lg);
+  border-radius: 0.75rem;
   overflow: hidden;
 }
 

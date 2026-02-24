@@ -43,10 +43,14 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
 
   if (compact) {
     return (
-      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-accent text-xs">
-        <Code2 className="h-3 w-3 text-foreground/70" />
-        <span className="font-medium">{element.componentName}</span>
-        <button onClick={onRemove} className="ml-0.5 hover:text-destructive transition-colors">
+      <div className="group flex items-center gap-1.5 pl-2 pr-1 py-1 text-xs rounded-md border border-lg-border bg-lg-control hover:bg-lg-control-hover transition-colors shrink-0 max-w-[180px]">
+        <Code2 className="h-3.5 w-3.5 shrink-0 text-foreground/70" />
+        <span className="truncate text-foreground/80">{element.componentName}</span>
+        <button
+          onClick={onRemove}
+          className="h-4 w-4 flex items-center justify-center rounded transition-opacity opacity-0 group-hover:opacity-100 hover:bg-lg-control-hover shrink-0 -mr-0.5"
+          title="Remove"
+        >
           <X className="h-3 w-3" />
         </button>
       </div>
