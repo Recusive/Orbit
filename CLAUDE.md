@@ -12,8 +12,20 @@
 <metadata>
   <title>CLAUDE.md</title>
   <description>Guidance for Claude Code when working with the Orbit codebase</description>
-  <extended_docs file="CLAUDE-CONTINUOUS.md">For detailed examples, historical context, and verbose explanations</extended_docs>
+  <note>Sub-level CLAUDE.md files contain area-specific details. See sub_level_docs below.</note>
 </metadata>
+
+<sub_level_docs note="Each major directory has its own CLAUDE.md with detailed, area-specific guidance">
+<doc path="apps/agent/CLAUDE.md" scope="Agent app stores, protocol types, CSS, testing, hooks, tool widgets"/>
+<doc path="apps/Canvas-UI-Builder/CLAUDE.md" scope="Canvas setup, preview server, inspector, component registry"/>
+<doc path="apps/common/CLAUDE.md" scope="Shared frontend code: logger, cn(), Tauri test mocks, canvas hooks"/>
+<doc path="agent-bridge/CLAUDE.md" scope="SDK sidecar, IPC protocol, SDK type workaround, testing philosophy"/>
+<doc path="src-tauri/CLAUDE.md" scope="Rust backend, Tauri commands, agent bridge, managed state, ACL"/>
+<doc path="crates/common/CLAUDE.md" scope="11 Rust crates: core, fs, terminal, git, conversations, settings, search, lsp, sf-symbols, ai (stub), syntax (stub)"/>
+<doc path="packages/shared-schemas/CLAUDE.md" scope="Zod schemas shared across agent-bridge and all frontend apps"/>
+<doc path="docs/CLAUDE.md" scope="Documentation folder index"/>
+<doc path="apps/agent/src/stress-tests/CLAUDE.md" scope="In-app stress test creation guide"/>
+</sub_level_docs>
 
 <project_overview>
 Orbit is a modern AI-powered code editor built with Tauri 2 (Rust backend) and React 19 (TypeScript frontend). It's a monorepo containing three frontend apps (Orbit Agent, Orbit Canvas, Orbit Editor) that share a common Rust backend.
@@ -232,53 +244,13 @@ Different parts of the codebase use different test runners optimized for their r
   </why_different_runners>
 
 <frontend_test_setup>
-Frontend tests use Vitest with jsdom and these key configurations:
-
-- `vitest.config.ts` - Main config with React plugin and path aliases
-- `vitest.setup.ts` - Global mocks for browser APIs (localStorage, ResizeObserver, etc.) and Tauri APIs
-- `vitest.d.ts` - TypeScript declarations for test globals
-- `tsconfig.json` - Includes `vitest/globals` and `@testing-library/jest-dom` types
-
-Test files: `apps/*/src/**/*.test.{ts,tsx}` or `apps/*/src/**/*.spec.{ts,tsx}`
+Vitest + jsdom. Test files: `apps/*/src/**/*.test.{ts,tsx}`. ESLint has relaxed `no-unsafe-*` rules for test files (Vitest 4 + ESLint projectService incompatibility). See `eslint.config.ts`.
+<reference>See apps/agent/CLAUDE.md "Testing" section for full configuration and patterns.</reference>
 </frontend_test_setup>
 
-<eslint_test_override>
-ESLint has relaxed rules for test files due to Vitest 4 + moduleResolution "bundler" incompatibility.
-The `@typescript-eslint/no-unsafe-*` rules are disabled for test files because ESLint's projectService
-cannot resolve Vitest's global types (even though `tsc --noEmit` passes).
-See `eslint.config.ts` for the documented override.
-</eslint_test_override>
-
 <agent_bridge_sdk_types importance="high">
-ESLint's `projectService` cannot resolve `SDKMessage` from `@anthropic-ai/claude-agent-sdk` across the agent-bridge tsconfig `moduleResolution: "bundler"` boundary. TypeScript's own `tsc --noEmit` resolves it fine, but ESLint sees every property access on SDK messages as `no-unsafe-*` errors.
-
-<workaround status="pragmatic, not ideal">
-Local mirror types in `agent-bridge/src/common/types/claude-sdk.ts` define a `LocalSDKMessage` discriminated union that mirrors the SDK's `SDKMessage`. Files cast once at the `for await` iteration boundary:
-
-```typescript
-for await (const rawMessage of this.currentQuery) {
-  const message = rawMessage as LocalSDKMessage;
-  // ESLint-safe property access via discriminated union narrowing
-}
-```
-
-</workaround>
-
-<maintenance_risks>
-<risk severity="high">Local types can drift from SDK — if SDK updates message shapes, local types must be updated manually or runtime crashes occur (no compile-time enforcement since `as` cast is unsafe)</risk>
-<risk severity="high">User message content is `string | unknown[]` (string for text, array for tool results). Always guard with `Array.isArray()` before calling array methods. Missing this caused a production crash.</risk>
-<risk severity="medium">When adding new SDK message type handling, add the type to `LocalSDKOtherMessage.type` union for switch exhaustiveness</risk>
-</maintenance_risks>
-
-<affected_files>
-<file path="agent-bridge/src/common/types/claude-sdk.ts" role="Shared local type definitions (source of truth for mirror types)"/>
-<file path="agent-bridge/src/agent/core/agent.ts" role="Main agent — heaviest usage of LocalSDKMessage"/>
-<file path="agent-bridge/src/agent/session/session-manager.ts" role="Session management — typed narrowing on result messages"/>
-<file path="agent-bridge/src/canvas/core/canvas-agent.ts" role="Canvas agent — same cast-at-boundary pattern"/>
-<file path="agent-bridge/src/canvas/orchestrator/agents/base-agent.ts" role="Base agent — same pattern"/>
-</affected_files>
-
-<proper_fix>Resolve ESLint's type resolution for the SDK package. Either configure `projectService` to find the SDK's `.d.ts` files, or wait for tooling improvements. Until then, keep local mirror types in sync with the SDK manually.</proper_fix>
+ESLint cannot resolve SDK types across the agent-bridge tsconfig boundary. Uses local mirror types (`LocalSDKMessage`) with cast-at-boundary pattern. User message content is `string | unknown[]` — always guard with `Array.isArray()`.
+<reference>See agent-bridge/CLAUDE.md "SDK Type Workaround" section for full details, affected files, and maintenance risks.</reference>
 </agent_bridge_sdk_types>
 </testing_architecture>
 
@@ -336,93 +308,16 @@ Backend features (file system, terminal, etc.) won't work in browser-only mode.
 </configuration_files>
 </development_workflow>
 
-<frontend_backend_communication>
-<tauri_hook file="apps/agent/src/hooks/use-tauri.ts">
-<example name="Send message to backend"><![CDATA[
-const { postMessage } = useTauri();
-postMessage({ type: 'message:send', uuid, session_id, content });
-]]></example>
-<example name="Listen for backend messages"><![CDATA[
-useTauri({
-  onMessage: (message) => {
-    if (message.type === 'agent:chunk') {
-      // Handle streaming response
-    }
-  },
-});
-]]></example>
-</tauri_hook>
-
-<backend_api file="apps/agent/src/lib/backend.ts">
-Direct Tauri invoke calls for file operations, LSP, terminal, git, etc.
-<example><![CDATA[
-import { readFile, writeFile, listDirectory } from '@/lib/backend';
-
-// File operations
-const content = await readFile('/path/to/file');
-await writeFile('/path/to/file', content);
-const entries = await listDirectory('/path/to/dir');
-
-// LSP operations
-const completions = await getCompletions(path, line, column);
-const hover = await getHover(path, line, column);
-
-// Terminal operations
-const info = await createTerminal(id, cwd, shell);
-await writeTerminal(id, data);
-]]></example>
-</backend_api>
-</frontend_backend_communication>
-
-<codemirror_editor file="apps/agent/src/components/editor/CodeMirrorEditor.tsx">
-<features>
-<feature>Full editing with syntax highlighting</feature>
-<feature>Custom dark/light themes matching app colors</feature>
-<feature>Language support: TypeScript, JavaScript, Python, Rust, Go, JSON, HTML, CSS, Markdown</feature>
-<feature>LSP autocompletion integration</feature>
-<feature>Cmd-S save functionality</feature>
-<feature>Theme-aware (syncs with app light/dark mode via MutationObserver)</feature>
-</features>
-<theme_colors>
-<dark background="oklch(0.16 0.012 60)" style="github-dark"/>
-<light background="oklch(0.98 0.005 75)" style="github-light"/>
-</theme_colors>
-</codemirror_editor>
+<!-- Frontend-backend communication and CodeMirror details: See apps/agent/CLAUDE.md -->
 
 <state_management location="apps/agent/src/stores/">
-<store name="ui-store" purpose="Panel layout, dimensions, active tabs"/>
-<store name="file-store" purpose="File tree state, changes, selections"/>
-<store name="file-viewer-store" purpose="Open file tabs, content, modified state"/>
-<store name="terminal-store" purpose="xterm sessions, output buffers"/>
-<store name="git-store" purpose="Git branch, status, ahead/behind"/>
-<store name="tool-store" purpose="Tool execution, permissions, token tracking"/>
-<store name="browser-store" purpose="Browser/webpage viewing state"/>
-<store name="checkpoint-store" purpose="Conversation checkpoints for rewind"/>
-<store name="queued-message-store" purpose="Pending message queue buffer"/>
-<store name="onboarding-store" purpose="First-launch setup (persisted to localStorage)"/>
-<store name="provider-store" purpose="OAuth provider configuration"/>
+Zustand stores organized by domain (ui/, agent/, chat/, file/, terminal/, browser/, git/, onboarding/). Always use granular selectors: `useStore((s) => s.value)`.
+<reference>See apps/agent/CLAUDE.md "State Management" section for full store table and patterns.</reference>
 </state_management>
 
-<protocol_types location="apps/agent/src/types/protocol.ts" note="All message types with Zod schemas">
-<frontend_to_backend name="WebviewMessage">
-<message type="message:send" description="Send chat message"/>
-<message type="file:read" description="File operations"/>
-<message type="file:write" description="File operations"/>
-<message type="terminal:create" description="Terminal operations"/>
-<message type="terminal:write" description="Terminal operations"/>
-<message type="agent:stop" description="Stop AI generation"/>
-</frontend_to_backend>
-
-<backend_to_frontend name="ExtensionMessage">
-<message type="agent:chunk" description="AI responses"/>
-<message type="agent:complete" description="AI responses"/>
-<message type="tool:start" description="Tool execution"/>
-<message type="tool:end" description="Tool execution"/>
-<message type="file:content" description="File data"/>
-<message type="file:tree:response" description="File data"/>
-<message type="terminal:output" description="Terminal data"/>
-<message type="terminal:created" description="Terminal data"/>
-</backend_to_frontend>
+<protocol_types location="apps/agent/src/types/protocol.ts">
+All message types defined with Zod schemas. WebviewMessage (frontend→backend) and ExtensionMessage (backend→frontend).
+<reference>See apps/agent/CLAUDE.md "Protocol Types" section for full type definitions.</reference>
 </protocol_types>
 
 <code_style>
@@ -446,24 +341,7 @@ This is a production-grade AI-powered code editor. It must withstand the same pr
 </eslint_rules>
 
 <structured_logging importance="high">
-Use the structured logger instead of console.\* calls
-<example><![CDATA[
-import { createLogger } from '@/lib/logger';
-
-const logger = createLogger('MyComponent');
-
-// Log levels
-logger.debug('Dev-only message', { count: 42 }); // Filtered in production
-logger.info('Operational message'); // Always shown
-logger.warn('Potential issue', { userId: '123' }); // Always shown
-logger.error('Error occurred', new Error('fail')); // Always shown with stack
-]]></example>
-<benefits>
-<benefit name="Context prefix">Easily identify source: [MyComponent] message</benefit>
-<benefit name="Log levels">Debug messages hidden in production</benefit>
-<benefit name="Structured data">JSON metadata for log aggregation</benefit>
-<benefit name="Error handling">Proper error serialization with stack traces</benefit>
-</benefits>
+Use `createLogger('Name')` from `@/lib/logger` instead of console.\*. Levels: debug (dev-only), info, warn, error. Provides [Context] prefix, structured JSON metadata, and proper error serialization.
 </structured_logging>
 
 <tailwind_dynamic_styles>
@@ -545,101 +423,30 @@ This project includes AI coding assistant skills adapted from Vercel's agent-ski
 </priority>
 </key_rules>
 
-<reference>See .claude/skills/ for complete guidelines. Code examples in CLAUDE-CONTINUOUS.md.</reference>
+<quick_examples><![CDATA[
+// Parallel async:  const [files, status] = await Promise.all([invoke('list_directory', { path }), invoke('get_git_status', { path })]);
+// Dynamic import:  const CodeMirrorEditor = React.lazy(() => import('./CodeMirrorEditor'));
+// State in handler: const handleSave = () => { const { activeFile } = useFileStore.getState(); };
+// Accessible icon: <button aria-label="Close dialog" onClick={onClose}><X className="h-4 w-4" /></button>
+]]></quick_examples>
+<reference>See .claude/skills/ for complete guidelines.</reference>
 </agent_skills>
 
 <module_organization_patterns>
-<patterns>
-<pattern layer="Frontend TS" approach="Barrel (index.ts)" reason="Users import from modules"/>
-<pattern layer="Tauri commands" approach="Explicit paths" reason="Internal, registered by function"/>
-<pattern layer="Shared Rust crates" approach="Selective re-export" reason="Convenience for cross-crate types"/>
-</patterns>
-<guidelines>
-<guideline context="Frontend">Every folder with multiple files should have an index.ts barrel</guideline>
-<guideline context="Rust commands">Use explicit pub mod declarations, no re-exports</guideline>
-<guideline context="Shared crates">Re-export commonly used types at crate root</guideline>
-</guidelines>
-<reference>See CLAUDE-CONTINUOUS.md for detailed examples.</reference>
+<pattern layer="Frontend TS" approach="Barrel (index.ts) — every folder with multiple files"/>
+<pattern layer="Tauri commands" approach="Explicit pub mod, no re-exports"/>
+<pattern layer="Shared Rust crates" approach="Selective re-export at crate root"/>
+<reference>See apps/agent/CLAUDE.md and src-tauri/CLAUDE.md for examples.</reference>
 </module_organization_patterns>
 
 <dead_code_analysis tool="knip" config="knip.config.ts">
-Knip scans for unused files, dependencies, and exports across the monorepo.
-
-<workspace_architecture importance="high">
-Key structural insight: `apps/agent`, `apps/Canvas-UI-Builder`, and `apps/editor` are NOT real Bun workspaces (no `package.json`). They live under the root workspace and share root `package.json` dependencies. Only `apps/common`, `packages/shared-schemas`, and `agent-bridge` are real workspaces.
-
-The knip config reflects this by scanning all app source files as part of the root workspace (`workspaces['.']`), with path aliases configured so knip can resolve cross-app imports (`@/*`, `@canvas/*`, `@editor/*`, `@orbit/common`).
-</workspace_architecture>
-
-<what_knip_finds>
-<finding type="Unused files">Dead components, unused barrel index.ts files</finding>
-<finding type="Unused dependencies">Packages in root package.json with zero imports</finding>
-<finding type="Unused exports">Exported functions/types/constants never imported elsewhere</finding>
-<finding type="Duplicate exports">Same symbol re-exported from multiple locations</finding>
-</what_knip_finds>
-
-<known_exceptions reason="Cannot be traced by static analysis">
-<exception name="CSS-only deps">tailwindcss, tailwindcss-animate, tw-animate-css — consumed via CSS @import/@plugin, not JS</exception>
-<exception name="@orbit/common">Resolved via tsconfig paths alias, not declared in root package.json</exception>
-<exception name="agent-bridge">Excluded entirely (separate toolchain with its own knip config)</exception>
-</known_exceptions>
-
-<auto_detected_plugins>Knip auto-discovers entry points from: vite, vitest, eslint, lint-staged, typescript, husky configs</auto_detected_plugins>
+Knip scans for unused files, dependencies, and exports. Key: `apps/agent`, `apps/Canvas-UI-Builder`, `apps/editor` are NOT real Bun workspaces — they share root `package.json`. Only `apps/common`, `packages/shared-schemas`, and `agent-bridge` are real workspaces.
+<known_exceptions>CSS-only deps (tailwindcss, tw-animate-css), @orbit/common (tsconfig alias), agent-bridge (excluded).</known_exceptions>
 </dead_code_analysis>
 
-<monorepo_structure>
-<apps location="apps/">
-<app name="agent" description="Chat/AI agent interface" status="Active"/>
-<app name="Canvas-UI-Builder" description="Visual component builder with shadcn" status="Active"/>
-<app name="editor" description="Code editor" status="Stub"/>
-</apps>
+<!-- monorepo_structure: See project_structure above for full tree -->
 
-<shared_crates location="crates/common/">
-<crate name="core" description="Core types, config, state"/>
-<crate name="fs" description="File system operations"/>
-<crate name="terminal" description="PTY management"/>
-<crate name="git" description="Git operations"/>
-<crate name="ai" description="Claude API integration"/>
-<crate name="lsp" description="Language server protocol"/>
-<crate name="search" description="Ripgrep search"/>
-</shared_crates>
-
-  <commands location="src-tauri/src/commands/">
-    <folder name="common/" description="Shared commands (files, terminal, git, etc.)"/>
-    <folder name="agent/" description="Agent-specific commands (ai, conversations)"/>
-    <folder name="canvas/" description="Canvas UI Builder (setup, download, save, preview)"/>
-    <folder name="editor/" description="Editor-specific commands (stub)"/>
-  </commands>
-</monorepo_structure>
-
-<implementation_status>
-<completed>
-<item>Tauri 2 project setup with Rust workspace</item>
-<item>Monorepo restructure (apps/, crates/common/, commands/)</item>
-<item>CodeMirror 6 editor with custom themes</item>
-<item>File editing with save (Cmd-S)</item>
-<item>Modified indicator on tabs</item>
-<item>Theme switching (light/dark)</item>
-<item>Frontend-backend communication layer</item>
-<item>Terminal with xterm.js</item>
-<item>Git status and operations</item>
-<item>Bun workspace management</item>
-<item>CI/CD with GitHub Actions</item>
-<item>Embedded browser panel (WebKit via Tauri multiwebview)</item>
-<item>Canvas UI Builder (setup, download, preview, save, export)</item>
-</completed>
-
-<in_progress>
-<item>Editor app implementation</item>
-<item>Shared packages extraction</item>
-</in_progress>
-
-  <todo>
-    <item>Tree-sitter syntax highlighting</item>
-    <item>LSP/diagnostics integration</item>
-    <item>Advanced search features</item>
-  </todo>
-</implementation_status>
+<!-- implementation_status: Core features complete. In progress: editor app, shared packages. Todo: tree-sitter, LSP, advanced search. -->
 
 <troubleshooting>
   <issue name="Zod Schema Validation Errors" symptoms="Invalid credentials, Unrecognized keys, or parsing errors">
@@ -648,7 +455,7 @@ The knip config reflects this by scanning all app source files as part of the ro
       <file>agent-bridge/src/schemas.ts</file>
       <file>packages/shared-schemas/</file>
     </files_to_check>
-    <quick_fix>Use .loose() for external data, .strict() for internal. See CLAUDE-CONTINUOUS.md for examples.</quick_fix>
+    <quick_fix>Use .loose() for external data, .strict() for internal. See agent-bridge/CLAUDE.md for Zod schema examples.</quick_fix>
   </issue>
 
 <issue name="Agent Bridge SDK Type Mismatch Crash" symptoms="J.every is not a function, J.map is not a function, or similar TypeError in compiled agent-bridge binary">
@@ -662,42 +469,16 @@ The knip config reflects this by scanning all app source files as part of the ro
   </issue>
 
 <integration_test_coverage importance="high">
-When creating integration tests for a function or feature, always add a warning comment to the source file being tested. This ensures future developers know to run and update tests when modifying the code.
-<comment_format><![CDATA[
-/\*\*
-
-- [existing docstring...]
--
-- <warning>
-- TESTED: This function is covered by integration tests.
-- If you modify this, run: cd agent-bridge && bun test
-- Test file: src/**tests**/[test-file-name].test.ts
-- </warning>
-   */
-  ]]></comment_format>
-      <tested_features>
-        <feature name="File Rewind" source="agent-bridge/src/agent.ts:rewindFiles()" test="agent-bridge/src/__tests__/file-rewind.test.ts"/>
-        <!-- DEPRECATED: Conversation context prepend tests removed - see Task #5 -->
-        <!-- Old system used XML context prepending; new system uses parentUuid chains -->
-      </tested_features>
-    </integration_test_coverage>
+When creating integration tests, add a `TESTED:` warning comment to the source file with the test file path and run command (`cd agent-bridge && bun test`).
+<tested_features>
+<feature name="File Rewind" source="agent-bridge/src/agent.ts:rewindFiles()" test="agent-bridge/src/__tests__/file-rewind.test.ts"/>
+</tested_features>
+</integration_test_coverage>
 
 <mandatory_test_requirements importance="critical">
-We follow real integration testing, not unit testing with mocks.
-<do_not>
-<item>Mock the Claude SDK</item>
-<item>Test single files in isolation</item>
-<item>Use fake data that always passes</item>
-</do_not>
-<do>
-<item>Use REAL Claude API calls</item>
-<item>Test full module integration</item>
-<item>Use real data through real pipelines</item>
-</do>
-<running_tests command="cd agent-bridge &amp;&amp; bun test">
-Integration tests (run locally, skipped in CI)
-</running_tests>
-<requirements>Tests require Claude Code CLI OAuth credentials (macOS Keychain). They auto-skip in GitHub Actions.</requirements>
+Agent-bridge uses REAL integration testing — no mocks. Real Claude API calls through real pipelines.
+Run: `cd agent-bridge && bun test`. Requires OAuth credentials (macOS Keychain). Auto-skips in CI.
+<reference>See agent-bridge/CLAUDE.md "Testing Philosophy" section.</reference>
 </mandatory_test_requirements>
 
 <known_security_vulnerabilities last_audited="January 2025">
@@ -708,118 +489,18 @@ ReDoS in UriTemplate class. No patch available. Low practical risk (local sideca
 </troubleshooting>
 
 <css_architecture importance="high">
-The app uses a unified color system with agent as the source of truth.
-
-<file_structure>
-<file path="apps/agent/src/globals.css" role="SOURCE OF TRUTH for all colors"/>
-<file path="apps/Canvas-UI-Builder/src/globals.css" role="Canvas-specific styles only (NO color definitions)"/>
-</file_structure>
-
-<import_order location="apps/agent/src/main.tsx">
-<import order="1" file="./globals.css" description="Agent colors (source of truth)"/>
-<import order="2" file="@canvas/globals.css" description="Canvas styles (no color overrides)"/>
-</import_order>
-
-<color_variables location="apps/agent/src/globals.css">
-<variable name="--background" light="oklch(0.95 ...)" dark="oklch(0.16 ...)" purpose="Main app background"/>
-<variable name="--chat-area" light="oklch(0.93 ...)" dark="oklch(0.18 ...)" purpose="Chat messages area"/>
-<variable name="--card" light="oklch(0.90 ...)" dark="oklch(0.20 ...)" purpose="Cards, headers, input"/>
-<variable name="--sidebar" light="oklch(0.96 ...)" dark="oklch(0.20 ...)" purpose="Sidebar background"/>
-<variable name="--primary" light="oklch(0.56 ...)" dark="oklch(0.68 ...)" purpose="Coral accent"/>
-</color_variables>
-
-  <rules>
-    <rule>NEVER define :root color variables in canvas globals.css - They will override agent colors</rule>
-    <rule>Canvas uses agent's variables - e.g., var(--background), var(--card), var(--primary)</rule>
-    <rule>Canvas globals.css contains only: Tailwind @theme mappings (pointing to agent's variables), ReactFlow style overrides (.react-flow__*), Scrollbar styling, Base layout (html, body, #root)</rule>
-  </rules>
-
-<adding_new_colors>
-<step order="1">Add the variable to apps/agent/src/globals.css in both :root and html.dark sections</step>
-<step order="2">Add the Tailwind mapping in @theme inline { } block</step>
-<step order="3">Canvas will automatically have access to the new variable</step>
-</adding_new_colors>
+Unified color system: `apps/agent/src/globals.css` is the SINGLE SOURCE OF TRUTH for all colors (oklch).
+Canvas imports agent's globals — NEVER define :root color variables in canvas globals.css.
+To add new colors: add to agent globals.css (both :root and html.dark), add Tailwind @theme mapping.
+<reference>See apps/agent/CLAUDE.md "CSS & Styling" for color values and apps/Canvas-UI-Builder/CLAUDE.md for canvas-specific notes.</reference>
 </css_architecture>
 
 <canvas_ui_builder>
-The Canvas UI Builder is a visual component customization tool that lets you browse, customize, and export shadcn/ui components.
-
-<architecture><![CDATA[
-┌─────────────────────────────────────────────────────────────────┐
-│  Canvas UI Builder                                               │
-│  ┌─────────────┬──────────────────────┬───────────────────────┐ │
-│  │ Left Sidebar│   Preview Panel      │   Inspector Panel     │ │
-│  │             │                      │                       │ │
-│  │ Component   │   Live component     │   Props Editor        │ │
-│  │ Library     │   preview via Vite   │   (variant, size,     │ │
-│  │             │   dev server         │    disabled, etc.)    │ │
-│  │             │                      │                       │ │
-│  │ [Button]    │   ┌──────────────┐   │   Variant: [default]  │ │
-│  │ [Card]      │   │   Button     │   │   Size: [md]          │ │
-│  │ [Dialog]    │   │   Preview    │   │   Disabled: [ ]       │ │
-│  │ [Input]     │   └──────────────┘   │                       │ │
-│  │ ...         │                      │   [Save Component]    │ │
-│  └─────────────┴──────────────────────┴───────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-]]></architecture>
-
-<first_run_setup trigger="CanvasSetupWizard" location="~/.orbit/canvas/">
-<step order="1">Creates directory structure</step>
-<step order="2">Downloads shadcn/ui components from registry</step>
-<step order="3">Sets up Vite preview server config</step>
-<step order="4">Installs npm dependencies</step>
-</first_run_setup>
-
-<backend_commands language="Rust">
-<command name="canvas_check_setup" description="Check if ~/.orbit/canvas is initialized"/>
-<command name="canvas_initialize" description="Create directory structure"/>
-<command name="canvas_download_components" description="Download shadcn components from registry"/>
-<command name="canvas_start_preview_server" description="Start Vite dev server for live preview"/>
-<command name="canvas_stop_preview_server" description="Stop the preview server"/>
-<command name="canvas_save_component" description="Save customized component to registry"/>
-<command name="canvas_export_to_project" description="Export component to external project"/>
-</backend_commands>
-
-<frontend_hooks>
-<hook name="useCanvasSetup" description="Setup state and initialization flow"/>
-<hook name="useComponentRegistry" description="Local component registry CRUD"/>
-<hook name="usePreviewServer" description="Preview server lifecycle management"/>
-</frontend_hooks>
-
-<canvas_directory_structure><![CDATA[
-apps/Canvas-UI-Builder/src/
-├── components/
-│   ├── setup/              # CanvasSetupWizard
-│   ├── inspector/          # InspectorPanel, PropsEditor
-│   ├── preview/            # PreviewPanel (Vite iframe)
-│   ├── sidebar/            # ComponentList
-│   ├── dialogs/            # SaveComponentDialog
-│   └── layout/             # CanvasRootLayout, sidebars
-├── hooks/
-│   ├── use-canvas-setup.ts
-│   ├── use-component-registry.ts
-│   └── use-preview-server.ts
-├── stores/
-│   ├── css-customization-store.ts
-│   └── design-tokens-store.ts
-├── CanvasApp.tsx           # Root component
-└── globals.css             # Canvas styles (no colors!)
-]]></canvas_directory_structure>
-
-<orbit_canvas_structure><![CDATA[
-~/.orbit/canvas/
-├── components/
-│   └── ui/                 # Downloaded shadcn components
-│       ├── button.tsx
-│       ├── card.tsx
-│       └── ...
-├── lib/
-│   └── utils.ts            # cn() utility
-├── registry/
-│   └── local.json          # Saved customized components
-├── package.json            # Dependencies
-└── vite.config.ts          # Preview server config
-]]></orbit_canvas_structure>
+Visual component customization tool (browse, customize, export shadcn/ui components).
+Three-panel layout: Left Sidebar (component library) | Preview Panel (live Vite preview) | Inspector Panel (props editor).
+First-run setup via CanvasSetupWizard initializes ~/.orbit/canvas/ with shadcn components + Vite preview server.
+Rust commands in src-tauri/src/commands/canvas/. Frontend in apps/Canvas-UI-Builder/src/.
+<reference>See apps/Canvas-UI-Builder/CLAUDE.md for full details.</reference>
 </canvas_ui_builder>
 
 <feature_documentation location="docs/">
@@ -857,7 +538,6 @@ Search SDK docs whenever working on agent-bridge, SDK integration, permissions, 
     <entry>Embedded browser - WebKit via Tauri multiwebview</entry>
     <entry>pnpm to Bun migration</entry>
   </period>
-  <reference>See CLAUDE-CONTINUOUS.md for detailed changelog.</reference>
 </changelog>
 
 </claude_code_guidance>

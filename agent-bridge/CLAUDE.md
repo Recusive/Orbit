@@ -286,6 +286,116 @@ Tests auto-skip in CI/GitHub Actions.
 | `canvas-e2e.test.ts`          | Canvas agent end-to-end flow         |
 | `text-event-batcher.test.ts`  | Text batching utility                |
 
+## SDK Type Workaround (ESLint vs TypeScript)
+
+ESLint's `projectService` cannot resolve `SDKMessage` from `@anthropic-ai/claude-agent-sdk` across the tsconfig `moduleResolution: "bundler"` boundary. TypeScript's own `tsc --noEmit` resolves it fine, but ESLint sees every property access on SDK messages as `no-unsafe-*` errors.
+
+### Workaround: Local Mirror Types
+
+Local mirror types in `src/common/types/claude-sdk.ts` define a `LocalSDKMessage` discriminated union that mirrors the SDK's `SDKMessage`. Files cast once at the `for await` iteration boundary:
+
+```typescript
+for await (const rawMessage of this.currentQuery) {
+  const message = rawMessage as LocalSDKMessage;
+  // ESLint-safe property access via discriminated union narrowing
+}
+```
+
+### Maintenance Risks
+
+| Risk                  | Severity | Detail                                                                                                                                                                                |
+| --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Type drift            | **High** | If SDK updates message shapes, local types must be updated manually — `as` cast hides mismatches                                                                                      |
+| User message content  | **High** | Content is `string \| unknown[]` (string for text, array for tool results). Always guard with `Array.isArray()` before calling array methods. Missing this caused a production crash. |
+| Switch exhaustiveness | Medium   | When adding new SDK message type handling, add the type to `LocalSDKOtherMessage.type` union                                                                                          |
+
+### Affected Files
+
+| File                                           | Role                                 |
+| ---------------------------------------------- | ------------------------------------ |
+| `src/common/types/claude-sdk.ts`               | Source of truth for mirror types     |
+| `src/agent/core/agent.ts`                      | Main agent — heaviest usage          |
+| `src/agent/session/session-manager.ts`         | Session management — typed narrowing |
+| `src/canvas/core/canvas-agent.ts`              | Canvas agent — same pattern          |
+| `src/canvas/orchestrator/agents/base-agent.ts` | Base agent — same pattern            |
+
+### Proper Fix
+
+Resolve ESLint's type resolution for the SDK package. Either configure `projectService` to find the SDK's `.d.ts` files, or wait for tooling improvements. Until then, keep local mirror types in sync with the SDK manually.
+
+---
+
+## Testing Philosophy
+
+We follow **real integration testing**, not unit testing with mocks.
+
+**DO NOT:**
+
+- Mock the Claude SDK
+- Test single files in isolation
+- Use fake data that always passes
+
+**DO:**
+
+- Use REAL Claude API calls
+- Test full module integration
+- Use real data through real pipelines
+
+Tests require Claude Code CLI OAuth credentials (macOS Keychain). They auto-skip in GitHub Actions.
+
+### Good vs Bad Test Example
+
+```typescript
+// ❌ BAD - Mock test that proves nothing
+it('should analyze intent', () => {
+  const mockAnalyzer = { analyze: () => ({ useFastPath: true }) };
+  expect(mockAnalyzer.analyze('test').useFastPath).toBe(true);
+});
+
+// ✅ GOOD - Real integration test
+it('should route simple requests to fast path via real session', async () => {
+  const manager = new CanvasSessionManager();
+  await manager.createSession('test-session', { model: 'claude-sonnet-4-20250514' });
+  const intentAnalyzer = manager['intentAnalyzer'];
+  const state: CanvasState = { nodes: [], edges: [] };
+  const snapshot = manager['convertToSnapshot'](state);
+  const analysis = intentAnalyzer.analyze('Create a button', snapshot);
+  expect(analysis.useFastPath).toBe(true);
+  await manager.deleteSession('test-session');
+});
+```
+
+### Zod Schema Patterns
+
+```typescript
+// For API responses with unknown extra fields
+const ApiResponseSchema = z.object({ data: z.unknown(), status: z.number() }).passthrough();
+
+// For internal data with strict shape
+const InternalStateSchema = z.object({ count: z.number(), items: z.array(z.string()) }).strict();
+
+// KeychainCredentials — external data needs flexibility
+.object({ expiresAt: z.union([z.number(), z.string()]) }).loose() // ✅
+.object({ expiresAt: z.string() }).strict() // ❌ breaks on number timestamps
+```
+
+---
+
+## Known Security Vulnerabilities
+
+| Package                              | CVE                                 | Severity | Status           |
+| ------------------------------------ | ----------------------------------- | -------- | ---------------- |
+| `@modelcontextprotocol/sdk` <=1.25.1 | CVE-2026-0621 (GHSA-8r9q-7v3j-jr4g) | High     | Waiting upstream |
+
+**ReDoS** in UriTemplate class. Low practical risk — agent-bridge is a local sidecar, URIs come from our SDK calls, not untrusted input. Override for `qs>=6.14.1` added for related transitive DoS.
+
+```bash
+bun pm audit                                    # Check current vulnerabilities
+bun pm view @modelcontextprotocol/sdk version   # Check latest version
+```
+
+---
+
 ## Code Style
 
 ### TypeScript Strictness

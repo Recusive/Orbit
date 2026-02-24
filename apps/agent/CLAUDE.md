@@ -345,6 +345,31 @@ const width = 200;
 <div className="w-px h-[32px]" />
 ```
 
+### Tauri WKWebView Blur Workaround
+
+Tauri's WKWebView has rendering quirks. Avoid these CSS properties on interactive elements:
+
+| Avoid                                              | Use Instead                       |
+| -------------------------------------------------- | --------------------------------- |
+| `backdrop-filter: blur()`                          | Solid backgrounds (`var(--card)`) |
+| `color-mix()`                                      | CSS variables or `rgba()`         |
+| `transition`/`animation` inside ReactFlow viewport | Remove entirely                   |
+
+`will-change: transform` and `contain: layout style paint` do **NOT** fix the blur. The only solution for elements inside ReactFlow's viewport is to completely remove transitions and animations.
+
+```css
+/* ❌ Causes blur in Tauri WebView */
+.card-action-toolbar {
+  background: color-mix(in oklch, var(--card) 95%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+/* ✅ Crisp rendering in Tauri WebView */
+.card-action-toolbar {
+  background: var(--card);
+}
+```
+
 ---
 
 ## Key Patterns
@@ -422,6 +447,20 @@ handlers/
 2. Register in `components/chat/tools/index.ts`
 
 3. Add to tool rendering logic in message component
+
+### Module Organization (Barrel Pattern)
+
+Every folder with multiple files gets an `index.ts` barrel:
+
+```typescript
+// components/chat/messages/index.ts
+export { MessageItem } from './MessageItem';
+export { ToolWidgetRenderer } from './ToolWidgetRenderer';
+export type { ChatMessage, MessageItemProps } from './types';
+export { buildSegments } from './message-utils';
+```
+
+Nested folders each get their own barrel, and the parent barrel imports from subfolders.
 
 ### Adding a New Store
 
