@@ -16,6 +16,20 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 /** Indentation for conversation items nested under workspace (px) */
 const CONVERSATION_INDENT_PX = 19;
 
+/** Evaluated once — reduced-motion preference is static for session lifetime */
+const PREFERS_REDUCED_MOTION =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * Asymmetric enter/exit transitions for the collapsible conversation list.
+ * Enter: ease-out (fast arrival, gentle settle) — 200ms
+ * Exit:  ease-in  (gentle start, fast disappearance) — 150ms
+ */
+const GRID_ENTER = 'grid-template-rows 200ms cubic-bezier(0.16, 1, 0.3, 1)';
+const GRID_EXIT = 'grid-template-rows 150ms cubic-bezier(0.4, 0, 1, 1)';
+const OPACITY_ENTER = 'opacity 150ms cubic-bezier(0.16, 1, 0.3, 1)';
+const OPACITY_EXIT = 'opacity 100ms cubic-bezier(0.4, 0, 1, 1)';
+
 interface ConversationListProps {
   readonly conversations: ConversationSummary[];
   readonly worktrees: WorktreeUIState[];
@@ -57,47 +71,67 @@ export const ConversationList: FC<ConversationListProps> = ({
   const mainWorktreePath = worktrees.find((wt) => wt.worktree.isMain)?.worktree.path ?? null;
   const effectiveActiveWorktreePath = activeWorktreePath ?? mainWorktreePath;
 
-  // Render conversation items for a given list
-  const renderConversations = (convList: ConversationSummary[]): ReactNode => {
+  // Render conversation items for a given list, with animated expand/collapse
+  const renderConversations = (convList: ConversationSummary[], expanded: boolean): ReactNode => {
     if (convList.length === 0) return null;
 
     return (
-      <div className="relative mt-1" style={{ marginLeft: CONVERSATION_INDENT_PX }}>
-        {/* Vertical timeline line */}
+      <div
+        className="grid"
+        style={{
+          gridTemplateRows: expanded ? '1fr' : '0fr',
+          transition: PREFERS_REDUCED_MOTION ? undefined : expanded ? GRID_ENTER : GRID_EXIT,
+        }}
+      >
         <div
-          className="absolute top-0 bottom-2 w-[2px] rounded-full bg-border/60"
+          className="overflow-hidden"
           style={{
-            left: -2,
-            maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
+            opacity: expanded ? 1 : 0,
+            transition: PREFERS_REDUCED_MOTION
+              ? undefined
+              : expanded
+                ? OPACITY_ENTER
+                : OPACITY_EXIT,
           }}
-        />
-        {/* Conversations */}
-        <div className="flex flex-col gap-0.5">
-          {convList.map((conv) => (
-            <ConversationItem
-              key={conv.sessionId}
-              conversation={conv}
-              active={conv.sessionId === activeConversationId}
-              isEditing={editingConversationId === conv.sessionId}
-              onClick={() => {
-                onLoadConversation(conv.sessionId);
-              }}
-              onDoubleClick={() => {
-                onStartEditConversation(conv.sessionId);
-              }}
-              onRename={(newTitle) => {
-                onRenameConversation(conv.sessionId, newTitle);
-              }}
-              onCancelEdit={onCancelEditConversation}
-              onDelete={() => {
-                onDeleteConversation(conv);
-              }}
-              onDuplicate={() => {
-                onDuplicateConversation(conv.sessionId);
+        >
+          <div className="relative mt-1" style={{ marginLeft: CONVERSATION_INDENT_PX }}>
+            {/* Vertical timeline line */}
+            <div
+              className="absolute top-0 bottom-2 w-[2px] rounded-full bg-border/60"
+              style={{
+                left: -2,
+                maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
               }}
             />
-          ))}
+            {/* Conversations */}
+            <div className="flex flex-col gap-0.5">
+              {convList.map((conv) => (
+                <ConversationItem
+                  key={conv.sessionId}
+                  conversation={conv}
+                  active={conv.sessionId === activeConversationId}
+                  isEditing={editingConversationId === conv.sessionId}
+                  onClick={() => {
+                    onLoadConversation(conv.sessionId);
+                  }}
+                  onDoubleClick={() => {
+                    onStartEditConversation(conv.sessionId);
+                  }}
+                  onRename={(newTitle) => {
+                    onRenameConversation(conv.sessionId, newTitle);
+                  }}
+                  onCancelEdit={onCancelEditConversation}
+                  onDelete={() => {
+                    onDeleteConversation(conv);
+                  }}
+                  onDuplicate={() => {
+                    onDuplicateConversation(conv.sessionId);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -143,8 +177,8 @@ export const ConversationList: FC<ConversationListProps> = ({
                     onRemoveWorktree(wt.worktree);
                   }}
                 />
-                {wt.worktree.path === effectiveActiveWorktreePath && wt.isExpanded
-                  ? renderConversations(conversations)
+                {wt.worktree.path === effectiveActiveWorktreePath
+                  ? renderConversations(conversations, wt.isExpanded)
                   : null}
               </div>
             ))}
@@ -159,8 +193,8 @@ export const ConversationList: FC<ConversationListProps> = ({
                 // No-op for single workspace
               }}
             />
-            {/* Conversation list with timeline */}
-            {renderConversations(conversations)}
+            {/* Conversation list with timeline — single workspace is always expanded */}
+            {renderConversations(conversations, true)}
           </>
         ) : null}
       </div>

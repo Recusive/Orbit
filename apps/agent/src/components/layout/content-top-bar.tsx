@@ -9,7 +9,7 @@
  */
 import { IconSquareGridCircle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSquareGridCircle';
 import { ArrowLeft, ArrowRight, PanelLeft, PanelRight, Terminal } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import type { FC } from 'react';
@@ -112,6 +112,39 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
 
   const isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
 
+  /* ── Overflow-fade detection ─────────────────────────────────── */
+  const leftSectionRef = useRef<HTMLDivElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  const checkOverflow = useCallback((): void => {
+    const el = leftSectionRef.current;
+    if (el) {
+      setIsOverflowing(el.scrollWidth > el.clientWidth);
+    }
+  }, []);
+
+  // Re-check on container resize (window resize, panel drag)
+  useEffect(() => {
+    const el = leftSectionRef.current;
+    if (!el) return;
+    checkOverflow();
+    const ro = new ResizeObserver(checkOverflow);
+    ro.observe(el);
+    return (): void => {
+      ro.disconnect();
+    };
+  }, [checkOverflow]);
+
+  // Re-check when content or sidebar state changes
+  useEffect(() => {
+    checkOverflow();
+    // Re-check after sidebar controls animation settles (200ms transition)
+    const timer = setTimeout(checkOverflow, 250);
+    return (): void => {
+      clearTimeout(timer);
+    };
+  }, [sidebarOpen, workspaceName, conversationTitle, checkOverflow]);
+
   const { postMessage } = useTauri();
 
   const {
@@ -189,8 +222,23 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
       )}
       style={{ height: HEIGHTS.headerBar }}
     >
-      {/* Left section: [button] | project name | chat name */}
-      <div className="flex items-center gap-1.5 pl-2 min-w-0">
+      {/* Left section: [button] | project name | chat name
+          Gradient overlay fades text when it overflows toward the right controls */}
+      <div
+        ref={leftSectionRef}
+        className="relative flex items-center gap-1.5 pl-2 min-w-0 overflow-hidden"
+      >
+        {/* Fade overlay — shown only when text overflows toward the right controls */}
+        {isOverflowing ? (
+          <div
+            className="absolute right-0 top-0 bottom-0 pointer-events-none z-10"
+            style={{
+              width: 48,
+              background: 'linear-gradient(to right, transparent, var(--chat-area))',
+            }}
+            aria-hidden="true"
+          />
+        ) : null}
         {/* Navigation + sidebar controls — always rendered, animated in/out with sidebar */}
         {!isDemo ? (
           <div
@@ -273,11 +321,11 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
           </div>
         ) : null}
 
-        {/* Project name */}
+        {/* Project name — fades via parent mask when header is narrow */}
         {workspaceName ? (
           <span
             data-tauri-drag-region={false}
-            className="text-base text-lg-text-secondary cursor-pointer hover:text-foreground transition-colors shrink-0"
+            className="text-base text-lg-text-secondary cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
           >
             {workspaceName}
           </span>
@@ -289,7 +337,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
             <div className="w-px h-3.5 bg-lg-separator shrink-0" />
             <span
               data-tauri-drag-region={false}
-              className="text-base text-foreground cursor-pointer hover:text-foreground transition-colors truncate"
+              className="text-base text-foreground cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
             >
               {conversationTitle}
             </span>
@@ -302,7 +350,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
 
       {/* Right section: Git controls + Panel toggles */}
       {hasWorkspace || isDemo ? (
-        <div className="flex items-center pr-1" style={{ gap: '0.3rem' }}>
+        <div className="flex items-center pr-1 shrink-0" style={{ gap: '0.3rem' }}>
           {/* Git controls */}
           <div className="flex items-center gap-2 mr-1" data-tauri-drag-region={false}>
             <DiffStatsButton />
