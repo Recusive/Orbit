@@ -19,6 +19,7 @@ import { ModelSelector } from './model-selector';
 import type { InputControlsProps } from './types';
 import type { FC } from 'react';
 
+import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useContainerWidth } from '@/hooks/ui';
 import { cn, INPUT_CONTROLS, TRANSITION_CLASSES } from '@/lib/utils';
@@ -77,7 +78,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               onClick={cycleInputMode}
               aria-label={`Input mode: ${INPUT_MODE_LABELS[inputMode]}. Click to change.`}
               className={cn(
-                `h-7 px-2.5 flex items-center gap-1.5 rounded-full ${TRANSITION_CLASSES.button}`,
+                `h-7 px-2.5 flex items-center gap-1.5 rounded-[9px] ${TRANSITION_CLASSES.button}`,
                 'hover:scale-[1.02] active:scale-[0.98]',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
                 inputMode === 'default' &&
@@ -90,7 +91,12 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               <span className="text-sm font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
             </button>
           </TooltipTrigger>
-          <TooltipContent>Input mode</TooltipContent>
+          <TooltipContent className="flex items-center gap-1.5 rounded-[9px] py-1 dark:bg-[var(--background)]">
+            <span className="leading-none">Input mode</span>
+            <Kbd className="h-[18px] !text-[11px] px-1 rounded-[9px] border-white/20 bg-white/10 text-inherit">
+              <span className="text-[13px] leading-none">⇧</span> Tab
+            </Kbd>
+          </TooltipContent>
         </Tooltip>
         {/* Model Picker */}
         <ModelSelector onModelChange={onModelChange} />
@@ -120,7 +126,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                   onClick={handleImageClick}
                   aria-label="Attach image"
                   className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-full',
+                    'h-7 w-7 flex items-center justify-center rounded-[9px]',
                     'bg-transparent text-muted-foreground/70',
                     TRANSITION_CLASSES.button,
                     'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
@@ -164,7 +170,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                   onClick={handleImageClick}
                   aria-label="Attach image"
                   className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-full',
+                    'h-7 w-7 flex items-center justify-center rounded-[9px]',
                     'bg-transparent text-muted-foreground/70',
                     TRANSITION_CLASSES.button,
                     'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',

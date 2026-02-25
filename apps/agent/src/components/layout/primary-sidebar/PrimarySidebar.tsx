@@ -8,6 +8,7 @@
 import { IconCirclePlus } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconCirclePlus';
 import { IconSearchlinesSparkle } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconSearchlinesSparkle';
 import { createLogger } from '@orbit/common/lib';
+import { Facehash } from 'facehash';
 import {
   ArrowLeft,
   ArrowRight,
@@ -456,6 +457,19 @@ export const PrimarySidebar: FC = () => {
                   key={project.path}
                   type="button"
                   onClick={handleRecentProjectClick(project.path)}
+                  onMouseEnter={(e) => {
+                    const face = e.currentTarget.querySelector('[data-facehash-face]');
+                    if (face instanceof HTMLElement) {
+                      face.dataset['savedTransform'] = face.style.transform;
+                      face.style.transform = 'rotateX(0deg) rotateY(0deg) translateZ(12px)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const face = e.currentTarget.querySelector('[data-facehash-face]');
+                    if (face instanceof HTMLElement && face.dataset['savedTransform']) {
+                      face.style.transform = face.dataset['savedTransform'];
+                    }
+                  }}
                   className={cn(
                     'group flex items-center gap-2.5 px-2 py-2 rounded-[9px]',
                     'transition-[background-color] duration-100',
@@ -463,9 +477,14 @@ export const PrimarySidebar: FC = () => {
                     'text-left outline-none'
                   )}
                 >
-                  <div className="flex items-center justify-center w-6 h-6 rounded-md bg-lg-control shrink-0">
-                    <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-                  </div>
+                  <Facehash
+                    name={project.name}
+                    size={24}
+                    variant="solid"
+                    colorClasses={['bg-[#945036] dark:bg-[#e9ad97]']}
+                    className="rounded-md shrink-0 text-white dark:text-current"
+                    style={{ pointerEvents: 'none' }}
+                  />
                   <div className="flex flex-col min-w-0 flex-1">
                     <span className="text-sm font-medium text-foreground truncate">
                       {project.name}

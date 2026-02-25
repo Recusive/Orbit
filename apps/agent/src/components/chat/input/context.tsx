@@ -129,7 +129,7 @@ export const ContextTrigger: FC<ContextTriggerProps> = ({ children, className })
     <HoverCardTrigger asChild>
       <button
         className={cn(
-          'h-7 flex items-center px-1.5 rounded-full hover:bg-lg-control-hover transition-colors',
+          'h-7 flex items-center px-1.5 rounded-[9px] hover:bg-lg-control-hover transition-colors',
           className
         )}
         title="Context usage"

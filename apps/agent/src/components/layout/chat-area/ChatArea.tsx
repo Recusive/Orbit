@@ -9,12 +9,13 @@
  * To change chat max-width or CSS variable names,
  * update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts - DO NOT hardcode here.
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { ChatContent } from './ChatContent';
 import { useLayoutStabilization } from './use-layout-stabilization';
 
 import type { ChatMessage } from '@/components/chat/messages';
+import type { InputMode } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { useQueuedMessageHandler } from '@/components/chat';
@@ -106,6 +107,19 @@ export const ChatArea: FC = () => {
   const handleFeedback = useCallback((): void => {
     window.dispatchEvent(new CustomEvent('focusChatInput'));
   }, []);
+
+  // Listen for cycleInputMode keyboard shortcut (Shift+Tab)
+  useEffect(() => {
+    const handleCycleInputMode = (): void => {
+      const nextMode: InputMode =
+        inputMode === 'default' ? 'plan' : inputMode === 'plan' ? 'accept' : 'default';
+      handleModeChange(nextMode);
+    };
+    window.addEventListener('cycleInputMode', handleCycleInputMode);
+    return (): void => {
+      window.removeEventListener('cycleInputMode', handleCycleInputMode);
+    };
+  }, [inputMode, handleModeChange]);
 
   return (
     <div
