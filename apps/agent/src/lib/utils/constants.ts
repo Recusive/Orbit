@@ -447,6 +447,13 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
   },
 
   // Agent
+  cycleInputMode: {
+    key: 'Tab',
+    shift: true,
+    description: 'Cycle input mode',
+    event: 'cycleInputMode',
+    allowInInput: true,
+  },
   startAgentTask: {
     key: 'Enter',
     cmd: true,

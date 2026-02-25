@@ -25,6 +25,7 @@ export const ShortcutsSettings: FC = () => {
       <SectionHeader title="Chat">Chat-related shortcuts</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">
+        <ShortcutItem label="Cycle Input Mode" keys={[mod.shift, '⇥']} />
         <ShortcutItem label="Send Message" keys={[mod.cmd, '↵']} />
         <ShortcutItem label="Stop Generation" keys={['Esc']} />
         <ShortcutItem label="Add Context" keys={['@']} />

@@ -366,7 +366,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         ref={triggerRef}
         onClick={handleToggle}
         className={cn(
-          'h-7 px-2.5 flex items-center gap-1.5 rounded-full',
+          'h-7 px-2.5 flex items-center gap-1.5 rounded-[9px]',
           'bg-transparent text-muted-foreground',
           TRANSITION_CLASSES.button,
           'hover:bg-lg-control-hover hover:text-foreground',

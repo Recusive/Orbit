@@ -61,7 +61,7 @@ export const EffortLevelButton: FC<EffortLevelButtonProps> = ({
             onClick={cycleEffortLevel}
             aria-label={`Effort level: ${effortInfo.level}. Click to change.`}
             className={cn(
-              'h-7 flex items-center justify-center gap-1 px-1.5 rounded-full',
+              'h-7 flex items-center justify-center gap-1 px-1.5 rounded-[9px]',
               TRANSITION_CLASSES.button,
               'hover:bg-lg-control-hover hover:scale-[1.02]',
               'active:scale-95',
