@@ -24,7 +24,7 @@ import type { FC } from 'react';
 import { ErrorBoundary } from '@/components/shared';
 import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
 import { rehypeInsightBlocks } from '@/lib/rehype-insight-blocks';
-import { cn, CHAT_SPACING, CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
+import { cn, CHAT_SPACING } from '@/lib/utils';
 
 /** Max collapsed height for user message bubbles (px). Content taller than this gets a "Show more" toggle. */
 const USER_MESSAGE_MAX_HEIGHT = 200;
@@ -125,17 +125,16 @@ const UserMessageBubble: FC<{ readonly content: string; readonly animate: boolea
     return (
       <div
         className={cn(
-          'w-fit rounded-xl bg-lg-control dark:bg-[#272727] px-3.5 pt-2.5',
+          'w-fit max-w-full rounded-xl bg-lg-control dark:bg-[#272727] px-3.5 pt-2.5',
           isCollapsed ? 'pb-0' : 'pb-2.5',
           animate === true && 'animate-message-in'
         )}
-        style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
         {/* Content area with optional height clamp + mask fade when collapsed */}
         <div className="relative">
           <p
             ref={contentRef}
-            className="text-base leading-relaxed whitespace-pre-wrap select-text"
+            className="text-base leading-relaxed whitespace-pre-wrap break-words select-text"
             style={
               isCollapsed
                 ? {
@@ -258,7 +257,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
       ) : (
         /* Assistant message - no bubble, content flows naturally */
         <div
-          className="py-1"
+          className="my-1"
           style={{
             paddingLeft: CHAT_SPACING.assistantPadding,
             paddingRight: CHAT_SPACING.assistantPadding,

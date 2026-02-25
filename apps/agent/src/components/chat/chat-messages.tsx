@@ -1,22 +1,22 @@
 /**
- * ChatMessages - Virtualized message list with auto-scroll behavior
+ * ChatMessages - Message list with auto-scroll behavior
  *
- * Uses @tanstack/react-virtual for DOM virtualization. Only messages near
- * the viewport are rendered, capping DOM nodes to ~30 (viewport + overscan)
- * regardless of conversation length. This is the primary fix for the 2.27GB
- * DOM memory spike observed in profiling.
+ * Renders all messages in normal document flow for proper native text
+ * selection. No virtualization — React handles reconciliation directly.
+ *
+ * IMPORTANT: Do NOT add `contain: paint`, `content-visibility: auto`, or
+ * `user-select: none` to .message-item — all three break native text
+ * selection in WKWebView by causing block-level selection highlights.
  *
  * Integration with use-stick-to-bottom:
- * - scrollRef: shared scroll container for both virtualizer and stick-to-bottom
- * - contentRef: on the wrapper div whose height is driven by virtualizer.getTotalSize()
- *   The stick-to-bottom ResizeObserver sees this height change and triggers auto-scroll.
+ * - scrollRef: shared scroll container for stick-to-bottom
+ * - contentRef: on the wrapper div whose natural height drives the
+ *   ResizeObserver that triggers auto-scroll.
  *
  * NOTE: Chat container widths come from @/lib/utils/constants.
  * To change chat max-width, update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts.
  */
-import { createLogger } from '@orbit/common/lib';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 // PINNED: use-stick-to-bottom@1.1.2 — the session-switch scroll reset workaround
 // (stopScroll() call below) depends on this library's internal ResizeObserver
 // timing. Upgrading may break the workaround silently. Test thoroughly before
@@ -36,8 +36,6 @@ import { HyperText } from '@/components/ui/hyper-text';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 import { deduplicateAndSortTools, useRunningTool, useToolStore } from '@/stores/agent/tool-store';
-
-const logger = createLogger('ChatMessages');
 
 // Rotating loading messages - fun tech-themed phrases (fallback when no tool is running)
 const LOADING_MESSAGES = [
@@ -167,9 +165,6 @@ function useRotatingMessage(isActive: boolean, intervalMs = 2500): string {
 
   return LOADING_MESSAGES[index] ?? 'Thinking';
 }
-
-/** Estimated average message height for virtualizer initial sizing */
-const ESTIMATED_MESSAGE_HEIGHT = 120;
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
@@ -411,134 +406,43 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     };
   }, []);
 
-  // ─────────────────────────────────────────────────────────────
-  // Virtualizer Setup
-  // ─────────────────────────────────────────────────────────────
-  // Always virtualize — even short conversations benefit from containment.
-  // The overscan of 5 above + 5 below means ~10-15 items in DOM at any time.
-
-  // Stable getScrollElement callback for the virtualizer.
-  // use-stick-to-bottom types scrollRef as RefObject<HTMLElement>, not HTMLDivElement.
-  const getScrollElement = useCallback((): HTMLElement | null => {
-    return scrollRef.current;
-  }, [scrollRef]);
-
-  // Stable key extractor — uses message ID for consistent reconciliation.
-  // Without this, the virtualizer uses array index which causes full re-renders
-  // when messages are prepended or removed (e.g., conversation:loaded merge).
-  const getItemKey = useCallback(
-    (index: number): string => {
-      const id = messages[index]?.id;
-      if (id === undefined) {
-        // Fallback should never trigger — virtualizer count matches messages.length.
-        // If it fires, something is out of sync during a rapid session switch.
-        logger.warn('getItemKey: messages[index] undefined, falling back to index', {
-          index,
-          count: messages.length,
-        });
-      }
-      return id ?? String(index);
-    },
-    [messages]
-  );
-
-  const virtualizer = useVirtualizer<HTMLElement, HTMLDivElement>({
-    count: messages.length,
-    getScrollElement,
-    estimateSize: () => ESTIMATED_MESSAGE_HEIGHT,
-    getItemKey,
-    // Overscan: render 5 extra items above and below the viewport.
-    // Higher values reduce visible blank areas during fast scrolling
-    // but increase DOM node count. 5 is a good balance.
-    overscan: 5,
-    // FIX: Disable flushSync to prevent "flushSync called inside lifecycle"
-    // errors with React 19. The library's default onChange wraps rerender()
-    // in flushSync for synchronous scrollToIndex measurement, but when the
-    // virtualizer's internal memoization chain fires during a parent render
-    // (e.g., streaming message updates), React 19 throws. Setting this to
-    // false uses the same internal useReducer rerender without the flushSync
-    // wrapper — zero extra renders, zero GC overhead. Safe here because
-    // use-stick-to-bottom handles all scroll-to-bottom behavior independently.
-    useFlushSync: false,
-  });
-
-  const virtualItems = virtualizer.getVirtualItems();
-  const totalSize = virtualizer.getTotalSize();
-
   return (
     <div
       ref={scrollRef}
-      className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-28"
+      className="flex-1 overflow-y-auto overflow-x-hidden"
       style={{
         scrollbarGutter: 'stable both-edges',
-        // PERF: contain layout + style to this scroll container.
-        // Prevents layout/style recalculations from propagating to parent.
-        // Cannot use `contain: paint` here because overflow-y: auto already
-        // establishes a paint containment context.
         contain: 'layout style',
       }}
     >
-      {/*
-       * contentRef from use-stick-to-bottom watches this element's height via ResizeObserver.
-       * The height is driven by the spacer div inside (getTotalSize()). When the virtualizer
-       * count increases (new messages), getTotalSize() grows, this wrapper's height changes,
-       * and stick-to-bottom detects it and auto-scrolls.
-       */}
       <div
         ref={contentRef}
-        className="mx-auto"
+        className="mx-auto pt-4 px-4"
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
-        {/* Spacer div — establishes the correct scrollable height.
-         * Items are absolutely positioned inside, so this div's height
-         * sets the scroll container's scrollHeight correctly.
-         * PERF: contain: layout style paint isolates this subtree from the
-         * rest of the page. Combined with content-visibility on children,
-         * this limits layout/paint recalculations to only visible messages. */}
-        <div
-          className="relative w-full"
-          style={{
-            height: `${String(totalSize)}px`,
-            contain: 'layout style paint',
-          }}
-        >
-          {virtualItems.map((virtualItem) => {
-            const msg = messages[virtualItem.index];
-            if (!msg) return null;
+        {messages.map((msg) => {
+          const isLastAssistant = msg.id === lastAssistantMessageId;
+          const isLastInGroup = lastInAssistantGroupIds.has(msg.id);
+          const shouldAnimate = animatingMessageIds.has(msg.id);
+          const tools = toolsByMessageId.get(msg.id) ?? [];
 
-            const isLastAssistant = msg.id === lastAssistantMessageId;
-            const isLastInGroup = lastInAssistantGroupIds.has(msg.id);
-            const shouldAnimate = animatingMessageIds.has(msg.id);
-            const tools = toolsByMessageId.get(msg.id) ?? [];
-
-            return (
-              <div
-                key={virtualItem.key}
-                data-index={virtualItem.index}
-                ref={virtualizer.measureElement}
-                className="absolute left-0 w-full pb-3 select-auto"
-                style={{
-                  top: `${String(virtualItem.start)}px`,
-                }}
-              >
-                <MessageItem
-                  message={msg}
-                  tools={tools}
-                  isLastAssistantMessage={isLastAssistant}
-                  isLastInAssistantGroup={isLastInGroup}
-                  isAgentRunning={isAgentRunning}
-                  animate={shouldAnimate}
-                  onRewind={onRewind}
-                  onOpenFile={onOpenFile}
-                  onOpenUrl={onOpenUrl}
-                  onFeedback={onFeedback}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Footer lives outside the virtual list — always visible at the bottom */}
+          return (
+            <div key={msg.id} className="mb-3">
+              <MessageItem
+                message={msg}
+                tools={tools}
+                isLastAssistantMessage={isLastAssistant}
+                isLastInAssistantGroup={isLastInGroup}
+                isAgentRunning={isAgentRunning}
+                animate={shouldAnimate}
+                onRewind={onRewind}
+                onOpenFile={onOpenFile}
+                onOpenUrl={onOpenUrl}
+                onFeedback={onFeedback}
+              />
+            </div>
+          );
+        })}
 
         {/* Queued message bubble - shows when user typed while agent was running */}
         {queuedMessage !== null ? (
@@ -560,6 +464,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             </HyperText>
           </div>
         ) : null}
+
+        {/* Bottom spacer — uses margin so never included in text selection */}
+        <div className="mt-28" aria-hidden="true" />
       </div>
     </div>
   );
