@@ -1,6 +1,6 @@
 # Plan: Worktree Switching = Workspace Switching
 
-> **Audit status:** Revised per combined audit (Claude + Codex, Feb 24 2026).
+> **Audit status:** Revised per combined audit rounds 1, 2 & 3 (Claude + Codex, Feb 24–25 2026).
 > See `reviews/audit-plan.md` for full audit report.
 
 ## Context
@@ -20,7 +20,7 @@ And `ensureSession` already sets `cwd = activeWorktreePath` (use-tauri-session.t
 
 ## Changes
 
-### 1. UIStore — add `repoRootPath`, add `switchToWorktree` action
+### 1. UIStore — add `repoRootPath`, split `setWorkspace` into `initializeWorkspace`, add `switchToWorktree`
 
 **File:** `apps/agent/src/stores/ui/ui-store.ts`
 
@@ -36,24 +36,49 @@ repoRootPath: string | null; // Git repo root — stable across worktree switche
 repoRootPath: null,
 ```
 
-**c) Modify `setWorkspace`** (line 313) — set `repoRootPath` as initial fallback only:
+**c) Add `initializeWorkspace` action + keep `setWorkspace` as transitional shim** (audit round 2 critical #1, audit round 3 critical #1):
+
+The old `setWorkspace` had `if (state.repoRootPath === null)` which broke after opening a second project — `repoRootPath` stayed pointed at the first project.
+
+**Migration strategy:** Keep `setWorkspace` as a shim that delegates to `initializeWorkspace`. This avoids partial-migration breakage — there are 8+ call sites across the codebase including `chat-message-service.ts:396` (workspace bootstrap on first `system:init`), `App.tsx:102` (demo mode), and test files. All call sites migrate incrementally; the shim is removed in a follow-up PR.
 
 ```typescript
-setWorkspace: (path: string): void => {
+initializeWorkspace: (path: string): void => {
   set((state) => {
-    state.isLoadingConversation = true;
-    state.isConversationTransitioning = true;
     state.workspacePath = path;
-    // Set as initial fallback — loadWorktrees will override with main worktree path
-    // for git repos. For non-git projects, this stays as the root.
-    if (state.repoRootPath === null) {
-      state.repoRootPath = path;
-    }
+    state.repoRootPath = path; // ALWAYS reset — this is a new project context
+    state.activeWorktreePath = null;
+    saveActiveWorktreeToStorage(null);
     const segments = path.split(PATH_SEPARATOR_RE).filter(Boolean);
     state.workspaceName = segments[segments.length - 1] ?? path;
+    // Clear all prior-project state
+    state.conversations = [];
+    state.isLoadingConversation = true;
+    state.isConversationTransitioning = true;
   });
 },
+
+// TRANSITIONAL: shim for unmigrated call sites. Remove after all callers use initializeWorkspace.
+setWorkspace: (path: string): void => {
+  get().initializeWorkspace(path);
+},
 ```
+
+**Full call site inventory** (all must eventually migrate to `initializeWorkspace`):
+
+| Call site                          | Context                                    | Priority           |
+| ---------------------------------- | ------------------------------------------ | ------------------ |
+| `PrimarySidebar.tsx:183`           | openProject                                | Migrate in this PR |
+| `file-handlers.ts:71`              | handleOpenFolder                           | Migrate in this PR |
+| `file-explorer.tsx:220`            | onSelectFolder                             | Migrate in this PR |
+| `ssh-connection-dialog.tsx:149`    | handleConnect                              | Migrate in this PR |
+| `ProjectsDialog.tsx:104`           | handleOpenProject                          | Migrate in this PR |
+| `clone-repository-dialog.tsx:224`  | handleClone                                | Migrate in this PR |
+| `chat-message-service.ts:396`      | Workspace bootstrap on first `system:init` | Migrate in this PR |
+| `App.tsx:102`                      | Demo/mock mode setup                       | Migrate in this PR |
+| `ui-store.test.ts` (4 occurrences) | Unit tests                                 | Update in this PR  |
+
+> **Why split from `switchToWorktree`?** Project initialization and worktree switching have different invariants. `initializeWorkspace` is a full reset (root, worktree, conversations, loading state). `switchToWorktree` is a lens change within an established root. Conflating them caused the stale `repoRootPath` bug.
 
 **d) Add `switchToWorktree` action** (in `UIActions` interface + implementation):
 
@@ -69,8 +94,11 @@ switchToWorktree: (worktreePath: string | null): void => {
     const segments = targetPath.split(PATH_SEPARATOR_RE).filter(Boolean);
     state.workspaceName = segments[segments.length - 1] ?? targetPath;
     // Clear conversation list immediately to avoid stale sessions from
-    // previous worktree showing during async fetch (audit critical #1)
+    // previous worktree showing during async fetch (audit round 1 critical #1)
     state.conversations = [];
+    // Clear active conversation — prevents stale session reference
+    state.activeConversationId = null;
+    state.activeConversationTitle = null;
     // Trigger loading state for conversation list refresh
     state.isLoadingConversation = true;
     state.isConversationTransitioning = true;
@@ -78,7 +106,7 @@ switchToWorktree: (worktreePath: string | null): void => {
 },
 ```
 
-**e) Update `removeWorktree`** — must also reset `workspacePath` when deleting the active worktree (audit critical #2):
+**e) Update `removeWorktree`** — must also reset `workspacePath` when deleting the active worktree (audit round 1 critical #2):
 
 ```typescript
 removeWorktree: (path: string): void => {
@@ -95,6 +123,8 @@ removeWorktree: (path: string): void => {
       state.activeWorktreePath = null;
       saveActiveWorktreeToStorage(null);
       // Clear stale conversations and trigger refresh
+      state.activeConversationId = null;
+      state.activeConversationTitle = null;
       state.conversations = [];
       state.isLoadingConversation = true;
       state.isConversationTransitioning = true;
@@ -104,7 +134,17 @@ removeWorktree: (path: string): void => {
 },
 ```
 
-**f) Add selector:**
+**f) Add `setRepoRootPath` action** — explicit, testable store action for `loadWorktrees` to use (audit recommended #1):
+
+```typescript
+setRepoRootPath: (path: string): void => {
+  set((state) => {
+    state.repoRootPath = path;
+  });
+},
+```
+
+**g) Add selector:**
 
 ```typescript
 export const useRepoRootPath = (): string | null => {
@@ -112,11 +152,48 @@ export const useRepoRootPath = (): string | null => {
 };
 ```
 
-### 2. PrimarySidebar — wire `onSelectWorktree` to `switchToWorktree`
+### 1b. ChatStore — add `clearActiveSession` action (audit round 2 critical #2)
+
+**File:** `apps/agent/src/stores/chat/chat-store.ts`
+
+After worktree switching, `activeSessionId` in ChatStore can still point to a session from the previous worktree. `handleSend` (`chat-actions.ts:97-119`) reads both `ChatStore.activeSessionId` and `UIStore.workspacePath`, so a stale session + updated workspace = context mismatch. Messages would land in the old session tagged with new workspace metadata.
+
+```typescript
+clearActiveSession: (): void => {
+  set((draft) => {
+    draft.activeSessionId = null;
+  });
+},
+```
+
+This is called from `PrimarySidebar` alongside `switchToWorktree` (Section 2b), `loadWorktrees` fallback (Section 3), and `removeWorktree` flows. The combination of `UIStore.switchToWorktree` (clears `activeConversationId/Title`) + `ChatStore.clearActiveSession` (clears `activeSessionId`) ensures no cross-store mismatch after context switches.
+
+### 2. PrimarySidebar — wire project-open to `initializeWorkspace`, worktree select to `switchToWorktree` + session clearing
 
 **File:** `apps/agent/src/components/layout/primary-sidebar/PrimarySidebar.tsx`
 
-**a) Both `onSelectWorktree` handlers** (lines 500-502 and 526-528):
+**a) Project-open flows** — use `initializeWorkspace` instead of `setWorkspace` (audit round 2 critical #1, round 3 critical #1):
+
+```typescript
+// Before (line ~183 in openProject and similar handlers):
+useUIStore.getState().setWorkspace(path);
+
+// After:
+useUIStore.getState().initializeWorkspace(path);
+```
+
+All 8 call sites that previously called `setWorkspace(path)` must be migrated. The `setWorkspace` shim (Section 1c) ensures unmigrated call sites still work during transition, but all should be explicitly migrated in this PR:
+
+- `PrimarySidebar.tsx:183` — `openProject`
+- `file-handlers.ts:71` — `handleOpenFolder`
+- `file-explorer.tsx:220` — `onSelectFolder`
+- `ssh-connection-dialog.tsx:149` — `handleConnect`
+- `ProjectsDialog.tsx:104` — `handleOpenProject`
+- `clone-repository-dialog.tsx:224` — `handleClone`
+- `chat-message-service.ts:396` — workspace bootstrap on first `system:init` (guarded by `!uiState.workspacePath`)
+- `App.tsx:102` — demo/mock mode setup (`applyDemoView`)
+
+**b) Both `onSelectWorktree` handlers** (lines 500-502 and 526-528) — switch worktree AND clear active session (audit round 2 critical #2):
 
 ```typescript
 // Before:
@@ -127,10 +204,12 @@ onSelectWorktree={(path) => {
 // After:
 onSelectWorktree={(path) => {
   useUIStore.getState().switchToWorktree(path);
+  // Clear active session to prevent sending to old worktree context
+  useChatStore.getState().clearActiveSession();
 }}
 ```
 
-**b) `CreateWorktreeDialog` `onCreated`** (line 602-605):
+**c) `CreateWorktreeDialog` `onCreated`** (line 602-605):
 
 ```typescript
 // Before:
@@ -141,6 +220,7 @@ onCreated={(worktree) => {
 // After:
 onCreated={(worktree) => {
   useUIStore.getState().switchToWorktree(worktree.path);
+  useChatStore.getState().clearActiveSession();
 }}
 ```
 
@@ -175,17 +255,14 @@ const loadWorktrees = useCallback(async (): Promise<void> => {
       return;
     }
 
-    // Derive repoRootPath from the main worktree (audit critical #2).
-    // This is authoritative — overrides the fallback set by setWorkspace.
+    // Derive repoRootPath from the main worktree (audit round 1 critical #2).
+    // This is authoritative — overrides the fallback set by initializeWorkspace.
+    // Uses a dedicated store action instead of raw set() (audit recommended #1).
     const mainWorktree = worktreeList.find((wt) => wt.isMain);
     if (mainWorktree) {
       const currentRoot = useUIStore.getState().repoRootPath;
       if (currentRoot !== mainWorktree.path) {
-        useUIStore.getState().set?.((state) => {
-          state.repoRootPath = mainWorktree.path;
-        });
-        // Or use a dedicated action if set() is not exposed:
-        // useUIStore.setState((state) => ({ ...state, repoRootPath: mainWorktree.path }));
+        useUIStore.getState().setRepoRootPath(mainWorktree.path);
       }
     }
 
@@ -206,21 +283,23 @@ const loadWorktrees = useCallback(async (): Promise<void> => {
       currentActiveWorktree !== null && worktreePaths.has(currentActiveWorktree);
 
     if (!isActiveWorktreeValid) {
-      // Invalid/stale — fall back to main
+      // Invalid/stale — fall back to main + clear session (audit round 2 critical #2)
       const fallbackWorktree = mainWorktree ?? worktreeList[0];
       if (fallbackWorktree) {
         useUIStore.getState().switchToWorktree(fallbackWorktree.path);
       } else {
         useUIStore.getState().switchToWorktree(null);
       }
+      useChatStore.getState().clearActiveSession();
     } else {
-      // STARTUP RECONCILIATION (audit critical #4):
+      // STARTUP RECONCILIATION (audit round 1 critical #4):
       // activeWorktreePath is valid (restored from localStorage), but
-      // workspacePath may still be the repo root from setWorkspace().
+      // workspacePath may still be the repo root from initializeWorkspace().
       // Reconcile by calling switchToWorktree so workspacePath matches.
       const currentWorkspace = useUIStore.getState().workspacePath;
       if (currentActiveWorktree && currentWorkspace !== currentActiveWorktree) {
         useUIStore.getState().switchToWorktree(currentActiveWorktree);
+        // Don't clear session here — startup reconciliation preserves continuity
       }
     }
   } catch {
@@ -229,12 +308,13 @@ const loadWorktrees = useCallback(async (): Promise<void> => {
     const root = useUIStore.getState().repoRootPath;
     if (current !== null && current !== root) {
       useUIStore.getState().switchToWorktree(null);
+      useChatStore.getState().clearActiveSession();
     }
   }
 }, [repoRootPath, workspacePath, setWorktrees]);
 ```
 
-**c) Use `repoRootPath` for `handleRemoveWorktree`** (audit critical #2):
+**c) Use `repoRootPath` for `handleRemoveWorktree` + clear active session** (audit round 1 critical #2, audit round 3 critical #2):
 
 ```typescript
 const handleRemoveWorktree = useCallback(
@@ -246,6 +326,9 @@ const handleRemoveWorktree = useCallback(
     try {
       await gitWorktreeRemove(removePath, worktreeToDelete.path, false);
       removeWorktree(worktreeToDelete.path);
+      // removeWorktree() resets UIStore (workspacePath, conversations, activeConversationId)
+      // but ChatStore.activeSessionId must also be cleared to prevent cross-context sends
+      useChatStore.getState().clearActiveSession();
       // ... rest unchanged
     }
   },
@@ -404,14 +487,14 @@ if (currentWorkspace && currentWorkspace !== currentRoot) {
 
 These files already work correctly because they read `workspacePath` or `activeWorktreePath`:
 
-| File                                               | Why no change needed                                                                           |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `use-chat-messages.ts` Effect 2                    | Sends `conversation:list` with `workspacePath` — auto-scopes. Fires on `workspacePath` change. |
-| `chat-message-service.ts` `scheduleSidebarRefresh` | Reads `workspacePath` at callback time — auto-scopes                                           |
-| `use-tauri-session.ts` `ensureSession`             | Uses `activeWorktreePath ?? getWorkspacePath()` — both correct                                 |
-| `chat-actions.ts` `handleSend`                     | Reads `workspacePath` + `activeWorktreePath` — both correct                                    |
-| `content-top-bar.tsx` header                       | Uses `useWorkspaceName()` — updated by `switchToWorktree`                                      |
-| `terminal-panel.tsx`                               | Uses `workspacePath` for new terminal cwd — auto-scopes                                        |
+| File                                               | Why no change needed                                                                                                                                                                                                                                         |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `use-chat-messages.ts` Effect 2                    | Sends `conversation:list` with `workspacePath` — auto-scopes. Fires on `workspacePath` change.                                                                                                                                                               |
+| `chat-message-service.ts` `scheduleSidebarRefresh` | Reads `workspacePath` at callback time — auto-scopes                                                                                                                                                                                                         |
+| `use-tauri-session.ts` `ensureSession`             | Uses `activeWorktreePath ?? getWorkspacePath()` — both correct                                                                                                                                                                                               |
+| `chat-actions.ts` `handleSend`                     | Reads `workspacePath` + `activeWorktreePath` — both correct after switch. Protected by `clearActiveSession` (Section 1b) which nulls `activeSessionId` before new workspace takes effect, preventing messages from landing in old session with new metadata. |
+| `content-top-bar.tsx` header                       | Uses `useWorkspaceName()` — updated by `switchToWorktree`                                                                                                                                                                                                    |
+| `terminal-panel.tsx`                               | Uses `workspacePath` for new terminal cwd — auto-scopes                                                                                                                                                                                                      |
 
 ---
 
@@ -419,6 +502,7 @@ These files already work correctly because they read `workspacePath` or `activeW
 
 Mark these as `// TRANSITIONAL: remove after worktree-as-workspace migration` in code:
 
+- `setWorkspace` shim — remove after all call sites use `initializeWorkspace` directly
 - `sessionWorktreeMap` — no longer needed for sidebar grouping
 - `conversationBelongsToWorktree()` — no longer needed (conversations are workspace-scoped)
 - `useEffectivePath()` — redundant (`workspacePath` IS the effective path)
@@ -429,14 +513,17 @@ Mark these as `// TRANSITIONAL: remove after worktree-as-workspace migration` in
 ## Edge cases
 
 1. **Switching back to main:** `switchToWorktree(mainPath)` or `switchToWorktree(null)` → restores `workspacePath = repoRootPath`. File tree sync now reacts to `workspacePath` changes (change #7), so null transitions work.
-2. **Active streaming during switch:** Running session keeps its cwd. UI shows different conversation list. Session continues in background. Consider: only set `isConversationTransitioning` if active conversation changes.
+2. **Active streaming during switch:** Running session keeps its cwd. UI shows different conversation list. `clearActiveSession()` nulls `activeSessionId`, so `handleSend` cannot accidentally write to the old session. Session continues in background — user can find it in the original worktree's conversation list.
 3. **First switch with no conversations:** Empty list shown immediately (`switchToWorktree` clears `conversations` in the batch). User creates new session manually.
 4. **Non-git projects:** `worktrees[]` empty, `repoRootPath === workspacePath`. No behavioral change.
-5. **Worktree deletion while active:** `removeWorktree()` resets `workspacePath = repoRootPath`, clears conversations, triggers refresh.
+5. **Worktree deletion while active:** `removeWorktree()` resets `workspacePath = repoRootPath`, clears conversations + active session, triggers refresh.
 6. **App restart with persisted worktree:** `loadWorktrees` validates the stored path. If valid, startup reconciliation calls `switchToWorktree(activeWorktreePath)` so `workspacePath` matches. If invalid/deleted, falls back to main.
 7. **Worktree deleted from outside the app:** `loadWorktrees` validation catches the stale `activeWorktreePath` on next poll/mount and resets to main via `switchToWorktree`.
 8. **Creating worktree from non-main worktree:** `CreateWorktreeDialog` uses `repoRootPath` for both path derivation and `gitWorktreeAdd`, so sibling dirs are always relative to the repo root.
 9. **Rapid worktree switches:** `loadWorktrees` async results could arrive out of order. Mitigated by: `switchToWorktree` immediately clears conversations (no stale list shown), and `setConversations` optimistic merge self-corrects on next response. For full protection, add a request epoch guard to `loadWorktrees` (recommended improvement, not required for v1).
+10. **Opening Project B after Project A:** `initializeWorkspace(pathB)` always resets `repoRootPath = pathB`, `activeWorktreePath = null`, and clears conversations. No stale state leaks from Project A. All 8 call sites use `initializeWorkspace` (not `switchToWorktree`).
+11. **Sending message immediately after worktree switch:** `clearActiveSession()` runs synchronously after `switchToWorktree`. `handleSend` checks `activeSessionId` — if null, it creates a new session in the current workspace context. No cross-context contamination.
+12. **Switching from git project to non-git project:** `initializeWorkspace` resets `repoRootPath` and `activeWorktreePath = null`. `loadWorktrees` returns empty list. `worktrees[]` empty, `repoRootPath === workspacePath`. Clean transition.
 
 ---
 
@@ -458,9 +545,22 @@ Mark these as `// TRANSITIONAL: remove after worktree-as-workspace migration` in
    - **NEW:** Restart app with worktree selected → correct conversations on startup
    - **NEW:** Switch to worktree with zero sessions → empty list (no stale sessions)
    - **NEW:** Create worktree while on non-main worktree → path derives from repo root
+   - **NEW:** Open Project B after Project A → `repoRootPath` points to B, not A
+   - **NEW:** Switch worktree then immediately send message → new session created in new worktree context (not old session)
+   - **NEW:** Switch from git project to non-git folder → no stale worktree state
 5. **Unit tests to add:**
-   - `switchToWorktree` sets `workspacePath`, `activeWorktreePath`, `workspaceName`, clears `conversations`
+   - `initializeWorkspace` always resets `repoRootPath`, `activeWorktreePath`, and clears conversations
+   - `initializeWorkspace` on second call overwrites first call's `repoRootPath` (no null guard)
+   - `setWorkspace` shim delegates to `initializeWorkspace` (same behavior)
+   - `switchToWorktree` sets `workspacePath`, `activeWorktreePath`, `workspaceName`, clears `conversations` + `activeConversationId`
    - `switchToWorktree(null)` restores `workspacePath = repoRootPath`
-   - `removeWorktree` on active worktree resets `workspacePath` to `repoRootPath`
-   - `setWorkspace` only sets `repoRootPath` when null (doesn't overwrite once set)
+   - `removeWorktree` on active worktree resets `workspacePath` to `repoRootPath` and clears `activeConversationId`
    - Startup reconciliation: valid persisted worktree triggers `switchToWorktree`
+6. **Existing test migration** (`ui-store.test.ts` — 4 occurrences at lines 210, 220, 230, 1001):
+   - Update `setWorkspace` calls to `initializeWorkspace` in tests
+   - Add assertions for `repoRootPath` being set on every `initializeWorkspace` call
+7. **Cross-store integration tests to add** (audit recommended #3):
+   - Switch worktree + send message → message uses new workspace context (not old session)
+   - `clearActiveSession` nulls `activeSessionId` — verify `handleSend` creates new session
+   - `initializeWorkspace` followed by `loadWorktrees` → `repoRootPath` updated to main worktree path
+   - Remove active worktree + send message → new session in repo root context (not deleted worktree)
