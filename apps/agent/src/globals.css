@@ -930,6 +930,8 @@ html.dark .chat-markdown code:not(pre code) {
   border-left: 2px solid var(--accent-7);
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
   background: var(--accent-a2);
+  overflow: hidden;
+  overflow-wrap: break-word;
 }
 
 .insight-block .insight-header {
@@ -1505,16 +1507,10 @@ html.dark ::-webkit-scrollbar-thumb:hover {
    Performance Optimizations
    ============================================ */
 
-/* For chat message items - layout containment */
-.message-item {
-  contain: layout style paint;
-}
-
-/* Completed messages - enable content-visibility for off-screen optimization */
-.message-item[data-streaming='false'] {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 200px;
-}
+/* NOTE: Do NOT add `contain: paint`, `content-visibility: auto`, or
+ * `user-select: none` to .message-item — all three break native text
+ * selection in WKWebView by causing block-level selection highlights
+ * instead of text-following selection. */
 
 /* Disable all transitions during conversation switching to prevent layout flash */
 .no-transitions,
