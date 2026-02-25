@@ -40,7 +40,7 @@ export interface UseKeyboardShortcutsReturn {
 
 /**
  * Hook for registering global keyboard shortcuts
- * Handles common shortcuts like Cmd+K, Cmd+/, Cmd+B, etc.
+ * Handles common shortcuts like Cmd+K, Cmd+S, Cmd+B, etc.
  */
 export function useKeyboardShortcuts(
   options: UseKeyboardShortcutsOptions

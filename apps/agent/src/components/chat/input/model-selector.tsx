@@ -24,10 +24,7 @@ const POPOVER_GAP = 8;
 // Wrapper components to match the expected interface
 const ClaudeIcon: FC<{ className?: string }> = ({ className }) => (
   <SiClaude
-    className={cn(
-      'w-3 h-3 opacity-70 group-hover:opacity-100 transition-opacity duration-150',
-      className
-    )}
+    className={cn('w-3 h-3 opacity-70 group-hover:opacity-100', className)}
     style={{ color: '#d97757' }}
   />
 );

@@ -264,10 +264,10 @@ export const POPOVER_ANIMATION = {
  * @see InputControls, ModelSelector, ThinkingModeButton, MoreActionsMenu
  */
 export const TRANSITION_CLASSES = {
-  /** Standard interactive button: bg-color + text color + transform at 150ms */
-  button: 'transition-[background-color,color,transform] duration-150',
-  /** Popover/dropdown list item: bg-color + transform at 150ms */
-  item: 'transition-[background-color,transform] duration-150',
+  /** Standard interactive button: transform only at 75ms (bg/color are instant for snappy feel) */
+  button: 'transition-transform duration-75',
+  /** Popover/dropdown list item: transform only at 75ms (bg is instant for pointer tracking) */
+  item: 'transition-transform duration-75',
 } as const;
 
 /**
@@ -379,14 +379,7 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
 
   // Sidebar & panels
   toggleLeftSidebar: {
-    key: '/',
-    cmd: true,
-    description: 'Toggle left sidebar',
-    event: 'toggleLeftSidebar',
-  },
-  // Alternative binding for non-US keyboards where / requires Shift
-  toggleLeftSidebarAlt: {
-    key: '.',
+    key: 's',
     cmd: true,
     description: 'Toggle left sidebar',
     event: 'toggleLeftSidebar',
@@ -418,18 +411,26 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
     event: 'openSourceControl',
   },
 
+  // Session
+  newSession: {
+    key: 'n',
+    cmd: true,
+    description: 'New session',
+    event: 'newSession',
+  },
+  openProjects: {
+    key: 't',
+    cmd: true,
+    description: 'Open projects',
+    event: 'openProjects',
+  },
+
   // File operations
   quickOpenFile: {
     key: 'p',
     cmd: true,
     description: 'Quick open file',
     event: 'quickOpenFile',
-  },
-  saveFile: {
-    key: 's',
-    cmd: true,
-    description: 'Save current file',
-    event: 'saveFile',
   },
   saveAllFiles: {
     key: 's',

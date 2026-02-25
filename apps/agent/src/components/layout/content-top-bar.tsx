@@ -71,7 +71,7 @@ const DiffStatsButton: FC = () => {
           data-tauri-drag-region={false}
           onClick={handleClick}
           className={cn(
-            'flex items-center h-6 rounded-full overflow-hidden',
+            'flex items-center h-6 rounded-[9px] overflow-hidden',
             'text-[11px] font-medium tabular-nums',
             'transition-[background-color,color] duration-150'
           )}
@@ -201,6 +201,14 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
     setVaultOpen,
   ]);
 
+  // Listen for newSession keyboard shortcut event
+  useEffect(() => {
+    window.addEventListener('newSession', handleNewSession);
+    return (): void => {
+      window.removeEventListener('newSession', handleNewSession);
+    };
+  }, [handleNewSession]);
+
   const handleToggleTerminal = (): void => {
     // Always pick a visible position — if the activity panel is closed,
     // the 'activity' slot is off-screen so force 'chat'.
@@ -278,7 +286,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
                 data-tauri-drag-region={false}
                 aria-label="Go back"
                 tabIndex={sidebarOpen ? -1 : 0}
-                className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+                className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
               >
                 <SFSymbol
                   name="arrow.left"
@@ -291,7 +299,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
                 data-tauri-drag-region={false}
                 aria-label="Go forward"
                 tabIndex={sidebarOpen ? -1 : 0}
-                className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+                className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
               >
                 <SFSymbol
                   name="arrow.right"

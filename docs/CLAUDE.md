@@ -15,11 +15,12 @@ Use this to find the right file. Read the file directly — no links needed.
 | `reference/`    | SDK docs, prompts, external guides | API references, prompt templates |
 | `orbitweb/`     | Marketing site context             | Orbitweb-specific (read-only)    |
 
-## decisions/ (3 files)
+## decisions/ (4 files)
 
 - `BROWSER-WINDOW-CORNER-RADIUS.md` — Why native CALayer rounding is needed for the embedded browser (CSS can't clip NSWindows)
 - `CHAT-PANEL-MINIMUM-WIDTH.md` — Constant 400px chat floor via dynamic activity cap, sidebar auto-collapse, header overflow fade
 - `SIDEBAR-ANIMATION-SINGLE-PROPERTY.md` — Why sidebar uses single margin-left slide instead of two-property transition (eliminates desync jank)
+- `INSTANT-HOVER-SIDEBAR-LISTS.md` — Instant hover for all list items: removed backdrop-blur, bg transitions, and transition-all (Frequency Principle)
 
 ## architecture/ (12 files)
 

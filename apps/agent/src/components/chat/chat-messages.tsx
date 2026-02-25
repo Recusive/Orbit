@@ -195,8 +195,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // - Velocity-based spring animation for smooth content growth
   // - Scroll anchoring when content above viewport resizes
   const { scrollRef, contentRef, scrollToBottom, stopScroll } = useStickToBottom({
-    // Smooth spring animation when content resizes (tool expand/collapse)
-    resize: 'smooth',
+    // Instant scroll on resize — prevents the spring animation from amplifying
+    // tiny height changes (1-2px content reflow) into visible multi-frame "wobble"
+    // that appears as messages shifting down then back.
+    // Streaming still looks smooth: chunks arrive every 50ms, so instant jumps
+    // at that rate are imperceptible.
+    resize: 'instant',
     // Smooth initial scroll on mount
     initial: 'smooth',
   });

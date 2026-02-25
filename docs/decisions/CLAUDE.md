@@ -82,6 +82,7 @@ ASCII diagram showing the flow/structure.
 | `BROWSER-WINDOW-CORNER-RADIUS.md`      | Native CALayer rounding for embedded browser — CSS can't clip NSWindows                      | 2026-02-23 |
 | `CHAT-PANEL-MINIMUM-WIDTH.md`          | Constant 400px chat floor, dynamic activity cap, sidebar auto-collapse, header overflow fade | 2026-02-24 |
 | `SIDEBAR-ANIMATION-SINGLE-PROPERTY.md` | Single margin-left slide instead of two-property transition to eliminate desync jank         | 2026-02-24 |
+| `INSTANT-HOVER-SIDEBAR-LISTS.md`       | Instant hover for all list items — removed backdrop-blur, bg transitions, transition-all     | 2026-02-25 |
 
 ---
 

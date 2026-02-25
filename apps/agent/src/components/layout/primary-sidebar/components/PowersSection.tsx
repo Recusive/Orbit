@@ -70,8 +70,8 @@ export const PowersSection: FC<PowersSectionProps> = ({ onSkillsClick }) => {
       {/* Header — identical structure to SidebarItem expanded layout */}
       <button
         className={cn(
-          'flex items-center gap-1.5 h-8 rounded-[9px] mx-1.5 overflow-hidden hover:bg-lg-sidebar-hover hover:backdrop-blur-[20px] active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground',
-          isExpanded && 'bg-lg-sidebar-selected backdrop-blur-[20px] text-foreground'
+          'flex items-center gap-1.5 h-8 rounded-[9px] mx-1.5 overflow-hidden hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground',
+          isExpanded && 'bg-lg-sidebar-selected text-foreground'
         )}
         onClick={handleToggle}
         aria-expanded={isExpanded}
@@ -123,7 +123,7 @@ export const PowersSection: FC<PowersSectionProps> = ({ onSkillsClick }) => {
                 <div key={item.label} className="relative group mx-1.5 ml-2">
                   <button
                     className={cn(
-                      'flex items-center gap-2 h-7 w-full rounded-[9px] pl-[7px] pr-3 overflow-hidden transition-[background-color] duration-100',
+                      'flex items-center gap-2 h-7 w-full rounded-[9px] pl-[7px] pr-3 overflow-hidden',
                       item.comingSoon === true
                         ? 'text-sidebar-foreground/40 cursor-default'
                         : 'hover:bg-lg-sidebar-hover text-sidebar-foreground hover:text-foreground'

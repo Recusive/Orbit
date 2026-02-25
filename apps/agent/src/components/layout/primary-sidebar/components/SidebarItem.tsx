@@ -24,9 +24,9 @@ export const SidebarItem: FC<SidebarItemProps> = ({
   return (
     <button
       className={cn(
-        'flex items-center gap-1.5 h-8 rounded-[9px] mx-1.5 overflow-hidden hover:bg-lg-sidebar-hover hover:backdrop-blur-[20px] active:scale-[0.98] transition-[background-color,transform] duration-100',
+        'flex items-center gap-1.5 h-8 rounded-[9px] mx-1.5 overflow-hidden hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75',
         active
-          ? 'bg-lg-sidebar-selected backdrop-blur-[20px] text-foreground'
+          ? 'bg-lg-sidebar-selected text-foreground'
           : 'text-sidebar-foreground hover:text-foreground',
         className
       )}
@@ -45,7 +45,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
       {badge ? (
         <span
           className={cn(
-            'ml-auto mr-2 shrink-0 inline-flex items-center h-5 rounded-full px-1.5 text-[11px] font-[510] select-none backdrop-blur-[20px]',
+            'ml-auto mr-2 shrink-0 inline-flex items-center h-5 rounded-full px-1.5 text-[11px] font-[510] select-none',
             badgeVariant === 'primary'
               ? ''
               : 'bg-black/[0.04] text-[#4C4C4C] dark:bg-white/[0.08] dark:text-[#B0B0B0]'

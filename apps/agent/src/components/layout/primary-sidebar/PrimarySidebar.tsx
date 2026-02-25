@@ -20,7 +20,7 @@ import {
   Settings2,
   Terminal,
 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import { ConversationList } from './components/ConversationList';
@@ -143,6 +143,17 @@ export const PrimarySidebar: FC = () => {
   const [activeTab, setActiveTab] = useState<SidebarTab>('conversations');
   const [editorTab, setEditorTab] = useState<EditorSidebarTab>('explorer');
   const [projectsDialogOpen, setProjectsDialogOpen] = useState(false);
+
+  // Listen for openProjects keyboard shortcut event
+  useEffect(() => {
+    const handleOpenProjects = (): void => {
+      setProjectsDialogOpen(true);
+    };
+    window.addEventListener('openProjects', handleOpenProjects);
+    return (): void => {
+      window.removeEventListener('openProjects', handleOpenProjects);
+    };
+  }, []);
   const [skillsDialogOpen, setSkillsDialogOpen] = useState(false);
 
   const {
@@ -232,7 +243,7 @@ export const PrimarySidebar: FC = () => {
         <button
           onClick={toggleLeftSidebar}
           aria-label="Collapse sidebar"
-          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
+          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
         >
           <SFSymbol
             name="sidebar.left"
@@ -245,7 +256,7 @@ export const PrimarySidebar: FC = () => {
         <div className="flex items-center gap-0.5 ml-auto">
           <button
             aria-label="Go back"
-            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
           >
             <SFSymbol
               name="arrow.left"
@@ -256,7 +267,7 @@ export const PrimarySidebar: FC = () => {
           </button>
           <button
             aria-label="Go forward"
-            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground"
+            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
           >
             <SFSymbol
               name="arrow.right"
@@ -395,11 +406,13 @@ export const PrimarySidebar: FC = () => {
             )}
             label="New Session"
             large
+            shortcut={['⌘', 'N']}
             onClick={handleStartConversation}
           />
           <SidebarItem
             icon={FolderOpen}
             label="Projects"
+            shortcut={['⌘', 'T']}
             onClick={() => {
               setProjectsDialogOpen(true);
             }}
@@ -560,7 +573,7 @@ export const PrimarySidebar: FC = () => {
         {/* Settings | Feedback — inline row */}
         <div className="flex items-center h-8 mx-1.5 gap-1.5 overflow-hidden">
           <button
-            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
+            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
             onClick={() => {
               openSettings('agent');
             }}
@@ -575,7 +588,7 @@ export const PrimarySidebar: FC = () => {
           </button>
           <div className="w-px h-3.5 bg-lg-separator shrink-0" />
           <button
-            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-[background-color,transform] duration-100 text-sidebar-foreground hover:text-foreground overflow-hidden"
+            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
             onClick={() => {
               openSettings('feedback');
             }}

@@ -226,7 +226,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group/card flex items-center gap-2 py-1.5 px-2.5 mx-1',
-          'transition-colors duration-150 w-[calc(100%-0.5rem)] text-left',
+          'w-[calc(100%-0.5rem)] text-left',
           'rounded-lg hover:bg-lg-control-hover',
           canExpand ? 'cursor-pointer' : 'cursor-default'
         )}
@@ -235,7 +235,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
         <div
           className={cn(
             'w-[22px] h-[22px] rounded-md flex items-center justify-center shrink-0',
-            'transition-colors duration-150',
+            '',
             STATUS_BADGE_BG[file.displayStatus]
           )}
         >
@@ -264,7 +264,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
               <button
                 onClick={handleDiscard}
                 disabled={isLoading}
-                className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-lg-control-hover active:scale-95 transition-[background-color,color,transform] duration-150"
+                className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-lg-control-hover active:scale-95 transition-transform duration-75"
                 title="Discard"
                 aria-label={`Discard changes to ${fileName}`}
               >
@@ -274,7 +274,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
             <button
               onClick={handleAction}
               disabled={isLoading}
-              className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-[background-color,color,transform] duration-150"
+              className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-transform duration-75"
               title={isStaged ? 'Unstage' : 'Stage'}
               aria-label={isStaged ? `Unstage ${fileName}` : `Stage ${fileName}`}
             >

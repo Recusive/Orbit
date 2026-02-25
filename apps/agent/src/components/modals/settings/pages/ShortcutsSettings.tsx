@@ -15,7 +15,8 @@ export const ShortcutsSettings: FC = () => {
         <ShortcutItem label="Command Palette" keys={[mod.cmd, 'K']} />
         <ShortcutItem label="Quick Open / Go to File" keys={[mod.cmd, 'P']} />
         <ShortcutItem label="Settings" keys={[mod.cmd, ',']} />
-        <ShortcutItem label="New Chat" keys={[mod.cmd, 'N']} />
+        <ShortcutItem label="New Session" keys={[mod.cmd, 'N']} />
+        <ShortcutItem label="Projects" keys={[mod.cmd, 'T']} />
         <ShortcutItem label="Close Tab" keys={[mod.cmd, 'W']} />
       </div>
 
@@ -36,7 +37,6 @@ export const ShortcutsSettings: FC = () => {
       <SectionHeader title="Editor">Editor shortcuts</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">
-        <ShortcutItem label="Save File" keys={[mod.cmd, 'S']} />
         <ShortcutItem label="Find in File" keys={[mod.cmd, 'F']} />
         <ShortcutItem label="Go to Line" keys={[mod.cmd, 'G']} />
         <ShortcutItem label="Undo" keys={[mod.cmd, 'Z']} />
@@ -48,7 +48,7 @@ export const ShortcutsSettings: FC = () => {
       <SectionHeader title="Panels">Panel visibility shortcuts</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">
-        <ShortcutItem label="Toggle Left Sidebar" keys={[mod.cmd, '/']} />
+        <ShortcutItem label="Toggle Left Sidebar" keys={[mod.cmd, 'S']} />
         <ShortcutItem label="Toggle Activity Panel" keys={[mod.cmd, 'B']} />
         <ShortcutItem label="Toggle Editor Panel" keys={[mod.cmd, 'E']} />
         <ShortcutItem label="Toggle Terminal" keys={[mod.cmd, 'J']} />

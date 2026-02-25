@@ -69,7 +69,7 @@ export const ConversationDeleteDialog: FC<ConversationDeleteDialogProps> = ({
           <div className="flex w-full items-center" style={{ gap: 8 }}>
             <button
               type="button"
-              className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-all duration-150 active:scale-[0.97]"
+              className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
               onClick={() => {
                 onOpenChange(false);
               }}
@@ -78,7 +78,7 @@ export const ConversationDeleteDialog: FC<ConversationDeleteDialogProps> = ({
             </button>
             <button
               type="button"
-              className="liquid-glass-btn liquid-glass-btn-destructive flex-1 cursor-pointer transition-all duration-150 active:scale-[0.97]"
+              className="liquid-glass-btn liquid-glass-btn-destructive flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
               onClick={handleConfirm}
             >
               Delete

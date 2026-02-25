@@ -162,7 +162,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
       role="group"
       tabIndex={0}
       className={cn(
-        'group flex items-center gap-1.5 h-8 w-full rounded-[9px] overflow-hidden transition-colors duration-100 hover:bg-lg-sidebar-hover cursor-default',
+        'group flex items-center gap-1.5 h-8 w-full rounded-[9px] overflow-hidden hover:bg-lg-sidebar-hover cursor-default',
         active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'
       )}
       onClick={handleRowClick}
@@ -229,7 +229,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           <SelectTrigger
             className={cn(
               'flex items-center gap-0.5 h-auto w-auto px-1.5 py-0.5 rounded-full text-[11px] border-0',
-              'backdrop-blur-[20px] font-[510] cursor-pointer',
+              'font-[510] cursor-pointer',
               'hover:bg-black/8 dark:hover:bg-white/15',
               'active:scale-[0.97] disabled:opacity-50',
               'focus-visible:ring-0',
