@@ -2,6 +2,7 @@
  * ProjectsDialog — Icon grid dialog showing recent projects.
  */
 import { createLogger } from '@orbit/common/lib';
+import { Facehash } from 'facehash';
 import { FolderOpen, FolderPlus, X } from 'lucide-react';
 import { useCallback } from 'react';
 
@@ -43,10 +44,28 @@ interface ProjectTileProps {
   readonly onClick: () => void;
 }
 
+const setFaceHover = (e: React.MouseEvent, hovered: boolean): void => {
+  const face = e.currentTarget.querySelector('[data-facehash-face]');
+  if (face instanceof HTMLElement) {
+    if (hovered) {
+      face.dataset['savedTransform'] = face.style.transform;
+      face.style.transform = 'rotateX(0deg) rotateY(0deg) translateZ(12px)';
+    } else if (face.dataset['savedTransform']) {
+      face.style.transform = face.dataset['savedTransform'];
+    }
+  }
+};
+
 const ProjectTile: FC<ProjectTileProps> = ({ project, onClick }) => (
   <button
     type="button"
     onClick={onClick}
+    onMouseEnter={(e) => {
+      setFaceHover(e, true);
+    }}
+    onMouseLeave={(e) => {
+      setFaceHover(e, false);
+    }}
     className={cn(
       'flex flex-col items-center gap-2 p-4 rounded-xl cursor-pointer',
       'transition-[background-color,transform] duration-150',
@@ -55,12 +74,14 @@ const ProjectTile: FC<ProjectTileProps> = ({ project, onClick }) => (
       'outline-none focus-visible:ring-2 focus-visible:ring-foreground/30'
     )}
   >
-    <div className="flex items-center justify-center h-12 w-12 rounded-xl bg-lg-control dark:bg-lg-separator">
-      <FolderOpen
-        className="h-6 w-6 text-lg-text-secondary dark:text-lg-text-secondary"
-        aria-hidden="true"
-      />
-    </div>
+    <Facehash
+      name={project.name}
+      size={48}
+      variant="solid"
+      colorClasses={['bg-[#945036] dark:bg-[#e9ad97]']}
+      className="rounded-xl shrink-0 text-white dark:text-current"
+      style={{ pointerEvents: 'none' }}
+    />
     <div className="flex flex-col items-center gap-0.5 min-w-0 w-full">
       <span className="text-sm font-medium text-foreground truncate max-w-full">
         {project.name}
