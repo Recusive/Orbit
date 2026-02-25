@@ -15,9 +15,10 @@ Use this to find the right file. Read the file directly — no links needed.
 | `reference/`    | SDK docs, prompts, external guides | API references, prompt templates |
 | `orbitweb/`     | Marketing site context             | Orbitweb-specific (read-only)    |
 
-## decisions/ (1 file)
+## decisions/ (2 files)
 
 - `BROWSER-WINDOW-CORNER-RADIUS.md` — Why native CALayer rounding is needed for the embedded browser (CSS can't clip NSWindows)
+- `SIDEBAR-ANIMATION-SINGLE-PROPERTY.md` — Why sidebar uses single margin-left slide instead of two-property transition (eliminates desync jank)
 
 ## architecture/ (12 files)
 
@@ -49,7 +50,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `DMG-BUILD-GUIDE.md` — Building macOS distributable
 - `BUNDLING-TECHNICAL-NOTES.md` — Claude CLI bundling internals
 
-## plans/ (18 files)
+## plans/ (19 files)
 
 - `AUTO-UPDATE-PLAN.md` — Auto-update mechanism
 - `CANVAS-RUST-TRANSFORM-PLAN.md` — Canvas Rust backend transformation
@@ -63,6 +64,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `MULTI-WINDOW-PLAN.md` — Multi-window support
 - `NAVIGATION-HISTORY-PLAN.md` — File navigation history
 - `PARALLEL_AGENTS_PLAN.md` — Parallel agent execution
+- `PIERRE-DIFFS-MIGRATION-PLAN.md` — Replace custom diff rendering with @pierre/diffs library
 - `PRODUCTION-READINESS-PLAN.md` — Production readiness checklist
 - `RUST-BACKEND-MIGRATION-PLAN.md` — Rust backend migration
 - `SDK-SESSION-STORAGE-PLAN.md` — SDK session storage
