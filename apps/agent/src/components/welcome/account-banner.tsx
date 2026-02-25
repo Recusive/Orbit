@@ -114,7 +114,7 @@ function showAccountToast(status: KeychainStatus): string | number {
           style={{ padding: '10px 8px 8px 12px' }}
         >
           {/* App icon */}
-          <div className="flex items-center justify-center h-8 w-8 rounded-lg shrink-0 bg-black/[0.06] dark:bg-white/10 backdrop-blur-[20px]">
+          <div className="flex items-center justify-center h-8 w-8 rounded-lg shrink-0 bg-black/[0.06] dark:bg-white/10">
             <SiClaude
               className={cn('h-4.5 w-4.5', !isConnected && 'text-black/40 dark:text-white/40')}
               style={isConnected ? { color: '#d97757' } : undefined}

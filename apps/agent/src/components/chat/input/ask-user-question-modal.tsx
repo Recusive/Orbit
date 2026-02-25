@@ -271,7 +271,7 @@ export const AskUserQuestionModal: FC<AskUserQuestionModalProps> = ({
                 onClick={() => {
                   handleOptionClick(idx);
                 }}
-                className={`group/row flex w-full items-center gap-3 h-[3.25rem] px-3 text-left cursor-pointer rounded-2xl outline-none transition-all duration-100 active:scale-[0.99] ${
+                className={`group/row flex w-full items-center gap-3 h-[3.25rem] px-3 text-left cursor-pointer rounded-2xl outline-none transition-transform duration-75 active:scale-[0.99] ${
                   selectedOption === idx ? 'bg-foreground/8' : 'hover:bg-lg-control-hover'
                 }`}
               >

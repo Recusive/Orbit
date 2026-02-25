@@ -147,7 +147,7 @@ export const ConversationList: FC<ConversationListProps> = ({
           <TooltipTrigger asChild>
             <button
               aria-label="Create worktree"
-              className="relative h-5 w-5 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-90 transition-[background-color,transform] duration-100 text-muted-foreground hover:text-foreground shrink-0 before:absolute before:content-[''] before:inset-[-10px]"
+              className="relative h-5 w-5 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-90 transition-transform duration-75 text-muted-foreground hover:text-foreground shrink-0 before:absolute before:content-[''] before:inset-[-10px]"
               onClick={onOpenCreateWorktree}
             >
               <Plus className="h-3.5 w-3.5" />
