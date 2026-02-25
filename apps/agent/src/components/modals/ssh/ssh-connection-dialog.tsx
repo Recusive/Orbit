@@ -146,7 +146,7 @@ export const SSHConnectionDialog: FC<SSHConnectionDialogProps> = ({ open, onOpen
 
         // Set the workspace and build file index for fuzzy search
         await initializeWorkspace(selected);
-        useUIStore.getState().setWorkspace(selected);
+        useUIStore.getState().initializeWorkspace(selected);
         setRootPath(selected);
 
         // Load conversations for this workspace (Claude Code-style folder isolation)

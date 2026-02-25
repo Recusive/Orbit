@@ -158,10 +158,11 @@ describe('useSidebarActions', () => {
     });
 
     describe('edge cases: Untitled conversation guard', () => {
-      it('should NOT create new conversation when active conversation is "Untitled"', () => {
+      it('should NOT create new conversation when active conversation is empty Untitled', () => {
         const untitledConversation = createMockConversation({
           sessionId: 'untitled-session',
           title: 'Untitled',
+          messageCount: 0,
         });
 
         const { result } = renderHook(() =>
@@ -177,7 +178,7 @@ describe('useSidebarActions', () => {
           result.current.handleStartConversation();
         });
 
-        // Should NOT call postMessage because current conversation is Untitled
+        // Should NOT call postMessage because current conversation is empty Untitled
         expect(mockPostMessage).not.toHaveBeenCalled();
       });
 
@@ -187,6 +188,7 @@ describe('useSidebarActions', () => {
         const untitledConversation = createMockConversation({
           sessionId: 'untitled-session',
           title: 'Untitled',
+          messageCount: 0,
         });
 
         const { result } = renderHook(() =>
@@ -206,6 +208,29 @@ describe('useSidebarActions', () => {
         expect(useUIStore.getState().vaultOpen).toBe(false);
         // But no message sent
         expect(mockPostMessage).not.toHaveBeenCalled();
+      });
+
+      it('should create new conversation when active conversation is Untitled but has messages', () => {
+        const untitledConversation = createMockConversation({
+          sessionId: 'untitled-session',
+          title: 'Untitled',
+          messageCount: 3,
+        });
+
+        const { result } = renderHook(() =>
+          useSidebarActions(
+            createDefaultHookProps({
+              conversations: [untitledConversation],
+              activeConversationId: 'untitled-session',
+            })
+          )
+        );
+
+        act(() => {
+          result.current.handleStartConversation();
+        });
+
+        expect(mockPostMessage).toHaveBeenCalledTimes(1);
       });
 
       it('should create new conversation when active conversation has a real title', () => {

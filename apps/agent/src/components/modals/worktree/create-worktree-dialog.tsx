@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { gitBranchInfo, gitWorktreeAdd } from '@/lib/api';
-import { useUIStore, useWorkspacePath } from '@/stores/ui/ui-store';
+import { useRepoRootPath, useUIStore, useWorkspacePath } from '@/stores/ui/ui-store';
 
 const logger = createLogger('CreateWorktreeDialog');
 
@@ -49,6 +49,8 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
   onCreated,
 }) => {
   const workspacePath = useWorkspacePath();
+  const repoRootPath = useRepoRootPath();
+  const repoPath = repoRootPath ?? workspacePath;
   const addWorktree = useUIStore((s) => s.addWorktree);
 
   // Form state
@@ -69,12 +71,12 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
 
   // Load branches when dialog opens
   useEffect(() => {
-    if (!open || !workspacePath) return;
+    if (!open || !repoPath) return;
 
     const loadBranches = async (): Promise<void> => {
       setLoadingBranches(true);
       try {
-        const branchList = await gitBranchInfo(workspacePath);
+        const branchList = await gitBranchInfo(repoPath);
         setBranches(branchList);
         // Set default base branch to current branch
         const currentBranch = branchList.find((b) => b.isCurrent);
@@ -89,7 +91,7 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
     };
 
     void loadBranches();
-  }, [open, workspacePath]);
+  }, [open, repoPath]);
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -106,10 +108,10 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
 
   // Compute worktree path based on branch name
   const worktreePath = useMemo(() => {
-    if (!workspacePath || !effectiveBranchName) return '';
+    if (!repoPath || !effectiveBranchName) return '';
 
     // Get parent directory and repo name
-    const parts = workspacePath.split(PATH_SEPARATOR_RE);
+    const parts = repoPath.split(PATH_SEPARATOR_RE);
     const repoName = parts.pop() ?? 'repo';
     const parentDir = parts.join('/');
 
@@ -117,10 +119,10 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
     const safeBranchName = effectiveBranchName.replace(UNSAFE_FS_CHARS_RE, '-');
 
     return `${parentDir}/${repoName}-${safeBranchName}`;
-  }, [workspacePath, effectiveBranchName]);
+  }, [repoPath, effectiveBranchName]);
 
   const handleCreate = useCallback(async (): Promise<void> => {
-    if (!workspacePath || !effectiveBranchName || !worktreePath) return;
+    if (!repoPath || !effectiveBranchName || !worktreePath) return;
 
     setIsCreating(true);
     setError(null);
@@ -136,7 +138,7 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
       } else {
         options.commitIsh = selectedExistingBranch;
       }
-      const worktree = await gitWorktreeAdd(workspacePath, worktreePath, options);
+      const worktree = await gitWorktreeAdd(repoPath, worktreePath, options);
 
       logger.info('Created worktree', { path: worktree.path, branch: worktree.branch });
 
@@ -164,7 +166,7 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
       setIsCreating(false);
     }
   }, [
-    workspacePath,
+    repoPath,
     effectiveBranchName,
     newBranchName,
     selectedExistingBranch,

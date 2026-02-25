@@ -217,7 +217,7 @@ export const FileExplorer: FC = () => {
         // Persist the workspace path and build file index for fuzzy search
         await initializeWorkspace(selected);
         // Update UI store with workspace name (for header display)
-        useUIStore.getState().setWorkspace(selected);
+        useUIStore.getState().initializeWorkspace(selected);
         // Update the file store to load the new folder
         setRootPath(selected);
         // Refresh the file tree

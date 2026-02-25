@@ -6,6 +6,7 @@
  * update DEFAULT_UI_STATE, PANEL_SIZES, and SIDEBAR in constants.ts.
  */
 import { createLogger } from '@orbit/common/lib';
+import { enableMapSet } from 'immer';
 import { useMemo } from 'react';
 import { z } from 'zod';
 import { create } from 'zustand';
@@ -21,6 +22,9 @@ const logger = createLogger('UIStore');
 
 // Hoisted RegExp for path splitting (avoids recreation in store actions)
 const PATH_SEPARATOR_RE = /[/\\]/;
+
+// Enable Immer support for Map and Set (sessionWorktreeMap).
+enableMapSet();
 
 export type { StoredConversationSummary } from '@/types/protocol';
 
@@ -85,6 +89,7 @@ interface UIState {
   // Workspace (from VS Code)
   workspacePath: string | null;
   workspaceName: string | null;
+  repoRootPath: string | null; // Git repo root — stable across worktree switches
   // Active conversation
   activeConversationId: string | null;
   activeConversationTitle: string | null;
@@ -138,6 +143,7 @@ interface UIState {
 
 interface UIActions {
   setContainerDimensions: (width: number, height: number) => void;
+  initializeWorkspace: (path: string) => void;
   setWorkspace: (path: string) => void;
   // Conversation actions
   setActiveConversation: (id: string | null, title: string | null) => void;
@@ -183,6 +189,8 @@ interface UIActions {
   setWorktrees: (worktrees: WorktreeUIState[]) => void;
   addWorktree: (worktree: WorktreeInfo) => void;
   removeWorktree: (path: string) => void;
+  setRepoRootPath: (path: string) => void;
+  switchToWorktree: (worktreePath: string | null) => void;
   setActiveWorktree: (path: string | null) => void;
   toggleWorktreeExpanded: (path: string) => void;
   setCreateWorktreeDialogOpen: (open: boolean) => void;
@@ -265,6 +273,7 @@ export const useUIStore = create<UIStore>()(
     containerHeight: null,
     workspacePath: null,
     workspaceName: null,
+    repoRootPath: null,
     activeConversationId: null,
     activeConversationTitle: null,
     isLoadingConversation: false,
@@ -310,22 +319,26 @@ export const useUIStore = create<UIStore>()(
       });
     },
 
-    setWorkspace: (path: string): void => {
-      logger.info(`Workspace set: ${path}`);
+    initializeWorkspace: (path: string): void => {
+      logger.info(`Workspace initialized: ${path}`);
       set((state) => {
-        // Enable transition mode BEFORE workspace change takes effect
-        // This ensures ChatArea mounts with visibility: hidden, preventing
-        // the flash when transitioning from WelcomePage → ChatArea.
-        // The useLayoutEffect stabilization in chat-area.tsx will handle
-        // revealing content once layout is stable.
-        state.isLoadingConversation = true;
-        state.isConversationTransitioning = true;
-
         state.workspacePath = path;
-        // Extract folder name from path (last segment)
+        state.repoRootPath = path;
+        state.activeWorktreePath = null;
+        saveActiveWorktreeToStorage(null);
         const segments = path.split(PATH_SEPARATOR_RE).filter(Boolean);
         state.workspaceName = segments[segments.length - 1] ?? path;
+        state.activeConversationId = null;
+        state.activeConversationTitle = null;
+        state.conversations = [];
+        state.isLoadingConversation = true;
+        state.isConversationTransitioning = true;
       });
+    },
+
+    setWorkspace: (path: string): void => {
+      // TRANSITIONAL: shim for callers not yet migrated to initializeWorkspace.
+      get().initializeWorkspace(path);
     },
 
     setActiveConversation: (id: string | null, title: string | null): void => {
@@ -686,20 +699,61 @@ export const useUIStore = create<UIStore>()(
     removeWorktree: (path: string): void => {
       set((state) => {
         state.worktrees = state.worktrees.filter((w) => w.worktree.path !== path);
-        // Clear active if removed
         if (state.activeWorktreePath === path) {
+          const targetPath = state.repoRootPath;
+          if (targetPath) {
+            state.workspacePath = targetPath;
+            const segments = targetPath.split(PATH_SEPARATOR_RE).filter(Boolean);
+            state.workspaceName = segments[segments.length - 1] ?? targetPath;
+          } else {
+            state.workspacePath = null;
+            state.workspaceName = null;
+          }
           state.activeWorktreePath = null;
           saveActiveWorktreeToStorage(null);
+          state.activeConversationId = null;
+          state.activeConversationTitle = null;
+          state.conversations = [];
+          state.isLoadingConversation = true;
+          state.isConversationTransitioning = true;
         }
         saveWorktreesToStorage(state.worktrees);
       });
     },
 
-    setActiveWorktree: (path: string | null): void => {
+    setRepoRootPath: (path: string): void => {
       set((state) => {
-        state.activeWorktreePath = path;
-        saveActiveWorktreeToStorage(path);
+        state.repoRootPath = path;
       });
+    },
+
+    switchToWorktree: (worktreePath: string | null): void => {
+      set((state) => {
+        const targetPath = worktreePath ?? state.repoRootPath;
+        if (!targetPath) {
+          state.activeWorktreePath = null;
+          saveActiveWorktreeToStorage(null);
+          return;
+        }
+        if (state.workspacePath === targetPath && state.activeWorktreePath === worktreePath) {
+          return;
+        }
+        state.workspacePath = targetPath;
+        state.activeWorktreePath = worktreePath;
+        saveActiveWorktreeToStorage(worktreePath);
+        const segments = targetPath.split(PATH_SEPARATOR_RE).filter(Boolean);
+        state.workspaceName = segments[segments.length - 1] ?? targetPath;
+        state.conversations = [];
+        state.activeConversationId = null;
+        state.activeConversationTitle = null;
+        state.isLoadingConversation = true;
+        state.isConversationTransitioning = true;
+      });
+    },
+
+    setActiveWorktree: (path: string | null): void => {
+      // TRANSITIONAL: shim for callers not yet migrated to switchToWorktree.
+      get().switchToWorktree(path);
     },
 
     toggleWorktreeExpanded: (path: string): void => {
@@ -803,6 +857,10 @@ export const useWorkspaceName = (): string | null => {
 
 export const useWorkspacePath = (): string | null => {
   return useUIStore((state) => state.workspacePath);
+};
+
+export const useRepoRootPath = (): string | null => {
+  return useUIStore((state) => state.repoRootPath);
 };
 
 export const useHasWorkspace = (): boolean => {

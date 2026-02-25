@@ -15,7 +15,6 @@ import { useShallow } from 'zustand/shallow';
 import type { FC } from 'react';
 
 import { SquareAndPencil } from '@/components/icons';
-import { conversationBelongsToWorktree } from '@/components/layout/primary-sidebar/hooks/use-sidebar-actions';
 import { SFSymbol } from '@/components/shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTauri } from '@/hooks/agent/use-tauri';
@@ -150,10 +149,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
   const handleNewSession = useCallback((): void => {
     setVaultOpen(false);
     const activeConv = conversations.find((c) => c.sessionId === activeConversationId);
-    if (
-      activeConv?.title === 'Untitled' &&
-      conversationBelongsToWorktree(activeConv, activeWorktreePath)
-    ) {
+    if (activeConv?.title === 'Untitled' && activeConv.messageCount === 0) {
       return;
     }
     postMessage({

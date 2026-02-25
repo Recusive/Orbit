@@ -18,6 +18,7 @@ export {
   useIsLeftSidebarCollapsed,
   useWorkspaceName,
   useWorkspacePath,
+  useRepoRootPath,
   useHasWorkspace,
   useActiveConversationId,
   useActiveConversationTitle,

@@ -99,7 +99,7 @@ function applyDemoView(view: string): (() => void) | undefined {
 
   // Set workspace so the full workspace UI renders (sidebar, file tree, etc.)
   // MOCK_ROOT is '/demo' → workspaceName becomes 'demo'
-  uiStore.setWorkspace(MOCK_ROOT);
+  uiStore.initializeWorkspace(MOCK_ROOT);
 
   let cleanupFn: (() => void) | undefined;
 
