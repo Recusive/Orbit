@@ -74,7 +74,7 @@ export const PANEL_SIZES = {
   review: {
     default: 400,
     min: 300,
-    max: 800,
+    max: 9999, // No static cap — getActivityMax in App.tsx dynamically caps based on CHAT_PANEL.MIN_WIDTH
   },
   terminal: {
     default: 200,
@@ -587,8 +587,7 @@ export const ACTIVITY_PANEL = {
  * Chat panel sizing constants
  *
  * MIN_WIDTH prevents the chat panel from becoming too narrow for the input toolbar.
- * At widths below INPUT_CONTROLS.collapseBreakpoint (520px), the toolbar collapses
- * into compact mode but remains functional down to 400px.
+ * Fixed at 400px regardless of window size.
  */
 export const CHAT_PANEL = {
   MIN_WIDTH: 400,
@@ -603,33 +602,28 @@ export const CHAT_PANEL = {
 /**
  * Input controls responsive behavior
  *
- * When the toolbar gets too narrow, secondary buttons (@, Thinking, Globe)
- * collapse into a "More actions" dropdown menu. The Image button stays
- * visible for quick attachment access.
+ * When the toolbar gets too narrow, the Thinking/Effort button collapses
+ * into a "More actions" dropdown menu. Image button stays visible.
  *
  * **Expanded mode** (width >= collapseBreakpoint):
- *   Mode | Model | @ | Thinking | Globe | Image | Context | Send
+ *   Mode | Model | Effort/Thinking | Image | Context | Send
  *
  * **Compact mode** (width < collapseBreakpoint):
  *   Mode | Model | MoreActions[⋯] | Image | Context | Send
- *   (@ / Thinking / Globe are inside the MoreActions dropdown)
  */
 export const INPUT_CONTROLS = {
   /**
-   * Width below which secondary buttons collapse into "More actions" menu.
+   * Width below which Thinking/Effort collapses into "More actions" menu.
    *
-   * Compact mode calculation (what's visible when collapsed):
-   * - Mode Picker: ~70px (varies: "Default"/"Plan"/"Accept")
-   * - Model Selector: ~110px (varies by model name)
-   * - Image Button: 28px (h-7 w-7)
-   * - More Actions trigger: 28px (h-7 w-7)
+   * Expanded mode calculation:
+   * - Mode Picker: ~70px
+   * - Model Selector: ~110px
+   * - Effort/Thinking: ~50px
+   * - Image Button: 28px
    * - Context Usage: ~60px
-   * - Send Button: 28px (h-7 w-7)
-   * - Gaps: ~12px (gap-0.5 × 6)
-   * - Buffer: ~50px safety margin
-   * Total: ~386px minimum + buffer ≈ 440px
-   *
-   * Set to 400px - tight fit for expanded mode with no buffer.
+   * - Send Button: 28px + 6px margin
+   * - Gaps: ~10px
+   * Total: ~362px → breakpoint at 340px with comfortable margin.
    */
-  collapseBreakpoint: 400,
+  collapseBreakpoint: 340,
 } as const;

@@ -162,7 +162,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
       role="group"
       tabIndex={0}
       className={cn(
-        'group flex items-center gap-1.5 h-8 w-full rounded-lg overflow-hidden transition-colors duration-100 hover:bg-lg-sidebar-hover cursor-default',
+        'group flex items-center gap-1.5 h-8 w-full rounded-[9px] overflow-hidden transition-colors duration-100 hover:bg-lg-sidebar-hover cursor-default',
         active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'
       )}
       onClick={handleRowClick}

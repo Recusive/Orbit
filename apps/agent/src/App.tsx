@@ -34,7 +34,7 @@ import { useAutoUpdate } from '@/hooks/core/use-auto-update';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { useFullscreen } from '@/hooks/ui/use-fullscreen';
 import { useTrafficLights } from '@/hooks/ui/use-traffic-lights';
-import { CONTENT_CARD, HEIGHTS, SIDEBAR } from '@/lib/utils/constants';
+import { CHAT_PANEL, CONTENT_CARD, HEIGHTS, PANEL_SIZES, SIDEBAR } from '@/lib/utils/constants';
 import { TauriProvider } from '@/providers/tauri-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
@@ -404,6 +404,31 @@ const App: FC = () => {
     };
   }, [toggleLeftSidebar]);
 
+  // Auto-collapse sidebar when window becomes too narrow to fit all open panels.
+  // Checks: sidebar + chat min + activity panel + actions bar + gaps > window width.
+  const collapseLeftSidebar = useUIStore((s) => s.collapseLeftSidebar);
+  useEffect(() => {
+    const handleResize = (): void => {
+      const { leftSidebarWidth, reviewPanelOpen, reviewPanelWidth, rightSidebarOpen } =
+        useUIStore.getState();
+      // Only act when sidebar is actually expanded
+      if (leftSidebarWidth <= SIDEBAR.collapsed) return;
+
+      let requiredWidth = leftSidebarWidth + CHAT_PANEL.MIN_WIDTH;
+      if (reviewPanelOpen) requiredWidth += reviewPanelWidth + CONTENT_CARD.gap;
+      if (rightSidebarOpen) requiredWidth += SIDEBAR.iconColumnWidth;
+
+      if (window.innerWidth < requiredWidth) {
+        collapseLeftSidebar();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return (): void => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [collapseLeftSidebar]);
+
   // Activity panel slide wrapper — mirrors the sidebar's margin-slide pattern.
   // When closed, marginRight = -width slides the entire panel off the right edge
   // as one rigid body. Content inside never compresses.
@@ -537,15 +562,29 @@ const App: FC = () => {
     return parentHeight - CONTENT_CARD.margin;
   }, []);
 
-  // Direct DOM ref for the activity wrapper — bypasses React during drag resize.
+  // Direct DOM refs for activity column resize.
+  // cardsRowRef measures the flex container that holds both columns.
+  // activityWrapperRef targets the activity column for direct DOM width updates.
+  const cardsRowRef = useRef<HTMLDivElement>(null);
+  const activityWrapperRef = useRef<HTMLDivElement>(null);
+
   // ResizeHandle calls onDrag → sets style.width directly at 60fps, no re-renders.
   // Store commit happens once on mouseup.
-  const activityWrapperRef = useRef<HTMLDivElement>(null);
   const handleActivityDrag = useCallback((width: number): void => {
     const el = activityWrapperRef.current;
     if (el) {
       el.style.width = `${String(width)}px`;
     }
+  }, []);
+
+  // Dynamic max constraint for activity resize — the sole width cap for the
+  // activity panel. Ensures the chat panel never shrinks below CHAT_PANEL.MIN_WIDTH
+  // (400px) regardless of window size. On a big monitor the activity can grow wider;
+  // on a small monitor it gets less room — but the chat floor is always 400px.
+  const getActivityMax = useCallback((): number => {
+    const row = cardsRowRef.current;
+    if (!row) return PANEL_SIZES.review.default;
+    return row.clientWidth - CHAT_PANEL.MIN_WIDTH - CONTENT_CARD.gap;
   }, []);
 
   // Show onboarding flow if user hasn't completed it yet (skip in demo mode)
@@ -573,10 +612,15 @@ const App: FC = () => {
                 on the activity wrapper, but that blocked terminal height transitions). */}
             <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
               {/* Cards row — content column + activity column side by side */}
-              <div className="flex-1 flex min-h-0">
+              <div ref={cardsRowRef} className="flex-1 flex min-h-0">
                 {/* ── Content column ── */}
                 {/* flex-col: ContentCard on top, terminal below when position='chat' */}
-                <div className="flex-1 flex flex-col min-w-0 min-h-0">
+                {/* min-width prevents flexbox from crushing the chat area when the
+                    activity panel is wide or the window is narrow. */}
+                <div
+                  className="flex-1 flex flex-col min-h-0"
+                  style={{ minWidth: CHAT_PANEL.MIN_WIDTH }}
+                >
                   {/* Main content card — takes remaining vertical space */}
                   <ContentCard
                     sidebarOpen={sidebarOpen}
@@ -732,6 +776,7 @@ const App: FC = () => {
                       borderless
                       size={CONTENT_CARD.gap}
                       onDrag={handleActivityDrag}
+                      getMax={getActivityMax}
                     />
 
                     {/* Activity card + terminal stacked vertically */}
