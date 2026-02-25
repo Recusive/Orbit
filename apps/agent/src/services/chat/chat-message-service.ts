@@ -393,7 +393,7 @@ class ChatMessageService {
     // Set workspace if we don't already have one
     const uiState = useUIStore.getState();
     if (message.cwd && !uiState.workspacePath) {
-      uiState.setWorkspace(message.cwd);
+      uiState.initializeWorkspace(message.cwd);
       // Load conversations for this workspace
       void conversationList(message.cwd)
         .then((conversations) => {
@@ -850,18 +850,16 @@ class ChatMessageService {
   private handleConversationList(
     message: Extract<ExtensionMessage, { type: 'conversation:list' }>
   ): void {
-    if (message.conversations.length > 0) {
-      useUIStore.getState().setConversations(
-        message.conversations.map((c) => ({
-          sessionId: c.session_id,
-          title: c.title,
-          updatedAt: c.updated_at,
-          messageCount: c.message_count,
-          ...(c.workspace_path ? { workspacePath: c.workspace_path } : {}),
-          ...(c.worktree_path ? { worktreePath: c.worktree_path } : {}),
-        }))
-      );
-    }
+    useUIStore.getState().setConversations(
+      message.conversations.map((c) => ({
+        sessionId: c.session_id,
+        title: c.title,
+        updatedAt: c.updated_at,
+        messageCount: c.message_count,
+        ...(c.workspace_path ? { workspacePath: c.workspace_path } : {}),
+        ...(c.worktree_path ? { worktreePath: c.worktree_path } : {}),
+      }))
+    );
   }
 
   private handleConversationLoading(): void {

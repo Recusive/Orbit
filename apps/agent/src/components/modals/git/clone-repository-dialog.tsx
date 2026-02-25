@@ -221,7 +221,7 @@ export const CloneRepositoryDialog: FC<CloneRepositoryDialogProps> = ({ open, on
       // Open the cloned project and build file index for fuzzy search
       await initializeWorkspace(finalPath);
       await addRecentProject(finalPath);
-      useUIStore.getState().setWorkspace(finalPath);
+      useUIStore.getState().initializeWorkspace(finalPath);
       setRootPath(finalPath);
 
       // Load conversations for this workspace (Claude Code-style folder isolation)

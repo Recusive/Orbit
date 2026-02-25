@@ -93,6 +93,7 @@ function resetStore(): void {
     containerHeight: null,
     workspacePath: null,
     workspaceName: null,
+    repoRootPath: null,
     activeConversationId: null,
     activeConversationTitle: null,
     isLoadingConversation: false,
@@ -142,6 +143,7 @@ describe('ui-store', () => {
       const state = useUIStore.getState();
       expect(state.workspacePath).toBeNull();
       expect(state.workspaceName).toBeNull();
+      expect(state.repoRootPath).toBeNull();
     });
 
     it('should start with no active conversation', () => {
@@ -203,21 +205,22 @@ describe('ui-store', () => {
   // Workspace
   // ============================================================================
 
-  describe('setWorkspace', () => {
+  describe('initializeWorkspace', () => {
     it('should set workspace path and extract name', () => {
-      const { setWorkspace } = useUIStore.getState();
+      const { initializeWorkspace } = useUIStore.getState();
 
-      setWorkspace('/Users/dev/projects/my-app');
+      initializeWorkspace('/Users/dev/projects/my-app');
 
       const state = useUIStore.getState();
       expect(state.workspacePath).toBe('/Users/dev/projects/my-app');
       expect(state.workspaceName).toBe('my-app');
+      expect(state.repoRootPath).toBe('/Users/dev/projects/my-app');
     });
 
     it('should enable loading and transition states', () => {
-      const { setWorkspace } = useUIStore.getState();
+      const { initializeWorkspace } = useUIStore.getState();
 
-      setWorkspace('/workspace');
+      initializeWorkspace('/workspace');
 
       const state = useUIStore.getState();
       expect(state.isLoadingConversation).toBe(true);
@@ -225,11 +228,35 @@ describe('ui-store', () => {
     });
 
     it('should handle Windows paths', () => {
-      const { setWorkspace } = useUIStore.getState();
+      const { initializeWorkspace } = useUIStore.getState();
 
-      setWorkspace('C:\\Users\\dev\\projects\\my-app');
+      initializeWorkspace('C:\\Users\\dev\\projects\\my-app');
 
       expect(useUIStore.getState().workspaceName).toBe('my-app');
+    });
+
+    it('should clear active conversation and conversation list', () => {
+      const { initializeWorkspace, setActiveConversation, addConversation } = useUIStore.getState();
+
+      addConversation(createMockConversation('conv-1', 'Existing'));
+      setActiveConversation('conv-1', 'Existing');
+      initializeWorkspace('/next-workspace');
+
+      const state = useUIStore.getState();
+      expect(state.activeConversationId).toBeNull();
+      expect(state.activeConversationTitle).toBeNull();
+      expect(state.conversations).toEqual([]);
+    });
+  });
+
+  describe('setWorkspace (shim)', () => {
+    it('should delegate to initializeWorkspace', () => {
+      const { setWorkspace } = useUIStore.getState();
+      setWorkspace('/shim-workspace');
+
+      const state = useUIStore.getState();
+      expect(state.workspacePath).toBe('/shim-workspace');
+      expect(state.repoRootPath).toBe('/shim-workspace');
     });
   });
 
@@ -898,14 +925,57 @@ describe('ui-store', () => {
         expect(useUIStore.getState().worktrees[0]?.worktree.path).toBe('/repo/feature-2');
       });
 
-      it('should clear active worktree if removed', () => {
-        const { setWorktrees, setActiveWorktree, removeWorktree } = useUIStore.getState();
+      it('should reset workspace to repo root when active worktree is removed', () => {
+        const { initializeWorkspace, setWorktrees, setActiveWorktree, removeWorktree } =
+          useUIStore.getState();
+        initializeWorkspace('/repo');
         setWorktrees([{ worktree: createMockWorktree('/repo/feature-1'), isExpanded: true }]);
         setActiveWorktree('/repo/feature-1');
+        useUIStore.getState().setActiveConversation('conv-1', 'Conversation');
+        useUIStore.getState().addConversation(createMockConversation('conv-1', 'Conversation'));
 
         removeWorktree('/repo/feature-1');
 
-        expect(useUIStore.getState().activeWorktreePath).toBeNull();
+        const state = useUIStore.getState();
+        expect(state.activeWorktreePath).toBeNull();
+        expect(state.workspacePath).toBe('/repo');
+        expect(state.workspaceName).toBe('repo');
+        expect(state.activeConversationId).toBeNull();
+        expect(state.activeConversationTitle).toBeNull();
+        expect(state.conversations).toEqual([]);
+      });
+    });
+
+    describe('switchToWorktree', () => {
+      it('should switch workspacePath to the selected worktree and clear conversations', () => {
+        const { initializeWorkspace, switchToWorktree, addConversation, setActiveConversation } =
+          useUIStore.getState();
+        initializeWorkspace('/repo');
+        addConversation(createMockConversation('conv-1', 'Conversation'));
+        setActiveConversation('conv-1', 'Conversation');
+
+        switchToWorktree('/repo/feature-1');
+
+        const state = useUIStore.getState();
+        expect(state.workspacePath).toBe('/repo/feature-1');
+        expect(state.activeWorktreePath).toBe('/repo/feature-1');
+        expect(state.workspaceName).toBe('feature-1');
+        expect(state.conversations).toEqual([]);
+        expect(state.activeConversationId).toBeNull();
+        expect(state.activeConversationTitle).toBeNull();
+      });
+
+      it('should switch back to repo root when path is null', () => {
+        const { initializeWorkspace, switchToWorktree } = useUIStore.getState();
+        initializeWorkspace('/repo');
+        switchToWorktree('/repo/feature-1');
+
+        switchToWorktree(null);
+
+        const state = useUIStore.getState();
+        expect(state.workspacePath).toBe('/repo');
+        expect(state.activeWorktreePath).toBeNull();
+        expect(state.workspaceName).toBe('repo');
       });
     });
 
@@ -996,9 +1066,9 @@ describe('ui-store', () => {
     });
 
     it('should handle workspace path with no folder name', () => {
-      const { setWorkspace } = useUIStore.getState();
+      const { initializeWorkspace } = useUIStore.getState();
 
-      setWorkspace('/');
+      initializeWorkspace('/');
 
       // Should handle edge case gracefully
       expect(useUIStore.getState().workspaceName).toBe('/');

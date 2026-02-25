@@ -6,7 +6,7 @@
  * update SIDEBAR and TRANSITIONS in constants.ts - DO NOT hardcode here.
  */
 import { createLogger } from '@orbit/common/lib';
-import { ChevronDown, GitBranch, Loader2, MoreHorizontal, Trash2 } from 'lucide-react';
+import { ChevronDown, FolderOpen, GitBranch, Loader2, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -15,11 +15,11 @@ import type { WorktreeUIState } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import {
   Select,
   SelectContent,
@@ -55,7 +55,6 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
   onRemove,
 }) => {
   const { worktree, isExpanded } = worktreeState;
-  const [isHovered, setIsHovered] = useState(false);
   const [branches, setBranches] = useState<GitBranchInfo[]>([]);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
@@ -158,143 +157,127 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
     [worktree.path, isCheckingOut, branchName]
   );
 
-  return (
+  const rowContent = (
     <div
-      className="relative group mx-1.5"
-      onMouseEnter={() => {
-        setIsHovered(true);
-      }}
-      onMouseLeave={() => {
-        setIsHovered(false);
+      role="group"
+      tabIndex={0}
+      className={cn(
+        'group flex items-center gap-1.5 h-8 w-full rounded-lg overflow-hidden transition-colors duration-100 hover:bg-lg-sidebar-hover cursor-default',
+        active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'
+      )}
+      onClick={handleRowClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleRowClick();
+        }
       }}
     >
-      <div
-        role="group"
-        tabIndex={0}
-        className={cn(
-          'flex items-center h-8 w-full rounded-lg overflow-hidden transition-[background-color,color] duration-100 hover:bg-lg-sidebar-hover cursor-default',
-          active ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground',
-          isExpanded && !active && 'bg-lg-sidebar-selected'
-        )}
-        onClick={handleRowClick}
+      {/* Toggle button — shows project icon by default, chevron on row hover */}
+      <button
+        type="button"
+        aria-label={isExpanded ? 'Collapse worktree' : 'Expand worktree'}
+        className="relative flex items-center justify-center shrink-0 h-5 w-5 group-hover:hover:bg-lg-control-hover rounded-full ml-0.5"
+        onClick={handleChevronClick}
         onKeyDown={(e) => {
+          // Stop Enter/Space from bubbling to parent role="button" div,
+          // which would fire handleRowClick (select) in addition to
+          // the chevron's onClick (toggle). (Code review: Opus cycle 3, issue #8)
           if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleRowClick();
+            e.stopPropagation();
           }
         }}
       >
-        {/* Chevron toggle - clickable separately to expand/collapse */}
-        <button
-          type="button"
-          aria-label={isExpanded ? 'Collapse worktree' : 'Expand worktree'}
-          className="flex items-center justify-center shrink-0 h-5 w-5 hover:bg-lg-control-hover rounded-md ml-0.5"
-          onClick={handleChevronClick}
-          onKeyDown={(e) => {
-            // Stop Enter/Space from bubbling to parent role="button" div,
-            // which would fire handleRowClick (select) in addition to
-            // the chevron's onClick (toggle). (Code review: Opus cycle 3, issue #8)
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.stopPropagation();
-            }
+        {/* Project icon — visible by default, hidden on row hover */}
+        <FolderOpen className="h-4 w-4 shrink-0 opacity-60 group-hover:hidden" />
+        {/* Chevron — hidden by default, visible on row hover */}
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 shrink-0 transition-transform duration-150 hidden group-hover:block',
+            !isExpanded && '-rotate-90'
+          )}
+        />
+      </button>
+
+      {/* Workspace name */}
+      <span
+        className="text-base whitespace-nowrap overflow-hidden text-left flex-1 w-auto"
+        style={{
+          maskImage: 'linear-gradient(to right, black 80%, transparent 95%)',
+          WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 95%)',
+        }}
+      >
+        {workspaceName}
+      </span>
+
+      {/* Branch badge — Apple liquid glass pill with Select dropdown */}
+      <div
+        className="mr-1 shrink-0"
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+        onMouseEnter={handleBadgeHover}
+      >
+        <Select
+          value={branchName}
+          onValueChange={(value) => {
+            void handleBranchCheckout(value);
           }}
+          onOpenChange={handleBranchDropdownOpen}
+          disabled={isCheckingOut}
         >
-          <ChevronDown
+          <SelectTrigger
             className={cn(
-              'h-4 w-4 shrink-0 transition-transform duration-150',
-              !isExpanded && '-rotate-90'
+              'flex items-center gap-0.5 h-auto w-auto px-1.5 py-0.5 rounded-full text-[11px] border-0',
+              'backdrop-blur-[20px] font-[510] cursor-pointer',
+              'hover:bg-black/8 dark:hover:bg-white/15',
+              'active:scale-[0.97] disabled:opacity-50',
+              'focus-visible:ring-0',
+              '[&>svg:last-child]:h-2.5 [&>svg:last-child]:w-2.5 [&>svg:last-child]:opacity-60',
+              worktree.isMain
+                ? 'bg-black/5 text-[#4C4C4C] dark:bg-white/10 dark:text-[#B0B0B0]'
+                : 'bg-black/4 text-[#4C4C4C] dark:bg-white/8 dark:text-[#999]'
             )}
-          />
-        </button>
-
-        {/* Workspace name */}
-        <span
-          className="text-base whitespace-nowrap overflow-hidden text-left flex-1 w-auto"
-          style={{
-            maskImage: 'linear-gradient(to right, black 80%, transparent 95%)',
-            WebkitMaskImage: 'linear-gradient(to right, black 80%, transparent 95%)',
-          }}
-        >
-          {workspaceName}
-        </span>
-
-        {/* Branch badge — Apple liquid glass pill with Select dropdown */}
-        <div
-          className="mr-1 shrink-0"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-          onMouseEnter={handleBadgeHover}
-        >
-          <Select
-            value={branchName}
-            onValueChange={(value) => {
-              void handleBranchCheckout(value);
-            }}
-            onOpenChange={handleBranchDropdownOpen}
-            disabled={isCheckingOut}
+            style={{ mixBlendMode: 'plus-darker' }}
+            aria-label={`Switch branch (${branchName})`}
           >
-            <SelectTrigger
-              className={cn(
-                'flex items-center gap-0.5 h-auto w-auto px-1.5 py-0.5 rounded-full text-[11px] border-0',
-                'backdrop-blur-[20px] font-[510] cursor-pointer',
-                'hover:bg-black/8 dark:hover:bg-white/15',
-                'active:scale-[0.97] disabled:opacity-50',
-                'focus-visible:ring-0',
-                '[&>svg:last-child]:h-2.5 [&>svg:last-child]:w-2.5 [&>svg:last-child]:opacity-60',
-                worktree.isMain
-                  ? 'bg-black/5 text-[#4C4C4C] dark:bg-white/10 dark:text-[#B0B0B0]'
-                  : 'bg-black/4 text-[#4C4C4C] dark:bg-white/8 dark:text-[#999]'
-              )}
-              style={{ mixBlendMode: 'plus-darker' }}
-              aria-label={`Switch branch (${branchName})`}
-            >
-              {isCheckingOut ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <GitBranch className="h-3 w-3" />
-              )}
-              <SelectValue>{branchName}</SelectValue>
-            </SelectTrigger>
-            <SelectContent className="bg-[#f3f3f3]! dark:bg-[oklch(23%_0_0)]! border! border-white! dark:border-white/5! shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md [&::before]:hidden [&::after]:hidden">
-              {branches.map((b) => (
-                <SelectItem key={b.name} value={b.name}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            {isCheckingOut ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <GitBranch className="h-3 w-3" />
+            )}
+            <SelectValue>{branchName}</SelectValue>
+          </SelectTrigger>
+          <SelectContent className="bg-[#f3f3f3]! dark:bg-[oklch(23%_0_0)]! border! border-white! dark:border-white/5! shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md [&::before]:hidden [&::after]:hidden">
+            {branches.map((b) => (
+              <SelectItem key={b.name} value={b.name}>
+                {b.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
+    </div>
+  );
 
-      {/* More options dropdown - appears on hover */}
-      {!worktree.isMain && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className={cn(
-                'absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-md transition-[background-color,opacity,transform] duration-150 hover:bg-lg-control-hover active:scale-90',
-                isHovered ? 'opacity-100' : 'opacity-0'
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-              aria-label="More options"
-              title="More options"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive focus:bg-destructive/10"
+  return (
+    <div className="relative mx-1.5">
+      {/* Non-main worktrees get a right-click context menu for remove action */}
+      {!worktree.isMain ? (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
+          <ContextMenuContent className="w-44 rounded-xl p-1.5">
+            <ContextMenuItem
+              className="rounded-lg text-destructive focus:text-destructive focus:bg-destructive/10"
               onSelect={handleRemove}
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Remove worktree
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              <span className="text-[13px]">Remove worktree</span>
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      ) : (
+        rowContent
       )}
 
       {/* Locked indicator */}

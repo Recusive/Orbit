@@ -1,15 +1,14 @@
 /**
- * ConversationList - Renders worktree groups with nested conversations
+ * ConversationList - Renders worktree navigation and active-worktree conversations
  */
 import { Plus } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
 
 import { ConversationItem } from './ConversationItem';
 import { WorkspaceItem } from './WorkspaceItem';
 
 import type { WorktreeInfo } from '@/lib/api';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 
 import { WorktreeItem } from '@/components/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -55,73 +54,11 @@ export const ConversationList: FC<ConversationListProps> = ({
   onRemoveWorktree,
   onOpenCreateWorktree,
 }) => {
-  // Build a Map of worktree path -> conversations for O(1) lookups
-  // This avoids O(n*m) complexity from filtering conversations for each worktree
-  // Also pre-computes legacy conversation handling to avoid O(n) filter on each render
-  const conversationsByWorktree = useMemo(() => {
-    const map = new Map<string, ConversationSummary[]>();
-    const legacyConversations: ConversationSummary[] = [];
-
-    // Find main worktree path (once, not per-render)
-    const mainWt = worktrees.find((wt) => wt.worktree.isMain);
-    const mainPath = mainWt?.worktree.path ?? null;
-
-    // Build set of all worktree paths for fast lookup
-    const worktreePaths = new Set(worktrees.map((wt) => wt.worktree.path));
-
-    for (const conv of conversations) {
-      if (conv.worktreePath) {
-        // Modern conversation with explicit worktreePath
-        const existing = map.get(conv.worktreePath);
-        if (existing) {
-          existing.push(conv);
-        } else {
-          map.set(conv.worktreePath, [conv]);
-        }
-      } else if (conv.workspacePath) {
-        // Legacy conversation (no worktreePath)
-        // Check if workspacePath matches any worktree path
-        if (worktreePaths.has(conv.workspacePath)) {
-          // workspacePath matches a worktree - group under that worktree
-          const existing = map.get(conv.workspacePath);
-          if (existing) {
-            existing.push(conv);
-          } else {
-            map.set(conv.workspacePath, [conv]);
-          }
-        } else {
-          // workspacePath doesn't match any worktree - treat as legacy
-          // These will be shown under the main worktree
-          legacyConversations.push(conv);
-        }
-      } else {
-        // Conversation with neither worktreePath nor workspacePath
-        // This can happen with very old conversations - show under main worktree
-        legacyConversations.push(conv);
-      }
-    }
-
-    // Map all legacy conversations to main worktree
-    // This ensures they're visible even when workspacePath differs from any worktree path
-    if (mainPath && legacyConversations.length > 0) {
-      const mainConversations = map.get(mainPath) ?? [];
-      map.set(mainPath, [...mainConversations, ...legacyConversations]);
-    }
-
-    return map;
-  }, [conversations, worktrees]);
-
-  // Helper to get conversations for a specific worktree path (O(1) lookup)
-  // All legacy conversation handling is pre-computed in useMemo above
-  const getWorktreeConversations = useCallback(
-    (worktreePath: string): ConversationSummary[] => {
-      return conversationsByWorktree.get(worktreePath) ?? [];
-    },
-    [conversationsByWorktree]
-  );
+  const mainWorktreePath = worktrees.find((wt) => wt.worktree.isMain)?.worktree.path ?? null;
+  const effectiveActiveWorktreePath = activeWorktreePath ?? mainWorktreePath;
 
   // Render conversation items for a given list
-  const renderConversations = (convList: ConversationSummary[]): React.ReactNode => {
+  const renderConversations = (convList: ConversationSummary[]): ReactNode => {
     if (convList.length === 0) return null;
 
     return (
@@ -129,7 +66,11 @@ export const ConversationList: FC<ConversationListProps> = ({
         {/* Vertical timeline line */}
         <div
           className="absolute top-0 bottom-2 w-[2px] rounded-full bg-border/60"
-          style={{ left: -2 }}
+          style={{
+            left: -2,
+            maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
+          }}
         />
         {/* Conversations */}
         <div className="flex flex-col gap-0.5">
@@ -191,7 +132,7 @@ export const ConversationList: FC<ConversationListProps> = ({
               <div key={wt.worktree.path}>
                 <WorktreeItem
                   worktreeState={wt}
-                  active={wt.worktree.path === activeWorktreePath}
+                  active={wt.worktree.path === effectiveActiveWorktreePath}
                   onToggle={() => {
                     onToggleWorktree(wt.worktree.path);
                   }}
@@ -202,14 +143,9 @@ export const ConversationList: FC<ConversationListProps> = ({
                     onRemoveWorktree(wt.worktree);
                   }}
                 />
-                {/* Conversations for this worktree — kept mounted, toggled via CSS to avoid remount cost.
-                    NOTE: With display:none, React hooks/subscriptions in ConversationItem remain active.
-                    For typical usage (<50 conversations), this is fine. For very large lists (200+),
-                    consider unmounting collapsed worktrees or virtualizing the list.
-                    (Code review: Opus cycle 1, issue #8) */}
-                <div style={{ display: wt.isExpanded ? 'block' : 'none' }}>
-                  {renderConversations(getWorktreeConversations(wt.worktree.path))}
-                </div>
+                {wt.worktree.path === effectiveActiveWorktreePath && wt.isExpanded
+                  ? renderConversations(conversations)
+                  : null}
               </div>
             ))}
           </>

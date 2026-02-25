@@ -68,7 +68,7 @@ export async function handleFileTreeRequest(
       // Update UI store with workspace path
       // Note: LSP workspace initialization is handled reactively by useLsp hook
       // when it receives rootPath from the file store
-      useUIStore.getState().setWorkspace(targetPath);
+      useUIStore.getState().initializeWorkspace(targetPath);
 
       // Load conversations for this workspace (Claude Code-style folder isolation)
       conversationList(targetPath)

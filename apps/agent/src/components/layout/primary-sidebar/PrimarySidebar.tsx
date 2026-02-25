@@ -53,6 +53,7 @@ import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { cn, HEIGHTS, SIDEBAR } from '@/lib/utils';
+import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
 import {
   useUIStore,
@@ -180,7 +181,7 @@ export const PrimarySidebar: FC = () => {
       try {
         await initializeWorkspace(path);
         await addRecentProject(path);
-        useUIStore.getState().setWorkspace(path);
+        useUIStore.getState().initializeWorkspace(path);
         setRootPath(path);
         const convos = await conversationList(path);
         useUIStore.getState().setConversations(toConversationSummaries(convos));
@@ -498,7 +499,8 @@ export const PrimarySidebar: FC = () => {
               onDuplicateConversation={handleDuplicateConversation}
               onToggleWorktree={toggleWorktreeExpanded}
               onSelectWorktree={(path) => {
-                useUIStore.getState().setActiveWorktree(path);
+                useUIStore.getState().switchToWorktree(path);
+                useChatStore.getState().clearActiveSession();
               }}
               onRemoveWorktree={handleOpenDeleteWorktreeDialog}
               onOpenCreateWorktree={handleOpenCreateWorktree}
@@ -524,7 +526,8 @@ export const PrimarySidebar: FC = () => {
             onDuplicateConversation={handleDuplicateConversation}
             onToggleWorktree={toggleWorktreeExpanded}
             onSelectWorktree={(path) => {
-              useUIStore.getState().setActiveWorktree(path);
+              useUIStore.getState().switchToWorktree(path);
+              useChatStore.getState().clearActiveSession();
             }}
             onRemoveWorktree={handleOpenDeleteWorktreeDialog}
             onOpenCreateWorktree={handleOpenCreateWorktree}
@@ -601,7 +604,8 @@ export const PrimarySidebar: FC = () => {
         onOpenChange={useUIStore.getState().setCreateWorktreeDialogOpen}
         onCreated={(worktree) => {
           // Auto-switch to the newly created worktree
-          useUIStore.getState().setActiveWorktree(worktree.path);
+          useUIStore.getState().switchToWorktree(worktree.path);
+          useChatStore.getState().clearActiveSession();
         }}
       />
 

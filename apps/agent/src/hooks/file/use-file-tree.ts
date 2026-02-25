@@ -12,12 +12,12 @@ import { useFileViewerStore, getLanguageFromPath } from '@/stores/file/file-view
 import { useUIStore } from '@/stores/ui/ui-store';
 
 // ═══════════════════════════════════════════════════════════════
-// Worktree → File Tree Sync
+// Workspace → File Tree Sync
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Hook that syncs activeWorktreePath changes to the file tree.
- * When the user switches worktrees, the file explorer should show
+ * Hook that syncs workspacePath changes to the file tree.
+ * When the user switches worktrees/workspaces, the file explorer should show
  * the new worktree's directory structure.
  */
 export function useWorktreeFileTreeSync(): void {
@@ -25,48 +25,48 @@ export function useWorktreeFileTreeSync(): void {
 
   useEffect(() => {
     // Initialize the ref with current value on mount
-    prevWorktreeRef.current = useUIStore.getState().activeWorktreePath;
+    prevWorktreeRef.current = useUIStore.getState().workspacePath;
 
-    // Handle initial mount - if there's an activeWorktreePath but
+    // Handle initial mount - if there's a workspacePath but
     // the file store doesn't have a rootPath, sync them
-    const currentWorktree = useUIStore.getState().activeWorktreePath;
+    const currentWorkspace = useUIStore.getState().workspacePath;
     const currentRoot = useFileStore.getState().rootPath;
 
-    if (currentWorktree && currentWorktree !== currentRoot) {
+    if (currentWorkspace && currentWorkspace !== currentRoot) {
       // Update Rust workspace path first, then sync file store
-      setWorkspacePath(currentWorktree)
+      setWorkspacePath(currentWorkspace)
         .then(() => {
-          useFileStore.getState().setRootPath(currentWorktree);
+          useFileStore.getState().setRootPath(currentWorkspace);
         })
         .catch((err: unknown) => {
           logger.error('Failed to set initial workspace path for worktree', err);
           toast.error('Failed to set workspace path');
-          useFileStore.getState().setRootPath(currentWorktree);
+          useFileStore.getState().setRootPath(currentWorkspace);
         });
     }
 
-    // Subscribe to full state and manually check activeWorktreePath
+    // Subscribe to full state and manually check workspacePath
     // (Zustand doesn't have built-in selector subscriptions without middleware)
     const unsubscribe = useUIStore.subscribe((state) => {
-      const activeWorktree = state.activeWorktreePath;
+      const targetPath = state.workspacePath;
       const prevWorktree = prevWorktreeRef.current;
 
       // Only trigger if the path actually changed and we have a new path
-      if (activeWorktree !== prevWorktree && activeWorktree) {
-        logger.info(`Worktree switched: ${prevWorktree ?? 'none'} → ${activeWorktree}`);
+      if (targetPath && targetPath !== prevWorktree) {
+        logger.info(`Workspace path changed: ${prevWorktree ?? 'none'} → ${targetPath}`);
 
         // CRITICAL: Update the Rust backend's workspace path FIRST
         // The Rust backend has workspace sandboxing that blocks file access
         // outside the set workspace path. Without this, file operations to
         // the worktree directory will fail with PermissionDenied.
-        setWorkspacePath(activeWorktree)
+        setWorkspacePath(targetPath)
           .then(() => {
             // setRootPath automatically clears the tree and triggers a refresh
-            useFileStore.getState().setRootPath(activeWorktree);
+            useFileStore.getState().setRootPath(targetPath);
 
             // Reinitialize file watcher for the new worktree
             // Without this, file changes in the new worktree won't be detected
-            initFileWatcher(activeWorktree).catch((watcherErr: unknown) => {
+            initFileWatcher(targetPath).catch((watcherErr: unknown) => {
               logger.warn('Failed to reinitialize file watcher for worktree', {
                 error: watcherErr,
               });
@@ -74,7 +74,7 @@ export function useWorktreeFileTreeSync(): void {
 
             // Rebuild file index for fuzzy search (@ mentions)
             // Without this, file search will use stale data from previous worktree
-            buildFileIndex(activeWorktree).catch((indexErr: unknown) => {
+            buildFileIndex(targetPath).catch((indexErr: unknown) => {
               logger.warn('Failed to rebuild file index for worktree', { error: indexErr });
             });
           })
@@ -82,12 +82,12 @@ export function useWorktreeFileTreeSync(): void {
             logger.error('Failed to update workspace path for worktree', err);
             toast.error('Failed to switch workspace');
             // Still try to update the file store - error will surface later
-            useFileStore.getState().setRootPath(activeWorktree);
+            useFileStore.getState().setRootPath(targetPath);
           });
       }
 
       // Update ref for next comparison
-      prevWorktreeRef.current = activeWorktree;
+      prevWorktreeRef.current = targetPath;
     });
 
     return unsubscribe;
@@ -170,8 +170,8 @@ const EMPTY_CHILDREN: readonly FileNode[] = [];
 export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult {
   const { autoLoad = true, debug = false } = options;
 
-  // Sync activeWorktreePath changes to file tree rootPath
-  // This ensures the file explorer shows the correct directory when worktrees are switched
+  // Sync workspacePath changes to file tree rootPath
+  // This ensures the file explorer shows the correct directory when context is switched
   useWorktreeFileTreeSync();
 
   // Track pending requests: path -> { uuid, timeoutId, rootPath }

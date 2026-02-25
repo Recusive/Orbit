@@ -93,7 +93,8 @@ export const useSidebarActions = ({
     setLoadingConversation,
     setConversationTransitioning,
     setWorktrees,
-    setActiveWorktree,
+    setRepoRootPath,
+    switchToWorktree,
     removeWorktree,
     setCreateWorktreeDialogOpen,
     setEditingConversationId,
@@ -101,6 +102,7 @@ export const useSidebarActions = ({
     setVaultOpen,
   } = useUIStore();
   const { postMessage } = useTauri();
+  const repoRootPath = useUIStore((s) => s.repoRootPath);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -112,14 +114,14 @@ export const useSidebarActions = ({
   const [worktreeDeleteDialogOpen, setWorktreeDeleteDialogOpen] = useState(false);
   const [worktreeToDelete, setWorktreeToDelete] = useState<WorktreeInfo | null>(null);
 
-  // Load worktrees when workspace changes
-  // NOTE: This should only run when workspacePath changes, not when activeWorktreePath changes.
-  // Including activeWorktreePath would cause all worktrees to reset isExpanded on every selection.
+  // Load worktrees when repo root/workspace context changes.
+  // NOTE: Do not include activeWorktreePath — that would reset isExpanded on every selection.
   const loadWorktrees = useCallback(async (): Promise<void> => {
-    if (!workspacePath) return;
+    const discoveryPath = repoRootPath ?? workspacePath;
+    if (!discoveryPath) return;
 
     try {
-      const worktreeList = await gitWorktreeList(workspacePath);
+      const worktreeList = await gitWorktreeList(discoveryPath);
 
       // GUARD: If git discovery found a PARENT repo (not the workspace itself),
       // ignore the worktree list entirely. This happens when the workspace is a
@@ -127,18 +129,26 @@ export const useSidebarActions = ({
       // where ~ has .git). The user's chosen workspace must never be overridden
       // by a parent repo root — that would hijack the file explorer.
       const worktreePaths = new Set(worktreeList.map((wt) => wt.path));
-      const workspaceIsWorktree = worktreePaths.has(workspacePath);
+      const workspaceIsWorktree = worktreePaths.has(discoveryPath);
       const workspaceInsideWorktree = worktreeList.some((wt) =>
-        workspacePath.startsWith(wt.path + '/')
+        discoveryPath.startsWith(wt.path + '/')
       );
 
       if (!workspaceIsWorktree && workspaceInsideWorktree) {
         logger.info('Workspace is inside a parent repo, ignoring discovered worktrees', {
-          workspace: workspacePath,
+          workspace: discoveryPath,
           discoveredRoot: worktreeList[0]?.path,
         });
         setWorktrees([]);
         return;
+      }
+
+      const mainWorktree = worktreeList.find((wt) => wt.isMain);
+      if (mainWorktree) {
+        const currentRoot = useUIStore.getState().repoRootPath;
+        if (currentRoot !== mainWorktree.path) {
+          setRepoRootPath(mainWorktree.path);
+        }
       }
 
       // Preserve existing isExpanded state when refreshing worktree list
@@ -154,6 +164,15 @@ export const useSidebarActions = ({
       }));
       setWorktrees(worktreeStates);
 
+      if (worktreeList.length === 0) {
+        const currentActiveWorktree = useUIStore.getState().activeWorktreePath;
+        if (currentActiveWorktree !== null) {
+          switchToWorktree(null);
+          useChatStore.getState().clearActiveSession();
+        }
+        return;
+      }
+
       // CRITICAL: Validate activeWorktreePath against the new worktree list.
       // A stale path from a prior workspace could drive file/git/terminal ops to wrong directory.
       const currentActiveWorktree = useUIStore.getState().activeWorktreePath;
@@ -162,32 +181,36 @@ export const useSidebarActions = ({
 
       if (!isActiveWorktreeValid) {
         // Reset to main worktree (or first available) when active is invalid/stale
-        const mainWorktree = worktreeList.find((wt) => wt.isMain);
         const fallbackWorktree = mainWorktree ?? worktreeList[0];
         if (fallbackWorktree) {
           logger.info('Resetting stale activeWorktreePath', {
             stale: currentActiveWorktree,
             newPath: fallbackWorktree.path,
           });
-          setActiveWorktree(fallbackWorktree.path);
+          switchToWorktree(fallbackWorktree.path);
         } else {
           // No worktrees available - clear the active path
-          setActiveWorktree(null);
+          switchToWorktree(null);
+        }
+        useChatStore.getState().clearActiveSession();
+      } else {
+        const currentWorkspace = useUIStore.getState().workspacePath;
+        if (currentActiveWorktree && currentWorkspace !== currentActiveWorktree) {
+          switchToWorktree(currentActiveWorktree);
         }
       }
     } catch {
       logger.warn('Failed to load worktrees (may not be a git repo)');
       // Not a git repo or error - clear the worktree list.
       setWorktrees([]);
-      // Only clear activeWorktreePath if it's stale (pointing to a different directory
-      // from a previous workspace). If it matches the current workspace or is already
-      // null, leave it alone to avoid triggering unnecessary file tree re-syncs.
       const current = useUIStore.getState().activeWorktreePath;
-      if (current !== null && current !== workspacePath) {
-        setActiveWorktree(null);
+      const root = useUIStore.getState().repoRootPath;
+      if (current !== null && current !== root) {
+        switchToWorktree(null);
+        useChatStore.getState().clearActiveSession();
       }
     }
-  }, [workspacePath, setWorktrees, setActiveWorktree]);
+  }, [repoRootPath, workspacePath, setRepoRootPath, setWorktrees, switchToWorktree]);
 
   // Auto-load worktrees on workspace change
   useEffect(() => {
@@ -197,13 +220,10 @@ export const useSidebarActions = ({
   const handleStartConversation = useCallback((): void => {
     // Close vault if open
     setVaultOpen(false);
-    // Skip if current conversation is empty (title still "Untitled" means no message sent)
-    // BUT only if it belongs to the current worktree - allow new session after switching worktrees
+    // Skip only if current conversation is truly empty.
+    // Title alone is not a reliable signal because many persisted sessions stay "Untitled".
     const activeConv = conversations.find((c) => c.sessionId === activeConversationId);
-    if (
-      activeConv?.title === 'Untitled' &&
-      conversationBelongsToWorktree(activeConv, activeWorktreePath)
-    ) {
+    if (activeConv?.title === 'Untitled' && activeConv.messageCount === 0) {
       return;
     }
     postMessage({
@@ -282,12 +302,15 @@ export const useSidebarActions = ({
   // Remove worktree (called from dialog confirmation)
   const handleRemoveWorktree = useCallback(
     async (deleteBranch: boolean): Promise<void> => {
-      if (!workspacePath || !worktreeToDelete) return;
+      const repoRoot = useUIStore.getState().repoRootPath;
+      const removePath = repoRoot ?? workspacePath;
+      if (!removePath || !worktreeToDelete) return;
 
       try {
         // Note: deleteBranch option not yet supported by backend
-        await gitWorktreeRemove(workspacePath, worktreeToDelete.path, false);
+        await gitWorktreeRemove(removePath, worktreeToDelete.path, false);
         removeWorktree(worktreeToDelete.path);
+        useChatStore.getState().clearActiveSession();
         logger.info('Removed worktree', {
           path: worktreeToDelete.path,
           deletedBranch: deleteBranch ? worktreeToDelete.branch : null,

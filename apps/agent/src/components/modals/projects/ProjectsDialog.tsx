@@ -101,7 +101,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
       try {
         await initializeWorkspace(path);
         await addRecentProject(path);
-        useUIStore.getState().setWorkspace(path);
+        useUIStore.getState().initializeWorkspace(path);
         setRootPath(path);
 
         const conversations = await conversationList(path);

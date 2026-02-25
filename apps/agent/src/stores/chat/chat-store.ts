@@ -89,6 +89,7 @@ export interface ChatStoreState {
   // ── Actions ───────────────────────────────────────────────────────────
   getOrCreateSession: (id: string) => ChatSessionData;
   setActiveSession: (id: string) => void;
+  clearActiveSession: () => void;
   setMessages: (id: string, msgs: ChatMessage[]) => void;
   appendToLastMessage: (id: string, messageId: string, content: string) => void;
   appendThinking: (id: string, messageId: string, thinking: string) => void;
@@ -253,6 +254,12 @@ export const useChatStore = create<ChatStoreState>()(
           // Ensure session exists
           draft.sessions[id] ??= createEmptySession();
           touchLru(draft.lruOrder, id);
+        });
+      },
+
+      clearActiveSession: (): void => {
+        set((draft) => {
+          draft.activeSessionId = null;
         });
       },
 
