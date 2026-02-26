@@ -247,7 +247,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   };
 
   return (
-    <div className="min-w-0 mx-1 rounded-lg overflow-hidden">
+    <div className="min-w-0 mx-1 overflow-hidden" style={{ borderRadius: 9 }}>
       {/* Header */}
       <div
         onClick={handleToggle}
@@ -281,51 +281,52 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
           </span>
         </div>
 
-        {/* File name and path */}
-        <div className="flex items-baseline gap-1.5 min-w-0 flex-1">
+        {/* File name, path, and diff stat */}
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <span className="text-sm font-medium truncate text-foreground/90">{fileName}</span>
           {fileDir ? (
             <span className="text-[11px] text-muted-foreground/50 truncate shrink-2">
               {fileDir}
             </span>
           ) : null}
+          {hasDiff ? (
+            <div className="shrink-0">
+              <DiffStat additions={additions} deletions={deletions} />
+            </div>
+          ) : null}
         </div>
 
-        {/* Right side: DiffStat + actions + chevron */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {hasDiff ? <DiffStat additions={additions} deletions={deletions} /> : null}
-
-          {/* Action buttons (on hover) */}
-          <div className="flex items-center gap-0.5 opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 ease-out motion-reduce:transition-none">
-            {onDiscard ? (
-              <button
-                onClick={handleDiscard}
-                disabled={isLoading}
-                className="relative h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-lg-control-hover active:scale-95 transition-[transform,color,background-color] duration-75 ease-out motion-reduce:transition-none before:absolute before:inset-0 before:min-h-[44px] before:min-w-[44px] before:-translate-x-1/2 before:-translate-y-1/2 before:left-1/2 before:top-1/2"
-                title="Discard"
-                aria-label={`Discard changes to ${fileName}`}
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            ) : null}
+        {/* Right side: actions + chevron */}
+        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 ease-out motion-reduce:transition-none">
+          {onDiscard ? (
             <button
-              onClick={handleAction}
+              onClick={handleDiscard}
               disabled={isLoading}
-              className="relative h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-[transform,color,background-color] duration-75 ease-out motion-reduce:transition-none before:absolute before:inset-0 before:min-h-[44px] before:min-w-[44px] before:-translate-x-1/2 before:-translate-y-1/2 before:left-1/2 before:top-1/2"
-              title={isStaged ? 'Unstage' : 'Stage'}
-              aria-label={isStaged ? `Unstage ${fileName}` : `Stage ${fileName}`}
+              className="relative h-6 w-6 flex items-center justify-center rounded-full text-muted-foreground/50 hover:bg-destructive-subtle hover:text-destructive-text active:scale-95 transition-[transform,color,background-color] duration-75 ease-out motion-reduce:transition-none before:absolute before:inset-0 before:min-h-[44px] before:min-w-[44px] before:-translate-x-1/2 before:-translate-y-1/2 before:left-1/2 before:top-1/2"
+              title="Discard"
+              aria-label={`Discard changes to ${fileName}`}
             >
-              {isStaged ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+              <X className="h-3.5 w-3.5" />
             </button>
-          </div>
-
+          ) : null}
+          <button
+            onClick={handleAction}
+            disabled={isLoading}
+            className="relative h-6 w-6 flex items-center justify-center rounded-full text-muted-foreground/50 hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-[transform,color,background-color] duration-75 ease-out motion-reduce:transition-none before:absolute before:inset-0 before:min-h-[44px] before:min-w-[44px] before:-translate-x-1/2 before:-translate-y-1/2 before:left-1/2 before:top-1/2"
+            title={isStaged ? 'Unstage' : 'Stage'}
+            aria-label={isStaged ? `Unstage ${fileName}` : `Stage ${fileName}`}
+          >
+            {isStaged ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+          </button>
           {canExpand ? (
-            <ChevronDown
-              className={cn(
-                'h-3.5 w-3.5 text-muted-foreground/50 transition-[rotate] duration-150 ease-out motion-reduce:transition-none shrink-0',
-                isExpanded && 'rotate-180'
-              )}
-            />
+            <div className="h-6 w-6 flex items-center justify-center rounded-full text-muted-foreground/50 hover:bg-lg-control-hover">
+              <ChevronDown
+                className={cn(
+                  'h-3.5 w-3.5 transition-[rotate] duration-150 ease-out motion-reduce:transition-none',
+                  isExpanded && 'rotate-180'
+                )}
+              />
+            </div>
           ) : null}
         </div>
       </div>
