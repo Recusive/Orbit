@@ -10,11 +10,13 @@
  * single-file change — just swap children for WorkerPoolContextProvider wrapping.
  */
 import { createLogger } from '@orbit/common/lib';
-import { DEFAULT_THEMES, preloadHighlighter } from '@pierre/diffs';
+import { preloadHighlighter } from '@pierre/diffs';
 import { useEffect } from 'react';
 
 import type { SupportedLanguages } from '@pierre/diffs';
 import type { FC, ReactNode } from 'react';
+
+import { PIERRE_THEME } from '@/lib/utils/pierre-adapter';
 
 interface PierreProviderProps {
   readonly children: ReactNode;
@@ -42,7 +44,7 @@ export const PierreProvider: FC<PierreProviderProps> = ({ children }) => {
     let isMounted = true;
 
     void preloadHighlighter({
-      themes: [DEFAULT_THEMES.light, DEFAULT_THEMES.dark],
+      themes: [PIERRE_THEME.light, PIERRE_THEME.dark],
       langs: PRELOAD_LANGUAGES,
     }).catch((error: unknown) => {
       if (!isMounted) return;
