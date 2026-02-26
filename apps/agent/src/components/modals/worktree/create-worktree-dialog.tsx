@@ -1,17 +1,15 @@
 import { createLogger } from '@orbit/common/lib';
-import { AlertCircle, GitBranch, Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, GitBranch, Loader2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { BranchInfo, WorktreeInfo } from '@/lib/api';
 import type { FC, KeyboardEvent } from 'react';
 
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -52,6 +50,7 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
   const repoRootPath = useRepoRootPath();
   const repoPath = repoRootPath ?? workspacePath;
   const addWorktree = useUIStore((s) => s.addWorktree);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [newBranchName, setNewBranchName] = useState('');
@@ -66,7 +65,6 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
   const [loadingBranches, setLoadingBranches] = useState(false);
 
   // Filter branches that can be checked out (not already in a worktree)
-  // For now, we just filter out the current branch since it's checked out in main worktree
   const availableBranches = useMemo(() => branches.filter((b) => !b.isCurrent), [branches]);
 
   // Load branches when dialog opens
@@ -93,13 +91,19 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
     void loadBranches();
   }, [open, repoPath]);
 
-  // Reset form when dialog opens
+  // Reset form and autofocus when dialog opens
   useEffect(() => {
     if (open) {
       setNewBranchName('');
       setSelectedExistingBranch('');
       setCreateNewBranch(true);
       setError(null);
+      const isTouchDevice = 'ontouchstart' in window;
+      if (!isTouchDevice) {
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 50);
+      }
     }
   }, [open]);
 
@@ -192,150 +196,181 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Create Worktree</DialogTitle>
-          <DialogDescription>
-            Create a new git worktree to work on multiple branches simultaneously.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-[425px] gap-0 p-0 [&>button:last-child]:hidden">
+        <div className="relative flex flex-col" style={{ padding: '20px 16px 16px', gap: 16 }}>
+          {/* Close button — glass style */}
+          <DialogClose className="absolute right-[16px] top-[16px] z-10 rounded-[9px] p-1.5 bg-foreground/6 text-muted-foreground transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text active:bg-destructive-subtle-hover">
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
 
-        <div className="grid gap-4 py-4">
-          {/* Create new branch toggle */}
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Create new branch</span>
-            <Switch checked={createNewBranch} onCheckedChange={setCreateNewBranch} />
+          {/* Icon + Title + Description */}
+          <div className="flex flex-col items-start" style={{ gap: 10 }}>
+            <div
+              className="liquid-glass-icon flex shrink-0 items-center justify-center bg-accent-9/10"
+              style={{ filter: 'none' }}
+            >
+              <GitBranch className="h-7 w-7 text-accent-11" aria-hidden="true" />
+            </div>
+            <DialogTitle className="liquid-glass-title">Create Worktree</DialogTitle>
+            <DialogDescription className="liquid-glass-desc">
+              Work on multiple branches simultaneously with isolated worktrees.
+            </DialogDescription>
           </div>
 
-          {createNewBranch ? (
-            /* New branch mode: text input + base branch selector */
-            <>
-              <div className="grid gap-2">
-                <label htmlFor="new-branch-name" className="text-sm font-medium">
-                  New Branch Name
-                </label>
-                <div className="relative">
-                  <GitBranch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="new-branch-name"
-                    placeholder="feature/my-feature"
-                    value={newBranchName}
-                    onChange={(e) => {
-                      setNewBranchName(e.target.value);
-                    }}
-                    onKeyDown={handleKeyDown}
-                    className="pl-9"
-                    autoFocus
-                  />
-                </div>
-              </div>
+          {/* Form fields */}
+          <div className="flex flex-col" style={{ gap: 14 }}>
+            {/* Create new branch toggle */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Create new branch</span>
+              <Switch checked={createNewBranch} onCheckedChange={setCreateNewBranch} />
+            </div>
 
-              <div className="grid gap-2">
-                <label htmlFor="base-branch" className="text-sm font-medium">
-                  Base Branch
-                </label>
-                <Select value={baseBranch} onValueChange={setBaseBranch} disabled={loadingBranches}>
-                  <SelectTrigger id="base-branch">
-                    <SelectValue
-                      placeholder={loadingBranches ? 'Loading branches...' : 'Select base branch'}
+            {createNewBranch ? (
+              /* New branch mode: text input + base branch selector */
+              <>
+                <div className="grid gap-2">
+                  <label htmlFor="new-branch-name" className="text-sm font-medium">
+                    New Branch Name
+                  </label>
+                  <div className="relative">
+                    <GitBranch
+                      className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                      aria-hidden="true"
                     />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.name} value={branch.name}>
-                        {branch.name}
-                        {branch.isCurrent ? ' (current)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          ) : (
-            /* Existing branch mode: dropdown selector */
-            <div className="grid gap-2">
-              <label htmlFor="existing-branch" className="text-sm font-medium">
-                Select Branch
-              </label>
-              <Select
-                value={selectedExistingBranch}
-                onValueChange={setSelectedExistingBranch}
-                disabled={loadingBranches}
-              >
-                <SelectTrigger id="existing-branch">
-                  <div className="flex items-center gap-2">
-                    <GitBranch className="h-4 w-4 text-muted-foreground" />
-                    <SelectValue
-                      placeholder={
-                        loadingBranches
-                          ? 'Loading branches...'
-                          : availableBranches.length === 0
-                            ? 'No branches available'
-                            : 'Select a branch'
-                      }
+                    <Input
+                      ref={inputRef}
+                      id="new-branch-name"
+                      placeholder="feature/my-feature"
+                      value={newBranchName}
+                      onChange={(e) => {
+                        setNewBranchName(e.target.value);
+                      }}
+                      onKeyDown={handleKeyDown}
+                      className="pl-9"
                     />
                   </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {availableBranches.length === 0 ? (
-                    <div className="px-2 py-4 text-sm text-muted-foreground text-center">
-                      All branches are already checked out
-                    </div>
-                  ) : (
-                    availableBranches.map((branch) => (
-                      <SelectItem key={branch.name} value={branch.name}>
-                        {branch.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              {availableBranches.length === 0 && !loadingBranches ? (
-                <p className="text-xs text-muted-foreground">
-                  Create a new branch instead, or close worktrees to free up branches.
-                </p>
-              ) : null}
-            </div>
-          )}
+                </div>
 
-          {/* Worktree path preview */}
-          <div className="grid gap-2">
-            <span className="text-sm text-muted-foreground">Worktree Path</span>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-lg-control text-sm text-foreground">
-              <GitBranch className="h-4 w-4 shrink-0" />
-              <span className="truncate">{worktreePath || 'Enter a branch name...'}</span>
-            </div>
-          </div>
-
-          {/* Error message */}
-          {error !== null && (
-            <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              onOpenChange(false);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button onClick={() => void handleCreate()} disabled={!isValid || isCreating}>
-            {isCreating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
+                <div className="grid gap-2">
+                  <label htmlFor="base-branch" className="text-sm font-medium">
+                    Base Branch
+                  </label>
+                  <Select
+                    value={baseBranch}
+                    onValueChange={setBaseBranch}
+                    disabled={loadingBranches}
+                  >
+                    <SelectTrigger id="base-branch">
+                      <SelectValue
+                        placeholder={loadingBranches ? 'Loading branches...' : 'Select base branch'}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.name} value={branch.name}>
+                          {branch.name}
+                          {branch.isCurrent ? ' (current)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </>
             ) : (
-              'Create Worktree'
+              /* Existing branch mode: dropdown selector */
+              <div className="grid gap-2">
+                <label htmlFor="existing-branch" className="text-sm font-medium">
+                  Select Branch
+                </label>
+                <Select
+                  value={selectedExistingBranch}
+                  onValueChange={setSelectedExistingBranch}
+                  disabled={loadingBranches}
+                >
+                  <SelectTrigger id="existing-branch">
+                    <div className="flex items-center gap-2">
+                      <GitBranch className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <SelectValue
+                        placeholder={
+                          loadingBranches
+                            ? 'Loading branches...'
+                            : availableBranches.length === 0
+                              ? 'No branches available'
+                              : 'Select a branch'
+                        }
+                      />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableBranches.length === 0 ? (
+                      <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                        All branches are already checked out
+                      </div>
+                    ) : (
+                      availableBranches.map((branch) => (
+                        <SelectItem key={branch.name} value={branch.name}>
+                          {branch.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {availableBranches.length === 0 && !loadingBranches ? (
+                  <p className="text-xs text-muted-foreground">
+                    Create a new branch instead, or close worktrees to free up branches.
+                  </p>
+                ) : null}
+              </div>
             )}
-          </Button>
-        </DialogFooter>
+
+            {/* Worktree path preview */}
+            <div className="grid gap-2">
+              <span className="text-sm text-muted-foreground">Worktree Path</span>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-[9px] bg-[var(--lg-control-bg)] text-sm">
+                <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="truncate">{worktreePath || 'Enter a branch name...'}</span>
+              </div>
+            </div>
+
+            {/* Error message */}
+            {error !== null && (
+              <div className="flex items-start gap-2 p-3 rounded-[9px] bg-destructive/10 text-destructive text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" aria-hidden="true" />
+                <span>{error}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Buttons — pill-shaped glass style */}
+          <div className="flex w-full items-center pt-2" style={{ gap: 8 }}>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none"
+              onClick={() => {
+                onOpenChange(false);
+              }}
+              disabled={isCreating}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-primary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
+              onClick={() => void handleCreate()}
+              disabled={!isValid || isCreating}
+            >
+              {isCreating ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  Creating&hellip;
+                </span>
+              ) : (
+                'Create Worktree'
+              )}
+            </button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
