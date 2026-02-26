@@ -35,13 +35,13 @@ export const CommitForm: React.FC<CommitFormProps> = ({ value, onChange, onCommi
         placeholder="Commit message (Ctrl+Enter to commit)..."
         rows={COMMIT_TEXTAREA_ROWS} // Extracted constant
         className="
-          w-full px-2.5 py-2 rounded-xl text-sm
-          bg-background border-3 border-transparent
-          ring-1 ring-lg-separator
-          placeholder:text-lg-text-secondary
-          hover:ring-lg-border
-          focus:outline-none focus:ring-0 focus:border-ring focus:bg-lg-control
-          transition-[background-color,border-color,box-shadow] duration-200 resize-none
+          w-full px-2.5 py-2 rounded-[14px] text-sm resize-none
+          bg-[#f3f3f3] dark:bg-[oklch(23%_0_0)]
+          border-0 dark:border dark:border-white/5
+          shadow-[0_0_0_2px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md
+          placeholder:text-muted-foreground/60
+          focus:outline-none
+          transition-shadow duration-200
         "
       />
       {error ? <p className="text-xs text-destructive mt-1">{error}</p> : null}

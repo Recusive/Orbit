@@ -7,6 +7,20 @@ import type { WebviewMessage } from '@/types/protocol';
 
 const logger = createLogger('FileHandlers');
 
+/**
+ * System entries to hide from the file explorer.
+ * Stored in lowercase — matched case-insensitively for macOS/Windows.
+ * Distinct from IGNORED_PATH_PATTERNS in use-tauri-file-watcher.ts (which filters change events).
+ */
+const EXCLUDED_ENTRY_NAMES: ReadonlySet<string> = new Set([
+  '.git',
+  '.ds_store',
+  '.spotlight-v100',
+  '.trashes',
+  'thumbs.db',
+  'desktop.ini',
+]);
+
 import {
   buildFileIndex,
   conversationList,
@@ -111,14 +125,18 @@ export async function handleFileTreeRequest(
     // Show hidden files (dotfiles like .gitignore, .env, .eslintrc) by default
     // Developers need to see these files in a code editor
     const entries = await listDirectory(targetPath, true);
+    const filteredEntries = entries.filter(
+      (entry: FileEntry) => !EXCLUDED_ENTRY_NAMES.has(entry.name.toLowerCase())
+    );
 
     // Convert FileEntry to FileNode format
-    const children = entries.map((entry: FileEntry) => ({
+    const children = filteredEntries.map((entry: FileEntry) => ({
       name: entry.name,
       path: entry.path,
       isDirectory: entry.isDir,
       isFile: !entry.isDir,
       isSymlink: entry.isSymlink,
+      isGitIgnored: entry.isGitIgnored,
     }));
 
     window.postMessage(

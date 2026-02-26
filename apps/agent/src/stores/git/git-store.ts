@@ -74,6 +74,18 @@ const initialState: GitState = {
   branchDiffStats: null,
 };
 
+/** Compute a stable, order-independent fingerprint for a status entry list */
+function listSignature(entries: readonly StatusEntry[]): string {
+  if (entries.length === 0) return '';
+
+  return entries
+    .map((entry) => {
+      return `${entry.path}\0${entry.status}\0${entry.oldPath ?? ''}\0${String(entry.similarity ?? '')}`;
+    })
+    .sort()
+    .join('\x01');
+}
+
 // ============================================
 // Store
 // ============================================
@@ -103,10 +115,10 @@ export const useGitStore = create<GitStore>()(
               prev.branch === status.branch &&
               prev.ahead === status.ahead &&
               prev.behind === status.behind &&
-              prev.staged.length === status.staged.length &&
-              prev.modified.length === status.modified.length &&
-              prev.untracked.length === status.untracked.length &&
-              prev.conflicted.length === status.conflicted.length;
+              listSignature(prev.staged) === listSignature(status.staged) &&
+              listSignature(prev.modified) === listSignature(status.modified) &&
+              listSignature(prev.untracked) === listSignature(status.untracked) &&
+              listSignature(prev.conflicted) === listSignature(status.conflicted);
             if (unchanged) {
               // Only update lastUpdated for background refreshes, don't trigger re-renders
               state.lastUpdated = Date.now();
