@@ -63,6 +63,13 @@ export default defineConfig({
       '@canvas': path.resolve(__dirname, './apps/Canvas-UI-Builder/src'),
       '@editor': path.resolve(__dirname, './apps/editor/src'),
       '@orbit/common': path.resolve(__dirname, './apps/common/src'),
+      // Pierre's package.json exports don't include internal theme files.
+      // Alias bypasses the exports check so we can extend pierre-dark/light
+      // with custom sidebar-matched backgrounds in pierre-adapter.ts.
+      '@pierre/diffs/dist/themes': path.resolve(
+        __dirname,
+        'node_modules/@pierre/diffs/dist/themes'
+      ),
     },
   },
   // Keep function/class names in production for readable stack traces and profiling

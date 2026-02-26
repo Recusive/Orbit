@@ -24,24 +24,20 @@ const LIGHT_BG = '#e5e5e5'; // --gray-2 (light sidebar)
 const DARK_SEPARATOR = '#313131'; // --gray-5 (two steps up from dark sidebar)
 const LIGHT_SEPARATOR = '#d2d2d2'; // --gray-3 (one step up from light sidebar)
 
-/** Custom dark theme: github-dark with sidebar-matched background */
+/** Custom dark theme: pierre-dark with sidebar-matched background */
 registerCustomTheme('orbit-dark', async (): Promise<ThemeRegistration> => {
-  const { default: githubDark } = (await import('shiki/themes/github-dark.mjs')) as {
-    default: ThemeRegistration;
-  };
-  const theme = structuredClone(githubDark);
+  const { default: pierreDark } = await import('@pierre/diffs/dist/themes/pierre-dark.js');
+  const theme = structuredClone(pierreDark);
   theme.name = 'orbit-dark';
   theme.bg = DARK_BG;
   theme.colors = { ...theme.colors, 'editor.background': DARK_BG };
   return theme;
 });
 
-/** Custom light theme: github-light with sidebar-matched background */
+/** Custom light theme: pierre-light with sidebar-matched background */
 registerCustomTheme('orbit-light', async (): Promise<ThemeRegistration> => {
-  const { default: githubLight } = (await import('shiki/themes/github-light.mjs')) as {
-    default: ThemeRegistration;
-  };
-  const theme = structuredClone(githubLight);
+  const { default: pierreLight } = await import('@pierre/diffs/dist/themes/pierre-light.js');
+  const theme = structuredClone(pierreLight);
   theme.name = 'orbit-light';
   theme.bg = LIGHT_BG;
   theme.colors = { ...theme.colors, 'editor.background': LIGHT_BG };
