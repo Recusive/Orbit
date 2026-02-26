@@ -496,7 +496,7 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
     const isGitIgnored = node.isGitIgnored === true;
 
     const rowButton = (
-      <button
+      <div
         className={cn(
           'file-tree-item flex items-center w-full text-base hover:bg-lg-sidebar-hover',
           isSelected && 'bg-lg-sidebar-selected text-foreground',
@@ -514,6 +514,17 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
           opacity: isGitIgnored ? 0.5 : 1,
         }}
         onClick={handleClick}
+        onKeyDown={(e): void => {
+          // Only handle keyboard activation on the row itself, not nested controls.
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleClick();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-selected={isSelected}
         title={isGitIgnored ? `${path} (gitignored)` : path}
       >
         {/* Indent guide lines - one vertical line per ancestor depth level */}
@@ -613,7 +624,7 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
             retry
           </span>
         ) : null}
-      </button>
+      </div>
     );
 
     return (

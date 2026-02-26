@@ -130,25 +130,25 @@ pub async fn copy_file(from: String, to: String) -> Result<()> {
 /// Uses `open -R` on macOS to select the item in Finder.
 #[tauri::command]
 pub async fn reveal_in_file_manager(path: String) -> Result<()> {
+    let resolved_path = resolve_workspace_path(&path)?;
+
     #[cfg(target_os = "macos")]
     {
         let _child = Command::new("open")
             .arg("-R")
-            .arg(&path)
+            .arg("--")
+            .arg(&resolved_path)
             .spawn()
             .map_err(Error::Io)?;
     }
 
     #[cfg(target_os = "linux")]
     {
+        let reveal_target = resolved_path
+            .parent()
+            .unwrap_or_else(|| resolved_path.as_path());
         let _child = Command::new("xdg-open")
-            .arg(
-                Path::new(&path)
-                    .parent()
-                    .unwrap_or_else(|| Path::new(&path))
-                    .to_string_lossy()
-                    .as_ref(),
-            )
+            .arg(reveal_target)
             .spawn()
             .map_err(Error::Io)?;
     }
@@ -157,7 +157,7 @@ pub async fn reveal_in_file_manager(path: String) -> Result<()> {
     {
         let _child = Command::new("explorer")
             .arg("/select,")
-            .arg(&path)
+            .arg(&resolved_path)
             .spawn()
             .map_err(Error::Io)?;
     }
@@ -168,15 +168,21 @@ pub async fn reveal_in_file_manager(path: String) -> Result<()> {
 /// Open a file in the system default application.
 #[tauri::command]
 pub async fn open_in_default_app(path: String) -> Result<()> {
+    let resolved_path = resolve_workspace_path(&path)?;
+
     #[cfg(target_os = "macos")]
     {
-        let _child = Command::new("open").arg(&path).spawn().map_err(Error::Io)?;
+        let _child = Command::new("open")
+            .arg("--")
+            .arg(&resolved_path)
+            .spawn()
+            .map_err(Error::Io)?;
     }
 
     #[cfg(target_os = "linux")]
     {
         let _child = Command::new("xdg-open")
-            .arg(&path)
+            .arg(&resolved_path)
             .spawn()
             .map_err(Error::Io)?;
     }
@@ -184,7 +190,7 @@ pub async fn open_in_default_app(path: String) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
         let _child = Command::new("explorer")
-            .arg(&path)
+            .arg(&resolved_path)
             .spawn()
             .map_err(Error::Io)?;
     }
@@ -332,6 +338,24 @@ fn ensure_workspace_paths(paths: &[&str]) -> Result<()> {
         ensure_within_workspace(path)?;
     }
     Ok(())
+}
+
+fn resolve_workspace_path(path: &str) -> Result<PathBuf> {
+    ensure_within_workspace(path)?;
+
+    let Some(workspace_path) = workspace::get_workspace_path() else {
+        return Err(Error::Config("Workspace path not set".to_owned()));
+    };
+
+    let workspace_root = normalize_path_for_compare(Path::new(&workspace_path));
+    let requested = Path::new(path);
+    let resolved = if requested.is_absolute() {
+        normalize_path_for_compare(requested)
+    } else {
+        normalize_path_for_compare(&workspace_root.join(requested))
+    };
+
+    Ok(resolved)
 }
 
 /// Convert orbit-fs FileEvent to our FileChangeEvent for the frontend.

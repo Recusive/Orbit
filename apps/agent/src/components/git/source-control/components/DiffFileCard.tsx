@@ -9,7 +9,7 @@
 import { parseDiffFromFile } from '@pierre/diffs';
 import { FileDiff as PierreFileDiff } from '@pierre/diffs/react';
 import { preloadFileDiff } from '@pierre/diffs/ssr';
-import { ChevronDown, Minus, Plus, X } from 'lucide-react';
+import { AlertCircle, ChevronDown, Minus, Plus, X } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { DisplayFileStatus, FileItem } from '../types';
@@ -117,6 +117,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   }
 
   const [preloaded, setPreloaded] = useState<PreloadedDiff | null>(null);
+  const [preloadError, setPreloadError] = useState<string | null>(null);
   const prefetchRef = useRef<{ promise: Promise<PreloadedDiff | null>; key: string } | null>(null);
 
   /** Build a cache key from the inputs that affect the fetched content. */
@@ -141,10 +142,15 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   /** Fetch file content → parse diff → preload Shiki highlighting. */
   const fetchAndPreload = (): Promise<PreloadedDiff | null> => {
     if (prefetchRef.current?.key === prefetchKey) return prefetchRef.current.promise;
-    if (!diff || diff.isBinary || !repoPath) return Promise.resolve(null);
+    if (!diff || diff.isBinary) return Promise.resolve(null);
+    if (!repoPath) {
+      setPreloadError('Repository path unavailable for this diff.');
+      return Promise.resolve(null);
+    }
 
     const absolutePath = `${repoPath}/${file.path}`;
     const oldRef = isStaged ? 'HEAD' : 'INDEX';
+    setPreloadError(null);
 
     const promise = Promise.all([
       gitFileAtRef(repoPath, file.path, oldRef).catch(() => ''),
@@ -161,7 +167,10 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
         const result = await preloadFileDiff({ fileDiff, options: pierreOptions });
         return { fileDiff: result.fileDiff, prerenderedHTML: result.prerenderedHTML };
       })
-      .catch(() => null);
+      .catch(() => {
+        setPreloadError('Failed to load diff preview.');
+        return null;
+      });
 
     prefetchRef.current = { promise, key: prefetchKey };
     return promise;
@@ -177,6 +186,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   useEffect(() => {
     if (!isExpanded) {
       setPreloaded(null);
+      setPreloadError(null);
       prefetchRef.current = null;
       return;
     }
@@ -224,6 +234,16 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   const handleDiscard = (e: React.MouseEvent): void => {
     e.stopPropagation();
     onDiscard?.(file.path);
+  };
+
+  const handleRetryPreload = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    setPreloaded(null);
+    setPreloadError(null);
+    prefetchRef.current = null;
+    void fetchAndPreload().then((result) => {
+      setPreloaded(result);
+    });
   };
 
   return (
@@ -331,6 +351,18 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
                 style={PIERRE_DIFF_STYLE as React.CSSProperties}
                 options={pierreOptions}
               />
+            ) : preloadError ? (
+              <div className="px-3 py-2 text-xs text-destructive/90 flex items-center gap-2">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="flex-1">{preloadError}</span>
+                <button
+                  type="button"
+                  onClick={handleRetryPreload}
+                  className="text-xs text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
+                >
+                  Retry
+                </button>
+              </div>
             ) : (
               <div className="px-3 py-2 text-xs text-muted-foreground/60">Loading diff…</div>
             )

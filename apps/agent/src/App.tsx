@@ -410,13 +410,15 @@ const App: FC = () => {
   const collapseLeftSidebar = useUIStore((s) => s.collapseLeftSidebar);
   useEffect(() => {
     const handleResize = (): void => {
-      const { leftSidebarWidth, reviewPanelOpen, reviewPanelWidth, rightSidebarOpen } =
+      const { leftSidebarWidth, reviewPanelOpen, reviewPanelWidth, rightSidebarOpen, activeTab } =
         useUIStore.getState();
       // Only act when sidebar is actually expanded
       if (leftSidebarWidth <= SIDEBAR.collapsed) return;
 
       let requiredWidth = leftSidebarWidth + CHAT_PANEL.MIN_WIDTH;
-      if (reviewPanelOpen) requiredWidth += reviewPanelWidth + CONTENT_CARD.gap;
+      const activityPanelOpen =
+        (reviewPanelOpen || activeTab === 'editor') && (hasWorkspace || isDemo);
+      if (activityPanelOpen) requiredWidth += reviewPanelWidth + CONTENT_CARD.gap;
       if (rightSidebarOpen) requiredWidth += SIDEBAR.iconColumnWidth;
 
       if (window.innerWidth < requiredWidth) {
@@ -428,7 +430,7 @@ const App: FC = () => {
     return (): void => {
       window.removeEventListener('resize', handleResize);
     };
-  }, [collapseLeftSidebar]);
+  }, [collapseLeftSidebar, hasWorkspace, isDemo]);
 
   // Activity panel slide wrapper — mirrors the sidebar's margin-slide pattern.
   // When closed, marginRight = -width slides the entire panel off the right edge

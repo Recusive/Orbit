@@ -19,6 +19,18 @@ function normalizePathForComparison(path: string): string {
   return trimmed;
 }
 
+function getDescendantPrefix(parentPath: string): string {
+  if (parentPath === '/' || WINDOWS_DRIVE_ROOT_RE.test(parentPath)) {
+    return parentPath;
+  }
+  return `${parentPath}/`;
+}
+
+function isPathDescendant(path: string, parentPath: string): boolean {
+  const descendantPrefix = getDescendantPrefix(parentPath);
+  return path.startsWith(descendantPrefix) && path.length > parentPath.length;
+}
+
 export function getPathName(path: string): string {
   const trimmed = path.replace(/[\\/]+$/, '');
   if (trimmed.length === 0) return path;
@@ -50,7 +62,7 @@ export function isPathEqualOrWithin(path: string, parentPath: string): boolean {
   const normalizedParent = normalizePathForComparison(parentPath);
 
   if (normalizedPath === normalizedParent) return true;
-  return normalizedPath.startsWith(`${normalizedParent}/`);
+  return isPathDescendant(normalizedPath, normalizedParent);
 }
 
 export function isPathWithin(path: string, parentPath: string): boolean {
@@ -58,15 +70,16 @@ export function isPathWithin(path: string, parentPath: string): boolean {
   const normalizedParent = normalizePathForComparison(parentPath);
 
   if (normalizedPath === normalizedParent) return false;
-  return normalizedPath.startsWith(`${normalizedParent}/`);
+  return isPathDescendant(normalizedPath, normalizedParent);
 }
 
 export function toRelativePath(path: string, rootPath: string): string | null {
   const normalizedPath = normalizePathForComparison(path);
   const normalizedRoot = normalizePathForComparison(rootPath);
+  const descendantPrefix = getDescendantPrefix(normalizedRoot);
 
   if (normalizedPath === normalizedRoot) return '';
-  if (!normalizedPath.startsWith(`${normalizedRoot}/`)) return null;
+  if (!normalizedPath.startsWith(descendantPrefix)) return null;
 
-  return normalizedPath.slice(normalizedRoot.length + 1);
+  return normalizedPath.slice(descendantPrefix.length);
 }

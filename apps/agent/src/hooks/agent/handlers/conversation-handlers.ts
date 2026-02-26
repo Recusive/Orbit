@@ -12,6 +12,7 @@ import {
   conversationUpdateTitle,
 } from '@/lib/api';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('ConversationHandlers');
 
@@ -64,12 +65,21 @@ export async function handleConversationList(
     );
   } catch (err: unknown) {
     logger.error('Conversation list error', err);
-    // Return empty list on error (localStorage will still have data)
+    // Preserve the current sidebar list on transient errors.
+    const existingConversations = useUIStore.getState().conversations.map((c) => ({
+      session_id: c.sessionId,
+      title: c.title,
+      updated_at: c.updatedAt,
+      message_count: c.messageCount,
+      ...(c.workspacePath ? { workspace_path: c.workspacePath } : {}),
+      ...(c.worktreePath ? { worktree_path: c.worktreePath } : {}),
+    }));
+
     window.postMessage(
       {
         type: 'conversation:list',
         uuid: crypto.randomUUID(),
-        conversations: [],
+        conversations: existingConversations,
       },
       '*'
     );

@@ -472,13 +472,23 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         return;
       }
 
+      // Shift+Tab cycles input mode when focus is inside the chat input.
+      // Scoped here to preserve native reverse-tab navigation elsewhere.
+      if (e.key === 'Tab' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        const nextMode: InputMode =
+          inputMode === 'default' ? 'plan' : inputMode === 'plan' ? 'accept' : 'default';
+        onModeChange(nextMode);
+        return;
+      }
+
       // Enter sends message
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSend();
       }
     },
-    [popover, slashCommands, handleSlashSelect, handleSend]
+    [popover, slashCommands, handleSlashSelect, handleSend, inputMode, onModeChange]
   );
 
   // Paste handler

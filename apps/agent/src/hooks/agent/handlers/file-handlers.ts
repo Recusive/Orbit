@@ -65,10 +65,14 @@ export async function handleFileTreeRequest(
     // Only update UI store workspace on initial load (when no specific path was requested)
     // This prevents subfolder navigation from overwriting the root workspace
     if (message.path === undefined || message.path === '') {
-      // Update UI store with workspace path
-      // Note: LSP workspace initialization is handled reactively by useLsp hook
-      // when it receives rootPath from the file store
-      useUIStore.getState().initializeWorkspace(targetPath);
+      const uiStore = useUIStore.getState();
+      // Only run destructive workspace bootstrap when the workspace actually changes.
+      // Root tree refreshes for the same workspace should not wipe worktree/session UI state.
+      if (uiStore.workspacePath !== targetPath) {
+        // Note: LSP workspace initialization is handled reactively by useLsp hook
+        // when it receives rootPath from the file store
+        uiStore.initializeWorkspace(targetPath);
+      }
 
       // Load conversations for this workspace (Claude Code-style folder isolation)
       conversationList(targetPath)
