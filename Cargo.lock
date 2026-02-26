@@ -3609,6 +3609,7 @@ dependencies = [
  "git2",
  "orbit-core",
  "serde",
+ "tempfile",
  "tokio",
  "tracing",
 ]

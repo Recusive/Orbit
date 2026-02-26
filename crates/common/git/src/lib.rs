@@ -1234,10 +1234,27 @@ pub async fn clone(url: &str, target_path: &Path) -> Result<()> {
 ///
 /// Uses `git worktree list --porcelain` for reliable parsing.
 ///
+/// Prunes stale worktree metadata (best-effort) before listing to ensure
+/// externally deleted worktrees are excluded from results.
+///
+/// [warning] TESTED: This function is covered by integration tests.
+///     If you modify this, run: cargo test -p orbit-git
+///     Test file: crates/common/git/tests/worktree_stale_cleanup.rs
+///
 /// # Errors
 /// Returns an error if the command fails or output cannot be parsed.
 pub async fn worktree_list(repo_path: &Path) -> Result<Vec<WorktreeInfo>> {
     debug!(?repo_path, "Listing worktrees");
+
+    // Best-effort prune: remove stale worktree metadata before listing.
+    // Non-fatal: listing should still proceed even if prune fails.
+    if let Err(err) = worktree_prune(repo_path).await {
+        error!(
+            ?repo_path,
+            error = %err,
+            "Worktree prune failed before listing; continuing"
+        );
+    }
 
     let output = Command::new("git")
         .args(["worktree", "list", "--porcelain"])
