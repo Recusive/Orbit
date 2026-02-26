@@ -1,20 +1,17 @@
 import { createLogger } from '@orbit/common/lib';
 import { open } from '@tauri-apps/plugin-shell';
-import { Bug, Loader2 } from 'lucide-react';
+import { Bug, Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { FC } from 'react';
 
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogContent,
+  DialogClose,
+  DialogContentGlass,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import { enhanceBugReport } from '@/lib/api/agent';
 
 const logger = createLogger('FeedbackDialog');
@@ -37,14 +34,18 @@ export const FeedbackDialog: FC<FeedbackDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Focus textarea when dialog opens
+  // Reset state and autofocus on open
+  // Skip autofocus on touch devices — opens keyboard unexpectedly
   useEffect(() => {
     if (isOpen) {
       setDescription('');
       setIsLoading(false);
-      setTimeout(() => {
-        textareaRef.current?.focus();
-      }, 50);
+      const isTouchDevice = 'ontouchstart' in window;
+      if (!isTouchDevice) {
+        setTimeout(() => {
+          textareaRef.current?.focus();
+        }, 50);
+      }
     }
   }, [isOpen]);
 
@@ -70,7 +71,6 @@ export const FeedbackDialog: FC<FeedbackDialogProps> = ({
 
     setIsLoading(true);
 
-    // Truncate messageContent to ~500 chars to keep the prompt reasonable
     const truncatedContent =
       messageContent.length > 500 ? `${messageContent.slice(0, 500)}...` : messageContent;
 
@@ -88,53 +88,101 @@ export const FeedbackDialog: FC<FeedbackDialogProps> = ({
       });
   }, [description, messageContent, openGitHubIssue]);
 
+  // Cmd+Enter / Ctrl+Enter to submit (forms-controls: keyboard submission)
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleSubmit();
+      }
+    },
+    [handleSubmit]
+  );
+
+  const isSubmitDisabled = description.trim().length === 0 || isLoading;
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Bug className="h-4 w-4" aria-hidden="true" />
-            Report an Issue
-          </DialogTitle>
-          <DialogDescription>
-            Describe the problem and we&apos;ll create a structured bug report for you.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContentGlass className="liquid-glass-dialog gap-0 overflow-hidden p-0 bg-chat-area border-0 shadow-none [&>.absolute]:hidden">
+        {/* Close button */}
+        <DialogClose className="liquid-glass-close absolute right-2 top-2 z-10 rounded-full p-1 opacity-60 transition-opacity duration-150 hover:opacity-100">
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
 
-        <Textarea
-          ref={textareaRef}
-          placeholder="What went wrong? (e.g., 'The response was completely off-topic' or 'It suggested code that doesn't compile')"
-          value={description}
-          onChange={(e): void => {
-            setDescription(e.target.value);
-          }}
-          rows={4}
-          className="resize-none"
-          disabled={isLoading}
-        />
+        {/* Content — macOS 26 alert layout: padding 20px 16px 16px, gap 16px */}
+        <div
+          className="relative flex flex-col items-center"
+          style={{ padding: '20px 16px 16px', gap: 16 }}
+        >
+          {/* Icon — 64×64, left-aligned */}
+          <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+            <div
+              className="liquid-glass-icon flex shrink-0 items-center justify-center bg-accent-9/10"
+              style={{ filter: 'none' }}
+            >
+              <Bug className="h-7 w-7 text-accent-11" aria-hidden="true" />
+            </div>
+          </div>
 
-        <DialogFooter>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              onOpenChange(false);
-            }}
-            disabled={isLoading}
+          {/* Title + Description — left-aligned */}
+          <div
+            className="flex w-full flex-col items-start"
+            style={{ padding: '0 6px 2px', gap: 10 }}
           >
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={description.trim().length === 0 || isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                Enhancing...
-              </>
-            ) : (
-              'Enhance & Report'
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+            <DialogTitle className="liquid-glass-title w-full">Report an Issue</DialogTitle>
+            <DialogDescription className="liquid-glass-desc w-full">
+              Describe the problem and we&apos;ll create a structured bug report for you.
+            </DialogDescription>
+          </div>
+
+          {/* Textarea — glass input surface */}
+          <div className="w-full" style={{ padding: '0 6px' }}>
+            <textarea
+              ref={textareaRef}
+              placeholder="What went wrong?"
+              value={description}
+              onChange={(e): void => {
+                setDescription(e.target.value);
+              }}
+              onKeyDown={handleKeyDown}
+              rows={4}
+              disabled={isLoading}
+              className="liquid-glass-textarea w-full resize-none"
+              spellCheck={false}
+            />
+          </div>
+
+          {/* Buttons — pill-shaped, 32px height, gap 8px */}
+          <div className="flex w-full items-center" style={{ gap: 8 }}>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none"
+              onClick={() => {
+                onOpenChange(false);
+              }}
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-primary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
+              onClick={handleSubmit}
+              disabled={isSubmitDisabled}
+            >
+              {isLoading ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  Enhancing&hellip;
+                </span>
+              ) : (
+                'Enhance & Report'
+              )}
+            </button>
+          </div>
+        </div>
+      </DialogContentGlass>
     </Dialog>
   );
 };

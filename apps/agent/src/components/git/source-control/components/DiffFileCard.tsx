@@ -1,26 +1,32 @@
 /**
  * DiffFileCard - Expandable file card with inline diff view
  *
- * Mirrors the Edit/Write tool widget visual language:
- * - Header: icon badge → filename → label → DiffStat → actions → chevron
- * - Body: colored border, tinted backgrounds,
- *   sticky line numbers, `text-sm leading-4` monospace lines.
+ * Uses Pierre's <FileDiff> for rendering with full old/new file content,
+ * enabling expandable "N unmodified lines" separators.
  *
- * Context lines (unchanged) are shown unhighlighted.
+ * Header layout: status badge → filename → label → DiffStat → actions → chevron
  */
+import { parseDiffFromFile } from '@pierre/diffs';
+import { FileDiff as PierreFileDiff } from '@pierre/diffs/react';
+import { preloadFileDiff } from '@pierre/diffs/ssr';
 import { ChevronDown, Minus, Plus, X } from 'lucide-react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import React, { useMemo, useState } from 'react';
-
-import { DIFF_EXPAND_TRANSITION, DIFF_EXPAND_TRANSITION_NONE } from '../constants';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { DisplayFileStatus, FileItem } from '../types';
-import type { HighlightToken } from '@/components/chat/tools/shared';
-import type { DiffLine, FileDiff } from '@/lib/api';
+import type { FileDiff } from '@/lib/api';
+import type { FileContents, FileDiffMetadata } from '@pierre/diffs/react';
 import type { FC } from 'react';
 
-import { DiffStat, useHighlightedTokens, useIsDarkMode } from '@/components/chat/tools/shared';
+import { DiffStat, useIsDarkMode } from '@/components/chat/tools/shared';
+import { readFile } from '@/lib/api/files';
+import { gitFileAtRef } from '@/lib/api/git';
 import { cn, GIT_STATUS_STYLES } from '@/lib/utils';
+import {
+  PIERRE_DIFF_STYLE,
+  PIERRE_DIFF_UNSAFE_CSS,
+  PIERRE_THEME,
+} from '@/lib/utils/pierre-adapter';
+import { useGitStore } from '@/stores/git/git-store';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -74,85 +80,6 @@ function countChanges(diff: FileDiff): { additions: number; deletions: number } 
   return { additions, deletions };
 }
 
-/** Tinted scroll container background — matches Write tool's bg-success/5 pattern */
-function getScrollBgClass(additions: number, deletions: number): string {
-  if (additions > 0 && deletions === 0) return 'bg-success/5';
-  if (deletions > 0 && additions === 0) return 'bg-destructive/5';
-  return '';
-}
-
-// ---------------------------------------------------------------------------
-// DiffLineRow - Single line in the diff (matches tool widget line layout)
-// ---------------------------------------------------------------------------
-
-interface DiffLineRowProps {
-  readonly line: DiffLine;
-  readonly tokens: HighlightToken[] | null;
-}
-
-const DiffLineRow: FC<DiffLineRowProps> = ({ line, tokens }) => {
-  const isAdd = line.origin === '+';
-  const isDel = line.origin === '-';
-  const isContext = !isAdd && !isDel;
-  const lineNum = isDel ? line.oldLine : line.newLine;
-
-  return (
-    <div
-      className={cn(
-        'flex font-mono text-sm leading-4',
-        isAdd && 'bg-success/10',
-        isDel && 'bg-destructive/10',
-        isContext && 'bg-card'
-      )}
-    >
-      {/* Sticky gutter: line number */}
-      <div
-        className={cn(
-          'sticky left-0 flex shrink-0',
-          isAdd && 'bg-success/5',
-          isDel && 'bg-destructive/5',
-          isContext && 'bg-card'
-        )}
-      >
-        <div
-          className={cn(
-            'w-8 px-1.5 text-right select-none',
-            isAdd && 'text-success/50 bg-success/10',
-            isDel && 'text-destructive/50 bg-destructive/10',
-            isContext && 'text-muted-foreground/40'
-          )}
-        >
-          {lineNum ?? ''}
-        </div>
-      </div>
-      {/* Origin sign — matches edit tool's +/- column */}
-      <div
-        className={cn(
-          'w-5 px-1 text-center select-none shrink-0',
-          isAdd && 'text-success/70',
-          isDel && 'text-destructive/70',
-          isContext && 'text-transparent'
-        )}
-      >
-        {isContext ? ' ' : line.origin}
-      </div>
-      {/* Content — syntax highlighted when tokens available */}
-      <div className={cn('flex-1 px-2 whitespace-pre', isDel && 'opacity-70')}>
-        {tokens ? (
-          /* key={ti} uses array index — acceptable since tokens are rebuilt per render and never reordered */
-          tokens.map((token, ti) => (
-            <span key={ti} style={token.color ? { color: token.color } : undefined}>
-              {token.content}
-            </span>
-          ))
-        ) : (
-          <span className="text-foreground">{line.content || ' '}</span>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // ---------------------------------------------------------------------------
 // DiffFileCard
 // ---------------------------------------------------------------------------
@@ -166,8 +93,10 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   onDiscard,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const shouldReduceMotion = useReducedMotion();
+  // Keep content mounted during the collapse animation, unmount after transition ends
+  const [isMounted, setIsMounted] = useState(false);
   const isDarkMode = useIsDarkMode();
+  const repoPath = useGitStore((s) => s.repoPath);
 
   const fileName = getFileName(file.path);
   const fileDir = getFileDirectory(file.path);
@@ -180,22 +109,110 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     [diff]
   );
 
-  // Build full content for syntax highlighting (only when expanded to avoid unnecessary work)
-  const fullContent = useMemo(() => {
-    if (!isExpanded || !diff) return '';
-    return diff.hunks
-      .flatMap((h) => h.lines)
-      .map((l) => l.content)
-      .join('\n');
-  }, [isExpanded, diff]);
+  // Prefetch file content, parse diff, AND preload Shiki highlighting on hover.
+  // By the time the user clicks, the fully-highlighted HTML is ready — expand is instant.
+  interface PreloadedDiff {
+    fileDiff: FileDiffMetadata;
+    prerenderedHTML: string;
+  }
 
-  const highlightedTokens = useHighlightedTokens(fullContent, file.path, isDarkMode);
+  const [preloaded, setPreloaded] = useState<PreloadedDiff | null>(null);
+  const prefetchRef = useRef<{ promise: Promise<PreloadedDiff | null>; key: string } | null>(null);
+
+  /** Build a cache key from the inputs that affect the fetched content. */
+  const prefetchKey = `${file.path}:${isStaged ? 'staged' : 'unstaged'}`;
+
+  /** Pierre options used for both preload and live rendering */
+  const themeType: 'dark' | 'light' = isDarkMode ? 'dark' : 'light';
+  const pierreOptions = useMemo(
+    () => ({
+      theme: PIERRE_THEME,
+      themeType,
+      diffStyle: 'unified' as const,
+      diffIndicators: 'bars' as const,
+      lineDiffType: 'word' as const,
+      overflow: 'wrap' as const,
+      disableFileHeader: true,
+      unsafeCSS: PIERRE_DIFF_UNSAFE_CSS,
+    }),
+    [themeType]
+  );
+
+  /** Fetch file content → parse diff → preload Shiki highlighting. */
+  const fetchAndPreload = (): Promise<PreloadedDiff | null> => {
+    if (prefetchRef.current?.key === prefetchKey) return prefetchRef.current.promise;
+    if (!diff || diff.isBinary || !repoPath) return Promise.resolve(null);
+
+    const absolutePath = `${repoPath}/${file.path}`;
+    const oldRef = isStaged ? 'HEAD' : 'INDEX';
+
+    const promise = Promise.all([
+      gitFileAtRef(repoPath, file.path, oldRef).catch(() => ''),
+      isStaged
+        ? gitFileAtRef(repoPath, file.path, 'INDEX').catch(() => '')
+        : readFile(absolutePath).catch(() => ''),
+    ])
+      .then(async ([oldContent, newContent]): Promise<PreloadedDiff | null> => {
+        const oldFile: FileContents = { name: file.path, contents: oldContent };
+        const newFile: FileContents = { name: file.path, contents: newContent };
+        const fileDiff = parseDiffFromFile(oldFile, newFile);
+
+        // Preload Shiki highlighting — this is the expensive work
+        const result = await preloadFileDiff({ fileDiff, options: pierreOptions });
+        return { fileDiff: result.fileDiff, prerenderedHTML: result.prerenderedHTML };
+      })
+      .catch(() => null);
+
+    prefetchRef.current = { promise, key: prefetchKey };
+    return promise;
+  };
+
+  /** Start prefetching + preloading on hover — data is ready by the time user clicks. */
+  const handleMouseEnter = (): void => {
+    if (canExpand && !isExpanded) void fetchAndPreload();
+  };
+
+  // When expanded, resolve prefetched data (or trigger fetch if hover was skipped).
+  // When collapsed, clear to free memory.
+  useEffect(() => {
+    if (!isExpanded) {
+      setPreloaded(null);
+      prefetchRef.current = null;
+      return;
+    }
+
+    let cancelled = false;
+    void fetchAndPreload().then((result) => {
+      if (!cancelled) setPreloaded(result);
+    });
+
+    return (): void => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchAndPreload is stable via ref
+  }, [isExpanded, prefetchKey]);
 
   const style = GIT_STATUS_STYLES[file.displayStatus];
 
   const handleToggle = (): void => {
-    if (canExpand) {
-      setIsExpanded((prev) => !prev);
+    if (!canExpand) return;
+    setIsExpanded((prev) => {
+      if (!prev) {
+        setIsMounted(true); // Mount immediately on expand
+      } else {
+        // When reduced motion is active, transitionEnd won't fire — unmount immediately
+        const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+        if (mq.matches) setIsMounted(false);
+      }
+      return !prev;
+    });
+  };
+
+  /** Unmount content after collapse transition finishes to free memory */
+  const handleTransitionEnd = (e: React.TransitionEvent): void => {
+    // Only react to the grid-template-rows transition on this element
+    if (e.propertyName === 'grid-template-rows' && !isExpanded) {
+      setIsMounted(false);
     }
   };
 
@@ -210,10 +227,11 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   };
 
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 mx-1 rounded-lg overflow-hidden">
       {/* Header */}
       <div
         onClick={handleToggle}
+        onMouseEnter={handleMouseEnter}
         onKeyDown={(e): void => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -225,9 +243,9 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
         aria-label={isExpanded ? `Collapse diff for ${fileName}` : `Expand diff for ${fileName}`}
         aria-expanded={isExpanded}
         className={cn(
-          'group/card flex items-center gap-2 py-1.5 px-2.5 mx-1',
-          'w-[calc(100%-0.5rem)] text-left',
-          'rounded-lg hover:bg-lg-control-hover',
+          'group/card flex items-center gap-2 py-1.5 px-2.5',
+          'w-full text-left bg-sidebar',
+          'hover:bg-lg-control-hover',
           canExpand ? 'cursor-pointer' : 'cursor-default'
         )}
       >
@@ -235,7 +253,6 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
         <div
           className={cn(
             'w-[22px] h-[22px] rounded-md flex items-center justify-center shrink-0',
-            '',
             STATUS_BADGE_BG[file.displayStatus]
           )}
         >
@@ -259,12 +276,12 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
           {hasDiff ? <DiffStat additions={additions} deletions={deletions} /> : null}
 
           {/* Action buttons (on hover) */}
-          <div className="flex items-center gap-0.5 opacity-0 group-hover/card:opacity-100 transition-opacity duration-150">
+          <div className="flex items-center gap-0.5 opacity-0 group-hover/card:opacity-100 transition-opacity duration-150 ease-out motion-reduce:transition-none">
             {onDiscard ? (
               <button
                 onClick={handleDiscard}
                 disabled={isLoading}
-                className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-lg-control-hover active:scale-95 transition-transform duration-75"
+                className="relative h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-destructive hover:bg-lg-control-hover active:scale-95 transition-[transform,color,background-color] duration-75 ease-out motion-reduce:transition-none before:absolute before:inset-0 before:min-h-[44px] before:min-w-[44px] before:-translate-x-1/2 before:-translate-y-1/2 before:left-1/2 before:top-1/2"
                 title="Discard"
                 aria-label={`Discard changes to ${fileName}`}
               >
@@ -274,7 +291,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
             <button
               onClick={handleAction}
               disabled={isLoading}
-              className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-transform duration-75"
+              className="relative h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-[transform,color,background-color] duration-75 ease-out motion-reduce:transition-none before:absolute before:inset-0 before:min-h-[44px] before:min-w-[44px] before:-translate-x-1/2 before:-translate-y-1/2 before:left-1/2 before:top-1/2"
               title={isStaged ? 'Unstage' : 'Stage'}
               aria-label={isStaged ? `Unstage ${fileName}` : `Stage ${fileName}`}
             >
@@ -285,7 +302,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
           {canExpand ? (
             <ChevronDown
               className={cn(
-                'h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200 shrink-0',
+                'h-3.5 w-3.5 text-muted-foreground/50 transition-[rotate] duration-150 ease-out motion-reduce:transition-none shrink-0',
                 isExpanded && 'rotate-180'
               )}
             />
@@ -293,60 +310,33 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
         </div>
       </div>
 
-      {/* Expandable diff body — thick border box matching tool widget content */}
-      <AnimatePresence initial={false}>
-        {isExpanded ? (
-          <motion.div
-            initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={shouldReduceMotion ? DIFF_EXPAND_TRANSITION_NONE : DIFF_EXPAND_TRANSITION}
-            style={{ overflow: 'hidden' }}
-          >
-            <div className="px-2.5 pb-1.5">
-              <div
-                className={cn(
-                  'rounded-lg border bg-card overflow-hidden',
-                  isBinary ? 'border-muted-foreground/20' : 'border-white dark:border-white/5'
-                )}
-              >
-                {isBinary ? (
-                  <div className="px-3 py-2 text-xs text-muted-foreground/60 italic">
-                    Binary file — diff not available
-                  </div>
-                ) : diff ? (
-                  <div
-                    className={cn(
-                      'overflow-auto max-h-[300px]',
-                      getScrollBgClass(additions, deletions)
-                    )}
-                  >
-                    <div className="w-fit min-w-full">
-                      {(() => {
-                        // NOTE: flatIndex is a mutable counter across nested maps. If hunks are ever
-                        // reordered, this will break — consider building a flat array in useMemo.
-                        let flatIndex = 0;
-                        return diff.hunks.map((hunk, hunkIndex) =>
-                          hunk.lines.map((line, lineIndex) => {
-                            const tokenIndex = flatIndex++;
-                            return (
-                              <DiffLineRow
-                                key={`${String(hunkIndex)}-${String(lineIndex)}`}
-                                line={line}
-                                tokens={highlightedTokens?.[tokenIndex] ?? null}
-                              />
-                            );
-                          })
-                        );
-                      })()}
-                    </div>
-                  </div>
-                ) : null}
+      {/* Expandable diff body — uses CSS grid-rows for GPU-friendly expand/collapse */}
+      <div
+        onTransitionEnd={handleTransitionEnd}
+        className={cn(
+          'grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none',
+          isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        )}
+      >
+        <div className="overflow-hidden min-h-0">
+          {isMounted ? (
+            isBinary ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground/60 italic">
+                Binary file — diff not available
               </div>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+            ) : preloaded ? (
+              <PierreFileDiff
+                fileDiff={preloaded.fileDiff}
+                prerenderedHTML={preloaded.prerenderedHTML}
+                style={PIERRE_DIFF_STYLE as React.CSSProperties}
+                options={pierreOptions}
+              />
+            ) : (
+              <div className="px-3 py-2 text-xs text-muted-foreground/60">Loading diff…</div>
+            )
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 };

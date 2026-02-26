@@ -228,7 +228,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         >
           <SelectTrigger
             className={cn(
-              'flex items-center gap-0.5 h-auto w-auto px-1.5 py-0.5 rounded-full text-[11px] border-0',
+              'flex items-center gap-0.5 h-auto w-auto px-1.5 py-0.5 rounded-[7px] text-[11px] border-0',
               'font-[510] cursor-pointer',
               'hover:bg-black/8 dark:hover:bg-white/15',
               'active:scale-[0.97] disabled:opacity-50',
@@ -248,10 +248,20 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
             )}
             <SelectValue>{branchName}</SelectValue>
           </SelectTrigger>
-          <SelectContent className="bg-[#f3f3f3]! dark:bg-[oklch(23%_0_0)]! border! border-white! dark:border-white/5! shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md [&::before]:hidden [&::after]:hidden">
+          <SelectContent className="min-w-0 bg-[#f3f3f3]! dark:bg-[oklch(23%_0_0)]! border! border-white! dark:border-white/5! shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md [&::before]:hidden [&::after]:hidden">
             {branches.map((b) => (
-              <SelectItem key={b.name} value={b.name}>
-                {b.name}
+              <SelectItem
+                key={b.name}
+                value={b.name}
+                className="py-1.5 pl-2.5 pr-7 text-sm rounded-[7px]"
+              >
+                <span className="flex items-center gap-1.5">
+                  <GitBranch
+                    className="h-3 w-3 shrink-0 text-muted-foreground/60"
+                    aria-hidden="true"
+                  />
+                  {b.name}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>

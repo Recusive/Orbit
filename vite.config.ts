@@ -137,6 +137,13 @@ export default defineConfig({
           if (id.includes('node_modules/streamdown')) {
             return 'vendor-streamdown';
           }
+          // Pierre diffs — bundles Shiki internally for syntax highlighting (~200KB)
+          if (
+            id.includes('node_modules/@pierre/diffs') ||
+            id.includes('node_modules/@pierre/precision-diffs')
+          ) {
+            return 'vendor-pierre-diffs';
+          }
           // All other node_modules will be bundled together into the main vendor chunk
           // by Vite's default behavior. Only split out packages that are >100KB or
           // used lazily to benefit from code splitting.
@@ -179,6 +186,10 @@ export default defineConfig({
       '@xterm/addon-fit',
       '@xterm/addon-search',
       '@xterm/addon-web-links',
+      // Pierre diffs — pre-bundle to prevent stale cache in dev
+      '@pierre/diffs',
+      '@pierre/diffs/react',
+      '@pierre/precision-diffs',
     ],
   },
   // Tauri expects a fixed port

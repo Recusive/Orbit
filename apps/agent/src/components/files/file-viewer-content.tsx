@@ -133,7 +133,7 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
 
   // Render diff view when in diff mode with diff data
   if (file.viewMode === 'diff' && file.diffData) {
-    return <FileDiffViewer diffData={file.diffData} />;
+    return <FileDiffViewer diffData={file.diffData} filePath={file.path} />;
   }
 
   return (

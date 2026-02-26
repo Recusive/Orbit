@@ -93,6 +93,8 @@
     "@lezer/highlight": "^1.2.3",
     "@lucide/lab": "^0.1.2",
     "@orbit/shared-schemas": "workspace:*",
+    "@pierre/diffs": "^1.0.11",
+    "@pierre/precision-diffs": "^0.6.1",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-context-menu": "^2.2.16",
     "@radix-ui/react-dialog": "^1.1.15",

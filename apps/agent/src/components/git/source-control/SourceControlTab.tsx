@@ -137,7 +137,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
             onClick={() => void handleFetch()}
             disabled={isFetching}
             className={cn(
-              'flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium',
+              'flex items-center gap-1 px-2.5 py-1 rounded-[9px] text-[11px] font-medium',
               'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
               'active:scale-[0.97] transition-[background-color,color,transform] duration-150',
               'disabled:opacity-40'
@@ -150,7 +150,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
             onClick={() => void refresh()}
             disabled={isLoading}
             className={cn(
-              'flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium',
+              'flex items-center gap-1 px-2.5 py-1 rounded-[9px] text-[11px] font-medium',
               'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
               'active:scale-[0.97] transition-[background-color,color,transform] duration-150',
               'disabled:opacity-40'
