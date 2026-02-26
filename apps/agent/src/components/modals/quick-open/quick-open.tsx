@@ -152,7 +152,7 @@ export const QuickOpen: FC<QuickOpenProps> = ({ open, onOpenChange }) => {
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} shouldFilter={false}>
       <CommandInput placeholder="Search files..." value={query} onValueChange={setQuery} />
-      <CommandList>
+      <CommandList className="[-webkit-mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]">
         <CommandEmpty>
           {isIndexing
             ? 'Indexing files...'
