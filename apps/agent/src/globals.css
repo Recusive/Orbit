@@ -93,6 +93,9 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-hover: var(--destructive-hover);
+  --color-destructive-subtle: var(--lg-alert-destructive-bg);
+  --color-destructive-subtle-hover: var(--lg-alert-destructive-bg-hover);
+  --color-destructive-text: var(--lg-alert-destructive-text);
   --color-border: var(--border);
   --color-border-panel: var(--border-panel);
   --color-input: var(--input);

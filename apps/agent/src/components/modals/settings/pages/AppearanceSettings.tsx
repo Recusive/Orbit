@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/providers/theme-provider';
+import { selectChatFullWidth, useChatWidthStore } from '@/stores/ui/chat-width-store';
 import { AVAILABLE_THEMES, selectIconTheme, useIconThemeStore } from '@/stores/ui/icon-theme-store';
 import {
   WELCOME_ANIMATIONS,
@@ -40,6 +41,10 @@ export const AppearanceSettings: FC = () => {
   // Welcome animation from Zustand store (persisted)
   const currentWelcomeAnimation = useWelcomeAnimationStore(selectWelcomeAnimation);
   const setWelcomeAnimation = useWelcomeAnimationStore((state) => state.setAnimation);
+
+  // Chat width from Zustand store (persisted)
+  const chatFullWidth = useChatWidthStore(selectChatFullWidth);
+  const setChatFullWidth = useChatWidthStore((state) => state.setFullWidth);
 
   const handleThemeChange = (value: string): void => {
     setTheme(value as 'light' | 'dark' | 'system');
@@ -123,6 +128,19 @@ export const AppearanceSettings: FC = () => {
               ))}
             </SelectContent>
           </Select>
+        </SettingItem>
+      </div>
+
+      <SectionDivider />
+
+      <SectionHeader title="Layout">Chat area layout preferences</SectionHeader>
+
+      <div className="space-y-0 divide-y divide-border/40">
+        <SettingItem
+          label="Full Width Chat"
+          description="Stretch the chat area to fill the available width"
+        >
+          <Switch checked={chatFullWidth} onCheckedChange={setChatFullWidth} />
         </SettingItem>
       </div>
 

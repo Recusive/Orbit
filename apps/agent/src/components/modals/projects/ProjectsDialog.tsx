@@ -175,7 +175,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="h-7 w-7 p-0 hover:bg-[var(--lg-alert-destructive-bg)] hover:text-[var(--lg-alert-destructive-text)] active:bg-[var(--lg-alert-destructive-bg-hover)]"
+                  className="h-7 w-7 p-0 hover:bg-destructive-subtle hover:text-destructive-text active:bg-destructive-subtle-hover"
                   aria-label="Close"
                 >
                   <X className="h-4 w-4" />
