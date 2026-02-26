@@ -644,7 +644,8 @@ impl ConversationManager {
         let parsed = parse_jsonl_lines(reader, &path);
 
         // Merge consecutive assistant messages into single turns.
-        let mut messages = merge_consecutive_assistants(parsed.raw_messages);
+        let mut messages =
+            merge_consecutive_assistants(parsed.raw_messages, &parsed.turn_start_ids);
 
         // Merge per-message metadata from sidecar (e.g., thinking_duration_ms).
         //
@@ -1018,6 +1019,7 @@ impl Default for ConversationManager {
 /// Intermediate state collected while parsing JSONL lines.
 struct ParsedJsonl {
     raw_messages: Vec<Message>,
+    turn_start_ids: HashSet<String>,
     title: String,
     first_timestamp: Option<u64>,
     last_timestamp: Option<u64>,
@@ -1245,6 +1247,8 @@ struct ParseContext {
     first_timestamp: Option<u64>,
     last_timestamp: Option<u64>,
     tool_results: HashMap<String, ToolResultData>,
+    pending_interrupt_boundary: bool,
+    turn_start_ids: HashSet<String>,
     last_msg_uuid: Option<String>,
     /// Tracks whether the most recently encountered assistant line was on the active branch.
     /// Used to skip `turn_duration` system lines that follow dead-branch assistants.
@@ -1261,6 +1265,8 @@ impl ParseContext {
             first_timestamp: None,
             last_timestamp: None,
             tool_results: HashMap::new(),
+            pending_interrupt_boundary: false,
+            turn_start_ids: HashSet::new(),
             last_msg_uuid: None,
             last_assistant_active: false,
         }
@@ -1300,6 +1306,7 @@ impl ParseContext {
                     last.is_interrupted = Some(true);
                 }
             }
+            self.pending_interrupt_boundary = true;
             return;
         }
         if text.is_empty() {
@@ -1334,6 +1341,10 @@ impl ParseContext {
         let ts = timestamp.map_or_else(|| self.last_timestamp.unwrap_or(0), parse_iso_timestamp);
         self.track_timestamp(ts);
         let mut msg = build_assistant_message(&uuid, value, ts);
+        if self.pending_interrupt_boundary {
+            let _ = self.turn_start_ids.insert(uuid.clone());
+            self.pending_interrupt_boundary = false;
+        }
         msg.parent_uuid.clone_from(&self.last_msg_uuid);
         self.last_msg_uuid = Some(uuid.clone());
         dedup_insert(&mut self.raw_messages, &mut self.seen_uuids, uuid, msg);
@@ -1344,6 +1355,7 @@ impl ParseContext {
         let title = resolve_title(self.title, self.first_user_text);
         ParsedJsonl {
             raw_messages: self.raw_messages,
+            turn_start_ids: self.turn_start_ids,
             title,
             first_timestamp: self.first_timestamp,
             last_timestamp: self.last_timestamp,
@@ -1510,7 +1522,7 @@ fn parse_title_line(line: &str) -> Option<String> {
 /// After merging, any `parent_uuid` references that pointed to a consumed (merged-away)
 /// message are remapped to the surviving message's UUID. Without this remap, the
 /// frontend's `getActiveChain()` walk breaks at merged boundaries.
-fn merge_consecutive_assistants(raw: Vec<Message>) -> Vec<Message> {
+fn merge_consecutive_assistants(raw: Vec<Message>, turn_starts: &HashSet<String>) -> Vec<Message> {
     let mut merged: Vec<Message> = Vec::with_capacity(raw.len());
     // Track consumed UUID → surviving UUID so we can fix parent_uuid references.
     let mut uuid_remap: HashMap<String, String> = HashMap::new();
@@ -1518,7 +1530,7 @@ fn merge_consecutive_assistants(raw: Vec<Message>) -> Vec<Message> {
     for msg in raw {
         if msg.role == MessageRole::Assistant {
             if let Some(last) = merged.last_mut() {
-                if last.role == MessageRole::Assistant {
+                if last.role == MessageRole::Assistant && !turn_starts.contains(&msg.id) {
                     // This message will be absorbed — record the remap.
                     let _ = uuid_remap.insert(msg.id.clone(), last.id.clone());
                     absorb_assistant_message(last, msg);
@@ -3011,6 +3023,92 @@ mod tests {
             conv.messages[3].is_interrupted, None,
             "Non-interrupted assistant should not be marked"
         );
+    }
+
+    #[test]
+    fn test_interrupt_marker_creates_merge_boundary_before_placeholder_response() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // tool_result and interrupt markers are protocol lines consumed by the parser.
+        // After filtering, assistant a1 and a2 become adjacent; interrupt must force
+        // a merge boundary so "No response requested." stays on its own message.
+        let path = ws_dir.join("interrupt-boundary.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"ask me"},"cwd":"/test","sessionId":"interrupt-boundary","timestamp":"2026-02-26T12:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"thinking","thinking":"Need user input."},{"type":"tool_use","id":"ask_1","name":"AskUserQuestion","input":{"questions":[{"question":"Proceed?"}]}}]},"cwd":"/test","sessionId":"interrupt-boundary","timestamp":"2026-02-26T12:00:01.000Z"}"#,
+            r#"{"type":"user","uuid":"tr1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"ask_1","content":"User declined to answer","is_error":true}]},"cwd":"/test","sessionId":"interrupt-boundary","timestamp":"2026-02-26T12:00:02.000Z"}"#,
+            r#"{"type":"user","uuid":"u-int","message":{"role":"user","content":"[Request interrupted by user for tool use]"},"cwd":"/test","sessionId":"interrupt-boundary","timestamp":"2026-02-26T12:00:03.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"No response requested."}]},"cwd":"/test","sessionId":"interrupt-boundary","timestamp":"2026-02-26T12:00:04.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("interrupt-boundary", None)
+            .expect("load")
+            .expect("not found");
+
+        assert_eq!(conv.messages.len(), 3);
+        assert_eq!(conv.messages[0].id, "u1");
+
+        let interrupted = &conv.messages[1];
+        assert_eq!(interrupted.id, "a1");
+        assert_eq!(interrupted.role, MessageRole::Assistant);
+        assert_eq!(interrupted.is_interrupted, Some(true));
+        assert_eq!(interrupted.tool_uses.len(), 1);
+        assert_eq!(interrupted.tool_uses[0].name, "AskUserQuestion");
+        assert_eq!(
+            interrupted.tool_uses[0].output.as_deref(),
+            Some("User declined to answer")
+        );
+        assert!(
+            !interrupted.tool_uses[0].success,
+            "Tool result with is_error:true should mark tool success=false"
+        );
+
+        let placeholder = &conv.messages[2];
+        assert_eq!(placeholder.id, "a2");
+        assert_eq!(placeholder.role, MessageRole::Assistant);
+        assert_eq!(placeholder.content, "No response requested.");
+        assert!(
+            placeholder.tool_uses.is_empty(),
+            "Placeholder continuation should remain a standalone assistant message"
+        );
+    }
+
+    #[test]
+    fn test_tool_result_does_not_create_merge_boundary() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Normal tool flow must keep merging across tool_result:
+        // assistant(tool_use) -> user(tool_result) -> assistant(text continuation)
+        let path = ws_dir.join("tool-result-merge.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"run ls"},"cwd":"/test","sessionId":"tool-result-merge","timestamp":"2026-02-26T12:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}}]},"cwd":"/test","sessionId":"tool-result-merge","timestamp":"2026-02-26T12:00:01.000Z"}"#,
+            r#"{"type":"user","uuid":"tr1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"file1.txt"}]},"cwd":"/test","sessionId":"tool-result-merge","timestamp":"2026-02-26T12:00:02.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"Found file1.txt"}]},"cwd":"/test","sessionId":"tool-result-merge","timestamp":"2026-02-26T12:00:03.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("tool-result-merge", None)
+            .expect("load")
+            .expect("not found");
+
+        // Expect one merged assistant turn; tool_result alone must not split it.
+        assert_eq!(conv.messages.len(), 2);
+        assert_eq!(conv.messages[0].id, "u1");
+        let assistant = &conv.messages[1];
+        assert_eq!(assistant.role, MessageRole::Assistant);
+        assert_eq!(assistant.id, "a1");
+        assert_eq!(assistant.content, "Found file1.txt");
+        assert_eq!(assistant.tool_uses.len(), 1);
+        assert_eq!(assistant.tool_uses[0].name, "Bash");
+        assert_eq!(assistant.tool_uses[0].output.as_deref(), Some("file1.txt"));
     }
 
     #[test]
