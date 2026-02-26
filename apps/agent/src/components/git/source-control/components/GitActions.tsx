@@ -29,7 +29,7 @@ export const GitActions: React.FC<GitActionsProps> = ({
   const isSyncing = isPulling || isPushing;
 
   return (
-    <div className="px-3 py-2 flex gap-1.5 border-b border-lg-separator">
+    <div className="px-3 py-2 flex gap-1.5">
       {/* Commit button - primary action */}
       <button
         onClick={() => void onCommit()}

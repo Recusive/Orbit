@@ -77,14 +77,14 @@ export const ChangesList: React.FC<ChangesListProps> = ({
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex items-center gap-0.5 px-1.5 h-[34px] border-b border-lg-separator">
+      <div className="flex items-center gap-0.5 px-1.5 h-[34px]">
         {/* Staged tab */}
         <button
           onClick={() => {
             setActiveTab('staged');
           }}
           className={cn(
-            'flex items-center gap-1 px-2 h-6 rounded-md text-xs tracking-wide',
+            'flex items-center gap-1 px-2 h-6 rounded-[9px] text-xs tracking-wide',
             '',
             activeTab === 'staged'
               ? 'bg-lg-control text-foreground font-medium'
@@ -112,7 +112,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             setActiveTab('changes');
           }}
           className={cn(
-            'flex items-center gap-1 px-2 h-6 rounded-md text-xs tracking-wide',
+            'flex items-center gap-1 px-2 h-6 rounded-[9px] text-xs tracking-wide',
             '',
             activeTab === 'changes'
               ? 'bg-lg-control text-foreground font-medium'
@@ -141,7 +141,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
           <button
             onClick={() => void activeBulkAction()}
             disabled={isStaging}
-            className="flex items-center gap-1 px-2 h-6 rounded-md text-xs text-foreground hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-transform duration-75"
+            className="flex items-center gap-1 px-2 h-6 rounded-[9px] text-xs text-foreground hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-transform duration-75"
             aria-label={isStaged ? 'Unstage all files' : 'Stage all files'}
           >
             {isStaged ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
