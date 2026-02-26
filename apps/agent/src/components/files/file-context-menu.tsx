@@ -25,6 +25,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { openInDefaultApp, revealInFileManager } from '@/lib/api';
+import { getPathName, toRelativePath } from '@/lib/utils/path-utils';
 import { useFileStore } from '@/stores/file/file-store';
 
 interface FileContextMenuProps {
@@ -45,16 +46,20 @@ export const FileContextMenu: FC<FileContextMenuProps> = ({
   onOpenChange,
 }) => {
   const rootPath = useFileStore((s) => s.rootPath);
-  const fileName = path.split('/').pop() ?? path;
+  const fileName = getPathName(path);
 
   const handleCopyPath = (): void => {
     void navigator.clipboard.writeText(path);
   };
 
   const handleCopyRelativePath = (): void => {
-    if (rootPath !== null && path.startsWith(rootPath)) {
-      const relative = path.slice(rootPath.length + 1);
-      void navigator.clipboard.writeText(relative);
+    if (rootPath !== null) {
+      const relative = toRelativePath(path, rootPath);
+      if (relative !== null) {
+        void navigator.clipboard.writeText(relative.length > 0 ? relative : fileName);
+        return;
+      }
+      void navigator.clipboard.writeText(path);
     } else {
       void navigator.clipboard.writeText(path);
     }

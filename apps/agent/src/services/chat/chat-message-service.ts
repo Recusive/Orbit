@@ -109,10 +109,10 @@ function scheduleSidebarRefresh(): void {
   };
 
   if (typeof requestIdleCallback === 'function') {
-    sidebarIdleCallbackId = requestIdleCallback(callback) as unknown as number;
+    sidebarIdleCallbackId = requestIdleCallback(callback);
   } else {
     // Fallback for environments without requestIdleCallback
-    sidebarIdleCallbackId = window.setTimeout(callback, 100) as unknown as number;
+    sidebarIdleCallbackId = window.setTimeout(callback, 100);
   }
 }
 
@@ -1323,32 +1323,46 @@ class ChatMessageService {
       const { addFileChange } = useFileStore.getState();
 
       if (toolName === 'edit') {
-        const filePath = tool.toolInput['file_path'] as string;
-        const rawOld = tool.toolInput['old_string'];
-        const rawNew = tool.toolInput['new_string'];
-        const oldString = typeof rawOld === 'string' ? rawOld : '';
-        const newString = typeof rawNew === 'string' ? rawNew : '';
-        addFileChange({
-          path: filePath,
-          type: 'modified',
-          oldContent: oldString,
-          newContent: newString,
-          diff: computeSimpleDiff(oldString, newString),
-          language: getLanguageFromPath(filePath),
-        });
+        const rawPath = tool.toolInput['file_path'];
+        if (typeof rawPath !== 'string' || rawPath.length === 0) {
+          logger.warn('Skipping Edit file change tracking: invalid file_path', {
+            toolId: message.tool_id,
+            rawPath,
+          });
+        } else {
+          const rawOld = tool.toolInput['old_string'];
+          const rawNew = tool.toolInput['new_string'];
+          const oldString = typeof rawOld === 'string' ? rawOld : '';
+          const newString = typeof rawNew === 'string' ? rawNew : '';
+          addFileChange({
+            path: rawPath,
+            type: 'modified',
+            oldContent: oldString,
+            newContent: newString,
+            diff: computeSimpleDiff(oldString, newString),
+            language: getLanguageFromPath(rawPath),
+          });
+        }
       }
       if (toolName === 'write') {
-        const filePath = tool.toolInput['file_path'] as string;
-        const rawContent = tool.toolInput['content'];
-        const content = typeof rawContent === 'string' ? rawContent : '';
-        addFileChange({
-          path: filePath,
-          type: 'created',
-          oldContent: '',
-          newContent: content,
-          diff: computeSimpleDiff('', content),
-          language: getLanguageFromPath(filePath),
-        });
+        const rawPath = tool.toolInput['file_path'];
+        if (typeof rawPath !== 'string' || rawPath.length === 0) {
+          logger.warn('Skipping Write file change tracking: invalid file_path', {
+            toolId: message.tool_id,
+            rawPath,
+          });
+        } else {
+          const rawContent = tool.toolInput['content'];
+          const content = typeof rawContent === 'string' ? rawContent : '';
+          addFileChange({
+            path: rawPath,
+            type: 'created',
+            oldContent: '',
+            newContent: content,
+            diff: computeSimpleDiff('', content),
+            language: getLanguageFromPath(rawPath),
+          });
+        }
       }
     }
 

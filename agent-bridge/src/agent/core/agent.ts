@@ -58,11 +58,7 @@ function isToolResultBlock(block: unknown): block is ToolResultBlock {
     return false;
   }
   const obj = block as Record<string, unknown>;
-  return (
-    obj.type === 'tool_result' &&
-    typeof obj.tool_use_id === 'string' &&
-    typeof obj.content === 'string'
-  );
+  return obj.type === 'tool_result' && typeof obj.tool_use_id === 'string';
 }
 
 /**

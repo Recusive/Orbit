@@ -25,6 +25,7 @@ import {
 } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { cn, GIT_STATUS_STYLES } from '@/lib/utils';
+import { getParentPath, getPathName, joinPath } from '@/lib/utils/path-utils';
 import { useFileStore } from '@/stores/file/file-store';
 import { selectFileStatus, useGitStore } from '@/stores/git/git-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -208,8 +209,12 @@ export const FileExplorer: FC = () => {
 
   const handleRename = useCallback(
     (filePath: string, newName: string): void => {
-      const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
-      const newPath = `${parentDir}/${newName}`;
+      const parentDir = getParentPath(filePath);
+      if (parentDir === null) {
+        logger.warn('Failed to derive parent directory for rename', { filePath, newName });
+        return;
+      }
+      const newPath = joinPath(parentDir, newName);
       renameFile(filePath, newPath)
         .then(() => {
           refresh();
@@ -285,7 +290,7 @@ export const FileExplorer: FC = () => {
           {rootPath ? (
             <>
               <span className="shrink-0">/</span>
-              <span className="truncate">{rootPath.split('/').pop()}</span>
+              <span className="truncate">{getPathName(rootPath)}</span>
             </>
           ) : null}
         </div>

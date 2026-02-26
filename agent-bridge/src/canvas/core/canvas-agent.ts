@@ -606,28 +606,30 @@ export class CanvasAgent {
     switch (message.type) {
       case 'assistant': {
         for (const block of message.message.content) {
-          if (block.type === 'text') {
+          const blockType = (block as { type?: string }).type;
+          if (blockType === 'text') {
             this.emitter.emit('message', {
               type: 'text',
-              content: block.text,
+              content: (block as { text: string }).text,
             } as SDKMessage);
-          } else if (block.type === 'tool_use') {
+          } else if (blockType === 'tool_use') {
             this.emitter.emit('message', {
               type: 'tool_use',
               content: '',
               metadata: {
-                toolName: block.name,
-                toolId: block.id,
-                toolInput: block.input,
+                toolName: (block as { name: string }).name,
+                toolId: (block as { id: string }).id,
+                toolInput: (block as { input: Record<string, unknown> }).input,
                 status: 'running',
               },
             } as SDKMessage);
-          } else {
-            // Remaining variant: thinking
+          } else if (blockType === 'thinking') {
             this.emitter.emit('message', {
               type: 'thinking',
-              content: block.thinking,
+              content: (block as { thinking: string }).thinking,
             } as SDKMessage);
+          } else {
+            logger.warn({ block }, 'Ignoring unknown assistant content block');
           }
         }
         break;

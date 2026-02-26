@@ -803,8 +803,10 @@ impl ConversationManager {
     /// with "Session ID already in use" if the file is present. The CLI itself
     /// creates the file on first message. We only append to an existing file.
     ///
-    /// POSIX guarantees atomic appends for writes under `PIPE_BUF` (4096 bytes),
-    /// so this is safe even if the SDK sidecar is also writing to the same file.
+    /// NOTE: For regular files, `PIPE_BUF` does not guarantee cross-process atomicity.
+    /// We still serialize to a single line and write it with one `write_all` call to
+    /// minimize interleaving risk. If strict multi-writer guarantees are needed,
+    /// file locking must be added around all writers.
     pub fn update_title(
         &self,
         session_id: &str,
@@ -825,6 +827,14 @@ impl ConversationManager {
             "type": "custom-title",
             "title": title,
         });
+        let mut line_bytes = serde_json::to_vec(&line).map_err(|e| {
+            Error::Config(format!(
+                "Failed to serialize custom-title JSON for {}: {}",
+                jsonl_path.display(),
+                e
+            ))
+        })?;
+        line_bytes.push(b'\n');
 
         let mut file = OpenOptions::new()
             .append(true)
@@ -837,7 +847,7 @@ impl ConversationManager {
                 ))
             })?;
 
-        writeln!(file, "{line}").map_err(|e| {
+        file.write_all(&line_bytes).map_err(|e| {
             Error::Config(format!(
                 "Failed to write custom-title to {}: {}",
                 jsonl_path.display(),
