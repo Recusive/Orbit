@@ -553,7 +553,7 @@ describe('ui-store', () => {
         expect(useUIStore.getState().reviewPanelWidth).toBe(PANEL_SIZES.review.min);
 
         // Too large
-        setReviewPanelWidth(2000);
+        setReviewPanelWidth(12000);
         expect(useUIStore.getState().reviewPanelWidth).toBe(PANEL_SIZES.review.max);
 
         // Valid

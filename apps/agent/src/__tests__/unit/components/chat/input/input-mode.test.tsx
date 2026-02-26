@@ -258,8 +258,8 @@ describe('InputControls Mode Picker Button', () => {
 
       const button = getModePickerButton();
       expect(button).toHaveClass('h-7');
-      expect(button).toHaveClass('rounded-lg');
-      expect(button).toHaveClass('transition-[background-color,color,transform]');
+      expect(button).toHaveClass('rounded-[9px]');
+      expect(button).toHaveClass('transition-transform');
     });
   });
 

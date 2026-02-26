@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Review Verification'
+  short_description: 'Verify review findings against source code'
+  default_prompt: 'Use $verify-review to verify reviews/cycle-3-opus.md against the current source and write a verification report.'

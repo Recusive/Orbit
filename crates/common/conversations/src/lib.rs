@@ -1389,9 +1389,12 @@ fn read_last_summary(path: &Path) -> Option<String> {
         return last_summary.or(first_user_text);
     }
 
-    // For large files, scan the last 4 KB first
+    // For large files, scan the tail first (where summary/custom-title usually lands).
+    const TAIL_SCAN_BYTES: u64 = 64 * 1024;
     let mut reader = BufReader::new(file);
-    let _ = reader.seek(SeekFrom::End(-4096)).ok()?;
+    let tail_scan = file_len.min(TAIL_SCAN_BYTES);
+    let tail_offset = i64::try_from(tail_scan).ok()?;
+    let _ = reader.seek(SeekFrom::End(-tail_offset)).ok()?;
 
     let mut partial = String::new();
     let _ = reader.read_line(&mut partial).ok()?;
@@ -1405,27 +1408,32 @@ fn read_last_summary(path: &Path) -> Option<String> {
         }
     }
 
-    // Fallback: check the first line
-    let file2 = fs::File::open(path).ok()?;
-    let mut reader2 = BufReader::new(file2);
-    let mut first_line = String::new();
-    let _ = reader2.read_line(&mut first_line).ok()?;
-    if let Some(summary) = parse_title_line(first_line.trim()) {
-        return Some(summary);
-    }
+    // Tail window did not include a title marker. Fall back to a forward stream
+    // over the file so older custom-title entries are still discoverable.
+    forward_scan_title(path)
+}
 
-    // Last resort: first user message content
-    let file3 = fs::File::open(path).ok()?;
-    let reader3 = BufReader::new(file3);
-    for line_result in reader3.lines().take(50) {
+/// Scan the entire file line-by-line for the last `custom-title`/`summary` entry,
+/// falling back to the first user message text.
+fn forward_scan_title(path: &Path) -> Option<String> {
+    let file = fs::File::open(path).ok()?;
+    let reader = BufReader::new(file);
+    let mut last_summary: Option<String> = None;
+    let mut first_user_text: Option<String> = None;
+    for line_result in reader.lines() {
         let Ok(line) = line_result else { continue };
         let trimmed = line.trim();
-        if let Some(text) = extract_user_text_from_line(trimmed) {
-            return Some(text);
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some(summary) = parse_title_line(trimmed) {
+            last_summary = Some(summary);
+        }
+        if first_user_text.is_none() {
+            first_user_text = extract_user_text_from_line(trimmed);
         }
     }
-
-    None
+    last_summary.or(first_user_text)
 }
 
 /// Extract user message text from a JSONL line, if it's a real user message.
@@ -2366,6 +2374,40 @@ mod tests {
             .expect("load summaries");
         let s = summaries.iter().find(|s| s.session_id == "small-session");
         assert_eq!(s.expect("found").title, "My Small Chat");
+    }
+
+    #[test]
+    fn test_large_file_finds_custom_title_outside_tail_window() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let mut content = String::new();
+        content.push_str(
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"fallback title text"},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:00.000Z"}"#,
+        );
+        content.push('\n');
+        content.push_str(r#"{"type":"custom-title","title":"Pinned Custom Title"}"#);
+        content.push('\n');
+
+        // Ensure file is much larger than the tail scan window so custom-title
+        // is outside the tail and must be found by forward fallback scanning.
+        let filler = "x".repeat(160);
+        for i in 0_i32..2_200_i32 {
+            let line = format!(r#"{{"type":"system","idx":{i},"payload":"{filler}"}}"#);
+            content.push_str(&line);
+            content.push('\n');
+        }
+
+        fs::write(ws_dir.join("large-custom-title-session.jsonl"), content).expect("write");
+
+        let summaries = manager
+            .load_summaries_for_workspace(None)
+            .expect("load summaries");
+        let s = summaries
+            .iter()
+            .find(|s| s.session_id == "large-custom-title-session");
+        assert_eq!(s.expect("found").title, "Pinned Custom Title");
     }
 
     #[test]
