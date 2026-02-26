@@ -290,14 +290,17 @@ export function hasVisibleContent(
     return true;
   }
 
-  // Filter out SDK placeholder responses to slash commands (e.g., "No response requested."
-  // from /compact). These are protocol artifacts, not real assistant content.
-  if (message.content.trim() === 'No response requested.') return false;
-
   const hasThinking =
     (message.thinkingBlocks !== undefined && message.thinkingBlocks.length > 0) ||
     Boolean(message.thinking);
   const hasSegments = segments.length > 0;
 
-  return hasThinking || hasSegments || isComplete || Boolean(message.isInterrupted);
+  // Messages with thinking, tools, or interrupted status should always stay visible.
+  if (hasThinking || hasSegments || Boolean(message.isInterrupted)) return true;
+
+  // Filter out SDK placeholder responses to slash commands (e.g., /compact).
+  // Only hide it when no other renderable content exists.
+  if (message.content.trim() === 'No response requested.') return false;
+
+  return isComplete;
 }
