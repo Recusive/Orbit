@@ -115,21 +115,17 @@ export const FeedbackDialog: FC<FeedbackDialogProps> = ({
           className="relative flex flex-col items-center"
           style={{ padding: '20px 16px 16px', gap: 16 }}
         >
-          {/* Icon — 64×64, left-aligned */}
-          <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+          {/* Icon + Title + Description — tighter internal gap */}
+          <div
+            className="flex w-full flex-col items-start"
+            style={{ padding: '0 6px 2px', gap: 10 }}
+          >
             <div
               className="liquid-glass-icon flex shrink-0 items-center justify-center bg-accent-9/10"
               style={{ filter: 'none' }}
             >
               <Bug className="h-7 w-7 text-accent-11" aria-hidden="true" />
             </div>
-          </div>
-
-          {/* Title + Description — left-aligned */}
-          <div
-            className="flex w-full flex-col items-start"
-            style={{ padding: '0 6px 2px', gap: 10 }}
-          >
             <DialogTitle className="liquid-glass-title w-full">Report an Issue</DialogTitle>
             <DialogDescription className="liquid-glass-desc w-full">
               Describe the problem and we&apos;ll create a structured bug report for you.
