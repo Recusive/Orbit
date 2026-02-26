@@ -1,10 +1,16 @@
 import { Command as CommandPrimitive } from 'cmdk';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import * as React from 'react';
 
 import type { DialogProps } from '@radix-ui/react-dialog';
 
-import { Dialog, DialogContentTopCenter, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContentTopCenter,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 const Command = React.forwardRef<
@@ -34,11 +40,15 @@ const CommandDialog = ({
 }: CommandDialogProps): React.JSX.Element => {
   return (
     <Dialog {...props}>
-      <DialogContentTopCenter className="overflow-hidden p-0" aria-describedby={undefined}>
+      <DialogContentTopCenter
+        className="overflow-hidden p-0 [&>button:last-child]:hidden"
+        aria-describedby={undefined}
+      >
         <DialogTitle className="sr-only">Command Palette</DialogTitle>
+        <DialogDescription className="sr-only">Search files and commands</DialogDescription>
         <Command
           shouldFilter={shouldFilter}
-          className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground/50 [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-widest [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-1.5 [&_[cmdk-input-wrapper]_svg]:h-4 [&_[cmdk-input-wrapper]_svg]:w-4 [&_[cmdk-input]]:h-11 [&_[cmdk-item]]:px-3 [&_[cmdk-item]]:py-2 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4"
+          className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground/50 [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-widest [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-1.5 [&_[cmdk-input-wrapper]_svg]:h-4 [&_[cmdk-input-wrapper]_svg]:w-4 [&_[cmdk-item]]:px-3 [&_[cmdk-item]]:py-2 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4"
         >
           {children}
         </Command>
@@ -51,16 +61,27 @@ const CommandInput = React.forwardRef<
   React.ComponentRef<typeof CommandPrimitive.Input>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b border-lg-separator px-4" cmdk-input-wrapper="">
-    <Search className="mr-3 h-4 w-4 shrink-0 opacity-40" />
-    <CommandPrimitive.Input
-      ref={ref}
-      className={cn(
-        'flex h-11 w-full rounded-md bg-transparent py-3 text-base outline-none placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-50',
-        className
-      )}
-      {...props}
-    />
+  <div className="flex items-center px-3 py-2" cmdk-input-wrapper="">
+    <div className="relative flex-1">
+      <Search
+        className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50"
+        aria-hidden="true"
+      />
+      <CommandPrimitive.Input
+        ref={ref}
+        className={cn(
+          'w-full h-9 rounded-[9px] bg-[var(--lg-alert-secondary-bg)] pl-9 pr-9 text-sm',
+          'placeholder:text-muted-foreground/40 outline-none',
+          'focus:bg-[var(--lg-control-bg)]',
+          className
+        )}
+        {...props}
+      />
+      <DialogClose className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 bg-foreground/8 text-muted-foreground/50 transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text">
+        <X className="h-3 w-3" aria-hidden="true" />
+        <span className="sr-only">Close</span>
+      </DialogClose>
+    </div>
   </div>
 ));
 
@@ -127,7 +148,7 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      'group relative flex cursor-default gap-3 select-none items-center border-l-2 border-transparent pl-[10px] pr-3 py-2 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected=false]:rounded-lg data-[selected=false]:hover:bg-lg-control-hover data-[selected=true]:rounded-r-lg data-[selected=true]:bg-foreground/8 data-[selected=true]:text-foreground data-[selected=true]:border-foreground/40 data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+      'group relative flex cursor-default gap-3 select-none items-center border-l-2 border-transparent pl-[10px] pr-3 py-2 text-sm outline-none text-lg-text-secondary data-[disabled=true]:pointer-events-none data-[selected=false]:rounded-lg data-[selected=false]:hover:bg-lg-sidebar-hover data-[selected=false]:hover:text-foreground data-[selected=true]:rounded-r-lg data-[selected=true]:bg-foreground/8 data-[selected=true]:text-foreground data-[selected=true]:border-foreground/40 data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
       className
     )}
     {...props}
