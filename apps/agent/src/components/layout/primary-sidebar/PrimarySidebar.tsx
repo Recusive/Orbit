@@ -482,7 +482,7 @@ export const PrimarySidebar: FC = () => {
                     size={24}
                     variant="solid"
                     colorClasses={['bg-[#945036] dark:bg-[#e9ad97]']}
-                    className="rounded-md shrink-0 text-white dark:text-current"
+                    className="rounded-md shrink-0 text-white dark:text-black"
                     style={{ pointerEvents: 'none' }}
                   />
                   <div className="flex flex-col min-w-0 flex-1">

@@ -79,7 +79,7 @@ const ProjectTile: FC<ProjectTileProps> = ({ project, onClick }) => (
       size={48}
       variant="solid"
       colorClasses={['bg-[#945036] dark:bg-[#e9ad97]']}
-      className="rounded-xl shrink-0 text-white dark:text-current"
+      className="rounded-xl shrink-0 text-white dark:text-black"
       style={{ pointerEvents: 'none' }}
     />
     <div className="flex flex-col items-center gap-0.5 min-w-0 w-full">
@@ -167,20 +167,15 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
               Projects
             </DialogTitle>
             <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-sm text-lg-text-secondary"
-                onClick={() => void handleOpenFolder()}
-              >
-                <FolderPlus className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
+              <Button variant="secondary" size="sm" onClick={() => void handleOpenFolder()}>
+                <FolderPlus className="h-3.5 w-3.5" aria-hidden="true" />
                 Open Folder
               </Button>
               <DialogClose asChild>
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="sm"
-                  className="h-7 w-7 p-0 text-lg-text-secondary hover:bg-red-500/10 hover:text-red-500 active:bg-red-500/15"
+                  className="h-7 w-7 p-0 hover:bg-[var(--lg-alert-destructive-bg)] hover:text-[var(--lg-alert-destructive-text)] active:bg-[var(--lg-alert-destructive-bg-hover)]"
                   aria-label="Close"
                 >
                   <X className="h-4 w-4" />
