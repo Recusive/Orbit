@@ -2,6 +2,8 @@
  * UI store - User interface state
  */
 
+export { selectChatFullWidth, useChatWidthStore } from './chat-width-store';
+
 export {
   AVAILABLE_THEMES,
   THEME_BY_ID,

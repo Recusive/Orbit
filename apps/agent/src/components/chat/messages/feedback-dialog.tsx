@@ -104,22 +104,21 @@ export const FeedbackDialog: FC<FeedbackDialogProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContentGlass className="liquid-glass-dialog gap-0 overflow-hidden p-0 bg-chat-area border-0 shadow-none">
-        {/* Close button */}
-        <DialogClose className="liquid-glass-close absolute right-2 top-2 z-10 rounded-full p-1 opacity-60 transition-opacity duration-150 hover:opacity-100">
-          <X className="h-3.5 w-3.5" aria-hidden="true" />
-          <span className="sr-only">Close</span>
-        </DialogClose>
-
         {/* Content — macOS 26 alert layout: padding 20px 16px 16px, gap 16px */}
         <div
           className="relative flex flex-col items-center"
           style={{ padding: '20px 16px 16px', gap: 16 }}
         >
-          {/* Icon + Title + Description — tighter internal gap */}
+          {/* Icon + Title + Description + Close — tighter internal gap */}
           <div
             className="flex w-full flex-col items-start"
             style={{ padding: '0 6px 2px', gap: 10 }}
           >
+            {/* Close button — top-right inside padded area */}
+            <DialogClose className="absolute right-[22px] top-[20px] z-10 rounded-[9px] p-1.5 bg-foreground/6 text-muted-foreground transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text active:bg-destructive-subtle-hover">
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
             <div
               className="liquid-glass-icon flex shrink-0 items-center justify-center bg-accent-9/10"
               style={{ filter: 'none' }}
