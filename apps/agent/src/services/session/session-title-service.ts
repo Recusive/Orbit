@@ -127,6 +127,8 @@ export function flushPendingTitle(sessionId: string, remappedFromId?: string): v
 
 /** Sessions that have already had an AI title generated (prevents duplicate calls). */
 const aiTitleGenerated = new Set<string>();
+/** Sessions with an AI title request currently in progress (dedupes concurrent calls). */
+const aiTitleInFlight = new Set<string>();
 
 /**
  * Generate an AI-powered session title and persist it.
@@ -143,7 +145,8 @@ export function generateAITitle(
   assistantResponse: string
 ): void {
   // Prevent duplicate calls for the same session
-  if (aiTitleGenerated.has(sessionId)) return;
+  if (aiTitleGenerated.has(sessionId) || aiTitleInFlight.has(sessionId)) return;
+  aiTitleInFlight.add(sessionId);
 
   void (async (): Promise<void> => {
     try {
@@ -152,8 +155,9 @@ export function generateAITitle(
       applySessionTitle(sessionId, title);
       logger.info('AI title generated', { sessionId, title });
     } catch (err: unknown) {
-      aiTitleGenerated.delete(sessionId); // Defense-in-depth: allow retry on next agent:complete
       logger.warn('AI title generation failed, will retry on next turn', { sessionId, err });
+    } finally {
+      aiTitleInFlight.delete(sessionId);
     }
   })();
 }

@@ -234,31 +234,33 @@ export function useBrowser(): void {
   // from the react-grab plugin and emits this event. We bridge it into the
   // existing ExtensionMessage flow so the switch/case above handles it.
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-
-    void (async () => {
-      unlisten = await onBrowserElementSelected((data: string) => {
-        try {
-          const element = JSON.parse(data) as ReactElementContext;
-          window.postMessage(
-            {
-              type: 'browser:element-selected',
-              uuid: generateUUID(),
-              element,
-            },
-            '*'
-          );
-        } catch (err) {
-          logger.error(
-            'Failed to parse element selection data',
-            err instanceof Error ? err : new Error(String(err))
-          );
-        }
-      });
-    })();
+    const unlistenPromise = onBrowserElementSelected((data: string) => {
+      try {
+        const element = JSON.parse(data) as ReactElementContext;
+        window.postMessage(
+          {
+            type: 'browser:element-selected',
+            uuid: generateUUID(),
+            element,
+          },
+          '*'
+        );
+      } catch (err) {
+        logger.error(
+          'Failed to parse element selection data',
+          err instanceof Error ? err : new Error(String(err))
+        );
+      }
+    });
 
     return (): void => {
-      unlisten?.();
+      void unlistenPromise
+        .then((dispose) => {
+          dispose();
+        })
+        .catch((err: unknown) => {
+          logger.warn('Failed to unlisten browser element selection handler', { err });
+        });
     };
   }, []);
 

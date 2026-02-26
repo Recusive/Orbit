@@ -406,19 +406,24 @@ export abstract class BaseAgent {
     switch (message.type) {
       case 'assistant': {
         for (const block of message.message.content) {
-          if (block.type === 'text') {
-            this.emitter.emit('text', block.text);
-          } else if (block.type === 'tool_use') {
+          const blockType = (block as { type?: string }).type;
+          if (blockType === 'text') {
+            this.emitter.emit('text', (block as { text: string }).text);
+          } else if (blockType === 'tool_use') {
             this.emitter.emit('toolUse', {
-              name: block.name,
-              id: block.id,
-              input: block.input,
+              name: (block as { name: string }).name,
+              id: (block as { id: string }).id,
+              input: (block as { input: Record<string, unknown> }).input,
             });
             // Track node modifications from tool use
-            this.trackToolUse(block.name, block.input);
+            this.trackToolUse(
+              (block as { name: string }).name,
+              (block as { input: Record<string, unknown> }).input
+            );
+          } else if (blockType === 'thinking') {
+            this.emitter.emit('thinking', (block as { thinking: string }).thinking);
           } else {
-            // Remaining variant: thinking
-            this.emitter.emit('thinking', block.thinking);
+            this.logger.warn({ block }, 'Ignoring unknown assistant content block');
           }
         }
         break;

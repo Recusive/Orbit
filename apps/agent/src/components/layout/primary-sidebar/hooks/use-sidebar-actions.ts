@@ -9,8 +9,13 @@ import type { WorktreeInfo } from '@/lib/api';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
-import { conversationDelete, gitWorktreeList, gitWorktreeRemove } from '@/lib/api';
-import { applySessionTitle } from '@/services/session';
+import {
+  conversationDelete,
+  conversationUpdateTitle,
+  gitWorktreeList,
+  gitWorktreeRemove,
+} from '@/lib/api';
+import { isPathEqualOrWithin, isPathWithin } from '@/lib/utils/path-utils';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
@@ -89,18 +94,17 @@ export const useSidebarActions = ({
   workspacePath,
   activeWorktreePath,
 }: UseSidebarActionsProps): UseSidebarActionsReturn => {
-  const {
-    setLoadingConversation,
-    setConversationTransitioning,
-    setWorktrees,
-    setRepoRootPath,
-    switchToWorktree,
-    removeWorktree,
-    setCreateWorktreeDialogOpen,
-    setEditingConversationId,
-    removeConversation,
-    setVaultOpen,
-  } = useUIStore();
+  const setLoadingConversation = useUIStore((s) => s.setLoadingConversation);
+  const setConversationTransitioning = useUIStore((s) => s.setConversationTransitioning);
+  const setWorktrees = useUIStore((s) => s.setWorktrees);
+  const setRepoRootPath = useUIStore((s) => s.setRepoRootPath);
+  const switchToWorktree = useUIStore((s) => s.switchToWorktree);
+  const removeWorktree = useUIStore((s) => s.removeWorktree);
+  const setCreateWorktreeDialogOpen = useUIStore((s) => s.setCreateWorktreeDialogOpen);
+  const setEditingConversationId = useUIStore((s) => s.setEditingConversationId);
+  const removeConversation = useUIStore((s) => s.removeConversation);
+  const setVaultOpen = useUIStore((s) => s.setVaultOpen);
+  const updateConversationTitle = useUIStore((s) => s.updateConversationTitle);
   const { postMessage } = useTauri();
   const repoRootPath = useUIStore((s) => s.repoRootPath);
 
@@ -128,10 +132,12 @@ export const useSidebarActions = ({
       // plain folder inside a directory that has a .git (e.g., ~/Desktop/test1
       // where ~ has .git). The user's chosen workspace must never be overridden
       // by a parent repo root — that would hijack the file explorer.
-      const worktreePaths = new Set(worktreeList.map((wt) => wt.path));
-      const workspaceIsWorktree = worktreePaths.has(discoveryPath);
+      const workspaceIsWorktree = worktreeList.some(
+        (wt) =>
+          isPathEqualOrWithin(discoveryPath, wt.path) && isPathEqualOrWithin(wt.path, discoveryPath)
+      );
       const workspaceInsideWorktree = worktreeList.some((wt) =>
-        discoveryPath.startsWith(wt.path + '/')
+        isPathWithin(discoveryPath, wt.path)
       );
 
       if (!workspaceIsWorktree && workspaceInsideWorktree) {
@@ -177,7 +183,12 @@ export const useSidebarActions = ({
       // A stale path from a prior workspace could drive file/git/terminal ops to wrong directory.
       const currentActiveWorktree = useUIStore.getState().activeWorktreePath;
       const isActiveWorktreeValid =
-        currentActiveWorktree !== null && worktreePaths.has(currentActiveWorktree);
+        currentActiveWorktree !== null &&
+        worktreeList.some(
+          (wt) =>
+            isPathEqualOrWithin(currentActiveWorktree, wt.path) &&
+            isPathEqualOrWithin(wt.path, currentActiveWorktree)
+        );
 
       if (!isActiveWorktreeValid) {
         // Reset to main worktree (or first available) when active is invalid/stale
@@ -333,12 +344,28 @@ export const useSidebarActions = ({
   // Conversation rename handler
   const handleRenameConversation = useCallback(
     (sessionId: string, newTitle: string): void => {
-      // Persist to UIStore (memory) + Rust backend (JSONL on disk)
-      applySessionTitle(sessionId, newTitle);
+      const previousTitle = useUIStore
+        .getState()
+        .conversations.find((c) => c.sessionId === sessionId)?.title;
+
+      // Optimistic in-memory update
+      updateConversationTitle(sessionId, newTitle);
       setEditingConversationId(null);
-      toast.success('Conversation renamed');
+
+      const workspacePathForPersist = useUIStore.getState().workspacePath ?? undefined;
+      void conversationUpdateTitle(sessionId, newTitle, workspacePathForPersist)
+        .then(() => {
+          toast.success('Conversation renamed');
+        })
+        .catch((err: unknown) => {
+          if (previousTitle !== undefined) {
+            updateConversationTitle(sessionId, previousTitle);
+          }
+          logger.error('Failed to persist renamed conversation title', err);
+          toast.error('Failed to rename conversation');
+        });
     },
-    [setEditingConversationId]
+    [setEditingConversationId, updateConversationTitle]
   );
 
   // Conversation delete handler

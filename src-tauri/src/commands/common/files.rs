@@ -183,8 +183,8 @@ pub async fn open_in_default_app(path: String) -> Result<()> {
 
     #[cfg(target_os = "windows")]
     {
-        let _child = Command::new("cmd")
-            .args(["/C", "start", "", &path])
+        let _child = Command::new("explorer")
+            .arg(&path)
             .spawn()
             .map_err(Error::Io)?;
     }

@@ -15,6 +15,10 @@ import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 
 const logger = createLogger('ConversationHandlers');
 
+function isChatRole(role: ConversationMessageDto['role']): role is 'user' | 'assistant' {
+  return role === 'user' || role === 'assistant';
+}
+
 export function handleConversationCreate(
   message: Extract<WebviewMessage, { type: 'conversation:create' }>
 ): void {
@@ -357,14 +361,16 @@ export async function handleConversationRewind(
           session_id,
           new_session_id: session_id,
           rewind_to_message_id: message_id,
-          messages: messagesUpToRewind.map((m) => ({
-            id: m.id,
-            role: m.role as 'user' | 'assistant',
-            content: m.content,
-            timestamp: m.createdAt,
-            toolUses: m.toolUses,
-            parentUuid: m.parentUuid,
-          })),
+          messages: messagesUpToRewind
+            .filter((m) => isChatRole(m.role))
+            .map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              timestamp: m.createdAt,
+              toolUses: m.toolUses,
+              parentUuid: m.parentUuid,
+            })),
         },
         '*'
       );

@@ -27,6 +27,12 @@ interface KeychainStatus {
   error: string | null;
 }
 
+declare global {
+  interface Window {
+    __showAccountToast?: () => void;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -64,18 +70,6 @@ function timeTextColor(expiresAtMs: number): string {
 // ---------------------------------------------------------------------------
 // Toast content renderer
 // ---------------------------------------------------------------------------
-
-// DEBUG: expose on window for DevTools testing
-// @ts-expect-error -- temporary debug helper
-window.__showAccountToast = (): void => {
-  showAndAutoDismiss({
-    hasCredentials: true,
-    credentialType: 'OAuth',
-    expiresAt: Date.now() + 3 * 60 * 60_000,
-    entryExists: true,
-    error: null,
-  });
-};
 
 const TOAST_DURATION_MS = 6000;
 
@@ -201,6 +195,18 @@ function showAccountToast(status: KeychainStatus): string | number {
 function showAndAutoDismiss(status: KeychainStatus): void {
   const id = showAccountToast(status);
   setTimeout(() => toast.dismiss(id), TOAST_DURATION_MS);
+}
+
+if (import.meta.env.DEV) {
+  window.__showAccountToast = (): void => {
+    showAndAutoDismiss({
+      hasCredentials: true,
+      credentialType: 'OAuth',
+      expiresAt: Date.now() + 3 * 60 * 60_000,
+      entryExists: true,
+      error: null,
+    });
+  };
 }
 
 // ---------------------------------------------------------------------------
