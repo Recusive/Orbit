@@ -123,6 +123,7 @@ export function useSourceControl(): UseSourceControlReturn {
   const branches = useGitStore((s) => s.branches);
   const isFetching = useGitStore((s) => s.isFetching);
   const lastFetchedAt = useGitStore((s) => s.lastFetchedAt);
+  const lastUpdated = useGitStore((s) => s.lastUpdated);
 
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
@@ -163,12 +164,11 @@ export function useSourceControl(): UseSourceControlReturn {
     }
   }, [status, repoPath]);
 
-  // Re-fetch diffs whenever status changes (picks up new files, external modifications, etc.)
+  // Re-fetch diffs on status updates and background polling ticks.
   useEffect(() => {
-    if (status && repoPath) {
-      void fetchDiffs();
-    }
-  }, [status, repoPath, fetchDiffs]);
+    if (!repoPath || !status) return;
+    void fetchDiffs();
+  }, [lastUpdated, repoPath, status, fetchDiffs]);
 
   /** Refresh git status by calling the API and writing to the store */
   const refreshStatus = useCallback(async (): Promise<void> => {

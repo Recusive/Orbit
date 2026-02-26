@@ -163,6 +163,43 @@ describe('git-store', () => {
       expect(useGitStore.getState().status?.ahead).toBe(2);
     });
 
+    it('should update when changed entries have same list length', () => {
+      const { setStatus } = useGitStore.getState();
+      const firstStatus = createGitStatus({
+        modified: [createStatusEntry('src/a.ts', 'modified')],
+      });
+      const secondStatus = createGitStatus({
+        modified: [createStatusEntry('src/b.ts', 'modified')],
+      });
+
+      setStatus(firstStatus);
+      setStatus(secondStatus);
+
+      expect(useGitStore.getState().status).toBe(secondStatus);
+      expect(useGitStore.getState().status?.modified[0]?.path).toBe('src/b.ts');
+    });
+
+    it('should skip update for reordered entries with identical content', () => {
+      const { setStatus } = useGitStore.getState();
+      const firstStatus = createGitStatus({
+        modified: [
+          createStatusEntry('src/a.ts', 'modified'),
+          createStatusEntry('src/b.ts', 'modified'),
+        ],
+      });
+      const reorderedStatus = createGitStatus({
+        modified: [
+          createStatusEntry('src/b.ts', 'modified'),
+          createStatusEntry('src/a.ts', 'modified'),
+        ],
+      });
+
+      setStatus(firstStatus);
+      setStatus(reorderedStatus);
+
+      expect(useGitStore.getState().status).toBe(firstStatus);
+    });
+
     it('should clear error when status is set', () => {
       const { setError, setStatus } = useGitStore.getState();
 

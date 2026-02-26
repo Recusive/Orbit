@@ -37,7 +37,7 @@ export const GitActions: React.FC<GitActionsProps> = ({
         aria-label={isCommitting ? 'Committing changes...' : 'Commit staged changes'}
         className="
           flex-1 flex items-center justify-center gap-1.5
-          h-7 rounded-lg text-sm font-medium
+          h-7 rounded-[9px] text-sm font-medium
           bg-foreground text-background
           hover:bg-foreground/90
           active:scale-[0.98] transition-[background-color,transform] duration-150
@@ -58,7 +58,7 @@ export const GitActions: React.FC<GitActionsProps> = ({
         disabled={isSyncing}
         aria-label={isPulling ? 'Pulling changes...' : 'Pull from remote'}
         className="
-          h-7 px-2.5 flex items-center justify-center gap-1 rounded-lg
+          h-7 px-2.5 flex items-center justify-center gap-1 rounded-[9px]
           text-sm text-muted-foreground
           border border-lg-separator
           hover:bg-lg-control-hover hover:text-foreground hover:border-lg-border
@@ -80,7 +80,7 @@ export const GitActions: React.FC<GitActionsProps> = ({
         disabled={isSyncing}
         aria-label={isPushing ? 'Pushing changes...' : 'Push to remote'}
         className="
-          h-7 px-2.5 flex items-center justify-center gap-1 rounded-lg
+          h-7 px-2.5 flex items-center justify-center gap-1 rounded-[9px]
           text-sm text-muted-foreground
           border border-lg-separator
           hover:bg-lg-control-hover hover:text-foreground hover:border-lg-border
