@@ -35,6 +35,7 @@ import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { useFullscreen } from '@/hooks/ui/use-fullscreen';
 import { useTrafficLights } from '@/hooks/ui/use-traffic-lights';
 import { CHAT_PANEL, CONTENT_CARD, HEIGHTS, PANEL_SIZES, SIDEBAR } from '@/lib/utils/constants';
+import { PierreProvider } from '@/providers/pierre-provider';
 import { TauriProvider } from '@/providers/tauri-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
@@ -598,261 +599,272 @@ const App: FC = () => {
 
   return (
     <ThemeProvider>
-      <TauriProvider>
-        <TooltipProvider delayDuration={0}>
-          <AppShell
-            sidebar={<PrimarySidebar />}
-            resizeHandle={<SidebarResizeHandle />}
-            sidebarWidth={leftSidebarWidth}
-            lastExpandedSidebarWidth={lastExpandedSidebarWidth}
-            actionsBar={rightSidebarOpen && !isWelcome ? <ActionsBar /> : undefined}
-          >
-            {/* Main content wrapper — flex column for cards row + full-width terminal.
+      <PierreProvider>
+        <TauriProvider>
+          <TooltipProvider delayDuration={0}>
+            <AppShell
+              sidebar={<PrimarySidebar />}
+              resizeHandle={<SidebarResizeHandle />}
+              sidebarWidth={leftSidebarWidth}
+              lastExpandedSidebarWidth={lastExpandedSidebarWidth}
+              actionsBar={rightSidebarOpen && !isWelcome ? <ActionsBar /> : undefined}
+            >
+              {/* Main content wrapper — flex column for cards row + full-width terminal.
                 overflow-hidden clips the activity panel's slide animation (previously
                 on the activity wrapper, but that blocked terminal height transitions). */}
-            <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
-              {/* Cards row — content column + activity column side by side */}
-              <div ref={cardsRowRef} className="flex-1 flex min-h-0">
-                {/* ── Content column ── */}
-                {/* flex-col: ContentCard on top, terminal below when position='chat' */}
-                {/* min-width prevents flexbox from crushing the chat area when the
+              <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+                {/* Cards row — content column + activity column side by side */}
+                <div ref={cardsRowRef} className="flex-1 flex min-h-0">
+                  {/* ── Content column ── */}
+                  {/* flex-col: ContentCard on top, terminal below when position='chat' */}
+                  {/* min-width prevents flexbox from crushing the chat area when the
                     activity panel is wide or the window is narrow. */}
-                <div
-                  className="flex-1 flex flex-col min-h-0"
-                  style={{ minWidth: CHAT_PANEL.MIN_WIDTH }}
-                >
-                  {/* Main content card — takes remaining vertical space */}
-                  <ContentCard
-                    sidebarOpen={sidebarOpen}
-                    actionsBarOpen={activityOpen || rightSidebarOpen ? !isWelcome : false}
-                    isFullscreen={isFullscreen}
-                    terminalBelow={terminalChatOpen || terminalBothOpen}
+                  <div
+                    className="flex-1 flex flex-col min-h-0"
+                    style={{ minWidth: CHAT_PANEL.MIN_WIDTH }}
                   >
-                    {/* Welcome background image — inside the card */}
-                    {isWelcome ? (
-                      <>
-                        <div
-                          className="absolute inset-0 bg-cover bg-center bg-no-repeat rounded-[inherit]"
-                          style={{ backgroundImage: `url(${welcomeBg})` }}
-                          aria-hidden="true"
-                        />
-                        <div
-                          className="absolute inset-0 hidden dark:block bg-linear-to-t from-gray-3/80 via-gray-3/55 to-gray-3/35 rounded-[inherit]"
-                          aria-hidden="true"
-                        />
-                      </>
-                    ) : null}
+                    {/* Main content card — takes remaining vertical space */}
+                    <ContentCard
+                      sidebarOpen={sidebarOpen}
+                      actionsBarOpen={activityOpen || rightSidebarOpen ? !isWelcome : false}
+                      isFullscreen={isFullscreen}
+                      terminalBelow={terminalChatOpen || terminalBothOpen}
+                    >
+                      {/* Welcome background image — inside the card */}
+                      {isWelcome ? (
+                        <>
+                          <div
+                            className="absolute inset-0 bg-cover bg-center bg-no-repeat rounded-[inherit]"
+                            style={{ backgroundImage: `url(${welcomeBg})` }}
+                            aria-hidden="true"
+                          />
+                          <div
+                            className="absolute inset-0 hidden dark:block bg-linear-to-t from-gray-3/80 via-gray-3/55 to-gray-3/35 rounded-[inherit]"
+                            aria-hidden="true"
+                          />
+                        </>
+                      ) : null}
 
-                    {/* ContentTopBar — follows the chat area.
+                      {/* ContentTopBar — follows the chat area.
                         In editor mode the chat moves to ActivityCard, so the header goes with it. */}
-                    {activeTab !== 'editor' ? (
-                      <ContentTopBar
-                        sidebarOpen={sidebarOpen}
-                        transparent={isWelcome}
-                        className="relative z-10"
-                      />
-                    ) : null}
-
-                    {/* Mode content — wrapped in relative container so gradient overlays scroll area */}
-                    <div className="flex-1 min-h-0 overflow-hidden relative z-0">
-                      {/* Gradient fade below header — follows the chat area (skipped in editor mode) */}
-                      {!isWelcome && activeTab !== 'editor' ? (
-                        <div
-                          className="absolute inset-x-0 top-0 h-8 z-10 pointer-events-none"
-                          style={{
-                            background: 'linear-gradient(to bottom, var(--chat-area), transparent)',
-                          }}
-                          aria-hidden="true"
+                      {activeTab !== 'editor' ? (
+                        <ContentTopBar
+                          sidebarOpen={sidebarOpen}
+                          transparent={isWelcome}
+                          className="relative z-10"
                         />
                       ) : null}
-                      {isWelcome ? (
-                        <WelcomePage />
-                      ) : (
-                        <>
-                          {/* Agent mode - mounted on first visit, kept alive */}
-                          {mounted.agent ? (
-                            <div
-                              className="h-full w-full"
-                              style={
-                                activeTab === 'agent' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE
-                              }
-                            >
-                              <ErrorBoundary
-                                fallback={(error, reset) => (
-                                  <ModeErrorFallback mode="agent" error={error} onReset={reset} />
-                                )}
-                              >
-                                <AgentMode />
-                              </ErrorBoundary>
-                            </div>
-                          ) : null}
-                          {/* Canvas mode - mounted on first visit, kept alive */}
-                          {mounted.canvas ? (
-                            <div
-                              className="h-full w-full"
-                              style={
-                                activeTab === 'canvas' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE
-                              }
-                            >
-                              <ErrorBoundary
-                                fallback={(error, reset) => (
-                                  <ModeErrorFallback mode="canvas" error={error} onReset={reset} />
-                                )}
-                              >
-                                <CanvasMode />
-                              </ErrorBoundary>
-                            </div>
-                          ) : null}
-                          {/* Editor mode - mounted on first visit, kept alive */}
-                          {mounted.editor ? (
-                            <div
-                              className="h-full w-full"
-                              style={
-                                activeTab === 'editor' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE
-                              }
-                            >
-                              <ErrorBoundary
-                                fallback={(error, reset) => (
-                                  <ModeErrorFallback mode="editor" error={error} onReset={reset} />
-                                )}
-                              >
-                                <EditorMode />
-                              </ErrorBoundary>
-                            </div>
-                          ) : null}
-                        </>
-                      )}
-                    </div>
 
-                    {/* Crash notification dialog */}
-                    {hasCrash && crashLog ? (
-                      <CrashNotification
-                        open={crashDialogOpen}
-                        onOpenChange={handleOpenChange}
-                        crashLog={crashLog}
-                        onDismiss={dismiss}
-                      />
-                    ) : null}
-
-                    {/* Toast notifications — offset accounts for card margin */}
-                    <Toaster position="bottom-right" offset={46} expand />
-                  </ContentCard>
-
-                  {/* Terminal in 'chat' position — below ContentCard in same column */}
-                  <div ref={terminalChatRef} style={terminalChatStyle}>
-                    <div className="h-full flex flex-col">
-                      <ResizeHandle
-                        direction="horizontal"
-                        target="bottom"
-                        borderless
-                        size={CONTENT_CARD.gap}
-                        onDrag={handleTerminalDrag}
-                        getMax={getTerminalMax}
-                        onDragEnd={handleTerminalDragEnd}
-                      />
-                      <TerminalCard
-                        position="chat"
-                        sidebarOpen={sidebarOpen}
-                        actionsBarOpen={activityOpen || rightSidebarOpen ? !isWelcome : false}
-                        isFullscreen={isFullscreen}
-                      >
-                        {terminalPosition === 'chat' ? (
-                          <TerminalPanelBoth variant="full-width" collapsed={terminalCollapsed} />
+                      {/* Mode content — wrapped in relative container so gradient overlays scroll area */}
+                      <div className="flex-1 min-h-0 overflow-hidden relative z-0">
+                        {/* Gradient fade below header — follows the chat area (skipped in editor mode) */}
+                        {!isWelcome && activeTab !== 'editor' ? (
+                          <div
+                            className="absolute inset-x-0 top-0 h-8 z-10 pointer-events-none"
+                            style={{
+                              background:
+                                'linear-gradient(to bottom, var(--chat-area), transparent)',
+                            }}
+                            aria-hidden="true"
+                          />
                         ) : null}
-                      </TerminalCard>
+                        {isWelcome ? (
+                          <WelcomePage />
+                        ) : (
+                          <>
+                            {/* Agent mode - mounted on first visit, kept alive */}
+                            {mounted.agent ? (
+                              <div
+                                className="h-full w-full"
+                                style={
+                                  activeTab === 'agent' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE
+                                }
+                              >
+                                <ErrorBoundary
+                                  fallback={(error, reset) => (
+                                    <ModeErrorFallback mode="agent" error={error} onReset={reset} />
+                                  )}
+                                >
+                                  <AgentMode />
+                                </ErrorBoundary>
+                              </div>
+                            ) : null}
+                            {/* Canvas mode - mounted on first visit, kept alive */}
+                            {mounted.canvas ? (
+                              <div
+                                className="h-full w-full"
+                                style={
+                                  activeTab === 'canvas' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE
+                                }
+                              >
+                                <ErrorBoundary
+                                  fallback={(error, reset) => (
+                                    <ModeErrorFallback
+                                      mode="canvas"
+                                      error={error}
+                                      onReset={reset}
+                                    />
+                                  )}
+                                >
+                                  <CanvasMode />
+                                </ErrorBoundary>
+                              </div>
+                            ) : null}
+                            {/* Editor mode - mounted on first visit, kept alive */}
+                            {mounted.editor ? (
+                              <div
+                                className="h-full w-full"
+                                style={
+                                  activeTab === 'editor' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE
+                                }
+                              >
+                                <ErrorBoundary
+                                  fallback={(error, reset) => (
+                                    <ModeErrorFallback
+                                      mode="editor"
+                                      error={error}
+                                      onReset={reset}
+                                    />
+                                  )}
+                                >
+                                  <EditorMode />
+                                </ErrorBoundary>
+                              </div>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Crash notification dialog */}
+                      {hasCrash && crashLog ? (
+                        <CrashNotification
+                          open={crashDialogOpen}
+                          onOpenChange={handleOpenChange}
+                          crashLog={crashLog}
+                          onDismiss={dismiss}
+                        />
+                      ) : null}
+
+                      {/* Toast notifications — offset accounts for card margin */}
+                      <Toaster position="bottom-right" offset={46} expand />
+                    </ContentCard>
+
+                    {/* Terminal in 'chat' position — below ContentCard in same column */}
+                    <div ref={terminalChatRef} style={terminalChatStyle}>
+                      <div className="h-full flex flex-col">
+                        <ResizeHandle
+                          direction="horizontal"
+                          target="bottom"
+                          borderless
+                          size={CONTENT_CARD.gap}
+                          onDrag={handleTerminalDrag}
+                          getMax={getTerminalMax}
+                          onDragEnd={handleTerminalDragEnd}
+                        />
+                        <TerminalCard
+                          position="chat"
+                          sidebarOpen={sidebarOpen}
+                          actionsBarOpen={activityOpen || rightSidebarOpen ? !isWelcome : false}
+                          isFullscreen={isFullscreen}
+                        >
+                          {terminalPosition === 'chat' ? (
+                            <TerminalPanelBoth variant="full-width" collapsed={terminalCollapsed} />
+                          ) : null}
+                        </TerminalCard>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* ── Activity column ── */}
-                {/* Slides in/out via negative marginRight (sidebar pattern). */}
-                {/* flex-row: ResizeHandle spans full height, column content beside it. */}
-                <div ref={activityWrapperRef} style={activityWrapperStyle}>
-                  <div className="h-full flex">
-                    {/* Vertical resize handle — spans full activity column height (card + terminal) */}
-                    <ResizeHandle
-                      direction="vertical"
-                      target="review"
-                      borderless
-                      size={CONTENT_CARD.gap}
-                      onDrag={handleActivityDrag}
-                      getMax={getActivityMax}
-                    />
+                  {/* ── Activity column ── */}
+                  {/* Slides in/out via negative marginRight (sidebar pattern). */}
+                  {/* flex-row: ResizeHandle spans full height, column content beside it. */}
+                  <div ref={activityWrapperRef} style={activityWrapperStyle}>
+                    <div className="h-full flex">
+                      {/* Vertical resize handle — spans full activity column height (card + terminal) */}
+                      <ResizeHandle
+                        direction="vertical"
+                        target="review"
+                        borderless
+                        size={CONTENT_CARD.gap}
+                        onDrag={handleActivityDrag}
+                        getMax={getActivityMax}
+                      />
 
-                    {/* Activity card + terminal stacked vertically */}
-                    <div className="flex-1 flex flex-col min-w-0 min-h-0">
-                      <ActivityCard
-                        actionsBarOpen={rightSidebarOpen}
-                        isFullscreen={isFullscreen}
-                        terminalBelow={terminalActivityOpen || terminalBothOpen}
-                      >
-                        {activeTab === 'editor' ? (
-                          <EditorChatPanel />
-                        ) : (
-                          <ActivityPanel canManageBrowser />
-                        )}
-                      </ActivityCard>
+                      {/* Activity card + terminal stacked vertically */}
+                      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+                        <ActivityCard
+                          actionsBarOpen={rightSidebarOpen}
+                          isFullscreen={isFullscreen}
+                          terminalBelow={terminalActivityOpen || terminalBothOpen}
+                        >
+                          {activeTab === 'editor' ? (
+                            <EditorChatPanel />
+                          ) : (
+                            <ActivityPanel canManageBrowser />
+                          )}
+                        </ActivityCard>
 
-                      {/* Terminal in 'activity' position — below ActivityCard in same column */}
-                      <div ref={terminalActivityRef} style={terminalActivityStyle}>
-                        <div className="h-full flex flex-col">
-                          <ResizeHandle
-                            direction="horizontal"
-                            target="bottom"
-                            borderless
-                            size={CONTENT_CARD.gap}
-                            onDrag={handleTerminalDrag}
-                            getMax={getTerminalMax}
-                            onDragEnd={handleTerminalDragEnd}
-                          />
-                          <TerminalCard
-                            position="activity"
-                            sidebarOpen={false}
-                            actionsBarOpen={rightSidebarOpen}
-                            isFullscreen={isFullscreen}
-                          >
-                            {terminalPosition === 'activity' ? (
-                              <TerminalPanelBoth
-                                variant="full-width"
-                                collapsed={terminalCollapsed}
-                              />
-                            ) : null}
-                          </TerminalCard>
+                        {/* Terminal in 'activity' position — below ActivityCard in same column */}
+                        <div ref={terminalActivityRef} style={terminalActivityStyle}>
+                          <div className="h-full flex flex-col">
+                            <ResizeHandle
+                              direction="horizontal"
+                              target="bottom"
+                              borderless
+                              size={CONTENT_CARD.gap}
+                              onDrag={handleTerminalDrag}
+                              getMax={getTerminalMax}
+                              onDragEnd={handleTerminalDragEnd}
+                            />
+                            <TerminalCard
+                              position="activity"
+                              sidebarOpen={false}
+                              actionsBarOpen={rightSidebarOpen}
+                              isFullscreen={isFullscreen}
+                            >
+                              {terminalPosition === 'activity' ? (
+                                <TerminalPanelBoth
+                                  variant="full-width"
+                                  collapsed={terminalCollapsed}
+                                />
+                              ) : null}
+                            </TerminalCard>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Terminal in 'both' position — full width below the cards row */}
-              <div ref={terminalBothRef} style={terminalBothStyle}>
-                <div className="h-full flex flex-col">
-                  <ResizeHandle
-                    direction="horizontal"
-                    target="bottom"
-                    borderless
-                    size={CONTENT_CARD.gap}
-                    onDrag={handleTerminalDrag}
-                    getMax={getTerminalMax}
-                    onDragEnd={handleTerminalDragEnd}
-                  />
-                  <TerminalCard
-                    position="both"
-                    sidebarOpen={sidebarOpen}
-                    actionsBarOpen={rightSidebarOpen}
-                    isFullscreen={isFullscreen}
-                  >
-                    {terminalPosition === 'both' ? (
-                      <TerminalPanelBoth variant="full-width" collapsed={terminalCollapsed} />
-                    ) : null}
-                  </TerminalCard>
+                {/* Terminal in 'both' position — full width below the cards row */}
+                <div ref={terminalBothRef} style={terminalBothStyle}>
+                  <div className="h-full flex flex-col">
+                    <ResizeHandle
+                      direction="horizontal"
+                      target="bottom"
+                      borderless
+                      size={CONTENT_CARD.gap}
+                      onDrag={handleTerminalDrag}
+                      getMax={getTerminalMax}
+                      onDragEnd={handleTerminalDragEnd}
+                    />
+                    <TerminalCard
+                      position="both"
+                      sidebarOpen={sidebarOpen}
+                      actionsBarOpen={rightSidebarOpen}
+                      isFullscreen={isFullscreen}
+                    >
+                      {terminalPosition === 'both' ? (
+                        <TerminalPanelBoth variant="full-width" collapsed={terminalCollapsed} />
+                      ) : null}
+                    </TerminalCard>
+                  </div>
                 </div>
               </div>
-            </div>
-          </AppShell>
-        </TooltipProvider>
-      </TauriProvider>
+            </AppShell>
+          </TooltipProvider>
+        </TauriProvider>
+      </PierreProvider>
     </ThemeProvider>
   );
 };

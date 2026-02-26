@@ -1967,6 +1967,62 @@ html.dark .liquid-glass-dialog::after {
   background: var(--lg-alert-destructive-bg-hover);
 }
 
+.liquid-glass-btn-primary {
+  background: var(--lg-default-bg);
+  color: var(--lg-default-text);
+  transition: opacity 150ms ease;
+}
+
+.liquid-glass-btn-primary:hover {
+  opacity: 0.85;
+}
+
+.liquid-glass-btn-primary:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Multiline glass input — matches .lg-input surface treatment */
+.liquid-glass-textarea {
+  background: var(--lg-input-bg);
+  box-shadow: var(--lg-input-border);
+  font-size: var(--lg-font-size);
+  font-weight: var(--lg-font-weight);
+  line-height: var(--lg-line-height);
+  color: var(--lg-text-primary);
+  caret-color: var(--lg-input-cursor);
+  border: none;
+  border-radius: var(--lg-window-r);
+  padding: 8px 12px;
+  outline: none;
+  transition: box-shadow 150ms ease;
+}
+
+.liquid-glass-textarea::placeholder {
+  color: var(--lg-input-placeholder);
+  font-weight: var(--lg-font-weight);
+}
+
+.liquid-glass-textarea:focus {
+  box-shadow: 0px 0px 0px 3px rgba(0, 122, 255, 0.4);
+}
+
+html.dark .liquid-glass-textarea:focus {
+  box-shadow: var(--lg-input-focus);
+}
+
+.liquid-glass-textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-glass-btn-primary,
+  .liquid-glass-textarea {
+    transition: none;
+  }
+}
+
 .liquid-glass-close {
   color: var(--lg-close-text);
 }

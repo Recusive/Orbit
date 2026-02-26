@@ -78,6 +78,13 @@ pub fn git_staged_diff(repo_path: String) -> Result<Vec<FileDiff>> {
     orbit_git::get_staged_diff(Path::new(&repo_path)).capture("git_staged_diff")
 }
 
+/// Read a file at a given git ref (e.g. "HEAD", ":0:" for index).
+#[tauri::command]
+pub fn git_file_at_ref(repo_path: String, file: String, git_ref: String) -> Result<String> {
+    orbit_git::get_file_at_ref(Path::new(&repo_path), Path::new(&file), &git_ref)
+        .capture("git_file_at_ref")
+}
+
 /// Get diff stats for current branch vs a base branch (e.g. "main").
 ///
 /// Returns total additions, deletions, and files changed.

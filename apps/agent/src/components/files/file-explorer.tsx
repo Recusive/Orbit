@@ -7,15 +7,22 @@
 import { createLogger } from '@orbit/common/lib';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AlertCircle, ChevronRight, FolderOpen, Loader2, RefreshCw, Search } from 'lucide-react';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 
 import type { FileStatus } from '@/lib/api';
 import type { FileNode } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { FileIcon, FolderIcon } from '@/components/files';
+import { FileContextMenu } from '@/components/files/file-context-menu';
 import { useFileTree } from '@/hooks/file/use-file-tree';
-import { conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
+import {
+  conversationList,
+  deleteFile,
+  initializeWorkspace,
+  openFileDialog,
+  renameFile,
+} from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { cn, GIT_STATUS_STYLES } from '@/lib/utils';
 import { useFileStore } from '@/stores/file/file-store';
@@ -199,6 +206,40 @@ export const FileExplorer: FC = () => {
     [retryFolder]
   );
 
+  const handleRename = useCallback(
+    (filePath: string, newName: string): void => {
+      const parentDir = filePath.substring(0, filePath.lastIndexOf('/'));
+      const newPath = `${parentDir}/${newName}`;
+      renameFile(filePath, newPath)
+        .then(() => {
+          refresh();
+        })
+        .catch((err: unknown) => {
+          logger.error(
+            'Failed to rename file',
+            err instanceof Error ? err : new Error(String(err))
+          );
+        });
+    },
+    [refresh]
+  );
+
+  const handleDelete = useCallback(
+    (filePath: string): void => {
+      deleteFile(filePath)
+        .then(() => {
+          refresh();
+        })
+        .catch((err: unknown) => {
+          logger.error(
+            'Failed to delete file',
+            err instanceof Error ? err : new Error(String(err))
+          );
+        });
+    },
+    [refresh]
+  );
+
   const handleOpenQuickSearch = useCallback((): void => {
     window.dispatchEvent(new CustomEvent('openCommandPalette'));
   }, []);
@@ -325,6 +366,8 @@ export const FileExplorer: FC = () => {
                   onOpen={handleOpen}
                   onSelect={handleSelect}
                   onRetry={handleRetry}
+                  onRename={handleRename}
+                  onDelete={handleDelete}
                 />
               );
             })}
@@ -349,6 +392,8 @@ interface FileTreeRowProps {
   readonly onOpen: (path: string) => void;
   readonly onSelect: (path: string | null) => void;
   readonly onRetry: (path: string) => void;
+  readonly onRename: (path: string, newName: string) => void;
+  readonly onDelete: (path: string) => void;
 }
 
 /**
@@ -359,24 +404,33 @@ interface FileTreeRowProps {
  * - Not affected by other rows expanding/selecting
  */
 const FileTreeRow: FC<FileTreeRowProps> = memo(
-  ({ path, depth, node, top, height, onToggle, onOpen, onSelect, onRetry }) => {
+  ({ path, depth, node, top, height, onToggle, onOpen, onSelect, onRetry, onRename, onDelete }) => {
     // Subscribe to only this row's state
     const isExpanded = useFileStore((s) => s.expandedFolders.has(path));
     const isLoading = useFileStore((s) => s.loadingPaths.has(path));
     const isSelected = useFileStore((s) => s.selectedTreePath === path);
     const error = useFileStore((s) => s.errorPaths.get(path) ?? null);
 
+    // Inline rename state
+    const [isRenaming, setIsRenaming] = useState(false);
+    const [renameValue, setRenameValue] = useState(node.name);
+    const renameInputRef = useRef<HTMLInputElement>(null);
+
+    // Context menu open state — keeps hover bg while menu is visible
+    const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
+
     // Git status for this file (uses full path for matching)
     const gitStatus = useGitStore(selectFileStatus(path));
 
     const handleClick = useCallback((): void => {
+      if (isRenaming) return;
       if (node.isDirectory) {
         onToggle(path);
       } else {
         onSelect(path);
         onOpen(path);
       }
-    }, [node.isDirectory, path, onToggle, onSelect, onOpen]);
+    }, [node.isDirectory, path, onToggle, onSelect, onOpen, isRenaming]);
 
     const handleRetry = useCallback(
       (e: React.MouseEvent | React.KeyboardEvent): void => {
@@ -386,16 +440,62 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
       [path, onRetry]
     );
 
+    const handleStartRename = useCallback((): void => {
+      setRenameValue(node.name);
+      setIsRenaming(true);
+      // Focus the input after React renders it
+      requestAnimationFrame(() => {
+        renameInputRef.current?.focus();
+        // Select filename without extension for files
+        const input = renameInputRef.current;
+        if (input) {
+          const dotIndex = node.isDirectory ? -1 : node.name.lastIndexOf('.');
+          input.setSelectionRange(0, dotIndex > 0 ? dotIndex : node.name.length);
+        }
+      });
+    }, [node.name, node.isDirectory]);
+
+    const handleCommitRename = useCallback((): void => {
+      const trimmed = renameValue.trim();
+      if (trimmed.length > 0 && trimmed !== node.name) {
+        onRename(path, trimmed);
+      }
+      setIsRenaming(false);
+    }, [renameValue, node.name, path, onRename]);
+
+    const handleCancelRename = useCallback((): void => {
+      setIsRenaming(false);
+      setRenameValue(node.name);
+    }, [node.name]);
+
+    const handleRenameKeyDown = useCallback(
+      (e: React.KeyboardEvent): void => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleCommitRename();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          handleCancelRename();
+        }
+      },
+      [handleCommitRename, handleCancelRename]
+    );
+
+    const handleDelete = useCallback((): void => {
+      onDelete(path);
+    }, [path, onDelete]);
+
     const indentPx = depth * 12 + 8;
 
     // Check if file is gitignored (files only, not directories)
     const isGitIgnored = node.isGitIgnored === true;
 
-    return (
+    const rowButton = (
       <button
         className={cn(
-          'file-tree-item flex items-center w-full text-sm hover:bg-lg-sidebar-hover',
-          isSelected && 'bg-lg-sidebar-selected text-foreground'
+          'file-tree-item flex items-center w-full text-base hover:bg-lg-sidebar-hover',
+          isSelected && 'bg-lg-sidebar-selected text-foreground',
+          isContextMenuOpen && !isSelected && 'bg-lg-sidebar-hover'
         )}
         style={{
           position: 'absolute',
@@ -459,18 +559,36 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
           )}
         </span>
 
-        {/* Name — tinted by git status (VSCode-style) */}
-        <span
-          className={cn(
-            'truncate text-left flex-1',
-            gitStatus && GIT_STATUS_STYLES[gitStatus].fileColor
-          )}
-        >
-          {node.name}
-        </span>
+        {/* Name — inline rename input or tinted label */}
+        {isRenaming ? (
+          <input
+            ref={renameInputRef}
+            className="flex-1 bg-input text-foreground text-base px-1 py-0 rounded-sm border border-primary outline-none min-w-0"
+            value={renameValue}
+            onChange={(e): void => {
+              setRenameValue(e.target.value);
+            }}
+            onBlur={handleCommitRename}
+            onKeyDown={handleRenameKeyDown}
+            onClick={(e): void => {
+              e.stopPropagation();
+            }}
+          />
+        ) : (
+          <span
+            className={cn(
+              'truncate text-left flex-1',
+              gitStatus && GIT_STATUS_STYLES[gitStatus].fileColor
+            )}
+          >
+            {node.name}
+          </span>
+        )}
 
         {/* Git status badge */}
-        {gitStatus && !node.isDirectory ? <GitStatusBadge status={gitStatus} /> : null}
+        {gitStatus && !node.isDirectory && !isRenaming ? (
+          <GitStatusBadge status={gitStatus} />
+        ) : null}
 
         {/* Error retry button */}
         {error ? (
@@ -491,6 +609,18 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
           </span>
         ) : null}
       </button>
+    );
+
+    return (
+      <FileContextMenu
+        path={path}
+        isDirectory={node.isDirectory}
+        onRename={handleStartRename}
+        onDelete={handleDelete}
+        onOpenChange={setIsContextMenuOpen}
+      >
+        {rowButton}
+      </FileContextMenu>
     );
   },
   // Custom comparison - re-render if position, identity, node name, or gitignore status changes

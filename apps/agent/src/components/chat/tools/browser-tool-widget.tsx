@@ -61,7 +61,7 @@ function getHostname(url: string): string {
 
 /** Get a small icon for the step row based on action type */
 function getStepIcon(actionName: string): ReactNode {
-  const cls = 'h-2.5 w-2.5 text-violet-500/70';
+  const cls = 'h-4 w-4 text-violet-500/70';
   switch (actionName) {
     case 'browser_open':
       return <Monitor className={cls} />;
@@ -182,20 +182,13 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
       >
         {/* Left: icon + tool name + spinner */}
         <div className="flex items-center gap-2 shrink-0">
-          <div
+          <Globe
             className={cn(
-              'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
+              'h-4 w-4 shrink-0',
+              isFailed ? 'text-destructive/60' : 'text-foreground',
+              isRunning && 'animate-pulse'
             )}
-          >
-            <Globe
-              className={cn(
-                'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-foreground/60',
-                isRunning && 'animate-pulse'
-              )}
-            />
-          </div>
+          />
 
           <span
             className={cn(
@@ -233,16 +226,14 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
             <div className="flex flex-col">
               {/* Connector line: header icon → step icon */}
               <div className="flex flex-row px-2.5 mb-1">
-                <div className="w-5 flex justify-center shrink-0">
+                <div className="w-4 flex justify-center shrink-0">
                   <div className="w-[2px] rounded-full h-3 bg-violet-500/30" />
                 </div>
               </div>
 
               {/* Step row: action icon + label */}
               <div className="flex flex-row items-center px-2.5">
-                <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-violet-500/8">
-                  {stepIcon}
-                </div>
+                {stepIcon}
                 <span className="ml-2.5 text-xs text-lg-text-secondary min-w-0 truncate">
                   {stepLabel.text}
                   {stepLabel.linkUrl ? (
@@ -265,7 +256,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
 
               {/* Connector line: step icon → status icon (gap via my-1) */}
               <div className="flex flex-row px-2.5 my-1">
-                <div className="w-5 flex justify-center shrink-0">
+                <div className="w-4 flex justify-center shrink-0">
                   <div
                     className={cn(
                       'w-[2px] rounded-full h-3',
@@ -287,27 +278,18 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
               {/* Bottom status row */}
               {!isRunning && success !== undefined ? (
                 <div className="flex flex-row items-center px-2.5 pb-1">
-                  <div
-                    className={cn(
-                      'w-5 h-5 rounded flex items-center justify-center shrink-0',
-                      isFailed ? 'bg-red-500/15' : 'bg-green-500/15'
-                    )}
-                  >
-                    {isFailed ? (
-                      <XCircle className="h-3 w-3 text-red-500/80" />
-                    ) : (
-                      <CheckCircle2 className="h-3 w-3 text-green-500/80" />
-                    )}
-                  </div>
+                  {isFailed ? (
+                    <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500/80" />
+                  )}
                   <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>
               ) : isRunning ? (
                 <div className="flex flex-row items-center px-2.5 pb-1">
-                  <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-violet-500/8">
-                    <Loader2 className="h-2.5 w-2.5 animate-spin text-violet-500/60" />
-                  </div>
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-500/60" />
                   <span className="ml-2.5 text-xs text-muted-foreground">Working…</span>
                 </div>
               ) : null}

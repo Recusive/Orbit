@@ -530,6 +530,58 @@ pub fn get_staged_diff(path: &Path) -> Result<Vec<FileDiff>> {
     parse_diff(&diff)
 }
 
+/// Read a file's content at a given git ref.
+///
+/// `git_ref` can be:
+/// - `"HEAD"` (or any commit-ish) — reads from that commit's tree
+/// - `"INDEX"` — reads from the staging area (git index)
+///
+/// Returns the UTF-8 content, or an empty string for new/untracked files
+/// where the blob does not exist at the given ref.
+///
+/// # Errors
+/// Returns an error if the repository cannot be opened.
+pub fn get_file_at_ref(repo_path: &Path, file: &Path, git_ref: &str) -> Result<String> {
+    let repo = open(repo_path)?;
+
+    let relative = if file.is_absolute() {
+        file.strip_prefix(repo_path).unwrap_or(file)
+    } else {
+        file
+    };
+
+    let relative_str = relative.to_string_lossy();
+
+    let blob_id = if git_ref == "INDEX" {
+        // Read from the git index (staging area)
+        let index = repo
+            .index()
+            .map_err(|e| Error::Git(format!("Failed to read index: {e}")))?;
+        match index.get_path(relative, 0) {
+            Some(entry) => entry.id,
+            None => return Ok(String::new()), // not in index
+        }
+    } else {
+        // Read from a commit tree (HEAD, HEAD~1, etc.)
+        let spec = format!("{git_ref}:{relative_str}");
+        match repo.revparse_single(&spec) {
+            Ok(obj) => obj.id(),
+            Err(_) => return Ok(String::new()), // not in tree
+        }
+    };
+
+    let blob = repo
+        .find_blob(blob_id)
+        .map_err(|e| Error::Git(format!("Failed to read blob for {relative_str}: {e}")))?;
+
+    if blob.is_binary() {
+        return Ok(String::new());
+    }
+
+    String::from_utf8(blob.content().to_vec())
+        .map_err(|e| Error::Git(format!("File {relative_str} is not valid UTF-8: {e}")))
+}
+
 /// Get the diff for a specific file.
 ///
 /// # Errors

@@ -27,7 +27,7 @@ const ContextMenuSubTrigger = React.forwardRef<
   <ContextMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
-      'flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none focus:bg-lg-control-hover data-[state=open]:bg-lg-control-hover [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+      'flex cursor-default select-none items-center gap-2 rounded-[9px] px-2 py-1.5 text-sm outline-none transition-transform duration-75 focus:bg-lg-sidebar-hover active:scale-[0.98] data-[state=open]:bg-lg-sidebar-hover [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
       inset && 'pl-8',
       className
     )}
@@ -46,7 +46,7 @@ const ContextMenuSubContent = React.forwardRef<
   <ContextMenuPrimitive.SubContent
     ref={ref}
     className={cn(
-      'z-50 min-w-[8rem] overflow-hidden rounded-md border border-lg-separator bg-popover p-1 text-popover-foreground shadow-lg',
+      'z-50 min-w-[8rem] overflow-hidden rounded-xl bg-[#f3f3f3] dark:bg-[oklch(23%_0_0)] border border-white dark:border-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md p-1.5 text-popover-foreground',
       // Transform origin from Radix - scales from where it connects to parent menu
       'origin-[--radix-context-menu-content-transform-origin]',
       // Enter animation: subtle scale + fade + directional slide
@@ -56,6 +56,8 @@ const ContextMenuSubContent = React.forwardRef<
       // Directional slides based on which side the submenu appears
       'data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1',
       'data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1',
+      // Accessibility: disable animations for users who prefer reduced motion
+      'motion-reduce:animate-none',
       className
     )}
     style={{
@@ -76,7 +78,7 @@ const ContextMenuContent = React.forwardRef<
     <ContextMenuPrimitive.Content
       ref={ref}
       className={cn(
-        'z-50 min-w-[8rem] overflow-hidden rounded-md border border-lg-separator bg-popover p-1 text-popover-foreground shadow-md',
+        'z-50 min-w-[8rem] overflow-hidden rounded-xl bg-[#f3f3f3] dark:bg-[oklch(23%_0_0)] border border-white dark:border-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md p-1.5 text-popover-foreground',
         // Transform origin from Radix - scales from cursor position
         'origin-[--radix-context-menu-content-transform-origin]',
         // Enter animation: subtle scale + fade + directional slide
@@ -86,6 +88,8 @@ const ContextMenuContent = React.forwardRef<
         // Directional slides based on which side the menu appears
         'data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1',
         'data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1',
+        // Accessibility: disable animations for users who prefer reduced motion
+        'motion-reduce:animate-none',
         className
       )}
       style={{
@@ -108,7 +112,7 @@ const ContextMenuItem = React.forwardRef<
   <ContextMenuPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors focus:bg-lg-control-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0',
+      'relative flex cursor-default select-none items-center gap-2 rounded-[9px] px-2 py-1.5 text-sm outline-none transition-transform duration-75 focus:bg-lg-sidebar-hover active:scale-[0.98] data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0',
       inset && 'pl-8',
       className
     )}
@@ -124,7 +128,7 @@ const ContextMenuCheckboxItem = React.forwardRef<
   <ContextMenuPrimitive.CheckboxItem
     ref={ref}
     className={cn(
-      'relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-lg-control-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+      'relative flex cursor-default select-none items-center rounded-[9px] py-1.5 pl-8 pr-2 text-sm outline-none transition-transform duration-75 focus:bg-lg-sidebar-hover active:scale-[0.98] data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className
     )}
     checked={checked ?? false}
@@ -147,7 +151,7 @@ const ContextMenuRadioItem = React.forwardRef<
   <ContextMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
-      'relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-lg-control-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+      'relative flex cursor-default select-none items-center rounded-[9px] py-1.5 pl-8 pr-2 text-sm outline-none transition-transform duration-75 focus:bg-lg-sidebar-hover active:scale-[0.98] data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className
     )}
     {...props}
@@ -182,7 +186,7 @@ const ContextMenuSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ContextMenuPrimitive.Separator
     ref={ref}
-    className={cn('-mx-1 my-1 h-px bg-lg-separator', className)}
+    className={cn('mx-1 my-1 h-px bg-lg-separator', className)}
     {...props}
   />
 ));

@@ -90,6 +90,14 @@ export async function copyFile(from: string, to: string): Promise<void> {
   return invoke('copy_file', { from, to });
 }
 
+export async function revealInFileManager(path: string): Promise<void> {
+  return invoke('reveal_in_file_manager', { path });
+}
+
+export async function openInDefaultApp(path: string): Promise<void> {
+  return invoke('open_in_default_app', { path });
+}
+
 export async function fileExists(path: string): Promise<boolean> {
   return invoke<boolean>('file_exists', { path });
 }

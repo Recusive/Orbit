@@ -10,6 +10,7 @@
 
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -122,6 +123,73 @@ pub async fn rename_file(old_path: String, new_path: String) -> Result<()> {
 pub async fn copy_file(from: String, to: String) -> Result<()> {
     ensure_workspace_paths(&[&from, &to])?;
     orbit_fs::copy_file(&from, &to).await.capture("copy_file")
+}
+
+/// Reveal a file or directory in the system file manager (Finder on macOS).
+///
+/// Uses `open -R` on macOS to select the item in Finder.
+#[tauri::command]
+pub async fn reveal_in_file_manager(path: String) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        let _child = Command::new("open")
+            .arg("-R")
+            .arg(&path)
+            .spawn()
+            .map_err(Error::Io)?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let _child = Command::new("xdg-open")
+            .arg(
+                Path::new(&path)
+                    .parent()
+                    .unwrap_or_else(|| Path::new(&path))
+                    .to_string_lossy()
+                    .as_ref(),
+            )
+            .spawn()
+            .map_err(Error::Io)?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let _child = Command::new("explorer")
+            .arg("/select,")
+            .arg(&path)
+            .spawn()
+            .map_err(Error::Io)?;
+    }
+
+    Ok(())
+}
+
+/// Open a file in the system default application.
+#[tauri::command]
+pub async fn open_in_default_app(path: String) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        let _child = Command::new("open").arg(&path).spawn().map_err(Error::Io)?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let _child = Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(Error::Io)?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let _child = Command::new("cmd")
+            .args(["/C", "start", "", &path])
+            .spawn()
+            .map_err(Error::Io)?;
+    }
+
+    Ok(())
 }
 
 /// Check if a file exists.

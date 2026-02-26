@@ -134,20 +134,13 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
       >
         {/* Left: icon + tool name + count + spinner + progress */}
         <div className="flex items-center gap-2 shrink-0">
-          <div
+          <ListTodo
             className={cn(
-              'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
+              'h-4 w-4 shrink-0',
+              isFailed ? 'text-destructive/60' : 'text-foreground',
+              isRunning && 'animate-pulse'
             )}
-          >
-            <ListTodo
-              className={cn(
-                'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-foreground/60',
-                isRunning && 'animate-pulse'
-              )}
-            />
-          </div>
+          />
 
           <span
             className={cn(
@@ -203,7 +196,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
             <div className="flex flex-col">
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line */}
-                <div className="w-5 flex justify-center shrink-0">
+                <div className="w-4 flex justify-center shrink-0">
                   <div
                     className={cn(
                       'w-[2px] rounded-full h-full',
@@ -283,23 +276,17 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
               {/* Bottom status indicator */}
               {isFailed ? (
                 <div className="flex flex-row items-center px-2.5 py-1">
-                  <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-red-500/15">
-                    <XCircle className="h-3 w-3 text-red-500/80" />
-                  </div>
+                  <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
                   <span className="ml-2.5 text-xs text-lg-text-secondary">Failed</span>
                 </div>
               ) : allCompleted && !isRunning ? (
                 <div className="flex flex-row items-center px-2.5 py-1">
-                  <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-green-500/15">
-                    <CheckCircle2 className="h-3 w-3 text-green-500/80" />
-                  </div>
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500/80" />
                   <span className="ml-2.5 text-xs text-lg-text-secondary">Completed</span>
                 </div>
               ) : (
                 <div className="flex flex-row items-center px-2.5 py-1">
-                  <div className="w-5 h-5 rounded flex items-center justify-center shrink-0 bg-yellow-500/15">
-                    <Circle className="h-3 w-3 text-yellow-500/80" />
-                  </div>
+                  <Circle className="h-4 w-4 shrink-0 text-yellow-500/80" />
                   <span className="ml-2.5 text-xs text-lg-text-secondary">Running</span>
                 </div>
               )}

@@ -176,6 +176,14 @@ export async function gitStagedDiff(repoPath: string): Promise<FileDiff[]> {
   return invoke<FileDiff[]>('git_staged_diff', { repoPath });
 }
 
+export async function gitFileAtRef(
+  repoPath: string,
+  file: string,
+  gitRef: string
+): Promise<string> {
+  return invoke<string>('git_file_at_ref', { repoPath, file, gitRef });
+}
+
 export async function gitDiscard(repoPath: string, files: string[]): Promise<void> {
   return invoke('git_discard', { repoPath, files });
 }

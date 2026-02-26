@@ -151,7 +151,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
       </div>
 
       {/* File cards for active tab */}
-      <div className="py-0.5">
+      <div className="py-1 space-y-1">
         {activeFiles.length > 0 ? (
           activeFiles.map((file) => (
             <DiffFileCard

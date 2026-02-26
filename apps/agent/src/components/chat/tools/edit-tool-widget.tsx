@@ -1,18 +1,25 @@
-import { CheckCircle2, ChevronDown, ChevronRight, Loader2, Pencil, XCircle } from 'lucide-react';
+import { IconWrite } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconWrite';
+import { FileDiff } from '@pierre/diffs/react';
+import { CheckCircle2, ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   DiffStat,
   TOOL_EXPAND_TRANSITION,
   TOOL_EXPAND_TRANSITION_NONE,
-  useHighlightedTokens,
   useIsDarkMode,
 } from './shared';
 
 import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
+import {
+  editToolToPierreDiff,
+  PIERRE_DIFF_STYLE,
+  PIERRE_DIFF_UNSAFE_CSS,
+  PIERRE_THEME,
+} from '@/lib/utils/pierre-adapter';
 
 interface EditToolWidgetProps {
   readonly filePath: string;
@@ -33,12 +40,9 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
 }) => {
   // Always start collapsed — user expands manually if they want the full view
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showAllLines, setShowAllLines] = useState(false);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
   const isDarkMode = useIsDarkMode();
-  const oldTokens = useHighlightedTokens(oldString, filePath, isDarkMode);
-  const newTokens = useHighlightedTokens(newString, filePath, isDarkMode);
 
   const fileName = filePath.split('/').pop() ?? filePath;
   const oldLines = oldString.split('\n');
@@ -46,12 +50,11 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   const deletions = oldLines.length;
   const additions = newLines.length;
 
-  // For preview view, show first few lines of each
-  const maxPreviewLines = 4;
-  const displayOldLines = showAllLines ? oldLines : oldLines.slice(0, maxPreviewLines);
-  const displayNewLines = showAllLines ? newLines : newLines.slice(0, maxPreviewLines);
-  const hasMore =
-    !showAllLines && (oldLines.length > maxPreviewLines || newLines.length > maxPreviewLines);
+  // Parse diff only when expanded — avoid work for collapsed widgets
+  const fileDiff = useMemo(() => {
+    if (!isExpanded) return null;
+    return editToolToPierreDiff(filePath, oldString, newString);
+  }, [isExpanded, filePath, oldString, newString]);
 
   const handleFileClick = (e: React.MouseEvent): void => {
     e.preventDefault();
@@ -78,20 +81,13 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
       >
         {/* Left: icon, filename, badges, spinner, diff */}
         <div className="flex items-center gap-2 shrink-0 min-w-0">
-          <div
+          <IconWrite
             className={cn(
-              'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
+              'h-4 w-4 shrink-0',
+              isFailed ? 'text-destructive/60' : 'text-foreground',
+              isRunning && 'animate-pulse'
             )}
-          >
-            <Pencil
-              className={cn(
-                'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-foreground/60',
-                isRunning && 'animate-pulse'
-              )}
-            />
-          </div>
+          />
 
           <a
             role="link"
@@ -150,7 +146,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
             <div className="flex flex-col">
               <div className="flex flex-row px-2.5">
                 {/* Gutter: single continuous vertical connector line */}
-                <div className="w-5 flex justify-center shrink-0">
+                <div className="w-4 flex justify-center shrink-0">
                   <div
                     className={cn(
                       'w-[2px] rounded-full h-full',
@@ -168,147 +164,48 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
                   />
                 </div>
 
-                {/* Content column — diff sections + show-more toggle share one gutter line */}
+                {/* Content column — Pierre diff */}
                 <div className="flex-1 min-w-0 ml-2.5 flex flex-col">
-                  {/* Diff content */}
-                  <div className="my-1.5 flex flex-col">
-                    {/* Deleted lines (old) — red border */}
-                    {displayOldLines.length > 0 ? (
-                      <div
-                        className={cn(
-                          'border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden',
-                          displayNewLines.length > 0 ? 'rounded-t-xl border-b-0' : 'rounded-xl'
-                        )}
-                      >
-                        <div className={cn('overflow-auto', !showAllLines && 'max-h-[150px]')}>
-                          <div className="w-fit min-w-full">
-                            {displayOldLines.map((line, index) => {
-                              const tokens = oldTokens?.[index];
-                              return (
-                                <div
-                                  key={`old-${String(index)}`}
-                                  className="flex font-mono text-sm leading-4 bg-destructive/10"
-                                >
-                                  <div className="sticky left-0 flex shrink-0 bg-destructive/10">
-                                    <div className="w-5 px-1 text-center text-destructive/70 select-none">
-                                      -
-                                    </div>
-                                  </div>
-                                  <div className="flex-1 px-2 whitespace-pre opacity-70">
-                                    {tokens ? (
-                                      tokens.map((token, ti) => (
-                                        <span
-                                          key={ti}
-                                          style={token.color ? { color: token.color } : undefined}
-                                        >
-                                          {token.content}
-                                        </span>
-                                      ))
-                                    ) : (
-                                      <span className="text-foreground">{line || ' '}</span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {/* Added lines (new) — green border */}
-                    {displayNewLines.length > 0 ? (
-                      <div
-                        className={cn(
-                          'border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden',
-                          displayOldLines.length > 0 ? 'rounded-b-xl border-t-0' : 'rounded-xl'
-                        )}
-                      >
-                        <div className={cn('overflow-auto', !showAllLines && 'max-h-[150px]')}>
-                          <div className="w-fit min-w-full">
-                            {displayNewLines.map((line, index) => {
-                              const tokens = newTokens?.[index];
-                              return (
-                                <div
-                                  key={`new-${String(index)}`}
-                                  className="flex font-mono text-sm leading-4 bg-success/10"
-                                >
-                                  <div className="sticky left-0 flex shrink-0 bg-success/10">
-                                    <div className="w-5 px-1 text-center text-success/70 select-none">
-                                      +
-                                    </div>
-                                  </div>
-                                  <div className="flex-1 px-2 whitespace-pre">
-                                    {tokens ? (
-                                      tokens.map((token, ti) => (
-                                        <span
-                                          key={ti}
-                                          style={token.color ? { color: token.color } : undefined}
-                                        >
-                                          {token.content}
-                                        </span>
-                                      ))
-                                    ) : (
-                                      <span className="text-foreground">{line || ' '}</span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {/* Show all / Show less toggle */}
-                  {(hasMore || showAllLines) &&
-                  (oldLines.length > maxPreviewLines || newLines.length > maxPreviewLines) ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowAllLines(!showAllLines);
-                      }}
-                      className="py-1 text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
-                    >
-                      <span>
-                        {showAllLines
-                          ? 'Show less'
-                          : `Show all changes (${String(oldLines.length + newLines.length)} lines)`}
-                      </span>
-                      <ChevronDown
-                        className={cn(
-                          'h-2.5 w-2.5 transition-[rotate] duration-200 ease-out',
-                          showAllLines && 'rotate-180'
-                        )}
+                  <div className="my-1.5 overflow-hidden rounded-lg">
+                    {fileDiff ? (
+                      <FileDiff
+                        fileDiff={fileDiff}
+                        style={PIERRE_DIFF_STYLE as React.CSSProperties}
+                        options={{
+                          theme: PIERRE_THEME,
+                          themeType: isDarkMode ? 'dark' : 'light',
+                          diffStyle: 'unified',
+                          diffIndicators: 'bars',
+                          lineDiffType: 'word',
+                          overflow: 'wrap',
+                          disableFileHeader: true,
+                          unsafeCSS: PIERRE_DIFF_UNSAFE_CSS,
+                        }}
                       />
-                    </button>
-                  ) : null}
+                    ) : (
+                      <div className="px-3 py-2 text-xs text-muted-foreground/60">
+                        Unable to render diff
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Bottom status indicator */}
               {!isRunning && success !== undefined ? (
                 <div className="flex flex-row items-center px-2.5 py-1">
-                  <div
-                    className={cn(
-                      'w-5 h-5 rounded flex items-center justify-center shrink-0',
-                      isFailed ? 'bg-red-500/15' : 'bg-green-500/15'
-                    )}
-                  >
-                    {isFailed ? (
-                      <XCircle className="h-3 w-3 text-red-500/80" />
-                    ) : (
-                      <CheckCircle2 className="h-3 w-3 text-green-500/80" />
-                    )}
-                  </div>
+                  {isFailed ? (
+                    <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500/80" />
+                  )}
                   <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>
               ) : (
                 <div className="flex flex-row h-1 px-2.5">
-                  <div className="w-5 flex justify-center">
+                  <div className="w-4 flex justify-center">
                     <div className="w-[2px] rounded-full h-full bg-border/20" />
                   </div>
                 </div>

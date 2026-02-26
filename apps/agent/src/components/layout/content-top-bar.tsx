@@ -71,16 +71,20 @@ const DiffStatsButton: FC = () => {
           data-tauri-drag-region={false}
           onClick={handleClick}
           className={cn(
-            'flex items-center h-6 rounded-[9px] overflow-hidden',
+            'flex items-center h-6 rounded-md overflow-hidden',
             'text-[11px] font-medium tabular-nums',
             'transition-[background-color,color] duration-150'
           )}
         >
-          <span className="flex items-center gap-0.5 px-2 h-full text-success bg-success/20">
-            <span>+{additions}</span>
+          {/* Green gutter bar + additions */}
+          <span className="flex items-center h-full bg-success/20 pr-2">
+            <span className="w-[3px] self-stretch bg-success shrink-0" />
+            <span className="pl-1.5 text-success">+{additions}</span>
           </span>
-          <span className="flex items-center gap-0.5 px-2 h-full text-destructive bg-destructive/20">
-            <span>
+          {/* Red gutter bar + deletions */}
+          <span className="flex items-center h-full bg-destructive/20 pr-2">
+            <span className="w-[3px] self-stretch bg-destructive shrink-0" />
+            <span className="pl-1.5 text-destructive">
               {'\u2212'}
               {deletions}
             </span>

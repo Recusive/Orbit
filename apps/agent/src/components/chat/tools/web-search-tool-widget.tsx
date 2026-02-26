@@ -124,20 +124,13 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
       >
         {/* Left: icon + tool name + count + spinner */}
         <div className="flex items-center gap-2 shrink-0">
-          <div
+          <Search
             className={cn(
-              'w-5 h-5 rounded flex items-center justify-center shrink-0',
-              isFailed ? 'bg-destructive/8' : 'bg-foreground/8'
+              'h-4 w-4 shrink-0',
+              isFailed ? 'text-destructive/60' : 'text-foreground',
+              isRunning && 'animate-pulse'
             )}
-          >
-            <Search
-              className={cn(
-                'h-3 w-3',
-                isFailed ? 'text-destructive/60' : 'text-foreground/60',
-                isRunning && 'animate-pulse'
-              )}
-            />
-          </div>
+          />
 
           <span
             className={cn(
@@ -181,7 +174,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
             <div className="flex flex-col">
               <div className="flex flex-row px-2.5">
                 {/* Gutter: vertical connector line */}
-                <div className="w-5 flex justify-center shrink-0">
+                <div className="w-4 flex justify-center shrink-0">
                   <div
                     className={cn(
                       'w-[2px] rounded-full h-full',
@@ -268,25 +261,18 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
               {/* Bottom status indicator */}
               {!isRunning && success !== undefined ? (
                 <div className="flex flex-row items-center px-2.5 py-1">
-                  <div
-                    className={cn(
-                      'w-5 h-5 rounded flex items-center justify-center shrink-0',
-                      isFailed ? 'bg-red-500/15' : 'bg-green-500/15'
-                    )}
-                  >
-                    {isFailed ? (
-                      <XCircle className="h-3 w-3 text-red-500/80" />
-                    ) : (
-                      <CheckCircle2 className="h-3 w-3 text-green-500/80" />
-                    )}
-                  </div>
+                  {isFailed ? (
+                    <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500/80" />
+                  )}
                   <span className="ml-2.5 text-xs text-lg-text-secondary">
                     {isFailed ? 'Failed' : 'Completed'}
                   </span>
                 </div>
               ) : (
                 <div className="flex flex-row h-1 px-2.5">
-                  <div className="w-5 flex justify-center">
+                  <div className="w-4 flex justify-center">
                     <div className="w-[2px] rounded-full h-full bg-border/20" />
                   </div>
                 </div>
