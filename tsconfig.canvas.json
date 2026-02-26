@@ -45,5 +45,5 @@
       "@orbit/common/*": ["./apps/common/src/*"]
     }
   },
-  "include": ["apps/Canvas-UI-Builder/src/**/*"]
+  "include": ["apps/Canvas-UI-Builder/src/**/*", "apps/agent/src/vite-env.d.ts"]
 }
