@@ -1,7 +1,7 @@
 /**
  * Session Management Module
  */
-export { SessionManager } from './session-manager.js';
+export { SessionManager, repairPollutedJsonls } from './session-manager.js';
 export type {
   AgentMessage,
   PermissionRequest,
@@ -15,6 +15,7 @@ export type {
 
 export {
   saveSession,
+  saveSessionInitMapping,
   getSDKSessionIdForSession,
   touchSession,
   deleteSession,

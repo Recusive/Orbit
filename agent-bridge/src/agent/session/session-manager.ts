@@ -18,6 +18,8 @@ import { Disposable, Emitter } from '../../common/events/events.js';
 import { createLogger } from '../../common/logging/logger.js';
 import { OrbitAgent } from '../core/agent.js';
 
+import { getStorageDirPath, getStoredSessionsSnapshot } from './session-storage.js';
+
 import type { McpToolRequest, McpToolResponse } from '../../browser/index.js';
 import type { OrbitAgentConfig } from '../core/agent.js';
 import type { AttachmentContentBlock } from '../types/messages.js';
@@ -888,6 +890,8 @@ export class SessionManager extends Disposable {
       sourceSessionId?: string;
     }
   >();
+  /** Sessions currently in rewindFiles — block sendMessage to prevent JSONL races */
+  private rewindingSessionIds = new Set<string>();
   /** Tracks turn start times per session for performance logging */
   private turnStartTimes = new Map<string, number>();
   private sessionInitFired = new Set<string>();
@@ -1113,6 +1117,34 @@ export class SessionManager extends Disposable {
     });
 
     this.activeSessions.set(sessionId, agent);
+
+    // Strip rewind pollution from the JSONL BEFORE the SDK reads it.
+    // The rewindFiles flow creates a temporary query with an empty prompt that
+    // pollutes the parent JSONL. The CLI subprocess writes asynchronously so
+    // backup/restore is racy. Stripping here — right before startSession — is
+    // race-free because the CLI from rewindFiles has already exited by the time
+    // the user navigates to the parent session and triggers resume.
+    // Best-effort: if the strip fails, session creation should still proceed —
+    // the startup repair pass will catch it on next launch.
+    if (config?.resumeSessionId) {
+      try {
+        const jsonlPath = findSessionJsonl(config.resumeSessionId);
+        if (jsonlPath !== null) {
+          const stripped = stripRewindPollution(jsonlPath);
+          if (stripped > 0) {
+            logger.info(
+              { sessionId, resumeSessionId: config.resumeSessionId, linesStripped: stripped },
+              'Stripped rewind pollution from JSONL before session resume'
+            );
+          }
+        }
+      } catch (scrubErr) {
+        logger.warn(
+          { sessionId, resumeSessionId: config.resumeSessionId, error: scrubErr },
+          'Failed to strip rewind pollution — continuing with session creation'
+        );
+      }
+    }
 
     try {
       await agent.startSession();
@@ -1496,15 +1528,14 @@ export class SessionManager extends Disposable {
           } else if (sdkMessage.type === 'user') {
             // Emit checkpoint event if user message has a UUID
             // This UUID can be used to rewind files to this point
+            const userContent = sdkMessage.message?.content;
             logger.warn(
               {
                 sessionId,
                 hasUuid: sdkMessage.uuid !== undefined,
                 uuid: sdkMessage.uuid?.slice(0, 8) ?? 'none',
-                hasContent: sdkMessage.message?.content !== undefined,
-                contentLength: Array.isArray(sdkMessage.message?.content)
-                  ? sdkMessage.message.content.length
-                  : 0,
+                hasContent: userContent !== undefined,
+                contentLength: Array.isArray(userContent) ? userContent.length : 0,
               },
               'CHECKPOINT user message received from SDK'
             );
@@ -1801,6 +1832,10 @@ export class SessionManager extends Disposable {
       throw new Error(`Session ${sessionId} not found. Call createSession() first.`);
     }
 
+    if (this.rewindingSessionIds.has(sessionId)) {
+      throw new Error(`Session ${sessionId} is currently rewinding — message rejected`);
+    }
+
     if (!agent.isSessionReady()) {
       throw new Error(`Session ${sessionId} is not ready.`);
     }
@@ -1848,6 +1883,26 @@ export class SessionManager extends Disposable {
         });
         return; // Don't queue message to dead session
       }
+    }
+
+    // Pre-send JSONL sanitization: strip empty user messages that the rewindFiles
+    // CLI may have written. By the time the user types and sends a message, the
+    // rewind CLI has definitely finished writing, so we catch the full pollution
+    // block (including the end marker that may have been missing at resume time).
+    try {
+      const sdkId = agent.effectiveSessionId;
+      const jsonlPath = findSessionJsonl(sdkId);
+      if (jsonlPath !== null) {
+        const preSendStripped = stripRewindPollution(jsonlPath);
+        if (preSendStripped > 0) {
+          logger.info(
+            { sessionId, sdkSessionId: sdkId, linesStripped: preSendStripped },
+            'Pre-send: stripped rewind pollution from JSONL'
+          );
+        }
+      }
+    } catch (scrubErr) {
+      logger.warn({ sessionId, error: scrubErr }, 'Pre-send JSONL scrub failed — continuing');
     }
 
     // Track turn start time
@@ -2058,9 +2113,15 @@ export class SessionManager extends Disposable {
       throw new Error(`Session ${sessionId} not found`);
     }
 
-    // Call the agent's rewindFiles method directly
-    // This creates a new query that resumes the session and calls rewindFiles
+    // Lock the session to prevent sendMessage during rewind.
+    // Everything after this MUST be inside try/finally to guarantee unlock.
+    this.rewindingSessionIds.add(sessionId);
+
     try {
+      // NOTE: We do NOT backup/restore the JSONL here. The SDK's CLI subprocess
+      // writes to the JSONL asynchronously, so restoring a backup is racy — the
+      // CLI can re-pollute the file after our restore. Instead, we strip pollution
+      // on session resume (in createSession) where there's no race.
       await agent.rewindFiles(checkpointId);
       logger.warn(
         { sessionId, checkpointId },
@@ -2073,6 +2134,8 @@ export class SessionManager extends Disposable {
         'REWIND SessionManager.rewindFiles FAILED'
       );
       throw err;
+    } finally {
+      this.rewindingSessionIds.delete(sessionId);
     }
   }
 
@@ -2599,4 +2662,143 @@ Assistant (truncated): "${assistantResponse.slice(0, 300)}"`;
 
     super.dispose();
   }
+}
+
+// ============================================================================
+// JSONL Rewind Pollution Cleanup
+// ============================================================================
+
+// Versioned flag — bump when matcher logic changes to force a re-run
+const REWIND_POLLUTION_REPAIR_FLAG = '.orbit-rewind-pollution-repaired-v3';
+
+/**
+ * Parsed JSONL line for pollution detection.
+ *
+ * Real SDK JSONL shapes (from 894b068f.jsonl analysis):
+ *   - queue-operation: `{ type: "queue-operation", operation: "enqueue"|"dequeue" }`
+ *   - file-history-snapshot: `{ type: "file-history-snapshot", messageId, snapshot }`
+ *   - interrupt marker: `{ type: "user", message: { content: [{ type: "text", text: "[Request interrupted by user]" }] } }`
+ *   - user message: `{ type: "user", message: { role: "user", content: [...] } }`
+ *   - assistant: `{ type: "assistant", message: { role: "assistant", content: [...] } }`
+ */
+interface JsonlEntry {
+  type?: string;
+  message?: {
+    content?: { type?: string; text?: string }[] | string;
+  };
+}
+
+/**
+ * Check if a JSONL line is a user message with ALL empty text content blocks.
+ * This is the signature of the `rewindFiles` pollution: `{ type: "user", message: { content: [{ type: "text", text: "" }] } }`.
+ */
+function isEmptyUserMessage(entry: JsonlEntry): boolean {
+  if (entry.type !== 'user') return false;
+  const content = entry.message?.content;
+  if (!Array.isArray(content) || content.length === 0) return false;
+  return content.every(
+    (block) => block.type === 'text' && (block.text === '' || block.text === undefined)
+  );
+}
+
+/**
+ * Strip rewind pollution from a JSONL file.
+ *
+ * ONLY strips empty user messages (`text: ""`) — the single line type that
+ * causes the API to reject with 400 "text content blocks must be non-empty".
+ *
+ * Everything else is left intact, including:
+ *   - `"No response requested."` — legitimate SDK interrupt response
+ *   - `[Request interrupted by user]` — real user-visible interrupt marker
+ *   - `queue-operation` / `file-history-snapshot` — needed for bookkeeping
+ *   - `custom-title` / `summary` — needed for conversation loading / title
+ *   - `system` (e.g. turn duration) — metadata
+ *   - `progress` — hook progress entries
+ *
+ * @returns Number of lines stripped.
+ */
+function stripRewindPollution(jsonlPath: string): number {
+  let content: string;
+  try {
+    content = fs.readFileSync(jsonlPath, 'utf-8');
+  } catch {
+    return 0;
+  }
+
+  const lines = content.split('\n');
+  const stripped = new Set<number>();
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === undefined || line.trim() === '') continue;
+
+    let entry: JsonlEntry;
+    try {
+      entry = JSON.parse(line) as JsonlEntry;
+    } catch {
+      continue;
+    }
+
+    if (isEmptyUserMessage(entry)) {
+      stripped.add(i);
+    }
+  }
+
+  if (stripped.size === 0) return 0;
+
+  // Write cleaned JSONL back
+  const cleaned = lines.filter((_, idx) => !stripped.has(idx)).join('\n');
+  fs.writeFileSync(jsonlPath, cleaned, 'utf-8');
+
+  logger.info({ jsonlPath, linesStripped: stripped.size }, 'Stripped rewind pollution from JSONL');
+
+  return stripped.size;
+}
+
+/**
+ * One-time startup repair: scan all stored sessions and strip rewind pollution
+ * from their JSONL files. Gated by a flag file so it runs only once.
+ */
+export function repairPollutedJsonls(): { repairedCount: number } {
+  const storageDir = getStorageDirPath();
+  const flagPath = path.join(storageDir, REWIND_POLLUTION_REPAIR_FLAG);
+
+  try {
+    if (fs.existsSync(flagPath)) {
+      return { repairedCount: 0 };
+    }
+  } catch {
+    // If flag check fails, proceed with repair (idempotent)
+  }
+
+  let repairedCount = 0;
+  const sessions = getStoredSessionsSnapshot();
+
+  for (const session of sessions) {
+    const sdkSessionId = session.sdkSessionId;
+    if (!sdkSessionId) continue;
+
+    const jsonlPath = findSessionJsonl(sdkSessionId);
+    if (jsonlPath === null) continue;
+
+    const linesStripped = stripRewindPollution(jsonlPath);
+    if (linesStripped > 0) {
+      repairedCount++;
+    }
+  }
+
+  // Write flag file
+  try {
+    if (!fs.existsSync(storageDir)) {
+      fs.mkdirSync(storageDir, { recursive: true });
+    }
+    fs.writeFileSync(flagPath, '', 'utf-8');
+  } catch (flagErr) {
+    logger.warn(
+      { error: flagErr instanceof Error ? flagErr.message : String(flagErr) },
+      'Failed to write rewind pollution repair flag — will retry on next startup'
+    );
+  }
+
+  return { repairedCount };
 }
