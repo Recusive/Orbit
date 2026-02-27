@@ -2,7 +2,7 @@ import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
-import type { ExtensionMessage, FileNode } from '@/types/protocol';
+import type { ExtensionMessage, FileChanged, FileNode } from '@/types/protocol';
 import type { RefObject } from 'react';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
@@ -143,7 +143,15 @@ const EMPTY_CHILDREN: readonly FileNode[] = [];
 /** Debounce delay for file-watcher-triggered directory refreshes (ms). */
 const FILE_TREE_REFRESH_DEBOUNCE_MS = 150;
 
-type RefreshTimers = Map<string, ReturnType<typeof setTimeout>>;
+interface PendingRefresh {
+  timerId: ReturnType<typeof setTimeout>;
+  /** True if any created/deleted event occurred in this debounce window. */
+  hasStructuralChange: boolean;
+}
+
+type RefreshTimers = Map<string, PendingRefresh>;
+type TreeChangeType = FileChanged['change_type'];
+
 const WINDOWS_DRIVE_ROOT_RE = /^[A-Za-z]:\/$/;
 
 const refreshStats = {
@@ -152,13 +160,27 @@ const refreshStats = {
   executed: 0,
   skippedStale: 0,
   skippedInvisible: 0,
+  skippedEqual: 0,
+  pendingHighWater: 0,
+  dirtyHighWater: 0,
+  dirtyExpandRefreshes: 0,
 };
 
+const MAX_CONCURRENT_REFRESHES = 5;
+let inFlightRefreshCount = 0;
+
+interface PendingRefreshEntry {
+  dirPath: string;
+  hasStructuralChange: boolean;
+}
+
 const activeTimerRefs = new Set<RefObject<RefreshTimers>>();
+const pendingRefreshWork = new Map<string, PendingRefreshEntry>();
+const dirtyCollapsedFolders = new Set<string>();
 
 function clearScheduledDirectoryRefreshes(timers: RefreshTimers): void {
-  for (const timer of timers.values()) {
-    clearTimeout(timer);
+  for (const pending of timers.values()) {
+    clearTimeout(pending.timerId);
   }
   timers.clear();
 }
@@ -240,7 +262,68 @@ function timerKey(dirPath: string): string {
   return normalizePathForFsComparison(dirPath);
 }
 
-async function refreshDirectory(dirPath: string): Promise<void> {
+function getFileNodeSignature(node: FileNode): string {
+  const normalizedPath = normalizePathForFsComparison(node.path);
+  const isDir = node.isDirectory ? '1' : '0';
+  const isSymlink = node.isSymlink === true ? '1' : '0';
+  const isIgnored = node.isGitIgnored === true ? '1' : '0';
+  return `${node.name}\0${normalizedPath}\0${isDir}\0${isSymlink}\0${isIgnored}`;
+}
+
+function areChildrenStructurallyEqual(
+  existing: readonly FileNode[],
+  incoming: readonly FileNode[]
+): boolean {
+  if (existing.length !== incoming.length) return false;
+  for (let i = 0; i < existing.length; i += 1) {
+    const existingNode = existing[i];
+    const incomingNode = incoming[i];
+    if (!existingNode || !incomingNode) return false;
+    if (getFileNodeSignature(existingNode) !== getFileNodeSignature(incomingNode)) return false;
+  }
+  return true;
+}
+
+function drainPendingRefreshWork(): void {
+  while (inFlightRefreshCount < MAX_CONCURRENT_REFRESHES && pendingRefreshWork.size > 0) {
+    const iterator = pendingRefreshWork.entries().next();
+    if (iterator.done) break;
+
+    const [key, entry] = iterator.value;
+    pendingRefreshWork.delete(key);
+
+    inFlightRefreshCount += 1;
+    void refreshDirectory(entry.dirPath, entry.hasStructuralChange).finally(() => {
+      inFlightRefreshCount -= 1;
+      drainPendingRefreshWork();
+    });
+  }
+}
+
+function enqueueRefresh(dirPath: string, hasStructuralChange: boolean): void {
+  const key = timerKey(dirPath);
+
+  if (inFlightRefreshCount < MAX_CONCURRENT_REFRESHES) {
+    inFlightRefreshCount += 1;
+    void refreshDirectory(dirPath, hasStructuralChange).finally(() => {
+      inFlightRefreshCount -= 1;
+      drainPendingRefreshWork();
+    });
+    return;
+  }
+
+  const existing = pendingRefreshWork.get(key);
+  pendingRefreshWork.set(key, {
+    dirPath,
+    hasStructuralChange: hasStructuralChange || (existing?.hasStructuralChange ?? false),
+  });
+
+  if (pendingRefreshWork.size > refreshStats.pendingHighWater) {
+    refreshStats.pendingHighWater = pendingRefreshWork.size;
+  }
+}
+
+async function refreshDirectory(dirPath: string, hasStructuralChange: boolean): Promise<void> {
   try {
     const storeBeforeFetch = useFileStore.getState();
     const rootAtStart = storeBeforeFetch.rootPath;
@@ -252,14 +335,18 @@ async function refreshDirectory(dirPath: string): Promise<void> {
       targetDirPath === rootAtStart || storeBeforeFetch.expandedFolders.has(targetDirPath);
 
     if (!isVisible) {
-      refreshStats.skippedInvisible += 1;
-
-      if (storeBeforeFetch.treeNodes[targetDirPath]) {
+      if (hasStructuralChange && storeBeforeFetch.treeNodes[targetDirPath]) {
         useFileStore.setState((state) => {
           Reflect.deleteProperty(state.treeNodes, targetDirPath);
         });
+      } else if (storeBeforeFetch.treeNodes[targetDirPath]) {
+        dirtyCollapsedFolders.add(timerKey(targetDirPath));
+        if (dirtyCollapsedFolders.size > refreshStats.dirtyHighWater) {
+          refreshStats.dirtyHighWater = dirtyCollapsedFolders.size;
+        }
       }
 
+      refreshStats.skippedInvisible += 1;
       logger.debug('Directory refresh skipped (folder not visible)', {
         path: targetDirPath,
         stats: { ...refreshStats },
@@ -287,7 +374,20 @@ async function refreshDirectory(dirPath: string): Promise<void> {
       return;
     }
 
-    storeAfterFetch.setTreeChildren(targetDirPath, toFileNodes(entries));
+    dirtyCollapsedFolders.delete(timerKey(targetDirPath));
+
+    const newChildren = toFileNodes(entries);
+    const existingChildren = storeAfterFetch.treeNodes[targetDirPath];
+    if (existingChildren && areChildrenStructurallyEqual(existingChildren, newChildren)) {
+      refreshStats.skippedEqual += 1;
+      logger.debug('Directory refresh skipped (structure unchanged)', {
+        path: targetDirPath,
+        stats: { ...refreshStats },
+      });
+      return;
+    }
+
+    storeAfterFetch.setTreeChildren(targetDirPath, newChildren);
     refreshStats.executed += 1;
     logger.debug('Directory refresh executed', { path: targetDirPath, stats: { ...refreshStats } });
   } catch (err: unknown) {
@@ -300,24 +400,30 @@ async function refreshDirectory(dirPath: string): Promise<void> {
   }
 }
 
-function scheduleDirectoryRefresh(timers: RefreshTimers, dirPath: string): void {
+function scheduleDirectoryRefresh(
+  timers: RefreshTimers,
+  dirPath: string,
+  changeType: TreeChangeType
+): void {
   const key = timerKey(dirPath);
   const existing = timers.get(key);
+  const isStructural = changeType === 'created' || changeType === 'deleted';
+  const hasStructuralChange = isStructural || (existing?.hasStructuralChange ?? false);
 
   if (existing !== undefined) {
-    clearTimeout(existing);
+    clearTimeout(existing.timerId);
     refreshStats.coalesced += 1;
   } else {
     refreshStats.scheduled += 1;
   }
 
-  timers.set(
-    key,
-    setTimeout(() => {
+  timers.set(key, {
+    hasStructuralChange,
+    timerId: setTimeout(() => {
       timers.delete(key);
-      void refreshDirectory(dirPath);
-    }, FILE_TREE_REFRESH_DEBOUNCE_MS)
-  );
+      enqueueRefresh(dirPath, hasStructuralChange);
+    }, FILE_TREE_REFRESH_DEBOUNCE_MS),
+  });
 }
 
 if (import.meta.hot) {
@@ -326,6 +432,9 @@ if (import.meta.hot) {
       clearScheduledDirectoryRefreshes(ref.current);
     }
     activeTimerRefs.clear();
+    pendingRefreshWork.clear();
+    dirtyCollapsedFolders.clear();
+    inFlightRefreshCount = 0;
   });
 }
 
@@ -516,15 +625,13 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
           // Handle immediate tree updates (delete events update children synchronously).
           useFileStore.getState().handleFileChanged(message.path, message.change_type);
 
-          if (message.change_type === 'created' || message.change_type === 'deleted') {
-            const parentPath = getParentPath(message.path);
-            if (parentPath) {
-              scheduleDirectoryRefresh(refreshTimersRef.current, parentPath);
-            } else {
-              const rootPath = useFileStore.getState().rootPath;
-              if (rootPath) {
-                scheduleDirectoryRefresh(refreshTimersRef.current, rootPath);
-              }
+          const parentPath = getParentPath(message.path);
+          if (parentPath) {
+            scheduleDirectoryRefresh(refreshTimersRef.current, parentPath, message.change_type);
+          } else {
+            const rootPath = useFileStore.getState().rootPath;
+            if (rootPath) {
+              scheduleDirectoryRefresh(refreshTimersRef.current, rootPath, message.change_type);
             }
           }
           break;
@@ -767,6 +874,10 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         clearTimeout(pending.timeoutId);
       }
       pendingRequests.current.clear();
+
+      clearScheduledDirectoryRefreshes(refreshTimersRef.current);
+      pendingRefreshWork.clear();
+      dirtyCollapsedFolders.clear();
     }
     prevRootPathRef.current = currentRootPath;
   }, [currentRootPath, debug]);
@@ -801,9 +912,19 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
 
       store.toggleFolder(path);
 
-      // If expanding and children not loaded, request them
-      if (!wasExpanded && !(path in store.treeNodes)) {
-        requestChildren(path);
+      if (!wasExpanded) {
+        const key = timerKey(path);
+        if (dirtyCollapsedFolders.has(key)) {
+          dirtyCollapsedFolders.delete(key);
+          refreshStats.dirtyExpandRefreshes += 1;
+          useFileStore.setState((state) => {
+            Reflect.deleteProperty(state.treeNodes, path);
+          });
+        }
+
+        if (!(path in useFileStore.getState().treeNodes)) {
+          requestChildren(path);
+        }
       }
     },
     [requestChildren]

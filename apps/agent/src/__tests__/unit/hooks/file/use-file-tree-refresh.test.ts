@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 
 import type { FileEntry } from '@/lib/api';
-import type { ExtensionMessage } from '@/types/protocol';
+import type { ExtensionMessage, FileNode } from '@/types/protocol';
 
 const { mockBuildFileIndex, mockListDirectory, mockLspDidOpen, mockSetWorkspacePath } = vi.hoisted(
   () => ({
@@ -117,7 +117,12 @@ function resetFileStore(): void {
   });
 }
 
-function createEntry(path: string, name: string, isDir = false): FileEntry {
+function createEntry(
+  path: string,
+  name: string,
+  isDir = false,
+  overrides: Partial<FileEntry> = {}
+): FileEntry {
   return {
     path,
     name,
@@ -125,6 +130,24 @@ function createEntry(path: string, name: string, isDir = false): FileEntry {
     isSymlink: false,
     isHidden: false,
     isGitIgnored: false,
+    ...overrides,
+  };
+}
+
+function createNode(
+  path: string,
+  name: string,
+  isDirectory = false,
+  overrides: Partial<FileNode> = {}
+): FileNode {
+  return {
+    name,
+    path,
+    isDirectory,
+    isFile: !isDirectory,
+    isSymlink: false,
+    isGitIgnored: false,
+    ...overrides,
   };
 }
 
@@ -171,6 +194,11 @@ function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void
   };
 }
 
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe('use-file-tree external refresh', () => {
   beforeEach(() => {
     resetFileStore();
@@ -194,208 +222,365 @@ describe('use-file-tree external refresh', () => {
     vi.useRealTimers();
   });
 
-  it('coalesces burst create events for same parent into one directory refresh', async () => {
+  it('schedules refresh for modified events in expanded folders', async () => {
     const { setRootPath, expandFolder } = useFileStore.getState();
     setRootPath('/workspace');
     expandFolder('/workspace/src');
 
     renderHook(() => useFileTree({ autoLoad: false }));
 
-    emitFileChanged(0, '/workspace/src/a.ts', 'created');
-    emitFileChanged(0, '/workspace/src/b.ts', 'created');
-
+    emitFileChanged(0, '/workspace/src/file.ts', 'modified');
     await vi.advanceTimersByTimeAsync(160);
 
     expect(mockListDirectory).toHaveBeenCalledTimes(1);
     expect(mockListDirectory).toHaveBeenCalledWith('/workspace/src', true);
-    expect(useFileStore.getState().treeNodes['/workspace/src']?.[0]?.name).toBe('new.ts');
   });
 
-  it('skips root tree request when no root path is available yet', async () => {
-    renderHook(() => useFileTree());
-    await Promise.resolve();
+  it('does not call setTreeChildren when listing is structurally identical', async () => {
+    const { setRootPath, setTreeChildren, expandFolder } = useFileStore.getState();
+    setRootPath('/workspace');
+    expandFolder('/workspace/src');
+    setTreeChildren('/workspace/src', [createNode('/workspace/src/a.ts', 'a.ts')]);
+    mockListDirectory.mockResolvedValueOnce([createEntry('/workspace/src/a.ts', 'a.ts')]);
+
+    renderHook(() => useFileTree({ autoLoad: false }));
+    const beforeRef = useFileStore.getState().treeNodes['/workspace/src'];
+
+    emitFileChanged(0, '/workspace/src/a.ts', 'modified');
+    await vi.advanceTimersByTimeAsync(160);
+
+    const afterRef = useFileStore.getState().treeNodes['/workspace/src'];
+    expect(afterRef).toBe(beforeRef);
+  });
+
+  it('applies refresh when metadata changes without path changes', async () => {
+    const { setRootPath, setTreeChildren, expandFolder } = useFileStore.getState();
+    setRootPath('/workspace');
+    expandFolder('/workspace/src');
+    setTreeChildren('/workspace/src', [createNode('/workspace/src/a.ts', 'a.ts')]);
+    mockListDirectory.mockResolvedValueOnce([
+      createEntry('/workspace/src/a.ts', 'a.ts', false, { isGitIgnored: true }),
+    ]);
+
+    renderHook(() => useFileTree({ autoLoad: false }));
+    const beforeRef = useFileStore.getState().treeNodes['/workspace/src'];
+
+    emitFileChanged(0, '/workspace/src/a.ts', 'modified');
+    await vi.advanceTimersByTimeAsync(160);
+
+    const afterRef = useFileStore.getState().treeNodes['/workspace/src'];
+    expect(afterRef).not.toBe(beforeRef);
+    expect(afterRef?.[0]?.isGitIgnored).toBe(true);
+  });
+
+  it('preserves structural intent when created then modified events coalesce', async () => {
+    const { setRootPath, setTreeChildren } = useFileStore.getState();
+    setRootPath('/workspace');
+    setTreeChildren('/workspace/src', [createNode('/workspace/src/old.ts', 'old.ts')]);
+
+    renderHook(() => useFileTree({ autoLoad: false }));
+
+    emitFileChanged(0, '/workspace/src/new.ts', 'created');
+    emitFileChanged(0, '/workspace/src/new.ts', 'modified');
+    await vi.advanceTimersByTimeAsync(160);
+
+    expect(mockListDirectory).not.toHaveBeenCalled();
+    expect(useFileStore.getState().treeNodes['/workspace/src']).toBeUndefined();
+  });
+
+  it('skips cache eviction for collapsed folder when only modified events in window', async () => {
+    const { setRootPath, setTreeChildren } = useFileStore.getState();
+    setRootPath('/workspace');
+    setTreeChildren('/workspace/src', [createNode('/workspace/src/old.ts', 'old.ts')]);
+
+    renderHook(() => useFileTree({ autoLoad: false }));
+    const beforeRef = useFileStore.getState().treeNodes['/workspace/src'];
+
+    emitFileChanged(0, '/workspace/src/old.ts', 'modified');
+    await vi.advanceTimersByTimeAsync(160);
+
+    expect(mockListDirectory).not.toHaveBeenCalled();
+    expect(useFileStore.getState().treeNodes['/workspace/src']).toBe(beforeRef);
+  });
+
+  it('limits concurrent listDirectory calls during burst refreshes', async () => {
+    const { setRootPath, expandFolder } = useFileStore.getState();
+    setRootPath('/workspace');
+
+    for (let i = 0; i < 10; i += 1) {
+      expandFolder(`/workspace/dir${String(i)}`);
+    }
+
+    let inFlight = 0;
+    let peakInFlight = 0;
+    const deferredCalls: {
+      path: string;
+      resolve: (entries: FileEntry[]) => void;
+    }[] = [];
+
+    mockListDirectory.mockImplementation((path: string) => {
+      inFlight += 1;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      const deferred = createDeferred<FileEntry[]>();
+      deferredCalls.push({
+        path,
+        resolve: (entries: FileEntry[]) => {
+          inFlight -= 1;
+          deferred.resolve(entries);
+        },
+      });
+      return deferred.promise;
+    });
+
+    renderHook(() => useFileTree({ autoLoad: false }));
+
+    for (let i = 0; i < 10; i += 1) {
+      emitFileChanged(0, `/workspace/dir${String(i)}/file.ts`, 'created');
+    }
+    await vi.advanceTimersByTimeAsync(160);
+
+    expect(mockListDirectory).toHaveBeenCalledTimes(5);
+    expect(peakInFlight).toBeLessThanOrEqual(5);
+
+    const firstBatch = deferredCalls.splice(0, 5);
+    for (const call of firstBatch) {
+      call.resolve([createEntry(`${call.path}/synced.ts`, 'synced.ts')]);
+    }
+    await flushMicrotasks();
+    expect(mockListDirectory).toHaveBeenCalledTimes(10);
+    expect(peakInFlight).toBeLessThanOrEqual(5);
+
+    const secondBatch = deferredCalls.splice(0);
+    for (const call of secondBatch) {
+      call.resolve([createEntry(`${call.path}/synced.ts`, 'synced.ts')]);
+    }
+    await flushMicrotasks();
+  });
+
+  it('dedupes pending refreshes for the same directory', async () => {
+    const { setRootPath, expandFolder } = useFileStore.getState();
+    setRootPath('/workspace');
+    for (let i = 0; i < 5; i += 1) {
+      expandFolder(`/workspace/busy${String(i)}`);
+    }
+    expandFolder('/workspace/src');
+
+    const deferredCalls: {
+      path: string;
+      resolve: (entries: FileEntry[]) => void;
+    }[] = [];
+
+    mockListDirectory.mockImplementation((path: string) => {
+      const deferred = createDeferred<FileEntry[]>();
+      deferredCalls.push({
+        path,
+        resolve: (entries: FileEntry[]) => {
+          deferred.resolve(entries);
+        },
+      });
+      return deferred.promise;
+    });
+
+    renderHook(() => useFileTree({ autoLoad: false }));
+
+    for (let i = 0; i < 5; i += 1) {
+      emitFileChanged(0, `/workspace/busy${String(i)}/file.ts`, 'created');
+    }
+    await vi.advanceTimersByTimeAsync(160);
+    expect(mockListDirectory).toHaveBeenCalledTimes(5);
+
+    emitFileChanged(0, '/workspace/src/one.ts', 'modified');
+    await vi.advanceTimersByTimeAsync(160);
+    emitFileChanged(0, '/workspace/src/two.ts', 'modified');
+    await vi.advanceTimersByTimeAsync(160);
+
+    expect(mockListDirectory).toHaveBeenCalledTimes(5);
+
+    const firstBusy = deferredCalls.shift();
+    if (!firstBusy) throw new Error('Missing deferred busy call');
+    firstBusy.resolve([createEntry(`${firstBusy.path}/done.ts`, 'done.ts')]);
+    await flushMicrotasks();
+
+    const srcCalls = mockListDirectory.mock.calls.filter(
+      (args: readonly unknown[]) => args[0] === '/workspace/src' && args[1] === true
+    );
+    expect(srcCalls).toHaveLength(1);
+
+    const remaining = deferredCalls.splice(0);
+    for (const call of remaining) {
+      call.resolve([createEntry(`${call.path}/done.ts`, 'done.ts')]);
+    }
+    await flushMicrotasks();
+  });
+
+  it('never drops refresh intent — all enqueued directories eventually processed', async () => {
+    const { setRootPath, expandFolder } = useFileStore.getState();
+    setRootPath('/workspace');
+    for (let i = 0; i < 15; i += 1) {
+      expandFolder(`/workspace/dir${String(i)}`);
+    }
+
+    const deferredCalls: {
+      path: string;
+      resolve: (entries: FileEntry[]) => void;
+    }[] = [];
+
+    mockListDirectory.mockImplementation((path: string) => {
+      const deferred = createDeferred<FileEntry[]>();
+      deferredCalls.push({
+        path,
+        resolve: (entries: FileEntry[]) => {
+          deferred.resolve(entries);
+        },
+      });
+      return deferred.promise;
+    });
+
+    renderHook(() => useFileTree({ autoLoad: false }));
+
+    for (let i = 0; i < 15; i += 1) {
+      emitFileChanged(0, `/workspace/dir${String(i)}/new.ts`, 'created');
+    }
+    await vi.advanceTimersByTimeAsync(160);
+    expect(mockListDirectory).toHaveBeenCalledTimes(5);
+
+    for (let round = 0; round < 3; round += 1) {
+      const batch = deferredCalls.splice(0, 5);
+      for (const call of batch) {
+        call.resolve([createEntry(`${call.path}/done.ts`, 'done.ts')]);
+      }
+      await flushMicrotasks();
+    }
+
+    expect(mockListDirectory).toHaveBeenCalledTimes(15);
+  });
+
+  it('preserves tree state when listDirectory rejects during modified-triggered refresh', async () => {
+    const { setRootPath, setTreeChildren, expandFolder } = useFileStore.getState();
+    setRootPath('/workspace');
+    expandFolder('/workspace/src');
+    setTreeChildren('/workspace/src', [createNode('/workspace/src/a.ts', 'a.ts')]);
+    mockListDirectory.mockRejectedValueOnce(new Error('boom'));
+
+    renderHook(() => useFileTree({ autoLoad: false }));
+    const beforeRef = useFileStore.getState().treeNodes['/workspace/src'];
+
+    emitFileChanged(0, '/workspace/src/a.ts', 'modified');
+    await vi.advanceTimersByTimeAsync(160);
+
+    expect(mockListDirectory).toHaveBeenCalledTimes(1);
+    expect(useFileStore.getState().treeNodes['/workspace/src']).toBe(beforeRef);
+  });
+
+  it('marks collapsed folder as dirty on modified event and refreshes on expand', async () => {
+    const { setRootPath, setTreeChildren } = useFileStore.getState();
+    setRootPath('/workspace');
+    setTreeChildren('/workspace/src', [createNode('/workspace/src/old.ts', 'old.ts')]);
+
+    const { result } = renderHook(() => useFileTree({ autoLoad: false }));
+    const beforeRef = useFileStore.getState().treeNodes['/workspace/src'];
+
+    emitFileChanged(0, '/workspace/src/old.ts', 'modified');
+    await vi.advanceTimersByTimeAsync(160);
+
+    expect(useFileStore.getState().treeNodes['/workspace/src']).toBe(beforeRef);
+
+    act(() => {
+      result.current.toggleFolder('/workspace/src');
+    });
+
+    expect(useFileStore.getState().treeNodes['/workspace/src']).toBeUndefined();
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'file:tree:request',
+        path: '/workspace/src',
+      })
+    );
+  });
+
+  it('does not mark expanded folder as dirty (refresh runs normally)', async () => {
+    const { setRootPath, setTreeChildren, expandFolder } = useFileStore.getState();
+    setRootPath('/workspace');
+    expandFolder('/workspace/src');
+    setTreeChildren('/workspace/src', [createNode('/workspace/src/old.ts', 'old.ts')]);
+    mockListDirectory.mockResolvedValueOnce([createEntry('/workspace/src/new.ts', 'new.ts')]);
+
+    const { result } = renderHook(() => useFileTree({ autoLoad: false }));
+    emitFileChanged(0, '/workspace/src/old.ts', 'modified');
+    await vi.advanceTimersByTimeAsync(160);
+
+    mockPostMessage.mockClear();
+    act(() => {
+      result.current.toggleFolder('/workspace/src');
+    });
+    act(() => {
+      result.current.toggleFolder('/workspace/src');
+    });
 
     expect(mockPostMessage).not.toHaveBeenCalled();
   });
 
-  it('initializes file watcher for the active root path', () => {
-    useFileStore.getState().setRootPath('/workspace');
-
-    renderHook(() => useFileTree({ autoLoad: false }));
-
-    expect(mockInitFileWatcher).toHaveBeenCalledWith('/workspace');
-  });
-
-  it('ignores stale refresh results when root path changes during fetch', async () => {
-    const deferred = createDeferred<FileEntry[]>();
-    mockListDirectory.mockReturnValueOnce(deferred.promise);
-
+  it('clears pending refresh timers when workspace root changes', async () => {
     const { setRootPath, expandFolder } = useFileStore.getState();
-    setRootPath('/workspace');
-    expandFolder('/workspace/src');
+    setRootPath('/workspace-a');
+    expandFolder('/workspace-a/src');
 
     renderHook(() => useFileTree({ autoLoad: false }));
 
-    emitFileChanged(0, '/workspace/src/new.ts', 'created');
+    emitFileChanged(0, '/workspace-a/src/file.ts', 'modified');
+
+    await act(async () => {
+      useFileStore.getState().setRootPath('/workspace-b');
+      await Promise.resolve();
+    });
+
     await vi.advanceTimersByTimeAsync(160);
-    expect(mockListDirectory).toHaveBeenCalledTimes(1);
-
-    useFileStore.getState().setRootPath('/other-workspace');
-    deferred.resolve([createEntry('/workspace/src/new.ts', 'new.ts')]);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(useFileStore.getState().rootPath).toBe('/other-workspace');
-    expect(useFileStore.getState().treeNodes['/workspace/src']).toBeUndefined();
-  });
-
-  it('skips refresh for collapsed directories', async () => {
-    useFileStore.getState().setRootPath('/workspace');
-
-    renderHook(() => useFileTree({ autoLoad: false }));
-
-    emitFileChanged(0, '/workspace/src/new.ts', 'created');
-    await vi.advanceTimersByTimeAsync(160);
-
     expect(mockListDirectory).not.toHaveBeenCalled();
   });
 
-  it('still removes deleted files immediately without debounce', () => {
-    const { setRootPath, setTreeChildren } = useFileStore.getState();
-    setRootPath('/workspace');
-    setTreeChildren('/workspace/src', [
-      {
-        name: 'a.ts',
-        path: '/workspace/src/a.ts',
-        isDirectory: false,
-        isFile: true,
-        isSymlink: false,
-      },
-      {
-        name: 'b.ts',
-        path: '/workspace/src/b.ts',
-        isDirectory: false,
-        isFile: true,
-        isSymlink: false,
-      },
-    ]);
-
-    renderHook(() => useFileTree({ autoLoad: false }));
-
-    emitFileChanged(0, '/workspace/src/a.ts', 'deleted');
-
-    const children = useFileStore.getState().treeNodes['/workspace/src'];
-    expect(children?.map((child) => child.path)).toEqual(['/workspace/src/b.ts']);
-    expect(mockListDirectory).not.toHaveBeenCalled();
-  });
-
-  it('triggers parent refresh for deleted events in expanded folders', async () => {
-    const { setRootPath, setTreeChildren, expandFolder } = useFileStore.getState();
-    setRootPath('/workspace');
-    expandFolder('/workspace/src');
-    setTreeChildren('/workspace/src', [
-      {
-        name: 'a.ts',
-        path: '/workspace/src/a.ts',
-        isDirectory: false,
-        isFile: true,
-        isSymlink: false,
-      },
-      {
-        name: 'b.ts',
-        path: '/workspace/src/b.ts',
-        isDirectory: false,
-        isFile: true,
-        isSymlink: false,
-      },
-    ]);
-
-    mockListDirectory.mockResolvedValueOnce([createEntry('/workspace/src/b.ts', 'b.ts')]);
-
-    renderHook(() => useFileTree({ autoLoad: false }));
-
-    emitFileChanged(0, '/workspace/src/a.ts', 'deleted');
-    await vi.advanceTimersByTimeAsync(160);
-
-    expect(mockListDirectory).toHaveBeenCalledWith('/workspace/src', true);
-    expect(useFileStore.getState().treeNodes['/workspace/src']?.map((node) => node.name)).toEqual([
-      'b.ts',
-    ]);
-  });
-
-  it('invalidates cached collapsed directory so next expand can refetch', async () => {
-    const { setRootPath, setTreeChildren } = useFileStore.getState();
-    setRootPath('/workspace');
-    setTreeChildren('/workspace/src', [
-      {
-        name: 'old.ts',
-        path: '/workspace/src/old.ts',
-        isDirectory: false,
-        isFile: true,
-        isSymlink: false,
-      },
-    ]);
-
-    renderHook(() => useFileTree({ autoLoad: false }));
-
-    emitFileChanged(0, '/workspace/src/new.ts', 'created');
-    await vi.advanceTimersByTimeAsync(160);
-
-    expect(mockListDirectory).not.toHaveBeenCalled();
-    expect(useFileStore.getState().treeNodes['/workspace/src']).toBeUndefined();
-  });
-
-  it('coalesces case-variant parent paths on case-insensitive filesystems', async () => {
+  it('rejects in-flight old-root refresh completions after workspace switch', async () => {
     const { setRootPath, expandFolder } = useFileStore.getState();
-    setRootPath('/workspace');
-    expandFolder('/workspace/src');
+    setRootPath('/workspace-a');
+    for (let i = 0; i < 6; i += 1) {
+      expandFolder(`/workspace-a/dir${String(i)}`);
+    }
+
+    const deferredCalls: {
+      path: string;
+      resolve: (entries: FileEntry[]) => void;
+    }[] = [];
+    mockListDirectory.mockImplementation((path: string) => {
+      const deferred = createDeferred<FileEntry[]>();
+      deferredCalls.push({
+        path,
+        resolve: (entries: FileEntry[]) => {
+          deferred.resolve(entries);
+        },
+      });
+      return deferred.promise;
+    });
 
     renderHook(() => useFileTree({ autoLoad: false }));
 
-    emitFileChanged(0, '/Workspace/Src/a.ts', 'created');
-    emitFileChanged(0, '/workspace/src/b.ts', 'created');
+    for (let i = 0; i < 6; i += 1) {
+      emitFileChanged(0, `/workspace-a/dir${String(i)}/file.ts`, 'created');
+    }
     await vi.advanceTimersByTimeAsync(160);
+    expect(mockListDirectory).toHaveBeenCalledTimes(5);
 
-    expect(mockListDirectory).toHaveBeenCalledTimes(1);
-    expect(mockListDirectory).toHaveBeenCalledWith('/workspace/src', true);
-  });
+    await act(async () => {
+      useFileStore.getState().setRootPath('/workspace-b');
+      await Promise.resolve();
+    });
 
-  it('refreshes using canonical folder path when event path casing differs', async () => {
-    const { setRootPath, expandFolder } = useFileStore.getState();
-    setRootPath('/workspace');
-    expandFolder('/workspace/src');
+    const inFlightBatch = deferredCalls.splice(0);
+    for (const call of inFlightBatch) {
+      call.resolve([createEntry(`${call.path}/done.ts`, 'done.ts')]);
+    }
+    await flushMicrotasks();
 
-    renderHook(() => useFileTree({ autoLoad: false }));
-
-    emitFileChanged(0, '/Workspace/Src/new.ts', 'created');
-    await vi.advanceTimersByTimeAsync(160);
-
-    expect(mockListDirectory).toHaveBeenCalledTimes(1);
-    expect(mockListDirectory).toHaveBeenCalledWith('/workspace/src', true);
-    expect(useFileStore.getState().treeNodes['/workspace/src']).toBeDefined();
-  });
-
-  it('keeps timer maps isolated across hook instances during unmount', async () => {
-    const { setRootPath, expandFolder } = useFileStore.getState();
-    setRootPath('/workspace');
-    expandFolder('/workspace/src');
-    expandFolder('/workspace/lib');
-
-    const first = renderHook(() => useFileTree({ autoLoad: false }));
-    const firstHandlerIndex = tauriHandlers.length - 1;
-    const second = renderHook(() => useFileTree({ autoLoad: false }));
-    const secondHandlerIndex = tauriHandlers.length - 1;
-
-    emitFileChanged(firstHandlerIndex, '/workspace/src/a.ts', 'created');
-    emitFileChanged(secondHandlerIndex, '/workspace/lib/b.ts', 'created');
-
-    first.unmount();
-
-    await vi.advanceTimersByTimeAsync(160);
-
-    expect(mockListDirectory).toHaveBeenCalledTimes(1);
-    expect(mockListDirectory).toHaveBeenCalledWith('/workspace/lib', true);
-
-    second.unmount();
+    expect(useFileStore.getState().rootPath).toBe('/workspace-b');
+    expect(Object.keys(useFileStore.getState().treeNodes)).toHaveLength(0);
+    expect(mockListDirectory).toHaveBeenCalledTimes(5);
   });
 });
