@@ -75,7 +75,7 @@ export const MessageActions: FC<MessageActionsProps> = ({
   };
 
   return (
-    <div className="mt-3 flex items-center justify-between">
+    <div className="mt-3 flex items-center justify-between opacity-0 transition-opacity duration-150 group-hover/actions:opacity-100 focus-within:opacity-100">
       {turnDurationMs !== undefined && turnDurationMs > 0 ? (
         <span className="flex items-center gap-1 text-xs tabular-nums text-lg-text-secondary">
           <ClockFading className="h-3.5 w-3.5" aria-hidden="true" />
