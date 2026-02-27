@@ -157,6 +157,7 @@ export interface SessionInitEvent {
 export interface SerializableError {
   message: string;
   stack?: string;
+  sessionId?: string;
 }
 
 /**
@@ -1364,7 +1365,7 @@ export class SessionManager extends Disposable {
                       'This indicates SDK integration failure. Check stream_event handling above.'
                   );
                   // Emit error to frontend so user knows something went wrong
-                  this._onError.fire({ message: errorMsg });
+                  this._onError.fire({ message: errorMsg, sessionId });
                   continue;
                 }
 
@@ -1432,7 +1433,7 @@ export class SessionManager extends Disposable {
                         'This indicates SDK integration failure. The sdkMessage.uuid should have been captured.'
                     );
                     // Emit error to frontend so user knows something went wrong
-                    this._onError.fire({ message: errorMsg });
+                    this._onError.fire({ message: errorMsg, sessionId });
                     continue;
                   }
                   this.textBatcher.add(sessionId, currentMessageId, block.text);
@@ -1743,7 +1744,11 @@ export class SessionManager extends Disposable {
           });
         } else {
           logger.error({ sessionId, error: errorMessage }, 'Background consumer error');
-          this._onError.fire({ message: `[SDK Error] ${errorMessage}`, stack: errorStack });
+          this._onError.fire({
+            message: `[SDK Error] ${errorMessage}`,
+            stack: errorStack,
+            sessionId,
+          });
         }
       }
     })();
@@ -1883,26 +1888,6 @@ export class SessionManager extends Disposable {
         });
         return; // Don't queue message to dead session
       }
-    }
-
-    // Pre-send JSONL sanitization: strip empty user messages that the rewindFiles
-    // CLI may have written. By the time the user types and sends a message, the
-    // rewind CLI has definitely finished writing, so we catch the full pollution
-    // block (including the end marker that may have been missing at resume time).
-    try {
-      const sdkId = agent.effectiveSessionId;
-      const jsonlPath = findSessionJsonl(sdkId);
-      if (jsonlPath !== null) {
-        const preSendStripped = stripRewindPollution(jsonlPath);
-        if (preSendStripped > 0) {
-          logger.info(
-            { sessionId, sdkSessionId: sdkId, linesStripped: preSendStripped },
-            'Pre-send: stripped rewind pollution from JSONL'
-          );
-        }
-      }
-    } catch (scrubErr) {
-      logger.warn({ sessionId, error: scrubErr }, 'Pre-send JSONL scrub failed — continuing');
     }
 
     // Track turn start time
@@ -2669,7 +2654,8 @@ Assistant (truncated): "${assistantResponse.slice(0, 300)}"`;
 // ============================================================================
 
 // Versioned flag — bump when matcher logic changes to force a re-run
-const REWIND_POLLUTION_REPAIR_FLAG = '.orbit-rewind-pollution-repaired-v3';
+// v3 → v4: chain-safe strip that re-parents children when removing nodes
+const REWIND_POLLUTION_REPAIR_FLAG = '.orbit-rewind-pollution-repaired-v4';
 
 /**
  * Parsed JSONL line for pollution detection.
@@ -2683,6 +2669,8 @@ const REWIND_POLLUTION_REPAIR_FLAG = '.orbit-rewind-pollution-repaired-v3';
  */
 interface JsonlEntry {
   type?: string;
+  uuid?: string;
+  parentUuid?: string;
   message?: {
     content?: { type?: string; text?: string }[] | string;
   };
@@ -2702,10 +2690,15 @@ function isEmptyUserMessage(entry: JsonlEntry): boolean {
 }
 
 /**
- * Strip rewind pollution from a JSONL file.
+ * Strip rewind pollution from a JSONL file (chain-safe).
  *
  * ONLY strips empty user messages (`text: ""`) — the single line type that
  * causes the API to reject with 400 "text content blocks must be non-empty".
+ *
+ * **Chain-safe:** When removing a node, all entries whose `parentUuid` points
+ * to the removed node's `uuid` are re-parented to the removed node's own
+ * `parentUuid`. This preserves the linked-list chain that
+ * `build_active_uuid_set()` in Rust walks to determine active entries.
  *
  * Everything else is left intact, including:
  *   - `"No response requested."` — legitimate SDK interrupt response
@@ -2717,7 +2710,7 @@ function isEmptyUserMessage(entry: JsonlEntry): boolean {
  *
  * @returns Number of lines stripped.
  */
-function stripRewindPollution(jsonlPath: string): number {
+export function stripRewindPollution(jsonlPath: string): number {
   let content: string;
   try {
     content = fs.readFileSync(jsonlPath, 'utf-8');
@@ -2726,33 +2719,76 @@ function stripRewindPollution(jsonlPath: string): number {
   }
 
   const lines = content.split('\n');
-  const stripped = new Set<number>();
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line === undefined || line.trim() === '') continue;
+  // First pass: parse all entries and identify which to strip
+  const parsed: (JsonlEntry | null)[] = [];
+  const strippedUuids = new Map<string, string | undefined>(); // removedUuid → removedParentUuid
+
+  for (const line of lines) {
+    if (line.trim() === '') {
+      parsed.push(null);
+      continue;
+    }
 
     let entry: JsonlEntry;
     try {
       entry = JSON.parse(line) as JsonlEntry;
     } catch {
+      parsed.push(null);
       continue;
     }
 
-    if (isEmptyUserMessage(entry)) {
-      stripped.add(i);
+    parsed.push(entry);
+
+    if (isEmptyUserMessage(entry) && entry.uuid) {
+      strippedUuids.set(entry.uuid, entry.parentUuid);
     }
   }
 
-  if (stripped.size === 0) return 0;
+  if (strippedUuids.size === 0) return 0;
+
+  // Second pass: re-parent children of removed nodes and rebuild lines.
+  // For each surviving entry whose parentUuid points to a removed node,
+  // walk up the removal chain to find the nearest surviving ancestor.
+  const outputLines: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === undefined) continue;
+
+    const entry = parsed[i];
+
+    // Remove lines that are empty user messages with a known uuid
+    if (entry?.uuid && isEmptyUserMessage(entry) && strippedUuids.has(entry.uuid)) {
+      continue; // skip this line
+    }
+
+    // Re-parent if this entry's parentUuid points to a removed node
+    if (entry?.parentUuid && strippedUuids.has(entry.parentUuid)) {
+      // Walk up the chain: the removed node's parent might also be removed
+      let ancestor: string | undefined = entry.parentUuid;
+      while (ancestor && strippedUuids.has(ancestor)) {
+        ancestor = strippedUuids.get(ancestor);
+      }
+      // Mutate the parsed object and re-serialize
+      entry.parentUuid = ancestor;
+      outputLines.push(JSON.stringify(entry));
+      continue;
+    }
+
+    // Keep line as-is (preserves original formatting/whitespace)
+    outputLines.push(line);
+  }
 
   // Write cleaned JSONL back
-  const cleaned = lines.filter((_, idx) => !stripped.has(idx)).join('\n');
-  fs.writeFileSync(jsonlPath, cleaned, 'utf-8');
+  fs.writeFileSync(jsonlPath, outputLines.join('\n'), 'utf-8');
 
-  logger.info({ jsonlPath, linesStripped: stripped.size }, 'Stripped rewind pollution from JSONL');
+  logger.info(
+    { jsonlPath, linesStripped: strippedUuids.size },
+    'Stripped rewind pollution from JSONL (chain-safe re-parented children)'
+  );
 
-  return stripped.size;
+  return strippedUuids.size;
 }
 
 /**

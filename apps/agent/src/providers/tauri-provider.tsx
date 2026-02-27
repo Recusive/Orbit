@@ -430,13 +430,17 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
           })
       );
 
-      // Agent errors
+      // Agent errors (from bridge error_event — sessionId may be absent for startup errors)
       listenerPromises.push(
         onAgentError((event) => {
+          if (!event.sessionId) {
+            logger.error(`Global agent error (no session): ${event.message}`);
+            return;
+          }
           postWindowMessage({
             type: 'agent:error',
             uuid: crypto.randomUUID(),
-            session_id: '',
+            session_id: event.sessionId,
             message_id: crypto.randomUUID(),
             error: event.message,
           });

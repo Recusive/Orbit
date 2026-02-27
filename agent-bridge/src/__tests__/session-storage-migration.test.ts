@@ -15,7 +15,7 @@ import {
 import type { StoredSession } from '../agent/session/session-storage.js';
 
 const STORAGE_FILENAME = 'orbit-sessions.json';
-const REPAIR_FLAG = '.orbit-sessions-repaired-v1';
+const REPAIR_FLAG = '.orbit-sessions-repaired-v2';
 
 function getStoragePath(): string {
   return path.join(getStorageDirPath(), STORAGE_FILENAME);

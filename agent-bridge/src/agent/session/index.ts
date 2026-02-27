@@ -1,7 +1,7 @@
 /**
  * Session Management Module
  */
-export { SessionManager, repairPollutedJsonls } from './session-manager.js';
+export { SessionManager, repairPollutedJsonls, stripRewindPollution } from './session-manager.js';
 export type {
   AgentMessage,
   PermissionRequest,
