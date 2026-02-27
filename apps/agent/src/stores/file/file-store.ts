@@ -6,6 +6,8 @@ import { immer } from 'zustand/middleware/immer';
 
 import type { FileNode } from '@/types/protocol';
 
+import { getParentPath } from '@/lib/utils/path-utils';
+
 const logger = createLogger('FileStore');
 
 /** Maximum cached sessions to prevent unbounded memory growth */
@@ -43,6 +45,49 @@ function createDict<T>(): Record<string, T> {
  */
 function cloneDict<T>(source: Record<string, T>): Record<string, T> {
   return Object.assign(createDict<T>(), source);
+}
+
+const WINDOWS_DRIVE_ROOT_RE = /^[A-Za-z]:\/$/;
+
+function normalizePathForMatch(path: string): string {
+  const normalized = path.replace(/\\/g, '/');
+  if (normalized !== '/' && !WINDOWS_DRIVE_ROOT_RE.test(normalized)) {
+    return normalized.replace(/\/+$/, '');
+  }
+  return normalized;
+}
+
+function normalizePathCaseFold(path: string): string {
+  return normalizePathForMatch(path).toLowerCase();
+}
+
+function pathsEqual(pathA: string, pathB: string): boolean {
+  if (pathA === pathB) return true;
+  return normalizePathCaseFold(pathA) === normalizePathCaseFold(pathB);
+}
+
+function isDescendantPath(path: string, parentPath: string): boolean {
+  const normalizedPath = normalizePathCaseFold(path);
+  const normalizedParent = normalizePathCaseFold(parentPath);
+  if (normalizedPath === normalizedParent) return false;
+
+  const descendantPrefix =
+    normalizedParent === '/' || WINDOWS_DRIVE_ROOT_RE.test(normalizedParent)
+      ? normalizedParent
+      : `${normalizedParent}/`;
+
+  return normalizedPath.startsWith(descendantPrefix);
+}
+
+function resolveCanonicalCachedPath(path: string, cachedPaths: readonly string[]): string {
+  const exactPath = cachedPaths.find((cachedPath) => cachedPath === path);
+  if (exactPath !== undefined) return exactPath;
+
+  const normalizedTarget = normalizePathCaseFold(path);
+  const canonicalPath = cachedPaths.find(
+    (cachedPath) => normalizePathCaseFold(cachedPath) === normalizedTarget
+  );
+  return canonicalPath ?? path;
 }
 
 export type FileChangeType = 'created' | 'modified' | 'deleted';
@@ -570,24 +615,35 @@ export const useFileStore = create<FileState>()(
     handleFileChanged: (path: string, changeType: FileChangeType) => {
       logger.debug(`File changed: ${changeType}`, { path });
       set((state) => {
-        // Find the parent directory of the changed file
-        const lastSlashIndex = path.lastIndexOf('/');
-        const parentPath = lastSlashIndex > 0 ? path.substring(0, lastSlashIndex) : state.rootPath;
+        // Resolve parent path against cached tree keys to handle path case variants.
+        const cachedPaths = Object.keys(state.treeNodes);
+        const parentPathFromEvent = getParentPath(path) ?? state.rootPath;
+        const parentPath =
+          parentPathFromEvent !== null
+            ? resolveCanonicalCachedPath(parentPathFromEvent, cachedPaths)
+            : null;
 
         if (changeType === 'deleted') {
           // Remove the file/folder from its parent's children
           if (parentPath) {
             const children = state.treeNodes[parentPath];
             if (children) {
-              state.treeNodes[parentPath] = children.filter((c) => c.path !== path);
+              const exactMatchChildren = children.filter((child) => child.path !== path);
+              if (exactMatchChildren.length !== children.length) {
+                state.treeNodes[parentPath] = exactMatchChildren;
+              } else {
+                state.treeNodes[parentPath] = children.filter(
+                  (child) => !pathsEqual(child.path, path)
+                );
+              }
             }
           }
 
           // Recursively clean up: remove all cached children under this path
           // (handles deleted directories with expanded subfolders)
           const pathsToDelete: string[] = [];
-          for (const cachedPath of Object.keys(state.treeNodes)) {
-            if (cachedPath === path || cachedPath.startsWith(`${path}/`)) {
+          for (const cachedPath of cachedPaths) {
+            if (pathsEqual(cachedPath, path) || isDescendantPath(cachedPath, path)) {
               pathsToDelete.push(cachedPath);
             }
           }
@@ -598,7 +654,7 @@ export const useFileStore = create<FileState>()(
           // Also clean up expandedFolders for this path and all subpaths
           const foldersToCollapse: string[] = [];
           for (const folder of state.expandedFolders) {
-            if (folder === path || folder.startsWith(`${path}/`)) {
+            if (pathsEqual(folder, path) || isDescendantPath(folder, path)) {
               foldersToCollapse.push(folder);
             }
           }
@@ -606,11 +662,8 @@ export const useFileStore = create<FileState>()(
             state.expandedFolders.delete(f);
           }
         } else if (changeType === 'created') {
-          // For created, clear parent's cache to trigger re-fetch
-          // Only if parent is already loaded (otherwise nothing to refresh)
-          if (parentPath && state.treeNodes[parentPath]) {
-            Reflect.deleteProperty(state.treeNodes, parentPath);
-          }
+          // Created events are refreshed asynchronously in use-file-tree.ts
+          // via scheduleDirectoryRefresh() + listDirectory().
         }
         // For 'modified', we don't need to refresh the tree structure
         // (only file content changed, which is handled by file viewer)

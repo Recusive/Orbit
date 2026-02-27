@@ -3,10 +3,14 @@ import { useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
 import type { ExtensionMessage, FileNode } from '@/types/protocol';
+import type { RefObject } from 'react';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { initFileWatcher } from '@/hooks/agent/use-tauri-file-watcher';
-import { buildFileIndex, lspDidOpen, setWorkspacePath } from '@/lib/api';
+import { buildFileIndex, listDirectory, lspDidOpen, setWorkspacePath } from '@/lib/api';
+import { toFileNodes } from '@/lib/mappers';
+import { isMac } from '@/lib/utils';
+import { getParentPath, isPathEqualOrWithin } from '@/lib/utils/path-utils';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore, getLanguageFromPath } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -136,6 +140,195 @@ const REQUEST_TIMEOUT_MS = 30000;
 /** Stable empty array reference for selectors (prevents re-renders) */
 const EMPTY_CHILDREN: readonly FileNode[] = [];
 
+/** Debounce delay for file-watcher-triggered directory refreshes (ms). */
+const FILE_TREE_REFRESH_DEBOUNCE_MS = 150;
+
+type RefreshTimers = Map<string, ReturnType<typeof setTimeout>>;
+const WINDOWS_DRIVE_ROOT_RE = /^[A-Za-z]:\/$/;
+
+const refreshStats = {
+  scheduled: 0,
+  coalesced: 0,
+  executed: 0,
+  skippedStale: 0,
+  skippedInvisible: 0,
+};
+
+const activeTimerRefs = new Set<RefObject<RefreshTimers>>();
+
+function clearScheduledDirectoryRefreshes(timers: RefreshTimers): void {
+  for (const timer of timers.values()) {
+    clearTimeout(timer);
+  }
+  timers.clear();
+}
+
+function isCaseInsensitiveFS(): boolean {
+  if (isMac()) return true;
+  if (typeof navigator === 'undefined') return false;
+  return navigator.userAgent.toLowerCase().includes('win');
+}
+
+function normalizePathForFsComparison(path: string): string {
+  const normalized = path.replace(/\\/g, '/');
+  let trimmed = normalized;
+
+  if (trimmed !== '/' && !WINDOWS_DRIVE_ROOT_RE.test(trimmed)) {
+    trimmed = trimmed.replace(/\/+$/, '');
+  }
+
+  return isCaseInsensitiveFS() ? trimmed.toLowerCase() : trimmed;
+}
+
+function isPathEqualOrWithinFs(path: string, parentPath: string): boolean {
+  if (!isCaseInsensitiveFS()) {
+    return isPathEqualOrWithin(path, parentPath);
+  }
+
+  const normalizedPath = normalizePathForFsComparison(path);
+  const normalizedParent = normalizePathForFsComparison(parentPath);
+  if (normalizedPath === normalizedParent) return true;
+
+  const descendantPrefix =
+    normalizedParent === '/' || WINDOWS_DRIVE_ROOT_RE.test(normalizedParent)
+      ? normalizedParent
+      : `${normalizedParent}/`;
+
+  return (
+    normalizedPath.startsWith(descendantPrefix) && normalizedPath.length > normalizedParent.length
+  );
+}
+
+function resolveCanonicalDirectoryPath(
+  dirPath: string,
+  state: {
+    rootPath: string | null;
+    expandedFolders: Set<string>;
+    treeNodes: Record<string, FileNode[]>;
+  }
+): string | null {
+  if (!state.rootPath) return null;
+  if (dirPath === state.rootPath) return state.rootPath;
+  if (state.expandedFolders.has(dirPath)) return dirPath;
+  if (state.treeNodes[dirPath] !== undefined) return dirPath;
+
+  if (!isCaseInsensitiveFS()) {
+    return dirPath;
+  }
+
+  const normalizedTarget = normalizePathForFsComparison(dirPath);
+  if (normalizePathForFsComparison(state.rootPath) === normalizedTarget) {
+    return state.rootPath;
+  }
+
+  for (const folderPath of state.expandedFolders) {
+    if (normalizePathForFsComparison(folderPath) === normalizedTarget) {
+      return folderPath;
+    }
+  }
+
+  for (const cachedPath of Object.keys(state.treeNodes)) {
+    if (normalizePathForFsComparison(cachedPath) === normalizedTarget) {
+      return cachedPath;
+    }
+  }
+
+  return dirPath;
+}
+
+function timerKey(dirPath: string): string {
+  return normalizePathForFsComparison(dirPath);
+}
+
+async function refreshDirectory(dirPath: string): Promise<void> {
+  try {
+    const storeBeforeFetch = useFileStore.getState();
+    const rootAtStart = storeBeforeFetch.rootPath;
+    if (!rootAtStart) return;
+    if (!isPathEqualOrWithinFs(dirPath, rootAtStart)) return;
+
+    const targetDirPath = resolveCanonicalDirectoryPath(dirPath, storeBeforeFetch) ?? dirPath;
+    const isVisible =
+      targetDirPath === rootAtStart || storeBeforeFetch.expandedFolders.has(targetDirPath);
+
+    if (!isVisible) {
+      refreshStats.skippedInvisible += 1;
+
+      if (storeBeforeFetch.treeNodes[targetDirPath]) {
+        useFileStore.setState((state) => {
+          Reflect.deleteProperty(state.treeNodes, targetDirPath);
+        });
+      }
+
+      logger.debug('Directory refresh skipped (folder not visible)', {
+        path: targetDirPath,
+        stats: { ...refreshStats },
+      });
+      return;
+    }
+
+    const entries = await listDirectory(targetDirPath, true);
+
+    const storeAfterFetch = useFileStore.getState();
+    if (!storeAfterFetch.rootPath || storeAfterFetch.rootPath !== rootAtStart) {
+      refreshStats.skippedStale += 1;
+      logger.debug('Directory refresh skipped (stale root)', {
+        path: targetDirPath,
+        stats: { ...refreshStats },
+      });
+      return;
+    }
+    if (!isPathEqualOrWithinFs(targetDirPath, storeAfterFetch.rootPath)) {
+      refreshStats.skippedStale += 1;
+      logger.debug('Directory refresh skipped (outside workspace)', {
+        path: targetDirPath,
+        stats: { ...refreshStats },
+      });
+      return;
+    }
+
+    storeAfterFetch.setTreeChildren(targetDirPath, toFileNodes(entries));
+    refreshStats.executed += 1;
+    logger.debug('Directory refresh executed', { path: targetDirPath, stats: { ...refreshStats } });
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : typeof err === 'string' ? err : 'Unknown error';
+    logger.warn('Failed to refresh directory after file change', {
+      path: dirPath,
+      error: message,
+    });
+  }
+}
+
+function scheduleDirectoryRefresh(timers: RefreshTimers, dirPath: string): void {
+  const key = timerKey(dirPath);
+  const existing = timers.get(key);
+
+  if (existing !== undefined) {
+    clearTimeout(existing);
+    refreshStats.coalesced += 1;
+  } else {
+    refreshStats.scheduled += 1;
+  }
+
+  timers.set(
+    key,
+    setTimeout(() => {
+      timers.delete(key);
+      void refreshDirectory(dirPath);
+    }, FILE_TREE_REFRESH_DEBOUNCE_MS)
+  );
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    for (const ref of activeTimerRefs) {
+      clearScheduledDirectoryRefreshes(ref.current);
+    }
+    activeTimerRefs.clear();
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Hook
 // ═══════════════════════════════════════════════════════════════
@@ -184,8 +377,8 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
     >()
   );
 
-  // Track previous treeNodes for detecting cleared cache
-  const prevTreeNodesRef = useRef<Set<string>>(new Set());
+  // Each useFileTree instance owns its own refresh timers map.
+  const refreshTimersRef = useRef<RefreshTimers>(new Map());
 
   // Guard to ensure autoLoad only runs once per mount
   const hasAutoLoaded = useRef(false);
@@ -320,8 +513,20 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
           if (debug) {
             logger.debug('File changed', { path: message.path, changeType: message.change_type });
           }
-          // Handle file system changes (updates store, may clear cached children)
+          // Handle immediate tree updates (delete events update children synchronously).
           useFileStore.getState().handleFileChanged(message.path, message.change_type);
+
+          if (message.change_type === 'created' || message.change_type === 'deleted') {
+            const parentPath = getParentPath(message.path);
+            if (parentPath) {
+              scheduleDirectoryRefresh(refreshTimersRef.current, parentPath);
+            } else {
+              const rootPath = useFileStore.getState().rootPath;
+              if (rootPath) {
+                scheduleDirectoryRefresh(refreshTimersRef.current, rootPath);
+              }
+            }
+          }
           break;
         }
 
@@ -423,6 +628,28 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
     (s) => s.loadingPaths.has('__root__') || s.loadingPaths.has(s.rootPath ?? '')
   );
   const rootError = useFileStore((s) => s.errorPaths.get(s.rootPath ?? '__root__') ?? null);
+  const currentRootPath = useFileStore((s) => s.rootPath);
+  const treeNodeKeys = useFileStore((s) => Object.keys(s.treeNodes).join('\0'));
+
+  useEffect(() => {
+    if (!currentRootPath) return;
+
+    initFileWatcher(currentRootPath).catch((err: unknown) => {
+      logger.warn('Failed to initialize file watcher for file tree', {
+        path: currentRootPath,
+        error: err,
+      });
+    });
+  }, [currentRootPath]);
+
+  useEffect(() => {
+    const ref = refreshTimersRef;
+    activeTimerRefs.add(ref);
+    return (): void => {
+      clearScheduledDirectoryRefreshes(ref.current);
+      activeTimerRefs.delete(ref);
+    };
+  }, []);
 
   // Request children for a path
   const requestChildren = useCallback(
@@ -430,6 +657,13 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
       const store = useFileStore.getState();
       const requestPath = path ?? store.rootPath ?? '';
       const currentRootPath = store.rootPath;
+
+      if (!requestPath) {
+        if (debug) {
+          logger.debug('Skipping tree request without a resolved root path');
+        }
+        return;
+      }
 
       // Don't request if already pending
       if (pendingRequests.current.has(requestPath)) {
@@ -488,33 +722,11 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
     }
   }, [autoLoad, requestChildren]);
 
-  // Subscribe to treeNodes keys for detecting cleared folders
-  // Use Array.from instead of spread to handle Immer proxies more reliably
-  // Use NUL (\0) as delimiter since it cannot appear in file paths (unlike comma)
-  const treeNodeKeys = useFileStore((s) => Object.keys(s.treeNodes).join('\0'));
-  const expandedFoldersList = useFileStore((s) => Array.from(s.expandedFolders).join('\0'));
-  const currentRootPath = useFileStore((s) => s.rootPath);
-
-  // Re-fetch expanded folders when their children are cleared (e.g., by file watcher)
+  // Keep root tree loaded after workspace switches.
   useEffect(() => {
     const currentPaths = new Set(treeNodeKeys.split('\0').filter(Boolean));
-    const expandedFolders = new Set(expandedFoldersList.split('\0').filter(Boolean));
 
-    // Check for expanded folders that were loaded but now aren't
-    for (const folderPath of expandedFolders) {
-      const wasLoaded = prevTreeNodesRef.current.has(folderPath);
-      const isLoaded = currentPaths.has(folderPath);
-
-      // If folder was loaded but now isn't (cache cleared), re-fetch
-      if (wasLoaded && !isLoaded && !pendingRequests.current.has(folderPath)) {
-        if (debug) {
-          logger.debug('Re-fetching cleared folder', { path: folderPath });
-        }
-        requestChildren(folderPath);
-      }
-    }
-
-    // Also check root path - fetch if not loaded (covers both cleared cache and new root path)
+    // Fetch root if not loaded yet (covers initial load and workspace switches).
     if (currentRootPath) {
       const isRootLoaded = currentPaths.has(currentRootPath);
       if (!isRootLoaded && !pendingRequests.current.has(currentRootPath)) {
@@ -524,10 +736,7 @@ export function useFileTree(options: UseFileTreeOptions = {}): UseFileTreeResult
         requestChildren(currentRootPath);
       }
     }
-
-    // Update ref for next comparison
-    prevTreeNodesRef.current = currentPaths;
-  }, [treeNodeKeys, expandedFoldersList, currentRootPath, debug, requestChildren]);
+  }, [treeNodeKeys, currentRootPath, debug, requestChildren]);
 
   // Cleanup timeouts on unmount
   useEffect(() => {
