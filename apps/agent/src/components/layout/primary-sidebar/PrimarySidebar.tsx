@@ -50,6 +50,7 @@ import { SFSymbol } from '@/components/shared';
 import { Kbd } from '@/components/ui/kbd';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useSmoothScroll } from '@/hooks/ui';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
@@ -105,6 +106,8 @@ const SkillsDialog: FC<SkillsDialogProps> = (props) => (
 const logger = createLogger('PrimarySidebar');
 
 export const PrimarySidebar: FC = () => {
+  const smoothScrollRef = useSmoothScroll(0.08);
+
   // Use useShallow to prevent re-renders when unrelated store state changes
   const {
     toggleLeftSidebar,
@@ -436,7 +439,8 @@ export const PrimarySidebar: FC = () => {
 
       {/* Tab Content — mask fades content at bottom edge */}
       <div
-        className="flex-1 overflow-x-hidden overflow-y-auto"
+        ref={smoothScrollRef}
+        className="flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain"
         style={{
           maskImage: 'linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)',
           WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)',

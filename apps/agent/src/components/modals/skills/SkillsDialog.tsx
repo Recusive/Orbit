@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useTauri } from '@/hooks/agent/use-tauri';
+import { useSmoothScroll } from '@/hooks/ui';
 import { cn } from '@/lib/utils';
 
 // ═══════════════════════════════════════════════════════════════
@@ -137,6 +138,7 @@ const SkillsSkeleton: FC = () => (
 // ═══════════════════════════════════════════════════════════════
 
 export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
+  const smoothScrollRef = useSmoothScroll(0.08);
   const [skills, setSkills] = useState<SkillDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -257,7 +259,10 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
 
         {/* Scrollable content with edge fade */}
         <div className="flex-1 min-h-0">
-          <div className="h-full overflow-auto p-4 [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]">
+          <div
+            ref={smoothScrollRef}
+            className="h-full overflow-auto overscroll-y-contain p-4 [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]"
+          >
             {isLoading ? (
               <SkillsSkeleton />
             ) : error !== null ? (

@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useTauri } from '@/hooks/agent/use-tauri';
+import { useSmoothScroll } from '@/hooks/ui';
 import { cn } from '@/lib/utils';
 
 // Available tools that can be selected
@@ -121,6 +122,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
   postMessage,
   onGeneratedAgent,
 }) => {
+  const smoothScrollRef = useSmoothScroll(0.08);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [prompt, setPrompt] = useState('');
@@ -249,7 +251,10 @@ const AgentEditor: FC<AgentEditorProps> = ({
               </div>
 
               {/* Form */}
-              <div className="flex-1 min-h-0 overflow-y-auto py-5 px-6">
+              <div
+                ref={smoothScrollRef}
+                className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain py-5 px-6"
+              >
                 <div className="space-y-5 px-px">
                   {/* Name */}
                   <div>

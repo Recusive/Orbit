@@ -14,6 +14,9 @@ import { cn } from '@/lib/utils';
 // Disable Streamdown's built-in link safety modal (desktop app opens URLs via Tauri)
 const LINK_SAFETY_DISABLED = { enabled: false } as const;
 
+// Disable table copy/download controls
+const CONTROLS_CONFIG = { table: false } as const;
+
 // Zod schema for task output content blocks
 const ContentBlockSchema = z
   .object({
@@ -196,6 +199,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                         <Streamdown
                           remarkPlugins={[remarkGfm]}
                           rehypePlugins={[]}
+                          controls={CONTROLS_CONFIG}
                           linkSafety={LINK_SAFETY_DISABLED}
                         >
                           {parseTaskOutput(output)}

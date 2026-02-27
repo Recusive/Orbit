@@ -16,6 +16,7 @@ import type { FC } from 'react';
 import { FileIcon, FolderIcon } from '@/components/files';
 import { FileContextMenu } from '@/components/files/file-context-menu';
 import { useFileTree } from '@/hooks/file/use-file-tree';
+import { useSmoothScroll } from '@/hooks/ui';
 import {
   conversationList,
   deleteFile,
@@ -155,6 +156,14 @@ export const FileExplorer: FC = () => {
 
   // Stable ref for scroll container - must be defined before useVirtualizer
   const parentRef = useRef<HTMLDivElement>(null);
+  const smoothScrollRef = useSmoothScroll(0.08);
+  const mergedParentRef = useCallback(
+    (node: HTMLDivElement | null): void => {
+      parentRef.current = node;
+      smoothScrollRef(node);
+    },
+    [smoothScrollRef]
+  );
 
   // Memoize flat items with stable dependencies
   const flatItems = useMemo(() => {
@@ -323,7 +332,10 @@ export const FileExplorer: FC = () => {
       </div>
 
       {/* Tree content */}
-      <div ref={parentRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div
+        ref={mergedParentRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain"
+      >
         {/* Root error state */}
         {rootError ? (
           <div className="flex flex-col items-center justify-center py-8 px-4 text-center">

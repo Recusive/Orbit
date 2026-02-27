@@ -5,6 +5,7 @@ import type { ViewedFileDiff } from '@/stores/file/file-viewer-store';
 import type { FC } from 'react';
 
 import { useIsDarkMode } from '@/components/chat/tools/shared';
+import { useSmoothScroll } from '@/hooks/ui';
 import {
   editToolToPierreDiff,
   PIERRE_DIFF_STYLE,
@@ -27,6 +28,7 @@ export const FileDiffViewer: FC<FileDiffViewerProps> = ({
   filePath = 'file',
   className = '',
 }) => {
+  const smoothScrollRef = useSmoothScroll(0.08);
   const isDarkMode = useIsDarkMode();
   const fileDiff = useMemo(
     () => editToolToPierreDiff(filePath, diffData.oldContent, diffData.newContent),
@@ -34,7 +36,10 @@ export const FileDiffViewer: FC<FileDiffViewerProps> = ({
   );
 
   return (
-    <div className={`h-full overflow-y-auto bg-card ${className}`}>
+    <div
+      ref={smoothScrollRef}
+      className={`h-full overflow-y-auto overscroll-y-contain bg-card ${className}`}
+    >
       {fileDiff ? (
         <FileDiff
           fileDiff={fileDiff}

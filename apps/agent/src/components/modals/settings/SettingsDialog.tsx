@@ -11,6 +11,7 @@ import type { FC, ReactNode } from 'react';
 import { SFSymbol } from '@/components/shared';
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
+import { useSmoothScroll } from '@/hooks/ui';
 import { cn } from '@/lib/utils';
 
 // Loading fallback for lazy-loaded pages
@@ -26,6 +27,11 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
   defaultSection = 'agent',
 }) => {
   const [activeSection, setActiveSection] = useState<SettingsSection>(defaultSection);
+
+  // Smooth scroll for each settings page panel (each is an independent scroll container)
+  const staticScrollRef = useSmoothScroll(0.08);
+  const subagentsScrollRef = useSmoothScroll(0.08);
+  const commandsScrollRef = useSmoothScroll(0.08);
 
   // Track which async sections have been visited (so we only mount them once)
   // Once visited, they stay mounted to preserve fetched data
@@ -125,7 +131,10 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                 <div className="flex-1 overflow-auto bg-sidebar relative">
                   {/* Static sections - render via lazy components (unmounted when inactive) */}
                   {!isAsyncSection && (
-                    <div className="absolute inset-0 p-6 overflow-auto">
+                    <div
+                      ref={staticScrollRef}
+                      className="absolute inset-0 p-6 overflow-auto overscroll-y-contain"
+                    >
                       {renderStaticContent()}
                     </div>
                   )}
@@ -134,8 +143,9 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                   {/* These fetch data on mount; once visited, they stay mounted to preserve data */}
                   {visitedSubagents ? (
                     <div
+                      ref={subagentsScrollRef}
                       className={cn(
-                        'absolute inset-0 p-6 overflow-auto',
+                        'absolute inset-0 p-6 overflow-auto overscroll-y-contain',
                         activeSection !== 'subagents' && 'hidden'
                       )}
                     >
@@ -144,8 +154,9 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                   ) : null}
                   {visitedCommands ? (
                     <div
+                      ref={commandsScrollRef}
                       className={cn(
-                        'absolute inset-0 p-6 overflow-auto',
+                        'absolute inset-0 p-6 overflow-auto overscroll-y-contain',
                         activeSection !== 'commands' && 'hidden'
                       )}
                     >
