@@ -253,6 +253,8 @@ pub struct SerializableError {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stack: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
 }
 
 // ============================================================================

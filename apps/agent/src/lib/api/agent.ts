@@ -112,6 +112,7 @@ export interface ModeChangedEvent {
 export interface AgentErrorEvent {
   message: string;
   stack?: string;
+  sessionId?: string;
 }
 
 export interface CheckpointEvent {

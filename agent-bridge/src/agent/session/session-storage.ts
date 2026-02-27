@@ -24,7 +24,7 @@ export type { StoredSession } from '../../protocol/schemas.js';
 
 const STORAGE_VERSION = 1;
 const STORAGE_FILENAME = 'orbit-sessions.json';
-const REPAIR_V1_FLAG = '.orbit-sessions-repaired-v1';
+const REPAIR_V2_FLAG = '.orbit-sessions-repaired-v2';
 const MAX_SESSIONS = 50; // Limit stored sessions to prevent unbounded growth
 
 // ============================================
@@ -87,7 +87,7 @@ function ensureStorageDir(): void {
  */
 function hasRepairRun(): boolean {
   try {
-    return fs.existsSync(path.join(getStorageDir(), REPAIR_V1_FLAG));
+    return fs.existsSync(path.join(getStorageDir(), REPAIR_V2_FLAG));
   } catch {
     // If the check fails, retry repair on startup. The migration is idempotent.
     return false;
@@ -100,7 +100,7 @@ function hasRepairRun(): boolean {
 function markRepairComplete(): boolean {
   try {
     ensureStorageDir();
-    fs.writeFileSync(path.join(getStorageDir(), REPAIR_V1_FLAG), '', 'utf-8');
+    fs.writeFileSync(path.join(getStorageDir(), REPAIR_V2_FLAG), '', 'utf-8');
     return true;
   } catch (error) {
     logger.warn({ error }, 'Failed to write repair flag file');
@@ -151,6 +151,9 @@ function repairOverwrittenParentMappings(sessions: StoredSession[]): RepairResul
   let hadScanFailures = false;
   const now = Date.now();
 
+  // Collect fork records to add after iteration (avoid mutating while iterating)
+  const forkRecordsToAdd: StoredSession[] = [];
+
   for (const session of sessions) {
     // Self-mapped sessions are already correct.
     if (session.sessionId === session.sdkSessionId) continue;
@@ -161,13 +164,43 @@ function repairOverwrittenParentMappings(sessions: StoredSession[]): RepairResul
     }
     if (!found) continue;
 
+    // Save the old sdkSessionId (the fork's ID) before overwriting
+    const forkSdkId = session.sdkSessionId;
+
+    // Restore parent mapping
     session.sdkSessionId = session.sessionId;
     session.lastActiveAt = now;
     repairedCount += 1;
+
+    // Preserve fork: add a self-mapped record so the fork session can still be
+    // resolved by getSDKSessionIdForSession(). Only add if the fork's JSONL exists
+    // and no self-mapped record already exists for it.
+    const forkAlreadyExists = sessions.some((s) => s.sessionId === forkSdkId);
+    if (!forkAlreadyExists) {
+      const { found: forkJsonlExists } = hasJsonlForSessionId(forkSdkId);
+      if (forkJsonlExists) {
+        forkRecordsToAdd.push({
+          sessionId: forkSdkId,
+          sdkSessionId: forkSdkId,
+          createdAt: now,
+          lastActiveAt: now,
+        });
+      }
+    }
   }
 
-  if (repairedCount > 0) {
-    logger.warn({ repairedCount }, 'Repaired overwritten parent session mappings in storage');
+  // Add fork records
+  for (const record of forkRecordsToAdd) {
+    sessions.push(record);
+  }
+
+  const totalRepaired = repairedCount + forkRecordsToAdd.length;
+
+  if (totalRepaired > 0) {
+    logger.warn(
+      { repairedCount, forksPreserved: forkRecordsToAdd.length },
+      'Repaired overwritten parent session mappings in storage'
+    );
   }
 
   if (hadScanFailures) {
@@ -178,7 +211,7 @@ function repairOverwrittenParentMappings(sessions: StoredSession[]): RepairResul
   }
 
   return {
-    sessions: repairedCount > 0 ? sessions : null,
+    sessions: totalRepaired > 0 ? sessions : null,
     repairedCount,
     hadScanFailures,
   };
@@ -260,7 +293,7 @@ function loadSessionsFromDisk(): StoredSession[] {
         const flagWritten = markRepairComplete();
         if (!flagWritten) {
           logger.warn(
-            { flagPath: path.join(getStorageDir(), REPAIR_V1_FLAG) },
+            { flagPath: path.join(getStorageDir(), REPAIR_V2_FLAG) },
             'Repair completed but flag could not be written; startup will keep retrying'
           );
         }

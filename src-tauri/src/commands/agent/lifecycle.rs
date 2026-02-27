@@ -575,6 +575,7 @@ fn emit_error(app: &AppHandle, error: &SerializableError) {
         serde_json::json!({
             "message": error.message,
             "stack": error.stack,
+            "sessionId": error.session_id,
         }),
     ));
 }
