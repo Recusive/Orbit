@@ -24,9 +24,17 @@ import {
   openFileDialog,
   renameFile,
 } from '@/lib/api';
+import {
+  ORBIT_FILE_MIME,
+  ORBIT_FILE_TEXT_MIME,
+  clearCurrentOrbitDragDetail,
+  setCurrentOrbitDragDetail,
+  takeCurrentOrbitDragDetail,
+} from '@/lib/events/chat-context-events';
 import { toConversationSummaries } from '@/lib/mappers';
 import { cn, GIT_STATUS_STYLES } from '@/lib/utils';
 import { getParentPath, getPathName, joinPath } from '@/lib/utils/path-utils';
+import { enqueueFileChip } from '@/stores/chat/pending-context-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { selectFileStatus, useGitStore } from '@/stores/git/git-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -502,6 +510,84 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
       onDelete(path);
     }, [path, onDelete]);
 
+    const handleDragStart = useCallback(
+      (event: React.DragEvent<HTMLDivElement>): void => {
+        if (isRenaming) {
+          event.preventDefault();
+          return;
+        }
+
+        const payload = JSON.stringify({
+          path,
+          name: node.name,
+          isDirectory: node.isDirectory,
+        });
+        setCurrentOrbitDragDetail({
+          path,
+          name: node.name,
+          isDirectory: node.isDirectory,
+        });
+        event.dataTransfer.setData(ORBIT_FILE_MIME, payload);
+        event.dataTransfer.setData(ORBIT_FILE_TEXT_MIME, payload);
+        event.dataTransfer.setData('text/plain', path);
+        event.dataTransfer.effectAllowed = 'copy';
+
+        // Virtualized rows use transform-based positioning, which can produce
+        // offset native drag ghosts. Use a lightweight custom preview instead.
+        const dragPreview = document.createElement('div');
+        dragPreview.textContent = node.name;
+        Object.assign(dragPreview.style, {
+          position: 'fixed',
+          top: '-1000px',
+          left: '-1000px',
+          padding: '4px 8px',
+          borderRadius: '8px',
+          border: '1px solid color-mix(in srgb, var(--border) 75%, transparent)',
+          background: 'var(--popover)',
+          color: 'var(--popover-foreground)',
+          fontSize: '12px',
+          fontWeight: '500',
+          pointerEvents: 'none',
+          zIndex: '999999',
+        });
+        document.body.appendChild(dragPreview);
+        event.dataTransfer.setDragImage(dragPreview, 12, 12);
+        requestAnimationFrame(() => {
+          dragPreview.remove();
+        });
+      },
+      [isRenaming, node.isDirectory, node.name, path]
+    );
+
+    // Source-side drop handler — WKWebView consumes dragenter/dragover/drop
+    // at the native level for internal drags, so target-side listeners never
+    // fire. Instead, we handle the drop on the SOURCE element's dragend event
+    // and use elementFromPoint() to hit-test whether the cursor ended over
+    // the chat drop zone (marked with data-orbit-drop-zone="chat").
+    const handleDragEnd = useCallback((event: React.DragEvent<HTMLDivElement>): void => {
+      const { clientX, clientY } = event;
+
+      // elementFromPoint returns the topmost element at the given coordinates.
+      // Walk up the DOM tree to find the drop zone marker.
+      const hitEl = document.elementFromPoint(clientX, clientY);
+      if (hitEl !== null) {
+        let walk: Element | null = hitEl;
+        while (walk !== null) {
+          if (walk instanceof HTMLElement && walk.dataset['orbitDropZone'] === 'chat') {
+            const detail = takeCurrentOrbitDragDetail();
+            if (detail !== null) {
+              enqueueFileChip(detail);
+            }
+            return;
+          }
+          walk = walk.parentElement;
+        }
+      }
+
+      // Cursor was NOT over the chat area — clean up
+      clearCurrentOrbitDragDetail();
+    }, []);
+
     const indentPx = depth * 12 + 8;
 
     // Check if file is gitignored (files only, not directories)
@@ -524,6 +610,8 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
           paddingLeft: indentPx,
           // Reduce opacity for gitignored files to visually indicate they're not tracked
           opacity: isGitIgnored ? 0.5 : 1,
+          cursor: isRenaming ? 'text' : 'default',
+          userSelect: isRenaming ? 'text' : 'none',
         }}
         onClick={handleClick}
         onKeyDown={(e): void => {
@@ -538,6 +626,9 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
         tabIndex={0}
         aria-selected={isSelected}
         title={isGitIgnored ? `${path} (gitignored)` : path}
+        draggable={!isRenaming}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
       >
         {/* Indent guide lines - one vertical line per ancestor depth level */}
         {depth > 0 &&

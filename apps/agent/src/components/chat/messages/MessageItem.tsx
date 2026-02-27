@@ -25,6 +25,7 @@ import { ErrorBoundary } from '@/components/shared';
 import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
 import { rehypeInsightBlocks } from '@/lib/rehype-insight-blocks';
 import { cn, CHAT_SPACING } from '@/lib/utils';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 /** Max collapsed height for user message bubbles (px). Content taller than this gets a "Show more" toggle. */
 const USER_MESSAGE_MAX_HEIGHT = 200;
@@ -92,92 +93,139 @@ function calculateFlowDuration(contentLength: number): string {
 }
 
 /** Collapsible user message bubble — clamps long content behind a "Show more" toggle. */
-const UserMessageBubble: FC<{ readonly content: string; readonly animate: boolean | undefined }> =
-  memo(function UserMessageBubble({ content, animate }) {
-    const contentRef = useRef<HTMLParagraphElement>(null);
-    const [isOverflowing, setIsOverflowing] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false);
+const UserMessageBubble: FC<{
+  readonly content: string;
+  readonly animate: boolean | undefined;
+  readonly onOpenFile?: (path: string) => void;
+  readonly attachedFiles?: string[] | undefined;
+}> = memo(function UserMessageBubble({ content, animate, onOpenFile, attachedFiles }) {
+  const contentRef = useRef<HTMLParagraphElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
-    // Detect overflow after layout to decide whether the toggle is needed.
-    // useLayoutEffect fires synchronously before paint → no flash of "Show more" on short messages.
-    useLayoutEffect(() => {
-      const el = contentRef.current;
-      if (el === null) return;
-      setIsOverflowing(el.scrollHeight > USER_MESSAGE_MAX_HEIGHT);
-    }, [content]);
+  // Detect overflow after layout to decide whether the toggle is needed.
+  // useLayoutEffect fires synchronously before paint → no flash of "Show more" on short messages.
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (el === null) return;
+    setIsOverflowing(el.scrollHeight > USER_MESSAGE_MAX_HEIGHT);
+  }, [content]);
 
-    const toggleExpanded = useCallback(() => {
-      setIsExpanded((prev) => !prev);
-    }, []);
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded((prev) => !prev);
+  }, []);
 
-    // Render leading /slash-command and @file tokens as inline code tags for visual distinction.
-    // Matches tokens like "/commit", "@utils.ts @hooks/" at the start of content.
-    // Both prefixes can coexist: "/review-pr @file.ts explain this"
-    const renderedContent = useMemo(() => {
-      const match = /^((?:(?:\/[\w-]+|@[\w./-]+)(?:\s+|$))+)/.exec(content);
-      if (match === null) return content;
+  // Render /slash-commands and @file tokens with special styling anywhere in the message.
+  // Slash commands → gray inline code. @file tokens → light blue clickable links that
+  // open the file in the code editor. Plain text between tokens is preserved as-is.
+  const renderedContent = useMemo(() => {
+    // Match /slash-commands and @file tokens anywhere in the string
+    const tokenPattern = /(\/[\w-]+|@[\w./-]+)/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let matchResult: RegExpExecArray | null;
 
-      const rest = content.slice(match[0].length);
-      const tokens = match[0].trim().split(/\s+/);
+    while ((matchResult = tokenPattern.exec(content)) !== null) {
+      // Add plain text before this token
+      if (matchResult.index > lastIndex) {
+        parts.push(content.slice(lastIndex, matchResult.index));
+      }
 
-      return (
-        <>
-          {tokens.map((token, i) => (
-            <span key={i}>
-              <code className="rounded bg-lg-control px-1.5 py-0.5 font-mono text-sm">
-                {token}
-              </code>{' '}
-            </span>
-          ))}
-          {rest}
-        </>
-      );
-    }, [content]);
+      const token = matchResult[0];
+      const key = `${String(matchResult.index)}-${token}`;
 
-    const isCollapsed = isOverflowing && !isExpanded;
-
-    return (
-      <div
-        className={cn(
-          'w-fit max-w-full rounded-xl bg-lg-control dark:bg-[#272727] px-3.5 pt-2.5',
-          isCollapsed ? 'pb-0' : 'pb-2.5',
-          animate === true && 'animate-message-in'
-        )}
-      >
-        {/* Content area with optional height clamp + mask fade when collapsed */}
-        <div className="relative">
-          <p
-            ref={contentRef}
-            className="text-base leading-relaxed whitespace-pre-wrap wrap-break-word select-text"
-            style={
-              isCollapsed
-                ? {
-                    maxHeight: `${String(USER_MESSAGE_MAX_HEIGHT)}px`,
-                    overflow: 'hidden',
-                    maskImage: 'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
-                    WebkitMaskImage:
-                      'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
-                  }
-                : undefined
-            }
-          >
-            {renderedContent}
-          </p>
-        </div>
-
-        {/* Show more / Show less toggle */}
-        {isOverflowing ? (
+      if (token.startsWith('@')) {
+        const fileName = token.slice(1);
+        parts.push(
           <button
+            key={key}
             type="button"
-            onClick={toggleExpanded}
-            className="pt-1 pb-2.5 text-xs text-foreground/50 hover:text-foreground transition-colors w-3/4 text-left"
+            onClick={() => {
+              // Resolve @filename to an absolute path:
+              // 1. Try matching against attachedFiles (has full paths for current session)
+              // 2. Fall back to workspacePath + filename (works for JSONL-loaded messages)
+              const fromAttached = attachedFiles?.find(
+                (f) => f.endsWith(`/${fileName}`) || f === fileName
+              );
+              if (fromAttached) {
+                onOpenFile?.(fromAttached);
+                return;
+              }
+              const ws = useUIStore.getState().workspacePath;
+              const resolved = ws ? `${ws}/${fileName}` : fileName;
+              onOpenFile?.(resolved);
+            }}
+            className="inline text-[#0d87ff] dark:text-[#99ceff] hover:underline transition-colors cursor-pointer"
           >
-            {isExpanded ? 'Show less' : 'Show more'}
+            {fileName}
           </button>
-        ) : null}
+        );
+      } else {
+        parts.push(
+          <code key={key} className="rounded-[5px] bg-lg-control px-1.5 py-0.5 font-mono text-sm">
+            {token}
+          </code>
+        );
+      }
+
+      lastIndex = matchResult.index + token.length;
+    }
+
+    // Add remaining plain text after last token
+    if (lastIndex < content.length) {
+      parts.push(content.slice(lastIndex));
+    }
+
+    // No tokens found — return plain string (avoids wrapping in fragment)
+    if (parts.length === 1 && typeof parts[0] === 'string') return content;
+
+    return <>{parts}</>;
+  }, [content, onOpenFile, attachedFiles]);
+
+  const isCollapsed = isOverflowing && !isExpanded;
+
+  return (
+    <div
+      className={cn(
+        'w-fit max-w-full rounded-xl bg-lg-control dark:bg-[#272727] px-3.5 pt-2.5',
+        isCollapsed ? 'pb-0' : 'pb-2.5',
+        animate === true && 'animate-message-in'
+      )}
+    >
+      {/* Content area with optional height clamp + mask fade when collapsed */}
+      <div className="relative">
+        <p
+          ref={contentRef}
+          className="text-base leading-relaxed whitespace-pre-wrap wrap-break-word select-text"
+          style={
+            isCollapsed
+              ? {
+                  maxHeight: `${String(USER_MESSAGE_MAX_HEIGHT)}px`,
+                  overflow: 'hidden',
+                  maskImage: 'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
+                  WebkitMaskImage:
+                    'linear-gradient(to bottom, black calc(100% - 48px), transparent)',
+                }
+              : undefined
+          }
+        >
+          {renderedContent}
+        </p>
       </div>
-    );
-  });
+
+      {/* Show more / Show less toggle */}
+      {isOverflowing ? (
+        <button
+          type="button"
+          onClick={toggleExpanded}
+          className="pt-1 pb-2.5 text-xs text-foreground/50 hover:text-foreground transition-colors w-3/4 text-left"
+        >
+          {isExpanded ? 'Show less' : 'Show more'}
+        </button>
+      ) : null}
+    </div>
+  );
+});
 
 export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   message,
@@ -266,7 +314,12 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           <CompactIndicator messageId={message.id} />
         ) : (
           <div className="flex flex-col items-end gap-1 pb-3">
-            <UserMessageBubble content={message.displayedContent} animate={animate} />
+            <UserMessageBubble
+              content={message.displayedContent}
+              animate={animate}
+              onOpenFile={onOpenFile}
+              attachedFiles={message.attachedFiles}
+            />
           </div>
         )
       ) : (

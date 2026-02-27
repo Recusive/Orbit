@@ -15,6 +15,13 @@ import { useVaultOpen } from '@/stores/ui/ui-store';
  * - Messages state: Messages list + input at bottom
  *
  * Uses visibility:hidden during transitions to prevent layout flash.
+ *
+ * Drop target for file-explorer drag-and-drop: marked with
+ * data-orbit-drop-zone="chat" so the source-side handleDragEnd
+ * in file-explorer.tsx can hit-test via elementFromPoint().
+ * WKWebView intercepts target-side drag events (dragenter/dragover/drop)
+ * at the native level for internal drags, so we handle drops entirely
+ * on the source side instead.
  */
 export const ChatContent: FC<ChatContentProps> = ({
   contentRef,
@@ -69,7 +76,8 @@ export const ChatContent: FC<ChatContentProps> = ({
   return (
     <div
       ref={contentRef}
-      className={`flex-1 flex flex-col min-h-0${isTransitioning ? ' no-transitions' : ''}`}
+      data-orbit-drop-zone="chat"
+      className={`relative flex-1 flex flex-col min-h-0${isTransitioning ? ' no-transitions' : ''}`}
       style={isTransitioning ? { visibility: 'hidden' } : undefined}
     >
       {/* Screen reader status announcer for agent state changes */}
