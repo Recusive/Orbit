@@ -278,7 +278,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       tabIndex={-1}
       onKeyDown={handlePopoverKeyDown}
       className={cn(
-        'fixed bg-[#f3f3f3] dark:bg-[oklch(23%_0_0)] border border-white dark:border-white/5 rounded-[10px] overflow-hidden z-50 outline-none shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md',
+        'fixed bg-white/70 dark:bg-lg-control/80 backdrop-blur-sm dark:backdrop-blur-xl border border-white dark:border-white/5 rounded-[10px] overflow-hidden z-50 outline-none dark:shadow-md',
         position.side === 'top' ? 'origin-bottom-left' : 'origin-top-left',
         !isAnimatingOut &&
           cn(
@@ -292,6 +292,10 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         ...(position.bottom !== undefined ? { bottom: position.bottom } : {}),
         ...(position.top !== undefined ? { top: position.top } : {}),
         left: position.left,
+        boxShadow:
+          position.side === 'top'
+            ? '0 -4px 12px -2px rgba(0,0,0,0.1), 0 -8px 24px -4px rgba(0,0,0,0.08)'
+            : '0 4px 12px -2px rgba(0,0,0,0.1), 0 8px 24px -4px rgba(0,0,0,0.08)',
         // Enter uses ease-out (fast arrival, gentle settle)
         // Exit uses ease-in (gentle start, fast departure)
         animationTimingFunction: isAnimatingOut

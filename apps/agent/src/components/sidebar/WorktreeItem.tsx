@@ -5,21 +5,24 @@
  * To change icon widths, padding, or animation timing,
  * update SIDEBAR and TRANSITIONS in constants.ts - DO NOT hardcode here.
  */
+import { IconBranch } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconBranch';
 import { createLogger } from '@orbit/common/lib';
-import { ChevronDown, FolderOpen, GitBranch, Loader2, Trash2 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { ChevronDown, FolderOpen, Loader2, Trash2 } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { GitBranch as GitBranchInfo } from '@/lib/api';
 import type { WorktreeUIState } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
+import { BranchPickerContent } from '@/components/git/branch-picker';
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -27,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { gitBranches, gitCheckout, gitStatus } from '@/lib/api';
+import { gitBranches, gitCheckout, gitCreateBranch, gitStatus } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useGitStore } from '@/stores/git/git-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -57,14 +60,27 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
   const { worktree, isExpanded } = worktreeState;
   const [branches, setBranches] = useState<GitBranchInfo[]>([]);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [branchPopoverOpen, setBranchPopoverOpen] = useState(false);
+
+  // When source control is open, use the simpler Select; otherwise show the full popover
+  const activityTab = useUIStore((s) => s.activityTab);
+  const isSourceControlOpen = activityTab === 'source';
+
+  // For the active worktree, read branch from GitStore so source-control checkouts
+  // are reflected immediately (GitStore is updated by useSourceControl, UIStore.worktrees is not)
+  const gitBranchName = useGitStore((s) => s.status?.branch ?? null);
+
+  // Filter to local branches for the popover content
+  const localBranches = useMemo(() => branches.filter((b) => !b.isRemote), [branches]);
 
   // Extract workspace name from path (last segment)
   // Handles edge case: empty path or path with only separators falls back to '/' (root indicator)
   const workspaceName =
     worktree.path.split(PATH_SEPARATOR_RE).filter(Boolean).pop() ?? (worktree.path || '/');
 
-  // Get branch display name (without refs/heads/)
-  const branchName = worktree.branch?.replace(/^refs\/heads\//, '') ?? worktree.shortHead;
+  // Get branch display name — active worktree uses GitStore (always fresh), others use UIStore
+  const worktreeBranchName = worktree.branch?.replace(/^refs\/heads\//, '') ?? worktree.shortHead;
+  const branchName = active && gitBranchName !== null ? gitBranchName : worktreeBranchName;
 
   // Handle chevron click - toggles expand/collapse
   const handleChevronClick = useCallback(
@@ -97,10 +113,23 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
     }
   }, [worktree.path, branches.length]);
 
-  // Always re-fetch branches when the select opens to pick up newly created branches
+  // Always re-fetch branches when the select/popover opens to pick up newly created branches
   const handleBranchDropdownOpen = useCallback(
     (open: boolean): void => {
       if (open && worktree.path) {
+        void gitBranches(worktree.path).then((branchList) => {
+          setBranches(branchList);
+        });
+      }
+    },
+    [worktree.path]
+  );
+
+  // Popover open handler — re-fetches branches and manages open state
+  const handleBranchPopoverOpenChange = useCallback(
+    (nextOpen: boolean): void => {
+      setBranchPopoverOpen(nextOpen);
+      if (nextOpen && worktree.path) {
         void gitBranches(worktree.path).then((branchList) => {
           setBranches(branchList);
         });
@@ -157,6 +186,55 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
     [worktree.path, isCheckingOut, branchName]
   );
 
+  // Create a new branch from HEAD and check it out
+  const handleCreateAndCheckout = useCallback(
+    async (rawName: string): Promise<void> => {
+      const name = rawName.trim();
+      if (!worktree.path || isCheckingOut || name.length === 0) return;
+      setIsCheckingOut(true);
+      try {
+        await gitCreateBranch(worktree.path, name);
+        await gitCheckout(worktree.path, name);
+        const [newStatus, newBranches] = await Promise.all([
+          gitStatus(worktree.path),
+          gitBranches(worktree.path),
+        ]);
+        const gitStore = useGitStore.getState();
+        gitStore.setStatus(newStatus);
+        gitStore.setBranches(newBranches);
+        setBranches(newBranches);
+        const uiStore = useUIStore.getState();
+        const updated = uiStore.worktrees.map((w) =>
+          w.worktree.path === worktree.path
+            ? {
+                ...w,
+                worktree: {
+                  ...w.worktree,
+                  branch: `refs/heads/${name}`,
+                  shortHead: name,
+                },
+              }
+            : w
+        );
+        uiStore.setWorktrees(updated);
+        toast.success(`Created and switched to ${name}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const displayMessage = message.replace(/^Git error:\s*/i, '');
+        logger.warn('Create branch failed from worktree badge', {
+          worktree: worktree.path,
+          branch: name,
+          error: message,
+        });
+        toast.error('Create branch failed', { description: displayMessage });
+        throw new Error(displayMessage);
+      } finally {
+        setIsCheckingOut(false);
+      }
+    },
+    [worktree.path, isCheckingOut]
+  );
+
   const rowContent = (
     <div
       role="group"
@@ -210,7 +288,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         {workspaceName}
       </span>
 
-      {/* Branch badge — Apple liquid glass pill with Select dropdown */}
+      {/* Branch badge — full popover when source control is closed, simple Select when open */}
       <div
         className="mr-1 shrink-0"
         onClick={(e) => {
@@ -218,54 +296,103 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
         }}
         onMouseEnter={handleBadgeHover}
       >
-        <Select
-          value={branchName}
-          onValueChange={(value) => {
-            void handleBranchCheckout(value);
-          }}
-          onOpenChange={handleBranchDropdownOpen}
-          disabled={isCheckingOut}
-        >
-          <SelectTrigger
-            className={cn(
-              'flex items-center gap-0.5 h-auto w-auto px-1.5 py-0.5 rounded-[7px] text-[11px] border-0',
-              'font-[510] cursor-pointer',
-              'hover:bg-black/8 dark:hover:bg-white/15',
-              'active:scale-[0.97] disabled:opacity-50',
-              'focus-visible:ring-0',
-              '[&>svg:last-child]:h-2.5 [&>svg:last-child]:w-2.5 [&>svg:last-child]:opacity-60',
-              worktree.isMain
-                ? 'bg-black/5 text-[#4C4C4C] dark:bg-white/10 dark:text-[#B0B0B0]'
-                : 'bg-black/4 text-[#4C4C4C] dark:bg-white/8 dark:text-[#999]'
-            )}
-            style={{ mixBlendMode: 'plus-darker' }}
-            aria-label={`Switch branch (${branchName})`}
+        {isSourceControlOpen ? (
+          /* Simple Select when source control is already visible */
+          <Select
+            value={branchName}
+            onValueChange={(value) => {
+              void handleBranchCheckout(value);
+            }}
+            onOpenChange={handleBranchDropdownOpen}
+            disabled={isCheckingOut}
           >
-            {isCheckingOut ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <GitBranch className="h-3 w-3" />
-            )}
-            <SelectValue>{branchName}</SelectValue>
-          </SelectTrigger>
-          <SelectContent className="min-w-0 bg-[#f3f3f3]! dark:bg-[oklch(23%_0_0)]! border! border-white! dark:border-white/5! shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md [&::before]:hidden [&::after]:hidden">
-            {branches.map((b) => (
-              <SelectItem
-                key={b.name}
-                value={b.name}
-                className="py-1.5 pl-2.5 pr-7 text-sm rounded-[7px]"
+            <SelectTrigger
+              className={cn(
+                'flex items-center gap-0.5 h-auto w-auto px-1.5 py-0.5 rounded-[7px] text-[11px] border-0',
+                'font-[510] cursor-pointer',
+                'hover:bg-black/8 dark:hover:bg-white/15',
+                'active:scale-[0.97] disabled:opacity-50',
+                'focus-visible:ring-0',
+                '[&>svg:last-child]:h-2.5 [&>svg:last-child]:w-2.5 [&>svg:last-child]:opacity-60',
+                worktree.isMain
+                  ? 'bg-black/5 text-[#4C4C4C] dark:bg-white/10 dark:text-[#B0B0B0]'
+                  : 'bg-black/4 text-[#4C4C4C] dark:bg-white/8 dark:text-[#999]'
+              )}
+              style={{ mixBlendMode: 'plus-darker' }}
+              aria-label={`Switch branch (${branchName})`}
+            >
+              {isCheckingOut ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <IconBranch className="h-3 w-3" />
+              )}
+              <SelectValue>{branchName}</SelectValue>
+            </SelectTrigger>
+            <SelectContent className="min-w-0 bg-white/70! dark:bg-lg-control/80! backdrop-blur-sm dark:backdrop-blur-xl border! border-white! dark:border-white/5! shadow-[0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md [&::before]:hidden [&::after]:hidden">
+              {branches.map((b) => (
+                <SelectItem
+                  key={b.name}
+                  value={b.name}
+                  className="py-1.5 pl-2.5 pr-7 text-[12px] rounded-[9px]"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <IconBranch className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {b.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          /* Full branch picker popover when source control is not visible */
+          <Popover open={branchPopoverOpen} onOpenChange={handleBranchPopoverOpenChange}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                disabled={isCheckingOut}
+                className={cn(
+                  'flex items-center gap-0.5 h-auto w-auto px-1.5 py-0.5 rounded-[7px] text-[11px] border-0',
+                  'font-[510] cursor-pointer',
+                  'hover:bg-black/8 dark:hover:bg-white/15',
+                  'active:scale-[0.97] disabled:opacity-50',
+                  '[&>svg:last-child]:h-2.5 [&>svg:last-child]:w-2.5 [&>svg:last-child]:opacity-60',
+                  worktree.isMain
+                    ? 'bg-black/5 text-[#4C4C4C] dark:bg-white/10 dark:text-[#B0B0B0]'
+                    : 'bg-black/4 text-[#4C4C4C] dark:bg-white/8 dark:text-[#999]'
+                )}
+                style={{ mixBlendMode: 'plus-darker' }}
+                aria-label={`Switch branch (${branchName})`}
               >
-                <span className="flex items-center gap-1.5">
-                  <GitBranch
-                    className="h-3 w-3 shrink-0 text-muted-foreground/60"
-                    aria-hidden="true"
-                  />
-                  {b.name}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+                {isCheckingOut ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <IconBranch className="h-3 w-3" />
+                )}
+                <span style={{ pointerEvents: 'none' }}>{branchName}</span>
+                <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              className="w-[260px] p-0 bg-white/70 dark:bg-lg-control/80 backdrop-blur-sm dark:backdrop-blur-xl border-white dark:border-white/5 rounded-[9px] shadow-[0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md"
+              onOpenAutoFocus={(event) => {
+                event.preventDefault();
+              }}
+            >
+              <BranchPickerContent
+                currentBranch={branchName}
+                branches={localBranches}
+                onCheckout={(branch) => {
+                  void handleBranchCheckout(branch);
+                }}
+                onCreateAndCheckout={handleCreateAndCheckout}
+                onClose={() => {
+                  setBranchPopoverOpen(false);
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
     </div>
   );
