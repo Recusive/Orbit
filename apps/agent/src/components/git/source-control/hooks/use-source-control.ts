@@ -20,6 +20,7 @@ import {
   gitBranches,
   gitCheckout,
   gitCommit,
+  gitCreateBranch,
   gitDiffStructured,
   gitDiscard,
   gitFetch,
@@ -57,6 +58,20 @@ const toDisplayStatus = (backendStatus: BackendFileStatus): DisplayFileStatus =>
       return 'modified';
   }
 };
+
+export const toUserGitError = (err: unknown): string => {
+  const raw = err instanceof Error ? err.message : String(err);
+  const message = raw.replace(/^Git error:\s*/i, '');
+  if (/already exists/i.test(message)) return 'Branch already exists.';
+  if (/Failed to get HEAD|unborn branch/i.test(message)) {
+    return 'Cannot create a branch before the first commit.';
+  }
+  if (/invalid.*ref|invalid.*name/i.test(message)) return 'Invalid branch name.';
+  return message;
+};
+
+/** Marks a checkout failure after successful branch creation - prevents duplicate toasts */
+class CheckoutAfterCreateError extends Error {}
 
 export interface UseSourceControlReturn {
   // Status
@@ -103,6 +118,7 @@ export interface UseSourceControlReturn {
   branches: GitBranch[];
   isCheckingOut: boolean;
   handleCheckout: (branch: string) => Promise<void>;
+  handleCreateAndCheckout: (branchName: string) => Promise<void>;
 
   // Fetch
   isFetching: boolean;
@@ -424,9 +440,52 @@ export function useSourceControl(): UseSourceControlReturn {
         await refreshBranches();
         toast.success(`Switched to ${branch}`);
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        const displayMessage = message.replace(/^Git error:\s*/i, '');
+        const displayMessage = toUserGitError(err);
         toast.error('Checkout failed', { description: displayMessage });
+      } finally {
+        setIsCheckingOut(false);
+        operationInProgress.current = false;
+      }
+    },
+    [repoPath, refreshStatus, refreshBranches]
+  );
+
+  const handleCreateAndCheckout = useCallback(
+    async (rawName: string): Promise<void> => {
+      const branchName = rawName.trim();
+      if (operationInProgress.current || !repoPath || branchName.length === 0) return;
+
+      operationInProgress.current = true;
+      setIsCheckingOut(true);
+      setOperationError(null);
+
+      try {
+        await gitCreateBranch(repoPath, branchName);
+        try {
+          await gitCheckout(repoPath, branchName);
+        } catch (checkoutErr) {
+          const display = toUserGitError(checkoutErr);
+          toast.error('Branch created, but checkout failed', { description: display });
+
+          try {
+            await Promise.all([refreshStatus(), refreshBranches()]);
+          } catch {
+            // Non-blocking. Polling will reconcile shortly.
+          }
+
+          throw new CheckoutAfterCreateError(display);
+        }
+
+        await Promise.all([refreshStatus(), refreshBranches()]);
+        toast.success(`Created and switched to ${branchName}`);
+      } catch (err) {
+        if (err instanceof CheckoutAfterCreateError) {
+          throw err;
+        }
+
+        const display = toUserGitError(err);
+        toast.error('Create branch failed', { description: display });
+        throw new Error(display);
       } finally {
         setIsCheckingOut(false);
         operationInProgress.current = false;
@@ -507,6 +566,7 @@ export function useSourceControl(): UseSourceControlReturn {
     branches,
     isCheckingOut,
     handleCheckout,
+    handleCreateAndCheckout,
 
     // Fetch
     isFetching,

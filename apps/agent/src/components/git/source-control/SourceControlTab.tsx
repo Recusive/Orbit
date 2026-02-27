@@ -68,6 +68,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     branches,
     isCheckingOut,
     handleCheckout,
+    handleCreateAndCheckout,
 
     // Fetch
     isFetching,
@@ -122,7 +123,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header with Branch Dropdown */}
       <div
-        className="flex items-center justify-between px-4 shrink-0"
+        className="flex items-center justify-between px-3 shrink-0"
         style={{ height: HEADER_HEIGHT }} // Extracted constant
       >
         <BranchSelector
@@ -130,6 +131,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
           branches={branches}
           isCheckingOut={isCheckingOut}
           onCheckout={(branch) => void handleCheckout(branch)}
+          onCreateAndCheckout={handleCreateAndCheckout}
         />
         <div className="flex items-center gap-1.5">
           <SyncStatus status={status} />

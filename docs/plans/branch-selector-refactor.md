@@ -241,7 +241,7 @@ The search field is a plain `<input>` inside a styled wrapper, placed above `Com
       value={query}
       onChange={(e) => setQuery(e.target.value)}
       placeholder="Search branches"
-      className="w-full h-8 rounded-[9px] bg-[var(--lg-alert-secondary-bg)] pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground/40 focus:bg-[var(--lg-control-bg)]"
+      className="w-full h-8 rounded-[9px] bg-(--lg-alert-secondary-bg) pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground/40 focus:bg-lg-control"
       aria-label="Search branches"
     />
   </div>
