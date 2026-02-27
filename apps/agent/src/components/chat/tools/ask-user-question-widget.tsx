@@ -130,7 +130,7 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
             )}
           />
 
-          <span className={cn('text-xs font-medium truncate', 'text-lg-text-secondary')}>
+          <span className={cn('text-sm font-medium truncate', 'text-lg-text-secondary')}>
             {statusLabel}
           </span>
 

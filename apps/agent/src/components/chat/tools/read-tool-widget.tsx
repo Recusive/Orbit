@@ -60,10 +60,10 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
           )}
         />
 
-        <span className="text-xs text-lg-text-secondary font-medium">Read</span>
+        <span className="text-sm text-lg-text-secondary font-medium">Read</span>
         <span
           className={cn(
-            'text-xs font-medium truncate',
+            'text-sm font-medium truncate',
             isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
           )}
         >
@@ -72,7 +72,7 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
             <span className="text-lg-text-secondary ml-1 font-mono text-xs">#L1-{lineCount}</span>
           ) : null}
         </span>
-        {isFailed ? <span className="text-xs text-destructive/60">Failed</span> : null}
+        {isFailed ? <span className="text-sm text-destructive/60">Failed</span> : null}
 
         {isRunning ? (
           <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />

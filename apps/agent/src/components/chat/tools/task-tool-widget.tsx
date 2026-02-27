@@ -111,7 +111,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
 
           <span
             className={cn(
-              'text-xs font-medium truncate',
+              'text-sm font-medium truncate',
               isFailed ? 'text-foreground line-through' : 'text-foreground'
             )}
           >

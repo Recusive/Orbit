@@ -192,7 +192,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
 
           <span
             className={cn(
-              'text-xs font-medium shrink-0',
+              'text-sm font-medium shrink-0',
               isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >

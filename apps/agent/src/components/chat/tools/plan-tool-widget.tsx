@@ -83,7 +83,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
 
           <span
             className={cn(
-              'text-xs font-medium',
+              'text-sm font-medium',
               isFailed ? 'text-lg-text-secondary line-through' : 'text-mode-plan'
             )}
           >
@@ -92,7 +92,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
 
           <span
             className={cn(
-              'text-xs font-medium truncate cursor-pointer hover:underline',
+              'text-sm font-medium truncate cursor-pointer hover:underline',
               isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
             onClick={handleFileClick}
@@ -104,10 +104,10 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           {isRunning ? (
             <div className="flex items-center gap-1 text-lg-text-secondary">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
-              <span className="text-xs">Creating plan...</span>
+              <span className="text-sm">Creating plan...</span>
             </div>
           ) : !isFailed ? (
-            <span className="text-xs text-mode-plan/60">Ready for review</span>
+            <span className="text-sm text-mode-plan/60">Ready for review</span>
           ) : null}
 
           <ChevronRight
