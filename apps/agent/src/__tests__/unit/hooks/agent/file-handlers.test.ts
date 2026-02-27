@@ -33,6 +33,18 @@ vi.mock('@/lib/api', () => ({
 
 vi.mock('@/lib/mappers', () => ({
   toConversationSummaries: vi.fn(),
+  toFileNodes: vi.fn((entries: FileEntry[]) =>
+    entries
+      .filter((entry: FileEntry) => !['.git', '.ds_store'].includes(entry.name.toLowerCase()))
+      .map((entry: FileEntry) => ({
+        name: entry.name,
+        path: entry.path,
+        isDirectory: entry.isDir,
+        isFile: !entry.isDir,
+        isSymlink: entry.isSymlink,
+        isGitIgnored: entry.isGitIgnored,
+      }))
+  ),
 }));
 
 vi.mock('@/stores/file/file-viewer-store', () => ({

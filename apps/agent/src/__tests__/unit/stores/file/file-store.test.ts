@@ -500,7 +500,23 @@ describe('file-store', () => {
       expect(useFileStore.getState().expandedFolders.has('/workspace/src/components')).toBe(false);
     });
 
-    it('should invalidate parent cache for created file', () => {
+    it('should remove deleted file when event path casing differs', () => {
+      const { setRootPath, setTreeChildren, handleFileChanged } = useFileStore.getState();
+
+      setRootPath('/workspace');
+      setTreeChildren('/workspace/src', [
+        createFileNode('a.ts', '/workspace/src/a.ts'),
+        createFileNode('b.ts', '/workspace/src/b.ts'),
+      ]);
+
+      handleFileChanged('/Workspace/Src/A.ts', 'deleted');
+
+      const children = useFileStore.getState().treeNodes['/workspace/src'];
+      expect(children).toHaveLength(1);
+      expect(children?.[0]?.path).toBe('/workspace/src/b.ts');
+    });
+
+    it('should not clear parent cache for created file', () => {
       const { setRootPath, setTreeChildren, handleFileChanged } = useFileStore.getState();
 
       setRootPath('/workspace');
@@ -508,8 +524,8 @@ describe('file-store', () => {
 
       handleFileChanged('/workspace/src/b.ts', 'created');
 
-      // Parent cache should be cleared to trigger re-fetch
-      expect(useFileStore.getState().treeNodes['/workspace/src']).toBeUndefined();
+      // Cache remains; refresh is handled asynchronously in use-file-tree.ts
+      expect(useFileStore.getState().treeNodes['/workspace/src']).toBeDefined();
     });
   });
 

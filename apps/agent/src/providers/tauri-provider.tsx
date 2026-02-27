@@ -36,11 +36,9 @@ import {
   onBrowserLoading,
   onBrowserNavigated,
   onBrowserToolRequest,
-  onFileChange,
   onTerminalExit,
   onTerminalForeground,
   onTerminalOutput,
-  watchPath,
   getWorkspacePath,
   buildFileIndex,
 } from '@/lib/api';
@@ -49,40 +47,6 @@ import { WebviewMessageSchema } from '@/types/protocol';
 // ============================================================================
 // Constants
 // ============================================================================
-
-/** Paths to ignore for file watching */
-const IGNORED_PATH_PATTERNS = [
-  // Version control
-  '/.git/',
-  // JavaScript/Node
-  '/node_modules/',
-  '/.next/',
-  '/dist/',
-  '/build/',
-  '/.turbo/',
-  '/.parcel-cache/',
-  // Python
-  '/venv/',
-  '/.venv/',
-  '/site-packages/',
-  '/__pycache__/',
-  '/.mypy_cache/',
-  '/.pytest_cache/',
-  '/env/',
-  '/.env/',
-  // Rust
-  '/target/',
-  // General
-  '/.cache/',
-  '/.DS_Store',
-  '/coverage/',
-  '/.idea/',
-  '/.vscode/',
-];
-
-function shouldIgnorePath(path: string): boolean {
-  return IGNORED_PATH_PATTERNS.some((pattern) => path.includes(pattern));
-}
 
 const logger = createLogger('TauriProvider');
 
@@ -163,57 +127,8 @@ class ListenerAbortController {
 }
 
 // ============================================================================
-// File Watcher Setup (extracted to avoid ESLint false positives)
+// File Index Setup
 // ============================================================================
-
-/**
- * Setup file watcher with proper abort handling.
- *
- * Extracted to a separate function because TypeScript's flow analysis doesn't
- * understand that `controller.isAborted()` can change during `await` statements
- * (the cleanup function can be called from React while we're awaiting).
- *
- * By using a function that takes the controller, we make it clear to both
- * TypeScript and readers that the aborted state needs to be checked after
- * each await.
- */
-async function setupFileWatcher(controller: ListenerAbortController): Promise<void> {
-  // Check abort state before starting
-  if (controller.isAborted()) return;
-
-  try {
-    const workspacePath = await getWorkspacePath();
-
-    // Check again after await - cleanup may have been called
-    if (!workspacePath || controller.isAborted()) return;
-
-    const unlisten = await onFileChange((event) => {
-      if (shouldIgnorePath(event.path)) return;
-
-      postWindowMessage({
-        type: 'file:changed',
-        uuid: crypto.randomUUID(),
-        path: event.path,
-        change_type: event.type,
-      });
-    });
-    controller.addUnlisten(unlisten);
-
-    // Check again after await - cleanup may have been called
-    if (controller.isAborted()) return;
-
-    await watchPath(workspacePath);
-    logger.info('File watcher initialized', { workspacePath });
-  } catch (err: unknown) {
-    // Only log errors if we weren't aborted (avoids noise during cleanup)
-    if (!controller.isAborted()) {
-      logger.error(
-        'Failed to setup file watcher',
-        err instanceof Error ? err : new Error(String(err))
-      );
-    }
-  }
-}
 
 /**
  * Build the fuzzy file search index for the workspace.
@@ -749,11 +664,8 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
         );
       }
 
-      // File watcher and index (separate because they depend on workspace path)
-      // Use separate async functions to handle abort checks cleanly
-      // The controller.isAborted() state CAN change during await (cleanup called from React)
-      // Run both in parallel for faster initialization
-      await Promise.all([setupFileWatcher(controller), setupFileIndex(controller)]);
+      // Build file index (workspace-dependent initialization)
+      await setupFileIndex(controller);
 
       if (!controller.isAborted()) {
         logger.info('All Tauri event listeners initialized');
