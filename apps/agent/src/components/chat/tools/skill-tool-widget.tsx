@@ -36,12 +36,12 @@ export const SkillToolWidget: FC<SkillToolWidgetProps> = ({
         />
 
         {/* Label */}
-        <span className="text-xs text-lg-text-secondary font-medium">Skill</span>
+        <span className="text-sm text-lg-text-secondary font-medium">Skill</span>
 
         {/* Skill name */}
         <span
           className={cn(
-            'text-xs font-medium truncate',
+            'text-sm font-medium truncate',
             isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
           )}
         >

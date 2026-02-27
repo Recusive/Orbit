@@ -134,7 +134,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
 
           <span
             className={cn(
-              'text-xs font-medium truncate',
+              'text-sm font-medium truncate',
               isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >
@@ -142,7 +142,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
           </span>
 
           {!isRunning && !isFailed && resultCount > 0 ? (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               ({resultCount} {resultCount === 1 ? 'result' : 'results'})
             </span>
           ) : null}

@@ -120,12 +120,12 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
             />
           </svg>
 
-          <span className="text-xs font-medium truncate text-foreground">
+          <span className="text-sm font-medium truncate text-foreground">
             {isStreaming ? 'Thinking' : 'Thought'}
           </span>
 
           {!isStreaming && thinkingDurationMs > 0 ? (
-            <span className="text-xs text-muted-foreground">for {durationText}</span>
+            <span className="text-sm text-muted-foreground">for {durationText}</span>
           ) : null}
 
           <ChevronRight

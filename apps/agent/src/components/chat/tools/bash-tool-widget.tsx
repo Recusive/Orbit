@@ -139,7 +139,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
 
           <span
             className={cn(
-              'text-xs font-medium truncate',
+              'text-sm font-medium truncate',
               isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >

@@ -144,7 +144,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
 
           <span
             className={cn(
-              'text-xs font-medium truncate',
+              'text-sm font-medium truncate',
               isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
             )}
           >
@@ -152,7 +152,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
           </span>
 
           {!isRunning && !isFailed && totalCount > 0 ? (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               ({String(completedCount)}/{String(totalCount)}
               {inProgressCount > 0 ? `, ${String(inProgressCount)} active` : ''})
             </span>
@@ -167,7 +167,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
               <ProgressPie
                 percentage={totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0}
               />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 {Math.round((completedCount / totalCount) * 100)}%
               </span>
             </div>

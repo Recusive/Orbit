@@ -91,7 +91,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
             role="link"
             tabIndex={0}
             className={cn(
-              'text-xs font-medium truncate cursor-pointer hover:underline',
+              'text-sm font-medium truncate cursor-pointer hover:underline',
               isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
             )}
             onClick={handleFileClick}
@@ -106,7 +106,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
 
           <span
             className={cn(
-              'text-xs shrink-0',
+              'text-sm shrink-0',
               isFailed ? 'text-destructive/60' : 'text-muted-foreground'
             )}
           >
