@@ -9,6 +9,7 @@ import {
   ClipboardCopy,
   ExternalLink,
   FolderOpen,
+  MessageSquarePlus,
   Pencil,
   TextCursorInput,
   Trash2,
@@ -26,6 +27,7 @@ import {
 } from '@/components/ui/context-menu';
 import { openInDefaultApp, revealInFileManager } from '@/lib/api';
 import { getPathName, toRelativePath } from '@/lib/utils/path-utils';
+import { enqueueFileChip } from '@/stores/chat/pending-context-store';
 import { useFileStore } from '@/stores/file/file-store';
 
 interface FileContextMenuProps {
@@ -113,6 +115,14 @@ export const FileContextMenu: FC<FileContextMenuProps> = ({
         <ContextMenuItem onSelect={handleRevealInFinder}>
           <FolderOpen />
           Reveal in Finder
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={(): void => {
+            enqueueFileChip({ path, name: fileName, isDirectory });
+          }}
+        >
+          <MessageSquarePlus />
+          Add to Chat
         </ContextMenuItem>
 
         <ContextMenuSeparator />

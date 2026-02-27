@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { compressImage } from '@/lib/utils/image-utils';
 import { useSlashCommands, useCommandsStore } from '@/stores/agent';
 import { useElementContexts, useBrowserStore } from '@/stores/browser/browser-store';
+import { usePendingContextStore } from '@/stores/chat/pending-context-store';
 import { useFileStore } from '@/stores/file/file-store';
 
 const logger = createLogger('ChatInput');
@@ -117,6 +118,41 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
       window.removeEventListener('addSkillChip', handleAddSkill);
     };
   }, []);
+
+  // Drain pending file chips from the store (survives ChatInput unmount).
+  // Runs on mount and whenever new items are enqueued while mounted.
+  const pendingChips = usePendingContextStore((state) => state.pending);
+  const drainPendingChips = usePendingContextStore((state) => state.drain);
+
+  useEffect(() => {
+    if (pendingChips.length === 0) return;
+    const items = drainPendingChips();
+    if (items.length === 0) return;
+
+    setAttachedContext((prev) => {
+      let next = prev;
+      for (const detail of items) {
+        if (
+          next.some(
+            (item) => (item.type === 'file' || item.type === 'folder') && item.path === detail.path
+          )
+        ) {
+          continue;
+        }
+        next = [
+          ...next,
+          {
+            id: crypto.randomUUID(),
+            type: detail.isDirectory ? 'folder' : 'file',
+            name: detail.name,
+            path: detail.path,
+          },
+        ];
+      }
+      return next;
+    });
+    inputRef.current?.focus();
+  }, [pendingChips, drainPendingChips]);
 
   // Reset stopping guard when agent stops running
   useEffect(() => {
@@ -317,7 +353,16 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         name: file.name,
         path: absolutePath,
       };
-      setAttachedContext((prev) => [...prev, newContext]);
+      setAttachedContext((prev) => {
+        if (
+          prev.some(
+            (item) => (item.type === 'file' || item.type === 'folder') && item.path === absolutePath
+          )
+        ) {
+          return prev;
+        }
+        return [...prev, newContext];
+      });
 
       // Remove the @query from input
       if (inputRef.current) {

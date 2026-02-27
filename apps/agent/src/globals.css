@@ -652,7 +652,7 @@ html.dark [data-streamdown='code-block-container'] {
 
 /* Header — no visual bar, label flows into code */
 [data-streamdown='code-block-header'] {
-  padding: 0.75rem 0.75rem 0 !important;
+  padding: 0.5rem 0.5rem 0 !important;
   background-color: transparent !important;
   border-bottom: none !important;
 }
@@ -677,7 +677,7 @@ html.dark [data-streamdown='code-block-container'] {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border-radius: var(--radius-md) !important;
+  border-radius: 9px !important;
   background: transparent !important;
   color: var(--muted-foreground) !important;
   opacity: 0 !important;
@@ -709,19 +709,22 @@ html.dark [data-streamdown='code-block-container'] {
   transform: scale(0.95) !important;
 }
 
-/* Body — no separator, flows from label */
+/* Body — no separator, flows from label, wraps long lines */
 [data-streamdown='code-block-body'] {
   margin: 0 !important;
-  padding: 0.5rem 0.75rem 0.75rem !important;
+  padding: 0.5rem 0.5rem 0.75rem !important;
   font-size: 0.75rem !important; /* 12px */
   line-height: 1.5 !important;
   background-color: transparent !important;
   border-top: none !important;
+  overflow-x: hidden !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
 }
 
-/* Line numbers — Radix step 9: 3:1 contrast on bg, recedes behind code */
+/* Line numbers — match code text size, Radix step 9 for 3:1 contrast */
 [data-streamdown='code-block-body'] code span::before {
-  font-size: 0.625rem !important; /* 10px */
+  font-size: 0.75rem !important; /* 12px — same as code text */
   color: var(--gray-9) !important;
   margin-right: 0.625rem !important;
   width: 1rem !important;
@@ -1459,6 +1462,7 @@ html:not(.dark) .glass-popover::after {
 .chat-input-frost > * {
   pointer-events: auto;
 }
+
 
 /* Accessibility: respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
