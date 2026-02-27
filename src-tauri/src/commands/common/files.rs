@@ -144,9 +144,7 @@ pub async fn reveal_in_file_manager(path: String) -> Result<()> {
 
     #[cfg(target_os = "linux")]
     {
-        let reveal_target = resolved_path
-            .parent()
-            .unwrap_or_else(|| resolved_path.as_path());
+        let reveal_target = resolved_path.parent().unwrap_or(resolved_path.as_path());
         let _child = Command::new("xdg-open")
             .arg(reveal_target)
             .spawn()
