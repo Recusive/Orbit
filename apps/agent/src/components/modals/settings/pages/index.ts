@@ -17,19 +17,41 @@ export { SlashCommandsSettings } from './SlashCommandsSettings';
 export { SubagentsSettings } from './SubagentsSettings';
 export { TabsSettings } from './TabsSettings';
 
+/** Minimum time (ms) the skeleton fallback stays visible during tab switches */
+const MIN_SKELETON_MS = 500;
+
+/**
+ * Wraps a dynamic import with a minimum delay so the Suspense fallback
+ * (skeleton) is visible long enough to not flash. The module load and
+ * the timer run in parallel — if the import takes longer than the
+ * minimum, no extra delay is added.
+ */
+function lazyWithMinDelay<T extends ComponentType>(
+  factory: () => Promise<{ default: T }>
+): LazyExoticComponent<T> {
+  return lazy(() =>
+    Promise.all([
+      factory(),
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, MIN_SKELETON_MS);
+      }),
+    ]).then(([module]) => module)
+  );
+}
+
 // Lazy-loaded page components for code splitting
 export const SETTINGS_PAGE_COMPONENTS: Partial<
   Record<SettingsSection, LazyExoticComponent<ComponentType>>
 > = {
-  general: lazy(() => import('./GeneralSettings')),
-  appearance: lazy(() => import('./AppearanceSettings')),
-  agent: lazy(() => import('./AgentSettings')),
-  shortcuts: lazy(() => import('./ShortcutsSettings')),
-  browser: lazy(() => import('./BrowserSettings')),
-  editor: lazy(() => import('./EditorSettings')),
-  git: lazy(() => import('./GitSettings')),
-  notifications: lazy(() => import('./NotificationsSettings')),
-  tabs: lazy(() => import('./TabsSettings')),
-  account: lazy(() => import('./AccountSettings')),
-  feedback: lazy(() => import('./FeedbackSettings')),
+  general: lazyWithMinDelay(() => import('./GeneralSettings')),
+  appearance: lazyWithMinDelay(() => import('./AppearanceSettings')),
+  agent: lazyWithMinDelay(() => import('./AgentSettings')),
+  shortcuts: lazyWithMinDelay(() => import('./ShortcutsSettings')),
+  browser: lazyWithMinDelay(() => import('./BrowserSettings')),
+  editor: lazyWithMinDelay(() => import('./EditorSettings')),
+  git: lazyWithMinDelay(() => import('./GitSettings')),
+  notifications: lazyWithMinDelay(() => import('./NotificationsSettings')),
+  tabs: lazyWithMinDelay(() => import('./TabsSettings')),
+  account: lazyWithMinDelay(() => import('./AccountSettings')),
+  feedback: lazyWithMinDelay(() => import('./FeedbackSettings')),
 };
