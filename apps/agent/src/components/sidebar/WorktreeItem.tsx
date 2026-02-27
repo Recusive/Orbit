@@ -97,16 +97,16 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
     }
   }, [worktree.path, branches.length]);
 
-  // Fetch branches when the select opens (skip if already loaded from hover prefetch)
+  // Always re-fetch branches when the select opens to pick up newly created branches
   const handleBranchDropdownOpen = useCallback(
     (open: boolean): void => {
-      if (open && worktree.path && branches.length === 0) {
+      if (open && worktree.path) {
         void gitBranches(worktree.path).then((branchList) => {
           setBranches(branchList);
         });
       }
     },
-    [worktree.path, branches.length]
+    [worktree.path]
   );
 
   // Checkout a branch within this worktree
