@@ -34,3 +34,5 @@ export { useContainerWidth } from './use-container-width';
 
 export { useTrafficLights } from './use-traffic-lights';
 export { useFullscreen } from './use-fullscreen';
+
+export { useSmoothScroll } from './use-smooth-scroll';
