@@ -49,13 +49,13 @@ import {
   updateCommand,
 } from './agent/definitions/command-definitions.js';
 import { listSkills } from './agent/definitions/skill-definitions.js';
-import { SessionManager } from './agent/session/session-manager.js';
+import { SessionManager, repairPollutedJsonls } from './agent/session/session-manager.js';
 import {
   cleanupOldSessions,
   deleteSession as deleteStoredSession,
   getSDKSessionIdForSession,
   invalidateCache as invalidateSessionCache,
-  saveSession,
+  saveSessionInitMapping,
   touchSession,
 } from './agent/session/session-storage.js';
 import { CanvasSessionManager } from './canvas/index.js';
@@ -163,11 +163,10 @@ function main(): void {
     );
 
     // Persist session mapping for resume functionality
-    saveSession({
+    saveSessionInitMapping({
       sessionId: event.sessionId,
       sdkSessionId: event.sdkSessionId,
-      createdAt: Date.now(),
-      lastActiveAt: Date.now(),
+      isForked: event.isForked,
     });
 
     sendEvent({
@@ -394,6 +393,15 @@ function main(): void {
   const removedCount = cleanupOldSessions(30);
   if (removedCount > 0) {
     logger.info({ removedCount }, 'Cleaned up old stored sessions');
+  }
+
+  // One-time repair: strip rewind pollution from existing JSONL files
+  const repairResult = repairPollutedJsonls();
+  if (repairResult.repairedCount > 0) {
+    logger.info(
+      { repairedCount: repairResult.repairedCount },
+      'Repaired rewind-polluted JSONL files'
+    );
   }
 
   // Send ready event

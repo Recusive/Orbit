@@ -24,6 +24,7 @@ export type { StoredSession } from '../../protocol/schemas.js';
 
 const STORAGE_VERSION = 1;
 const STORAGE_FILENAME = 'orbit-sessions.json';
+const REPAIR_V1_FLAG = '.orbit-sessions-repaired-v1';
 const MAX_SESSIONS = 50; // Limit stored sessions to prevent unbounded growth
 
 // ============================================
@@ -71,12 +72,133 @@ function ensureStorageDir(): void {
 }
 
 /**
+ * Check whether one-time repair has already run.
+ */
+function hasRepairRun(): boolean {
+  try {
+    return fs.existsSync(path.join(getStorageDir(), REPAIR_V1_FLAG));
+  } catch {
+    // If the check fails, retry repair on startup. The migration is idempotent.
+    return false;
+  }
+}
+
+/**
+ * Mark one-time repair complete.
+ */
+function markRepairComplete(): boolean {
+  try {
+    ensureStorageDir();
+    fs.writeFileSync(path.join(getStorageDir(), REPAIR_V1_FLAG), '', 'utf-8');
+    return true;
+  } catch (error) {
+    logger.warn({ error }, 'Failed to write repair flag file');
+    return false;
+  }
+}
+
+function hasJsonlForSessionId(sessionId: string): { found: boolean; scanError: boolean } {
+  const projectsDir = path.join(os.homedir(), '.claude', 'projects');
+  if (!fs.existsSync(projectsDir)) {
+    return { found: false, scanError: false };
+  }
+
+  let scanError = false;
+  try {
+    const dirs = fs.readdirSync(projectsDir, { withFileTypes: true });
+    for (const dir of dirs) {
+      if (!dir.isDirectory()) continue;
+      try {
+        const jsonlPath = path.join(projectsDir, dir.name, `${sessionId}.jsonl`);
+        if (fs.existsSync(jsonlPath)) {
+          return { found: true, scanError };
+        }
+      } catch (error) {
+        scanError = true;
+        logger.warn(
+          { error, sessionId, directory: dir.name },
+          'Failed to scan project directory for JSONL during repair'
+        );
+      }
+    }
+  } catch (error) {
+    logger.warn({ error, sessionId }, 'Failed to read projects directory during repair');
+    return { found: false, scanError: true };
+  }
+
+  return { found: false, scanError };
+}
+
+interface RepairResult {
+  sessions: StoredSession[] | null;
+  repairedCount: number;
+  hadScanFailures: boolean;
+}
+
+function repairOverwrittenParentMappings(sessions: StoredSession[]): RepairResult {
+  let repairedCount = 0;
+  let hadScanFailures = false;
+  const now = Date.now();
+
+  for (const session of sessions) {
+    // Self-mapped sessions are already correct.
+    if (session.sessionId === session.sdkSessionId) continue;
+
+    const { found, scanError } = hasJsonlForSessionId(session.sessionId);
+    if (scanError) {
+      hadScanFailures = true;
+    }
+    if (!found) continue;
+
+    session.sdkSessionId = session.sessionId;
+    session.lastActiveAt = now;
+    repairedCount += 1;
+  }
+
+  if (repairedCount > 0) {
+    logger.warn({ repairedCount }, 'Repaired overwritten parent session mappings in storage');
+  }
+
+  if (hadScanFailures) {
+    logger.warn(
+      { repairedCount },
+      'JSONL scan had failures during repair; repair flag will not be written'
+    );
+  }
+
+  return {
+    sessions: repairedCount > 0 ? sessions : null,
+    repairedCount,
+    hadScanFailures,
+  };
+}
+
+function sortAndLimitSessions(sessions: StoredSession[]): StoredSession[] {
+  const sortedSessions = [...sessions]
+    .sort((a, b) => b.lastActiveAt - a.lastActiveAt)
+    .slice(0, MAX_SESSIONS);
+
+  if (sessions.length > MAX_SESSIONS) {
+    logger.debug(
+      { total: sessions.length, pruned: sessions.length - MAX_SESSIONS },
+      'Pruned sessions exceeding MAX_SESSIONS limit'
+    );
+  }
+
+  return sortedSessions;
+}
+
+/**
  * Load sessions from disk into cache (only called once)
  */
 function loadSessionsFromDisk(): StoredSession[] {
   try {
     const storagePath = getStoragePath();
     if (!fs.existsSync(storagePath)) {
+      // Mark as checked to avoid repeated scans on clean installs.
+      if (!hasRepairRun()) {
+        markRepairComplete();
+      }
       return [];
     }
 
@@ -104,6 +226,42 @@ function loadSessionsFromDisk(): StoredSession[] {
       return [];
     }
 
+    /**
+     * [warning] TESTED: This startup migration is covered by integration tests.
+     *     If you modify this, run: cd agent-bridge && bun test session-storage-migration
+     *     Test file: src/__tests__/session-storage-migration.test.ts
+     */
+    if (!hasRepairRun()) {
+      const result = repairOverwrittenParentMappings(parsed.sessions);
+      const sessions = result.sessions ?? parsed.sessions;
+      const normalized = sortAndLimitSessions(sessions);
+      const persisted = result.sessions !== null ? persistSessions(sessions) : true;
+
+      if (!persisted) {
+        logger.warn(
+          'Skipping repair flag write because repaired sessions were not persisted; startup will retry'
+        );
+      } else if (result.hadScanFailures) {
+        logger.warn(
+          'Skipping repair flag write because JSONL scan had failures; startup will retry'
+        );
+      } else {
+        const flagWritten = markRepairComplete();
+        if (!flagWritten) {
+          logger.warn(
+            { flagPath: path.join(getStorageDir(), REPAIR_V1_FLAG) },
+            'Repair completed but flag could not be written; startup will keep retrying'
+          );
+        }
+      }
+
+      logger.info(
+        { count: normalized.length, repaired: result.repairedCount },
+        'Loaded sessions from storage (initial load, repair pass)'
+      );
+      return normalized;
+    }
+
     logger.info({ count: parsed.sessions.length }, 'Loaded sessions from storage (initial load)');
     return parsed.sessions;
   } catch (error) {
@@ -123,14 +281,11 @@ function getSessions(): StoredSession[] {
 /**
  * Save sessions to disk and update cache
  */
-function persistSessions(sessions: StoredSession[]): void {
+function persistSessions(sessions: StoredSession[]): boolean {
   try {
     ensureStorageDir();
 
-    // Sort by lastActiveAt descending and limit to MAX_SESSIONS
-    const sortedSessions = [...sessions]
-      .sort((a, b) => b.lastActiveAt - a.lastActiveAt)
-      .slice(0, MAX_SESSIONS);
+    const sortedSessions = sortAndLimitSessions(sessions);
 
     // Update cache
     sessionsCache = sortedSessions;
@@ -143,24 +298,108 @@ function persistSessions(sessions: StoredSession[]): void {
     const storagePath = getStoragePath();
     fs.writeFileSync(storagePath, JSON.stringify(data, null, 2), 'utf-8');
     logger.debug({ count: sortedSessions.length, path: storagePath }, 'Saved sessions to storage');
+    return true;
   } catch (error) {
     logger.error({ error }, 'Failed to save sessions to storage');
+    return false;
   }
 }
 
 /**
- * Save or update a single session
+ * Session:init persistence event for collision-aware storage writes.
+ */
+interface SessionInitPersistenceEvent {
+  sessionId: string;
+  sdkSessionId: string;
+  isForked: boolean;
+}
+
+function upsertBySessionId(sessions: StoredSession[], record: StoredSession): void {
+  const existingIndex = sessions.findIndex((s) => s.sessionId === record.sessionId);
+  if (existingIndex >= 0) {
+    sessions[existingIndex] = record;
+  } else {
+    sessions.push(record);
+  }
+}
+
+function makeRecord(
+  existing: StoredSession | undefined,
+  sessionId: string,
+  sdkSessionId: string,
+  now: number
+): StoredSession {
+  return {
+    sessionId,
+    sdkSessionId,
+    createdAt: existing?.createdAt ?? now,
+    lastActiveAt: now,
+    workspacePath: existing?.workspacePath,
+    displayName: existing?.displayName,
+  };
+}
+
+/**
+ * Collision-aware persistence for session:init events.
+ *
+ * [warning] TESTED: This function is covered by integration tests.
+ *     If you modify this, run: cd agent-bridge && bun test session-storage-init-mapping session-storage-bridge
+ *     Test files: src/__tests__/session-storage-init-mapping.test.ts, src/__tests__/session-storage-bridge.test.ts
+ */
+export function saveSessionInitMapping(event: SessionInitPersistenceEvent): void {
+  const sessions = getSessions();
+  const now = Date.now();
+
+  const existingOrbit = sessions.find((s) => s.sessionId === event.sessionId);
+  const existingSdk = sessions.find((s) => s.sessionId === event.sdkSessionId);
+  const existingBySdk =
+    existingOrbit === undefined
+      ? sessions.find((s) => s.sdkSessionId === event.sessionId)
+      : undefined;
+
+  const wouldOverwriteExistingOrbitMapping =
+    event.isForked &&
+    existingOrbit !== undefined &&
+    existingOrbit.sdkSessionId !== event.sdkSessionId;
+
+  const wouldCreateShadowEntry =
+    event.isForked && existingOrbit === undefined && existingBySdk !== undefined;
+
+  if (wouldOverwriteExistingOrbitMapping || wouldCreateShadowEntry) {
+    const parentEntry = existingOrbit ?? existingBySdk;
+    if (parentEntry !== undefined) {
+      parentEntry.lastActiveAt = now;
+    }
+
+    upsertBySessionId(
+      sessions,
+      makeRecord(existingSdk, event.sdkSessionId, event.sdkSessionId, now)
+    );
+    persistSessions(sessions);
+    return;
+  }
+
+  upsertBySessionId(sessions, makeRecord(existingOrbit, event.sessionId, event.sdkSessionId, now));
+
+  if (event.isForked) {
+    upsertBySessionId(
+      sessions,
+      makeRecord(existingSdk, event.sdkSessionId, event.sdkSessionId, now)
+    );
+  }
+
+  persistSessions(sessions);
+}
+
+/**
+ * Save or update a single session.
+ *
+ * NOTE: Prefer `saveSessionInitMapping` for session:init events — it performs
+ * fork collision detection. This function is a low-level write used by tests.
  */
 export function saveSession(session: StoredSession): void {
   const sessions = getSessions();
-  const existingIndex = sessions.findIndex((s) => s.sessionId === session.sessionId);
-
-  if (existingIndex >= 0) {
-    sessions[existingIndex] = session;
-  } else {
-    sessions.push(session);
-  }
-
+  upsertBySessionId(sessions, session);
   persistSessions(sessions);
 }
 
@@ -240,6 +479,18 @@ export function cleanupOldSessions(maxAgeDays = 30): number {
   }
 
   return removed;
+}
+
+/** Read-only snapshot of stored sessions for external repair code. */
+export function getStoredSessionsSnapshot(): readonly StoredSession[] {
+  return [...getSessions()];
+}
+
+/**
+ * Get the storage directory path (exported for flag-file consumers).
+ */
+export function getStorageDirPath(): string {
+  return getStorageDir();
 }
 
 /**

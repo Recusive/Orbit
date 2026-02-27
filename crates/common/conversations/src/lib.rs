@@ -1152,9 +1152,17 @@ fn build_active_uuid_set(lines: &[String]) -> Option<HashSet<String>> {
             tracing::warn!("Cycle detected in parentUuid chain at {uuid}");
             break;
         }
-        let _ = active_uuids.insert(uuid.clone());
+        let Some(parent) = uuid_to_parent.get(&uuid).cloned() else {
+            // Dangling parent chain (e.g., an SDK artifact UUID was removed during cleanup).
+            // Fall back to unfiltered parsing so we never collapse to an empty conversation.
+            tracing::warn!(
+                "Dangling parentUuid chain at {uuid}; disabling active-branch filtering"
+            );
+            return None;
+        };
 
-        current = uuid_to_parent.get(&uuid).and_then(Clone::clone);
+        let _ = active_uuids.insert(uuid.clone());
+        current = parent;
     }
 
     Some(active_uuids)
@@ -3239,6 +3247,38 @@ mod tests {
         assert_eq!(conv.messages[1].content, "Hi!");
         assert_eq!(conv.messages[2].content, "goodbye");
         assert_eq!(conv.messages[3].content, "Bye!");
+    }
+
+    #[test]
+    fn test_dangling_parent_chain_falls_back_instead_of_empty_conversation() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        // Simulates rewind cleanup removing an intermediate UUID line while a later
+        // interrupt marker still points to it. The active chain is dangling:
+        // intr1 -> missing-empty-uuid (not present in file).
+        let path = ws_dir.join("dangling-parent.jsonl");
+        let lines = [
+            r#"{"parentUuid":null,"type":"user","uuid":"u1","message":{"role":"user","content":"hello"},"cwd":"/test","sessionId":"dangling-parent","timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            r#"{"parentUuid":"u1","type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Hi there!"}]},"cwd":"/test","sessionId":"dangling-parent","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"parentUuid":"a1","type":"user","uuid":"u2","message":{"role":"user","content":"next"},"cwd":"/test","sessionId":"dangling-parent","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+            r#"{"parentUuid":"u2","type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"Done"}]},"cwd":"/test","sessionId":"dangling-parent","timestamp":"2026-01-11T18:00:03.000Z"}"#,
+            r#"{"parentUuid":"missing-empty-uuid","type":"user","uuid":"intr1","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]},"cwd":"/test","sessionId":"dangling-parent","timestamp":"2026-01-11T18:00:04.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("dangling-parent", None)
+            .expect("load")
+            .expect("not found");
+
+        // Interrupt marker itself is consumed as metadata; the real turns remain visible.
+        assert_eq!(conv.messages.len(), 4);
+        assert_eq!(conv.messages[0].id, "u1");
+        assert_eq!(conv.messages[1].id, "a1");
+        assert_eq!(conv.messages[2].id, "u2");
+        assert_eq!(conv.messages[3].id, "a2");
     }
 
     #[test]
