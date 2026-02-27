@@ -3,6 +3,7 @@ import { ChevronRight, Settings2, X } from 'lucide-react';
 import { Suspense, useEffect, useState } from 'react';
 
 import { SettingsSidebar, FEEDBACK_ITEM, NAV_ITEMS } from './SettingsSidebar';
+import { SettingsSkeleton } from './components';
 import { SETTINGS_PAGE_COMPONENTS, SlashCommandsSettings, SubagentsSettings } from './pages';
 
 import type { SettingsDialogProps, SettingsSection } from './types';
@@ -10,16 +11,8 @@ import type { FC, ReactNode } from 'react';
 
 import { SFSymbol } from '@/components/shared';
 import { Dialog, DialogOverlay, DialogPortal } from '@/components/ui/dialog';
-import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { useSmoothScroll } from '@/hooks/ui';
 import { cn } from '@/lib/utils';
-
-// Loading fallback for lazy-loaded pages
-const PageLoader: FC = () => (
-  <div className="flex items-center justify-center h-full">
-    <ThinkingDots size={15} />
-  </div>
-);
 
 export const SettingsDialog: FC<SettingsDialogProps> = ({
   open,
@@ -69,7 +62,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
       return null;
     }
     return (
-      <Suspense fallback={<PageLoader />}>
+      <Suspense fallback={<SettingsSkeleton />}>
         <PageComponent />
       </Suspense>
     );
