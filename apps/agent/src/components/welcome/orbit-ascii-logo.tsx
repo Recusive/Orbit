@@ -55,7 +55,7 @@ export const OrbitAsciiLogo: FC<OrbitAsciiLogoProps> = ({
             text={ORBIT_ART}
             ariaLabel="ORBIT"
             className="text-[22px] leading-[1.15]"
-            duration={2400}
+            duration={1600}
           />
 
           {/* Tagline — beam starts after the main art finishes.
@@ -66,10 +66,10 @@ export const OrbitAsciiLogo: FC<OrbitAsciiLogoProps> = ({
               text={TAGLINE}
               ariaLabel="One workspace. Agent, editor, canvas."
               className="text-sm leading-normal text-center"
-              duration={1200}
+              duration={800}
               beamSize={8}
               blurLead={6}
-              delay={2400}
+              delay={1600}
               settledColor="var(--foreground)"
               onAnimationComplete={onAnimationComplete}
             />
