@@ -20,6 +20,7 @@ import { selectChatFullWidth, useChatWidthStore } from '@/stores/ui/chat-width-s
 import { AVAILABLE_THEMES, selectIconTheme, useIconThemeStore } from '@/stores/ui/icon-theme-store';
 import {
   WELCOME_ANIMATIONS,
+  selectEnableLaunchAnimation,
   selectWelcomeAnimation,
   useWelcomeAnimationStore,
 } from '@/stores/ui/welcome-animation-store';
@@ -41,6 +42,10 @@ export const AppearanceSettings: FC = () => {
   // Welcome animation from Zustand store (persisted)
   const currentWelcomeAnimation = useWelcomeAnimationStore(selectWelcomeAnimation);
   const setWelcomeAnimation = useWelcomeAnimationStore((state) => state.setAnimation);
+  const enableLaunchAnimation = useWelcomeAnimationStore(selectEnableLaunchAnimation);
+  const setEnableLaunchAnimation = useWelcomeAnimationStore(
+    (state) => state.setEnableLaunchAnimation
+  );
 
   // Chat width from Zustand store (persisted)
   const chatFullWidth = useChatWidthStore(selectChatFullWidth);
@@ -128,6 +133,12 @@ export const AppearanceSettings: FC = () => {
               ))}
             </SelectContent>
           </Select>
+        </SettingItem>
+        <SettingItem
+          label="Launch Animation"
+          description="Play the choreographed reveal sequence on startup"
+        >
+          <Switch checked={enableLaunchAnimation} onCheckedChange={setEnableLaunchAnimation} />
         </SettingItem>
       </div>
 

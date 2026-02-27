@@ -35,6 +35,8 @@ interface AppShellProps {
   readonly lastExpandedSidebarWidth: number;
   /** Optional right-side actions bar rendered on the base layer */
   readonly actionsBar?: ReactNode;
+  /** Override the sidebar margin-left transition (e.g., slower for launch sequence reveal) */
+  readonly transitionOverride?: string | undefined;
 }
 
 export const AppShell: FC<AppShellProps> = ({
@@ -44,6 +46,7 @@ export const AppShell: FC<AppShellProps> = ({
   sidebarWidth,
   lastExpandedSidebarWidth,
   actionsBar,
+  transitionOverride,
 }) => {
   // Mirror the activity panel's animation pattern: fixed width, single margin slide.
   // When collapsed, the wrapper keeps its expanded width and marginLeft pushes it
@@ -56,7 +59,8 @@ export const AppShell: FC<AppShellProps> = ({
     width: visualWidth,
     marginLeft: isCollapsed ? -visualWidth : 0,
     flexShrink: 0,
-    transition: WRAPPER_TRANSITION,
+    transition:
+      transitionOverride !== undefined ? `margin-left ${transitionOverride}` : WRAPPER_TRANSITION,
     overflow: 'hidden',
   };
 

@@ -213,10 +213,20 @@ if (import.meta.env.DEV) {
 // Component (renders nothing — fires toast as side-effect)
 // ---------------------------------------------------------------------------
 
-export const AccountBanner: FC = () => {
+interface AccountBannerProps {
+  /**
+   * When true, defers firing the toast until deferToast transitions to false.
+   * When undefined or false on mount, fires immediately (existing behavior preserved).
+   */
+  readonly deferToast?: boolean | undefined;
+}
+
+export const AccountBanner: FC<AccountBannerProps> = ({ deferToast }) => {
   const firedRef = useRef(false);
 
   useEffect(() => {
+    // If deferred, wait until deferToast becomes false
+    if (deferToast === true) return;
     if (firedRef.current) return;
     firedRef.current = true;
 
@@ -233,7 +243,7 @@ export const AccountBanner: FC = () => {
           error: 'Failed to check credentials',
         });
       });
-  }, []);
+  }, [deferToast]);
 
   return null;
 };

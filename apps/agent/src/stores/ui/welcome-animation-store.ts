@@ -61,16 +61,26 @@ function isValidAnimationId(id: unknown): id is WelcomeAnimationId {
 
 interface WelcomeAnimationState {
   currentAnimation: WelcomeAnimationId;
+  /** When false, skips the choreographed launch sequence and shows the final state instantly. */
+  enableLaunchAnimation: boolean;
 }
 
 interface WelcomeAnimationActions {
   setAnimation: (id: WelcomeAnimationId) => void;
+  setEnableLaunchAnimation: (enabled: boolean) => void;
 }
 
 export const useWelcomeAnimationStore = create<WelcomeAnimationState & WelcomeAnimationActions>()(
   persist(
     immer((set) => ({
       currentAnimation: DEFAULT_ANIMATION,
+      enableLaunchAnimation: true,
+
+      setEnableLaunchAnimation: (enabled: boolean): void => {
+        set((state) => {
+          state.enableLaunchAnimation = enabled;
+        });
+      },
 
       setAnimation: (id: WelcomeAnimationId): void => {
         if (!isValidAnimationId(id)) {
@@ -91,19 +101,28 @@ export const useWelcomeAnimationStore = create<WelcomeAnimationState & WelcomeAn
     })),
     {
       name: STORAGE_KEY,
-      partialize: (state) => ({ currentAnimation: state.currentAnimation }),
+      partialize: (state) => ({
+        currentAnimation: state.currentAnimation,
+        enableLaunchAnimation: state.enableLaunchAnimation,
+      }),
       onRehydrateStorage: () => (state, error) => {
         if (error !== undefined) {
           logger.warn('Error rehydrating welcome animation store', { error });
           return;
         }
 
-        if (state && !isValidAnimationId(state.currentAnimation)) {
-          logger.warn('Invalid animation ID in storage, resetting to default', {
-            stored: state.currentAnimation,
-            fallback: DEFAULT_ANIMATION,
-          });
-          state.currentAnimation = DEFAULT_ANIMATION;
+        if (state !== undefined) {
+          if (!isValidAnimationId(state.currentAnimation)) {
+            logger.warn('Invalid animation ID in storage, resetting to default', {
+              stored: state.currentAnimation,
+              fallback: DEFAULT_ANIMATION,
+            });
+            state.currentAnimation = DEFAULT_ANIMATION;
+          }
+
+          if (typeof state.enableLaunchAnimation !== 'boolean') {
+            state.enableLaunchAnimation = true;
+          }
         }
       },
     }
@@ -116,3 +135,6 @@ export const useWelcomeAnimationStore = create<WelcomeAnimationState & WelcomeAn
 
 export const selectWelcomeAnimation = (state: WelcomeAnimationState): WelcomeAnimationId =>
   state.currentAnimation;
+
+export const selectEnableLaunchAnimation = (state: WelcomeAnimationState): boolean =>
+  state.enableLaunchAnimation;

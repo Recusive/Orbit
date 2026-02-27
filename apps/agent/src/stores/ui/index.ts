@@ -43,7 +43,17 @@ export type {
 } from './ui-store';
 
 export {
+  useLaunchSequenceStore,
+  selectLaunchPhase,
+  selectIsLaunchActive,
+  selectLaunchRunId,
+} from './launch-sequence-store';
+
+export type { LaunchPhase } from './launch-sequence-store';
+
+export {
   WELCOME_ANIMATIONS,
+  selectEnableLaunchAnimation,
   selectWelcomeAnimation,
   useWelcomeAnimationStore,
 } from './welcome-animation-store';

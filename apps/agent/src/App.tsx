@@ -34,12 +34,20 @@ import { useAutoUpdate } from '@/hooks/core/use-auto-update';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { useFullscreen } from '@/hooks/ui/use-fullscreen';
 import { useTrafficLights } from '@/hooks/ui/use-traffic-lights';
-import { CHAT_PANEL, CONTENT_CARD, HEIGHTS, PANEL_SIZES, SIDEBAR } from '@/lib/utils/constants';
+import {
+  CHAT_PANEL,
+  CONTENT_CARD,
+  HEIGHTS,
+  LAUNCH_SEQUENCE,
+  PANEL_SIZES,
+  SIDEBAR,
+} from '@/lib/utils/constants';
 import { PierreProvider } from '@/providers/pierre-provider';
 import { TauriProvider } from '@/providers/tauri-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useOnboardingStore } from '@/stores/onboarding/onboarding-store';
+import { useLaunchSequenceStore } from '@/stores/ui/launch-sequence-store';
 import {
   useHasWorkspace,
   useLeftSidebarWidth,
@@ -49,6 +57,10 @@ import {
   useTerminalPosition,
   useUIStore,
 } from '@/stores/ui/ui-store';
+import {
+  selectEnableLaunchAnimation,
+  useWelcomeAnimationStore,
+} from '@/stores/ui/welcome-animation-store';
 
 // ============================================
 // Style Constants (avoid new object refs on each render)
@@ -60,6 +72,9 @@ const STYLE_DISPLAY_NONE: CSSProperties = { display: 'none' };
 /** Evaluated once — reduced-motion preference is static for session lifetime */
 const PREFERS_REDUCED_MOTION =
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Wallpaper fade transition — hoisted to module level (rendering-hoist-jsx) */
+const WALLPAPER_TRANSITION = `opacity ${String(LAUNCH_SEQUENCE.wallpaperFadeDuration)}ms ${LAUNCH_SEQUENCE.wallpaperEasing}`;
 
 /** Activity panel slide transition — margin reclaims space, transform moves it off-screen */
 const ACTIVITY_TRANSITION: string | undefined = PREFERS_REDUCED_MOTION
@@ -354,10 +369,37 @@ const App: FC = () => {
   // Sidebar state — now global (shared across all modes)
   const leftSidebarWidth = useLeftSidebarWidth();
   const lastExpandedSidebarWidth = useUIStore((s) => s.lastExpandedSidebarWidth);
-  const sidebarOpen = leftSidebarWidth > SIDEBAR.collapsed;
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const reviewPanelOpen = useUIStore((s) => s.reviewPanelOpen);
   const reviewPanelWidth = useUIStore((s) => s.reviewPanelWidth);
+
+  // ── Launch sequence state ──────────────────────────────────────────────
+  const launchPhase = useLaunchSequenceStore((s) => s.phase);
+  const isLaunchActive = useLaunchSequenceStore((s) => s.isActive);
+  const isLaunchAnimating = isLaunchActive && launchPhase !== 'complete';
+
+  const startSequence = useLaunchSequenceStore((s) => s.startSequence);
+  const skipToComplete = useLaunchSequenceStore((s) => s.skipToComplete);
+  const resetLaunch = useLaunchSequenceStore((s) => s.reset);
+  const enableLaunchAnimation = useWelcomeAnimationStore(selectEnableLaunchAnimation);
+
+  // Sidebar reveal target — use actual stored width, not hardcoded 256.
+  // If user previously resized sidebar to 340px, reveal should target 340px.
+  // If sidebar is stored as collapsed (0), use lastExpandedSidebarWidth as reveal target.
+  const revealSidebarWidth =
+    leftSidebarWidth > SIDEBAR.collapsed ? leftSidebarWidth : lastExpandedSidebarWidth;
+
+  // During phases idle/wallpaper/ascii → sidebar forced to 0 (collapsed)
+  // During ui-reveal → sidebar animates to stored width
+  // After complete → UIStore's actual value takes over
+  const effectiveSidebarWidth = isLaunchAnimating
+    ? launchPhase === 'ui-reveal'
+      ? revealSidebarWidth
+      : SIDEBAR.collapsed
+    : leftSidebarWidth;
+
+  // Derive sidebarOpen from effective width (not raw UIStore width)
+  const sidebarOpen = effectiveSidebarWidth > SIDEBAR.collapsed;
 
   // Dia-style layout hooks
   useTrafficLights(sidebarOpen);
@@ -436,6 +478,109 @@ const App: FC = () => {
   // When closed, marginRight = -width slides the entire panel off the right edge
   // as one rigid body. Content inside never compresses.
   const isWelcome = !hasWorkspace && !isDemo;
+
+  // ── Launch sequence orchestration ──────────────────────────────────────
+
+  // Start/reset launch sequence based on welcome state
+  useEffect(() => {
+    if (!isWelcome) {
+      resetLaunch();
+      return;
+    }
+    if (PREFERS_REDUCED_MOTION || !enableLaunchAnimation) {
+      skipToComplete();
+      return;
+    }
+    startSequence();
+  }, [isWelcome, enableLaunchAnimation, resetLaunch, skipToComplete, startSequence]);
+
+  // Wallpaper → ascii: runId-guarded transitionend handler
+  const advanceFromWallpaper = useCallback((expectedRunId: number): void => {
+    const s = useLaunchSequenceStore.getState();
+    if (s.runId !== expectedRunId) return; // stale callback from prior run
+    if (s.phase !== 'wallpaper') return; // already advanced by watchdog
+    s.advancePhase();
+  }, []);
+
+  const handleWallpaperTransitionEnd = useCallback(
+    (e: React.TransitionEvent<HTMLDivElement>): void => {
+      if (e.target !== e.currentTarget || e.propertyName !== 'opacity') return;
+      // Capture runId NOW — the delayed callback verifies it still matches
+      const expectedRunId = useLaunchSequenceStore.getState().runId;
+      window.setTimeout(() => {
+        advanceFromWallpaper(expectedRunId);
+      }, LAUNCH_SEQUENCE.wallpaperToAsciiDelay);
+    },
+    [advanceFromWallpaper]
+  );
+
+  // Wallpaper watchdog — fallback if transitionend never fires (tab hidden, theme toggle, etc.)
+  useEffect(() => {
+    if (launchPhase !== 'wallpaper') return;
+    const runId = useLaunchSequenceStore.getState().runId;
+    const watchdog = window.setTimeout(
+      () => {
+        const s = useLaunchSequenceStore.getState();
+        if (s.runId === runId && s.phase === 'wallpaper') {
+          s.advancePhase();
+        }
+      },
+      LAUNCH_SEQUENCE.wallpaperFadeDuration +
+        LAUNCH_SEQUENCE.wallpaperToAsciiDelay +
+        LAUNCH_SEQUENCE.watchdogEpsilon
+    );
+    return (): void => {
+      window.clearTimeout(watchdog);
+    };
+  }, [launchPhase]);
+
+  // ASCII → ui-reveal: fires when BeamAsciiPre completes
+  const handleAsciiComplete = useCallback((): void => {
+    const s = useLaunchSequenceStore.getState();
+    if (s.phase === 'ascii') {
+      s.advancePhase();
+    }
+  }, []);
+
+  // ui-reveal → complete: wait for sidebar CSS transition to settle
+  useEffect(() => {
+    if (launchPhase !== 'ui-reveal') return;
+    const runId = useLaunchSequenceStore.getState().runId;
+    const timer = window.setTimeout(() => {
+      const s = useLaunchSequenceStore.getState();
+      if (s.runId === runId && s.phase === 'ui-reveal') {
+        s.advancePhase();
+      }
+    }, LAUNCH_SEQUENCE.sidebarRevealDelay);
+    return (): void => {
+      window.clearTimeout(timer);
+    };
+  }, [launchPhase]);
+
+  // Toast deferral — delay toast until after launch sequence completes
+  const [toastReady, setToastReady] = useState(false);
+  useEffect(() => {
+    if (launchPhase !== 'complete' || !isWelcome) return;
+    const timer = window.setTimeout(() => {
+      setToastReady(true);
+    }, LAUNCH_SEQUENCE.toastDelay);
+    return (): void => {
+      window.clearTimeout(timer);
+    };
+  }, [launchPhase, isWelcome]);
+
+  // Derived launch props for WelcomePage
+  const showAscii = launchPhase !== 'idle' && launchPhase !== 'wallpaper';
+  const deferToast = isWelcome && !toastReady;
+
+  // Slower sidebar transition during launch reveal — 500ms vs normal 200ms.
+  // Paired Elements Rule: AppShell (margin-left) and ContentCard (margin) must match.
+  // Only active during ui-reveal phase; reverts to default after complete.
+  const launchTransitionOverride =
+    isLaunchAnimating && launchPhase === 'ui-reveal'
+      ? `${String(LAUNCH_SEQUENCE.sidebarRevealDuration)}ms ${LAUNCH_SEQUENCE.sidebarRevealEasing}`
+      : undefined;
+
   // reviewPanelOpen drives the activity card for agent/canvas modes.
   // Editor mode always shows the activity column — it hosts EditorChatPanel.
   const activityOpen = (reviewPanelOpen || activeTab === 'editor') && !isWelcome;
@@ -607,9 +752,10 @@ const App: FC = () => {
             <AppShell
               sidebar={<PrimarySidebar />}
               resizeHandle={<SidebarResizeHandle />}
-              sidebarWidth={leftSidebarWidth}
+              sidebarWidth={effectiveSidebarWidth}
               lastExpandedSidebarWidth={lastExpandedSidebarWidth}
               actionsBar={rightSidebarOpen && !isWelcome ? <ActionsBar /> : undefined}
+              transitionOverride={launchTransitionOverride}
             >
               {/* Main content wrapper — flex column for cards row + full-width terminal.
                 overflow-hidden clips the activity panel's slide animation (previously
@@ -631,17 +777,30 @@ const App: FC = () => {
                       actionsBarOpen={activityOpen || rightSidebarOpen ? !isWelcome : false}
                       isFullscreen={isFullscreen}
                       terminalBelow={terminalChatOpen || terminalBothOpen}
+                      transitionOverride={launchTransitionOverride}
                     >
-                      {/* Welcome background image — inside the card */}
+                      {/* Welcome background image — inside the card.
+                          During launch sequence: opacity animates 0→1 with wallpaper easing.
+                          transitionend on wallpaper div triggers next phase (with runId guard). */}
                       {isWelcome ? (
                         <>
                           <div
                             className="absolute inset-0 bg-cover bg-center bg-no-repeat rounded-[inherit]"
-                            style={{ backgroundImage: `url(${welcomeBg})` }}
+                            style={{
+                              backgroundImage: `url(${welcomeBg})`,
+                              opacity: launchPhase === 'idle' ? 0 : 1,
+                              transition: isLaunchAnimating ? WALLPAPER_TRANSITION : undefined,
+                            }}
+                            onTransitionEnd={handleWallpaperTransitionEnd}
                             aria-hidden="true"
                           />
+                          {/* Paired Elements Rule: overlay shares same opacity + transition */}
                           <div
                             className="absolute inset-0 hidden dark:block bg-linear-to-t from-gray-3/80 via-gray-3/55 to-gray-3/35 rounded-[inherit]"
+                            style={{
+                              opacity: launchPhase === 'idle' ? 0 : 1,
+                              transition: isLaunchAnimating ? WALLPAPER_TRANSITION : undefined,
+                            }}
                             aria-hidden="true"
                           />
                         </>
@@ -671,7 +830,11 @@ const App: FC = () => {
                           />
                         ) : null}
                         {isWelcome ? (
-                          <WelcomePage />
+                          <WelcomePage
+                            showAscii={showAscii}
+                            onAsciiAnimationComplete={handleAsciiComplete}
+                            deferToast={deferToast}
+                          />
                         ) : (
                           <>
                             {/* Agent mode - mounted on first visit, kept alive */}
