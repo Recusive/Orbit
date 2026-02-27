@@ -35,11 +35,22 @@ const MAX_SESSIONS = 50; // Limit stored sessions to prevent unbounded growth
 let sessionsCache: StoredSession[] | null = null;
 
 /**
+ * Overridable homedir for tests — avoids cross-module spy issues with
+ * `os.homedir()` in Bun's test runner (spies on built-in modules don't
+ * reliably intercept calls from other modules on Linux).
+ */
+let homeDirOverride: string | null = null;
+
+function getHomeDir(): string {
+  return homeDirOverride ?? os.homedir();
+}
+
+/**
  * Get the storage directory path
  */
 function getStorageDir(): string {
   // Use standard app data location
-  const homeDir = os.homedir();
+  const homeDir = getHomeDir();
   const platform = process.platform;
 
   if (platform === 'darwin') {
@@ -98,7 +109,7 @@ function markRepairComplete(): boolean {
 }
 
 function hasJsonlForSessionId(sessionId: string): { found: boolean; scanError: boolean } {
-  const projectsDir = path.join(os.homedir(), '.claude', 'projects');
+  const projectsDir = path.join(getHomeDir(), '.claude', 'projects');
   if (!fs.existsSync(projectsDir)) {
     return { found: false, scanError: false };
   }
@@ -500,4 +511,15 @@ export function getStorageDirPath(): string {
 export function invalidateCache(): void {
   sessionsCache = null;
   logger.debug('Session storage cache invalidated');
+}
+
+/**
+ * Override `os.homedir()` for testing. Pass `null` to clear.
+ *
+ * Bun's `jest.spyOn(os, 'homedir')` doesn't reliably intercept calls
+ * from other modules on Linux. This provides a direct override that
+ * works cross-platform without relying on cross-module spy behavior.
+ */
+export function _setHomeDirForTest(dir: string | null): void {
+  homeDirOverride = dir;
 }

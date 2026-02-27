@@ -5,7 +5,9 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, jest } from 'bun:test';
 
 import {
+  _setHomeDirForTest,
   getSDKSessionIdForSession,
+  getStorageDirPath,
   invalidateCache,
   saveSessionInitMapping,
 } from '../agent/session/session-storage.js';
@@ -15,22 +17,12 @@ import type { StoredSession } from '../agent/session/session-storage.js';
 const STORAGE_FILENAME = 'orbit-sessions.json';
 const REPAIR_FLAG = '.orbit-sessions-repaired-v1';
 
-function getStorageDir(homeDir: string): string {
-  if (process.platform === 'darwin') {
-    return path.join(homeDir, 'Library', 'Application Support', 'Orbit');
-  }
-  if (process.platform === 'win32') {
-    return path.join(process.env.APPDATA ?? path.join(homeDir, 'AppData', 'Roaming'), 'Orbit');
-  }
-  return path.join(process.env.XDG_CONFIG_HOME ?? path.join(homeDir, '.config'), 'orbit');
+function getStoragePath(): string {
+  return path.join(getStorageDirPath(), STORAGE_FILENAME);
 }
 
-function getStoragePath(homeDir: string): string {
-  return path.join(getStorageDir(homeDir), STORAGE_FILENAME);
-}
-
-function getRepairFlagPath(homeDir: string): string {
-  return path.join(getStorageDir(homeDir), REPAIR_FLAG);
+function getRepairFlagPath(): string {
+  return path.join(getStorageDirPath(), REPAIR_FLAG);
 }
 
 function makeSession(sessionId: string, sdkSessionId: string, at = Date.now()): StoredSession {
@@ -42,18 +34,14 @@ function makeSession(sessionId: string, sdkSessionId: string, at = Date.now()): 
   };
 }
 
-function writeStorage(homeDir: string, sessions: StoredSession[]): void {
-  const storageDir = getStorageDir(homeDir);
+function writeStorage(sessions: StoredSession[]): void {
+  const storageDir = getStorageDirPath();
   fs.mkdirSync(storageDir, { recursive: true });
-  fs.writeFileSync(
-    getStoragePath(homeDir),
-    JSON.stringify({ version: 1, sessions }, null, 2),
-    'utf-8'
-  );
+  fs.writeFileSync(getStoragePath(), JSON.stringify({ version: 1, sessions }, null, 2), 'utf-8');
 }
 
-function readStorage(homeDir: string): StoredSession[] {
-  const data = JSON.parse(fs.readFileSync(getStoragePath(homeDir), 'utf-8')) as {
+function readStorage(): StoredSession[] {
+  const data = JSON.parse(fs.readFileSync(getStoragePath(), 'utf-8')) as {
     sessions: StoredSession[];
   };
   return data.sessions;
@@ -67,32 +55,30 @@ function createJsonl(homeDir: string, sessionId: string, projectDirName = 'proje
 
 describe('session-storage migration repair', () => {
   let tmpHome: string;
-  let homedirSpy: ReturnType<typeof jest.spyOn>;
 
   beforeEach(() => {
     tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-migration-'));
-    homedirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpHome);
     invalidateCache();
+    _setHomeDirForTest(tmpHome);
   });
 
   afterEach(() => {
     invalidateCache();
-    homedirSpy.mockRestore();
     fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 
   it('repairs overwritten parent mapping without fork self-map entry', () => {
-    writeStorage(tmpHome, [makeSession('parent-id', 'fork-id')]);
+    writeStorage([makeSession('parent-id', 'fork-id')]);
     createJsonl(tmpHome, 'parent-id');
 
     expect(getSDKSessionIdForSession('parent-id')).toBe('parent-id');
 
-    const sessions = readStorage(tmpHome);
+    const sessions = readStorage();
     expect(sessions.find((s) => s.sessionId === 'parent-id')?.sdkSessionId).toBe('parent-id');
   });
 
   it('repairs overwritten parent mapping when fork self-map entry exists', () => {
-    writeStorage(tmpHome, [makeSession('parent-id', 'fork-id'), makeSession('fork-id', 'fork-id')]);
+    writeStorage([makeSession('parent-id', 'fork-id'), makeSession('fork-id', 'fork-id')]);
     createJsonl(tmpHome, 'parent-id');
 
     expect(getSDKSessionIdForSession('parent-id')).toBe('parent-id');
@@ -100,24 +86,24 @@ describe('session-storage migration repair', () => {
   });
 
   it('does not modify already self-mapped entries', () => {
-    writeStorage(tmpHome, [makeSession('session-id', 'session-id')]);
+    writeStorage([makeSession('session-id', 'session-id')]);
     createJsonl(tmpHome, 'session-id');
 
     expect(getSDKSessionIdForSession('session-id')).toBe('session-id');
-    const sessions = readStorage(tmpHome);
+    const sessions = readStorage();
     expect(sessions[0]).toMatchObject({ sessionId: 'session-id', sdkSessionId: 'session-id' });
   });
 
   it('does not repair alias when sessionId has no JSONL on disk', () => {
-    writeStorage(tmpHome, [makeSession('orbit-id', 'sdk-id')]);
+    writeStorage([makeSession('orbit-id', 'sdk-id')]);
 
     expect(getSDKSessionIdForSession('orbit-id')).toBe('sdk-id');
-    const sessions = readStorage(tmpHome);
+    const sessions = readStorage();
     expect(sessions[0]).toMatchObject({ sessionId: 'orbit-id', sdkSessionId: 'sdk-id' });
   });
 
   it('persists repaired mapping so reload stays correct', () => {
-    writeStorage(tmpHome, [makeSession('parent-id', 'fork-id')]);
+    writeStorage([makeSession('parent-id', 'fork-id')]);
     createJsonl(tmpHome, 'parent-id');
 
     expect(getSDKSessionIdForSession('parent-id')).toBe('parent-id');
@@ -126,9 +112,9 @@ describe('session-storage migration repair', () => {
   });
 
   it('does not write session storage file when no repairs are needed', () => {
-    writeStorage(tmpHome, [makeSession('clean-id', 'clean-id')]);
+    writeStorage([makeSession('clean-id', 'clean-id')]);
     createJsonl(tmpHome, 'clean-id');
-    const storagePath = getStoragePath(tmpHome);
+    const storagePath = getStoragePath();
 
     const writeSpy = jest.spyOn(fs, 'writeFileSync');
     const before = fs.readFileSync(storagePath, 'utf-8');
@@ -141,34 +127,34 @@ describe('session-storage migration repair', () => {
     expect(result).toBe('clean-id');
     expect(wroteSessionFile).toBe(false);
     expect(after).toBe(before);
-    expect(fs.existsSync(getRepairFlagPath(tmpHome))).toBe(true);
+    expect(fs.existsSync(getRepairFlagPath())).toBe(true);
   });
 
   it('skips repair entirely when repair flag already exists', () => {
-    writeStorage(tmpHome, [makeSession('parent-id', 'fork-id')]);
+    writeStorage([makeSession('parent-id', 'fork-id')]);
     createJsonl(tmpHome, 'parent-id');
-    fs.mkdirSync(getStorageDir(tmpHome), { recursive: true });
-    fs.writeFileSync(getRepairFlagPath(tmpHome), '', 'utf-8');
+    fs.mkdirSync(getStorageDirPath(), { recursive: true });
+    fs.writeFileSync(getRepairFlagPath(), '', 'utf-8');
 
     expect(getSDKSessionIdForSession('parent-id')).toBe('fork-id');
-    const sessions = readStorage(tmpHome);
+    const sessions = readStorage();
     expect(sessions.find((s) => s.sessionId === 'parent-id')?.sdkSessionId).toBe('fork-id');
   });
 
   it('preserves legitimate resume aliases on subsequent startups when flag exists', () => {
-    writeStorage(tmpHome, [makeSession('f275658a', '9541b1e0')]);
+    writeStorage([makeSession('f275658a', '9541b1e0')]);
     createJsonl(tmpHome, 'f275658a');
-    fs.mkdirSync(getStorageDir(tmpHome), { recursive: true });
-    fs.writeFileSync(getRepairFlagPath(tmpHome), '', 'utf-8');
+    fs.mkdirSync(getStorageDirPath(), { recursive: true });
+    fs.writeFileSync(getRepairFlagPath(), '', 'utf-8');
 
     expect(getSDKSessionIdForSession('f275658a')).toBe('9541b1e0');
   });
 
   it('does not mark repair complete when persisting repaired sessions fails', () => {
-    writeStorage(tmpHome, [makeSession('parent-id', 'fork-id')]);
+    writeStorage([makeSession('parent-id', 'fork-id')]);
     createJsonl(tmpHome, 'parent-id');
 
-    const storagePath = getStoragePath(tmpHome);
+    const storagePath = getStoragePath();
     const originalWrite = fs.writeFileSync;
     const writeSpy = jest.spyOn(fs, 'writeFileSync').mockImplementation(((
       file: fs.PathOrFileDescriptor,
@@ -182,17 +168,17 @@ describe('session-storage migration repair', () => {
     }) as typeof fs.writeFileSync);
 
     expect(getSDKSessionIdForSession('parent-id')).toBe('parent-id');
-    expect(fs.existsSync(getRepairFlagPath(tmpHome))).toBe(false);
+    expect(fs.existsSync(getRepairFlagPath())).toBe(false);
 
     writeSpy.mockRestore();
     invalidateCache();
 
     expect(getSDKSessionIdForSession('parent-id')).toBe('parent-id');
-    expect(fs.existsSync(getRepairFlagPath(tmpHome))).toBe(true);
+    expect(fs.existsSync(getRepairFlagPath())).toBe(true);
   });
 
   it('does not mark repair complete when JSONL scan has failures', () => {
-    writeStorage(tmpHome, [makeSession('parent-id', 'fork-id')]);
+    writeStorage([makeSession('parent-id', 'fork-id')]);
     createJsonl(tmpHome, 'parent-id', '1-good');
     fs.mkdirSync(path.join(tmpHome, '.claude', 'projects', '0-bad'), { recursive: true });
 
@@ -222,21 +208,21 @@ describe('session-storage migration repair', () => {
     });
 
     expect(getSDKSessionIdForSession('parent-id')).toBe('parent-id');
-    expect(fs.existsSync(getRepairFlagPath(tmpHome))).toBe(false);
+    expect(fs.existsSync(getRepairFlagPath())).toBe(false);
 
     existsSpy.mockRestore();
     readdirSpy.mockRestore();
     invalidateCache();
 
     expect(getSDKSessionIdForSession('parent-id')).toBe('parent-id');
-    expect(fs.existsSync(getRepairFlagPath(tmpHome))).toBe(true);
+    expect(fs.existsSync(getRepairFlagPath())).toBe(true);
   });
 
   it('treats flag existence check I/O errors as not-yet-repaired', () => {
-    writeStorage(tmpHome, [makeSession('parent-id', 'fork-id')]);
+    writeStorage([makeSession('parent-id', 'fork-id')]);
     createJsonl(tmpHome, 'parent-id');
 
-    const flagPath = getRepairFlagPath(tmpHome);
+    const flagPath = getRepairFlagPath();
     const originalExists = fs.existsSync;
     const existsSpy = jest.spyOn(fs, 'existsSync').mockImplementation((targetPath: fs.PathLike) => {
       if (String(targetPath) === flagPath) {
@@ -251,11 +237,11 @@ describe('session-storage migration repair', () => {
   });
 
   it('does not re-run repair after normal saveSessionInitMapping calls', () => {
-    writeStorage(tmpHome, [makeSession('parent-id', 'fork-id')]);
+    writeStorage([makeSession('parent-id', 'fork-id')]);
     createJsonl(tmpHome, 'parent-id');
 
     expect(getSDKSessionIdForSession('parent-id')).toBe('parent-id');
-    expect(fs.existsSync(getRepairFlagPath(tmpHome))).toBe(true);
+    expect(fs.existsSync(getRepairFlagPath())).toBe(true);
 
     saveSessionInitMapping({
       sessionId: 'parent-id',
@@ -268,19 +254,19 @@ describe('session-storage migration repair', () => {
   });
 
   it('is idempotent when forced to re-run on already repaired data', () => {
-    writeStorage(tmpHome, [makeSession('clean-a', 'clean-a'), makeSession('clean-b', 'clean-b')]);
+    writeStorage([makeSession('clean-a', 'clean-a'), makeSession('clean-b', 'clean-b')]);
     createJsonl(tmpHome, 'clean-a');
     createJsonl(tmpHome, 'clean-b');
 
     expect(getSDKSessionIdForSession('clean-a')).toBe('clean-a');
-    const beforeSecondRun = fs.readFileSync(getStoragePath(tmpHome), 'utf-8');
+    const beforeSecondRun = fs.readFileSync(getStoragePath(), 'utf-8');
 
-    fs.rmSync(getRepairFlagPath(tmpHome), { force: true });
+    fs.rmSync(getRepairFlagPath(), { force: true });
     invalidateCache();
 
     expect(getSDKSessionIdForSession('clean-a')).toBe('clean-a');
-    const afterSecondRun = fs.readFileSync(getStoragePath(tmpHome), 'utf-8');
+    const afterSecondRun = fs.readFileSync(getStoragePath(), 'utf-8');
     expect(afterSecondRun).toBe(beforeSecondRun);
-    expect(fs.existsSync(getRepairFlagPath(tmpHome))).toBe(true);
+    expect(fs.existsSync(getRepairFlagPath())).toBe(true);
   });
 });

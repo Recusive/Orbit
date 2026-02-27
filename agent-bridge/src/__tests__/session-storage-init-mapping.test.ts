@@ -2,10 +2,12 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, jest } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import {
+  _setHomeDirForTest,
   getSDKSessionIdForSession,
+  getStorageDirPath,
   invalidateCache,
   saveSession,
   saveSessionInitMapping,
@@ -16,22 +18,12 @@ import type { StoredSession } from '../agent/session/session-storage.js';
 const STORAGE_FILENAME = 'orbit-sessions.json';
 const MAX_SESSIONS = 50;
 
-function getStorageDir(homeDir: string): string {
-  if (process.platform === 'darwin') {
-    return path.join(homeDir, 'Library', 'Application Support', 'Orbit');
-  }
-  if (process.platform === 'win32') {
-    return path.join(process.env.APPDATA ?? path.join(homeDir, 'AppData', 'Roaming'), 'Orbit');
-  }
-  return path.join(process.env.XDG_CONFIG_HOME ?? path.join(homeDir, '.config'), 'orbit');
+function getStoragePath(): string {
+  return path.join(getStorageDirPath(), STORAGE_FILENAME);
 }
 
-function getStoragePath(homeDir: string): string {
-  return path.join(getStorageDir(homeDir), STORAGE_FILENAME);
-}
-
-function readStoredSessions(homeDir: string): StoredSession[] {
-  const data = JSON.parse(fs.readFileSync(getStoragePath(homeDir), 'utf-8')) as {
+function readStoredSessions(): StoredSession[] {
+  const data = JSON.parse(fs.readFileSync(getStoragePath(), 'utf-8')) as {
     sessions: StoredSession[];
   };
   return data.sessions;
@@ -39,17 +31,15 @@ function readStoredSessions(homeDir: string): StoredSession[] {
 
 describe('session-storage init mapping', () => {
   let tmpHome: string;
-  let homedirSpy: ReturnType<typeof jest.spyOn>;
 
   beforeEach(() => {
     tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-init-mapping-'));
-    homedirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpHome);
     invalidateCache();
+    _setHomeDirForTest(tmpHome);
   });
 
   afterEach(() => {
     invalidateCache();
-    homedirSpy.mockRestore();
     fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 
@@ -91,7 +81,7 @@ describe('session-storage init mapping', () => {
     saveSessionInitMapping(event);
     saveSessionInitMapping(event);
 
-    const sessions = readStoredSessions(tmpHome);
+    const sessions = readStoredSessions();
     const orbitRecords = sessions.filter((s) => s.sessionId === event.sessionId);
     const sdkRecords = sessions.filter((s) => s.sessionId === event.sdkSessionId);
 
@@ -114,7 +104,7 @@ describe('session-storage init mapping', () => {
       isForked: true,
     });
 
-    const sessions = readStoredSessions(tmpHome);
+    const sessions = readStoredSessions();
     expect(sessions.find((s) => s.sessionId === '9541b1e0')).toBeUndefined();
     expect(getSDKSessionIdForSession('9541b1e0')).toBe('9541b1e0');
     expect(getSDKSessionIdForSession('0efc7ca1')).toBe('0efc7ca1');
@@ -169,7 +159,7 @@ describe('session-storage init mapping', () => {
       isForked: true,
     });
 
-    const sessions = readStoredSessions(tmpHome);
+    const sessions = readStoredSessions();
     expect(sessions).toHaveLength(MAX_SESSIONS);
     expect(getSDKSessionIdForSession('parent-id')).toBe('parent-id');
     expect(getSDKSessionIdForSession('fork-id')).toBe('fork-id');
@@ -201,7 +191,7 @@ describe('session-storage init mapping', () => {
       isForked: true,
     });
 
-    const sessions = readStoredSessions(tmpHome);
+    const sessions = readStoredSessions();
     expect(sessions).toHaveLength(MAX_SESSIONS);
     expect(getSDKSessionIdForSession('session-0')).toBe('session-0');
     expect(getSDKSessionIdForSession('fork-z')).toBe('fork-z');
@@ -240,7 +230,7 @@ describe('session-storage init mapping', () => {
       isForked: true,
     });
 
-    const sessions = readStoredSessions(tmpHome);
+    const sessions = readStoredSessions();
     const parent = sessions.find((s) => s.sessionId === 'parent-id');
 
     expect(parent).toBeDefined();
