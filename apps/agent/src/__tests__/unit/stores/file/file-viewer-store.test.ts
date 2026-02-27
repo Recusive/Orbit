@@ -16,6 +16,7 @@ function resetStore(): void {
   useFileViewerStore.setState({
     openTabs: [],
     activeTabPath: null,
+    markdownPreview: {},
     cursorPositions: {},
     history: [],
     historyIndex: -1,
@@ -66,6 +67,10 @@ describe('file-viewer-store', () => {
 
     it('should start with null activeTabPath', () => {
       expect(useFileViewerStore.getState().activeTabPath).toBeNull();
+    });
+
+    it('should start with empty markdownPreview map', () => {
+      expect(useFileViewerStore.getState().markdownPreview).toEqual({});
     });
 
     it('should start with empty cursorPositions', () => {
@@ -392,6 +397,18 @@ describe('file-viewer-store', () => {
 
       expect(useFileViewerStore.getState().activeTabPath).toBe('/src/file2.ts');
     });
+
+    it('should clean up markdownPreview state for closed tab', () => {
+      const { openFile, closeTab, toggleMarkdownPreview } = useFileViewerStore.getState();
+
+      openFile('/src/README.md', '# docs');
+      toggleMarkdownPreview('/src/README.md');
+      expect(useFileViewerStore.getState().markdownPreview['/src/README.md']).toBe(true);
+
+      closeTab('/src/README.md');
+
+      expect(useFileViewerStore.getState().markdownPreview['/src/README.md']).toBeUndefined();
+    });
   });
 
   // ============================================================================
@@ -436,19 +453,56 @@ describe('file-viewer-store', () => {
 
   describe('closeAllTabs', () => {
     it('should close all tabs and clear history', () => {
-      const { openFile, closeAllTabs } = useFileViewerStore.getState();
+      const { openFile, closeAllTabs, toggleMarkdownPreview } = useFileViewerStore.getState();
 
       openFile('/src/file1.ts');
       openFile('/src/file2.ts');
       openFile('/src/file3.ts');
+      toggleMarkdownPreview('/src/file2.ts');
 
       closeAllTabs();
 
       const state = useFileViewerStore.getState();
       expect(state.openTabs).toEqual([]);
       expect(state.activeTabPath).toBeNull();
+      expect(state.markdownPreview).toEqual({});
       expect(state.history).toEqual([]);
       expect(state.historyIndex).toBe(-1);
+    });
+  });
+
+  // ============================================================================
+  // Markdown Preview
+  // ============================================================================
+
+  describe('markdown preview', () => {
+    it('should toggle markdown preview for a path', () => {
+      const { toggleMarkdownPreview } = useFileViewerStore.getState();
+
+      toggleMarkdownPreview('/src/README.md');
+      expect(useFileViewerStore.getState().markdownPreview['/src/README.md']).toBe(true);
+
+      toggleMarkdownPreview('/src/README.md');
+      expect(useFileViewerStore.getState().markdownPreview['/src/README.md']).toBe(false);
+    });
+
+    it('should not clear search state when toggling preview', () => {
+      const { toggleSearch, setSearchQuery, toggleMarkdownPreview } = useFileViewerStore.getState();
+
+      toggleSearch('/src/README.md');
+      setSearchQuery('heading');
+
+      toggleMarkdownPreview('/src/README.md');
+
+      const state = useFileViewerStore.getState();
+      expect(state.searchOpen).toBe(true);
+      expect(state.searchQuery).toBe('heading');
+      expect(state.searchTrigger?.path).toBe('/src/README.md');
+    });
+
+    it('should default to false for unopened files', () => {
+      const state = useFileViewerStore.getState();
+      expect(state.markdownPreview['/src/never-opened.md'] ?? false).toBe(false);
     });
   });
 
@@ -604,6 +658,26 @@ describe('file-viewer-store', () => {
       const secondId = useFileViewerStore.getState().pendingGoto?.id;
 
       expect(firstId).not.toBe(secondId);
+    });
+
+    it('should clear markdown preview for target path when navigating to position', () => {
+      const { openFile, toggleMarkdownPreview, gotoPosition } = useFileViewerStore.getState();
+
+      openFile('/src/README.md', '# hello');
+      toggleMarkdownPreview('/src/README.md');
+      expect(useFileViewerStore.getState().markdownPreview['/src/README.md']).toBe(true);
+
+      gotoPosition('/src/README.md', 5, 2);
+
+      expect(useFileViewerStore.getState().markdownPreview['/src/README.md']).toBeUndefined();
+    });
+
+    it('should not create markdown preview entry for non-markdown files', () => {
+      const { gotoPosition } = useFileViewerStore.getState();
+
+      gotoPosition('/src/file.ts', 2, 1, 'const x = 1;');
+
+      expect(useFileViewerStore.getState().markdownPreview['/src/file.ts']).toBeUndefined();
     });
   });
 

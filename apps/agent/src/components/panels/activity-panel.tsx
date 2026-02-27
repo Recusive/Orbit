@@ -1,5 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
-import { Ellipsis, Search, X } from 'lucide-react';
+import { BookOpen, Code, Ellipsis, Search, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ViewedFile } from '@/stores/file/file-viewer-store';
@@ -11,13 +11,16 @@ import { StatusBar } from '@/components/layout/status-bar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { useTauri } from '@/hooks/agent/use-tauri';
+import { useIsPreviewRendered } from '@/hooks/file/use-is-preview-rendered';
 import { useSmoothScroll } from '@/hooks/ui';
 import { lspDidClose } from '@/lib/api';
 import { ACTIVITY_PANEL, cn } from '@/lib/utils';
 import { useBrowserIsActive } from '@/stores/browser/browser-store';
 import {
+  useActiveFile,
   useFileViewerStore,
   useHasOpenFiles,
+  useMarkdownPreview,
   useOpenTabs,
   useWordWrap,
 } from '@/stores/file/file-viewer-store';
@@ -135,6 +138,10 @@ const TabsHeader: FC<TabsHeaderProps> = ({
   wordWrap,
   onToggleWordWrap,
 }) => {
+  const activeFile = useActiveFile();
+  const isPreviewRendered = useIsPreviewRendered(activeFile);
+  const markdownPreview = useMarkdownPreview(activeFile?.path ?? null);
+  const toggleMarkdownPreview = useFileViewerStore((state) => state.toggleMarkdownPreview);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollbarRef = useRef<HTMLDivElement>(null);
   const [scrollState, setScrollState] = useState({ scrollLeft: 0, scrollWidth: 0, clientWidth: 0 });
@@ -241,6 +248,13 @@ const TabsHeader: FC<TabsHeaderProps> = ({
 
   // Show scrollbar when hovered or dragging
   const showScrollbar = isHovered || isDragging;
+  const isMarkdown = activeFile?.language === 'markdown';
+  const isThresholdBlocked = markdownPreview && !isPreviewRendered;
+  const previewToggleLabel = isThresholdBlocked
+    ? 'Preview unavailable - file too large'
+    : markdownPreview
+      ? 'Show source'
+      : 'Show preview';
 
   return (
     <div
@@ -318,13 +332,39 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       >
         <button
           onClick={() => {
-            if (activeTabPath) onToggleSearch(activeTabPath);
+            if (activeTabPath && !isPreviewRendered) {
+              onToggleSearch(activeTabPath);
+            }
           }}
-          className="h-6 w-6 flex items-center justify-center rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-accent"
-          title="Search (⌘F)"
+          disabled={isPreviewRendered}
+          className={cn(
+            'h-6 w-6 flex items-center justify-center rounded transition-colors',
+            isPreviewRendered
+              ? 'cursor-not-allowed text-muted-foreground/40'
+              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+          )}
+          aria-label="Search in file"
+          title={isPreviewRendered ? 'Search unavailable in preview' : 'Search (⌘F)'}
         >
           <Search className="h-4 w-4" />
         </button>
+        {activeFile !== null && isMarkdown && activeFile.viewMode !== 'diff' ? (
+          <button
+            onClick={() => {
+              toggleMarkdownPreview(activeFile.path);
+            }}
+            className={cn(
+              'h-6 w-6 flex items-center justify-center rounded transition-colors',
+              isThresholdBlocked
+                ? 'text-muted-foreground/40'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            )}
+            aria-label={previewToggleLabel}
+            title={previewToggleLabel}
+          >
+            {markdownPreview ? <Code className="h-4 w-4" /> : <BookOpen className="h-4 w-4" />}
+          </button>
+        ) : null}
         <Popover>
           <PopoverTrigger asChild>
             <button

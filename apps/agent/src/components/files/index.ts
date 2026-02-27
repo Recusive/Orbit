@@ -9,3 +9,4 @@ export { FileContextMenu } from './file-context-menu';
 export { FileExplorer } from './file-explorer';
 export { FileViewer } from './file-viewer';
 export { FileViewerContent } from './file-viewer-content';
+export { MarkdownPreview } from './markdown-preview';
