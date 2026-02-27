@@ -246,6 +246,7 @@ export function arePropsEqual(prev: MessageItemProps, next: MessageItemProps): b
   // Compare other props
   if (prev.isLastAssistantMessage !== next.isLastAssistantMessage) return false;
   if (prev.isLastInAssistantGroup !== next.isLastInAssistantGroup) return false;
+  if (prev.isLastMessage !== next.isLastMessage) return false;
   if (prev.isAgentRunning !== next.isAgentRunning) return false;
   if (prev.animate !== next.animate) return false;
   if (prev.onRewind !== next.onRewind) return false;

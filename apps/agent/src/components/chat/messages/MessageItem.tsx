@@ -184,6 +184,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   tools,
   isLastAssistantMessage,
   isLastInAssistantGroup,
+  isLastMessage,
   isAgentRunning,
   animate,
   onRewind,
@@ -348,10 +349,10 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           {/* Message actions - shown on the last assistant message in a consecutive group.
            *  Multi-turn responses (tool use + text) produce multiple assistant messages;
            *  only the final one renders the action bar to avoid duplicate controls.
-           *  NOTE: We intentionally do NOT gate on !isAgentRunning — previous turns' action
-           *  bars should remain visible when the user sends a new message. Rewind is disabled
-           *  while the agent is running to prevent mid-generation forks. */}
-          {isComplete && isLastInAssistantGroup ? (
+           *  Hide actions only for the active in-flight message (last message while
+           *  agent is running). Previous turns remain visible after user sends.
+           *  Rewind is still disabled while the agent is running. */}
+          {isComplete && isLastInAssistantGroup && !(isAgentRunning && isLastMessage) ? (
             <>
               <MessageActions
                 rewindDisabled={isLastAssistantMessage || isAgentRunning}

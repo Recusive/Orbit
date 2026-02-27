@@ -65,7 +65,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Plan output' : 'Expand Plan output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 px-2.5 text-sm',
+          'group flex items-center py-1.5 text-sm',
           'cursor-pointer w-full text-left rounded-xl',
           isFailed
             ? 'border-2 border-dotted border-destructive/40'
@@ -131,7 +131,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
             style={{ overflow: 'hidden' }}
           >
             <div className="flex flex-col">
-              <div className="flex flex-row px-2.5">
+              <div className="flex flex-row">
                 {/* Gutter: vertical connector line */}
                 <div className="w-4 flex justify-center shrink-0">
                   <div className="w-[2px] rounded-full h-full bg-mode-plan/30" />
@@ -164,7 +164,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
               </div>
 
               {/* Bottom connector stub */}
-              <div className="flex flex-row h-1 px-2.5">
+              <div className="flex flex-row h-1">
                 <div className="w-4 flex justify-center">
                   <div className="w-[2px] rounded-full h-full bg-mode-plan/15" />
                 </div>

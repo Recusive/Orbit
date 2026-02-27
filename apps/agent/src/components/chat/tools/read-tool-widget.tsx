@@ -46,7 +46,7 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
       onClick={handleFileClick}
       title={filePath}
       className={cn(
-        'group w-full flex items-center gap-2 py-1.5 px-2.5 text-left',
+        'group w-full flex items-center gap-2 py-1.5 text-left',
         'cursor-pointer rounded-xl',
         isFailed && 'border-2 border-dotted border-destructive/40 opacity-60'
       )}

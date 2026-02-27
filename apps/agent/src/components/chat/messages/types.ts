@@ -84,6 +84,8 @@ export interface MessageItemProps {
    *  Multi-turn responses produce multiple assistant messages — only the
    *  last one in the group should render the action bar. */
   readonly isLastInAssistantGroup: boolean;
+  /** Whether this is the very last message in the array (any role). */
+  readonly isLastMessage: boolean;
   /** Whether the agent is still running (entire turn not yet complete) */
   readonly isAgentRunning: boolean;
   /** Whether to animate this message sliding in (for newly sent messages) */

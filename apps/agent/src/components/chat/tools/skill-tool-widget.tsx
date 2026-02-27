@@ -21,7 +21,7 @@ export const SkillToolWidget: FC<SkillToolWidgetProps> = ({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 py-1.5 px-2.5 text-sm rounded-xl',
+        'flex items-center gap-2 py-1.5 text-sm rounded-xl',
         isFailed && 'border-2 border-dotted border-destructive/40 opacity-60'
       )}
     >

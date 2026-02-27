@@ -117,7 +117,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Web Search output' : 'Expand Web Search output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 text-sm',
           'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
@@ -172,7 +172,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
             style={{ overflow: 'hidden' }}
           >
             <div className="flex flex-col">
-              <div className="flex flex-row px-2.5">
+              <div className="flex flex-row">
                 {/* Gutter: vertical connector line */}
                 <div className="w-4 flex justify-center shrink-0">
                   <div
@@ -260,7 +260,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
 
               {/* Bottom status indicator */}
               {!isRunning && success !== undefined ? (
-                <div className="flex flex-row items-center px-2.5 py-1">
+                <div className="flex flex-row items-center py-1">
                   {isFailed ? (
                     <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
                   ) : (
@@ -271,7 +271,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
                   </span>
                 </div>
               ) : (
-                <div className="flex flex-row h-1 px-2.5">
+                <div className="flex flex-row h-1">
                   <div className="w-4 flex justify-center">
                     <div className="w-[2px] rounded-full h-full bg-border/20" />
                   </div>

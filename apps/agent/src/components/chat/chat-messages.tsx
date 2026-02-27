@@ -449,6 +449,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         {messages.map((msg) => {
           const isLastAssistant = msg.id === lastAssistantMessageId;
           const isLastInGroup = lastInAssistantGroupIds.has(msg.id);
+          const isLastMsg = msg.id === messages[messages.length - 1]?.id;
           const shouldAnimate = animatingMessageIds.has(msg.id);
           const tools = toolsByMessageId.get(msg.id) ?? [];
 
@@ -459,6 +460,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                 tools={tools}
                 isLastAssistantMessage={isLastAssistant}
                 isLastInAssistantGroup={isLastInGroup}
+                isLastMessage={isLastMsg}
                 isAgentRunning={isAgentRunning}
                 animate={shouldAnimate}
                 onRewind={onRewind}
