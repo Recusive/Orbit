@@ -10,7 +10,7 @@
  *
  * Respects prefers-reduced-motion: shows static text immediately.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CSSProperties, FC } from 'react';
 
@@ -77,6 +77,8 @@ interface BeamAsciiPreProps {
   readonly delay?: number | undefined;
   /** Final resting color after beam completes (default: var(--accent-11)) */
   readonly settledColor?: string | undefined;
+  /** Fires once when the beam animation completes (done transitions to true). */
+  readonly onAnimationComplete?: (() => void) | undefined;
 }
 
 export const BeamAsciiPre: FC<BeamAsciiPreProps> = ({
@@ -88,6 +90,7 @@ export const BeamAsciiPre: FC<BeamAsciiPreProps> = ({
   blurLead = 10,
   delay = 0,
   settledColor = ACCENT_COLOR,
+  onAnimationComplete,
 }) => {
   // Parse text into rows and build block index once per text value
   const { rows, total, indexMap } = useMemo(() => {
@@ -128,6 +131,16 @@ export const BeamAsciiPre: FC<BeamAsciiPreProps> = ({
   const progress = Math.min(1, elapsed / duration);
   const beamHead = Math.floor(progress * (total + beamSize));
   const done = PREFERS_REDUCED_MOTION || elapsed >= duration + 400;
+
+  // Fire onAnimationComplete exactly once when done transitions to true.
+  // For reduced-motion: fires on first render (done starts as true).
+  const completeFiredRef = useRef(false);
+  useEffect(() => {
+    if (done && !completeFiredRef.current) {
+      completeFiredRef.current = true;
+      onAnimationComplete?.();
+    }
+  }, [done, onAnimationComplete]);
 
   /** Memoize char styles — only recompute when beamHead or done changes */
   const charStyles = useMemo(() => {

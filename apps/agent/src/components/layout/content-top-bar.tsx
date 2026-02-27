@@ -284,51 +284,56 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
                   fallback={<PanelLeft className="h-4 w-4" />}
                 />
               </button>
-              <div className="w-px h-3.5 bg-lg-separator shrink-0" />
-              {/* Back / Forward arrows — matches sidebar style */}
-              <button
-                data-tauri-drag-region={false}
-                aria-label="Go back"
-                tabIndex={sidebarOpen ? -1 : 0}
-                className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
-              >
-                <SFSymbol
-                  name="arrow.left"
-                  size={13}
-                  weight="semibold"
-                  fallback={<ArrowLeft className="h-3.5 w-3.5" />}
-                />
-              </button>
-              <button
-                data-tauri-drag-region={false}
-                aria-label="Go forward"
-                tabIndex={sidebarOpen ? -1 : 0}
-                className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
-              >
-                <SFSymbol
-                  name="arrow.right"
-                  size={13}
-                  weight="semibold"
-                  fallback={<ArrowRight className="h-3.5 w-3.5" />}
-                />
-              </button>
-              {/* New session */}
-              <button
-                data-tauri-drag-region={false}
-                aria-label="New session"
-                onClick={handleNewSession}
-                tabIndex={sidebarOpen ? -1 : 0}
-                className={cn(
-                  'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
-                  'hover:bg-lg-control-hover active:scale-[0.98]',
-                  'transition-[color,background-color,transform] duration-150',
-                  'text-sidebar-foreground hover:text-foreground'
-                )}
-              >
-                <SquareAndPencil size={18} />
-              </button>
-              {/* Trailing separator between controls and heading */}
-              <div className="w-px h-3.5 bg-lg-separator shrink-0 ml-0.5" />
+              {/* Navigation buttons — hidden on the welcome page (no workspace) */}
+              {hasWorkspace ? (
+                <>
+                  <div className="w-px h-3.5 bg-lg-separator shrink-0" />
+                  {/* Back / Forward arrows — matches sidebar style */}
+                  <button
+                    data-tauri-drag-region={false}
+                    aria-label="Go back"
+                    tabIndex={sidebarOpen ? -1 : 0}
+                    className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
+                  >
+                    <SFSymbol
+                      name="arrow.left"
+                      size={13}
+                      weight="semibold"
+                      fallback={<ArrowLeft className="h-3.5 w-3.5" />}
+                    />
+                  </button>
+                  <button
+                    data-tauri-drag-region={false}
+                    aria-label="Go forward"
+                    tabIndex={sidebarOpen ? -1 : 0}
+                    className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
+                  >
+                    <SFSymbol
+                      name="arrow.right"
+                      size={13}
+                      weight="semibold"
+                      fallback={<ArrowRight className="h-3.5 w-3.5" />}
+                    />
+                  </button>
+                  {/* New session */}
+                  <button
+                    data-tauri-drag-region={false}
+                    aria-label="New session"
+                    onClick={handleNewSession}
+                    tabIndex={sidebarOpen ? -1 : 0}
+                    className={cn(
+                      'h-6 w-6 flex items-center justify-center rounded-md shrink-0',
+                      'hover:bg-lg-control-hover active:scale-[0.98]',
+                      'transition-[color,background-color,transform] duration-150',
+                      'text-sidebar-foreground hover:text-foreground'
+                    )}
+                  >
+                    <SquareAndPencil size={18} />
+                  </button>
+                  {/* Trailing separator between controls and heading */}
+                  <div className="w-px h-3.5 bg-lg-separator shrink-0 ml-0.5" />
+                </>
+              ) : null}
             </div>
           </div>
         ) : null}

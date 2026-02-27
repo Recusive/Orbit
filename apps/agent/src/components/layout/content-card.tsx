@@ -29,6 +29,8 @@ interface ContentCardProps {
   /** When true, bottom margin shrinks to 4px to match the inter-card gap (terminal below). */
   readonly terminalBelow?: boolean;
   readonly children: ReactNode;
+  /** Override the margin transition (e.g., slower for launch sequence reveal) */
+  readonly transitionOverride?: string | undefined;
 }
 
 export const ContentCard: FC<ContentCardProps> = ({
@@ -37,9 +39,11 @@ export const ContentCard: FC<ContentCardProps> = ({
   isFullscreen,
   terminalBelow = false,
   children,
+  transitionOverride,
 }) => {
   const style = useMemo((): CSSProperties => {
     const m = CONTENT_CARD.margin;
+    const transitionValue = transitionOverride ?? CONTENT_CARD.transition;
 
     if (isFullscreen) {
       return {
@@ -49,7 +53,7 @@ export const ContentCard: FC<ContentCardProps> = ({
         boxShadow: 'none',
         transition: PREFERS_REDUCED_MOTION
           ? undefined
-          : `margin ${CONTENT_CARD.transition}, border-radius ${CONTENT_CARD.transition}`,
+          : `margin ${transitionValue}, border-radius ${transitionValue}`,
       };
     }
 
@@ -66,9 +70,9 @@ export const ContentCard: FC<ContentCardProps> = ({
       boxShadow: 'none',
       transition: PREFERS_REDUCED_MOTION
         ? undefined
-        : `margin ${CONTENT_CARD.transition}, border-radius ${CONTENT_CARD.transition}`,
+        : `margin ${transitionValue}, border-radius ${transitionValue}`,
     };
-  }, [sidebarOpen, actionsBarOpen, isFullscreen, terminalBelow]);
+  }, [sidebarOpen, actionsBarOpen, isFullscreen, terminalBelow, transitionOverride]);
 
   return (
     <div

@@ -15,6 +15,10 @@ import { selectWelcomeAnimation, useWelcomeAnimationStore } from '@/stores/ui';
 
 interface OrbitAsciiLogoProps {
   readonly className?: string;
+  /** When false, ASCII art is not rendered (container remains for layout). Default true. */
+  readonly showAscii?: boolean | undefined;
+  /** Fires once when the beam/scramble animation completes. */
+  readonly onAnimationComplete?: (() => void) | undefined;
 }
 
 const ORBIT_ART = ` ██████╗ ██████╗ ██████╗ ██╗████████╗
@@ -26,35 +30,52 @@ const ORBIT_ART = ` ██████╗ ██████╗ █████�
 
 const TAGLINE = 'One workspace. Agent, editor, canvas.';
 
-export const OrbitAsciiLogo: FC<OrbitAsciiLogoProps> = ({ className }) => {
+export const OrbitAsciiLogo: FC<OrbitAsciiLogoProps> = ({
+  className,
+  showAscii = true,
+  onAnimationComplete,
+}) => {
   const animation = useWelcomeAnimationStore(selectWelcomeAnimation);
 
   if (animation === 'scramble') {
-    return <ScrambleOrbitLogo className={className} />;
+    return (
+      <ScrambleOrbitLogo
+        className={className}
+        showAscii={showAscii}
+        onAnimationComplete={onAnimationComplete}
+      />
+    );
   }
 
   return (
     <div className={cn('flex flex-col items-center', className)}>
-      <BeamAsciiPre
-        text={ORBIT_ART}
-        ariaLabel="ORBIT"
-        className="text-[22px] leading-[1.15]"
-        duration={2400}
-      />
+      {showAscii ? (
+        <>
+          <BeamAsciiPre
+            text={ORBIT_ART}
+            ariaLabel="ORBIT"
+            className="text-[22px] leading-[1.15]"
+            duration={2400}
+          />
 
-      {/* Tagline — beam starts after the main art finishes */}
-      <div className="h-6 mt-3">
-        <BeamAsciiPre
-          text={TAGLINE}
-          ariaLabel="One workspace. Agent, editor, canvas."
-          className="text-sm leading-normal text-center"
-          duration={1200}
-          beamSize={8}
-          blurLead={6}
-          delay={2400}
-          settledColor="var(--foreground)"
-        />
-      </div>
+          {/* Tagline — beam starts after the main art finishes.
+              onAnimationComplete fires here (not on logo) so it triggers
+              after BOTH logo + tagline finish. */}
+          <div className="h-6 mt-3">
+            <BeamAsciiPre
+              text={TAGLINE}
+              ariaLabel="One workspace. Agent, editor, canvas."
+              className="text-sm leading-normal text-center"
+              duration={1200}
+              beamSize={8}
+              blurLead={6}
+              delay={2400}
+              settledColor="var(--foreground)"
+              onAnimationComplete={onAnimationComplete}
+            />
+          </div>
+        </>
+      ) : null}
     </div>
   );
 };
@@ -95,7 +116,17 @@ function easeOutInterval(progress: number, base: number): number {
 
 type Phase = 'decode-logo' | 'decode-tagline' | 'hold' | 'scramble';
 
-const ScrambleOrbitLogo: FC<{ readonly className?: string | undefined }> = ({ className }) => {
+interface ScrambleOrbitLogoProps {
+  readonly className?: string | undefined;
+  readonly showAscii?: boolean | undefined;
+  readonly onAnimationComplete?: (() => void) | undefined;
+}
+
+const ScrambleOrbitLogo: FC<ScrambleOrbitLogoProps> = ({
+  className,
+  showAscii = true,
+  onAnimationComplete,
+}) => {
   const [logoDisplay, setLogoDisplay] = useState(PREFERS_REDUCED_MOTION ? ORBIT_ART : '');
   const [taglineDisplay, setTaglineDisplay] = useState(PREFERS_REDUCED_MOTION ? TAGLINE : '');
 
@@ -103,6 +134,11 @@ const ScrambleOrbitLogo: FC<{ readonly className?: string | undefined }> = ({ cl
   const resolvedRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completeFiredRef = useRef(false);
+  // Stable ref for onAnimationComplete — avoids re-running the entire animation
+  // effect when the callback prop changes (it won't, but satisfies exhaustive-deps)
+  const onCompleteRef = useRef(onAnimationComplete);
+  onCompleteRef.current = onAnimationComplete;
 
   useEffect(() => {
     if (PREFERS_REDUCED_MOTION) return;
@@ -160,6 +196,11 @@ const ScrambleOrbitLogo: FC<{ readonly className?: string | undefined }> = ({ cl
       }
 
       if (nextPhase === 'hold') {
+        // Fire completion callback once on first hold (animation cycle complete)
+        if (!completeFiredRef.current) {
+          completeFiredRef.current = true;
+          onCompleteRef.current?.();
+        }
         holdTimerRef.current = setTimeout(() => {
           startPhase('scramble');
         }, HOLD_MS);
@@ -191,19 +232,23 @@ const ScrambleOrbitLogo: FC<{ readonly className?: string | undefined }> = ({ cl
 
   return (
     <div className={cn('flex flex-col items-center', className)}>
-      <pre
-        className="font-mono text-[22px] leading-[1.15] text-accent-9 dark:text-accent-11 whitespace-pre select-none"
-        aria-label="ORBIT"
-        role="img"
-      >
-        {logoDisplay}
-      </pre>
+      {showAscii ? (
+        <>
+          <pre
+            className="font-mono text-[22px] leading-[1.15] text-accent-9 dark:text-accent-11 whitespace-pre select-none"
+            aria-label="ORBIT"
+            role="img"
+          >
+            {logoDisplay}
+          </pre>
 
-      <div className="h-6 mt-3">
-        <pre className="font-mono text-sm text-foreground/60 whitespace-pre select-none text-center">
-          {taglineDisplay}
-        </pre>
-      </div>
+          <div className="h-6 mt-3">
+            <pre className="font-mono text-sm text-foreground/60 whitespace-pre select-none text-center">
+              {taglineDisplay}
+            </pre>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 };

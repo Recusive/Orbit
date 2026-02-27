@@ -271,6 +271,34 @@ export const TRANSITION_CLASSES = {
 } as const;
 
 /**
+ * Launch sequence animation timing.
+ *
+ * Controls the choreographed intro when the app opens in welcome state:
+ *   idle → wallpaper fade → ASCII beam → sidebar reveal → complete
+ *
+ * @see docs/plans/launch-sequence-animation.md
+ * @see stores/ui/launch-sequence-store.ts
+ */
+export const LAUNCH_SEQUENCE = {
+  /** Phase 1: wallpaper opacity 0→1 (page-level transition, intentionally > 300ms) */
+  wallpaperFadeDuration: 800,
+  /** Pause before ASCII starts — gives the eye time to register the wallpaper */
+  wallpaperToAsciiDelay: 200,
+  /** Duration for the cinematic sidebar reveal (slower than normal 200ms toggle) */
+  sidebarRevealDuration: 500,
+  /** Easing for sidebar reveal — same family as normal sidebar, just slower */
+  sidebarRevealEasing: 'cubic-bezier(0.165, 0.84, 0.44, 1)',
+  /** Buffer after sidebar reveal completes (500ms transition + 100ms safety) */
+  sidebarRevealDelay: 600,
+  /** Delay before account toast fires after sequence completes */
+  toastDelay: 400,
+  /** Wallpaper fade easing — ease-out-quint for dramatic entrance */
+  wallpaperEasing: 'cubic-bezier(0.23, 1, 0.32, 1)',
+  /** Watchdog epsilon — added to wallpaperFadeDuration as fallback if transitionend never fires */
+  watchdogEpsilon: 120,
+} as const;
+
+/**
  * Timeout and delay durations
  */
 export const DELAYS = {
