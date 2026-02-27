@@ -33,9 +33,19 @@ const USER_MESSAGE_MAX_HEIGHT = 200;
 // of <button> elements, letting our handleContentClick route them through onOpenUrl → Tauri.
 const LINK_SAFETY_DISABLED = { enabled: false } as const;
 
-// Disable table copy/download controls — they clutter the chat UI.
-// Code block controls are kept enabled.
-const CONTROLS_CONFIG = { table: false } as const;
+// Custom table component — replaces Streamdown's built-in MarkdownTable which hardcodes
+// `w-full border-collapse border border-border` on the <table> element and adds
+// copy/download control buttons. Our component renders a clean <table> inside a
+// .table-wrapper div, letting globals.css handle styling (rounded corners, fit-content).
+const MarkdownTable: FC<{ readonly children?: React.ReactNode }> = ({ children }) => (
+  <div className="table-wrapper">
+    <table>{children}</table>
+  </div>
+);
+
+// Stable components object — defined outside component to prevent recreation on each render.
+// Streamdown compares components by reference; recreating this object would force full re-renders.
+const STREAMDOWN_COMPONENTS = { table: MarkdownTable };
 
 // Stable plugin arrays - defined outside component to prevent recreation on each render.
 // This is critical for Streamdown performance as it compares plugin arrays by reference.
@@ -138,7 +148,7 @@ const UserMessageBubble: FC<{ readonly content: string; readonly animate: boolea
         <div className="relative">
           <p
             ref={contentRef}
-            className="text-base leading-relaxed whitespace-pre-wrap break-words select-text"
+            className="text-base leading-relaxed whitespace-pre-wrap wrap-break-word select-text"
             style={
               isCollapsed
                 ? {
@@ -306,7 +316,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                       remarkPlugins={REMARK_PLUGINS}
                       rehypePlugins={rehypePlugins}
                       plugins={STREAMDOWN_PLUGINS}
-                      controls={CONTROLS_CONFIG}
+                      components={STREAMDOWN_COMPONENTS}
                       linkSafety={LINK_SAFETY_DISABLED}
                       mode="static"
                     >

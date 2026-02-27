@@ -1006,21 +1006,24 @@ html.dark .chat-markdown code:not(pre code) {
 }
 
 /* Table styling - VS Code uses 12px for tables.
- * Streamdown wraps tables in [data-streamdown="table-wrapper"] > .overflow-x-auto > table.
- * border-radius lives on the wrapper (not the table) so we keep border-collapse: collapse
- * on the table — collapse gives clean native text selection without gaps between cells. */
-.chat-markdown [data-streamdown="table-wrapper"],
-.prose [data-streamdown="table-wrapper"] {
+ * Streamdown's built-in table component hardcodes w-full (width: 100%) on <table>,
+ * causing text selection to highlight empty cell space. We replace it with a custom
+ * MarkdownTable component (MessageItem.tsx) that wraps <table> in a .table-wrapper div.
+ * border-radius on the wrapper, border-collapse: collapse on the table — collapse is
+ * required for clean native text selection (no gaps between cells). */
+.chat-markdown .table-wrapper,
+.prose .table-wrapper {
   border-radius: 9px;
   overflow: hidden;
   border: 1px solid var(--border);
-  width: fit-content;
-  max-width: 100%;
+  width: 100%;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
 }
 
 .chat-markdown table,
 .prose table {
-  margin: 0;
+  width: 100%;
   border-collapse: collapse;
   font-size: 0.75rem; /* 12px - VS Code standard UI text */
 }
@@ -1035,6 +1038,19 @@ html.dark .chat-markdown code:not(pre code) {
 .chat-markdown tr:nth-child(even),
 .prose tr:nth-child(even) {
   background-color: var(--muted);
+}
+
+/* Inline code inside table cells — strip padding and background so code fragments
+ * don't create padded pill shapes that extend selection beyond the text glyphs.
+ * Uses longhand padding properties to match Tailwind's px-*/py-* longhand output. */
+.chat-markdown td code,
+.chat-markdown th code {
+  padding-top: 0;
+  padding-right: 0;
+  padding-bottom: 0;
+  padding-left: 0;
+  background-color: transparent;
+  border-radius: 0;
 }
 
 .chat-markdown th,
