@@ -1,5 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { OutlineItem } from '@/components/editor/editor-breadcrumbs';
 import type { GotoPosition, ViewedFile } from '@/stores/file/file-viewer-store';
@@ -7,6 +7,7 @@ import type { FC } from 'react';
 
 import { EditorBreadcrumbs, EditorSkeleton, extractMarkdownOutline } from '@/components/editor';
 import { FileDiffViewer } from '@/components/git';
+import { useIsPreviewRendered } from '@/hooks/file/use-is-preview-rendered';
 import { writeFile } from '@/lib/api';
 import {
   useCursorPosition,
@@ -19,6 +20,9 @@ const logger = createLogger('FileViewerContent');
 // Lazy load CodeMirror to reduce initial bundle size (~500KB)
 const LazyCodeMirrorEditor = lazy(() =>
   import('@/components/editor/CodeMirrorEditor').then((m) => ({ default: m.CodeMirrorEditor }))
+);
+const LazyMarkdownPreview = lazy(() =>
+  import('@/components/files/markdown-preview').then((m) => ({ default: m.MarkdownPreview }))
 );
 
 // Hook to detect theme from DOM
@@ -52,6 +56,8 @@ interface FileViewerContentProps {
 
 export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   const theme = useDetectTheme();
+  const isPreviewRendered = useIsPreviewRendered(file);
+  const prevPreviewRef = useRef(false);
   // Cursor position is scoped by file path for split view support
   const cursorPosition = useCursorPosition(file.path);
   const wordWrap = useWordWrap();
@@ -61,6 +67,7 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   const pendingGoto = useFileViewerStore((state) => state.pendingGoto);
   const clearPendingGoto = useFileViewerStore((state) => state.clearPendingGoto);
   const gotoPosition = useFileViewerStore((state) => state.gotoPosition);
+  const toggleMarkdownPreview = useFileViewerStore((state) => state.toggleMarkdownPreview);
 
   // Only apply goto if it's for the current file (prevents split view cross-navigation)
   const gotoForThisFile: GotoPosition | null = pendingGoto?.path === file.path ? pendingGoto : null;
@@ -93,6 +100,13 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
 
     return activeIndex;
   }, [outline, cursorPosition.line]);
+
+  useEffect(() => {
+    if (isPreviewRendered && !prevPreviewRef.current) {
+      useFileViewerStore.getState().closeSearch();
+    }
+    prevPreviewRef.current = isPreviewRendered;
+  }, [isPreviewRendered]);
 
   // Handle outline item click - navigate to that line
   const handleOutlineClick = useCallback(
@@ -131,6 +145,10 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
     }
   }, [file.path, file.content, file.isExternal, markSaved]);
 
+  const handleSwitchToSource = useCallback((): void => {
+    toggleMarkdownPreview(file.path);
+  }, [file.path, toggleMarkdownPreview]);
+
   // Render diff view when in diff mode with diff data
   if (file.viewMode === 'diff' && file.diffData) {
     return <FileDiffViewer diffData={file.diffData} filePath={file.path} />;
@@ -141,27 +159,37 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
       {/* Breadcrumbs */}
       <EditorBreadcrumbs
         filePath={file.path}
-        outline={outline}
-        activeOutlineIndex={activeOutlineIndex}
+        outline={isPreviewRendered ? [] : outline}
+        activeOutlineIndex={isPreviewRendered ? -1 : activeOutlineIndex}
         onOutlineClick={handleOutlineClick}
       />
 
       {/* Editor */}
       <div className="flex-1 relative min-h-0">
-        <Suspense fallback={<EditorSkeleton />}>
-          <LazyCodeMirrorEditor
-            value={file.content}
-            language={file.language}
-            filePath={file.path}
-            onChange={handleChange}
-            onSave={handleSave}
-            theme={theme}
-            gotoPosition={gotoForThisFile}
-            onGotoComplete={clearPendingGoto}
-            searchTrigger={searchTrigger}
-            wordWrap={wordWrap}
-          />
-        </Suspense>
+        {isPreviewRendered ? (
+          <Suspense fallback={<EditorSkeleton />}>
+            <LazyMarkdownPreview
+              filePath={file.path}
+              content={file.content}
+              onSwitchToSource={handleSwitchToSource}
+            />
+          </Suspense>
+        ) : (
+          <Suspense fallback={<EditorSkeleton />}>
+            <LazyCodeMirrorEditor
+              value={file.content}
+              language={file.language}
+              filePath={file.path}
+              onChange={handleChange}
+              onSave={handleSave}
+              theme={theme}
+              gotoPosition={gotoForThisFile}
+              onGotoComplete={clearPendingGoto}
+              searchTrigger={searchTrigger}
+              wordWrap={wordWrap}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   );

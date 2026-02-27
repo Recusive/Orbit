@@ -66,6 +66,7 @@ interface FileViewerState {
   // Open file tabs
   openTabs: ViewedFile[];
   activeTabPath: string | null;
+  markdownPreview: Record<string, boolean>;
 
   // Cursor positions per file (for split view - each pane tracks its own cursor)
   cursorPositions: Record<string, CursorPosition>;
@@ -97,6 +98,7 @@ interface FileViewerActions {
   closeTab: (path: string) => void;
   setActiveTab: (path: string) => void;
   closeAllTabs: () => void;
+  toggleMarkdownPreview: (path: string) => void;
 
   // Content management
   setFileContent: (path: string, content: string, language?: string) => void;
@@ -220,6 +222,7 @@ export const useFileViewerStore = create<FileViewerStore>()(
       // Initial state
       openTabs: [],
       activeTabPath: null,
+      markdownPreview: {},
       cursorPositions: {}, // Per-file cursor positions for split view
       history: [],
       historyIndex: -1,
@@ -312,10 +315,14 @@ export const useFileViewerStore = create<FileViewerStore>()(
         logger.debug(`Closing tab: ${path}`);
         set((state) => {
           const tabIndex = state.openTabs.findIndex((tab) => tab.path === path);
-          if (tabIndex === -1) return;
+          if (tabIndex === -1) {
+            Reflect.deleteProperty(state.markdownPreview, path);
+            return;
+          }
 
           // Remove the tab
           state.openTabs.splice(tabIndex, 1);
+          Reflect.deleteProperty(state.markdownPreview, path);
 
           // If closing active tab, switch to another
           if (state.activeTabPath === path) {
@@ -353,8 +360,16 @@ export const useFileViewerStore = create<FileViewerStore>()(
         set((state) => {
           state.openTabs = [];
           state.activeTabPath = null;
+          state.markdownPreview = {};
           state.history = [];
           state.historyIndex = -1;
+        });
+      },
+
+      toggleMarkdownPreview: (path: string): void => {
+        set((state) => {
+          const next = !(state.markdownPreview[path] ?? false);
+          state.markdownPreview[path] = next;
         });
       },
 
@@ -454,6 +469,9 @@ export const useFileViewerStore = create<FileViewerStore>()(
         // Use monotonic counter for guaranteed unique IDs (Date.now() can collide)
         gotoIdCounter += 1;
         set((state) => {
+          if (state.markdownPreview[path]) {
+            Reflect.deleteProperty(state.markdownPreview, path);
+          }
           state.pendingGoto = { path, line, column, id: gotoIdCounter };
         });
       },
@@ -506,6 +524,13 @@ export const useOpenTabs = (): ViewedFile[] => {
 
 export const useHasOpenFiles = (): boolean => {
   return useFileViewerStore((state) => state.openTabs.length > 0);
+};
+
+export const useMarkdownPreview = (path: string | null): boolean => {
+  return useFileViewerStore((state) => {
+    if (!path) return false;
+    return state.markdownPreview[path] ?? false;
+  });
 };
 
 // Use shallow comparison for object selectors to prevent infinite re-renders

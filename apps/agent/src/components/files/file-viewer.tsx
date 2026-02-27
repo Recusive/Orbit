@@ -7,6 +7,7 @@ import type { FC } from 'react';
 
 import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
+import { useIsPreviewRendered } from '@/hooks/file/use-is-preview-rendered';
 import {
   useActiveFile,
   useFileViewerLoading,
@@ -15,6 +16,7 @@ import {
 
 export const FileViewer: FC = () => {
   const activeFile = useActiveFile();
+  const isPreviewRendered = useIsPreviewRendered(activeFile);
   const { isLoading, path: loadingPath } = useFileViewerLoading();
   const toggleSearch = useFileViewerStore((state) => state.toggleSearch);
 
@@ -24,7 +26,7 @@ export const FileViewer: FC = () => {
       // Cmd+F to search - scoped by active file path for split view
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
-        if (activeFile?.path) {
+        if (activeFile?.path && !isPreviewRendered) {
           toggleSearch(activeFile.path);
         }
       }
@@ -34,7 +36,7 @@ export const FileViewer: FC = () => {
     return (): void => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [toggleSearch, activeFile?.path]);
+  }, [toggleSearch, activeFile?.path, isPreviewRendered]);
 
   return (
     <div className="flex flex-col h-full relative">
