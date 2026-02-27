@@ -33,6 +33,10 @@ const USER_MESSAGE_MAX_HEIGHT = 200;
 // of <button> elements, letting our handleContentClick route them through onOpenUrl → Tauri.
 const LINK_SAFETY_DISABLED = { enabled: false } as const;
 
+// Disable table copy/download controls — they clutter the chat UI.
+// Code block controls are kept enabled.
+const CONTROLS_CONFIG = { table: false } as const;
+
 // Stable plugin arrays - defined outside component to prevent recreation on each render.
 // This is critical for Streamdown performance as it compares plugin arrays by reference.
 const REMARK_PLUGINS = [remarkGfm];
@@ -302,6 +306,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                       remarkPlugins={REMARK_PLUGINS}
                       rehypePlugins={rehypePlugins}
                       plugins={STREAMDOWN_PLUGINS}
+                      controls={CONTROLS_CONFIG}
                       linkSafety={LINK_SAFETY_DISABLED}
                       mode="static"
                     >

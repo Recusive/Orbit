@@ -11,6 +11,7 @@ import { StatusBar } from '@/components/layout/status-bar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { useTauri } from '@/hooks/agent/use-tauri';
+import { useSmoothScroll } from '@/hooks/ui';
 import { lspDidClose } from '@/lib/api';
 import { ACTIVITY_PANEL, cn } from '@/lib/utils';
 import { useBrowserIsActive } from '@/stores/browser/browser-store';
@@ -348,6 +349,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
 };
 
 export const ActivityPanel: FC<ActivityPanelProps> = ({ canManageBrowser = true }) => {
+  const smoothScrollRef = useSmoothScroll(0.08);
   const hasOpenFiles = useHasOpenFiles();
   const openTabs = useOpenTabs();
   const activeTabPath = useFileViewerStore((state) => state.activeTabPath);
@@ -445,7 +447,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canManageBrowser = true 
         ) : activeTab === 'browser' ? (
           <BrowserPanel />
         ) : (
-          <div className="h-full overflow-y-auto">
+          <div ref={smoothScrollRef} className="h-full overflow-y-auto overscroll-y-contain">
             <SourceControlTab />
           </div>
         )}

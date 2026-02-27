@@ -16,6 +16,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useSmoothScroll } from '@/hooks/ui';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
@@ -142,6 +143,7 @@ export interface ProjectsDialogProps {
 }
 
 export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) => {
+  const smoothScrollRef = useSmoothScroll(0.08);
   const { projects, isLoading } = useRecentProjects();
   const setRootPath = useFileStore((s) => s.setRootPath);
   const [search, setSearch] = useState('');
@@ -253,7 +255,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
         </div>
 
         {/* Grid content */}
-        <div className="flex-1 overflow-auto p-4">
+        <div ref={smoothScrollRef} className="flex-1 overflow-auto overscroll-y-contain p-4">
           {isLoading ? (
             <ProjectsSkeleton />
           ) : !hasProjects ? (

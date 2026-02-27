@@ -16,7 +16,7 @@
  * NOTE: Chat container widths come from @/lib/utils/constants.
  * To change chat max-width, update CHAT_WIDTH and CHAT_WIDTH_VAR in constants.ts.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 // PINNED: use-stick-to-bottom@1.1.2 — the session-switch scroll reset workaround
 // (stopScroll() call below) depends on this library's internal ResizeObserver
 // timing. Upgrading may break the workaround silently. Test thoroughly before
@@ -34,6 +34,7 @@ import type { FC } from 'react';
 
 import { HyperText } from '@/components/ui/hyper-text';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
+import { useSmoothScroll } from '@/hooks/ui';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 import { deduplicateAndSortTools, useRunningTool, useToolStore } from '@/stores/agent/tool-store';
 
@@ -195,15 +196,31 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // - Velocity-based spring animation for smooth content growth
   // - Scroll anchoring when content above viewport resizes
   const { scrollRef, contentRef, scrollToBottom, stopScroll } = useStickToBottom({
-    // Instant scroll on resize — prevents the spring animation from amplifying
-    // tiny height changes (1-2px content reflow) into visible multi-frame "wobble"
-    // that appears as messages shifting down then back.
-    // Streaming still looks smooth: chunks arrive every 50ms, so instant jumps
-    // at that rate are imperceptible.
-    resize: 'instant',
+    // Smooth spring animation when content resizes (tool expand/collapse)
+    resize: 'smooth',
     // Smooth initial scroll on mount
     initial: 'smooth',
   });
+
+  // Lerp-based scroll damping — caps visual scroll speed for controlled feel.
+  // The passive scroll listener inside the hook keeps state in sync when
+  // useStickToBottom adjusts scrollTop (streaming, tool expand, etc.).
+  // onScrollAway calls stopScroll() so useStickToBottom releases immediately
+  // when the user scrolls up — without this, it fights the lerp animation.
+  const smoothScrollCallbackRef = useSmoothScroll({
+    damping: 0.08,
+    onScrollAway: stopScroll,
+  });
+
+  // Merge useStickToBottom's RefObject with useSmoothScroll's callback ref.
+  // Both need the same DOM node: one for scroll anchoring, one for wheel lerp.
+  const mergedScrollRef = useCallback(
+    (node: HTMLElement | null): void => {
+      (scrollRef as React.RefObject<HTMLElement | null>).current = node;
+      smoothScrollCallbackRef(node);
+    },
+    [scrollRef, smoothScrollCallbackRef]
+  );
 
   const prevSessionIdRef = useRef(sessionId);
 
@@ -412,11 +429,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   return (
     <div
-      ref={scrollRef}
-      className="flex-1 overflow-y-auto overflow-x-hidden"
+      ref={mergedScrollRef}
+      className="flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain"
       style={{
         scrollbarGutter: 'stable both-edges',
         contain: 'layout style',
+        // Disable native scroll anchoring — use-stick-to-bottom is the sole
+        // scroll controller. With overflow-anchor: auto (default), the browser
+        // adjusts scrollTop on content changes, conflicting with the library's
+        // spring animation and causing a visible "down then back" shift.
+        overflowAnchor: 'none',
       }}
     >
       <div

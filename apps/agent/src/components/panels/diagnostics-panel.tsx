@@ -12,6 +12,7 @@ import type { Diagnostic } from '@/lib/api';
 import type { FC } from 'react';
 
 import { useDiagnostics } from '@/hooks/lsp/use-diagnostics';
+import { useSmoothScroll } from '@/hooks/ui';
 import { cn } from '@/lib/utils';
 
 interface DiagnosticsPanelProps {
@@ -50,6 +51,7 @@ const SEVERITY_COLORS: Record<Diagnostic['severity'], string> = {
  * ```
  */
 export const DiagnosticsPanel: FC<DiagnosticsPanelProps> = ({ onDiagnosticClick, className }) => {
+  const smoothScrollRef = useSmoothScroll(0.08);
   const { diagnostics, totalErrors, totalWarnings, totalIssues } = useDiagnostics();
   // Use function initializer to avoid creating new Set on every render
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(() => new Set());
@@ -105,7 +107,7 @@ export const DiagnosticsPanel: FC<DiagnosticsPanelProps> = ({ onDiagnosticClick,
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div ref={smoothScrollRef} className="flex-1 overflow-auto overscroll-y-contain">
         {totalIssues === 0 ? (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
             No problems detected

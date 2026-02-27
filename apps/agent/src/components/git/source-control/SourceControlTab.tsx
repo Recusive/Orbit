@@ -21,9 +21,12 @@ import { useSourceControl } from './hooks/use-source-control';
 
 import type { SourceControlTabProps } from './types';
 
+import { useSmoothScroll } from '@/hooks/ui';
 import { cn } from '@/lib/utils';
 
 export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = '' }) => {
+  const smoothScrollRef = useSmoothScroll(0.08);
+
   const {
     // Status
     status,
@@ -165,7 +168,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={smoothScrollRef} className="flex-1 overflow-y-auto overscroll-y-contain">
         {/* Operation Error Banner */}
         {operationError ? <OperationError message={operationError} /> : null}
 
