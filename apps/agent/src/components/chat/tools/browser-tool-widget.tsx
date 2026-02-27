@@ -175,7 +175,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Browser output' : 'Expand Browser output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 text-sm',
           'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
@@ -225,14 +225,14 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
           >
             <div className="flex flex-col">
               {/* Connector line: header icon → step icon */}
-              <div className="flex flex-row px-2.5 mb-1">
+              <div className="flex flex-row mb-1">
                 <div className="w-4 flex justify-center shrink-0">
                   <div className="w-[2px] rounded-full h-3 bg-violet-500/30" />
                 </div>
               </div>
 
               {/* Step row: action icon + label */}
-              <div className="flex flex-row items-center px-2.5">
+              <div className="flex flex-row items-center">
                 {stepIcon}
                 <span className="ml-2.5 text-xs text-lg-text-secondary min-w-0 truncate">
                   {stepLabel.text}
@@ -255,7 +255,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
               </div>
 
               {/* Connector line: step icon → status icon (gap via my-1) */}
-              <div className="flex flex-row px-2.5 my-1">
+              <div className="flex flex-row my-1">
                 <div className="w-4 flex justify-center shrink-0">
                   <div
                     className={cn(
@@ -277,7 +277,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
 
               {/* Bottom status row */}
               {!isRunning && success !== undefined ? (
-                <div className="flex flex-row items-center px-2.5 pb-1">
+                <div className="flex flex-row items-center pb-1">
                   {isFailed ? (
                     <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
                   ) : (
@@ -288,7 +288,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
                   </span>
                 </div>
               ) : isRunning ? (
-                <div className="flex flex-row items-center px-2.5 pb-1">
+                <div className="flex flex-row items-center pb-1">
                   <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-500/60" />
                   <span className="ml-2.5 text-xs text-muted-foreground">Working…</span>
                 </div>

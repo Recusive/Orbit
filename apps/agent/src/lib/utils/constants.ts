@@ -279,6 +279,9 @@ export const DELAYS = {
   debounce: 150,
 } as const;
 
+/** Delay before clearing isAgentRunning after a tool-using turn completes. */
+export const AGENT_RUNNING_CLEAR_DELAY_MS = 1500;
+
 // ============================================
 // VIRTUALIZATION & SCROLLING
 // ============================================

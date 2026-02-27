@@ -127,7 +127,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Todo output' : 'Expand Todo output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 px-2.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 text-sm',
           'cursor-pointer w-full text-left rounded-xl',
           isFailed && 'border-2 border-dotted border-destructive/40'
         )}
@@ -194,7 +194,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
             style={{ overflow: 'hidden' }}
           >
             <div className="flex flex-col">
-              <div className="flex flex-row px-2.5">
+              <div className="flex flex-row">
                 {/* Gutter: vertical connector line */}
                 <div className="w-4 flex justify-center shrink-0">
                   <div
@@ -275,17 +275,17 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
 
               {/* Bottom status indicator */}
               {isFailed ? (
-                <div className="flex flex-row items-center px-2.5 py-1">
+                <div className="flex flex-row items-center py-1">
                   <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
                   <span className="ml-2.5 text-xs text-lg-text-secondary">Failed</span>
                 </div>
               ) : allCompleted && !isRunning ? (
-                <div className="flex flex-row items-center px-2.5 py-1">
+                <div className="flex flex-row items-center py-1">
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500/80" />
                   <span className="ml-2.5 text-xs text-lg-text-secondary">Completed</span>
                 </div>
               ) : (
-                <div className="flex flex-row items-center px-2.5 py-1">
+                <div className="flex flex-row items-center py-1">
                   <Circle className="h-4 w-4 shrink-0 text-yellow-500/80" />
                   <span className="ml-2.5 text-xs text-lg-text-secondary">Running</span>
                 </div>

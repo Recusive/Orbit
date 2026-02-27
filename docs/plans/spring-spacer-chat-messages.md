@@ -2,85 +2,109 @@
 
 ## Context
 
-When a chat starts or a new message is sent, the message bubble appears at the top of the viewport — but as it stands the spacer logic is broken. The goal is a "spring" spacer below all chat content that:
+When a chat starts or a new message is sent, the message bubble appears at the top of the viewport — but the current spacer is a static `mt-44` class that doesn't respond to content changes. The goal is a dynamic "spring" spacer below all chat content that:
 
 1. **Starts fully extended** — fills the remaining viewport below the last message, so that message sits at the top of the visible area
 2. **Compresses as content streams in** — AI response text pushes the spacer down in real time
-3. **Rests at a minimum** once content fills or exceeds the viewport — preserving the current gap above the floating input
+3. **Rests at a minimum** once content fills or exceeds the viewport — preserving the gap above the floating input
 4. **Resets on next message** — when the user sends a new message, the spring extends again
 
-## File to Modify
+## Architecture
 
-- `apps/agent/src/components/chat/chat-messages.tsx` — lines 225–261 (replace the existing spring spacer `useEffect`) and line 535 (the spacer `<div>`)
+Extract the spacer into a dedicated `SpringSpacer` component rather than inline logic. This isolates the observer lifecycle, cleanup, and rAF coalescing — matching existing patterns like `use-layout-stabilization.ts`.
+
+## Files to Create/Modify
+
+| File                                                                  | Action                                                                 |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `apps/agent/src/components/chat/SpringSpacer.tsx`                     | **Create** — dedicated spacer component                                |
+| `apps/agent/src/components/chat/chat-messages.tsx`                    | **Modify** — remove static spacer, wire `SpringSpacer` via merged refs |
+| `apps/agent/src/lib/utils/constants.ts`                               | **Modify** — add `CHAT_SPACING.springSpacerRestingMin` constant        |
+| `apps/agent/src/lib/utils/index.ts`                                   | **Modify** — add `CHAT_SPACING` to barrel exports                      |
+| `apps/agent/src/__tests__/unit/components/chat/SpringSpacer.test.tsx` | **Create** — unit tests                                                |
 
 ## Implementation
 
-### Replace the existing spacer effect (lines 225–261) with a clean version:
+### Step 1: Add constant — `constants.ts`
 
-```
-SPRING_RESTING_MIN = 112px  (padding above floating input — move to constants.ts)
-```
-
-**Algorithm** (unchanged in concept, rewritten for correctness):
-
-```
-spacerHeight = max(SPRING_RESTING_MIN, viewportHeight - contentHeightWithoutSpacer)
-```
-
-Where:
-
-- `viewportHeight` = `scrollEl.clientHeight` (the visible scroll area)
-- `contentHeightWithoutSpacer` = `contentEl.scrollHeight - currentSpacerHeight`
-
-**Observation mechanism:**
-
-- One `ResizeObserver` on the scroll container (catches viewport resize)
-- One `ResizeObserver` on the content wrapper (catches streaming, new messages, tool expand/collapse)
-- Both call the same `updateSpacer()` function
-- Direct DOM write (`spacerEl.style.height`) — no React state, no re-renders during streaming
-
-**Session switch reset:**
-
-- In the existing session-change `useEffect` (line 274), reset `spacerHeightRef.current = 0` so the spacer recalculates fresh for the new conversation
-
-### Add constant to `apps/agent/src/lib/utils/constants.ts`
+Add to the layout dimensions section:
 
 ```ts
-/** Minimum spring spacer height — padding above the floating chat input */
-SPRING_SPACER_RESTING_MIN: 112,
+export const CHAT_SPACING = {
+  /** Minimum spring spacer height under messages (px) */
+  springSpacerRestingMin: 112,
+} as const;
 ```
 
-Add this to a `CHAT` or `SCROLL` section in constants, and import it in `chat-messages.tsx` to replace the inline magic number.
+Export from `index.ts` barrel.
 
-### Spacer DOM element (line 535)
+### Step 2: Create `SpringSpacer.tsx`
 
-Keep the existing `<div ref={spacerRef} aria-hidden="true" />` — no change needed. The effect sets its height via direct DOM manipulation.
+A self-contained component that owns:
 
-## Why the current code is conceptually right but may misbehave
+- A `spacerRef` div (the DOM element whose height changes)
+- A `useLayoutEffect` keyed on `sessionId` (resets on conversation switch)
+- A single `ResizeObserver` watching three elements: scroll container, content wrapper, and `.chat-input-frost` overlay
+- rAF-coalesced writes (one frame max) with epsilon threshold to skip no-op updates
+- Proper cleanup: dispose flag, `cancelAnimationFrame`, observer disconnect, height reset to 0
 
-The current logic is:
+**Algorithm:**
+
+```
+overlayHeight = measure .chat-input-frost offsetHeight
+restingMin    = max(configuredMin, overlayHeight)
+contentOnly   = contentEl.scrollHeight - currentSpacerHeight
+spacerHeight  = max(restingMin, viewportHeight - contentOnly)
+```
+
+Key detail: `restingMin` dynamically measures the floating input overlay height instead of hardcoding 112px. This handles the expanding todo bar and variable input height.
+
+**Props interface:**
 
 ```ts
-const contentOnly = totalHeight - spacerHeightRef.current;
-const newHeight = Math.max(RESTING_MIN, viewportHeight - contentOnly);
+interface SpringSpacerProps {
+  readonly scrollRef: RefObject<HTMLElement | null>;
+  readonly contentRef: RefObject<HTMLElement | null>;
+  readonly sessionId?: string;
+  readonly minimumRestingHeight: number;
+}
 ```
 
-This is a correct formula. The likely issue is **initialization / reset timing** — on session switch or first mount, `spacerHeightRef.current` may be stale (still holding the previous session's value), causing `contentOnly` to be wrong on the first calculation. The fix is explicitly resetting `spacerHeightRef.current = 0` on session change and on effect cleanup, and running an initial measurement synchronously via `useLayoutEffect` instead of `useEffect`.
+### Step 3: Wire into `chat-messages.tsx`
 
-## Changes Summary
+1. Remove the existing static spacer (`mt-44` div)
+2. Remove existing spacer-related refs (`spacerRef`, `spacerHeightRef`) and the `useEffect` if present
+3. Add stable `RefObject` refs (`scrollElementRef`, `contentElementRef`) alongside the existing callback refs
+4. Merge into existing callback refs so both `use-stick-to-bottom` and `SpringSpacer` share the same DOM nodes
+5. Render `<SpringSpacer>` at the bottom of the content wrapper
 
-| File                                               | Change                                                                                                                           |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/agent/src/components/chat/chat-messages.tsx` | Replace spacer effect with clean version, reset spacerHeightRef on session switch, use `useLayoutEffect` for initial measurement |
-| `apps/agent/src/lib/utils/constants.ts`            | Add `SPRING_SPACER_RESTING_MIN: 112` constant                                                                                    |
+```tsx
+<SpringSpacer
+  scrollRef={scrollElementRef}
+  contentRef={contentElementRef}
+  sessionId={sessionId}
+  minimumRestingHeight={CHAT_SPACING.springSpacerRestingMin}
+/>
+```
+
+### Step 4: Add unit tests
+
+Test three cases:
+
+1. **Expands to fill viewport** — content < viewport → spacer = viewport - content
+2. **Clamps at minimum** — content > viewport → spacer = restingMin
+3. **Cleans up on unmount** — observer disconnected, rAF cancelled, height reset to 0
+
+Uses a `ControlledResizeObserver` mock for deterministic triggering.
 
 ## Verification
 
-1. `bun run dev` — open browser at localhost:5176
-2. Start a new chat → first message should appear at top of viewport, spacer fills below
-3. AI streams response → content grows, spacer compresses in real-time
-4. Long response → once content exceeds viewport, spacer rests at ~112px
-5. Send another message → spacer resets, new message at top
-6. Switch conversations → spacer resets correctly for the new conversation
-7. Resize window → spacer adjusts to new viewport height
-8. `bun run check` — typecheck + lint + tests pass
+1. `bun run check` — typecheck + lint + tests pass
+2. `bun test apps/agent/src/__tests__/unit/components/chat/SpringSpacer.test.tsx` — unit tests pass
+3. `bun run dev` — manual validation:
+   - New chat → first message at top of viewport, spacer fills below
+   - AI streams → spacer compresses in real-time
+   - Long response → spacer rests at minimum (above floating input)
+   - Send another message → spacer resets, new message at top
+   - Switch conversations → spacer resets correctly
+   - Resize window → spacer adjusts

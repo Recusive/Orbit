@@ -28,6 +28,7 @@ import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
 import { conversationAddMessage, conversationList, conversationLoad } from '@/lib/api';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { toConversationSummaries } from '@/lib/mappers';
+import { AGENT_RUNNING_CLEAR_DELAY_MS } from '@/lib/utils/constants';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { createCheckpointBatcher, rafBatch } from '@/lib/utils/event-batcher';
 import { flushPendingTitle, generateAITitle } from '@/services/session';
@@ -132,8 +133,10 @@ class ChatMessageService {
 
   // Track whether the current turn used tools (for re-asserting isAgentRunning on tool:start)
   private turnHadTools = new Map<string, boolean>();
-  // Safety timers for edge-case cleanup (interrupted sessions, errors)
+  // Safety timers for delayed isAgentRunning cleanup.
   private agentRunningTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // Due timestamps for delayed clears (needed for session remap with remaining delay).
+  private agentRunningTimerDueAt = new Map<string, number>();
 
   // Checkpoint batching — debounces rapid checkpoint events (100ms window)
   // Reduces ~30 checkpoint state updates per agent run to ~2-3
@@ -165,7 +168,22 @@ class ChatMessageService {
     if (timer !== undefined) {
       clearTimeout(timer);
       this.agentRunningTimers.delete(sessionId);
+      this.agentRunningTimerDueAt.delete(sessionId);
     }
+  }
+
+  /** Schedule delayed clear of isAgentRunning and stop-pending state. */
+  private scheduleAgentRunningClear(sessionId: string, delayMs: number): void {
+    this.cancelAgentRunningTimer(sessionId);
+    const dueAt = Date.now() + delayMs;
+    const timer = setTimeout(() => {
+      this.agentRunningTimers.delete(sessionId);
+      this.agentRunningTimerDueAt.delete(sessionId);
+      useChatStore.getState().setAgentRunning(sessionId, false);
+      useChatStore.getState().setStopPending(sessionId, false);
+    }, delayMs);
+    this.agentRunningTimers.set(sessionId, timer);
+    this.agentRunningTimerDueAt.set(sessionId, dueAt);
   }
 
   /** Flush all pending batchers for a session (call on agent:complete). */
@@ -202,6 +220,7 @@ class ChatMessageService {
     this.pendingChunkLengths.clear();
     this.thinkingStartTimes.clear();
     this.agentRunningTimers.clear();
+    this.agentRunningTimerDueAt.clear();
     this.turnHadTools.clear();
   }
 
@@ -323,6 +342,24 @@ class ChatMessageService {
   // System Init (Session Remap)
   // ══════════════════════════════════════════════════════════════════════
 
+  /** Migrate delayed running clear state across session ID remaps. */
+  private remapRunningState(oldSid: string, newSid: string): void {
+    const hadTools = this.turnHadTools.get(oldSid);
+    if (hadTools !== undefined) {
+      this.turnHadTools.delete(oldSid);
+      this.turnHadTools.set(newSid, hadTools);
+    }
+
+    const oldDueAt = this.agentRunningTimerDueAt.get(oldSid);
+    // Callbacks close over session ID, so old timer must be canceled.
+    this.cancelAgentRunningTimer(oldSid);
+
+    if (oldDueAt !== undefined) {
+      const remaining = Math.max(0, oldDueAt - Date.now());
+      this.scheduleAgentRunningClear(newSid, remaining);
+    }
+  }
+
   private handleSystemInit(message: Extract<ExtensionMessage, { type: 'system:init' }>): void {
     const sdkSessionId = message.sdk_session_id;
     const chatStore = useChatStore.getState();
@@ -371,6 +408,8 @@ class ChatMessageService {
       // This keeps the entry visible during streaming instead of removing it and
       // waiting for conversation:list to re-add it after agent:complete.
       useUIStore.getState().remapConversation(frontendSessionId, sdkSessionId);
+      // Migrate service-owned in-flight state (timers + tool flags).
+      this.remapRunningState(frontendSessionId, sdkSessionId);
 
       // Only update UI navigation if the user is still on this session.
       // remapSession() already conditionally updates activeSessionId in ChatStore
@@ -611,21 +650,29 @@ class ChatMessageService {
     // Mark checkpoint completion (associates checkpoint with the user message)
     useCheckpointStore.getState().onMessageComplete(sid);
 
-    // The SDK sends exactly ONE result message per sendMessage() call — always at
-    // the very end, after all tool-use turns complete internally. So agent:complete
-    // is ALWAYS the final event; there are no "intermediate" agent:complete events.
+    // The SDK sends a 'result' message after each tool-use round-trip within a
+    // single sendMessage() call, not just once at the very end. This means
+    // agent:complete can be intermediate during multi-tool runs.
     //
     // result_subtype is the SDK's SDKResultMessage.subtype:
     //   "success"                              → normal completion
     //   "error_max_turns" / "error_during_execution" / etc. → error completion
-    // (NOT "end_turn" — that's the raw Anthropic API stop_reason, not the SDK subtype)
-    //
-    // Clear isAgentRunning immediately in all cases.
+    // Intermediate result subtype values are SDK/version dependent — keep the
+    // hadTools fallback as the source of truth for delayed clear behavior.
     this.forceCompleteOrphanedTools(sid);
     this.cancelAgentRunningTimer(sid);
+    const hadTools = this.turnHadTools.get(sid) === true;
     this.turnHadTools.set(sid, false);
-    useChatStore.getState().setAgentRunning(sid, false);
-    useChatStore.getState().setStopPending(sid, false);
+    logger.debug('agent:complete', { sessionId: sid, subtype: message.result_subtype, hadTools });
+
+    if (hadTools) {
+      // Multi-tool flow: keep running state through intermediate result gaps.
+      this.scheduleAgentRunningClear(sid, AGENT_RUNNING_CLEAR_DELAY_MS);
+    } else {
+      // Text-only flow or final pass without tool usage: clear immediately.
+      useChatStore.getState().setAgentRunning(sid, false);
+      useChatStore.getState().setStopPending(sid, false);
+    }
 
     // Schedule coalesced sidebar refresh
     scheduleSidebarRefresh();
@@ -1373,6 +1420,8 @@ class ChatMessageService {
   private handlePermissionRequest(
     message: Extract<ExtensionMessage, { type: 'permission:request' }>
   ): void {
+    // Defensive: if permission arrives before tool:start, prevent stale timer clears.
+    this.cancelAgentRunningTimer(message.session_id);
     // Flush pending text chunks so tool widget has a message row to render in
     this.chunkBatchers.get(message.session_id)?.cancel(FLUSH_PENDING);
 
