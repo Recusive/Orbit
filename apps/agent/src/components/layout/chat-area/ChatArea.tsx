@@ -17,8 +17,7 @@ import { useLayoutStabilization } from './use-layout-stabilization';
 import type { ChatMessage } from '@/components/chat/messages';
 import type { FC } from 'react';
 
-import { useQueuedMessageHandler } from '@/components/chat';
-import { ThinkingDots } from '@/components/ui/thinking-dots';
+import { ChatSkeleton, useQueuedMessageHandler } from '@/components/chat';
 import { useChatMessages } from '@/hooks/chat/use-chat-messages';
 import {
   usePendingPermissions,
@@ -112,10 +111,10 @@ export const ChatArea: FC = () => {
       className="relative flex-1 flex flex-col min-w-0 overflow-hidden bg-chat-area"
       style={{ contain: 'layout style paint' }}
     >
-      {/* Conversation transition loader - centered dots while content swaps */}
+      {/* Conversation transition skeleton — mimics message layout while content swaps */}
       {isTransitioning ? (
-        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-          <ThinkingDots size={18} speed={1.2} />
+        <div className="absolute inset-0 z-10 overflow-hidden pointer-events-none pt-4">
+          <ChatSkeleton />
         </div>
       ) : null}
 

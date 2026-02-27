@@ -1203,6 +1203,24 @@ html.dark .chat-markdown code:not(pre code) {
     animation: message-slide-up 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
+  /* Chat skeleton staggered reveal — used during conversation switching.
+     Subtle scale (0.98→1) + opacity creates a gentle "forming" effect
+     without the jarring vertical jump of translateY. */
+  @keyframes skeleton-fade-in {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-skeleton-in {
+    animation: skeleton-fade-in 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
   /* Permission expand animation - for permission modals appearing in input */
   @keyframes permission-expand {
     from {
@@ -1422,6 +1440,13 @@ html:not(.dark) .glass-popover::after {
 
   /* Message slide-up animation */
   .animate-message-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Chat skeleton staggered reveal */
+  .animate-skeleton-in {
     animation: none;
     opacity: 1;
     transform: none;
