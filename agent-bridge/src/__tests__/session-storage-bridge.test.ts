@@ -2,9 +2,10 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, jest } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 import {
+  _setHomeDirForTest,
   getSDKSessionIdForSession,
   invalidateCache,
   saveSessionInitMapping,
@@ -12,17 +13,15 @@ import {
 
 describe('session-storage bridge lifecycle', () => {
   let tmpHome: string;
-  let homedirSpy: ReturnType<typeof jest.spyOn>;
 
   beforeEach(() => {
     tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-storage-bridge-'));
-    homedirSpy = jest.spyOn(os, 'homedir').mockReturnValue(tmpHome);
     invalidateCache();
+    _setHomeDirForTest(tmpHome);
   });
 
   afterEach(() => {
     invalidateCache();
-    homedirSpy.mockRestore();
     fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 
