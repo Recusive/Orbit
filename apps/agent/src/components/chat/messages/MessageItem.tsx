@@ -264,14 +264,14 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
         message.displayedContent.trim() === '/compact' ? (
           <CompactIndicator messageId={message.id} />
         ) : (
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-col items-end gap-1 pb-3">
             <UserMessageBubble content={message.displayedContent} animate={animate} />
           </div>
         )
       ) : (
         /* Assistant message - no bubble, content flows naturally */
         <div
-          className="my-1"
+          className="group/actions my-1"
           style={{
             paddingLeft: CHAT_SPACING.assistantPadding,
             paddingRight: CHAT_SPACING.assistantPadding,

@@ -492,7 +492,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         ) : null}
 
         {/* Bottom spacer — uses margin so never included in text selection */}
-        <div className="mt-28" aria-hidden="true" />
+        <div className="mt-44" aria-hidden="true" />
       </div>
     </div>
   );
