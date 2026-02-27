@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useSmoothScroll } from '@/hooks/ui';
 import { cn } from '@/lib/utils';
 
 interface BranchSelectorProps {
@@ -34,6 +35,8 @@ export const BranchSelector: FC<BranchSelectorProps> = ({
   onCheckout,
   onCreateAndCheckout,
 }) => {
+  const smoothScrollRef = useSmoothScroll(0.08);
+
   // Popover state
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -182,7 +185,10 @@ export const BranchSelector: FC<BranchSelectorProps> = ({
               </div>
             </div>
 
-            <CommandList className="max-h-64 overflow-y-auto pb-0 [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]">
+            <CommandList
+              ref={smoothScrollRef}
+              className="max-h-64 overflow-y-auto overscroll-y-contain pb-0 [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]"
+            >
               {visibleBranches.length === 0 ? (
                 <div className="px-3 py-6 text-center text-[12px] text-muted-foreground/50">
                   No branches found.

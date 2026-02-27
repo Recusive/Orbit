@@ -1237,7 +1237,7 @@ pub async fn clone(url: &str, target_path: &Path) -> Result<()> {
 /// Prunes stale worktree metadata (best-effort) before listing to ensure
 /// externally deleted worktrees are excluded from results.
 ///
-/// [warning] TESTED: This function is covered by integration tests.
+/// **Warning:** TESTED: This function is covered by integration tests.
 ///     If you modify this, run: cargo test -p orbit-git
 ///     Test file: crates/common/git/tests/worktree_stale_cleanup.rs
 ///

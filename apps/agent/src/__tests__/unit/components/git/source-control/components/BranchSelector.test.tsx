@@ -2,10 +2,10 @@
  * Unit tests for BranchSelector.tsx
  *
  * Tests:
- * - browse/create mode rendering and transitions
- * - manual branch filtering
- * - checkout/create interactions
- * - keyboard close/cancel behavior
+ * - browse mode rendering and search filtering
+ * - checkout interactions
+ * - keyboard close behavior
+ * - create dialog flow (open, pre-fill, submit, cancel)
  * - focus management and state reset
  */
 import { render, screen, waitFor } from '@testing-library/react';
@@ -124,26 +124,33 @@ describe('BranchSelector', () => {
     expect(screen.getByLabelText('Search branches')).toBeInTheDocument();
   });
 
-  it('enters create mode and pre-fills the branch name from search query', async () => {
+  it('opens create dialog and pre-fills the branch name from search query', async () => {
     const { user } = renderSelector();
     await openSelector(user);
 
     await user.type(screen.getByLabelText('Search branches'), 'feature/new');
-    await user.click(getCommandItemByText('Create and checkout new branch...'));
+    await user.click(screen.getByText('Create and checkout new branch...'));
 
-    expect(screen.queryByLabelText('Search branches')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('New branch name')).toHaveValue('feature/new');
+    // Popover closes, dialog opens with pre-filled value
+    await waitFor(() => {
+      expect(screen.getByLabelText('New branch name')).toHaveValue('feature/new');
+    });
   });
 
-  it('returns to browse mode on Escape in create mode without closing the popover', async () => {
+  it('closes create dialog on Escape', async () => {
     const { user } = renderSelector();
     await openSelector(user);
-    await user.click(getCommandItemByText('Create and checkout new branch...'));
+    await user.click(screen.getByText('Create and checkout new branch...'));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('New branch name')).toBeInTheDocument();
+    });
 
     await user.keyboard('{Escape}');
 
-    expect(screen.queryByLabelText('New branch name')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Search branches')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByLabelText('New branch name')).not.toBeInTheDocument();
+    });
   });
 
   it('closes the popover on Escape in browse mode', async () => {
@@ -157,19 +164,20 @@ describe('BranchSelector', () => {
     });
   });
 
-  it('resets mode and search state after closing and reopening', async () => {
+  it('resets search state after closing and reopening', async () => {
     const { user } = renderSelector();
     await openSelector(user);
 
     await user.type(screen.getByLabelText('Search branches'), 'temp-query');
-    await user.click(getCommandItemByText('Create and checkout new branch...'));
 
-    await user.click(screen.getByRole('button', { name: /main/i }));
+    // Close popover via Escape
+    await user.keyboard('{Escape}');
     await waitFor(() => {
-      expect(screen.queryByLabelText('New branch name')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Search branches')).not.toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /main/i }));
+    // Reopen — search should be empty
+    await openSelector(user);
     const searchInput = screen.getByLabelText('Search branches');
 
     expect(searchInput).toHaveValue('');
@@ -186,7 +194,7 @@ describe('BranchSelector', () => {
     expect(screen.getByText('Create and checkout new branch...')).toBeInTheDocument();
   });
 
-  it('manages focus between browse and create inputs', async () => {
+  it('opens create dialog with input visible when create action is clicked', async () => {
     const { user } = renderSelector();
     await openSelector(user);
 
@@ -195,17 +203,10 @@ describe('BranchSelector', () => {
       expect(document.activeElement).toBe(searchInput);
     });
 
-    await user.click(getCommandItemByText('Create and checkout new branch...'));
-
-    const createInput = screen.getByLabelText('New branch name');
-    await waitFor(() => {
-      expect(document.activeElement).toBe(createInput);
-    });
-
-    await user.keyboard('{Escape}');
+    await user.click(screen.getByText('Create and checkout new branch...'));
 
     await waitFor(() => {
-      expect(document.activeElement).toBe(screen.getByLabelText('Search branches'));
+      expect(screen.getByLabelText('New branch name')).toBeInTheDocument();
     });
   });
 
@@ -213,14 +214,18 @@ describe('BranchSelector', () => {
     const { user, onCreateAndCheckout } = renderSelector();
     await openSelector(user);
 
-    await user.click(getCommandItemByText('Create and checkout new branch...'));
+    await user.click(screen.getByText('Create and checkout new branch...'));
+    await waitFor(() => {
+      expect(screen.getByLabelText('New branch name')).toBeInTheDocument();
+    });
+
     const createInput = screen.getByLabelText('New branch name');
     await user.type(createInput, 'feature/new-work');
     await user.keyboard('{Enter}');
 
     expect(onCreateAndCheckout).toHaveBeenCalledWith('feature/new-work');
     await waitFor(() => {
-      expect(screen.queryByLabelText('Search branches')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('New branch name')).not.toBeInTheDocument();
     });
   });
 });

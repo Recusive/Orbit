@@ -111,6 +111,7 @@ const BROWSER_WINDOW_LABEL: &str = "browser-window";
 /// Corner radius for the browser window, matching the activity card's CSS
 /// `--content-card-radius` (10px). On macOS, a CALayer mask clips the native
 /// `WKWebView` to rounded corners so it sits flush inside the activity card.
+#[cfg(target_os = "macos")]
 const BROWSER_CORNER_RADIUS: f64 = 10.0;
 
 /// Handle an `orbit-eval://result?...` navigation callback.
