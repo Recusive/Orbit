@@ -476,7 +476,6 @@ export const PrimarySidebar: FC = () => {
                   }}
                   className={cn(
                     'group flex items-center gap-2.5 px-2 py-2 rounded-[9px]',
-                    'transition-[background-color] duration-100',
                     'hover:bg-lg-sidebar-hover',
                     'text-left outline-none'
                   )}
@@ -500,7 +499,6 @@ export const PrimarySidebar: FC = () => {
                   <ChevronRight
                     className={cn(
                       'h-3 w-3 text-transparent shrink-0',
-                      'transition-[color] duration-100',
                       'group-hover:text-muted-foreground'
                     )}
                     aria-hidden="true"
